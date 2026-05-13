@@ -1,0 +1,39 @@
+---
+description: How the frontend talks to DMIT (api.tokfai.com)
+globs: apps/web/lib/dmit/**,apps/web/app/**
+alwaysApply: false
+---
+
+# Calling DMIT from the frontend
+
+Base URL: `process.env.NEXT_PUBLIC_DMIT_API_BASE` (e.g. `https://api.tokfai.com`).
+
+## Auth header
+
+Forward the user's Supabase access token. DMIT verifies the JWT server-side
+with its service role.
+
+```ts
+const { data: { session } } = await supabase.auth.getSession();
+const res = await fetch(`${BASE}/v1/keys`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${session?.access_token}`,
+  },
+  body: JSON.stringify({ name: "my key" }),
+});
+```
+
+For Playground / chat completions, the frontend sends the **user's own
+`sk-tokfai-...` API key** instead — same path an external customer uses, so
+normal billing applies.
+
+## Don't
+
+- ❌ Don't inject `SUPABASE_SERVICE_ROLE_KEY`, `GRSAI_API_KEY`, or any
+  DMIT-only secret into requests. They aren't available in this repo, and
+  asking for them is a sign you're implementing the wrong layer.
+- ❌ Don't wrap DMIT in a Next.js Route Handler "for CORS" — DMIT must allow
+  `tokfai.com` directly. If CORS fails, that's a DMIT-side config fix.
+- ❌ Don't cache responses that contain credit balances or usage on a CDN.

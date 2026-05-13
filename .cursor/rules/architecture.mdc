@@ -1,0 +1,39 @@
+---
+description: Tokfai three-layer architecture (monorepo with web + dmit)
+alwaysApply: true
+---
+
+# Tokfai architecture (must respect)
+
+```
+apps/
+├── web/        # Vercel frontend  (tokfai.com)
+└── dmit-api/   # Core backend     (api.tokfai.com)
+supabase/       # DB migrations (source of truth)
+```
+
+## Layers
+
+- **Supabase** — Auth + DB. Owns `auth.users`, `profiles`, `credit_ledger`,
+  `usage_logs`, `api_keys` (hashed). Frontend uses anon key + RLS only.
+- **`apps/web`** — `tokfai.com`. Marketing, auth UI, dashboard, Playground,
+  Usage, Credits. Calls Supabase Auth + DMIT public API.
+- **`apps/dmit-api`** — `api.tokfai.com`. OpenAI-compatible API, API-key auth,
+  GRSAI calls, credit debiting, Stripe webhook. Holds all server-only secrets.
+
+## Secret matrix
+
+| Secret | Allowed in `apps/web` | Allowed in `apps/dmit-api` |
+|---|---|---|
+| `NEXT_PUBLIC_*` | ✅ | — |
+| `SUPABASE_SERVICE_ROLE_KEY` | ❌ never | ✅ |
+| `SUPABASE_JWT_SECRET` | ❌ never | ✅ |
+| `TOKEN_PEPPER` | ❌ never | ✅ |
+| `GRSAI_API_KEY` | ❌ never | ✅ |
+| `STRIPE_SECRET_KEY` | ❌ never | ✅ |
+| `STRIPE_WEBHOOK_SECRET` | ❌ never | ✅ |
+
+If a task asks you to put any DMIT-only secret into `apps/web`, stop and
+push back — the logic belongs in DMIT instead.
+
+See `AGENTS.md` for full detail.

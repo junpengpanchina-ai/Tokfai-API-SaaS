@@ -1,0 +1,40 @@
+---
+description: What the Vercel frontend may and may not implement
+globs: apps/web/**
+alwaysApply: false
+---
+
+# Frontend boundary (applies to apps/web only)
+
+`apps/web` is the Vercel frontend. Anything below is **out of scope** — it
+belongs in `apps/dmit-api` (`api.tokfai.com`) and the frontend just calls it.
+
+## ❌ Never implement in this repo
+
+- Stripe webhook (`/api/webhooks/stripe` or similar). Webhook URL is on DMIT.
+- API-key (`sk-tokfai-...`) verification or hashing.
+- `/v1/chat/completions`, `/v1/models`, `/v1/embeddings`, any OpenAI-compatible
+  proxy. Even as a "thin pass-through" Next.js Route Handler — don't.
+- Direct calls to GRSAI / OpenAI / any upstream LLM provider.
+- Writes to `credit_ledger` or `usage_logs`.
+- Issuing or revoking user API keys (call `POST /v1/keys` on DMIT instead).
+- Creating Stripe Checkout sessions (call `POST /v1/billing/checkout` on DMIT).
+- Anything that requires `SUPABASE_SERVICE_ROLE_KEY`.
+
+## ✅ Frontend may do
+
+- Supabase Auth flows (`signInWithPassword`, `signUp`, `signInWithOAuth`,
+  `signOut`, `resetPasswordForEmail`) directly with the anon client.
+- Read the **current user's own** rows from `profiles`, `credit_ledger`,
+  `usage_logs` via the anon client + user session (RLS enforces ownership).
+- `fetch` to `${NEXT_PUBLIC_DMIT_API_BASE}/v1/...` with the user's Supabase
+  access token in `Authorization: Bearer ...`.
+- Render dashboards, charts, docs, marketing pages.
+
+## Self-check before writing a Server Action or API Route
+
+1. Does it need a DMIT-only secret? → don't write it here; call DMIT.
+2. Does it write to a sensitive table? → don't write it here; call DMIT.
+3. Does it just read the current user's own data? → use the Supabase anon
+   client with the user's session in a Server Component instead. No API
+   Route needed.

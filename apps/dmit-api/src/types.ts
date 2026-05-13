@@ -1,0 +1,59 @@
+/**
+ * Row types for the tables DMIT touches.
+ *
+ * Keep in sync with supabase/migrations/0001_init.sql. apps/web has its own
+ * narrower copy of the *read-only* fields — that's intentional, the two apps
+ * stay decoupled.
+ */
+
+export interface ProfileRow {
+  id: string;
+  email: string | null;
+  credits_balance: string | number;
+  total_credits_purchased: string | number;
+  total_credits_used: string | number;
+  stripe_customer_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApiKeyRow {
+  id: string;
+  user_id: string;
+  name: string;
+  key_id: string;
+  prefix: string;
+  hash: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+}
+
+export interface UsageLogInsert {
+  user_id: string;
+  api_key_id: string | null;
+  model: string | null;
+  status: string;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  credits_charged: number | null;
+  request_id: string;
+  upstream_id: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  latency_ms: number | null;
+}
+
+export type CreditLedgerType =
+  | "purchase"
+  | "grant"
+  | "refund"
+  | "debit"
+  | "adjustment";
+
+export interface AuthedUser {
+  /** auth.users.id */
+  id: string;
+  email: string | null;
+}

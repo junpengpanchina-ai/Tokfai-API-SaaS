@@ -1,0 +1,69 @@
+---
+description: Conventions for the DMIT backend
+globs: apps/dmit-api/**
+alwaysApply: false
+---
+
+# DMIT backend (applies to apps/dmit-api only)
+
+DMIT is the only place server-only secrets live. It is also the only writer
+to `usage_logs`, `credit_ledger`, `profiles`, and `api_keys`.
+
+## Auth scheme per endpoint
+
+| Endpoint | Auth | Verifier |
+|---|---|---|
+| `GET/POST/DELETE /v1/keys` | `Bearer <supabase_access_token>` | `SUPABASE_JWT_SECRET` (HS256, jose) |
+| `POST /v1/billing/checkout` | `Bearer <supabase_access_token>` | same |
+| `POST /v1/chat/completions` | `Bearer sk-tokfai-{key_id}.{secret}` | lookup by `key_id`, compare `HMAC-SHA256(TOKEN_PEPPER, secret)` constant-time |
+| `GET  /v1/models` | `Bearer sk-tokfai-...` | same |
+| `POST /v1/webhooks/stripe` | `Stripe-Signature` header | `STRIPE_WEBHOOK_SECRET` |
+| `GET  /v1/health` | none | — |
+
+## Write rules
+
+- Writes to `profiles.credits_balance`, `total_credits_purchased`,
+  `total_credits_used` MUST go through the Postgres RPCs
+  (`public.debit_credits`, `public.credit_purchase`) — they enforce
+  atomicity and idempotency.
+- Direct `update profiles set credits_balance = ...` from application code is
+  forbidden. Always RPC.
+- `usage_logs` insert is the only place we record per-request data. One
+  insert per request, even for failures (with `status != 'succeeded'`).
+- Never UPDATE an existing `usage_logs` row to change billing data after the
+  fact — write a `credit_ledger` `adjustment` row instead, so the history
+  stays auditable.
+
+## API key format
+
+```
+sk-tokfai-{key_id}.{secret}
+                  ^-- separator is `.` (period)
+```
+
+- `key_id` = 8 chars base64url (6 random bytes)
+- `secret` = 32 chars base64url (24 random bytes)
+- Stored: `key_id` (indexed), `prefix = "sk-tokfai-{key_id}"`,
+  `hash = HMAC-SHA256(TOKEN_PEPPER, secret)` hex
+- Lookup by `key_id` is O(1) via the partial unique index where
+  `revoked_at IS NULL`
+- Compare must use `crypto.timingSafeEqual`
+
+## Error envelope (OpenAI-style)
+
+Every non-2xx response body:
+
+```json
+{ "error": { "message": "...", "code": "...", "type": "..." } }
+```
+
+`code` and `type` are stable enums consumed by frontend UIs.
+
+## What NOT to do
+
+- ❌ Don't read `NEXT_PUBLIC_*` vars here. DMIT is server-only.
+- ❌ Don't import anything from `apps/web`. The two apps are decoupled.
+- ❌ Don't log API keys, JWTs, or Stripe webhook bodies in full. Log the
+  `key_id` / `request_id` / Stripe `event.id` only.
+- ❌ Don't use the Supabase anon key. Use service_role only.
+- ❌ Don't store the raw `sk-tokfai-...` secret anywhere — only the HMAC hash.

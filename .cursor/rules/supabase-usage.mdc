@@ -1,0 +1,44 @@
+---
+description: Supabase usage rules for the frontend
+globs: apps/web/lib/supabase/**,apps/web/app/**,apps/web/middleware.ts
+alwaysApply: false
+---
+
+# Supabase usage (frontend)
+
+## Keys
+
+- Only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` exist
+  in this repo.
+- **`SUPABASE_SERVICE_ROLE_KEY` is forbidden here.** If you think you need
+  it, the operation belongs on DMIT, not the frontend.
+
+## Clients
+
+Use `@supabase/ssr`:
+
+- `lib/supabase/client.ts` — browser client (Client Components).
+- `lib/supabase/server.ts` — RSC / Server Action client (reads user cookies).
+- `middleware.ts` — refresh the session cookie on every request.
+
+All three use the **anon key**. The user's session (JWT in cookies)
+authenticates RLS-protected reads.
+
+## What to read directly via Supabase
+
+Tables the user owns rows in, with RLS `auth.uid() = user_id`:
+
+- `profiles` — name, plan, etc.
+- `credit_ledger` — own ledger entries / balance view
+- `usage_logs` — own usage rows
+- `api_keys` — own keys (metadata only; never the raw secret, which DMIT
+  shows once at creation time)
+
+## What to NOT read/write via Supabase
+
+- ❌ Don't write `credit_ledger` or `usage_logs` from the frontend, even if
+  RLS allowed it. DMIT is the only writer.
+- ❌ Don't `update` `profiles.plan` or any field that affects billing —
+  call DMIT.
+- ❌ Don't insert / delete `api_keys` from the frontend. Call DMIT's
+  `/v1/keys` endpoints so the raw key is hashed with `TOKEN_PEPPER` server-side.
