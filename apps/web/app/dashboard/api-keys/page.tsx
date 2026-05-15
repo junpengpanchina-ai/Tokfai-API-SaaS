@@ -11,6 +11,14 @@ export const metadata = {
 export default async function ApiKeysPage() {
   const supabase = createClient();
   const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login?redirect=/dashboard/api-keys");
+  }
+
+  const {
     data: { session },
   } = await supabase.auth.getSession();
 

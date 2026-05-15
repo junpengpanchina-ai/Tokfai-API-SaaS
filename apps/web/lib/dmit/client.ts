@@ -60,6 +60,27 @@ export class DmitApiError extends Error {
   }
 }
 
+/** Thrown before any DMIT request when a dashboard JWT was not supplied. */
+export const DMIT_MISSING_ACCESS_TOKEN =
+  "Missing Supabase access token before calling DMIT.";
+
+/**
+ * Dashboard DMIT calls must pass the server-read `session.access_token`.
+ * Never send a request without a non-empty Bearer token.
+ */
+export function requireDmitAccessToken(
+  accessToken: string | undefined | null
+): string {
+  if (typeof accessToken !== "string" || !accessToken.trim()) {
+    throw new DmitApiError({
+      status: 401,
+      message: DMIT_MISSING_ACCESS_TOKEN,
+      code: "missing_access_token",
+    });
+  }
+  return accessToken.trim();
+}
+
 // ---------------------------------------------------------------------------
 // Low-level fetch
 // ---------------------------------------------------------------------------
@@ -93,18 +114,23 @@ export async function dmitFetch<T = unknown>(
 
   const headers = new Headers(extraHeaders);
 
-  const token =
-    accessToken === undefined ? await getCurrentAccessToken() : accessToken;
-  if (token) {
+  if (accessToken === null) {
+    // Public endpoint (e.g. /v1/health) — no Authorization header.
+  } else if (accessToken !== undefined) {
+    headers.set(
+      "Authorization",
+      `Bearer ${requireDmitAccessToken(accessToken)}`
+    );
+  } else {
+    const token = await getCurrentAccessToken();
+    if (!token) {
+      throw new DmitApiError({
+        status: 401,
+        message: DMIT_MISSING_ACCESS_TOKEN,
+        code: "missing_access_token",
+      });
+    }
     headers.set("Authorization", `Bearer ${token}`);
-  } else if (accessToken === undefined) {
-    // Caller expected auth but no session exists. Surface as 401 locally
-    // so UI code can route to /login without making a wasted network call.
-    throw new DmitApiError({
-      status: 401,
-      message: "Not signed in.",
-      code: "no_session",
-    });
   }
 
   let body: BodyInit | undefined;
@@ -215,9 +241,10 @@ export interface DmitSessionAuth {
 export async function listApiKeys(
   auth: DmitSessionAuth
 ): Promise<ApiKey[]> {
+  const accessToken = requireDmitAccessToken(auth.accessToken);
   const res = await dmitFetch<ListApiKeysResponse | ApiKey[]>("/v1/keys", {
     method: "GET",
-    accessToken: auth.accessToken,
+    accessToken,
   });
   return Array.isArray(res) ? res : res.data;
 }
@@ -230,10 +257,11 @@ export async function createApiKey(
   input: CreateApiKeyInput,
   auth: DmitSessionAuth
 ): Promise<ApiKeyWithSecret> {
+  const accessToken = requireDmitAccessToken(auth.accessToken);
   return dmitFetch<ApiKeyWithSecret>("/v1/keys", {
     method: "POST",
     json: input,
-    accessToken: auth.accessToken,
+    accessToken,
   });
 }
 
@@ -241,9 +269,10 @@ export async function revokeApiKey(
   id: string,
   auth: DmitSessionAuth
 ): Promise<void> {
+  const accessToken = requireDmitAccessToken(auth.accessToken);
   await dmitFetch<void>(`/v1/keys/${encodeURIComponent(id)}`, {
     method: "DELETE",
-    accessToken: auth.accessToken,
+    accessToken,
   });
 }
 

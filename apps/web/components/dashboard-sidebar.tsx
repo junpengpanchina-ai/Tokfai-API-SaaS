@@ -19,12 +19,28 @@ const NAV_ITEMS = [
     label: "Overview",
     icon: LayoutDashboard,
     exact: true,
+    prefetch: true,
   },
-  { href: "/dashboard/api-keys", label: "API Keys", icon: KeyRound },
-  { href: "/dashboard/playground", label: "Playground", icon: Terminal },
-  { href: "/dashboard/usage", label: "Usage", icon: Gauge },
-  { href: "/dashboard/credits", label: "Credits", icon: CreditCard },
-  { href: "/docs", label: "Docs", icon: BookOpen },
+  {
+    href: "/dashboard/api-keys",
+    label: "API Keys",
+    icon: KeyRound,
+    prefetch: false,
+  },
+  {
+    href: "/dashboard/playground",
+    label: "Playground",
+    icon: Terminal,
+    prefetch: false,
+  },
+  { href: "/dashboard/usage", label: "Usage", icon: Gauge, prefetch: true },
+  {
+    href: "/dashboard/credits",
+    label: "Credits",
+    icon: CreditCard,
+    prefetch: false,
+  },
+  { href: "/docs", label: "Docs", icon: BookOpen, prefetch: true },
 ];
 
 export function DashboardSidebar() {
@@ -51,6 +67,7 @@ export function DashboardSidebar() {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={item.prefetch}
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                 isActive

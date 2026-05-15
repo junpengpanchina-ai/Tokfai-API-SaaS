@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Check,
@@ -37,8 +36,10 @@ type ListState =
   | { status: "ready"; keys: ApiKey[] }
   | { status: "error"; message: string };
 
+const DMIT_AUTH_FAILED =
+  "Could not authenticate with api.tokfai.com. Refresh this page. If it persists, sign out and sign in again (DMIT must use the same Supabase JWT secret).";
+
 export function ApiKeysClient({ accessToken }: { accessToken: string }) {
-  const router = useRouter();
   const [list, setList] = useState<ListState>({ status: "loading" });
 
   const [newName, setNewName] = useState("");
@@ -57,12 +58,20 @@ export function ApiKeysClient({ accessToken }: { accessToken: string }) {
       setList({ status: "ready", keys });
     } catch (err) {
       if (err instanceof DmitApiError && err.isAuth) {
-        router.replace("/login?redirect=%2Fdashboard%2Fapi-keys");
+        setList({ status: "error", message: dmitAuthErrorMessage(err) });
         return;
       }
       setList({ status: "error", message: formatError(err) });
     }
-  }, [accessToken, router]);
+  }, [accessToken]);
+
+  useEffect(() => {
+    console.log(
+      "[api-keys] accessToken present",
+      Boolean(accessToken),
+      accessToken?.slice(0, 12)
+    );
+  }, [accessToken]);
 
   useEffect(() => {
     void load();
@@ -86,7 +95,7 @@ export function ApiKeysClient({ accessToken }: { accessToken: string }) {
       await load();
     } catch (err) {
       if (err instanceof DmitApiError && err.isAuth) {
-        router.replace("/login?redirect=%2Fdashboard%2Fapi-keys");
+        setCreateError(dmitAuthErrorMessage(err));
         return;
       }
       setCreateError(formatError(err));
@@ -107,7 +116,7 @@ export function ApiKeysClient({ accessToken }: { accessToken: string }) {
       await load();
     } catch (err) {
       if (err instanceof DmitApiError && err.isAuth) {
-        router.replace("/login?redirect=%2Fdashboard%2Fapi-keys");
+        window.alert(`Revoke failed: ${dmitAuthErrorMessage(err)}`);
         return;
       }
       window.alert(`Revoke failed: ${formatError(err)}`);
@@ -373,6 +382,13 @@ function formatDate(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function dmitAuthErrorMessage(err: DmitApiError): string {
+  if (err.code === "missing_access_token") {
+    return err.message;
+  }
+  return `${DMIT_AUTH_FAILED} (${err.message})`;
 }
 
 function formatError(err: unknown): string {

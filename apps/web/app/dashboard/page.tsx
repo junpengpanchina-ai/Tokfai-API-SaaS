@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+/** Overview stats are placeholders until wired to Supabase/DMIT (no /v1/keys here). */
 const STATS = [
   {
     label: "Credits remaining",
