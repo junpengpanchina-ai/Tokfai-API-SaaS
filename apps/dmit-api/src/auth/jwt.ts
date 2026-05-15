@@ -1,68 +1,39 @@
-import { jwtVerify } from "jose";
-
-import { env } from "../env.js";
 import { ApiError } from "../errors.js";
 import { log } from "../logger.js";
+import { supabase } from "../supabase.js";
 import type { AuthedUser } from "../types.js";
 
 /**
- * Supabase signs user JWTs with HS256 + the project JWT secret (raw string).
+ * Verifies a browser Supabase access_token with Supabase Auth itself.
  *
- * Verify with the secret as UTF-8 bytes via TextEncoder. Do not base64-decode
- * SUPABASE_JWT_SECRET and do not import it as a JWK.
- *
- * Standard Supabase JWT payload looks like:
- *   {
- *     "iss": "https://<project>.supabase.co/auth/v1",
- *     "sub": "<auth.users.id>",
- *     "email": "...",
- *     "role": "authenticated",
- *     ...
- *   }
+ * Supabase projects that have migrated from the legacy JWT secret to JWT
+ * Signing Keys may issue user tokens that cannot be verified locally with
+ * SUPABASE_JWT_SECRET + HS256. The service-role client asks Supabase Auth to
+ * validate the token against the project's current signing keys.
  */
 export async function verifySupabaseJwt(token: string): Promise<AuthedUser> {
-  try {
-    const { payload } = await jwtVerify(
-      token,
-      new TextEncoder().encode(env.SUPABASE_JWT_SECRET),
-      { algorithms: ["HS256"] }
-    );
+  const {
+    data: { user },
+    error,
+  } = await supabase().auth.getUser(token);
 
-    const sub = payload.sub;
-    if (typeof sub !== "string" || sub.length === 0) {
-      throw ApiError.unauthorized("Invalid token (no subject).", "invalid_token");
-    }
-    if (payload.role && payload.role !== "authenticated") {
-      throw ApiError.forbidden("Token role is not 'authenticated'.", "wrong_role");
-    }
-
-    const email =
-      typeof payload.email === "string" && payload.email.length > 0
-        ? payload.email
-        : null;
-
-    return { id: sub, email };
-  } catch (err) {
-    if (err instanceof ApiError) throw err;
-
-    if (err instanceof Error) {
-      if (err.message.includes("expired") || err.name === "JWTExpired") {
-        throw ApiError.unauthorized("Token expired.", "expired_token");
-      }
-
-      log.error("jwt_invalid_token", {
-        errorName: err.name,
-        errorMessage: err.message,
-      });
-    } else {
-      log.error("jwt_invalid_token", {
-        errorName: "unknown",
-        errorMessage: String(err),
-      });
-    }
-
+  if (error) {
+    log.warn("supabase_auth_invalid_token", {
+      errorName: error.name,
+      errorMessage: error.message,
+    });
     throw ApiError.unauthorized("Invalid token.", "invalid_token");
   }
+
+  if (!user?.id) {
+    log.warn("supabase_auth_invalid_token", {
+      errorName: "MissingUser",
+      errorMessage: "Supabase Auth returned no user for access token.",
+    });
+    throw ApiError.unauthorized("Invalid token.", "invalid_token");
+  }
+
+  return { id: user.id, email: user.email ?? null };
 }
 
 /** Pulls `Bearer <token>` out of an Authorization header. */

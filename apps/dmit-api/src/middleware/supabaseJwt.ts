@@ -6,7 +6,7 @@ import type { AuthedUser } from "../types.js";
 
 /**
  * Requires a Supabase Bearer JWT. Resolves the user and stashes it on the
- * context for downstream handlers as `c.get('user')`.
+ * context for downstream handlers as `c.get('user')` and `c.get('userId')`.
  *
  * Use this for dashboard-driven endpoints: /v1/keys, /v1/billing/checkout.
  */
@@ -17,5 +17,6 @@ export const requireSupabaseJwt: MiddlewareHandler = async (c, next) => {
   }
   const user = await verifySupabaseJwt(token);
   c.set("user" as never, user satisfies AuthedUser);
+  c.set("userId" as never, user.id);
   await next();
 };
