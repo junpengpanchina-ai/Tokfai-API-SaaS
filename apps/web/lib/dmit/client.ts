@@ -207,9 +207,17 @@ interface ListApiKeysResponse {
   data: ApiKey[];
 }
 
-export async function listApiKeys(): Promise<ApiKey[]> {
+/** Pass `accessToken` from the server session for reliable dashboard auth. */
+export interface DmitSessionAuth {
+  accessToken: string;
+}
+
+export async function listApiKeys(
+  auth: DmitSessionAuth
+): Promise<ApiKey[]> {
   const res = await dmitFetch<ListApiKeysResponse | ApiKey[]>("/v1/keys", {
     method: "GET",
+    accessToken: auth.accessToken,
   });
   return Array.isArray(res) ? res : res.data;
 }
@@ -219,17 +227,23 @@ export interface CreateApiKeyInput {
 }
 
 export async function createApiKey(
-  input: CreateApiKeyInput
+  input: CreateApiKeyInput,
+  auth: DmitSessionAuth
 ): Promise<ApiKeyWithSecret> {
   return dmitFetch<ApiKeyWithSecret>("/v1/keys", {
     method: "POST",
     json: input,
+    accessToken: auth.accessToken,
   });
 }
 
-export async function revokeApiKey(id: string): Promise<void> {
+export async function revokeApiKey(
+  id: string,
+  auth: DmitSessionAuth
+): Promise<void> {
   await dmitFetch<void>(`/v1/keys/${encodeURIComponent(id)}`, {
     method: "DELETE",
+    accessToken: auth.accessToken,
   });
 }
 

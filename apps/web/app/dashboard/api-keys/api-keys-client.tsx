@@ -37,7 +37,7 @@ type ListState =
   | { status: "ready"; keys: ApiKey[] }
   | { status: "error"; message: string };
 
-export function ApiKeysClient() {
+export function ApiKeysClient({ accessToken }: { accessToken: string }) {
   const router = useRouter();
   const [list, setList] = useState<ListState>({ status: "loading" });
 
@@ -53,7 +53,7 @@ export function ApiKeysClient() {
   const load = useCallback(async () => {
     setList({ status: "loading" });
     try {
-      const keys = await listApiKeys();
+      const keys = await listApiKeys({ accessToken });
       setList({ status: "ready", keys });
     } catch (err) {
       if (err instanceof DmitApiError && err.isAuth) {
@@ -62,7 +62,7 @@ export function ApiKeysClient() {
       }
       setList({ status: "error", message: formatError(err) });
     }
-  }, [router]);
+  }, [accessToken, router]);
 
   useEffect(() => {
     void load();
@@ -80,7 +80,7 @@ export function ApiKeysClient() {
     setCreateError(null);
     setCopied(false);
     try {
-      const created = await createApiKey({ name });
+      const created = await createApiKey({ name }, { accessToken });
       setRevealed(created);
       setNewName("");
       await load();
@@ -103,7 +103,7 @@ export function ApiKeysClient() {
 
     setRevokingId(key.id);
     try {
-      await revokeApiKey(key.id);
+      await revokeApiKey(key.id, { accessToken });
       await load();
     } catch (err) {
       if (err instanceof DmitApiError && err.isAuth) {
