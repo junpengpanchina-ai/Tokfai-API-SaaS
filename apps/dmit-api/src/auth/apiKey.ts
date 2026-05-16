@@ -9,9 +9,9 @@ import { hashSecret, safeEqualHex } from "./hash.js";
  * sk-tokfai key format:
  *   sk-tokfai_<48 lowercase hex chars>
  *
- * `key_id` is derived from the first 12 random hex chars and remains indexed
- * for O(1) lookup. The full plaintext key is never stored; only
- * HMAC-SHA256(TOKEN_PEPPER, fullKey) hex lives in `api_keys.hash`.
+ * The full plaintext key is never stored; only HMAC-SHA256(TOKEN_PEPPER,
+ * fullKey) hex lives in `api_keys.hash`. `key_id` remains an internal field
+ * for DB compatibility and is not used for authentication.
  */
 
 const PREFIX = "sk-tokfai_";
@@ -44,19 +44,10 @@ export function generateApiKey(): NewApiKeyMaterial {
   };
 }
 
-interface ParsedKey {
-  keyId: string;
-  secret: string;
-}
-
-export function parseApiKey(raw: string): ParsedKey | null {
-  if (!raw.startsWith(PREFIX)) return null;
+export function isValidApiKeyFormat(raw: string): boolean {
+  if (!raw.startsWith(PREFIX)) return false;
   const randomHex = raw.slice(PREFIX.length);
-  if (!RANDOM_HEX_PATTERN.test(randomHex)) return null;
-  return {
-    keyId: randomHex.slice(0, KEY_ID_HEX_CHARS),
-    secret: raw,
-  };
+  return RANDOM_HEX_PATTERN.test(randomHex);
 }
 
 export interface VerifiedApiKey {
@@ -67,27 +58,30 @@ export interface VerifiedApiKey {
 }
 
 /**
- * Look up the api_keys row by key_id, verify the secret in constant time,
+ * Look up the api_keys row by HMAC hash of the full bearer token,
  * and mark `last_used_at` (fire-and-forget — we never block the call on
  * the update).
  *
- * Throws ApiError 401 on any failure (no leak of whether key_id existed).
+ * Throws ApiError 401 on any failure (no leak of whether the key existed).
  */
 export async function verifyApiKeyToken(
   rawToken: string
 ): Promise<VerifiedApiKey> {
-  const parsed = parseApiKey(rawToken);
-  if (!parsed) {
-    throw ApiError.unauthorized("Invalid API key format.", "invalid_api_key");
+  if (!isValidApiKeyFormat(rawToken)) {
+    throw ApiError.unauthorized(
+      "Invalid API key format. Use sk-tokfai_<48 hex>; legacy sk-tokfai-xxx.xxx keys are deprecated and must be regenerated.",
+      "invalid_api_key"
+    );
   }
 
+  const candidate = hashSecret(rawToken);
   const sb = supabase();
   const { data, error } = await sb
     .from("api_keys")
     .select<string, ApiKeyRow>(
       "id, user_id, name, key_id, prefix, hash, created_at, last_used_at, revoked_at"
     )
-    .eq("key_id", parsed.keyId)
+    .eq("hash", candidate)
     .is("revoked_at", null)
     .maybeSingle();
 
@@ -101,7 +95,6 @@ export async function verifyApiKeyToken(
     throw ApiError.unauthorized("API key not recognised.", "invalid_api_key");
   }
 
-  const candidate = hashSecret(parsed.secret);
   if (!safeEqualHex(candidate, data.hash)) {
     throw ApiError.unauthorized("API key not recognised.", "invalid_api_key");
   }

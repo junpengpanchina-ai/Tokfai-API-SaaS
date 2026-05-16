@@ -69,7 +69,7 @@ Owns:
 | Endpoint family | Auth header | Verified by |
 |---|---|---|
 | `/v1/keys`, `/v1/billing/checkout` | `Authorization: Bearer <supabase_access_token>` | DMIT verifies with `SUPABASE_JWT_SECRET` (HS256) |
-| `/v1/chat/completions`, `/v1/models` | `Authorization: Bearer sk-tokfai_...` | DMIT looks up `key_id`, compares HMAC-SHA256 of secret using `TOKEN_PEPPER` |
+| `/v1/chat/completions`, `/v1/models` | `Authorization: Bearer sk-tokfai_...` | DMIT validates the key format and looks up HMAC-SHA256 of the full token using `TOKEN_PEPPER` |
 | `/v1/webhooks/stripe` | `Stripe-Signature` header | DMIT verifies with `STRIPE_WEBHOOK_SECRET` |
 
 The frontend never mints its own tokens and never reads service-role secrets.

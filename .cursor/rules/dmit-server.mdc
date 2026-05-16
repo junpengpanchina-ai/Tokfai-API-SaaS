@@ -15,7 +15,7 @@ to `usage_logs`, `credit_ledger`, `profiles`, and `api_keys`.
 |---|---|---|
 | `GET/POST/DELETE /v1/keys` | `Bearer <supabase_access_token>` | `SUPABASE_JWT_SECRET` (HS256, jose) |
 | `POST /v1/billing/checkout` | `Bearer <supabase_access_token>` | same |
-| `POST /v1/chat/completions` | `Bearer sk-tokfai_<hex>` | lookup by `key_id`, compare `HMAC-SHA256(TOKEN_PEPPER, secret)` constant-time |
+| `POST /v1/chat/completions` | `Bearer sk-tokfai_<hex>` | lookup by `HMAC-SHA256(TOKEN_PEPPER, token)` |
 | `GET  /v1/models` | `Bearer sk-tokfai_...` | same |
 | `POST /v1/webhooks/stripe` | `Stripe-Signature` header | `STRIPE_WEBHOOK_SECRET` |
 | `GET  /v1/health` | none | — |
@@ -41,11 +41,10 @@ sk-tokfai_<48 lowercase hex chars>
 ```
 
 - random part = 24 random bytes encoded as lowercase hex
-- `key_id` = first 12 chars of the random hex, used for indexed lookup
+- `key_id` = first 12 chars of the random hex, internal DB compatibility only
 - Stored: `key_id` (indexed), `prefix = secret.slice(0, 18) + "..."`,
   `hash = HMAC-SHA256(TOKEN_PEPPER, secret)` hex
-- Lookup by `key_id` is O(1) via the partial unique index where
-  `revoked_at IS NULL`
+- Lookup by `hash` with `revoked_at IS NULL`
 - Compare must use `crypto.timingSafeEqual`
 
 ## Error envelope (OpenAI-style)

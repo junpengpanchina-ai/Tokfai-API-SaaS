@@ -40,11 +40,11 @@ create index if not exists profiles_stripe_customer_id_idx
 --   sk-tokfai_{24 random bytes encoded as 48 lowercase hex chars}
 --
 -- DMIT lookup path on every /v1/chat/completions request:
---   1. parse incoming token -> (key_id from first 12 random hex chars, secret)
---   2. SELECT ... FROM api_keys WHERE key_id = $1 AND revoked_at IS NULL
---   3. compare HMAC-SHA256(TOKEN_PEPPER, secret) hex to stored hash (constant-time)
+--   1. validate incoming token format -> sk-tokfai_<48 lowercase hex chars>
+--   2. hash full token with HMAC-SHA256(TOKEN_PEPPER, token)
+--   3. SELECT ... FROM api_keys WHERE hash = $1 AND revoked_at IS NULL
 --
--- The `prefix` column is the public-display form (secret.slice(0, 18) || '...')
+-- The `prefix` column is the public-display form (secret.slice(0, 18) + '...')
 -- shown in the dashboard; it does NOT include the full secret.
 
 create table if not exists public.api_keys (

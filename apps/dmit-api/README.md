@@ -92,4 +92,5 @@ src/
 - Writes to `usage_logs`, `credit_ledger`, `profiles.credits_*` happen here
   only, via the `debit_credits` and `credit_purchase` RPCs (atomic).
 - The raw `sk-tokfai_...` secret is never stored. Only its HMAC.
+- Legacy `sk-tokfai-xxx.xxx` keys are deprecated and must be regenerated.
 - See `.cursor/rules/dmit-server.mdc` and root `AGENTS.md`.
