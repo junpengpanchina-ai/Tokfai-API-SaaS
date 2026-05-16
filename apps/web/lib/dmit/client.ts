@@ -389,7 +389,39 @@ export interface ChatCompletionResponse {
   model: string;
   choices: ChatCompletionChoice[];
   usage?: ChatCompletionUsage;
+  credits_charged?: number;
+  request_id?: string;
   tokfai?: TokfaiCompletionExtension;
+}
+
+export interface ModelListItem {
+  id: string;
+  object?: "model" | string;
+  created?: number;
+  owned_by?: string;
+}
+
+export interface ModelListResponse {
+  object: "list";
+  data: ModelListItem[];
+}
+
+export async function listModels(apiKey: string): Promise<ModelListItem[]> {
+  if (!apiKey) {
+    throw new DmitApiError({
+      status: 400,
+      message: "Missing API key.",
+      code: "no_api_key",
+    });
+  }
+  const res = await dmitFetch<ModelListResponse | ModelListItem[]>(
+    "/v1/models",
+    {
+      method: "GET",
+      accessToken: apiKey,
+    }
+  );
+  return Array.isArray(res) ? res : res.data;
 }
 
 /**
@@ -409,12 +441,77 @@ export async function chatCompletions(
       code: "no_api_key",
     });
   }
-  return dmitFetch<ChatCompletionResponse>("/v1/chat/completions", {
-    method: "POST",
-    json: body,
-    // Bypass Supabase session lookup; use the customer key directly.
-    accessToken: apiKey,
-  });
+  const res = await dmitFetchWithHeaders<ChatCompletionResponse>(
+    "/v1/chat/completions",
+    {
+      method: "POST",
+      json: body,
+      // Bypass Supabase session lookup; use the customer key directly.
+      accessToken: apiKey,
+    }
+  );
+  const requestId = res.headers.get("x-request-id");
+  if (!requestId) return res.data;
+  return {
+    ...res.data,
+    tokfai: {
+      ...res.data.tokfai,
+      request_id: res.data.tokfai?.request_id ?? requestId,
+    },
+  };
+}
+
+async function dmitFetchWithHeaders<T = unknown>(
+  path: string,
+  options: DmitFetchOptions = {}
+): Promise<{ data: T; headers: Headers }> {
+  const { accessToken, json, headers: extraHeaders, ...init } = options;
+
+  const url = path.startsWith("http")
+    ? path
+    : `${getDmitBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
+
+  const headers = new Headers(extraHeaders);
+
+  if (accessToken === null) {
+    // Public endpoint (e.g. /v1/health) — no Authorization header.
+  } else if (accessToken !== undefined) {
+    headers.set(
+      "Authorization",
+      `Bearer ${requireDmitAccessToken(accessToken)}`
+    );
+  } else {
+    const token = await getCurrentAccessToken();
+    if (!token) {
+      throw new DmitApiError({
+        status: 401,
+        message: DMIT_MISSING_ACCESS_TOKEN,
+        code: "missing_access_token",
+      });
+    }
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  let requestBody: BodyInit | undefined;
+  if (json !== undefined) {
+    headers.set("Content-Type", "application/json");
+    requestBody = JSON.stringify(json);
+  }
+
+  const response = await fetch(url, { ...init, headers, body: requestBody });
+
+  if (response.status === 204) {
+    return { data: undefined as T, headers: response.headers };
+  }
+
+  const text = await response.text();
+  const parsed = parseJson(text);
+
+  if (!response.ok) {
+    throw toApiError(response.status, parsed);
+  }
+
+  return { data: parsed as T, headers: response.headers };
 }
 
 // ---------------------------------------------------------------------------

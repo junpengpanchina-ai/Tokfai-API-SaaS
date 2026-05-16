@@ -33,8 +33,6 @@ const LEDGER_COLUMNS =
 const PROFILE_COLUMNS =
   "id, email, credits_balance, total_credits_purchased, total_credits_used, updated_at";
 
-const TOPUP_AMOUNTS = [10, 25, 50, 100];
-
 export default async function CreditsPage({
   searchParams,
 }: {
@@ -120,7 +118,7 @@ export default async function CreditsPage({
         </CardContent>
       </Card>
 
-      <CreditsTopUpClient amounts={TOPUP_AMOUNTS} />
+      <CreditsTopUpClient userId={user.id} />
 
       <Card>
         <CardHeader>

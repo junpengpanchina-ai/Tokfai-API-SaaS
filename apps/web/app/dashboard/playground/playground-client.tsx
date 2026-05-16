@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Eye,
@@ -24,17 +24,15 @@ import { Label } from "@/components/ui/label";
 import {
   chatCompletions,
   DmitApiError,
+  listModels,
   type ChatCompletionResponse,
+  type ModelListItem,
 } from "@/lib/dmit/client";
 
-const MODELS = [
-  "gemini-3.1-pro",
-  "gemini-3-pro",
-  "gpt-4o-mini",
-  "nano-banana",
-] as const;
-
+const DEFAULT_MODEL = "gemini-3.1-pro";
+const FALLBACK_MODELS = [DEFAULT_MODEL] as const;
 const DEFAULT_PROMPT = "Say hello from Tokfai.";
+const MAX_TOKENS = 512;
 
 interface PlaygroundError {
   status: number;
@@ -46,13 +44,93 @@ interface PlaygroundError {
 export function PlaygroundClient() {
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
-  const [model, setModel] = useState<(typeof MODELS)[number]>(MODELS[0]);
+  const [models, setModels] = useState<ModelListItem[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelsError, setModelsError] = useState<PlaygroundError | null>(null);
+  const [model, setModel] = useState(DEFAULT_MODEL);
   const [temperature, setTemperature] = useState("0.7");
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ChatCompletionResponse | null>(null);
   const [error, setError] = useState<PlaygroundError | null>(null);
+  const modelOptions = useMemo(() => {
+    const ids = new Set<string>([DEFAULT_MODEL]);
+    for (const item of models) {
+      if (item.id) ids.add(item.id);
+    }
+    return Array.from(ids);
+  }, [models]);
+
+  useEffect(() => {
+    const trimmedKey = apiKey.trim();
+    setModelsError(null);
+
+    if (!trimmedKey) {
+      setModels([]);
+      setModelsLoading(false);
+      setModel((current) => current || FALLBACK_MODELS[0]);
+      return;
+    }
+
+    let cancelled = false;
+    const timeout = window.setTimeout(async () => {
+      setModelsLoading(true);
+      try {
+        const loadedModels = await listModels(trimmedKey);
+        if (cancelled) return;
+        setModels(loadedModels);
+        setModel((current) => {
+          if (loadedModels.some((item) => item.id === current)) return current;
+          if (loadedModels.some((item) => item.id === DEFAULT_MODEL)) {
+            return DEFAULT_MODEL;
+          }
+          return loadedModels[0]?.id ?? DEFAULT_MODEL;
+        });
+      } catch (err) {
+        if (cancelled) return;
+        setModels([]);
+        setModelsError(toPlaygroundError(err));
+      } finally {
+        if (!cancelled) setModelsLoading(false);
+      }
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [apiKey]);
+
+  async function handleLoadModels() {
+    const trimmedKey = apiKey.trim();
+    setModelsError(null);
+    if (!trimmedKey) {
+      setModelsError({
+        status: 0,
+        message: "Paste your sk-tokfai_ API key to load models.",
+      });
+      return;
+    }
+
+    setModelsLoading(true);
+    try {
+      const loadedModels = await listModels(trimmedKey);
+      setModels(loadedModels);
+      setModel((current) => {
+        if (loadedModels.some((item) => item.id === current)) return current;
+        if (loadedModels.some((item) => item.id === DEFAULT_MODEL)) {
+          return DEFAULT_MODEL;
+        }
+        return loadedModels[0]?.id ?? DEFAULT_MODEL;
+      });
+    } catch (err) {
+      setModels([]);
+      setModelsError(toPlaygroundError(err));
+    } finally {
+      setModelsLoading(false);
+    }
+  }
 
   async function handleRun(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -88,6 +166,7 @@ export function PlaygroundClient() {
       const res = await chatCompletions(trimmedKey, {
         model,
         messages: [{ role: "user", content: trimmedPrompt }],
+        max_tokens: MAX_TOKENS,
         temperature: parsedTemp,
         stream: false,
       });
@@ -119,7 +198,7 @@ export function PlaygroundClient() {
             <CardTitle>Request</CardTitle>
             <CardDescription>
               Prompt sent as a single user message. System / assistant turns
-              are coming in a later step.
+              are coming in a later step. Max tokens is fixed at {MAX_TOKENS}.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -212,21 +291,42 @@ export function PlaygroundClient() {
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="model">Model</Label>
-              <select
-                id="model"
-                value={model}
-                onChange={(e) =>
-                  setModel(e.target.value as (typeof MODELS)[number])
-                }
-                disabled={loading}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {MODELS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  id="model"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  disabled={loading || modelsLoading}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {modelOptions.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleLoadModels}
+                  disabled={loading || modelsLoading}
+                >
+                  {modelsLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading
+                    </>
+                  ) : (
+                    "Refresh"
+                  )}
+                </Button>
+              </div>
+              <ModelListStatus
+                loading={modelsLoading}
+                error={modelsError}
+                count={models.length}
+                hasApiKey={apiKey.trim().length > 0}
+              />
             </div>
 
             <div className="flex flex-col gap-2">
@@ -253,6 +353,50 @@ export function PlaygroundClient() {
   );
 }
 
+function ModelListStatus({
+  loading,
+  error,
+  count,
+  hasApiKey,
+}: {
+  loading: boolean;
+  error: PlaygroundError | null;
+  count: number;
+  hasApiKey: boolean;
+}) {
+  if (loading) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Loading models from <code>GET /v1/models</code>...
+      </p>
+    );
+  }
+
+  if (error) {
+    return (
+      <p className="text-xs text-destructive">
+        Could not load models: {error.message}
+      </p>
+    );
+  }
+
+  if (count > 0) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Loaded {count} model{count === 1 ? "" : "s"} from DMIT.
+      </p>
+    );
+  }
+
+  return (
+    <p className="text-xs text-muted-foreground">
+      {hasApiKey
+        ? "Models load automatically after the key is validated."
+        : "Paste a Tokfai API key to auto-load available models."}
+    </p>
+  );
+}
+
 function ResponsePanel({
   loading,
   error,
@@ -268,7 +412,7 @@ function ResponsePanel({
     return (
       <div className="flex items-center gap-2 rounded-md border bg-muted/40 p-4 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Streaming bytes from <code className="text-xs">{model}</code>…
+        Waiting for <code className="text-xs">{model}</code>…
       </div>
     );
   }
@@ -311,7 +455,10 @@ function ResponsePanel({
     result.choices?.[0]?.message?.content ?? "(no content returned)";
   const finishReason = result.choices?.[0]?.finish_reason ?? null;
   const usage = result.usage;
-  const tokfai = result.tokfai;
+  const tokfai = {
+    credits_charged: result.tokfai?.credits_charged ?? result.credits_charged,
+    request_id: result.tokfai?.request_id ?? result.request_id,
+  };
 
   return (
     <div className="flex flex-col gap-3">
@@ -386,7 +533,7 @@ function toPlaygroundError(err: unknown): PlaygroundError {
     return {
       status: err.status,
       code: err.code,
-      message: err.message,
+      message: messageForStatus(err.status, err.message),
       hint: hintForStatus(err.status, err.code),
     };
   }
@@ -401,6 +548,19 @@ function toPlaygroundError(err: unknown): PlaygroundError {
     return { status: 0, message: err.message };
   }
   return { status: 0, message: "Unknown error." };
+}
+
+function messageForStatus(status: number, fallback: string): string {
+  if (status === 401) {
+    return "API Key is invalid or has been revoked.";
+  }
+  if (status === 402) {
+    return "Insufficient credits. Please top up before running the request.";
+  }
+  if (status === 500 || status === 502) {
+    return "Upstream model error. Please retry shortly.";
+  }
+  return fallback;
 }
 
 function hintForStatus(status: number, code?: string): string | undefined {

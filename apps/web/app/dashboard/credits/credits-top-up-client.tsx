@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,157 +12,158 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  createCheckoutSession,
-  DmitApiError,
-} from "@/lib/dmit/client";
 
-interface TopUpError {
-  status: number;
-  code?: string;
-  message: string;
-  hint?: string;
+interface CreditPlan {
+  plan_id: "starter" | "pro" | "business";
+  name: string;
+  amount_cny: number;
+  credits: number;
 }
 
-export function CreditsTopUpClient({ amounts }: { amounts: number[] }) {
-  const router = useRouter();
-  const [loadingAmount, setLoadingAmount] = useState<number | null>(null);
-  const [error, setError] = useState<TopUpError | null>(null);
+interface RechargeIntent {
+  plan_id: CreditPlan["plan_id"];
+  amount_cny: number;
+  credits: number;
+  user_id: string;
+}
 
-  async function handleTopUp(amount: number) {
-    if (loadingAmount != null) return;
-    setError(null);
-    setLoadingAmount(amount);
+const CREDIT_PLANS: CreditPlan[] = [
+  {
+    plan_id: "starter",
+    name: "Starter",
+    amount_cny: 29,
+    credits: 10_000,
+  },
+  {
+    plan_id: "pro",
+    name: "Pro",
+    amount_cny: 99,
+    credits: 50_000,
+  },
+  {
+    plan_id: "business",
+    name: "Business",
+    amount_cny: 299,
+    credits: 200_000,
+  },
+];
 
-    try {
-      const siteUrl =
-        process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin;
-      const res = await createCheckoutSession({
-        amount_usd: amount,
-        success_url: `${siteUrl}/dashboard/credits?status=success`,
-        cancel_url: `${siteUrl}/dashboard/credits?status=cancel`,
-      });
+export function CreditsTopUpClient({ userId }: { userId: string }) {
+  const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
+  const [selectedIntent, setSelectedIntent] = useState<RechargeIntent | null>(
+    null
+  );
 
-      if (!res?.url) {
-        throw new DmitApiError({
-          status: 502,
-          message: "DMIT did not return a checkout URL.",
-          code: "missing_url",
-        });
-      }
+  async function handleRecharge(plan: CreditPlan) {
+    if (loadingPlanId != null) return;
 
-      // Page is about to unload — don't clear loading state.
-      window.location.assign(res.url);
-    } catch (err) {
-      if (err instanceof DmitApiError && err.isAuth) {
-        router.replace("/login?redirect=%2Fdashboard%2Fcredits");
-        return;
-      }
-      setError(toTopUpError(err));
-      setLoadingAmount(null);
-    }
+    const intent: RechargeIntent = {
+      plan_id: plan.plan_id,
+      amount_cny: plan.amount_cny,
+      credits: plan.credits,
+      user_id: userId,
+    };
+
+    setLoadingPlanId(plan.plan_id);
+    setSelectedIntent(null);
+    await createRechargePlaceholder(intent);
+    setSelectedIntent(intent);
+    setLoadingPlanId(null);
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Top up</CardTitle>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle>Recharge credits</CardTitle>
+          <Badge variant="secondary">Stripe checkout coming soon</Badge>
+        </div>
         <CardDescription>
-          Pick an amount. Checkout is handled by Stripe via the DMIT backend —
-          this app never talks to Stripe directly.
+          Choose a package now. Payment is a placeholder until Stripe checkout
+          is connected through DMIT.
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <div className="flex flex-wrap gap-2">
-          {amounts.map((amount) => {
-            const isLoading = loadingAmount === amount;
-            const isDisabled = loadingAmount != null;
+      <CardContent className="flex flex-col gap-4">
+        <div className="grid gap-3 md:grid-cols-3">
+          {CREDIT_PLANS.map((plan) => {
+            const isLoading = loadingPlanId === plan.plan_id;
+            const isDisabled = loadingPlanId != null;
             return (
-              <Button
-                key={amount}
-                variant="outline"
-                disabled={isDisabled}
-                onClick={() => handleTopUp(amount)}
-                aria-label={`Top up $${amount}`}
+              <div
+                key={plan.plan_id}
+                className="flex flex-col gap-4 rounded-lg border bg-card p-4"
               >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : null}
-                ${amount}
-              </Button>
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-semibold">{plan.name}</h3>
+                    <Badge variant="outline" className="font-mono text-[10px]">
+                      {plan.plan_id}
+                    </Badge>
+                  </div>
+                  <p className="mt-2 text-3xl font-semibold tracking-tight">
+                    ¥{plan.amount_cny}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {formatCredits(plan.credits)} credits
+                  </p>
+                </div>
+
+                <Button
+                  type="button"
+                  variant={plan.plan_id === "pro" ? "default" : "outline"}
+                  disabled={isDisabled}
+                  onClick={() => handleRecharge(plan)}
+                  aria-label={`Recharge ${plan.name}`}
+                  className="mt-auto"
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : null}
+                  {plan.plan_id === "starter" ? "Buy" : "Recharge"}
+                </Button>
+              </div>
             );
           })}
         </div>
 
-        {error ? <ErrorRow error={error} /> : null}
+        {selectedIntent ? <PlaceholderNotice intent={selectedIntent} /> : null}
 
         <p className="text-xs text-muted-foreground">
-          You&apos;ll be sent to Stripe&apos;s hosted checkout. Your card
-          details never touch Tokfai servers.
+          Stripe checkout coming soon. This button does not modify{" "}
+          <code>profiles.credits_balance</code> and does not start a real
+          payment yet.
         </p>
       </CardContent>
     </Card>
   );
 }
 
-function ErrorRow({ error }: { error: TopUpError }) {
+function PlaceholderNotice({ intent }: { intent: RechargeIntent }) {
   return (
-    <div className="flex flex-col gap-1 rounded-md border border-destructive/30 bg-destructive/5 p-3">
-      <div className="flex items-center gap-2 text-sm font-medium text-destructive">
-        <AlertTriangle className="h-4 w-4" />
-        Could not start checkout
-        {error.status > 0 ? (
-          <Badge variant="outline" className="ml-1">
-            HTTP {error.status}
-          </Badge>
-        ) : null}
-        {error.code ? (
-          <Badge variant="outline" className="font-mono text-[10px]">
-            {error.code}
-          </Badge>
-        ) : null}
+    <div className="flex flex-col gap-2 rounded-md border border-emerald-300 bg-emerald-50 p-3 text-emerald-950 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-100">
+      <div className="flex items-center gap-2 text-sm font-medium">
+        <CheckCircle2 className="h-4 w-4" />
+        Recharge placeholder selected
       </div>
-      <p className="text-sm">{error.message}</p>
-      {error.hint ? (
-        <p className="text-xs text-muted-foreground">{error.hint}</p>
-      ) : null}
+      <p className="text-xs text-emerald-900/80 dark:text-emerald-100/80">
+        Stripe checkout coming soon. Future checkout payload:{" "}
+        <code className="font-mono">
+          {intent.plan_id} / ¥{intent.amount_cny} /{" "}
+          {formatCredits(intent.credits)} credits
+        </code>
+        .
+      </p>
     </div>
   );
 }
 
-function toTopUpError(err: unknown): TopUpError {
-  if (err instanceof DmitApiError) {
-    return {
-      status: err.status,
-      code: err.code,
-      message: err.message,
-      hint: hintForStatus(err.status, err.code),
-    };
-  }
-  if (err instanceof TypeError) {
-    return {
-      status: 0,
-      message: "Could not reach api.tokfai.com.",
-      hint: "Network error or CORS misconfiguration on the DMIT side.",
-    };
-  }
-  if (err instanceof Error) {
-    return { status: 0, message: err.message };
-  }
-  return { status: 0, message: "Unknown error." };
+async function createRechargePlaceholder(
+  _intent: RechargeIntent
+): Promise<void> {
+  // Placeholder for a future DMIT Stripe checkout call.
+  await new Promise((resolve) => window.setTimeout(resolve, 250));
 }
 
-function hintForStatus(status: number, code?: string): string | undefined {
-  if (status === 400) {
-    return code === "invalid_amount"
-      ? "Pick one of the listed amounts."
-      : "DMIT rejected the request body. Check the amount and try again.";
-  }
-  if (status === 429) {
-    return "Slow down a moment, then try again.";
-  }
-  if (status >= 500) {
-    return "Tokfai or Stripe is having a moment. Try again shortly.";
-  }
-  return undefined;
+function formatCredits(value: number): string {
+  return new Intl.NumberFormat("en-US").format(value);
 }
