@@ -1,0 +1,8 @@
+
+# local DMIT debug/runtime files
+apps/dmit-api/.env
+apps/dmit-api/.env.*
+apps/dmit-api/*.save
+apps/dmit-api/dmit_check.sh
+apps/dmit-api/dmit_helper.sh
+apps/dmit-api/es
