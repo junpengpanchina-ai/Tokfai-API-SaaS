@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   Check,
@@ -48,6 +48,9 @@ export function ApiKeysClient({ accessToken }: { accessToken: string }) {
 
   const [revealed, setRevealed] = useState<ApiKeyWithSecret | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedPrefixId, setCopiedPrefixId] = useState<string | null>(null);
+  const [copyNotice, setCopyNotice] = useState<string | null>(null);
+  const noticeTimer = useRef<number | null>(null);
 
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
@@ -66,16 +69,16 @@ export function ApiKeysClient({ accessToken }: { accessToken: string }) {
   }, [accessToken]);
 
   useEffect(() => {
-    console.log(
-      "[api-keys] accessToken present",
-      Boolean(accessToken),
-      accessToken?.slice(0, 12)
-    );
-  }, [accessToken]);
-
-  useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimer.current) {
+        window.clearTimeout(noticeTimer.current);
+      }
+    };
+  }, []);
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -136,6 +139,23 @@ export function ApiKeysClient({ accessToken }: { accessToken: string }) {
       // selecting the text so the user can copy manually.
       const el = document.getElementById("revealed-key") as HTMLInputElement | null;
       el?.select();
+    }
+  }
+
+  async function handleCopyPrefix(key: ApiKey) {
+    try {
+      await navigator.clipboard.writeText(key.prefix);
+      setCopiedPrefixId(key.id);
+      setCopyNotice("Copied key prefix. Full secret is only shown once.");
+      if (noticeTimer.current) {
+        window.clearTimeout(noticeTimer.current);
+      }
+      noticeTimer.current = window.setTimeout(() => {
+        setCopiedPrefixId(null);
+        setCopyNotice(null);
+      }, 2500);
+    } catch {
+      setCopyNotice("Could not copy key prefix. Select it and copy manually.");
     }
   }
 
@@ -212,13 +232,30 @@ export function ApiKeysClient({ accessToken }: { accessToken: string }) {
         <CardHeader>
           <CardTitle>Your keys</CardTitle>
           <CardDescription>
-            Active <code>sk-tokfai_...</code> tokens.
+            Active <code>sk-tokfai_...</code> tokens. Full secret is shown only
+            once when created. If you lose it, revoke this key and create a new
+            one.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <KeyList state={list} revokingId={revokingId} onRevoke={handleRevoke} />
+          <KeyList
+            state={list}
+            revokingId={revokingId}
+            copiedPrefixId={copiedPrefixId}
+            onCopyPrefix={handleCopyPrefix}
+            onRevoke={handleRevoke}
+          />
         </CardContent>
       </Card>
+
+      {copyNotice ? (
+        <div
+          role="status"
+          className="fixed bottom-4 right-4 z-50 rounded-md border bg-background px-4 py-3 text-sm shadow-lg"
+        >
+          {copyNotice}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -226,10 +263,14 @@ export function ApiKeysClient({ accessToken }: { accessToken: string }) {
 function KeyList({
   state,
   revokingId,
+  copiedPrefixId,
+  onCopyPrefix,
   onRevoke,
 }: {
   state: ListState;
   revokingId: string | null;
+  copiedPrefixId: string | null;
+  onCopyPrefix: (key: ApiKey) => void;
   onRevoke: (key: ApiKey) => void;
 }) {
   if (state.status === "loading") {
@@ -281,7 +322,7 @@ function KeyList({
             <tr key={key.id} className="border-b last:border-0">
               <td className="py-3 pr-4 font-medium">{key.name}</td>
               <td className="py-3 pr-4 font-mono text-xs text-muted-foreground">
-                {key.prefix}…
+                {key.prefix}
               </td>
               <td className="py-3 pr-4 text-muted-foreground">
                 {key.last_used_at ? (
@@ -294,6 +335,20 @@ function KeyList({
                 {formatDate(key.created_at)}
               </td>
               <td className="py-3 pr-2 text-right">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => onCopyPrefix(key)}
+                  className="mr-1"
+                  aria-label={`Copy prefix for ${key.name}`}
+                >
+                  {copiedPrefixId === key.id ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                  Copy prefix
+                </Button>
                 <Button
                   size="sm"
                   variant="ghost"
