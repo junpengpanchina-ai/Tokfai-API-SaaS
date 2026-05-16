@@ -17,9 +17,11 @@ import { hashSecret, safeEqualHex } from "./hash.js";
 const PREFIX = "sk-tokfai_";
 const RANDOM_BYTES = 24; // -> 48 lowercase hex chars
 const KEY_ID_HEX_CHARS = 12; // 48 bits, matching the old lookup entropy
-const DISPLAY_PREFIX_CHARS = 18;
+const DISPLAY_PREFIX_CHARS = 22;
 
 const RANDOM_HEX_PATTERN = /^[0-9a-f]{48}$/;
+
+type ApiKeyAuthRow = Omit<ApiKeyRow, "encrypted_secret">;
 
 export interface NewApiKeyMaterial {
   /** Full secret shown to the user once. */
@@ -78,7 +80,7 @@ export async function verifyApiKeyToken(
   const sb = supabase();
   const { data, error } = await sb
     .from("api_keys")
-    .select<string, ApiKeyRow>(
+    .select<string, ApiKeyAuthRow>(
       "id, user_id, name, key_id, prefix, hash, created_at, last_used_at, revoked_at"
     )
     .eq("hash", candidate)

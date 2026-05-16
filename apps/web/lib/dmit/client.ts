@@ -206,13 +206,13 @@ function toApiError(status: number, body: unknown): DmitApiError {
 }
 
 // ---------------------------------------------------------------------------
-// API Keys — GET / POST / DELETE /v1/keys
+// API Keys — GET / POST / DELETE /v1/keys, POST /v1/keys/:id/reveal
 // ---------------------------------------------------------------------------
 
 /**
  * A user's API key as returned to the dashboard. The raw secret is never
- * stored client-side; DMIT only ever returns it once at creation time
- * (see `ApiKeyWithSecret`).
+ * stored client-side; DMIT returns it at creation time and reveals it only
+ * on explicit owner copy requests.
  */
 export interface ApiKey {
   id: string;
@@ -225,12 +225,22 @@ export interface ApiKey {
 }
 
 export interface ApiKeyWithSecret extends ApiKey {
-  /** Full plaintext key. Shown to the user once, immediately after creation. */
+  /** Full plaintext key. Keep in memory only long enough to display/copy. */
   secret: string;
 }
 
 interface ListApiKeysResponse {
   data: ApiKey[];
+}
+
+interface ApiKeyWithSecretResponse {
+  data: ApiKeyWithSecret;
+}
+
+interface RevealApiKeyResponse {
+  data: {
+    secret: string;
+  };
 }
 
 /** Pass `accessToken` from the server session for reliable dashboard auth. */
@@ -258,11 +268,30 @@ export async function createApiKey(
   auth: DmitSessionAuth
 ): Promise<ApiKeyWithSecret> {
   const accessToken = requireDmitAccessToken(auth.accessToken);
-  return dmitFetch<ApiKeyWithSecret>("/v1/keys", {
-    method: "POST",
-    json: input,
-    accessToken,
-  });
+  const res = await dmitFetch<ApiKeyWithSecret | ApiKeyWithSecretResponse>(
+    "/v1/keys",
+    {
+      method: "POST",
+      json: input,
+      accessToken,
+    }
+  );
+  return "data" in res ? res.data : res;
+}
+
+export async function revealApiKey(
+  id: string,
+  auth: DmitSessionAuth
+): Promise<string> {
+  const accessToken = requireDmitAccessToken(auth.accessToken);
+  const res = await dmitFetch<RevealApiKeyResponse>(
+    `/v1/keys/${encodeURIComponent(id)}/reveal`,
+    {
+      method: "POST",
+      accessToken,
+    }
+  );
+  return res.data.secret;
 }
 
 export async function revokeApiKey(

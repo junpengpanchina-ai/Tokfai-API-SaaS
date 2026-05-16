@@ -87,10 +87,12 @@ src/
 ## Boundary reminders
 
 - This app holds: `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`,
-  `TOKEN_PEPPER`, `GRSAI_API_KEY`, `STRIPE_SECRET_KEY`,
-  `STRIPE_WEBHOOK_SECRET`. None of these may appear in `apps/web`.
+  `TOKEN_PEPPER`, `TOKFAI_KEY_ENCRYPTION_SECRET`, `GRSAI_API_KEY`,
+  `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`. None of these may appear in
+  `apps/web`.
 - Writes to `usage_logs`, `credit_ledger`, `profiles.credits_*` happen here
   only, via the `debit_credits` and `credit_purchase` RPCs (atomic).
-- The raw `sk-tokfai_...` secret is never stored. Only its HMAC.
+- The raw `sk-tokfai_...` secret is stored only as AES-256-GCM ciphertext for
+  owner reveal/copy. Authentication uses only its HMAC hash.
 - Legacy `sk-tokfai-xxx.xxx` keys are deprecated and must be regenerated.
 - See `.cursor/rules/dmit-server.mdc` and root `AGENTS.md`.

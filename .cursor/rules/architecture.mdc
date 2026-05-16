@@ -29,6 +29,7 @@ supabase/       # DB migrations (source of truth)
 | `SUPABASE_SERVICE_ROLE_KEY` | ❌ never | ✅ |
 | `SUPABASE_JWT_SECRET` | ❌ never | ✅ |
 | `TOKEN_PEPPER` | ❌ never | ✅ |
+| `TOKFAI_KEY_ENCRYPTION_SECRET` | ❌ never | ✅ |
 | `GRSAI_API_KEY` | ❌ never | ✅ |
 | `STRIPE_SECRET_KEY` | ❌ never | ✅ |
 | `STRIPE_WEBHOOK_SECRET` | ❌ never | ✅ |

@@ -31,6 +31,7 @@ const Schema = z.object({
   SUPABASE_JWT_SECRET: z.string().min(20),
 
   TOKEN_PEPPER: z.string().min(32, "TOKEN_PEPPER must be at least 32 chars"),
+  TOKFAI_KEY_ENCRYPTION_SECRET: z.string().optional(),
 
   GRSAI_API_BASE: z.string().url(),
   GRSAI_API_KEY: z.string().min(1),

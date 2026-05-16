@@ -42,8 +42,9 @@ sk-tokfai_<48 lowercase hex chars>
 
 - random part = 24 random bytes encoded as lowercase hex
 - `key_id` = first 12 chars of the random hex, internal DB compatibility only
-- Stored: `key_id` (indexed), `prefix = secret.slice(0, 18) + "..."`,
-  `hash = HMAC-SHA256(TOKEN_PEPPER, secret)` hex
+- Stored: `key_id` (internal), `prefix = secret.slice(0, 22) + "..."`,
+  `hash = HMAC-SHA256(TOKEN_PEPPER, secret)` hex, and
+  `encrypted_secret = AES-256-GCM(TOKFAI_KEY_ENCRYPTION_SECRET, secret)`
 - Lookup by `hash` with `revoked_at IS NULL`
 - Compare must use `crypto.timingSafeEqual`
 
@@ -64,4 +65,5 @@ Every non-2xx response body:
 - ❌ Don't log API keys, JWTs, or Stripe webhook bodies in full. Log the
   `key_id` / `request_id` / Stripe `event.id` only.
 - ❌ Don't use the Supabase anon key. Use service_role only.
-- ❌ Don't store the raw `sk-tokfai_...` secret anywhere — only the HMAC hash.
+- ❌ Don't store the raw `sk-tokfai_...` secret in plaintext. Store only the
+  HMAC hash plus encrypted ciphertext for owner reveal/copy.

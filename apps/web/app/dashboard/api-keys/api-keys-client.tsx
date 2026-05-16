@@ -26,6 +26,7 @@ import {
   createApiKey,
   DmitApiError,
   listApiKeys,
+  revealApiKey,
   revokeApiKey,
   type ApiKey,
   type ApiKeyWithSecret,
@@ -48,7 +49,7 @@ export function ApiKeysClient({ accessToken }: { accessToken: string }) {
 
   const [revealed, setRevealed] = useState<ApiKeyWithSecret | null>(null);
   const [copied, setCopied] = useState(false);
-  const [copiedPrefixId, setCopiedPrefixId] = useState<string | null>(null);
+  const [copyingKeyId, setCopyingKeyId] = useState<string | null>(null);
   const [copyNotice, setCopyNotice] = useState<string | null>(null);
   const noticeTimer = useRef<number | null>(null);
 
@@ -142,20 +143,32 @@ export function ApiKeysClient({ accessToken }: { accessToken: string }) {
     }
   }
 
-  async function handleCopyPrefix(key: ApiKey) {
+  function showCopyNotice(message: string) {
+    setCopyNotice(message);
+    if (noticeTimer.current) {
+      window.clearTimeout(noticeTimer.current);
+    }
+    noticeTimer.current = window.setTimeout(() => {
+      setCopyNotice(null);
+    }, 2500);
+  }
+
+  async function handleCopyKey(key: ApiKey) {
+    setCopyingKeyId(key.id);
     try {
-      await navigator.clipboard.writeText(key.prefix);
-      setCopiedPrefixId(key.id);
-      setCopyNotice("Copied key prefix. Full secret is only shown once.");
-      if (noticeTimer.current) {
-        window.clearTimeout(noticeTimer.current);
+      const secret = await revealApiKey(key.id, { accessToken });
+      await navigator.clipboard.writeText(secret);
+      showCopyNotice("API key copied.");
+    } catch (err) {
+      if (err instanceof DmitApiError && err.code === "old_key_not_recoverable") {
+        showCopyNotice(
+          "This old key cannot be revealed. Revoke it and create a new one."
+        );
+        return;
       }
-      noticeTimer.current = window.setTimeout(() => {
-        setCopiedPrefixId(null);
-        setCopyNotice(null);
-      }, 2500);
-    } catch {
-      setCopyNotice("Could not copy key prefix. Select it and copy manually.");
+      showCopyNotice(formatError(err));
+    } finally {
+      setCopyingKeyId(null);
     }
   }
 
@@ -190,8 +203,8 @@ export function ApiKeysClient({ accessToken }: { accessToken: string }) {
         <CardHeader>
           <CardTitle>Create a new key</CardTitle>
           <CardDescription>
-            Give it a name you&apos;ll recognise. You&apos;ll see the full
-            secret exactly once.
+            Give it a name you&apos;ll recognise. The full key is encrypted for
+            owner-only copy later.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -232,17 +245,17 @@ export function ApiKeysClient({ accessToken }: { accessToken: string }) {
         <CardHeader>
           <CardTitle>Your keys</CardTitle>
           <CardDescription>
-            Active <code>sk-tokfai_...</code> tokens. Full secret is shown only
-            once when created. If you lose it, revoke this key and create a new
-            one.
+            Active <code>sk-tokfai_...</code> tokens. Full API keys are
+            encrypted and can be copied by the owner. For security, revoked or
+            legacy keys cannot be revealed.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <KeyList
             state={list}
             revokingId={revokingId}
-            copiedPrefixId={copiedPrefixId}
-            onCopyPrefix={handleCopyPrefix}
+            copyingKeyId={copyingKeyId}
+            onCopyKey={handleCopyKey}
             onRevoke={handleRevoke}
           />
         </CardContent>
@@ -263,14 +276,14 @@ export function ApiKeysClient({ accessToken }: { accessToken: string }) {
 function KeyList({
   state,
   revokingId,
-  copiedPrefixId,
-  onCopyPrefix,
+  copyingKeyId,
+  onCopyKey,
   onRevoke,
 }: {
   state: ListState;
   revokingId: string | null;
-  copiedPrefixId: string | null;
-  onCopyPrefix: (key: ApiKey) => void;
+  copyingKeyId: string | null;
+  onCopyKey: (key: ApiKey) => void;
   onRevoke: (key: ApiKey) => void;
 }) {
   if (state.status === "loading") {
@@ -338,16 +351,17 @@ function KeyList({
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => onCopyPrefix(key)}
+                  onClick={() => onCopyKey(key)}
+                  disabled={copyingKeyId === key.id}
                   className="mr-1"
-                  aria-label={`Copy prefix for ${key.name}`}
+                  aria-label={`Copy API key for ${key.name}`}
                 >
-                  {copiedPrefixId === key.id ? (
-                    <Check className="h-4 w-4" />
+                  {copyingKeyId === key.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Copy className="h-4 w-4" />
                   )}
-                  Copy prefix
+                  Copy key
                 </Button>
                 <Button
                   size="sm"
@@ -391,9 +405,8 @@ function RevealedKeyBanner({
           Save your new key now
         </CardTitle>
         <CardDescription className="text-amber-900/80 dark:text-amber-100/80">
-          This is the only time we&apos;ll show <strong>{revealed.name}</strong>
-          . Once you close this banner the secret is gone — you&apos;ll have to
-          create another key if you lose it.
+          Save <strong>{revealed.name}</strong> now or copy it later from the
+          encrypted key list. Revoked or legacy keys cannot be revealed.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">

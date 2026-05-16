@@ -54,6 +54,7 @@ create table if not exists public.api_keys (
   key_id        text not null unique,
   prefix        text not null,
   hash          text not null,
+  encrypted_secret text,
   created_at    timestamptz not null default now(),
   last_used_at  timestamptz,
   revoked_at    timestamptz

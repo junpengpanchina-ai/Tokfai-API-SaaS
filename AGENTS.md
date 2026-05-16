@@ -49,7 +49,8 @@ Does **not** own and must **never** implement:
 - Calls to GRSAI
 - Writes to `credit_ledger`, `usage_logs`, `profiles`, or `api_keys`
 - Any code path that needs `SUPABASE_SERVICE_ROLE_KEY`, `GRSAI_API_KEY`,
-  `TOKEN_PEPPER`, `STRIPE_SECRET_KEY`, or `STRIPE_WEBHOOK_SECRET`
+  `TOKEN_PEPPER`, `TOKFAI_KEY_ENCRYPTION_SECRET`, `STRIPE_SECRET_KEY`, or
+  `STRIPE_WEBHOOK_SECRET`
 
 ### 3. `apps/dmit-api` — core backend + API gateway (`api.tokfai.com`)
 Owns:
@@ -60,7 +61,8 @@ Owns:
 - Calls GRSAI
 - Debits credits, writes `credit_ledger`, writes `usage_logs`
 - Holds: `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, `GRSAI_API_KEY`,
-  `TOKEN_PEPPER`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
+  `TOKEN_PEPPER`, `TOKFAI_KEY_ENCRYPTION_SECRET`, `STRIPE_SECRET_KEY`,
+  `STRIPE_WEBHOOK_SECRET`
 
 ---
 
@@ -88,13 +90,14 @@ The frontend never mints its own tokens and never reads service-role secrets.
 | `SUPABASE_SERVICE_ROLE_KEY` | ❌ never | ✅ |
 | `SUPABASE_JWT_SECRET` | ❌ never | ✅ |
 | `TOKEN_PEPPER` | ❌ never | ✅ |
+| `TOKFAI_KEY_ENCRYPTION_SECRET` | ❌ never | ✅ |
 | `GRSAI_API_KEY` / `GRSAI_API_BASE` | ❌ never | ✅ |
 | `STRIPE_SECRET_KEY` | ❌ never | ✅ |
 | `STRIPE_WEBHOOK_SECRET` | ❌ never | ✅ |
 
 If you ever add a `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`,
-`GRSAI_API_KEY`, or `TOKEN_PEPPER` reference to `apps/web`: **stop**. That
-logic belongs in `apps/dmit-api`.
+`GRSAI_API_KEY`, `TOKEN_PEPPER`, or `TOKFAI_KEY_ENCRYPTION_SECRET` reference
+to `apps/web`: **stop**. That logic belongs in `apps/dmit-api`.
 
 ---
 

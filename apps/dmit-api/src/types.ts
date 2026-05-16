@@ -24,6 +24,7 @@ export interface ApiKeyRow {
   key_id: string;
   prefix: string;
   hash: string;
+  encrypted_secret: string | null;
   created_at: string;
   last_used_at: string | null;
   revoked_at: string | null;
