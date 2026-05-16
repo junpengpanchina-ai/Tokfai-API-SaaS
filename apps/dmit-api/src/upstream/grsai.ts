@@ -5,10 +5,9 @@ import { ApiError } from "../errors.js";
  * GRSAI is OpenAI-compatible — we passthrough the body to its
  * /v1/chat/completions endpoint, then layer on billing + logging.
  *
- * This file is a skeleton. The actual call is wired in D5.
  */
 
-const BASE = env.GRSAI_API_BASE.replace(/\/+$/, "");
+const BASE = env.GRSAI_BASE_URL.replace(/\/+$/, "");
 
 export interface UpstreamFetchOptions extends Omit<RequestInit, "body"> {
   json?: unknown;
@@ -37,15 +36,13 @@ export async function grsaiFetch<T = unknown>(
 
   if (!res.ok) {
     const text = await res.text();
+    const mapped = mapUpstreamError(res.status);
     throw new ApiError({
-      status: res.status >= 500 ? 502 : res.status,
+      status: mapped.status,
       message: `GRSAI returned ${res.status}.`,
-      code: "upstream_error",
-      type: "upstream_error",
-      publicMessage:
-        res.status >= 500
-          ? "Upstream provider is having a moment."
-          : truncate(text, 200),
+      code: mapped.code,
+      type: mapped.type,
+      publicMessage: mapped.publicMessage ?? truncate(text, 200),
     });
   }
 
@@ -55,4 +52,34 @@ export async function grsaiFetch<T = unknown>(
 
 function truncate(s: string, n: number): string {
   return s.length > n ? `${s.slice(0, n)}…` : s;
+}
+
+function mapUpstreamError(status: number): {
+  status: number;
+  code: string;
+  type: "auth_error" | "rate_limit_error" | "upstream_error";
+  publicMessage?: string;
+} {
+  if (status === 401 || status === 403) {
+    return {
+      status: 502,
+      code: "upstream_auth_error",
+      type: "upstream_error",
+      publicMessage: "Upstream authentication failed.",
+    };
+  }
+  if (status === 429) {
+    return {
+      status: 429,
+      code: "upstream_rate_limited",
+      type: "rate_limit_error",
+      publicMessage: "Upstream provider is rate limited.",
+    };
+  }
+  return {
+    status: 502,
+    code: "upstream_error",
+    type: "upstream_error",
+    publicMessage: "Upstream provider failed.",
+  };
 }

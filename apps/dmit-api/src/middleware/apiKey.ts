@@ -19,7 +19,7 @@ export const requireApiKey: MiddlewareHandler = async (c, next) => {
   if (!token) {
     throw ApiError.unauthorized(
       "Missing Bearer API key.",
-      "missing_api_key"
+      "missing_token"
     );
   }
   const apiKey = await verifyApiKeyToken(token);

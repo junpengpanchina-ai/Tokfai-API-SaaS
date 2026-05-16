@@ -12,7 +12,8 @@ const csv = (raw: string) =>
     .map((s) => s.trim())
     .filter(Boolean);
 
-const Schema = z.object({
+const Schema = z
+  .object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
@@ -33,8 +34,14 @@ const Schema = z.object({
   TOKEN_PEPPER: z.string().min(32, "TOKEN_PEPPER must be at least 32 chars"),
   TOKFAI_KEY_ENCRYPTION_SECRET: z.string().optional(),
 
-  GRSAI_API_BASE: z.string().url(),
+  GRSAI_BASE_URL: z.string().url().optional(),
+  GRSAI_API_BASE: z.string().url().optional(),
   GRSAI_API_KEY: z.string().min(1),
+  GRSAI_CHAT_COMPLETIONS_PATH: z
+    .string()
+    .min(1)
+    .default("/v1/chat/completions"),
+  BOT_MODEL: z.string().min(1).default("gemini-3.1-pro"),
 
   STRIPE_SECRET_KEY: z.string().min(1),
   STRIPE_WEBHOOK_SECRET: z.string().min(1),
@@ -56,7 +63,17 @@ const Schema = z.object({
     .string()
     .default("https://tokfai.com,http://localhost:3000")
     .transform(csv),
-});
+  })
+  .transform((data) => ({
+    ...data,
+    GRSAI_BASE_URL:
+      data.GRSAI_BASE_URL ?? data.GRSAI_API_BASE ?? "https://grsaiapi.com",
+    GRSAI_CHAT_COMPLETIONS_PATH: data.GRSAI_CHAT_COMPLETIONS_PATH.startsWith(
+      "/"
+    )
+      ? data.GRSAI_CHAT_COMPLETIONS_PATH
+      : `/${data.GRSAI_CHAT_COMPLETIONS_PATH}`,
+  }));
 
 export type Env = z.infer<typeof Schema>;
 

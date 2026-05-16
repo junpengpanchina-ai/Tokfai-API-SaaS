@@ -57,6 +57,7 @@ export interface VerifiedApiKey {
   userId: string;
   name: string;
   keyId: string;
+  prefix: string;
 }
 
 /**
@@ -72,7 +73,7 @@ export async function verifyApiKeyToken(
   if (!isValidApiKeyFormat(rawToken)) {
     throw ApiError.unauthorized(
       "Invalid API key format. Use sk-tokfai_<48 hex>; legacy sk-tokfai-xxx.xxx keys are deprecated and must be regenerated.",
-      "invalid_api_key"
+      "invalid_token"
     );
   }
 
@@ -94,11 +95,11 @@ export async function verifyApiKeyToken(
     );
   }
   if (!data) {
-    throw ApiError.unauthorized("API key not recognised.", "invalid_api_key");
+    throw ApiError.unauthorized("API key not recognised.", "invalid_token");
   }
 
   if (!safeEqualHex(candidate, data.hash)) {
-    throw ApiError.unauthorized("API key not recognised.", "invalid_api_key");
+    throw ApiError.unauthorized("API key not recognised.", "invalid_token");
   }
 
   // Touch last_used_at without blocking the request.
@@ -115,5 +116,6 @@ export async function verifyApiKeyToken(
     userId: data.user_id,
     name: data.name,
     keyId: data.key_id,
+    prefix: data.prefix,
   };
 }
