@@ -17,7 +17,7 @@ const SECTIONS = [
   },
   {
     title: "Authentication",
-    body: "Use Bearer tokens. Every request must include `Authorization: Bearer sk-tokfai-...`.",
+    body: "Use Bearer tokens. Every request must include `Authorization: Bearer sk-tokfai_...`.",
     href: "#authentication",
   },
   {

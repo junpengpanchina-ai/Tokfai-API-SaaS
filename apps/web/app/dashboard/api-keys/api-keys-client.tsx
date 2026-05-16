@@ -212,7 +212,7 @@ export function ApiKeysClient({ accessToken }: { accessToken: string }) {
         <CardHeader>
           <CardTitle>Your keys</CardTitle>
           <CardDescription>
-            Active <code>sk-tokfai-...</code> tokens.
+            Active <code>sk-tokfai_...</code> tokens.
           </CardDescription>
         </CardHeader>
         <CardContent>

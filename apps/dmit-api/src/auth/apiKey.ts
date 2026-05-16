@@ -1,43 +1,43 @@
+import { randomBytes } from "node:crypto";
+
 import { ApiError } from "../errors.js";
 import { supabase } from "../supabase.js";
 import type { ApiKeyRow } from "../types.js";
-import { hashSecret, randomBase64Url, safeEqualHex } from "./hash.js";
+import { hashSecret, safeEqualHex } from "./hash.js";
 
 /**
  * sk-tokfai key format:
- *   sk-tokfai-{key_id}.{secret}
+ *   sk-tokfai_<48 lowercase hex chars>
  *
- * - `key_id` is 8 chars (6 random bytes, base64url). Stored in plaintext;
- *   indexed for O(1) lookup.
- * - `secret` is 32 chars (24 random bytes, base64url). Never stored — only
- *   HMAC-SHA256(TOKEN_PEPPER, secret) hex lives in `api_keys.hash`.
- *
- * Separator is `.` so we can split unambiguously (base64url uses `_` and
- * `-` internally, never `.`).
+ * `key_id` is derived from the first 12 random hex chars and remains indexed
+ * for O(1) lookup. The full plaintext key is never stored; only
+ * HMAC-SHA256(TOKEN_PEPPER, fullKey) hex lives in `api_keys.hash`.
  */
 
-const PREFIX = "sk-tokfai-";
-const SEPARATOR = ".";
-const KEY_ID_BYTES = 6; // -> 8 chars base64url
-const SECRET_BYTES = 24; // -> 32 chars base64url
+const PREFIX = "sk-tokfai_";
+const RANDOM_BYTES = 24; // -> 48 lowercase hex chars
+const KEY_ID_HEX_CHARS = 12; // 48 bits, matching the old lookup entropy
+const DISPLAY_PREFIX_CHARS = 18;
+
+const RANDOM_HEX_PATTERN = /^[0-9a-f]{48}$/;
 
 export interface NewApiKeyMaterial {
   /** Full secret shown to the user once. */
   fullKey: string;
-  /** Public lookup id, e.g. "Abc123Xy". */
+  /** Public lookup id derived from the random key material. */
   keyId: string;
-  /** Display prefix, e.g. "sk-tokfai-Abc123Xy". */
+  /** Display prefix, e.g. "sk-tokfai_6b7f1e7a...". */
   prefix: string;
   /** HMAC hex, suitable for inserting into api_keys.hash. */
   hash: string;
 }
 
 export function generateApiKey(): NewApiKeyMaterial {
-  const keyId = randomBase64Url(KEY_ID_BYTES);
-  const secret = randomBase64Url(SECRET_BYTES);
-  const prefix = `${PREFIX}${keyId}`;
+  const secret = `${PREFIX}${randomBytes(RANDOM_BYTES).toString("hex")}`;
+  const keyId = secret.slice(PREFIX.length, PREFIX.length + KEY_ID_HEX_CHARS);
+  const prefix = `${secret.slice(0, DISPLAY_PREFIX_CHARS)}...`;
   return {
-    fullKey: `${prefix}${SEPARATOR}${secret}`,
+    fullKey: secret,
     keyId,
     prefix,
     hash: hashSecret(secret),
@@ -51,13 +51,12 @@ interface ParsedKey {
 
 export function parseApiKey(raw: string): ParsedKey | null {
   if (!raw.startsWith(PREFIX)) return null;
-  const rest = raw.slice(PREFIX.length);
-  const sepIdx = rest.indexOf(SEPARATOR);
-  if (sepIdx <= 0 || sepIdx === rest.length - 1) return null;
-  const keyId = rest.slice(0, sepIdx);
-  const secret = rest.slice(sepIdx + 1);
-  if (!keyId || !secret) return null;
-  return { keyId, secret };
+  const randomHex = raw.slice(PREFIX.length);
+  if (!RANDOM_HEX_PATTERN.test(randomHex)) return null;
+  return {
+    keyId: randomHex.slice(0, KEY_ID_HEX_CHARS),
+    secret: raw,
+  };
 }
 
 export interface VerifiedApiKey {

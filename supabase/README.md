@@ -15,7 +15,7 @@ supabase/
 | Object | Purpose | Written by |
 |---|---|---|
 | `public.profiles` | One row per user. Holds balance + Stripe customer id. | DMIT |
-| `public.api_keys` | Hashed `sk-tokfai-...` keys. Never store plaintext. | DMIT |
+| `public.api_keys` | Hashed `sk-tokfai_...` keys. Never store plaintext. | DMIT |
 | `public.usage_logs` | One row per API call. | DMIT |
 | `public.credit_ledger` | Append-only ledger of every credit movement. | DMIT |
 | `public.handle_new_user()` trigger | Auto-creates a `profiles` row when an auth user signs up. | Postgres |

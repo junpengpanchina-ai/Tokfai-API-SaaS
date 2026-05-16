@@ -217,7 +217,7 @@ function toApiError(status: number, body: unknown): DmitApiError {
 export interface ApiKey {
   id: string;
   name: string;
-  /** First few public chars of the key, for display, e.g. "sk-tokfai-abcd". */
+  /** First few public chars of the key, for display, e.g. "sk-tokfai_6b7f...". */
   prefix: string;
   created_at: string;
   last_used_at: string | null;
@@ -314,7 +314,7 @@ export async function createCheckoutSession(
 // Chat completions — POST /v1/chat/completions
 //
 // IMPORTANT: this endpoint is NOT called with the user's Supabase JWT. It
-// uses the user's own `sk-tokfai-...` API key — the exact same auth path an
+// uses the user's own `sk-tokfai_...` API key — the exact same auth path an
 // external customer hits. The Playground simulates that customer flow so
 // normal billing / rate limiting / usage logging applies.
 // ---------------------------------------------------------------------------
@@ -364,7 +364,7 @@ export interface ChatCompletionResponse {
 }
 
 /**
- * Call POST /v1/chat/completions using the user's own sk-tokfai-... key.
+ * Call POST /v1/chat/completions using the user's own sk-tokfai_... key.
  *
  * The api key is passed through to the Authorization header and never logged,
  * stored, or persisted by this module.

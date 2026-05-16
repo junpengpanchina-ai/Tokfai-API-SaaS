@@ -12,7 +12,7 @@ belongs in `apps/dmit-api` (`api.tokfai.com`) and the frontend just calls it.
 ## ❌ Never implement in this repo
 
 - Stripe webhook (`/api/webhooks/stripe` or similar). Webhook URL is on DMIT.
-- API-key (`sk-tokfai-...`) verification or hashing.
+- API-key (`sk-tokfai_...`) verification or hashing.
 - `/v1/chat/completions`, `/v1/models`, `/v1/embeddings`, any OpenAI-compatible
   proxy. Even as a "thin pass-through" Next.js Route Handler — don't.
 - Direct calls to GRSAI / OpenAI / any upstream LLM provider.

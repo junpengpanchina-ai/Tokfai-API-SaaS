@@ -65,7 +65,7 @@ export function PlaygroundClient() {
     if (!trimmedKey) {
       setError({
         status: 0,
-        message: "Paste your sk-tokfai- API key first.",
+        message: "Paste your sk-tokfai_ API key first.",
       });
       return;
     }
@@ -106,7 +106,7 @@ export function PlaygroundClient() {
           <h1 className="text-3xl font-semibold tracking-tight">Playground</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Send a chat completion straight from the browser. Uses your own{" "}
-            <code className="rounded bg-muted px-1 text-xs">sk-tokfai-…</code>{" "}
+            <code className="rounded bg-muted px-1 text-xs">sk-tokfai_…</code>{" "}
             key, just like an external customer would.
           </p>
         </div>
@@ -178,7 +178,7 @@ export function PlaygroundClient() {
                   type={showKey ? "text" : "password"}
                   autoComplete="off"
                   spellCheck={false}
-                  placeholder="sk-tokfai-…"
+                  placeholder="sk-tokfai_…"
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   disabled={loading}

@@ -93,7 +93,7 @@ export default function DashboardOverviewPage() {
             n={1}
             title="Create an API key"
             href="/dashboard/api-keys"
-            body="Generate a sk-tokfai-... key. You will only see the secret once."
+            body="Generate a sk-tokfai_... key. You will only see the secret once."
           />
           <Step
             n={2}

@@ -15,8 +15,8 @@ to `usage_logs`, `credit_ledger`, `profiles`, and `api_keys`.
 |---|---|---|
 | `GET/POST/DELETE /v1/keys` | `Bearer <supabase_access_token>` | `SUPABASE_JWT_SECRET` (HS256, jose) |
 | `POST /v1/billing/checkout` | `Bearer <supabase_access_token>` | same |
-| `POST /v1/chat/completions` | `Bearer sk-tokfai-{key_id}.{secret}` | lookup by `key_id`, compare `HMAC-SHA256(TOKEN_PEPPER, secret)` constant-time |
-| `GET  /v1/models` | `Bearer sk-tokfai-...` | same |
+| `POST /v1/chat/completions` | `Bearer sk-tokfai_<hex>` | lookup by `key_id`, compare `HMAC-SHA256(TOKEN_PEPPER, secret)` constant-time |
+| `GET  /v1/models` | `Bearer sk-tokfai_...` | same |
 | `POST /v1/webhooks/stripe` | `Stripe-Signature` header | `STRIPE_WEBHOOK_SECRET` |
 | `GET  /v1/health` | none | — |
 
@@ -37,13 +37,12 @@ to `usage_logs`, `credit_ledger`, `profiles`, and `api_keys`.
 ## API key format
 
 ```
-sk-tokfai-{key_id}.{secret}
-                  ^-- separator is `.` (period)
+sk-tokfai_<48 lowercase hex chars>
 ```
 
-- `key_id` = 8 chars base64url (6 random bytes)
-- `secret` = 32 chars base64url (24 random bytes)
-- Stored: `key_id` (indexed), `prefix = "sk-tokfai-{key_id}"`,
+- random part = 24 random bytes encoded as lowercase hex
+- `key_id` = first 12 chars of the random hex, used for indexed lookup
+- Stored: `key_id` (indexed), `prefix = secret.slice(0, 18) + "..."`,
   `hash = HMAC-SHA256(TOKEN_PEPPER, secret)` hex
 - Lookup by `key_id` is O(1) via the partial unique index where
   `revoked_at IS NULL`
@@ -66,4 +65,4 @@ Every non-2xx response body:
 - ❌ Don't log API keys, JWTs, or Stripe webhook bodies in full. Log the
   `key_id` / `request_id` / Stripe `event.id` only.
 - ❌ Don't use the Supabase anon key. Use service_role only.
-- ❌ Don't store the raw `sk-tokfai-...` secret anywhere — only the HMAC hash.
+- ❌ Don't store the raw `sk-tokfai_...` secret anywhere — only the HMAC hash.

@@ -26,7 +26,7 @@ const res = await fetch(`${BASE}/v1/keys`, {
 ```
 
 For Playground / chat completions, the frontend sends the **user's own
-`sk-tokfai-...` API key** instead — same path an external customer uses, so
+`sk-tokfai_...` API key** instead — same path an external customer uses, so
 normal billing applies.
 
 ## Don't

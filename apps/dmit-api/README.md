@@ -13,8 +13,8 @@
 | `DELETE /v1/keys/:id` | Supabase JWT | ⏳ 501 stub (D3) |
 | `POST /v1/billing/checkout` | Supabase JWT | ⏳ 501 stub (D4) |
 | `POST /v1/webhooks/stripe` | `Stripe-Signature` | ⏳ 501 stub (D4) |
-| `GET /v1/models` | `sk-tokfai-...` | ⏳ 501 stub (D5) |
-| `POST /v1/chat/completions` | `sk-tokfai-...` | ⏳ 501 stub (D5) |
+| `GET /v1/models` | `sk-tokfai_...` | ⏳ 501 stub (D5) |
+| `POST /v1/chat/completions` | `sk-tokfai_...` | ⏳ 501 stub (D5) |
 
 ## Local dev
 
@@ -91,5 +91,5 @@ src/
   `STRIPE_WEBHOOK_SECRET`. None of these may appear in `apps/web`.
 - Writes to `usage_logs`, `credit_ledger`, `profiles.credits_*` happen here
   only, via the `debit_credits` and `credit_purchase` RPCs (atomic).
-- The raw `sk-tokfai-...` secret is never stored. Only its HMAC.
+- The raw `sk-tokfai_...` secret is never stored. Only its HMAC.
 - See `.cursor/rules/dmit-server.mdc` and root `AGENTS.md`.

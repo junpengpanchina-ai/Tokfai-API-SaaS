@@ -1,12 +1,12 @@
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { env } from "../env.js";
 
 /**
  * HMAC-SHA256(TOKEN_PEPPER, secret) -> lowercase hex.
  *
- * Used to hash the secret half of sk-tokfai-{key_id}.{secret} before storing
- * it in `api_keys.hash`. The raw secret is never persisted.
+ * Used to hash API key secret material before storing it in `api_keys.hash`.
+ * The raw secret is never persisted.
  */
 export function hashSecret(secret: string): string {
   return createHmac("sha256", env.TOKEN_PEPPER).update(secret).digest("hex");
@@ -25,7 +25,3 @@ export function safeEqualHex(a: string, b: string): boolean {
   }
 }
 
-/** Random URL-safe base64 string of the given byte length. */
-export function randomBase64Url(bytes: number): string {
-  return randomBytes(bytes).toString("base64url");
-}

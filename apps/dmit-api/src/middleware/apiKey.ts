@@ -8,7 +8,7 @@ import {
 } from "../auth/apiKey.js";
 
 /**
- * Requires a sk-tokfai-... Bearer token. Resolves the api_keys row in
+ * Requires a sk-tokfai_... Bearer token. Resolves the api_keys row in
  * constant time and stashes it on the context as `c.get('apiKey')`.
  *
  * Use this for OpenAI-compatible customer-facing endpoints:

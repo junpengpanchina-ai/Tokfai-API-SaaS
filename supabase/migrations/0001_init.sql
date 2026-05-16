@@ -33,19 +33,19 @@ create index if not exists profiles_stripe_customer_id_idx
   where stripe_customer_id is not null;
 
 -- =============================================================================
--- api_keys  — sk-tokfai-<key_id>_<secret>, only hash is stored
+-- api_keys  — sk-tokfai_<48 hex chars>, only hash is stored
 -- =============================================================================
 --
 -- Key format produced by DMIT:
---   sk-tokfai-{key_id 8 chars base32}_{secret 32 chars base32}
+--   sk-tokfai_{24 random bytes encoded as 48 lowercase hex chars}
 --
 -- DMIT lookup path on every /v1/chat/completions request:
---   1. parse incoming token -> (key_id, secret)
+--   1. parse incoming token -> (key_id from first 12 random hex chars, secret)
 --   2. SELECT ... FROM api_keys WHERE key_id = $1 AND revoked_at IS NULL
 --   3. compare HMAC-SHA256(TOKEN_PEPPER, secret) hex to stored hash (constant-time)
 --
--- The `prefix` column is the public-display form ("sk-tokfai-{key_id}") shown
--- in the dashboard; it does NOT include the secret half.
+-- The `prefix` column is the public-display form (secret.slice(0, 18) || '...')
+-- shown in the dashboard; it does NOT include the full secret.
 
 create table if not exists public.api_keys (
   id            uuid primary key default gen_random_uuid(),
