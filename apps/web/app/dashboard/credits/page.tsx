@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   AlertCircle,
   AlertTriangle,
@@ -30,7 +31,7 @@ export const metadata = {
 const LEDGER_COLUMNS =
   "id, created_at, type, amount, balance_after, reason, reference_id";
 const PROFILE_COLUMNS =
-  "id, email, credits_balance, total_credits_purchased, total_credits_used";
+  "id, email, credits_balance, total_credits_purchased, total_credits_used, updated_at";
 
 const TOPUP_AMOUNTS = [10, 25, 50, 100];
 
@@ -40,9 +41,20 @@ export default async function CreditsPage({
   searchParams: { status?: string };
 }) {
   const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login?redirect=/dashboard/credits");
+  }
 
   const [profileRes, ledgerRes] = await Promise.all([
-    supabase.from("profiles").select(PROFILE_COLUMNS).maybeSingle(),
+    supabase
+      .from("profiles")
+      .select(PROFILE_COLUMNS)
+      .eq("id", user.id)
+      .maybeSingle(),
     supabase
       .from("credit_ledger")
       .select(LEDGER_COLUMNS)
@@ -57,6 +69,7 @@ export default async function CreditsPage({
 
   const profile = (profileRes.data ?? null) as ProfileRow | null;
   const ledger = (ledgerRes.data ?? []) as CreditLedgerRow[];
+  const profileMissing = !profileRes.error && !profile;
 
   return (
     <div className="flex flex-col gap-6">
@@ -74,24 +87,34 @@ export default async function CreditsPage({
         <QueryErrorCard errors={queryErrors} />
       ) : null}
 
+      {profileMissing ? <MissingProfileCard userId={user.id} /> : null}
+
       <Card>
         <CardHeader>
           <CardDescription>Current balance</CardDescription>
           <CardTitle className="text-4xl">
-            {formatUsd(profile?.credits_balance)}
+            {profile ? formatUsd(profile.credits_balance) : "Unavailable"}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-2 text-sm text-muted-foreground">
           <div>
             Total purchased:{" "}
             <span className="font-medium text-foreground">
-              {formatUsd(profile?.total_credits_purchased)}
+              {profile
+                ? formatUsd(profile.total_credits_purchased)
+                : "Unavailable"}
             </span>
           </div>
           <div>
             Total used:{" "}
             <span className="font-medium text-foreground">
-              {formatUsd(profile?.total_credits_used)}
+              {profile ? formatUsd(profile.total_credits_used) : "Unavailable"}
+            </span>
+          </div>
+          <div>
+            Last updated:{" "}
+            <span className="font-medium text-foreground">
+              {profile ? formatDateTime(profile.updated_at) : "Unavailable"}
             </span>
           </div>
         </CardContent>
@@ -158,6 +181,28 @@ export default async function CreditsPage({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function MissingProfileCard({ userId }: { userId: string }) {
+  return (
+    <Card className="border-destructive/30 bg-destructive/5">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <AlertTriangle className="h-4 w-4 text-destructive" />
+          Profile could not be found
+        </CardTitle>
+        <CardDescription>
+          Supabase did not return a <code>profiles</code> row for your user.
+          Balance data cannot be shown until the profile exists.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p className="font-mono text-xs text-muted-foreground">
+          user.id: {userId}
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 

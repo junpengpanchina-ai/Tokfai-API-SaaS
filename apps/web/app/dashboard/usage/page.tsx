@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AlertTriangle, Gauge } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -33,28 +34,40 @@ const PROFILE_COLUMNS =
 
 export default async function UsagePage() {
   const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login?redirect=/dashboard/usage");
+  }
 
   const [logsRes, totalCountRes, successCountRes, failedCountRes, profileRes] =
     await Promise.all([
       supabase
         .from("usage_logs")
         .select(LOG_COLUMNS)
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(50),
       supabase
         .from("usage_logs")
-        .select("id", { count: "exact", head: true }),
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id),
       supabase
         .from("usage_logs")
         .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
         .in("status", SUCCESS_STATUSES),
       supabase
         .from("usage_logs")
         .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
         .not("status", "in", `(${SUCCESS_STATUSES.join(",")})`),
       supabase
         .from("profiles")
         .select(PROFILE_COLUMNS)
+        .eq("id", user.id)
         .maybeSingle(),
     ]);
 
@@ -130,15 +143,13 @@ export default async function UsagePage() {
                     <th className="py-2 pr-4 text-right font-medium">
                       Credits
                     </th>
+                    <th className="py-2 pr-4 font-medium">Request ID</th>
                   </tr>
                 </thead>
                 <tbody>
                   {logs.map((row) => (
                     <tr key={row.id} className="border-b last:border-0">
-                      <td
-                        className="py-2 pr-4 text-muted-foreground"
-                        title={row.request_id ?? undefined}
-                      >
+                      <td className="py-2 pr-4 text-muted-foreground">
                         {formatDateTime(row.created_at)}
                       </td>
                       <td className="py-2 pr-4 font-mono text-xs">
@@ -167,6 +178,11 @@ export default async function UsagePage() {
                           ? formatCreditsPrecise(row.credits_charged)
                           : "—"}
                       </td>
+                      <td
+                        className="max-w-[12rem] truncate py-2 pr-4 font-mono text-xs text-muted-foreground"
+                      >
+                        {truncateRequestId(row.request_id)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -177,6 +193,12 @@ export default async function UsagePage() {
       </Card>
     </div>
   );
+}
+
+function truncateRequestId(requestId: string | null | undefined) {
+  if (!requestId) return "—";
+  if (requestId.length <= 16) return requestId;
+  return `${requestId.slice(0, 8)}...${requestId.slice(-6)}`;
 }
 
 function Stat({ label, value }: { label: string; value: string }) {

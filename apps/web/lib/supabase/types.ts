@@ -34,6 +34,7 @@ export interface ProfileRow {
   credits_balance: number | null;
   total_credits_purchased: number | null;
   total_credits_used: number | null;
+  updated_at: string | null;
 }
 
 export type CreditLedgerType =
