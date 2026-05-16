@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -16,7 +16,11 @@ import {
   formatUsd,
   toneForStatus,
 } from "@/lib/format";
-import { dmitServerFetch, DmitServerError } from "@/lib/dmit/server";
+import {
+  dmitServerFetch,
+  DmitServerError,
+  getDmitBaseUrl,
+} from "@/lib/dmit/server";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
@@ -76,8 +80,17 @@ type ApiKeysResponse = {
   data: AdminApiKey[];
 };
 
+type AdminDebug = {
+  statusCode: string;
+  message: string;
+  dmitBaseUrl: string;
+  hasAccessToken: boolean;
+  userEmail: string | null;
+};
+
 export default async function AdminPage() {
   const supabase = createClient();
+  const dmitBaseUrl = getDmitBaseUrl();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -90,39 +103,56 @@ export default async function AdminPage() {
     data: { session },
   } = await supabase.auth.getSession();
 
-  if (!session?.access_token) {
-    redirect("/login?redirect=/admin");
-  }
+  const userEmail = user.email ?? null;
+  const hasAccessToken = Boolean(session?.access_token);
+  const adminEmails = getAdminEmails();
+  const isAuthorized =
+    userEmail != null && adminEmails.has(userEmail.toLowerCase());
 
   let summary: AdminSummary | null = null;
   let usageLogs: AdminUsageLog[] = [];
   let users: AdminUser[] = [];
   let apiKeys: AdminApiKey[] = [];
-  let loadError: string | null = null;
+  let debug: AdminDebug | null = null;
 
-  try {
-    const [summaryRes, usersRes, apiKeysRes] = await Promise.all([
-      dmitServerFetch<SummaryResponse>("/admin/summary", session.access_token),
-      dmitServerFetch<UsersResponse>("/admin/users", session.access_token),
-      dmitServerFetch<ApiKeysResponse>("/admin/api-keys", session.access_token),
-    ]);
+  if (!isAuthorized) {
+    debug = {
+      statusCode: "403",
+      message: "Not authorized",
+      dmitBaseUrl,
+      hasAccessToken,
+      userEmail,
+    };
+  } else if (!session?.access_token) {
+    debug = {
+      statusCode: "401",
+      message: "Missing Supabase session access_token",
+      dmitBaseUrl,
+      hasAccessToken,
+      userEmail,
+    };
+  } else {
+    try {
+      const [summaryRes, usersRes, apiKeysRes] = await Promise.all([
+        dmitServerFetch<SummaryResponse>("/admin/summary", session.access_token),
+        dmitServerFetch<UsersResponse>("/admin/users", session.access_token),
+        dmitServerFetch<ApiKeysResponse>(
+          "/admin/api-keys",
+          session.access_token
+        ),
+      ]);
 
-    summary = summaryRes.data.summary;
-    usageLogs = summaryRes.data.usage_logs;
-    users = usersRes.data;
-    apiKeys = apiKeysRes.data;
-  } catch (error) {
-    if (
-      error instanceof DmitServerError &&
-      (error.status === 403 || error.status === 404)
-    ) {
-      notFound();
+      summary = summaryRes.data.summary;
+      usageLogs = summaryRes.data.usage_logs;
+      users = usersRes.data;
+      apiKeys = apiKeysRes.data;
+    } catch (error) {
+      debug = toAdminDebug(error, {
+        dmitBaseUrl,
+        hasAccessToken,
+        userEmail,
+      });
     }
-    if (error instanceof DmitServerError && error.status === 401) {
-      redirect("/login?redirect=/admin");
-    }
-    loadError =
-      error instanceof Error ? error.message : "Admin data could not be loaded.";
   }
 
   return (
@@ -139,7 +169,7 @@ export default async function AdminPage() {
           </p>
         </div>
 
-        {loadError ? <LoadError message={loadError} /> : null}
+        {debug ? <AdminDebugCard debug={debug} /> : null}
 
         {summary ? (
           <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
@@ -365,17 +395,76 @@ function EmptyState({ label }: { label: string }) {
   );
 }
 
-function LoadError({ message }: { message: string }) {
+function AdminDebugCard({ debug }: { debug: AdminDebug }) {
   return (
     <Card className="border-destructive/30 bg-destructive/5">
       <CardHeader>
-        <CardTitle className="text-base">Admin data could not be loaded</CardTitle>
-        <CardDescription>{message}</CardDescription>
+        <CardTitle className="text-base">Admin Debug/Error</CardTitle>
+        <CardDescription>{debug.message}</CardDescription>
       </CardHeader>
+      <CardContent>
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+          <DebugRow label="Status code" value={debug.statusCode} />
+          <DebugRow label="Error message" value={debug.message} />
+          <DebugRow label="DMIT API base URL" value={debug.dmitBaseUrl} />
+          <DebugRow
+            label="Has Supabase session access_token"
+            value={debug.hasAccessToken ? "yes" : "no"}
+          />
+          <DebugRow label="Current user email" value={debug.userEmail ?? "—"} />
+        </dl>
+      </CardContent>
     </Card>
+  );
+}
+
+function DebugRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="mt-1 break-words font-mono text-xs">{value}</dd>
+    </div>
   );
 }
 
 function formatMaybeInt(value: number | null | undefined): string {
   return value == null ? "—" : formatInt(value);
+}
+
+function getAdminEmails(): Set<string> {
+  return new Set(
+    (process.env.TOKFAI_ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+function toAdminDebug(
+  error: unknown,
+  context: Omit<AdminDebug, "statusCode" | "message">
+): AdminDebug {
+  if (error instanceof DmitServerError) {
+    return {
+      ...context,
+      statusCode: String(error.status),
+      message: error.message,
+    };
+  }
+
+  if (error instanceof Error) {
+    return {
+      ...context,
+      statusCode: "fetch failed",
+      message: error.message,
+    };
+  }
+
+  return {
+    ...context,
+    statusCode: "unknown",
+    message: "Admin data could not be loaded.",
+  };
 }
