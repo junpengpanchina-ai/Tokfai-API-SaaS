@@ -9,6 +9,7 @@ import { requireApiKey } from "../middleware/apiKey.js";
 import { supabase } from "../supabase.js";
 import type { UsageLogInsert } from "../types.js";
 import { grsaiFetch } from "../upstream/grsai.js";
+import { priceFor } from "../upstream/pricing.js";
 
 const ChatMessageSchema = z
   .object({
@@ -112,6 +113,8 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
   };
 
   try {
+    await assertHasCredits(apiKey.userId);
+
     const { data, upstreamId } = await grsaiFetch<ChatCompletionResponse>(
       env.GRSAI_CHAT_COMPLETIONS_PATH,
       {
@@ -121,15 +124,18 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     );
 
     const usage = normalizeUsage(data.usage);
-    await writeUsageLog({
+    const billedModel = data.model ?? resolvedModel;
+    const creditsCharged = calculateCreditsCharged(billedModel, usage);
+
+    await recordSuccessfulUsageAndDebit({
       user_id: apiKey.userId,
       api_key_id: apiKey.apiKeyId,
-      model: data.model ?? resolvedModel,
+      model: billedModel,
       status: "succeeded",
       prompt_tokens: usage.promptTokens,
       completion_tokens: usage.completionTokens,
       total_tokens: usage.totalTokens,
-      credits_charged: null,
+      credits_charged: creditsCharged,
       request_id: requestId,
       upstream_id: upstreamId,
       error_code: null,
@@ -140,8 +146,9 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     log.info("chat_completion_succeeded", {
       requestId,
       keyPrefix: apiKey.prefix,
-      model: data.model ?? resolvedModel,
+      model: billedModel,
       status: "succeeded",
+      creditsCharged,
     });
 
     return c.json(data);
@@ -227,6 +234,88 @@ function toTokenCount(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value)
     ? Math.trunc(value)
     : null;
+}
+
+async function assertHasCredits(userId: string): Promise<void> {
+  const { data, error } = await supabase()
+    .from("profiles")
+    .select("credits_balance")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw ApiError.internal(
+      `Credit precheck failed: ${error.message}`,
+      "credit_precheck_failed"
+    );
+  }
+
+  if (!data || toNumber(data.credits_balance) <= 0) {
+    throw insufficientCreditsError();
+  }
+}
+
+function calculateCreditsCharged(
+  model: string,
+  usage: ReturnType<typeof normalizeUsage>
+): number {
+  const raw = priceFor(
+    model,
+    usage.promptTokens ?? 0,
+    usage.completionTokens ?? 0
+  );
+  return roundCreditAmount(raw);
+}
+
+function roundCreditAmount(amount: number): number {
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  return Math.ceil(amount * 1_000_000) / 1_000_000;
+}
+
+function toNumber(value: string | number | null | undefined): number {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return Number(value);
+  return 0;
+}
+
+async function recordSuccessfulUsageAndDebit(
+  entry: UsageLogInsert
+): Promise<void> {
+  const { error } = await supabase().rpc("record_usage_and_debit", {
+    p_user_id: entry.user_id,
+    p_api_key_id: entry.api_key_id,
+    p_model: entry.model,
+    p_prompt_tokens: entry.prompt_tokens,
+    p_completion_tokens: entry.completion_tokens,
+    p_total_tokens: entry.total_tokens,
+    p_credits_charged: entry.credits_charged ?? 0,
+    p_request_id: entry.request_id,
+    p_upstream_id: entry.upstream_id,
+    p_latency_ms: entry.latency_ms,
+  });
+
+  if (!error) return;
+
+  if (
+    error.code === "P0001" ||
+    error.message.toLowerCase().includes("insufficient_credits")
+  ) {
+    throw insufficientCreditsError();
+  }
+
+  throw ApiError.internal(
+    `Usage billing failed: ${error.message}`,
+    "usage_billing_failed"
+  );
+}
+
+function insufficientCreditsError(): ApiError {
+  return new ApiError({
+    status: 402,
+    message: "Insufficient credits.",
+    code: "insufficient_credits",
+    type: "billing_error",
+  });
 }
 
 async function writeUsageLog(entry: UsageLogInsert): Promise<void> {
