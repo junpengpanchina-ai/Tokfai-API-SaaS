@@ -1,0 +1,68 @@
+const DEFAULT_BASE = "https://api.tokfai.com";
+
+export class DmitServerError extends Error {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(args: { status: number; message: string; code?: string }) {
+    super(args.message);
+    this.name = "DmitServerError";
+    this.status = args.status;
+    this.code = args.code;
+  }
+}
+
+export function getDmitBaseUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_DMIT_API_BASE?.replace(/\/+$/, "") ?? DEFAULT_BASE
+  );
+}
+
+export async function dmitServerFetch<T>(
+  path: string,
+  accessToken: string
+): Promise<T> {
+  const res = await fetch(`${getDmitBaseUrl()}${path}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    cache: "no-store",
+  });
+
+  const text = await res.text();
+  const body = parseJson(text);
+
+  if (!res.ok) {
+    throw toDmitServerError(res.status, body);
+  }
+
+  return body as T;
+}
+
+function parseJson(text: string): unknown {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function toDmitServerError(status: number, body: unknown): DmitServerError {
+  let message = `DMIT request failed (HTTP ${status}).`;
+  let code: string | undefined;
+
+  if (body && typeof body === "object") {
+    const maybeError = (body as { error?: unknown }).error;
+    if (maybeError && typeof maybeError === "object") {
+      const err = maybeError as { message?: unknown; code?: unknown };
+      if (typeof err.message === "string") message = err.message;
+      if (typeof err.code === "string") code = err.code;
+    }
+  } else if (typeof body === "string" && body.trim()) {
+    message = body;
+  }
+
+  return new DmitServerError({ status, message, code });
+}

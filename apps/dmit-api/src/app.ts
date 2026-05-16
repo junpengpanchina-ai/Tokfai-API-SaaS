@@ -10,6 +10,7 @@ import { billingRoutes } from "./routes/billing.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 import { modelRoutes } from "./routes/models.js";
 import { chatRoutes } from "./routes/chat.js";
+import { adminRoutes } from "./routes/admin.js";
 
 export function buildApp() {
   const app = new Hono();
@@ -23,6 +24,7 @@ export function buildApp() {
   app.route("/", webhookRoutes);
   app.route("/", modelRoutes);
   app.route("/", chatRoutes);
+  app.route("/", adminRoutes);
 
   app.notFound(notFoundHandler);
   app.onError(errorHandler);

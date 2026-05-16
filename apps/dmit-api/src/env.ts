@@ -30,6 +30,10 @@ const Schema = z
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
   SUPABASE_JWT_SECRET: z.string().min(20),
+  TOKFAI_ADMIN_EMAILS: z
+    .string()
+    .default("")
+    .transform((raw) => csv(raw).map((email) => email.toLowerCase())),
 
   TOKEN_PEPPER: z.string().min(32, "TOKEN_PEPPER must be at least 32 chars"),
   TOKFAI_KEY_ENCRYPTION_SECRET: z.string().optional(),
