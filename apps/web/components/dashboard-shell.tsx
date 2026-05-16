@@ -38,7 +38,7 @@ export async function DashboardShell({
           <div className="mx-auto flex w-full max-w-6xl items-center justify-between">
             <span>Tokfai · OpenAI-compatible image &amp; chat API</span>
             <Link
-              href="/docs"
+              href="/dashboard/docs"
               className="transition-colors hover:text-foreground"
             >
               API reference →

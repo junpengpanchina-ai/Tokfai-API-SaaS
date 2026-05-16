@@ -40,7 +40,7 @@ const NAV_ITEMS = [
     icon: CreditCard,
     prefetch: false,
   },
-  { href: "/docs", label: "Docs", icon: BookOpen, prefetch: true },
+  { href: "/dashboard/docs", label: "Docs", icon: BookOpen, prefetch: true },
 ];
 
 export function DashboardSidebar() {
