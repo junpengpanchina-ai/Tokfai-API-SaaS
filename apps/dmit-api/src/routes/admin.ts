@@ -30,6 +30,19 @@ type UsageAdminRow = {
   request_id: string | null;
 };
 
+type UsageCreditRow = {
+  credits_charged: number | string | null;
+};
+
+type ApiKeyAdminRow = {
+  id: string;
+  name: string;
+  prefix: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+};
+
 function authedUser(c: { get: (key: never) => unknown }): AuthedUser {
   return c.get("user" as never) as AuthedUser;
 }
@@ -112,6 +125,31 @@ async function listAllProfiles(): Promise<ProfileAdminRow[]> {
   return rows;
 }
 
+async function sumUsageCreditsCharged(): Promise<number> {
+  let total = 0;
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await supabase()
+      .from("usage_logs")
+      .select("credits_charged")
+      .range(from, to);
+
+    if (error) {
+      throw ApiError.internal(
+        `Failed to sum usage credits: ${error.message}`,
+        "admin_usage_sum_failed"
+      );
+    }
+
+    const page = (data ?? []) as UsageCreditRow[];
+    total += page.reduce((sum, row) => sum + toNumber(row.credits_charged), 0);
+    if (page.length < PAGE_SIZE) break;
+  }
+
+  return total;
+}
+
 async function listRecentUsageLogs() {
   const { data, error } = await supabase()
     .from("usage_logs")
@@ -167,6 +205,32 @@ async function listRecentUsageLogs() {
   }));
 }
 
+async function listAllApiKeys(): Promise<ApiKeyAdminRow[]> {
+  const rows: ApiKeyAdminRow[] = [];
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await supabase()
+      .from("api_keys")
+      .select("id, name, prefix, created_at, last_used_at, revoked_at")
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      throw ApiError.internal(
+        `Failed to list API keys: ${error.message}`,
+        "admin_api_keys_list_failed"
+      );
+    }
+
+    const page = (data ?? []) as ApiKeyAdminRow[];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) break;
+  }
+
+  return rows;
+}
+
 export const adminRoutes = new Hono();
 
 adminRoutes.use("/admin/*", requireSupabaseJwt);
@@ -176,30 +240,23 @@ adminRoutes.use("/admin/*", async (c, next) => {
 });
 
 adminRoutes.get("/admin/summary", async (c) => {
-  const [totalUsers, totalApiKeys, totalRequests, successRequests, profiles, logs] =
+  const [totalUsers, totalRequests, successRequests, totalCreditsCharged, logs] =
     await Promise.all([
       countRows("profiles"),
-      countRows("api_keys"),
       countRows("usage_logs"),
       countSuccessfulUsage(),
-      listAllProfiles(),
+      sumUsageCreditsCharged(),
       listRecentUsageLogs(),
     ]);
-
-  const totalCreditsConsumed = profiles.reduce(
-    (sum, row) => sum + toNumber(row.total_credits_used),
-    0
-  );
 
   return c.json({
     data: {
       summary: {
         total_users: totalUsers,
-        total_api_keys: totalApiKeys,
         total_requests: totalRequests,
         success_requests: successRequests,
         failed_requests: Math.max(totalRequests - successRequests, 0),
-        total_credits_consumed: totalCreditsConsumed,
+        total_credits_charged: totalCreditsCharged,
       },
       usage_logs: logs,
     },
@@ -216,6 +273,21 @@ adminRoutes.get("/admin/users", async (c) => {
       credits_balance: toNumber(row.credits_balance),
       total_credits_used: toNumber(row.total_credits_used),
       updated_at: row.updated_at,
+    })),
+  });
+});
+
+adminRoutes.get("/admin/api-keys", async (c) => {
+  const apiKeys = await listAllApiKeys();
+
+  return c.json({
+    data: apiKeys.map((row) => ({
+      id: row.id,
+      name: row.name,
+      prefix: row.prefix,
+      created_at: row.created_at,
+      last_used_at: row.last_used_at,
+      revoked_at: row.revoked_at,
     })),
   });
 });

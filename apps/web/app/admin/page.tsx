@@ -25,11 +25,10 @@ export const metadata = {
 
 type AdminSummary = {
   total_users: number;
-  total_api_keys: number;
   total_requests: number;
   success_requests: number;
   failed_requests: number;
-  total_credits_consumed: number;
+  total_credits_charged: number;
 };
 
 type AdminUsageLog = {
@@ -53,6 +52,15 @@ type AdminUser = {
   updated_at: string | null;
 };
 
+type AdminApiKey = {
+  id: string;
+  name: string;
+  prefix: string;
+  created_at: string | null;
+  last_used_at: string | null;
+  revoked_at: string | null;
+};
+
 type SummaryResponse = {
   data: {
     summary: AdminSummary;
@@ -62,6 +70,10 @@ type SummaryResponse = {
 
 type UsersResponse = {
   data: AdminUser[];
+};
+
+type ApiKeysResponse = {
+  data: AdminApiKey[];
 };
 
 export default async function AdminPage() {
@@ -85,17 +97,20 @@ export default async function AdminPage() {
   let summary: AdminSummary | null = null;
   let usageLogs: AdminUsageLog[] = [];
   let users: AdminUser[] = [];
+  let apiKeys: AdminApiKey[] = [];
   let loadError: string | null = null;
 
   try {
-    const [summaryRes, usersRes] = await Promise.all([
+    const [summaryRes, usersRes, apiKeysRes] = await Promise.all([
       dmitServerFetch<SummaryResponse>("/admin/summary", session.access_token),
       dmitServerFetch<UsersResponse>("/admin/users", session.access_token),
+      dmitServerFetch<ApiKeysResponse>("/admin/api-keys", session.access_token),
     ]);
 
     summary = summaryRes.data.summary;
     usageLogs = summaryRes.data.usage_logs;
     users = usersRes.data;
+    apiKeys = apiKeysRes.data;
   } catch (error) {
     if (
       error instanceof DmitServerError &&
@@ -127,12 +142,8 @@ export default async function AdminPage() {
         {loadError ? <LoadError message={loadError} /> : null}
 
         {summary ? (
-          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
             <Stat label="Total users" value={formatInt(summary.total_users)} />
-            <Stat
-              label="Total API keys"
-              value={formatInt(summary.total_api_keys)}
-            />
             <Stat
               label="Total requests"
               value={formatInt(summary.total_requests)}
@@ -143,8 +154,8 @@ export default async function AdminPage() {
             />
             <Stat label="Failed" value={formatInt(summary.failed_requests)} />
             <Stat
-              label="Credits consumed"
-              value={formatUsd(summary.total_credits_consumed)}
+              label="Credits charged"
+              value={formatUsd(summary.total_credits_charged)}
             />
           </div>
         ) : null}
@@ -266,6 +277,54 @@ export default async function AdminPage() {
               </div>
             ) : (
               <EmptyState label="No profiles found." />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>API keys</CardTitle>
+            <CardDescription>
+              Metadata only. Full keys, hashes, and encrypted secrets are never
+              returned to this page.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {apiKeys.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                      <th className="py-2 pr-4 font-medium">Name</th>
+                      <th className="py-2 pr-4 font-medium">Prefix</th>
+                      <th className="py-2 pr-4 font-medium">Created</th>
+                      <th className="py-2 pr-4 font-medium">Last used</th>
+                      <th className="py-2 pr-4 font-medium">Revoked</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {apiKeys.map((row) => (
+                      <tr key={row.id} className="border-b last:border-0">
+                        <td className="py-2 pr-4 font-medium">{row.name}</td>
+                        <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">
+                          {row.prefix}
+                        </td>
+                        <td className="py-2 pr-4 text-muted-foreground">
+                          {formatDateTime(row.created_at)}
+                        </td>
+                        <td className="py-2 pr-4 text-muted-foreground">
+                          {formatDateTime(row.last_used_at)}
+                        </td>
+                        <td className="py-2 pr-4 text-muted-foreground">
+                          {formatDateTime(row.revoked_at)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState label="No API keys found." />
             )}
           </CardContent>
         </Card>
