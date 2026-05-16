@@ -1,3 +1,4 @@
+import { createClient } from "@supabase/supabase-js";
 import { Hono } from "hono";
 
 import { extractBearer } from "../auth/jwt.js";
@@ -52,24 +53,52 @@ function adminEmailsFromEnv(): string[] {
     .filter(Boolean);
 }
 
+function adminAuthClient() {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw ApiError.internal("Missing Supabase admin auth env.", "admin_auth_env_missing");
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}
+
 async function requireAdmin(c: {
   req: { header: (name: string) => string | undefined };
   json: (data: unknown, status?: number) => Response;
 }) {
   const token = extractBearer(c.req.header("authorization"));
-  if (!token) {
-    throw ApiError.unauthorized("Missing Bearer token.", "missing_token");
-  }
-
-  const { data, error } = await supabase().auth.getUser(token);
-  if (error || !data.user) {
-    throw ApiError.unauthorized("Invalid Bearer token.", "invalid_token");
-  }
-
-  const currentEmail = normalizeEmail(data.user.email);
-  const adminEmailsRaw = process.env.TOKFAI_ADMIN_EMAILS;
+  const hasToken = Boolean(token);
+  const adminEmailsRaw = process.env.TOKFAI_ADMIN_EMAILS ?? "";
   const adminEmails = adminEmailsFromEnv();
+
+  let currentEmail = "";
+  let authUserErrorMessage: string | null = hasToken
+    ? null
+    : "Missing Bearer token.";
+
+  if (token) {
+    const { data, error } = await adminAuthClient().auth.getUser(token);
+    authUserErrorMessage = error?.message ?? (!data.user ? "No user returned." : null);
+    currentEmail = normalizeEmail(data.user?.email);
+  }
+
   const matchResult = Boolean(currentEmail && adminEmails.includes(currentEmail));
+
+  // Deliberately excludes bearer token and server-only secrets.
+  console.log("ADMIN_AUTH_DEBUG", {
+    currentEmail,
+    adminEmails,
+    matchResult,
+    authUserErrorMessage,
+  });
 
   if (!matchResult) {
     const body = {
@@ -78,12 +107,14 @@ async function requireAdmin(c: {
         code: "admin_not_authorized",
         type: "auth_error",
       },
-      ...(process.env.NODE_ENV === "development"
+      ...(process.env.NODE_ENV !== "production"
         ? {
             debug: {
               currentEmail,
               adminEmails,
-              adminEmailsRawPresent: Boolean(adminEmailsRaw),
+              adminEmailsRaw,
+              hasToken,
+              authUserErrorMessage,
               matchResult,
             },
           }
