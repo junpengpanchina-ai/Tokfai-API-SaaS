@@ -66,14 +66,14 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     );
   }
 
-  const model = parsed.data.model ?? env.BOT_MODEL;
+  const resolvedModel = parsed.data.model || env.BOT_MODEL;
   const stream = parsed.data.stream ?? false;
 
   if (stream) {
     await writeUsageLog({
       user_id: apiKey.userId,
       api_key_id: apiKey.apiKeyId,
-      model,
+      model: resolvedModel,
       status: "failed",
       prompt_tokens: null,
       completion_tokens: null,
@@ -89,7 +89,7 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     log.warn("chat_completion_rejected", {
       requestId,
       keyPrefix: apiKey.prefix,
-      model,
+      model: resolvedModel,
       status: "stream_not_supported",
     });
 
@@ -106,10 +106,8 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
   }
 
   const upstreamBody = {
-    model,
-    messages: parsed.data.messages,
-    temperature: parsed.data.temperature,
-    max_tokens: parsed.data.max_tokens,
+    ...parsed.data,
+    model: resolvedModel,
     stream,
   };
 
@@ -126,7 +124,7 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     await writeUsageLog({
       user_id: apiKey.userId,
       api_key_id: apiKey.apiKeyId,
-      model: data.model ?? model,
+      model: data.model ?? resolvedModel,
       status: "succeeded",
       prompt_tokens: usage.promptTokens,
       completion_tokens: usage.completionTokens,
@@ -142,7 +140,7 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     log.info("chat_completion_succeeded", {
       requestId,
       keyPrefix: apiKey.prefix,
-      model: data.model ?? model,
+      model: data.model ?? resolvedModel,
       status: "succeeded",
     });
 
@@ -152,7 +150,7 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       await writeUsageLog({
         user_id: apiKey.userId,
         api_key_id: apiKey.apiKeyId,
-        model,
+        model: resolvedModel,
         status: err.code === "upstream_rate_limited" ? "rate_limited" : "failed",
         prompt_tokens: null,
         completion_tokens: null,
@@ -168,7 +166,7 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       log.warn("chat_completion_failed", {
         requestId,
         keyPrefix: apiKey.prefix,
-        model,
+        model: resolvedModel,
         status: err.code ?? "failed",
       });
 
@@ -178,7 +176,7 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     await writeUsageLog({
       user_id: apiKey.userId,
       api_key_id: apiKey.apiKeyId,
-      model,
+      model: resolvedModel,
       status: "failed",
       prompt_tokens: null,
       completion_tokens: null,
@@ -194,7 +192,7 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     log.error("chat_completion_failed", {
       requestId,
       keyPrefix: apiKey.prefix,
-      model,
+      model: resolvedModel,
       status: "server_error",
     });
 
