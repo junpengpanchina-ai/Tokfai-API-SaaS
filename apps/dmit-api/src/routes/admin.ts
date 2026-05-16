@@ -1,10 +1,8 @@
 import { Hono } from "hono";
 
-import { env } from "../env.js";
+import { extractBearer } from "../auth/jwt.js";
 import { ApiError } from "../errors.js";
-import { requireSupabaseJwt } from "../middleware/supabaseJwt.js";
 import { supabase } from "../supabase.js";
-import type { AuthedUser } from "../types.js";
 
 const SUCCESS_STATUSES = ["succeeded", "success", "ok"];
 const PAGE_SIZE = 1000;
@@ -43,23 +41,56 @@ type ApiKeyAdminRow = {
   revoked_at: string | null;
 };
 
-function authedUser(c: { get: (key: never) => unknown }): AuthedUser {
-  return c.get("user" as never) as AuthedUser;
-}
-
 function normalizeEmail(email: string | null | undefined): string {
   return (email ?? "").trim().toLowerCase();
 }
 
-function isAdmin(user: AuthedUser): boolean {
-  const email = normalizeEmail(user.email);
-  return Boolean(email && env.TOKFAI_ADMIN_EMAILS.includes(email));
+function adminEmailsFromEnv(): string[] {
+  return (process.env.TOKFAI_ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
 }
 
-async function requireAdmin(c: { get: (key: never) => unknown }) {
-  const user = authedUser(c);
-  if (!isAdmin(user)) {
-    throw ApiError.notFound("Not found.", "route_not_found");
+async function requireAdmin(c: {
+  req: { header: (name: string) => string | undefined };
+  json: (data: unknown, status?: number) => Response;
+}) {
+  const token = extractBearer(c.req.header("authorization"));
+  if (!token) {
+    throw ApiError.unauthorized("Missing Bearer token.", "missing_token");
+  }
+
+  const { data, error } = await supabase().auth.getUser(token);
+  if (error || !data.user) {
+    throw ApiError.unauthorized("Invalid Bearer token.", "invalid_token");
+  }
+
+  const currentEmail = normalizeEmail(data.user.email);
+  const adminEmailsRaw = process.env.TOKFAI_ADMIN_EMAILS;
+  const adminEmails = adminEmailsFromEnv();
+  const matchResult = Boolean(currentEmail && adminEmails.includes(currentEmail));
+
+  if (!matchResult) {
+    const body = {
+      error: {
+        message: "Not authorized.",
+        code: "admin_not_authorized",
+        type: "auth_error",
+      },
+      ...(process.env.NODE_ENV === "development"
+        ? {
+            debug: {
+              currentEmail,
+              adminEmails,
+              adminEmailsRawPresent: Boolean(adminEmailsRaw),
+              matchResult,
+            },
+          }
+        : {}),
+    };
+
+    return c.json(body, 403);
   }
 }
 
@@ -233,9 +264,9 @@ async function listAllApiKeys(): Promise<ApiKeyAdminRow[]> {
 
 export const adminRoutes = new Hono();
 
-adminRoutes.use("/admin/*", requireSupabaseJwt);
 adminRoutes.use("/admin/*", async (c, next) => {
-  await requireAdmin(c);
+  const response = await requireAdmin(c);
+  if (response) return response;
   await next();
 });
 
