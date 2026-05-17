@@ -109,6 +109,8 @@ export function ApiKeysClient({ accessToken }: { accessToken: string }) {
   }
 
   async function handleRevoke(key: ApiKey) {
+    if (key.revoked_at) return;
+
     const ok = window.confirm(
       `Revoke "${key.name}"? Any traffic using this key will start failing immediately.`
     );
@@ -245,7 +247,7 @@ export function ApiKeysClient({ accessToken }: { accessToken: string }) {
         <CardHeader>
           <CardTitle>Your keys</CardTitle>
           <CardDescription>
-            Active <code>sk-tokfai_...</code> tokens. Full API keys are
+            Your <code>sk-tokfai_...</code> tokens. Full API keys are
             encrypted and can be copied by the owner. For security, revoked or
             legacy keys cannot be revealed.
           </CardDescription>
@@ -325,61 +327,72 @@ function KeyList({
           <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
             <th className="py-2 pr-4 font-medium">Name</th>
             <th className="py-2 pr-4 font-medium">Prefix</th>
+            <th className="py-2 pr-4 font-medium">Status</th>
             <th className="py-2 pr-4 font-medium">Last used</th>
             <th className="py-2 pr-4 font-medium">Created</th>
             <th className="py-2 pr-2 text-right font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {state.keys.map((key) => (
-            <tr key={key.id} className="border-b last:border-0">
-              <td className="py-3 pr-4 font-medium">{key.name}</td>
-              <td className="py-3 pr-4 font-mono text-xs text-muted-foreground">
-                {key.prefix}
-              </td>
-              <td className="py-3 pr-4 text-muted-foreground">
-                {key.last_used_at ? (
-                  formatDate(key.last_used_at)
-                ) : (
-                  <Badge variant="outline">Never</Badge>
-                )}
-              </td>
-              <td className="py-3 pr-4 text-muted-foreground">
-                {formatDate(key.created_at)}
-              </td>
-              <td className="py-3 pr-2 text-right">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => onCopyKey(key)}
-                  disabled={copyingKeyId === key.id}
-                  className="mr-1"
-                  aria-label={`Copy API key for ${key.name}`}
-                >
-                  {copyingKeyId === key.id ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+          {state.keys.map((key) => {
+            const isRevoked = Boolean(key.revoked_at);
+            return (
+              <tr key={key.id} className="border-b last:border-0">
+                <td className="py-3 pr-4 font-medium">{key.name}</td>
+                <td className="py-3 pr-4 font-mono text-xs text-muted-foreground">
+                  {key.prefix}
+                </td>
+                <td className="py-3 pr-4">
+                  {isRevoked ? (
+                    <Badge variant="outline">Revoked</Badge>
                   ) : (
-                    <Copy className="h-4 w-4" />
+                    <Badge variant="success">Active</Badge>
                   )}
-                  Copy key
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => onRevoke(key)}
-                  disabled={revokingId === key.id}
-                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                >
-                  {revokingId === key.id ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                </td>
+                <td className="py-3 pr-4 text-muted-foreground">
+                  {key.last_used_at ? (
+                    formatDate(key.last_used_at)
                   ) : (
-                    <Trash2 className="h-4 w-4" />
+                    <Badge variant="outline">Never</Badge>
                   )}
-                  Revoke
-                </Button>
-              </td>
-            </tr>
-          ))}
+                </td>
+                <td className="py-3 pr-4 text-muted-foreground">
+                  {formatDate(key.created_at)}
+                </td>
+                <td className="py-3 pr-2 text-right">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => onCopyKey(key)}
+                    disabled={copyingKeyId === key.id || isRevoked}
+                    className="mr-1"
+                    aria-label={`Copy API key for ${key.name}`}
+                  >
+                    {copyingKeyId === key.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                    Copy key
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => onRevoke(key)}
+                    disabled={revokingId === key.id || isRevoked}
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    {revokingId === key.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                    {isRevoked ? "Revoked" : "Revoke"}
+                  </Button>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

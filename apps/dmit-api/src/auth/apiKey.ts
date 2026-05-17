@@ -65,7 +65,8 @@ export interface VerifiedApiKey {
  * and mark `last_used_at` (fire-and-forget — we never block the call on
  * the update).
  *
- * Throws ApiError 401 on any failure (no leak of whether the key existed).
+ * Throws ApiError 401 on auth failures. Revoked keys get a distinct stable
+ * code so dashboard and API clients can explain why the token stopped working.
  */
 export async function verifyApiKeyToken(
   rawToken: string
@@ -85,7 +86,6 @@ export async function verifyApiKeyToken(
       "id, user_id, name, key_id, prefix, hash, created_at, last_used_at, revoked_at"
     )
     .eq("hash", candidate)
-    .is("revoked_at", null)
     .maybeSingle();
 
   if (error) {
@@ -100,6 +100,10 @@ export async function verifyApiKeyToken(
 
   if (!safeEqualHex(candidate, data.hash)) {
     throw ApiError.unauthorized("API key not recognised.", "invalid_token");
+  }
+
+  if (data.revoked_at) {
+    throw ApiError.unauthorized("API key has been revoked.", "key_revoked");
   }
 
   // Touch last_used_at without blocking the request.

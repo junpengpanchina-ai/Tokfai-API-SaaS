@@ -29,7 +29,6 @@ keyRoutes.get("/v1/keys", async (c) => {
     .from("api_keys")
     .select("id, name, prefix, created_at, last_used_at, revoked_at")
     .eq("user_id", user.id)
-    .is("revoked_at", null)
     .order("created_at", { ascending: false });
 
   if (error) {
