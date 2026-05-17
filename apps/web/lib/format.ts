@@ -2,36 +2,16 @@
  * Small formatting helpers reused across dashboard pages. No date libs.
  */
 
-const USD_2DP = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-const USD_PRECISE = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 4,
-  maximumFractionDigits: 6,
-});
-
 const INTEGER = new Intl.NumberFormat("en-US");
 const CREDITS = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 0,
   maximumFractionDigits: 6,
 });
 
-/** $X.XX with cents — for balances and large totals. */
-export function formatUsd(value: number | null | undefined): string {
-  return USD_2DP.format(value ?? 0);
-}
-
-/** $0.000123 — for per-request charges. */
 export function formatCreditsPrecise(
   value: number | null | undefined
 ): string {
-  return USD_PRECISE.format(value ?? 0);
+  return `${CREDITS.format(value ?? 0)} credits`;
 }
 
 export function formatInt(value: number | null | undefined): string {

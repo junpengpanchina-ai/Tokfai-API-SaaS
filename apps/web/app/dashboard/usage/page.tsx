@@ -12,10 +12,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  formatCredits,
   formatCreditsPrecise,
   formatDateTime,
   formatInt,
-  formatUsd,
   toneForStatus,
 } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
@@ -105,7 +105,7 @@ export default async function UsagePage() {
         <Stat label="Total requests" value={formatInt(totalRequests)} />
         <Stat label="Succeeded" value={formatInt(successRequests)} />
         <Stat label="Failed" value={formatInt(failedRequests)} />
-        <Stat label="Cost used" value={formatUsd(totalCreditsUsed)} />
+        <Stat label="Credits used" value={formatCredits(totalCreditsUsed)} />
       </div>
 
       <Card>

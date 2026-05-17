@@ -1,8 +1,20 @@
-
-# local DMIT debug/runtime files
+# local environment and backup files
+.env
+.env.*
+*.env
+*.local
+*.save
+*.bak
 apps/dmit-api/.env
 apps/dmit-api/.env.*
-apps/dmit-api/*.save
+apps/web/.env
+apps/web/.env.*
+
+# tracked environment templates are safe to keep versioned
+!apps/dmit-api/.env.example
+!apps/web/.env.local.example
+
+# local DMIT debug/runtime files
 apps/dmit-api/dmit_check.sh
 apps/dmit-api/dmit_helper.sh
 apps/dmit-api/es

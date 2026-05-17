@@ -49,7 +49,7 @@ export interface CreditLedgerRow {
   id: string;
   created_at: string;
   type: CreditLedgerType | null;
-  /** Positive = credits added, negative = credits debited. USD-equivalent. */
+  /** Positive = credits added, negative = credits debited. */
   amount: number | null;
   /** Credit balance immediately after this entry. */
   balance_after: number | null;

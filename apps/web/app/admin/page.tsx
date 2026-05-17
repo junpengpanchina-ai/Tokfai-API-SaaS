@@ -10,10 +10,10 @@ import {
 } from "@/components/ui/card";
 import { DashboardShell } from "@/components/dashboard-shell";
 import {
+  formatCredits,
   formatCreditsPrecise,
   formatDateTime,
   formatInt,
-  formatUsd,
   toneForStatus,
 } from "@/lib/format";
 import {
@@ -182,7 +182,7 @@ export default async function AdminPage() {
             <Stat label="Failed" value={formatInt(summary.failed_requests)} />
             <Stat
               label="Credits charged"
-              value={formatUsd(summary.total_credits_charged)}
+              value={formatCredits(summary.total_credits_charged)}
             />
           </div>
         ) : null}
@@ -289,10 +289,10 @@ export default async function AdminPage() {
                       <tr key={row.id} className="border-b last:border-0">
                         <td className="py-2 pr-4">{row.email ?? "—"}</td>
                         <td className="py-2 pr-4 text-right font-mono text-xs">
-                          {formatUsd(row.credits_balance)}
+                          {formatCredits(row.credits_balance)}
                         </td>
                         <td className="py-2 pr-4 text-right font-mono text-xs">
-                          {formatUsd(row.total_credits_used)}
+                          {formatCredits(row.total_credits_used)}
                         </td>
                         <td className="py-2 pr-4 text-muted-foreground">
                           {formatDateTime(row.updated_at)}

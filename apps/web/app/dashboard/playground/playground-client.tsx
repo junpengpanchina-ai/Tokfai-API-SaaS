@@ -28,6 +28,7 @@ import {
   type ChatCompletionResponse,
   type ModelListItem,
 } from "@/lib/dmit/client";
+import { formatCreditsPrecise } from "@/lib/format";
 
 const DEFAULT_MODEL = "gemini-3.1-pro";
 const FALLBACK_MODELS = [DEFAULT_MODEL] as const;
@@ -499,12 +500,7 @@ function UsageRow({
   if (typeof tokfai?.credits_charged === "number") {
     items.push({
       label: "credits charged",
-      value: tokfai.credits_charged.toLocaleString("en-US", {
-        style: "currency",
-        currency: "USD",
-        minimumFractionDigits: 4,
-        maximumFractionDigits: 6,
-      }),
+      value: formatCreditsPrecise(tokfai.credits_charged),
     });
   }
 
