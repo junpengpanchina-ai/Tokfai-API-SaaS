@@ -240,6 +240,8 @@ async function createCheckoutSession(c: Context) {
  */
 export const billingRoutes = new Hono();
 
-billingRoutes.use("/*", requireSupabaseJwt);
+billingRoutes.use("/billing/*", requireSupabaseJwt);
+billingRoutes.use("/v1/billing/*", requireSupabaseJwt);
 
-billingRoutes.post("/create-checkout-session", createCheckoutSession);
+billingRoutes.post("/v1/billing/checkout", createCheckoutSession);
+billingRoutes.post("/billing/create-checkout-session", createCheckoutSession);

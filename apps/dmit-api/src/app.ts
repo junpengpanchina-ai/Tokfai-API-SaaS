@@ -20,7 +20,7 @@ export function buildApp() {
 
   app.route("/", healthRoutes);
   app.route("/", keyRoutes);
-  app.route("/billing", billingRoutes);
+  app.route("/", billingRoutes);
   app.route("/stripe", stripeWebhookRoutes);
   app.route("/", modelRoutes);
   app.route("/", chatRoutes);

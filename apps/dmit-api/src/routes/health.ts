@@ -18,6 +18,7 @@ healthRoutes.get("/__version", (c) =>
     routes: [
       "GET /v1/models",
       "POST /v1/chat/completions",
+      "POST /v1/billing/checkout",
       "GET /api/system/health",
       "GET /admin/health",
       "POST /billing/create-checkout-session",
