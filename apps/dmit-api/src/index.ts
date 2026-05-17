@@ -3,8 +3,10 @@ import { serve } from "@hono/node-server";
 import { buildApp } from "./app.js";
 import { env } from "./env.js";
 import { log } from "./logger.js";
+import { handleStripeWebhook } from "./routes/webhooks.js";
 
 const app = buildApp();
+app.post("/v1/webhooks/stripe", handleStripeWebhook);
 
 const server = serve(
   {
