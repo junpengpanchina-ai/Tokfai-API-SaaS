@@ -48,6 +48,7 @@ export interface UsageLogInsert {
 
 export type CreditLedgerType =
   | "purchase"
+  | "topup"
   | "grant"
   | "refund"
   | "debit"

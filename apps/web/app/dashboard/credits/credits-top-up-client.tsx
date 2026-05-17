@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,19 +12,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { createCheckoutSession, DmitApiError } from "@/lib/dmit/client";
 
 interface CreditPlan {
   plan_id: "starter" | "pro" | "business";
   name: string;
   amount_cny: number;
   credits: number;
-}
-
-interface RechargeIntent {
-  plan_id: CreditPlan["plan_id"];
-  amount_cny: number;
-  credits: number;
-  user_id: string;
 }
 
 const CREDIT_PLANS: CreditPlan[] = [
@@ -48,27 +42,30 @@ const CREDIT_PLANS: CreditPlan[] = [
   },
 ];
 
-export function CreditsTopUpClient({ userId }: { userId: string }) {
+export function CreditsTopUpClient() {
   const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
-  const [selectedIntent, setSelectedIntent] = useState<RechargeIntent | null>(
-    null
-  );
+  const [error, setError] = useState<string | null>(null);
 
   async function handleRecharge(plan: CreditPlan) {
     if (loadingPlanId != null) return;
 
-    const intent: RechargeIntent = {
-      plan_id: plan.plan_id,
-      amount_cny: plan.amount_cny,
-      credits: plan.credits,
-      user_id: userId,
-    };
-
     setLoadingPlanId(plan.plan_id);
-    setSelectedIntent(null);
-    await createRechargePlaceholder(intent);
-    setSelectedIntent(intent);
-    setLoadingPlanId(null);
+    setError(null);
+    try {
+      const session = await createCheckoutSession({
+        plan_id: plan.plan_id,
+        success_url: `${window.location.origin}/dashboard/credits?status=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${window.location.origin}/dashboard/credits?status=cancelled`,
+      });
+      window.location.assign(session.url);
+    } catch (err) {
+      setError(
+        err instanceof DmitApiError
+          ? err.message
+          : "Unable to start Stripe Checkout. Please try again."
+      );
+      setLoadingPlanId(null);
+    }
   }
 
   return (
@@ -76,11 +73,11 @@ export function CreditsTopUpClient({ userId }: { userId: string }) {
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle>Recharge credits</CardTitle>
-          <Badge variant="secondary">Stripe checkout coming soon</Badge>
+          <Badge variant="secondary">Stripe Checkout</Badge>
         </div>
         <CardDescription>
-          Choose a package now. Payment is a placeholder until Stripe checkout
-          is connected through DMIT.
+          Choose a fixed one-time package. Payments are handled by Stripe, and
+          credits are added only after DMIT receives the signed webhook.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -126,42 +123,25 @@ export function CreditsTopUpClient({ userId }: { userId: string }) {
           })}
         </div>
 
-        {selectedIntent ? <PlaceholderNotice intent={selectedIntent} /> : null}
+        {error ? <CheckoutError message={error} /> : null}
 
         <p className="text-xs text-muted-foreground">
-          Stripe checkout coming soon. This button does not modify{" "}
-          <code>profiles.credits_balance</code> and does not start a real
-          payment yet.
+          The frontend never writes <code>profiles.credits_balance</code>.
+          Checkout success only shows a pending confirmation message until the
+          Stripe webhook credits the account.
         </p>
       </CardContent>
     </Card>
   );
 }
 
-function PlaceholderNotice({ intent }: { intent: RechargeIntent }) {
+function CheckoutError({ message }: { message: string }) {
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-emerald-300 bg-emerald-50 p-3 text-emerald-950 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-100">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <CheckCircle2 className="h-4 w-4" />
-        Recharge placeholder selected
-      </div>
-      <p className="text-xs text-emerald-900/80 dark:text-emerald-100/80">
-        Stripe checkout coming soon. Future checkout payload:{" "}
-        <code className="font-mono">
-          {intent.plan_id} / ¥{intent.amount_cny} /{" "}
-          {formatCredits(intent.credits)} credits
-        </code>
-        .
-      </p>
+    <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+      <p>{message}</p>
     </div>
   );
-}
-
-async function createRechargePlaceholder(
-  _intent: RechargeIntent
-): Promise<void> {
-  // Placeholder for a future DMIT Stripe checkout call.
-  await new Promise((resolve) => window.setTimeout(resolve, 250));
 }
 
 function formatCredits(value: number): string {

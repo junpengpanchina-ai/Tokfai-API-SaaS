@@ -310,8 +310,7 @@ export async function revokeApiKey(
 // ---------------------------------------------------------------------------
 
 export interface CreateCheckoutSessionInput {
-  /** Whole dollars, e.g. 25 for $25. */
-  amount_usd: number;
+  plan_id: "starter" | "pro" | "business";
   /** Optional override; DMIT will default to the dashboard's credits page. */
   success_url?: string;
   cancel_url?: string;
@@ -321,6 +320,10 @@ export interface CreateCheckoutSessionResponse {
   /** Stripe Checkout URL — redirect the browser to this. */
   url: string;
   session_id: string;
+  order_id: string;
+  plan_id: CreateCheckoutSessionInput["plan_id"];
+  amount_cny: number;
+  credits: number;
 }
 
 /**
@@ -333,10 +336,13 @@ export interface CreateCheckoutSessionResponse {
 export async function createCheckoutSession(
   input: CreateCheckoutSessionInput
 ): Promise<CreateCheckoutSessionResponse> {
-  return dmitFetch<CreateCheckoutSessionResponse>("/v1/billing/checkout", {
-    method: "POST",
-    json: input,
-  });
+  return dmitFetch<CreateCheckoutSessionResponse>(
+    "/billing/create-checkout-session",
+    {
+      method: "POST",
+      json: input,
+    }
+  );
 }
 
 // ---------------------------------------------------------------------------

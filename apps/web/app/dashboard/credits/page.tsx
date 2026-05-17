@@ -120,7 +120,7 @@ export default async function CreditsPage({
         </CardContent>
       </Card>
 
-      <CreditsTopUpClient userId={user.id} />
+      <CreditsTopUpClient />
 
       <Card>
         <CardHeader>
@@ -224,7 +224,7 @@ function CheckoutStatusBanner({ status }: { status?: string }) {
       </Card>
     );
   }
-  if (status === "cancel") {
+  if (status === "cancel" || status === "cancelled") {
     return (
       <Card className="border-amber-300 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30">
         <CardHeader className="pb-3">
@@ -266,7 +266,7 @@ function AmountCell({ amount }: { amount: number | null }) {
 function TypeBadge({ type }: { type: string | null | undefined }) {
   if (!type) return <Badge variant="outline">unknown</Badge>;
   const t = type.toLowerCase();
-  if (t === "purchase" || t === "grant" || t === "refund") {
+  if (t === "purchase" || t === "topup" || t === "grant" || t === "refund") {
     return <Badge variant="success">{type}</Badge>;
   }
   if (t === "debit") {
