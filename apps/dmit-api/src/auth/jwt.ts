@@ -12,10 +12,21 @@ import type { AuthedUser } from "../types.js";
  * validate the token against the project's current signing keys.
  */
 export async function verifySupabaseJwt(token: string): Promise<AuthedUser> {
+  let result: Awaited<ReturnType<ReturnType<typeof supabase>["auth"]["getUser"]>>;
+  try {
+    result = await supabase().auth.getUser(token);
+  } catch (err) {
+    log.warn("supabase_auth_invalid_token", {
+      errorName: err instanceof Error ? err.name : "UnknownAuthError",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
+    throw ApiError.unauthorized("Invalid token.", "invalid_token");
+  }
+
   const {
     data: { user },
     error,
-  } = await supabase().auth.getUser(token);
+  } = result;
 
   if (error) {
     log.warn("supabase_auth_invalid_token", {

@@ -1,9 +1,8 @@
 import { Hono, type Context } from "hono";
+import Stripe from "stripe";
 
-import { env } from "../env.js";
 import { ApiError } from "../errors.js";
 import { requireSupabaseJwt } from "../middleware/supabaseJwt.js";
-import { stripe } from "../stripe.js";
 import { supabase } from "../supabase.js";
 import type { AuthedUser } from "../types.js";
 
@@ -37,8 +36,46 @@ const CREDIT_PLANS: Record<PlanId, CreditPlan> = {
   },
 };
 
+let _billingStripe: Stripe | null = null;
+
 function authedUser(c: { get: (key: never) => unknown }): AuthedUser {
   return c.get("user" as never) as AuthedUser;
+}
+
+const csv = (raw: string) =>
+  raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+function allowedRedirectOrigins(): string[] {
+  return csv(
+    process.env.BILLING_ALLOWED_REDIRECT_ORIGINS ??
+      "https://tokfai.com,http://localhost:3000"
+  );
+}
+
+function billingStripe(): Stripe {
+  if (_billingStripe) return _billingStripe;
+
+  const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
+  if (!secretKey) {
+    throw ApiError.internal(
+      "STRIPE_SECRET_KEY is not configured for billing checkout.",
+      "stripe_not_configured"
+    );
+  }
+
+  _billingStripe = new Stripe(secretKey, {
+    apiVersion: "2025-02-24.acacia",
+    typescript: true,
+    maxNetworkRetries: 2,
+    appInfo: {
+      name: "tokfai-dmit-api",
+      version: "0.1.0",
+    },
+  });
+  return _billingStripe;
 }
 
 function parsePlanId(body: unknown): PlanId {
@@ -66,8 +103,8 @@ function allowedRedirectUrl(raw: unknown, fallbackPath: string): string {
     throw ApiError.badRequest("Redirect URL must be a string.", "invalid_redirect_url");
   }
 
-  const fallbackOrigin =
-    env.BILLING_ALLOWED_REDIRECT_ORIGINS[0] ?? "https://tokfai.com";
+  const origins = allowedRedirectOrigins();
+  const fallbackOrigin = origins[0] ?? "https://tokfai.com";
   const value = raw?.trim() || `${fallbackOrigin}${fallbackPath}`;
 
   let url: URL;
@@ -77,7 +114,7 @@ function allowedRedirectUrl(raw: unknown, fallbackPath: string): string {
     throw ApiError.badRequest("Redirect URL must be absolute.", "invalid_redirect_url");
   }
 
-  if (!env.BILLING_ALLOWED_REDIRECT_ORIGINS.includes(url.origin)) {
+  if (!origins.includes(url.origin)) {
     throw ApiError.badRequest(
       "Redirect URL origin is not allowed.",
       "redirect_origin_not_allowed"
@@ -96,143 +133,156 @@ async function createCheckoutSession(c: Context) {
     throw ApiError.badRequest("Invalid JSON body.", "invalid_json");
   }
 
-  const plan = CREDIT_PLANS[parsePlanId(body)];
-  const successUrl = allowedRedirectUrl(
-    (body as Record<string, unknown>).success_url,
-    "/dashboard/credits?status=success&session_id={CHECKOUT_SESSION_ID}"
-  );
-  const cancelUrl = allowedRedirectUrl(
-    (body as Record<string, unknown>).cancel_url,
-    "/dashboard/credits?status=cancelled"
-  );
-  const sb = supabase();
-
-  const { data: profile, error: profileError } = await sb
-    .from("profiles")
-    .select("id, email, stripe_customer_id")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profileError) {
-    throw ApiError.internal(
-      `Failed to load billing profile: ${profileError.message}`,
-      "billing_profile_load_failed"
+  try {
+    const plan = CREDIT_PLANS[parsePlanId(body)];
+    const successUrl = allowedRedirectUrl(
+      (body as Record<string, unknown>).success_url,
+      "/dashboard/credits?status=success&session_id={CHECKOUT_SESSION_ID}"
     );
-  }
-  if (!profile) {
-    throw ApiError.notFound("Profile not found.", "profile_not_found");
-  }
+    const cancelUrl = allowedRedirectUrl(
+      (body as Record<string, unknown>).cancel_url,
+      "/dashboard/credits?status=cancelled"
+    );
+    const sb = supabase();
+    const stripe = billingStripe();
 
-  let stripeCustomerId = (profile as { stripe_customer_id?: string | null })
-    .stripe_customer_id;
-  if (!stripeCustomerId) {
-    const customer = await stripe().customers.create({
-      email: user.email ?? (profile as { email?: string | null }).email ?? undefined,
-      metadata: {
-        tokfai_user_id: user.id,
-      },
-    });
-    stripeCustomerId = customer.id;
-
-    const { error: updateError } = await sb
+    const { data: profile, error: profileError } = await sb
       .from("profiles")
-      .update({
-        stripe_customer_id: stripeCustomerId,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", user.id);
+      .select("id, email, stripe_customer_id")
+      .eq("id", user.id)
+      .maybeSingle();
 
-    if (updateError) {
+    if (profileError) {
       throw ApiError.internal(
-        `Failed to save Stripe customer id: ${updateError.message}`,
-        "billing_customer_save_failed"
+        `Failed to load billing profile: ${profileError.message}`,
+        "billing_profile_load_failed"
       );
     }
-  }
+    if (!profile) {
+      throw ApiError.notFound("Profile not found.", "profile_not_found");
+    }
 
-  const { data: order, error: orderError } = await sb
-    .from("credit_orders")
-    .insert({
-      user_id: user.id,
-      plan_id: plan.plan_id,
-      status: "pending",
-      currency: "cny",
-      amount_cny: plan.amount_cny,
-      credits: plan.credits,
-      stripe_customer_id: stripeCustomerId,
-    })
-    .select("id")
-    .single();
+    let stripeCustomerId = (profile as { stripe_customer_id?: string | null })
+      .stripe_customer_id;
+    if (!stripeCustomerId) {
+      const customer = await stripe.customers.create({
+        email: user.email ?? (profile as { email?: string | null }).email ?? undefined,
+        metadata: {
+          tokfai_user_id: user.id,
+        },
+      });
+      stripeCustomerId = customer.id;
 
-  if (orderError || !order) {
-    throw ApiError.internal(
-      `Failed to create credit order: ${orderError?.message ?? "missing order"}`,
-      "credit_order_create_failed"
-    );
-  }
+      const { error: updateError } = await sb
+        .from("profiles")
+        .update({
+          stripe_customer_id: stripeCustomerId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
 
-  const orderId = (order as { id: string }).id;
-  const session = await stripe().checkout.sessions.create({
-    mode: "payment",
-    customer: stripeCustomerId,
-    client_reference_id: user.id,
-    success_url: successUrl,
-    cancel_url: cancelUrl,
-    line_items: [
-      {
-        quantity: 1,
-        price_data: {
-          currency: "cny",
-          unit_amount: plan.amount_cny * 100,
-          product_data: {
-            name: plan.name,
-            description: `${plan.credits.toLocaleString("en-US")} Tokfai credits`,
+      if (updateError) {
+        throw ApiError.internal(
+          `Failed to save Stripe customer id: ${updateError.message}`,
+          "billing_customer_save_failed"
+        );
+      }
+    }
+
+    const { data: order, error: orderError } = await sb
+      .from("credit_orders")
+      .insert({
+        user_id: user.id,
+        plan_id: plan.plan_id,
+        status: "pending",
+        currency: "cny",
+        amount_cny: plan.amount_cny,
+        credits: plan.credits,
+        stripe_customer_id: stripeCustomerId,
+      })
+      .select("id")
+      .single();
+
+    if (orderError || !order) {
+      throw ApiError.internal(
+        `Failed to create credit order: ${orderError?.message ?? "missing order"}`,
+        "credit_order_create_failed"
+      );
+    }
+
+    const orderId = (order as { id: string }).id;
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      customer: stripeCustomerId,
+      client_reference_id: user.id,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: "cny",
+            unit_amount: plan.amount_cny * 100,
+            product_data: {
+              name: plan.name,
+              description: `${plan.credits.toLocaleString("en-US")} Tokfai credits`,
+            },
           },
         },
-      },
-    ],
-    metadata: {
-      credit_order_id: orderId,
-      tokfai_user_id: user.id,
-      plan_id: plan.plan_id,
-      credits: String(plan.credits),
-    },
-    payment_intent_data: {
+      ],
       metadata: {
         credit_order_id: orderId,
         tokfai_user_id: user.id,
         plan_id: plan.plan_id,
+        credits: String(plan.credits),
       },
-    },
-  });
+      payment_intent_data: {
+        metadata: {
+          credit_order_id: orderId,
+          tokfai_user_id: user.id,
+          plan_id: plan.plan_id,
+        },
+      },
+    });
 
-  if (!session.url) {
-    throw ApiError.internal("Stripe Checkout did not return a URL.", "checkout_url_missing");
-  }
+    if (!session.url) {
+      throw ApiError.internal("Stripe Checkout did not return a URL.", "checkout_url_missing");
+    }
 
-  const { error: updateOrderError } = await sb
-    .from("credit_orders")
-    .update({
-      stripe_checkout_session_id: session.id,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", orderId);
+    const { error: updateOrderError } = await sb
+      .from("credit_orders")
+      .update({
+        stripe_checkout_session_id: session.id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", orderId);
 
-  if (updateOrderError) {
+    if (updateOrderError) {
+      throw ApiError.internal(
+        `Failed to save checkout session id: ${updateOrderError.message}`,
+        "checkout_session_save_failed"
+      );
+    }
+
+    return c.json({
+      url: session.url,
+      session_id: session.id,
+      order_id: orderId,
+      plan_id: plan.plan_id,
+      amount_cny: plan.amount_cny,
+      credits: plan.credits,
+    });
+  } catch (err) {
+    if (err instanceof ApiError) {
+      throw err;
+    }
     throw ApiError.internal(
-      `Failed to save checkout session id: ${updateOrderError.message}`,
-      "checkout_session_save_failed"
+      `Unhandled billing checkout error: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+      "billing_checkout_failed"
     );
   }
-
-  return c.json({
-    url: session.url,
-    session_id: session.id,
-    order_id: orderId,
-    plan_id: plan.plan_id,
-    amount_cny: plan.amount_cny,
-    credits: plan.credits,
-  });
 }
 
 /**

@@ -11,6 +11,16 @@ healthRoutes.get("/v1/health", (c) =>
   })
 );
 
+healthRoutes.get("/debug/routes", (c) =>
+  c.json({
+    service: "tokfai-dmit-api",
+    cwd: process.cwd(),
+    adminCreditsAdjustRoute: true,
+    routes: ["POST /admin/credits/adjust", "GET /debug/routes"],
+    time: new Date().toISOString(),
+  })
+);
+
 healthRoutes.get("/__version", (c) =>
   c.json({
     service: "tokfai-dmit-api",

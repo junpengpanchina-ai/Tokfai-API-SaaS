@@ -47,7 +47,7 @@ const Schema = z
     .default("/v1/chat/completions"),
   BOT_MODEL: z.string().min(1).default("gemini-3.1-pro"),
 
-  STRIPE_SECRET_KEY: z.string().min(1),
+  STRIPE_SECRET_KEY: z.string().min(1).optional(),
   STRIPE_WEBHOOK_SECRET: z.string().min(1),
 
   BILLING_ALLOWED_AMOUNTS: z
