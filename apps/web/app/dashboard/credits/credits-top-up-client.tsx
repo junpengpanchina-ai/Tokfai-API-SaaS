@@ -13,9 +13,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { createCheckoutSession, DmitApiError } from "@/lib/dmit/client";
+import { createClient } from "@/lib/supabase/client";
 
 interface CreditPlan {
   plan_id: "starter" | "pro" | "business";
+  package_code: "starter" | "pro" | "business";
   name: string;
   amount_cny: number;
   credits: number;
@@ -24,18 +26,21 @@ interface CreditPlan {
 const CREDIT_PLANS: CreditPlan[] = [
   {
     plan_id: "starter",
+    package_code: "starter",
     name: "Starter",
     amount_cny: 29,
     credits: 10_000,
   },
   {
     plan_id: "pro",
+    package_code: "pro",
     name: "Pro",
     amount_cny: 99,
     credits: 50_000,
   },
   {
     plan_id: "business",
+    package_code: "business",
     name: "Business",
     amount_cny: 299,
     credits: 200_000,
@@ -52,8 +57,20 @@ export function CreditsTopUpClient() {
     setLoadingPlanId(plan.plan_id);
     setError(null);
     try {
+      const supabase = createClient();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      if (!accessToken) {
+        setError("Please sign in again");
+        setLoadingPlanId(null);
+        return;
+      }
+
       const session = await createCheckoutSession({
         plan_id: plan.plan_id,
+        package_code: plan.package_code,
+        accessToken,
         success_url: `${window.location.origin}/dashboard/credits?status=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${window.location.origin}/dashboard/credits?status=cancelled`,
       });

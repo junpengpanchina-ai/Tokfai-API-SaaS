@@ -311,6 +311,8 @@ export async function revokeApiKey(
 
 export interface CreateCheckoutSessionInput {
   plan_id: "starter" | "pro" | "business";
+  package_code: "starter" | "pro" | "business";
+  accessToken: string;
   /** Optional override; DMIT will default to the dashboard's credits page. */
   success_url?: string;
   cancel_url?: string;
@@ -322,7 +324,7 @@ export interface CreateCheckoutSessionResponse {
   session_id: string;
   order_id: string;
   plan_id: CreateCheckoutSessionInput["plan_id"];
-  amount_cny: number;
+  amount_cents: number;
   credits: number;
 }
 
@@ -336,11 +338,13 @@ export interface CreateCheckoutSessionResponse {
 export async function createCheckoutSession(
   input: CreateCheckoutSessionInput
 ): Promise<CreateCheckoutSessionResponse> {
+  const { accessToken, ...json } = input;
   return dmitFetch<CreateCheckoutSessionResponse>(
     "/billing/create-checkout-session",
     {
       method: "POST",
-      json: input,
+      accessToken,
+      json,
     }
   );
 }
