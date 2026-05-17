@@ -121,14 +121,17 @@ async function requireAdmin(c: {
   json: (data: unknown, status?: number) => Response;
 }) {
   const authorization = c.req.raw.headers.get("authorization");
-  const hasAuthorization = Boolean(authorization);
+  const headerError = authHeaderError(authorization);
   const accessToken = extractAccessTokenFromAuthorization(authorization);
   const adminEmails = adminEmailsFromEnv();
+  const hasToken = Boolean(accessToken);
 
   let currentEmail = "";
   let authUserErrorMessage: string | null = accessToken
     ? null
-    : "Missing Authorization Bearer token.";
+    : headerError === "missing_authorization"
+      ? "Missing Bearer token."
+      : "Invalid Authorization Bearer format.";
 
   if (accessToken) {
     const supabase = adminAuthClient();
@@ -143,10 +146,36 @@ async function requireAdmin(c: {
   console.log("ADMIN_AUTH_DEBUG", {
     currentEmail,
     adminEmails,
-    hasAuthorization,
+    hasToken,
     matchResult,
     authUserErrorMessage,
   });
+
+  if (headerError) {
+    const body = {
+      error: {
+        message:
+          headerError === "missing_authorization"
+            ? "Missing Bearer token."
+            : "Invalid Authorization Bearer format.",
+        code: headerError,
+        type: "auth_error",
+      },
+      ...(process.env.NODE_ENV !== "production"
+        ? {
+            debug: {
+              currentEmail,
+              adminEmails,
+              hasToken,
+              authUserErrorMessage,
+              matchResult,
+            },
+          }
+        : {}),
+    };
+
+    return c.json(body, 401);
+  }
 
   if (!matchResult) {
     const body = {
@@ -160,7 +189,7 @@ async function requireAdmin(c: {
             debug: {
               currentEmail,
               adminEmails,
-              hasAuthorization,
+              hasToken,
               authUserErrorMessage,
               matchResult,
             },

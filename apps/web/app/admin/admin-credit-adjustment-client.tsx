@@ -7,7 +7,7 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { dmitFetch, DmitApiError } from "@/lib/dmit/client";
+import { getDmitBaseUrl } from "@/lib/dmit/client";
 import { createClient } from "@/lib/supabase/client";
 
 type Direction = "add" | "deduct";
@@ -55,27 +55,36 @@ export function AdminCreditAdjustmentClient({ userId }: { userId: string }) {
     setIsSubmitting(true);
     try {
       const supabase = createClient();
-      const { data, error: sessionError } = await supabase.auth.getSession();
-      const accessToken = data.session?.access_token;
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
 
       if (sessionError || !accessToken) {
         setError("Please sign in again before adjusting credits.");
         return;
       }
 
-      const res = await dmitFetch<AdminCreditAdjustmentResponse>(
-        "/admin/credits/adjust",
+      const response = await fetch(
+        `${getDmitBaseUrl()}/admin/credits/adjust`,
         {
           method: "POST",
-          accessToken,
-          json: {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
             user_id: userId,
             amount: parsedAmount,
             direction,
             reason,
-          },
+          }),
         }
       );
+      const res = (await parseJson(response)) as AdminCreditAdjustmentResponse;
+
+      if (!response.ok) {
+        throw new Error(errorMessageFromBody(res, response.status));
+      }
 
       setAmount("");
       setReason("");
@@ -90,10 +99,6 @@ export function AdminCreditAdjustmentClient({ userId }: { userId: string }) {
         router.refresh();
       });
     } catch (err) {
-      if (err instanceof DmitApiError) {
-        setError(err.message);
-        return;
-      }
       setError(err instanceof Error ? err.message : "Adjustment failed.");
     } finally {
       setIsSubmitting(false);
@@ -156,4 +161,29 @@ export function AdminCreditAdjustmentClient({ userId }: { userId: string }) {
       </div>
     </form>
   );
+}
+
+async function parseJson(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function errorMessageFromBody(body: unknown, status: number): string {
+  if (body && typeof body === "object") {
+    const maybeError = (body as { error?: unknown; message?: unknown }).error;
+    if (typeof maybeError === "string") return maybeError;
+    if (maybeError && typeof maybeError === "object") {
+      const message = (maybeError as { message?: unknown }).message;
+      if (typeof message === "string") return message;
+    }
+    const message = (body as { message?: unknown }).message;
+    if (typeof message === "string") return message;
+  }
+  if (typeof body === "string" && body.trim()) return body;
+  return `DMIT request failed (HTTP ${status}).`;
 }
