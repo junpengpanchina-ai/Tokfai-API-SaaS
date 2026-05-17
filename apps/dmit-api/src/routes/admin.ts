@@ -52,7 +52,9 @@ function adminEmailsFromEnv(): string[] {
     .filter(Boolean);
 }
 
-function extractBearerFromAuthorization(header: string | null | undefined): string | null {
+function extractAccessTokenFromAuthorization(
+  header: string | null | undefined
+): string | null {
   if (!header) return null;
   const match = /^Bearer\s+(.+)$/i.exec(header.trim());
   return match ? match[1]!.trim() : null;
@@ -76,23 +78,22 @@ function adminAuthClient() {
 }
 
 async function requireAdmin(c: {
-  req: { header: (name: string) => string | undefined };
+  req: { raw: { headers: { get: (name: string) => string | null } } };
   json: (data: unknown, status?: number) => Response;
 }) {
-  const authorization =
-    c.req.header("Authorization") ?? c.req.header("authorization");
-  const token = extractBearerFromAuthorization(authorization);
-  const hasToken = Boolean(token);
-  const adminEmailsRaw = process.env.TOKFAI_ADMIN_EMAILS ?? "";
+  const authorization = c.req.raw.headers.get("authorization");
+  const hasAuthorization = Boolean(authorization);
+  const accessToken = extractAccessTokenFromAuthorization(authorization);
   const adminEmails = adminEmailsFromEnv();
 
   let currentEmail = "";
-  let authUserErrorMessage: string | null = hasToken
+  let authUserErrorMessage: string | null = accessToken
     ? null
-    : "Missing Bearer token.";
+    : "Missing Authorization Bearer token.";
 
-  if (token) {
-    const { data, error } = await adminAuthClient().auth.getUser(token);
+  if (accessToken) {
+    const supabase = adminAuthClient();
+    const { data, error } = await supabase.auth.getUser(accessToken);
     authUserErrorMessage = error?.message ?? (!data.user ? "No user returned." : null);
     currentEmail = normalizeEmail(data.user?.email);
   }
@@ -103,7 +104,7 @@ async function requireAdmin(c: {
   console.log("ADMIN_AUTH_DEBUG", {
     currentEmail,
     adminEmails,
-    hasToken,
+    hasAuthorization,
     matchResult,
     authUserErrorMessage,
   });
@@ -120,8 +121,7 @@ async function requireAdmin(c: {
             debug: {
               currentEmail,
               adminEmails,
-              adminEmailsRaw,
-              hasToken,
+              hasAuthorization,
               authUserErrorMessage,
               matchResult,
             },

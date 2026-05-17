@@ -17,7 +17,6 @@ import {
   toneForStatus,
 } from "@/lib/format";
 import {
-  dmitServerFetch,
   DmitServerError,
   getDmitBaseUrl,
 } from "@/lib/dmit/server";
@@ -90,7 +89,7 @@ type AdminDebug = {
 
 export default async function AdminPage() {
   const supabase = createClient();
-  const dmitBaseUrl = getDmitBaseUrl();
+  const DMIT_API_BASE_URL = getDmitBaseUrl();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -103,11 +102,9 @@ export default async function AdminPage() {
     data: { session },
   } = await supabase.auth.getSession();
 
+  const accessToken = session?.access_token;
   const userEmail = user.email ?? null;
-  const hasAccessToken = Boolean(session?.access_token);
-  const adminEmails = getAdminEmails();
-  const isAuthorized =
-    userEmail != null && adminEmails.has(userEmail.toLowerCase());
+  const hasAccessToken = Boolean(accessToken);
 
   let summary: AdminSummary | null = null;
   let usageLogs: AdminUsageLog[] = [];
@@ -115,30 +112,28 @@ export default async function AdminPage() {
   let apiKeys: AdminApiKey[] = [];
   let debug: AdminDebug | null = null;
 
-  if (!isAuthorized) {
-    debug = {
-      statusCode: "403",
-      message: "Not authorized",
-      dmitBaseUrl,
-      hasAccessToken,
-      userEmail,
-    };
-  } else if (!session?.access_token) {
+  if (!accessToken) {
     debug = {
       statusCode: "401",
-      message: "Missing Supabase session access_token",
-      dmitBaseUrl,
+      message: "missing session token",
+      dmitBaseUrl: DMIT_API_BASE_URL,
       hasAccessToken,
       userEmail,
     };
   } else {
     try {
       const [summaryRes, usersRes, apiKeysRes] = await Promise.all([
-        dmitServerFetch<SummaryResponse>("/admin/summary", session.access_token),
-        dmitServerFetch<UsersResponse>("/admin/users", session.access_token),
-        dmitServerFetch<ApiKeysResponse>(
-          "/admin/api-keys",
-          session.access_token
+        fetchDmitAdmin<SummaryResponse>(
+          `${DMIT_API_BASE_URL}/admin/summary`,
+          accessToken
+        ),
+        fetchDmitAdmin<UsersResponse>(
+          `${DMIT_API_BASE_URL}/admin/users`,
+          accessToken
+        ),
+        fetchDmitAdmin<ApiKeysResponse>(
+          `${DMIT_API_BASE_URL}/admin/api-keys`,
+          accessToken
         ),
       ]);
 
@@ -148,7 +143,7 @@ export default async function AdminPage() {
       apiKeys = apiKeysRes.data;
     } catch (error) {
       debug = toAdminDebug(error, {
-        dmitBaseUrl,
+        dmitBaseUrl: DMIT_API_BASE_URL,
         hasAccessToken,
         userEmail,
       });
@@ -433,15 +428,6 @@ function formatMaybeInt(value: number | null | undefined): string {
   return value == null ? "—" : formatInt(value);
 }
 
-function getAdminEmails(): Set<string> {
-  return new Set(
-    (process.env.TOKFAI_ADMIN_EMAILS ?? "")
-      .split(",")
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean)
-  );
-}
-
 function toAdminDebug(
   error: unknown,
   context: Omit<AdminDebug, "statusCode" | "message">
@@ -467,4 +453,50 @@ function toAdminDebug(
     statusCode: "unknown",
     message: "Admin data could not be loaded.",
   };
+}
+
+async function fetchDmitAdmin<T>(url: string, accessToken: string): Promise<T> {
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    cache: "no-store",
+  });
+
+  const text = await res.text();
+  const body = parseJson(text);
+
+  if (!res.ok) {
+    throw toDmitServerError(res.status, body);
+  }
+
+  return body as T;
+}
+
+function parseJson(text: string): unknown {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function toDmitServerError(status: number, body: unknown): DmitServerError {
+  let message = `DMIT request failed (HTTP ${status}).`;
+  let code: string | undefined;
+
+  if (body && typeof body === "object") {
+    const maybeError = (body as { error?: unknown }).error;
+    if (maybeError && typeof maybeError === "object") {
+      const err = maybeError as { message?: unknown; code?: unknown };
+      if (typeof err.message === "string") message = err.message;
+      if (typeof err.code === "string") code = err.code;
+    }
+  } else if (typeof body === "string" && body.trim()) {
+    message = body;
+  }
+
+  return new DmitServerError({ status, message, code });
 }
