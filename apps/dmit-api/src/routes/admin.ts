@@ -1,7 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { Hono } from "hono";
 
-import { extractBearer } from "../auth/jwt.js";
 import { ApiError } from "../errors.js";
 import { supabase } from "../supabase.js";
 
@@ -53,6 +52,12 @@ function adminEmailsFromEnv(): string[] {
     .filter(Boolean);
 }
 
+function extractBearerFromAuthorization(header: string | null | undefined): string | null {
+  if (!header) return null;
+  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
+  return match ? match[1]!.trim() : null;
+}
+
 function adminAuthClient() {
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -74,7 +79,9 @@ async function requireAdmin(c: {
   req: { header: (name: string) => string | undefined };
   json: (data: unknown, status?: number) => Response;
 }) {
-  const token = extractBearer(c.req.header("authorization"));
+  const authorization =
+    c.req.header("Authorization") ?? c.req.header("authorization");
+  const token = extractBearerFromAuthorization(authorization);
   const hasToken = Boolean(token);
   const adminEmailsRaw = process.env.TOKFAI_ADMIN_EMAILS ?? "";
   const adminEmails = adminEmailsFromEnv();
@@ -96,6 +103,7 @@ async function requireAdmin(c: {
   console.log("ADMIN_AUTH_DEBUG", {
     currentEmail,
     adminEmails,
+    hasToken,
     matchResult,
     authUserErrorMessage,
   });
