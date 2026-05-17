@@ -17,7 +17,7 @@ export default function UsageLoading() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        {["Total requests", "Succeeded", "Failed", "Credits used"].map(
+        {["Total requests", "Succeeded", "Failed", "Cost used"].map(
           (label) => (
             <Card key={label}>
               <CardHeader className="pb-2">

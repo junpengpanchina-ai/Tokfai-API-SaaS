@@ -17,6 +17,10 @@ const USD_PRECISE = new Intl.NumberFormat("en-US", {
 });
 
 const INTEGER = new Intl.NumberFormat("en-US");
+const CREDITS = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 6,
+});
 
 /** $X.XX with cents — for balances and large totals. */
 export function formatUsd(value: number | null | undefined): string {
@@ -32,6 +36,10 @@ export function formatCreditsPrecise(
 
 export function formatInt(value: number | null | undefined): string {
   return INTEGER.format(value ?? 0);
+}
+
+export function formatCredits(value: number | null | undefined): string {
+  return `${CREDITS.format(value ?? 0)} credits`;
 }
 
 export function formatDateTime(iso: string | null | undefined): string {

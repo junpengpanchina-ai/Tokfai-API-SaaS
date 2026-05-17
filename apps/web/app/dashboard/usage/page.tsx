@@ -105,7 +105,7 @@ export default async function UsagePage() {
         <Stat label="Total requests" value={formatInt(totalRequests)} />
         <Stat label="Succeeded" value={formatInt(successRequests)} />
         <Stat label="Failed" value={formatInt(failedRequests)} />
-        <Stat label="Credits used" value={formatUsd(totalCreditsUsed)} />
+        <Stat label="Cost used" value={formatUsd(totalCreditsUsed)} />
       </div>
 
       <Card>

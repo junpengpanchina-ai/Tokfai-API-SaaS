@@ -18,7 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { formatDateTime, formatUsd } from "@/lib/format";
+import { formatCredits, formatDateTime } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import type { CreditLedgerRow, ProfileRow } from "@/lib/supabase/types";
 
@@ -91,7 +91,7 @@ export default async function CreditsPage({
         <CardHeader>
           <CardDescription>Current balance</CardDescription>
           <CardTitle className="text-4xl">
-            {profile ? formatUsd(profile.credits_balance) : "Unavailable"}
+            {profile ? formatCredits(profile.credits_balance) : "Unavailable"}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-2 text-sm text-muted-foreground">
@@ -99,14 +99,16 @@ export default async function CreditsPage({
             Total purchased:{" "}
             <span className="font-medium text-foreground">
               {profile
-                ? formatUsd(profile.total_credits_purchased)
+                ? formatCredits(profile.total_credits_purchased)
                 : "Unavailable"}
             </span>
           </div>
           <div>
             Total used:{" "}
             <span className="font-medium text-foreground">
-              {profile ? formatUsd(profile.total_credits_used) : "Unavailable"}
+              {profile
+                ? formatCredits(profile.total_credits_used)
+                : "Unavailable"}
             </span>
           </div>
           <div>
@@ -164,7 +166,7 @@ export default async function CreditsPage({
                       </td>
                       <td className="py-2 pr-4 text-right font-mono text-xs">
                         {entry.balance_after != null
-                          ? formatUsd(entry.balance_after)
+                          ? formatCredits(entry.balance_after)
                           : "—"}
                       </td>
                       <td className="py-2 pr-4 text-muted-foreground">
@@ -256,7 +258,7 @@ function AmountCell({ amount }: { amount: number | null }) {
       ) : (
         <ArrowDownRight className="h-3 w-3" />
       )}
-      {formatUsd(Math.abs(amount))}
+      {formatCredits(Math.abs(amount))}
     </span>
   );
 }

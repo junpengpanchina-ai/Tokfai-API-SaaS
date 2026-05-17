@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { formatInt, formatUsd } from "@/lib/format";
+import { formatCredits, formatInt } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import type { ProfileRow } from "@/lib/supabase/types";
 
@@ -50,13 +50,16 @@ export default async function DashboardOverviewPage() {
     ProfileRow,
     "id" | "email" | "credits_balance"
   > | null;
+  const profileMissing = !profileRes.error && !profile;
   const activeApiKeyCount = apiKeysRes.count ?? 0;
   const requestsLast24h = usageRes.count ?? 0;
   const stats = [
     {
       label: "Credits remaining",
-      value: profile ? formatUsd(profile.credits_balance) : "Unavailable",
-      sub: "Top up to start calling the API.",
+      value: formatCredits(profile?.credits_balance ?? 0),
+      sub: profileMissing
+        ? "Profile not found yet; showing 0 credits."
+        : "Top up to start calling the API.",
       href: "/dashboard/credits",
       icon: CreditCard,
     },
