@@ -548,59 +548,7 @@ async function adjustUserCredits(input: {
 
 export const adminRoutes = new Hono();
 
-adminRoutes.use("/admin/*", async (c, next) => {
-  if (
-    c.req.method === "POST" &&
-    new URL(c.req.url).pathname === "/admin/credits/adjust"
-  ) {
-    await next();
-    return;
-  }
-
-  const response = await requireAdmin(c);
-  if (response) return response;
-  await next();
-});
-
-adminRoutes.get("/admin/summary", async (c) => {
-  const [totalUsers, totalRequests, successRequests, totalCreditsCharged, logs] =
-    await Promise.all([
-      countRows("profiles"),
-      countRows("usage_logs"),
-      countSuccessfulUsage(),
-      sumUsageCreditsCharged(),
-      listRecentUsageLogs(),
-    ]);
-
-  return c.json({
-    data: {
-      summary: {
-        total_users: totalUsers,
-        total_requests: totalRequests,
-        success_requests: successRequests,
-        failed_requests: Math.max(totalRequests - successRequests, 0),
-        total_credits_charged: totalCreditsCharged,
-      },
-      usage_logs: logs,
-    },
-  });
-});
-
-adminRoutes.get("/admin/users", async (c) => {
-  const profiles = await listAllProfiles();
-
-  return c.json({
-    data: profiles.map((row) => ({
-      id: row.id,
-      email: row.email,
-      credits_balance: toNumber(row.credits_balance),
-      total_credits_used: toNumber(row.total_credits_used),
-      updated_at: row.updated_at,
-    })),
-  });
-});
-
-adminRoutes.post("/admin/credits/adjust", async (c) => {
+adminRoutes.post("/credits/adjust", async (c) => {
   const admin = await verifyAdminForCreditAdjustment(c);
   if (!admin.ok) {
     return jsonError(
@@ -642,7 +590,51 @@ adminRoutes.post("/admin/credits/adjust", async (c) => {
   });
 });
 
-adminRoutes.get("/admin/api-keys", async (c) => {
+adminRoutes.use("*", async (c, next) => {
+  const response = await requireAdmin(c);
+  if (response) return response;
+  await next();
+});
+
+adminRoutes.get("/summary", async (c) => {
+  const [totalUsers, totalRequests, successRequests, totalCreditsCharged, logs] =
+    await Promise.all([
+      countRows("profiles"),
+      countRows("usage_logs"),
+      countSuccessfulUsage(),
+      sumUsageCreditsCharged(),
+      listRecentUsageLogs(),
+    ]);
+
+  return c.json({
+    data: {
+      summary: {
+        total_users: totalUsers,
+        total_requests: totalRequests,
+        success_requests: successRequests,
+        failed_requests: Math.max(totalRequests - successRequests, 0),
+        total_credits_charged: totalCreditsCharged,
+      },
+      usage_logs: logs,
+    },
+  });
+});
+
+adminRoutes.get("/users", async (c) => {
+  const profiles = await listAllProfiles();
+
+  return c.json({
+    data: profiles.map((row) => ({
+      id: row.id,
+      email: row.email,
+      credits_balance: toNumber(row.credits_balance),
+      total_credits_used: toNumber(row.total_credits_used),
+      updated_at: row.updated_at,
+    })),
+  });
+});
+
+adminRoutes.get("/api-keys", async (c) => {
   const apiKeys = await listAllApiKeys();
 
   return c.json({

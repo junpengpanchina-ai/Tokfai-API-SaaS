@@ -24,7 +24,7 @@ export function buildApp() {
   app.route("/", webhookRoutes);
   app.route("/", modelRoutes);
   app.route("/", chatRoutes);
-  app.route("/", adminRoutes);
+  app.route("/admin", adminRoutes);
 
   app.notFound(notFoundHandler);
   app.onError(errorHandler);
