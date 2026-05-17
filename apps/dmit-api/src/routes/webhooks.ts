@@ -11,7 +11,7 @@ type CheckoutMetadata = {
   orderId?: string;
   userId: string;
   credits: number;
-  planId: string;
+  packageCode: string;
 };
 
 function asCheckoutSession(event: Stripe.Event): Stripe.Checkout.Session {
@@ -50,9 +50,14 @@ function parseCheckoutMetadata(session: Stripe.Checkout.Session): CheckoutMetada
   const userId =
     metadataValue(session.metadata, "user_id", "tokfai_user_id") ??
     session.client_reference_id?.trim();
-  const planId = metadataValue(session.metadata, "plan_id", "package_id");
+  const packageCode = metadataValue(
+    session.metadata,
+    "package_code",
+    "package_id",
+    "plan_id"
+  );
 
-  if (!userId || !planId) {
+  if (!userId || !packageCode) {
     throw ApiError.badRequest("Checkout session metadata is missing.", "missing_checkout_metadata");
   }
 
@@ -60,16 +65,16 @@ function parseCheckoutMetadata(session: Stripe.Checkout.Session): CheckoutMetada
     orderId: metadataValue(session.metadata, "credit_order_id", "order_id"),
     userId,
     credits: parsePositiveCredits(metadataValue(session.metadata, "credits")),
-    planId,
+    packageCode,
   };
 }
 
-function amountCny(session: Stripe.Checkout.Session): number {
+function amountCents(session: Stripe.Checkout.Session): number {
   const amountTotal = session.amount_total;
-  if (!amountTotal || amountTotal <= 0 || amountTotal % 100 !== 0) {
+  if (!amountTotal || amountTotal <= 0 || !Number.isInteger(amountTotal)) {
     throw ApiError.badRequest("Checkout session amount is invalid.", "invalid_checkout_amount");
   }
-  return amountTotal / 100;
+  return amountTotal;
 }
 
 async function ensureCreditOrder(session: Stripe.Checkout.Session, metadata: CheckoutMetadata) {
@@ -100,15 +105,12 @@ async function ensureCreditOrder(session: Stripe.Checkout.Session, metadata: Che
     .from("credit_orders")
     .insert({
       user_id: metadata.userId,
-      plan_id: metadata.planId,
+      email: session.customer_email ?? session.customer_details?.email ?? null,
+      package_code: metadata.packageCode,
       status: "pending",
       currency,
-      amount_cny: amountCny(session),
+      amount_cents: amountCents(session),
       credits: metadata.credits,
-      stripe_customer_id:
-        typeof session.customer === "string"
-          ? session.customer
-          : session.customer?.id ?? null,
       stripe_checkout_session_id: session.id,
       stripe_payment_intent_id: paymentIntentId(session),
     })

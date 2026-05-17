@@ -10,28 +10,32 @@ type PlanId = "starter" | "pro" | "business";
 
 interface CreditPlan {
   plan_id: PlanId;
+  package_code: PlanId;
   name: string;
-  amount_cny: number;
+  amount_cents: number;
   credits: number;
 }
 
 const CREDIT_PLANS: Record<PlanId, CreditPlan> = {
   starter: {
     plan_id: "starter",
+    package_code: "starter",
     name: "Tokfai Starter Credits",
-    amount_cny: 29,
+    amount_cents: 2900,
     credits: 10_000,
   },
   pro: {
     plan_id: "pro",
+    package_code: "pro",
     name: "Tokfai Pro Credits",
-    amount_cny: 99,
+    amount_cents: 9900,
     credits: 50_000,
   },
   business: {
     plan_id: "business",
+    package_code: "business",
     name: "Tokfai Business Credits",
-    amount_cny: 299,
+    amount_cents: 29900,
     credits: 200_000,
   },
 };
@@ -193,12 +197,12 @@ async function createCheckoutSession(c: Context) {
       .from("credit_orders")
       .insert({
         user_id: user.id,
-        plan_id: plan.plan_id,
+        email: user.email ?? (profile as { email?: string | null }).email ?? null,
+        package_code: plan.package_code,
         status: "pending",
         currency: "cny",
-        amount_cny: plan.amount_cny,
+        amount_cents: plan.amount_cents,
         credits: plan.credits,
-        stripe_customer_id: stripeCustomerId,
       })
       .select("id")
       .single();
@@ -222,7 +226,7 @@ async function createCheckoutSession(c: Context) {
           quantity: 1,
           price_data: {
             currency: "cny",
-            unit_amount: plan.amount_cny * 100,
+            unit_amount: plan.amount_cents,
             product_data: {
               name: plan.name,
               description: `${plan.credits.toLocaleString("en-US")} Tokfai credits`,
@@ -233,6 +237,7 @@ async function createCheckoutSession(c: Context) {
       metadata: {
         credit_order_id: orderId,
         tokfai_user_id: user.id,
+        package_code: plan.package_code,
         plan_id: plan.plan_id,
         credits: String(plan.credits),
       },
@@ -240,6 +245,7 @@ async function createCheckoutSession(c: Context) {
         metadata: {
           credit_order_id: orderId,
           tokfai_user_id: user.id,
+          package_code: plan.package_code,
           plan_id: plan.plan_id,
         },
       },
@@ -253,7 +259,6 @@ async function createCheckoutSession(c: Context) {
       .from("credit_orders")
       .update({
         stripe_checkout_session_id: session.id,
-        updated_at: new Date().toISOString(),
       })
       .eq("id", orderId);
 
@@ -269,7 +274,7 @@ async function createCheckoutSession(c: Context) {
       session_id: session.id,
       order_id: orderId,
       plan_id: plan.plan_id,
-      amount_cny: plan.amount_cny,
+      amount_cents: plan.amount_cents,
       credits: plan.credits,
     });
   } catch (err) {
