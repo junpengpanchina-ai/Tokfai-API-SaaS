@@ -15,6 +15,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 
+const LOGIN_ERRORS: Record<string, string> = {
+  missing_code: "Missing OAuth code.",
+  oauth_callback_failed: "Google login failed. Please try again.",
+};
+
+function getLoginErrorMessage(error?: string) {
+  if (!error) {
+    return null;
+  }
+
+  return LOGIN_ERRORS[error] ?? error;
+}
+
 export function LoginForm({
   redirectTo,
   initialError,
@@ -26,7 +39,10 @@ export function LoginForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(initialError ?? null);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [error, setError] = useState<string | null>(
+    getLoginErrorMessage(initialError)
+  );
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -53,21 +69,21 @@ export function LoginForm({
     router.refresh();
   }
 
-  async function handleGoogle() {
+  async function handleGoogleLogin() {
     setError(null);
+    setGoogleLoading(true);
+
     const supabase = createClient();
-    const origin =
-      process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin;
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${origin}/auth/callback?redirect=${encodeURIComponent(
-          redirectTo ?? "/dashboard"
-        )}`,
+        redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
+
     if (oauthError) {
       setError(oauthError.message);
+      setGoogleLoading(false);
     }
   }
 
@@ -109,7 +125,7 @@ export function LoginForm({
             </p>
           ) : null}
 
-          <Button type="submit" disabled={loading}>
+          <Button type="submit" disabled={loading || googleLoading}>
             {loading ? "Signing in…" : "Sign in"}
           </Button>
 
@@ -118,8 +134,13 @@ export function LoginForm({
             <span className="absolute inset-x-0 top-1/2 -z-10 h-px bg-border" />
           </div>
 
-          <Button type="button" variant="outline" onClick={handleGoogle}>
-            Continue with Google
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleGoogleLogin}
+            disabled={loading || googleLoading}
+          >
+            {googleLoading ? "Redirecting…" : "Continue with Google"}
           </Button>
         </form>
       </CardContent>
