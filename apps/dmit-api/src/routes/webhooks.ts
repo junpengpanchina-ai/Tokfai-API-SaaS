@@ -128,7 +128,7 @@ async function ensureCreditOrder(session: Stripe.Checkout.Session, metadata: Che
 async function handleStripeWebhook(c: Context) {
   const signature = c.req.header("stripe-signature");
   if (!signature) {
-    throw ApiError.badRequest("Missing Stripe-Signature header.", "missing_stripe_signature");
+    throw ApiError.badRequest("Missing Stripe-Signature header.", "missing_signature");
   }
 
   const rawBody = await c.req.text();
@@ -143,7 +143,7 @@ async function handleStripeWebhook(c: Context) {
     log.warn("stripe_webhook_signature_failed", {
       message: err instanceof Error ? err.message : String(err),
     });
-    throw ApiError.badRequest("Invalid Stripe signature.", "invalid_stripe_signature");
+    throw ApiError.badRequest("Invalid Stripe signature.", "invalid_signature");
   }
 
   if (event.type !== "checkout.session.completed") {
@@ -211,6 +211,7 @@ async function handleStripeWebhook(c: Context) {
  * STRIPE_WEBHOOK_SECRET. Never JWT or sk-tokfai.
  */
 export const stripeWebhookRoutes = new Hono();
+export const legacyStripeWebhookRoutes = new Hono();
 
-stripeWebhookRoutes.post("/stripe/webhook", handleStripeWebhook);
-stripeWebhookRoutes.post("/v1/webhooks/stripe", handleStripeWebhook);
+stripeWebhookRoutes.post("/stripe", handleStripeWebhook);
+legacyStripeWebhookRoutes.post("/stripe/webhook", handleStripeWebhook);

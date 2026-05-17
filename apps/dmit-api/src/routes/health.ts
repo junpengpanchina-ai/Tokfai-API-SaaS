@@ -16,7 +16,11 @@ healthRoutes.get("/debug/routes", (c) =>
     service: "tokfai-dmit-api",
     cwd: process.cwd(),
     adminCreditsAdjustRoute: true,
-    routes: ["POST /admin/credits/adjust", "GET /debug/routes"],
+    routes: [
+      "POST /admin/credits/adjust",
+      "POST /v1/webhooks/stripe",
+      "GET /debug/routes",
+    ],
     time: new Date().toISOString(),
   })
 );
@@ -32,6 +36,7 @@ healthRoutes.get("/__version", (c) =>
       "GET /api/system/health",
       "GET /admin/health",
       "POST /billing/create-checkout-session",
+      "POST /v1/webhooks/stripe",
       "POST /stripe/webhook",
       "POST /admin/credits/adjust",
     ],
