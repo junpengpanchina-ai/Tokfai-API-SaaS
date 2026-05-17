@@ -9,16 +9,16 @@
 
 | # | 验收项 | 状态 | 说明 |
 |---|---|---|---|
-| 1 | 域名 | 待完成 | 确认 `tokfai.com` 与 `api.tokfai.com` 的 DNS、HTTPS 和生产环境指向。 |
-| 2 | Vercel 页面 | 待完成 | 确认前端生产部署、环境变量和主要页面可访问。 |
-| 3 | DMIT API | 待完成 | 确认 `api.tokfai.com` 后端服务、环境变量和健康状态。 |
-| 4 | Supabase 表 | 待完成 | 确认生产库已应用迁移，并包含 `profiles`、`credit_ledger`、`usage_logs`、`api_keys` 等表。 |
-| 5 | API Key 创建 | 待完成 | 确认登录用户可通过前端调用 DMIT API 创建 Tokfai API Key。 |
-| 6 | `/v1/models` | 待完成 | 确认使用 Tokfai API Key 可请求模型列表。 |
-| 7 | `/v1/chat/completions` | 待完成 | 确认 OpenAI-compatible chat completions 请求可成功返回。 |
-| 8 | `usage_logs` | 待完成 | 确认成功调用后会写入用量记录。 |
-| 9 | `credit_ledger` | 待完成 | 确认成功调用或购买后会记录积分流水。 |
-| 10 | Credits 页面 | 待完成 | 确认用户可查看积分余额和积分流水。 |
-| 11 | Usage 页面 | 待完成 | 确认用户可查看自己的调用用量记录。 |
-| 12 | Docs 页面 | 待完成 | 确认文档页面展示生产 API 使用说明，并且链接可访问。 |
+| 1 | Google OAuth login | 已完成 | 前端登录链路已接入 Google OAuth，可用于生产登录验收。 |
+| 2 | Dashboard Overview real data | 已完成 | Overview 使用 RLS-scoped Supabase 读取当前用户余额、24 小时请求数和 active key 数量。 |
+| 3 | Credits balance and credit ledger | 已完成 | Credits 页面展示当前用户 credits 余额、累计数据和最近 credit ledger entries。 |
+| 4 | Usage logs RLS scoped per user | 已完成 | Usage 页面只读取当前登录用户自己的 `usage_logs` 记录和统计。 |
+| 5 | Admin read-only dashboard | 已完成 | Admin 页面用于只读查看 profiles、API keys 和 usage logs 状态。 |
+| 6 | API key revoke | 已完成 | API Keys 页面支持 revoke 用户自己的 key，并显示 active / revoked 状态。 |
+| 7 | Revoked key blocked by DMIT API | 已完成 | DMIT API key 校验会拒绝 `revoked_at` 不为空的 key。 |
+| 8 | Stripe Checkout | 待完成 | 需要完成生产 Checkout 配置、跳转链路和真实支付验收。 |
+| 9 | Stripe Webhook | 待完成 | 需要完成生产 webhook 签名验证、事件处理和幂等验收。 |
+| 10 | recharge order table | 待完成 | 需要补齐充值订单表，用于记录 Stripe checkout / payment 状态。 |
+| 11 | credit top-up ledger entry | 待完成 | 需要确认支付成功后写入 top-up credit ledger entry，并更新用户余额。 |
+| 12 | production security cleanup | 待完成 | 上线前需清理调试输出、确认 CORS / secrets / RLS / admin access 等生产安全项。 |
 
