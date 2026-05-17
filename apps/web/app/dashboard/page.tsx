@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowUpRight, CreditCard, Gauge, KeyRound } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -10,33 +11,74 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { formatInt, formatUsd } from "@/lib/format";
+import { createClient } from "@/lib/supabase/server";
+import type { ProfileRow } from "@/lib/supabase/types";
 
-/** Overview stats are placeholders until wired to Supabase/DMIT (no /v1/keys here). */
-const STATS = [
-  {
-    label: "Credits remaining",
-    value: "$0.00",
-    sub: "Top up to start calling the API.",
-    href: "/dashboard/credits",
-    icon: CreditCard,
-  },
-  {
-    label: "Requests (last 24h)",
-    value: "0",
-    sub: "No traffic yet.",
-    href: "/dashboard/usage",
-    icon: Gauge,
-  },
-  {
-    label: "Active API keys",
-    value: "0",
-    sub: "Create your first key.",
-    href: "/dashboard/api-keys",
-    icon: KeyRound,
-  },
-];
+const PROFILE_COLUMNS = "id, email, credits_balance";
 
-export default function DashboardOverviewPage() {
+export default async function DashboardOverviewPage() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login?redirect=/dashboard");
+  }
+
+  const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const [profileRes, apiKeysRes, usageRes] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select(PROFILE_COLUMNS)
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("api_keys")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .is("revoked_at", null),
+    supabase
+      .from("usage_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .gte("created_at", since24h),
+  ]);
+
+  const profile = (profileRes.data ?? null) as Pick<
+    ProfileRow,
+    "id" | "email" | "credits_balance"
+  > | null;
+  const activeApiKeyCount = apiKeysRes.count ?? 0;
+  const requestsLast24h = usageRes.count ?? 0;
+  const stats = [
+    {
+      label: "Credits remaining",
+      value: profile ? formatUsd(profile.credits_balance) : "Unavailable",
+      sub: "Top up to start calling the API.",
+      href: "/dashboard/credits",
+      icon: CreditCard,
+    },
+    {
+      label: "Requests (last 24h)",
+      value: formatInt(requestsLast24h),
+      sub: requestsLast24h > 0 ? "Recent API traffic." : "No traffic yet.",
+      href: "/dashboard/usage",
+      icon: Gauge,
+    },
+    {
+      label: "Active API keys",
+      value: formatInt(activeApiKeyCount),
+      sub:
+        activeApiKeyCount > 0
+          ? "Ready to use with the API."
+          : "Create your first key.",
+      href: "/dashboard/api-keys",
+      icon: KeyRound,
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex items-end justify-between gap-4">
@@ -51,7 +93,7 @@ export default function DashboardOverviewPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        {STATS.map((stat) => {
+        {stats.map((stat) => {
           const Icon = stat.icon;
           return (
             <Card key={stat.label}>

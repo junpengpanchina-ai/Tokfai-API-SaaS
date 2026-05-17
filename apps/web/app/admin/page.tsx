@@ -85,6 +85,7 @@ type AdminDebug = {
   dmitBaseUrl: string;
   hasAccessToken: boolean;
   userEmail: string | null;
+  isForbidden: boolean;
 };
 
 export default async function AdminPage() {
@@ -119,6 +120,7 @@ export default async function AdminPage() {
       dmitBaseUrl: DMIT_API_BASE_URL,
       hasAccessToken,
       userEmail,
+      isForbidden: false,
     };
   } else {
     try {
@@ -391,11 +393,16 @@ function EmptyState({ label }: { label: string }) {
 }
 
 function AdminDebugCard({ debug }: { debug: AdminDebug }) {
+  const title = debug.isForbidden ? "Admin access denied" : "Admin Debug/Error";
+  const description = debug.isForbidden
+    ? "Current user is not in the TOKFAI_ADMIN_EMAILS allowlist."
+    : debug.message;
+
   return (
     <Card className="border-destructive/30 bg-destructive/5">
       <CardHeader>
-        <CardTitle className="text-base">Admin Debug/Error</CardTitle>
-        <CardDescription>{debug.message}</CardDescription>
+        <CardTitle className="text-base">{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
@@ -430,13 +437,18 @@ function formatMaybeInt(value: number | null | undefined): string {
 
 function toAdminDebug(
   error: unknown,
-  context: Omit<AdminDebug, "statusCode" | "message">
+  context: Omit<AdminDebug, "statusCode" | "message" | "isForbidden">
 ): AdminDebug {
   if (error instanceof DmitServerError) {
+    const isForbidden = error.status === 403;
+
     return {
       ...context,
       statusCode: String(error.status),
-      message: error.message,
+      message: isForbidden
+        ? "Current user is not in the TOKFAI_ADMIN_EMAILS allowlist."
+        : error.message,
+      isForbidden,
     };
   }
 
@@ -445,6 +457,7 @@ function toAdminDebug(
       ...context,
       statusCode: "fetch failed",
       message: error.message,
+      isForbidden: false,
     };
   }
 
@@ -452,6 +465,7 @@ function toAdminDebug(
     ...context,
     statusCode: "unknown",
     message: "Admin data could not be loaded.",
+    isForbidden: false,
   };
 }
 
