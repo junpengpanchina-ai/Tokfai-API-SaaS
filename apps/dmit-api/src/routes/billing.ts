@@ -240,10 +240,6 @@ async function createCheckoutSession(c: Context) {
  */
 export const billingRoutes = new Hono();
 
-billingRoutes.use("/billing/*", requireSupabaseJwt);
-billingRoutes.use("/v1/billing/*", requireSupabaseJwt);
+billingRoutes.use("/*", requireSupabaseJwt);
 
-billingRoutes.post("/billing/create-checkout-session", createCheckoutSession);
-
-// Compatibility alias for the earlier dashboard client contract.
-billingRoutes.post("/v1/billing/checkout", createCheckoutSession);
+billingRoutes.post("/create-checkout-session", createCheckoutSession);

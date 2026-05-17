@@ -20,6 +20,8 @@ healthRoutes.get("/__version", (c) =>
       "POST /v1/chat/completions",
       "GET /api/system/health",
       "GET /admin/health",
+      "POST /billing/create-checkout-session",
+      "POST /stripe/webhook",
       "POST /admin/credits/adjust",
     ],
     buildTime: process.env.BUILD_TIME || null,

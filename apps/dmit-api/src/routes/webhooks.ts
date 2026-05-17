@@ -105,9 +105,6 @@ async function handleStripeWebhook(c: Context) {
  * Stripe-signed webhook. Auth is the `Stripe-Signature` header, verified with
  * STRIPE_WEBHOOK_SECRET. Never JWT or sk-tokfai.
  */
-export const webhookRoutes = new Hono();
+export const stripeWebhookRoutes = new Hono();
 
-webhookRoutes.post("/stripe/webhook", handleStripeWebhook);
-
-// Compatibility alias for the earlier route shape.
-webhookRoutes.post("/v1/webhooks/stripe", handleStripeWebhook);
+stripeWebhookRoutes.post("/webhook", handleStripeWebhook);
