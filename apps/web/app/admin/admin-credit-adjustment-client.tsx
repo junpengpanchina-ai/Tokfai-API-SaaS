@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { dmitFetch, DmitApiError } from "@/lib/dmit/client";
+import { createClient } from "@/lib/supabase/client";
 
 type Direction = "add" | "deduct";
 
@@ -45,10 +46,20 @@ export function AdminCreditAdjustmentClient({ userId }: { userId: string }) {
 
     setIsSubmitting(true);
     try {
+      const supabase = createClient();
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      const accessToken = data.session?.access_token;
+
+      if (sessionError || !accessToken) {
+        setError("Please sign in again before adjusting credits.");
+        return;
+      }
+
       const res = await dmitFetch<AdminCreditAdjustmentResponse>(
         "/admin/credits/adjust",
         {
           method: "POST",
+          accessToken,
           json: {
             user_id: userId,
             amount: parsedAmount,
