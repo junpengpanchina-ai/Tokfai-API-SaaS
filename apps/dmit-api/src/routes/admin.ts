@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { Hono } from "hono";
+import { randomUUID } from "node:crypto";
 
 import { ApiError } from "../errors.js";
 import { supabase } from "../supabase.js";
@@ -39,6 +40,13 @@ type ApiKeyAdminRow = {
   created_at: string;
   last_used_at: string | null;
   revoked_at: string | null;
+};
+
+type AdminCreditAdjustmentInput = {
+  user_id?: unknown;
+  amount?: unknown;
+  direction?: unknown;
+  reason?: unknown;
 };
 
 function normalizeEmail(email: string | null | undefined): string {
@@ -136,6 +144,34 @@ async function requireAdmin(c: {
 function toNumber(value: number | string | null | undefined): number {
   const n = Number(value ?? 0);
   return Number.isFinite(n) ? n : 0;
+}
+
+function parseCreditAdjustment(body: AdminCreditAdjustmentInput) {
+  const userId = typeof body.user_id === "string" ? body.user_id.trim() : "";
+  const amount = Number(body.amount);
+  const direction = body.direction;
+  const reason =
+    typeof body.reason === "string" && body.reason.trim()
+      ? body.reason.trim()
+      : "admin_adjustment";
+
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
+    throw ApiError.badRequest("Invalid user_id.", "invalid_user_id");
+  }
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw ApiError.badRequest("Amount must be greater than 0.", "invalid_amount");
+  }
+
+  if (direction !== "add" && direction !== "deduct") {
+    throw ApiError.badRequest("Direction must be add or deduct.", "invalid_direction");
+  }
+
+  if (reason.length > 200) {
+    throw ApiError.badRequest("Reason must be 200 characters or fewer.", "invalid_reason");
+  }
+
+  return { userId, amount, direction, reason };
 }
 
 async function countRows(table: "profiles" | "api_keys" | "usage_logs") {
@@ -301,6 +337,80 @@ async function listAllApiKeys(): Promise<ApiKeyAdminRow[]> {
   return rows;
 }
 
+async function adjustUserCredits(input: ReturnType<typeof parseCreditAdjustment>) {
+  const { userId, amount, direction, reason } = input;
+  const signedAmount = direction === "add" ? amount : -amount;
+
+  const { data: profile, error: profileError } = await supabase()
+    .from("profiles")
+    .select("id, credits_balance")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (profileError) {
+    throw ApiError.internal(
+      `Failed to load profile for credit adjustment: ${profileError.message}`,
+      "admin_credit_profile_load_failed"
+    );
+  }
+
+  if (!profile) {
+    throw ApiError.notFound("Profile not found.", "profile_not_found");
+  }
+
+  const currentBalance = toNumber(
+    (profile as { credits_balance?: number | string | null }).credits_balance
+  );
+  const newBalance = currentBalance + signedAmount;
+
+  if (newBalance < 0) {
+    throw ApiError.badRequest(
+      "Deduction would make the balance negative.",
+      "insufficient_credits"
+    );
+  }
+
+  const { error: updateError } = await supabase()
+    .from("profiles")
+    .update({
+      credits_balance: newBalance,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId);
+
+  if (updateError) {
+    throw ApiError.internal(
+      `Failed to update profile credits: ${updateError.message}`,
+      "admin_credit_update_failed"
+    );
+  }
+
+  const referenceId = `admin_adjustment:${randomUUID()}`;
+  const { error: ledgerError } = await supabase().from("credit_ledger").insert({
+    user_id: userId,
+    type: "adjustment",
+    amount: signedAmount,
+    balance_after: newBalance,
+    reason,
+    reference_id: referenceId,
+  });
+
+  if (ledgerError) {
+    throw ApiError.internal(
+      `Failed to write credit adjustment ledger: ${ledgerError.message}`,
+      "admin_credit_ledger_failed"
+    );
+  }
+
+  return {
+    user_id: userId,
+    amount: signedAmount,
+    balance_after: newBalance,
+    reason,
+    reference_id: referenceId,
+  };
+}
+
 export const adminRoutes = new Hono();
 
 adminRoutes.use("/admin/*", async (c, next) => {
@@ -345,6 +455,14 @@ adminRoutes.get("/admin/users", async (c) => {
       updated_at: row.updated_at,
     })),
   });
+});
+
+adminRoutes.post("/admin/credits/adjust", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as AdminCreditAdjustmentInput;
+  const input = parseCreditAdjustment(body);
+  const adjustment = await adjustUserCredits(input);
+
+  return c.json({ data: adjustment });
 });
 
 adminRoutes.get("/admin/api-keys", async (c) => {

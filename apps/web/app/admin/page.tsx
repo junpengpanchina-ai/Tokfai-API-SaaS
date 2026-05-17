@@ -22,6 +22,8 @@ import {
 } from "@/lib/dmit/server";
 import { createClient } from "@/lib/supabase/server";
 
+import { AdminCreditAdjustmentClient } from "./admin-credit-adjustment-client";
+
 export const metadata = {
   title: "Admin",
 };
@@ -156,7 +158,7 @@ export default async function AdminPage() {
     <DashboardShell>
       <div className="flex flex-col gap-6">
         <div>
-          <Badge variant="secondary">Read only</Badge>
+          <Badge variant="secondary">Admin tools</Badge>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight">
             Tokfai Admin
           </h1>
@@ -275,6 +277,7 @@ export default async function AdminPage() {
                   <thead>
                     <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
                       <th className="py-2 pr-4 font-medium">Email</th>
+                      <th className="py-2 pr-4 font-medium">User ID</th>
                       <th className="py-2 pr-4 text-right font-medium">
                         Credits balance
                       </th>
@@ -282,12 +285,21 @@ export default async function AdminPage() {
                         Total credits used
                       </th>
                       <th className="py-2 pr-4 font-medium">Updated</th>
+                      <th className="py-2 pr-4 font-medium">
+                        Adjust credits
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {users.map((row) => (
                       <tr key={row.id} className="border-b last:border-0">
                         <td className="py-2 pr-4">{row.email ?? "—"}</td>
+                        <td
+                          className="max-w-[10rem] truncate py-2 pr-4 font-mono text-xs text-muted-foreground"
+                          title={row.id}
+                        >
+                          {row.id}
+                        </td>
                         <td className="py-2 pr-4 text-right font-mono text-xs">
                           {formatCredits(row.credits_balance)}
                         </td>
@@ -296,6 +308,9 @@ export default async function AdminPage() {
                         </td>
                         <td className="py-2 pr-4 text-muted-foreground">
                           {formatDateTime(row.updated_at)}
+                        </td>
+                        <td className="py-2 pr-4">
+                          <AdminCreditAdjustmentClient userId={row.id} />
                         </td>
                       </tr>
                     ))}
