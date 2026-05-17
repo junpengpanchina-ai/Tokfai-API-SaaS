@@ -13,7 +13,15 @@ import { createClient } from "@/lib/supabase/client";
 type Direction = "add" | "deduct";
 
 type AdminCreditAdjustmentResponse = {
-  data: {
+  ok?: boolean;
+  user_id?: string;
+  previous_credits?: number;
+  delta?: number;
+  credits?: number;
+  balance_after?: number;
+  reason?: string;
+  reference_id?: string;
+  data?: {
     user_id: string;
     amount: number;
     balance_after: number;
@@ -71,7 +79,13 @@ export function AdminCreditAdjustmentClient({ userId }: { userId: string }) {
 
       setAmount("");
       setReason("");
-      setMessage(`Applied. New balance: ${res.data.balance_after} credits.`);
+      const balanceAfter =
+        res.balance_after ?? res.credits ?? res.data?.balance_after;
+      setMessage(
+        balanceAfter == null
+          ? "Applied. Admin data will refresh shortly."
+          : `Applied. New balance: ${balanceAfter} credits.`
+      );
       startTransition(() => {
         router.refresh();
       });

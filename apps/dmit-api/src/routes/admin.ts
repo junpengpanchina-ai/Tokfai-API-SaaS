@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { randomUUID } from "node:crypto";
 
 import { ApiError } from "../errors.js";
@@ -49,6 +49,27 @@ type AdminCreditAdjustmentInput = {
   reason?: unknown;
 };
 
+type SupabaseAuthUser = {
+  id: string;
+  email?: string | null;
+};
+
+type ParsedCreditAdjustment =
+  | {
+      userId: string;
+      amount: number;
+      direction: "add" | "deduct";
+      reason: string;
+    }
+  | {
+      error:
+        | "missing_user_id"
+        | "invalid_user_id"
+        | "invalid_amount"
+        | "invalid_direction"
+        | "invalid_reason";
+    };
+
 function normalizeEmail(email: string | null | undefined): string {
   return (email ?? "").trim().toLowerCase();
 }
@@ -66,6 +87,16 @@ function extractAccessTokenFromAuthorization(
   if (!header) return null;
   const match = /^Bearer\s+(.+)$/i.exec(header.trim());
   return match ? match[1]!.trim() : null;
+}
+
+function authHeaderError(header: string | null | undefined):
+  | "missing_authorization"
+  | "invalid_authorization_format"
+  | null {
+  if (!header) return "missing_authorization";
+  return /^Bearer\s+.+$/i.test(header.trim())
+    ? null
+    : "invalid_authorization_format";
 }
 
 function adminAuthClient() {
@@ -146,29 +177,45 @@ function toNumber(value: number | string | null | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function parseCreditAdjustment(body: AdminCreditAdjustmentInput) {
+function jsonError(
+  c: Context,
+  status: 400 | 401 | 403 | 404 | 500,
+  error: string,
+  extra?: Record<string, unknown>
+) {
+  return c.json({ error, ...(extra ?? {}) }, status);
+}
+
+function parseCreditAdjustment(
+  body: AdminCreditAdjustmentInput
+): ParsedCreditAdjustment {
   const userId = typeof body.user_id === "string" ? body.user_id.trim() : "";
   const amount = Number(body.amount);
-  const direction = body.direction;
   const reason =
     typeof body.reason === "string" && body.reason.trim()
       ? body.reason.trim()
       : "admin_adjustment";
 
+  if (!userId) {
+    return { error: "missing_user_id" as const };
+  }
+
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
-    throw ApiError.badRequest("Invalid user_id.", "invalid_user_id");
+    return { error: "invalid_user_id" as const };
   }
 
   if (!Number.isFinite(amount) || amount <= 0) {
-    throw ApiError.badRequest("Amount must be greater than 0.", "invalid_amount");
+    return { error: "invalid_amount" as const };
   }
 
-  if (direction !== "add" && direction !== "deduct") {
-    throw ApiError.badRequest("Direction must be add or deduct.", "invalid_direction");
+  if (body.direction !== "add" && body.direction !== "deduct") {
+    return { error: "invalid_direction" as const };
   }
+
+  const direction = body.direction;
 
   if (reason.length > 200) {
-    throw ApiError.badRequest("Reason must be 200 characters or fewer.", "invalid_reason");
+    return { error: "invalid_reason" as const };
   }
 
   return { userId, amount, direction, reason };
@@ -337,7 +384,93 @@ async function listAllApiKeys(): Promise<ApiKeyAdminRow[]> {
   return rows;
 }
 
-async function adjustUserCredits(input: ReturnType<typeof parseCreditAdjustment>) {
+async function verifyAdminForCreditAdjustment(c: Context): Promise<
+  | { ok: true; adminUser: SupabaseAuthUser }
+  | {
+      ok: false;
+      status: 401 | 403;
+      error:
+        | "missing_authorization"
+        | "invalid_authorization_format"
+        | "invalid_supabase_token"
+        | "admin_required"
+        | "admin_profile_not_configured";
+      detail?: string;
+    }
+> {
+  const authorization = c.req.raw.headers.get("authorization");
+  const headerError = authHeaderError(authorization);
+  if (headerError) {
+    return { ok: false, status: 401, error: headerError };
+  }
+
+  const accessToken = extractAccessTokenFromAuthorization(authorization);
+  if (!accessToken) {
+    return { ok: false, status: 401, error: "invalid_authorization_format" };
+  }
+
+  const authClient = adminAuthClient();
+  const { data: userData, error: userError } =
+    await authClient.auth.getUser(accessToken);
+
+  if (userError || !userData.user) {
+    return { ok: false, status: 401, error: "invalid_supabase_token" };
+  }
+
+  const adminUser: SupabaseAuthUser = {
+    id: userData.user.id,
+    email: userData.user.email,
+  };
+
+  const { data: adminProfile, error: adminProfileError } = await supabase()
+    .from("profiles")
+    .select("*")
+    .eq("id", adminUser.id)
+    .maybeSingle();
+
+  if (adminProfileError || !adminProfile) {
+    return {
+      ok: false,
+      status: 403,
+      error: "admin_profile_not_configured",
+      detail: adminProfileError?.message,
+    };
+  }
+
+  const profile = adminProfile as Record<string, unknown>;
+  const hasProfileAdminFields = "role" in profile || "is_admin" in profile;
+  const isProfileAdmin =
+    profile.role === "admin" || profile.is_admin === true;
+
+  if (hasProfileAdminFields) {
+    return isProfileAdmin
+      ? { ok: true, adminUser }
+      : { ok: false, status: 403, error: "admin_required" };
+  }
+
+  // Current Tokfai production admin pages use this allowlist; keep it as a
+  // compatibility fallback until role/is_admin exists in profiles.
+  const isAllowlistedAdmin = adminEmailsFromEnv().includes(
+    normalizeEmail(adminUser.email)
+  );
+
+  if (isAllowlistedAdmin) {
+    return { ok: true, adminUser };
+  }
+
+  return {
+    ok: false,
+    status: 403,
+    error: "admin_profile_not_configured",
+  };
+}
+
+async function adjustUserCredits(input: {
+  userId: string;
+  amount: number;
+  direction: "add" | "deduct";
+  reason: string;
+}) {
   const { userId, amount, direction, reason } = input;
   const signedAmount = direction === "add" ? amount : -amount;
 
@@ -355,7 +488,7 @@ async function adjustUserCredits(input: ReturnType<typeof parseCreditAdjustment>
   }
 
   if (!profile) {
-    throw ApiError.notFound("Profile not found.", "profile_not_found");
+    return { error: "target_user_not_found" as const };
   }
 
   const currentBalance = toNumber(
@@ -364,10 +497,11 @@ async function adjustUserCredits(input: ReturnType<typeof parseCreditAdjustment>
   const newBalance = currentBalance + signedAmount;
 
   if (newBalance < 0) {
-    throw ApiError.badRequest(
-      "Deduction would make the balance negative.",
-      "insufficient_credits"
-    );
+    return {
+      error: "insufficient_credits" as const,
+      current_credits: currentBalance,
+      requested_amount: amount,
+    };
   }
 
   const { error: updateError } = await supabase()
@@ -403,9 +537,10 @@ async function adjustUserCredits(input: ReturnType<typeof parseCreditAdjustment>
   }
 
   return {
+    previous_credits: currentBalance,
     user_id: userId,
-    amount: signedAmount,
-    balance_after: newBalance,
+    delta: signedAmount,
+    credits: newBalance,
     reason,
     reference_id: referenceId,
   };
@@ -414,6 +549,14 @@ async function adjustUserCredits(input: ReturnType<typeof parseCreditAdjustment>
 export const adminRoutes = new Hono();
 
 adminRoutes.use("/admin/*", async (c, next) => {
+  if (
+    c.req.method === "POST" &&
+    new URL(c.req.url).pathname === "/admin/credits/adjust"
+  ) {
+    await next();
+    return;
+  }
+
   const response = await requireAdmin(c);
   if (response) return response;
   await next();
@@ -458,11 +601,45 @@ adminRoutes.get("/admin/users", async (c) => {
 });
 
 adminRoutes.post("/admin/credits/adjust", async (c) => {
+  const admin = await verifyAdminForCreditAdjustment(c);
+  if (!admin.ok) {
+    return jsonError(
+      c,
+      admin.status,
+      admin.error,
+      admin.detail ? { detail: admin.detail } : undefined
+    );
+  }
+
   const body = (await c.req.json().catch(() => ({}))) as AdminCreditAdjustmentInput;
   const input = parseCreditAdjustment(body);
-  const adjustment = await adjustUserCredits(input);
+  if ("error" in input) {
+    return jsonError(c, 400, input.error);
+  }
 
-  return c.json({ data: adjustment });
+  const adjustment = await adjustUserCredits(input);
+  if ("error" in adjustment) {
+    if (adjustment.error === "target_user_not_found") {
+      return jsonError(c, 404, adjustment.error);
+    }
+    if (adjustment.error === "insufficient_credits") {
+      return jsonError(c, 400, adjustment.error, {
+        current_credits: adjustment.current_credits,
+        requested_amount: adjustment.requested_amount,
+      });
+    }
+  }
+
+  return c.json({
+    ok: true,
+    user_id: adjustment.user_id,
+    previous_credits: adjustment.previous_credits,
+    delta: adjustment.delta,
+    credits: adjustment.credits,
+    balance_after: adjustment.credits,
+    reason: adjustment.reason,
+    reference_id: adjustment.reference_id,
+  });
 });
 
 adminRoutes.get("/admin/api-keys", async (c) => {
