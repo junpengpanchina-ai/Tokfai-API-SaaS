@@ -1,6 +1,10 @@
 -- Atomically complete a Stripe Checkout credit order.
 -- Called only by DMIT after verifying the Stripe webhook signature.
 
+create unique index if not exists credit_ledger_topup_ref_idx
+  on public.credit_ledger (reference_id)
+  where type = 'topup' and reference_id is not null;
+
 create or replace function public.complete_credit_order(
   p_order_id                    uuid,
   p_user_id                     uuid,

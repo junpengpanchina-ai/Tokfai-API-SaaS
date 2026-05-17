@@ -27,10 +27,6 @@ create index if not exists credit_orders_stripe_checkout_session_id_idx
   on public.credit_orders (stripe_checkout_session_id)
   where stripe_checkout_session_id is not null;
 
-create unique index if not exists credit_ledger_topup_ref_idx
-  on public.credit_ledger (reference_id)
-  where type::text = 'topup' and reference_id is not null;
-
 alter table public.credit_orders enable row level security;
 
 drop policy if exists "credit_orders_select_own" on public.credit_orders;
