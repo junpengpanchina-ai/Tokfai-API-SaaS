@@ -125,7 +125,7 @@ async function ensureCreditOrder(session: Stripe.Checkout.Session, metadata: Che
   return (createdOrder as { id: string }).id;
 }
 
-async function handleStripeWebhook(c: Context) {
+export async function handleStripeWebhook(c: Context) {
   const signature = c.req.header("stripe-signature");
   if (!signature) {
     throw ApiError.badRequest("Missing Stripe-Signature header.", "missing_signature");

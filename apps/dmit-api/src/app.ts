@@ -7,7 +7,11 @@ import { requestIdMiddleware } from "./middleware/requestId.js";
 import { healthRoutes } from "./routes/health.js";
 import { keyRoutes } from "./routes/keys.js";
 import { billingRoutes } from "./routes/billing.js";
-import { legacyStripeWebhookRoutes, webhookRoutes } from "./routes/webhooks.js";
+import {
+  handleStripeWebhook,
+  legacyStripeWebhookRoutes,
+  webhookRoutes,
+} from "./routes/webhooks.js";
 import { modelRoutes } from "./routes/models.js";
 import { chatRoutes } from "./routes/chat.js";
 import { adminRoutes } from "./routes/admin.js";
@@ -21,6 +25,7 @@ export function buildApp() {
   app.route("/", healthRoutes);
   app.route("/", keyRoutes);
   app.route("/", billingRoutes);
+  app.post("/v1/webhooks/stripe", handleStripeWebhook);
   app.route("/v1/webhooks", webhookRoutes);
   app.route("/", legacyStripeWebhookRoutes);
   app.route("/", modelRoutes);
