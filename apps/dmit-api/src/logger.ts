@@ -10,19 +10,32 @@ const LEVELS: Record<Level, number> = {
 };
 
 const threshold = LEVELS[env.LOG_LEVEL];
+const ALLOWED_FIELD_KEYS = new Set(["requestId", "route", "status", "code", "message"]);
 
 /**
  * Minimal structured logger. Emits one JSON line per call so containers /
  * log aggregators can parse it. Keep secrets out — never log API keys,
  * JWTs, Stripe payloads in full, or anything with raw user content.
  */
+function sanitizeFields(fields?: Record<string, unknown>): Record<string, unknown> {
+  if (!fields) return {};
+
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (ALLOWED_FIELD_KEYS.has(key)) {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
 function emit(level: Level, message: string, fields?: Record<string, unknown>) {
   if (LEVELS[level] < threshold) return;
   const line = {
     ts: new Date().toISOString(),
     level,
     msg: message,
-    ...(fields ?? {}),
+    ...sanitizeFields(fields),
   };
   // Stdout for info, stderr for warn+.
   const out = level === "error" || level === "warn" ? process.stderr : process.stdout;

@@ -17,7 +17,11 @@ const MIN_SECRET_CHARS = 32;
 function encryptionKey(): Buffer {
   const secret = env.TOKFAI_KEY_ENCRYPTION_SECRET;
   if (!secret || secret.length < MIN_SECRET_CHARS) {
-    log.error("missing_key_encryption_secret");
+    log.error("key_encryption_config_error", {
+      status: 500,
+      code: "key_encryption_config_error",
+      message: "Key encryption is not configured.",
+    });
     throw ApiError.internal(
       "TOKFAI_KEY_ENCRYPTION_SECRET is missing or too short.",
       "missing_key_encryption_secret"

@@ -84,11 +84,16 @@ export type Env = z.infer<typeof Schema>;
 function load(): Env {
   const parsed = Schema.safeParse(process.env);
   if (!parsed.success) {
-    const issues = parsed.error.issues
-      .map((i) => `  - ${i.path.join(".") || "(root)"}: ${i.message}`)
-      .join("\n");
-    // eslint-disable-next-line no-console
-    console.error(`Invalid DMIT env:\n${issues}\n`);
+    process.stderr.write(
+      `${JSON.stringify({
+        ts: new Date().toISOString(),
+        level: "error",
+        msg: "invalid_env",
+        status: 500,
+        code: "invalid_env",
+        message: "Invalid DMIT environment configuration.",
+      })}\n`
+    );
     process.exit(1);
   }
   return parsed.data;

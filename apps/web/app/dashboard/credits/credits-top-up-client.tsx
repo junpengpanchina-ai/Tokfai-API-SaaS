@@ -16,34 +16,34 @@ import { createCheckoutSession, DmitApiError } from "@/lib/dmit/client";
 import { createClient } from "@/lib/supabase/client";
 
 interface CreditPlan {
-  plan_id: "starter" | "pro" | "business";
   package_code: "starter" | "pro" | "business";
   name: string;
   amount_cny: number;
   credits: number;
+  enabled: boolean;
 }
 
 const CREDIT_PLANS: CreditPlan[] = [
   {
-    plan_id: "starter",
     package_code: "starter",
     name: "Starter",
     amount_cny: 29,
     credits: 10_000,
+    enabled: true,
   },
   {
-    plan_id: "pro",
     package_code: "pro",
     name: "Pro",
     amount_cny: 99,
     credits: 50_000,
+    enabled: false,
   },
   {
-    plan_id: "business",
     package_code: "business",
     name: "Business",
     amount_cny: 299,
     credits: 200_000,
+    enabled: false,
   },
 ];
 
@@ -54,7 +54,7 @@ export function CreditsTopUpClient() {
   async function handleRecharge(plan: CreditPlan) {
     if (loadingPlanId != null) return;
 
-    setLoadingPlanId(plan.plan_id);
+    setLoadingPlanId(plan.package_code);
     setError(null);
     try {
       const supabase = createClient();
@@ -68,7 +68,6 @@ export function CreditsTopUpClient() {
       }
 
       const session = await createCheckoutSession({
-        plan_id: plan.plan_id,
         package_code: plan.package_code,
         accessToken,
         success_url: `${window.location.origin}/dashboard/credits?success=true&session_id={CHECKOUT_SESSION_ID}`,
@@ -100,18 +99,18 @@ export function CreditsTopUpClient() {
       <CardContent className="flex flex-col gap-4">
         <div className="grid gap-3 md:grid-cols-3">
           {CREDIT_PLANS.map((plan) => {
-            const isLoading = loadingPlanId === plan.plan_id;
-            const isDisabled = loadingPlanId != null;
+            const isLoading = loadingPlanId === plan.package_code;
+            const isDisabled = loadingPlanId != null || !plan.enabled;
             return (
               <div
-                key={plan.plan_id}
+                key={plan.package_code}
                 className="flex flex-col gap-4 rounded-lg border bg-card p-4"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="font-semibold">{plan.name}</h3>
                     <Badge variant="outline" className="font-mono text-[10px]">
-                      {plan.plan_id}
+                      {plan.package_code}
                     </Badge>
                   </div>
                   <p className="mt-2 text-3xl font-semibold tracking-tight">
@@ -124,7 +123,7 @@ export function CreditsTopUpClient() {
 
                 <Button
                   type="button"
-                  variant={plan.plan_id === "pro" ? "default" : "outline"}
+                  variant={plan.package_code === "starter" ? "default" : "outline"}
                   disabled={isDisabled}
                   onClick={() => handleRecharge(plan)}
                   aria-label={`Recharge ${plan.name}`}
@@ -133,7 +132,7 @@ export function CreditsTopUpClient() {
                   {isLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : null}
-                  {plan.plan_id === "starter" ? "Buy" : "Recharge"}
+                  {plan.enabled ? "Buy starter" : "Coming soon"}
                 </Button>
               </div>
             );

@@ -89,9 +89,10 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
 
     log.warn("chat_completion_rejected", {
       requestId,
-      keyPrefix: apiKey.prefix,
-      model: resolvedModel,
-      status: "stream_not_supported",
+      route: "/v1/chat/completions",
+      status: 400,
+      code: "stream_not_supported",
+      message: "Streaming is not supported yet.",
     });
 
     return c.json(
@@ -145,10 +146,10 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
 
     log.info("chat_completion_succeeded", {
       requestId,
-      keyPrefix: apiKey.prefix,
-      model: billedModel,
-      status: "succeeded",
-      creditsCharged,
+      route: "/v1/chat/completions",
+      status: 200,
+      code: "succeeded",
+      message: "Chat completion succeeded.",
     });
 
     return c.json(data);
@@ -172,9 +173,10 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
 
       log.warn("chat_completion_failed", {
         requestId,
-        keyPrefix: apiKey.prefix,
-        model: resolvedModel,
-        status: err.code ?? "failed",
+        route: "/v1/chat/completions",
+        status: err.status,
+        code: err.code ?? "failed",
+        message: err.publicMessage,
       });
 
       throw err;
@@ -198,9 +200,10 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
 
     log.error("chat_completion_failed", {
       requestId,
-      keyPrefix: apiKey.prefix,
-      model: resolvedModel,
-      status: "server_error",
+      route: "/v1/chat/completions",
+      status: 500,
+      code: "server_error",
+      message: "Internal error.",
     });
 
     throw ApiError.internal(
@@ -323,8 +326,10 @@ async function writeUsageLog(entry: UsageLogInsert): Promise<void> {
   if (error) {
     log.warn("usage_log_insert_failed", {
       requestId: entry.request_id,
-      model: entry.model,
-      status: entry.status,
+      route: "/v1/chat/completions",
+      status: 500,
+      code: "usage_log_insert_failed",
+      message: "Failed to write usage log.",
     });
   }
 }

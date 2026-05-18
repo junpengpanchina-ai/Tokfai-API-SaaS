@@ -7,6 +7,10 @@ function getRequestId(c: Context): string | undefined {
   return c.get("requestId" as never);
 }
 
+function getRoute(c: Context): string {
+  return `${c.req.method} ${c.req.path}`;
+}
+
 /**
  * Hono catch-all error handler. Converts thrown `ApiError`s into the
  * standard envelope. Anything else becomes a 500 with a generic message —
@@ -14,19 +18,24 @@ function getRequestId(c: Context): string | undefined {
  */
 export const errorHandler: ErrorHandler = (err, c) => {
   const requestId = getRequestId(c);
+  const route = getRoute(c);
 
   if (err instanceof ApiError) {
     if (err.status >= 500) {
       log.error("api_error_500", {
         requestId,
-        message: err.message,
+        route,
+        status: err.status,
         code: err.code,
+        message: err.publicMessage,
       });
     } else {
       log.warn("api_error", {
         requestId,
+        route,
         status: err.status,
         code: err.code,
+        message: err.publicMessage,
       });
     }
     return c.json(err.toJSON(), err.status as never);
@@ -34,8 +43,10 @@ export const errorHandler: ErrorHandler = (err, c) => {
 
   log.error("unhandled", {
     requestId,
-    message: err instanceof Error ? err.message : String(err),
-    stack: err instanceof Error ? err.stack : undefined,
+    route,
+    status: 500,
+    code: "server_error",
+    message: "Internal error.",
   });
 
   return c.json(

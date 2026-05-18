@@ -87,14 +87,16 @@ function parsePlanId(body: unknown): PlanId {
     throw ApiError.badRequest("Request body must be a JSON object.", "invalid_body");
   }
 
-  const planId = (body as Record<string, unknown>).plan_id;
+  const planId =
+    (body as Record<string, unknown>).package_code ??
+    (body as Record<string, unknown>).plan_id;
   if (
     planId !== "starter" &&
     planId !== "pro" &&
     planId !== "business"
   ) {
     throw ApiError.badRequest(
-      "plan_id must be one of starter, pro, or business.",
+      "package_code must be one of starter, pro, or business.",
       "invalid_plan_id"
     );
   }

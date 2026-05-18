@@ -24,10 +24,6 @@ function paymentIntentId(session: Stripe.Checkout.Session): string | null {
   return typeof value === "string" ? value : value.id;
 }
 
-function checkoutLedgerReferenceId(sessionId: string): string {
-  return `stripe_checkout:${sessionId}`;
-}
-
 export async function handleStripeWebhook(c: Context) {
   const signature = c.req.header("stripe-signature");
   if (!signature) {
@@ -42,9 +38,12 @@ export async function handleStripeWebhook(c: Context) {
       signature,
       env.STRIPE_WEBHOOK_SECRET
     );
-  } catch (err) {
+  } catch {
     log.warn("stripe_webhook_signature_failed", {
-      message: err instanceof Error ? err.message : String(err),
+      route: "/v1/webhooks/stripe",
+      status: 400,
+      code: "invalid_signature",
+      message: "Invalid Stripe signature.",
     });
     throw ApiError.badRequest("Invalid Stripe signature.", "invalid_signature");
   }
@@ -54,22 +53,7 @@ export async function handleStripeWebhook(c: Context) {
   }
 
   const session = asCheckoutSession(event);
-  const referenceId = checkoutLedgerReferenceId(session.id);
-
   const sb = supabase();
-  const { data: existingLedger, error: ledgerError } = await sb
-    .from("credit_ledger")
-    .select("id")
-    .eq("reference_id", referenceId)
-    .maybeSingle();
-
-  if (ledgerError) {
-    throw ApiError.internal(
-      `Failed to check credit ledger idempotency: ${ledgerError.message}`,
-      "credit_ledger_idempotency_check_failed"
-    );
-  }
-
   const { data: existingOrder, error: orderError } = await sb
     .from("credit_orders")
     .select("id, user_id, credits, status")
@@ -97,6 +81,8 @@ export async function handleStripeWebhook(c: Context) {
     status: (existingOrder as { status: string }).status,
   } satisfies CreditOrder;
 
+  const alreadyPaid = order.status === "paid";
+
   const { data: balanceAfter, error: completeError } = await sb.rpc(
     "complete_credit_order",
     {
@@ -114,21 +100,21 @@ export async function handleStripeWebhook(c: Context) {
     );
   }
 
-  if (existingLedger) {
-    log.info("stripe_checkout_already_ledgered", {
-      eventId: event.id,
-      sessionId: session.id,
-      orderId: order.id,
+  if (alreadyPaid) {
+    log.info("stripe_checkout_order_already_paid", {
+      route: "/v1/webhooks/stripe",
+      status: 200,
+      code: "already_processed",
+      message: "Stripe checkout order already paid.",
     });
     return c.json({ received: true, already_processed: true });
   }
 
   log.info("stripe_checkout_completed", {
-    eventId: event.id,
-    sessionId: session.id,
-    orderId: order.id,
-    orderStatus: order.status,
-    credits: order.credits,
+    route: "/v1/webhooks/stripe",
+    status: 200,
+    code: "succeeded",
+    message: "Stripe checkout completed.",
   });
 
   return c.json({

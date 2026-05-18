@@ -3,7 +3,6 @@ import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   AlertCircle,
-  AlertTriangle,
   ArrowDownRight,
   ArrowUpRight,
   CheckCircle2,
@@ -19,9 +18,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  getMyCredits,
+  listMyCreditLedger,
+} from "@/lib/dmit/server";
 import { formatCredits, formatDateTime } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
-import type { CreditLedgerRow, ProfileRow } from "@/lib/supabase/types";
 
 import { CreditsReturnRefresh } from "./credits-return-refresh";
 import { CreditsTopUpClient } from "./credits-top-up-client";
@@ -30,22 +32,6 @@ export const metadata = {
   title: "Credits",
 };
 export const dynamic = "force-dynamic";
-
-const LEDGER_COLUMNS =
-  "id, created_at, type, amount, balance_after, reason, reference_id";
-const PROFILE_COLUMNS =
-  "id, email, credits_balance, total_credits_purchased, total_credits_used, updated_at";
-const ORDER_COLUMNS =
-  "id, created_at, status, credits, paid_at, stripe_checkout_session_id";
-
-type CreditOrderRow = {
-  id: string;
-  created_at: string;
-  status: string | null;
-  credits: number | null;
-  paid_at: string | null;
-  stripe_checkout_session_id: string | null;
-};
 
 export default async function CreditsPage({
   searchParams,
@@ -63,34 +49,18 @@ export default async function CreditsPage({
     redirect("/login?redirect=/dashboard/credits");
   }
 
-  const [profileRes, ledgerRes, ordersRes] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select(PROFILE_COLUMNS)
-      .eq("id", user.id)
-      .maybeSingle(),
-    supabase
-      .from("credit_ledger")
-      .select(LEDGER_COLUMNS)
-      .order("created_at", { ascending: false })
-      .limit(50),
-    supabase
-      .from("credit_orders")
-      .select(ORDER_COLUMNS)
-      .order("created_at", { ascending: false })
-      .limit(10),
-  ]);
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  const queryErrors = collectErrors([
-    ["profiles", profileRes.error],
-    ["credit_ledger", ledgerRes.error],
-    ["credit_orders", ordersRes.error],
-  ]);
+  if (!session?.access_token) {
+    redirect("/login?redirect=/dashboard/credits");
+  }
 
-  const profile = (profileRes.data ?? null) as ProfileRow | null;
-  const ledger = (ledgerRes.data ?? []) as CreditLedgerRow[];
-  const orders = (ordersRes.data ?? []) as CreditOrderRow[];
-  const profileMissing = !profileRes.error && !profile;
+  const [profile, ledger] = await Promise.all([
+    getMyCredits(session.access_token),
+    listMyCreditLedger(session.access_token, 50),
+  ]);
   const checkoutSucceeded =
     searchParams.success === "true" || Boolean(searchParams.session_id);
 
@@ -104,8 +74,8 @@ export default async function CreditsPage({
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Credits</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Prepaid balance used by every API call. Reads are RLS-scoped to your
-          account.
+          Prepaid balance used by every API call. Data is loaded through DMIT
+          with your Supabase session.
         </p>
       </div>
 
@@ -113,12 +83,6 @@ export default async function CreditsPage({
         status={searchParams.status}
         checkoutSucceeded={checkoutSucceeded}
       />
-
-      {queryErrors.length > 0 ? (
-        <QueryErrorCard errors={queryErrors} />
-      ) : null}
-
-      {profileMissing ? <MissingProfileCard userId={user.id} /> : null}
 
       <Card>
         <CardHeader>
@@ -155,8 +119,6 @@ export default async function CreditsPage({
 
       <CreditsTopUpClient />
 
-      <RecentOrdersCard orders={orders} />
-
       <Card>
         <CardHeader>
           <CardTitle>Recent ledger entries</CardTitle>
@@ -173,7 +135,6 @@ export default async function CreditsPage({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-                    <th className="py-2 pr-4 font-medium">When</th>
                     <th className="py-2 pr-4 font-medium">Type</th>
                     <th className="py-2 pr-4 text-right font-medium">
                       Amount
@@ -182,17 +143,12 @@ export default async function CreditsPage({
                       Balance after
                     </th>
                     <th className="py-2 pr-4 font-medium">Reason</th>
+                    <th className="py-2 pr-4 font-medium">Created</th>
                   </tr>
                 </thead>
                 <tbody>
                   {ledger.map((entry) => (
                     <tr key={entry.id} className="border-b last:border-0">
-                      <td
-                        className="py-2 pr-4 text-muted-foreground"
-                        title={entry.reference_id ?? undefined}
-                      >
-                        {formatDateTime(entry.created_at)}
-                      </td>
                       <td className="py-2 pr-4">
                         <TypeBadge type={entry.type} />
                       </td>
@@ -205,7 +161,10 @@ export default async function CreditsPage({
                           : "—"}
                       </td>
                       <td className="py-2 pr-4 text-muted-foreground">
-                        {entry.reason ?? "—"}
+                        {displayReason(entry.reason)}
+                      </td>
+                      <td className="py-2 pr-4 text-muted-foreground">
+                        {formatDateTime(entry.created_at)}
                       </td>
                     </tr>
                   ))}
@@ -216,81 +175,6 @@ export default async function CreditsPage({
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function RecentOrdersCard({ orders }: { orders: CreditOrderRow[] }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Recent orders</CardTitle>
-        <CardDescription>
-          Checkout orders are shown for payment status only. Pending orders do
-          not affect your balance.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {orders.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No checkout orders yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-                  <th className="py-2 pr-4 font-medium">Created</th>
-                  <th className="py-2 pr-4 font-medium">Status</th>
-                  <th className="py-2 pr-4 text-right font-medium">Credits</th>
-                  <th className="py-2 pr-4 font-medium">Paid at</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((order) => (
-                  <tr key={order.id} className="border-b last:border-0">
-                    <td
-                      className="py-2 pr-4 text-muted-foreground"
-                      title={order.stripe_checkout_session_id ?? undefined}
-                    >
-                      {formatDateTime(order.created_at)}
-                    </td>
-                    <td className="py-2 pr-4">
-                      <OrderStatusBadge status={order.status} />
-                    </td>
-                    <td className="py-2 pr-4 text-right font-mono text-xs">
-                      {formatCredits(order.credits)}
-                    </td>
-                    <td className="py-2 pr-4 text-muted-foreground">
-                      {order.paid_at ? formatDateTime(order.paid_at) : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function MissingProfileCard({ userId }: { userId: string }) {
-  return (
-    <Card className="border-destructive/30 bg-destructive/5">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <AlertTriangle className="h-4 w-4 text-destructive" />
-          Profile could not be found
-        </CardTitle>
-        <CardDescription>
-          Supabase did not return a <code>profiles</code> row for your user.
-          Balance data cannot be shown until the profile exists.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="font-mono text-xs text-muted-foreground">
-          user.id: {userId}
-        </p>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -370,20 +254,6 @@ function TypeBadge({ type }: { type: string | null | undefined }) {
   return <Badge variant="outline">{type}</Badge>;
 }
 
-function OrderStatusBadge({ status }: { status: string | null }) {
-  const value = status?.toLowerCase();
-  if (value === "pending") {
-    return <Badge variant="warning">Waiting for payment</Badge>;
-  }
-  if (value === "paid") {
-    return <Badge variant="success">Paid</Badge>;
-  }
-  if (value === "cancelled" || value === "failed") {
-    return <Badge variant="outline">{status}</Badge>;
-  }
-  return <Badge variant="outline">{status ?? "unknown"}</Badge>;
-}
-
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed py-16 text-center">
@@ -398,44 +268,13 @@ function EmptyState() {
   );
 }
 
-function QueryErrorCard({
-  errors,
-}: {
-  errors: Array<{ source: string; message: string }>;
-}) {
-  return (
-    <Card className="border-destructive/30 bg-destructive/5">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <AlertTriangle className="h-4 w-4 text-destructive" />
-          Some data could not be loaded
-        </CardTitle>
-        <CardDescription>
-          Supabase returned the errors below. Balances may be missing until
-          the schema or RLS policy is fixed.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ul className="flex flex-col gap-1 text-xs">
-          {errors.map((e) => (
-            <li key={e.source} className="font-mono text-muted-foreground">
-              <span className="text-foreground">{e.source}:</span> {e.message}
-            </li>
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
-  );
-}
-
-function collectErrors(
-  pairs: Array<readonly [string, { message: string } | null | undefined]>
-) {
-  const out: Array<{ source: string; message: string }> = [];
-  for (const [source, err] of pairs) {
-    if (err && typeof err.message === "string") {
-      out.push({ source, message: err.message });
-    }
+function displayReason(reason: string | null | undefined) {
+  if (!reason) return "—";
+  if (reason === "stripe_checkout_completed") return "Stripe 充值到账";
+  if (reason === "Chat completion usage") return "API 调用扣费";
+  if (reason === "admin_adjustment") return "管理员调账";
+  if (reason === "reverse_duplicate_stripe_topup_ledger_only") {
+    return "系统修正";
   }
-  return out;
+  return reason;
 }

@@ -66,3 +66,45 @@ function toDmitServerError(status: number, body: unknown): DmitServerError {
 
   return new DmitServerError({ status, message, code });
 }
+
+export interface MeCredits {
+  id: string;
+  email: string | null;
+  credits_balance: number | null;
+  total_credits_purchased: number | null;
+  total_credits_used: number | null;
+  updated_at: string | null;
+}
+
+export interface MeCreditLedgerEntry {
+  id: string;
+  created_at: string;
+  type: string | null;
+  amount: number | null;
+  balance_after: number | null;
+  reason: string | null;
+  reference_id: string | null;
+}
+
+interface DataResponse<T> {
+  data: T;
+}
+
+export async function getMyCredits(accessToken: string): Promise<MeCredits> {
+  const res = await dmitServerFetch<DataResponse<MeCredits>>(
+    "/v1/me/credits",
+    accessToken
+  );
+  return res.data;
+}
+
+export async function listMyCreditLedger(
+  accessToken: string,
+  limit = 50
+): Promise<MeCreditLedgerEntry[]> {
+  const res = await dmitServerFetch<DataResponse<MeCreditLedgerEntry[]>>(
+    `/v1/me/credits/ledger?limit=${limit}`,
+    accessToken
+  );
+  return res.data;
+}

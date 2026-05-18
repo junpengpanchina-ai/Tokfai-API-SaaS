@@ -142,15 +142,6 @@ async function requireAdmin(c: {
 
   const matchResult = Boolean(currentEmail && adminEmails.includes(currentEmail));
 
-  // Deliberately excludes bearer token and server-only secrets.
-  console.log("ADMIN_AUTH_DEBUG", {
-    currentEmail,
-    adminEmails,
-    hasToken,
-    matchResult,
-    authUserErrorMessage,
-  });
-
   if (headerError) {
     const body = {
       error: {

@@ -54,6 +54,16 @@ export type CreditLedgerType =
   | "debit"
   | "adjustment";
 
+export interface CreditLedgerRow {
+  id: string;
+  created_at: string;
+  type: CreditLedgerType | string | null;
+  amount: string | number | null;
+  balance_after: string | number | null;
+  reason: string | null;
+  reference_id: string | null;
+}
+
 export interface AuthedUser {
   /** auth.users.id */
   id: string;

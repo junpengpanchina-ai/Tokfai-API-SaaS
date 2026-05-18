@@ -15,10 +15,11 @@ export async function verifySupabaseJwt(token: string): Promise<AuthedUser> {
   let result: Awaited<ReturnType<ReturnType<typeof supabase>["auth"]["getUser"]>>;
   try {
     result = await supabase().auth.getUser(token);
-  } catch (err) {
+  } catch {
     log.warn("supabase_auth_invalid_token", {
-      errorName: err instanceof Error ? err.name : "UnknownAuthError",
-      errorMessage: err instanceof Error ? err.message : String(err),
+      status: 401,
+      code: "invalid_token",
+      message: "Invalid token.",
     });
     throw ApiError.unauthorized("Invalid token.", "invalid_token");
   }
@@ -30,16 +31,18 @@ export async function verifySupabaseJwt(token: string): Promise<AuthedUser> {
 
   if (error) {
     log.warn("supabase_auth_invalid_token", {
-      errorName: error.name,
-      errorMessage: error.message,
+      status: 401,
+      code: "invalid_token",
+      message: "Invalid token.",
     });
     throw ApiError.unauthorized("Invalid token.", "invalid_token");
   }
 
   if (!user?.id) {
     log.warn("supabase_auth_invalid_token", {
-      errorName: "MissingUser",
-      errorMessage: "Supabase Auth returned no user for access token.",
+      status: 401,
+      code: "invalid_token",
+      message: "Invalid token.",
     });
     throw ApiError.unauthorized("Invalid token.", "invalid_token");
   }
