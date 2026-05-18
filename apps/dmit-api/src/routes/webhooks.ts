@@ -7,11 +7,11 @@ import { log } from "../logger.js";
 import { stripe } from "../stripe.js";
 import { supabase } from "../supabase.js";
 
-type CheckoutMetadata = {
-  orderId?: string;
+type CreditOrder = {
+  id: string;
   userId: string;
-  credits: number;
-  packageCode: string;
+  credits: string | number;
+  status: string;
 };
 
 function asCheckoutSession(event: Stripe.Event): Stripe.Checkout.Session {
@@ -24,107 +24,8 @@ function paymentIntentId(session: Stripe.Checkout.Session): string | null {
   return typeof value === "string" ? value : value.id;
 }
 
-function metadataValue(
-  metadata: Stripe.Metadata | null | undefined,
-  ...keys: string[]
-): string | undefined {
-  for (const key of keys) {
-    const value = metadata?.[key]?.trim();
-    if (value) return value;
-  }
-  return undefined;
-}
-
-function parsePositiveCredits(raw: string | undefined): number {
-  const credits = Number(raw);
-  if (!Number.isFinite(credits) || credits <= 0) {
-    throw ApiError.badRequest(
-      "Checkout session credits metadata is invalid.",
-      "invalid_checkout_credits"
-    );
-  }
-  return credits;
-}
-
-function parseCheckoutMetadata(session: Stripe.Checkout.Session): CheckoutMetadata {
-  const userId =
-    metadataValue(session.metadata, "user_id", "tokfai_user_id") ??
-    session.client_reference_id?.trim();
-  const packageCode = metadataValue(
-    session.metadata,
-    "package_code",
-    "package_id",
-    "plan_id"
-  );
-
-  if (!userId || !packageCode) {
-    throw ApiError.badRequest("Checkout session metadata is missing.", "missing_checkout_metadata");
-  }
-
-  return {
-    orderId: metadataValue(session.metadata, "credit_order_id", "order_id"),
-    userId,
-    credits: parsePositiveCredits(metadataValue(session.metadata, "credits")),
-    packageCode,
-  };
-}
-
-function amountCents(session: Stripe.Checkout.Session): number {
-  const amountTotal = session.amount_total;
-  if (!amountTotal || amountTotal <= 0 || !Number.isInteger(amountTotal)) {
-    throw ApiError.badRequest("Checkout session amount is invalid.", "invalid_checkout_amount");
-  }
-  return amountTotal;
-}
-
-async function ensureCreditOrder(session: Stripe.Checkout.Session, metadata: CheckoutMetadata) {
-  const sb = supabase();
-
-  if (metadata.orderId) {
-    return metadata.orderId;
-  }
-
-  const { data: existingOrder, error: existingError } = await sb
-    .from("credit_orders")
-    .select("id")
-    .eq("stripe_checkout_session_id", session.id)
-    .maybeSingle();
-
-  if (existingError) {
-    throw ApiError.internal(
-      `Failed to load credit order by checkout session: ${existingError.message}`,
-      "credit_order_lookup_failed"
-    );
-  }
-  if (existingOrder) {
-    return (existingOrder as { id: string }).id;
-  }
-
-  const currency = (session.currency ?? "cny").toLowerCase();
-  const { data: createdOrder, error: createError } = await sb
-    .from("credit_orders")
-    .insert({
-      user_id: metadata.userId,
-      email: session.customer_email ?? session.customer_details?.email ?? null,
-      package_code: metadata.packageCode,
-      status: "pending",
-      currency,
-      amount_cents: amountCents(session),
-      credits: metadata.credits,
-      stripe_checkout_session_id: session.id,
-      stripe_payment_intent_id: paymentIntentId(session),
-    })
-    .select("id")
-    .single();
-
-  if (createError || !createdOrder) {
-    throw ApiError.internal(
-      `Failed to create credit order from webhook: ${createError?.message ?? "missing order"}`,
-      "credit_order_create_failed"
-    );
-  }
-
-  return (createdOrder as { id: string }).id;
+function checkoutLedgerReferenceId(sessionId: string): string {
+  return `stripe_checkout:${sessionId}`;
 }
 
 export async function handleStripeWebhook(c: Context) {
@@ -153,36 +54,62 @@ export async function handleStripeWebhook(c: Context) {
   }
 
   const session = asCheckoutSession(event);
-  const metadata = parseCheckoutMetadata(session);
+  const referenceId = checkoutLedgerReferenceId(session.id);
 
   const sb = supabase();
-  const { data: existingOrder, error: existingError } = await sb
-    .from("credit_orders")
-    .select("id, status")
-    .eq("stripe_checkout_session_id", session.id)
+  const { data: existingLedger, error: ledgerError } = await sb
+    .from("credit_ledger")
+    .select("id")
+    .eq("reference_id", referenceId)
     .maybeSingle();
 
-  if (existingError) {
+  if (ledgerError) {
     throw ApiError.internal(
-      `Failed to check credit order idempotency: ${existingError.message}`,
-      "credit_order_idempotency_check_failed"
+      `Failed to check credit ledger idempotency: ${ledgerError.message}`,
+      "credit_ledger_idempotency_check_failed"
     );
   }
 
-  if ((existingOrder as { status?: string } | null)?.status === "paid") {
-    log.info("stripe_checkout_already_paid", {
+  if (existingLedger) {
+    log.info("stripe_checkout_already_ledgered", {
       eventId: event.id,
       sessionId: session.id,
     });
     return c.json({ received: true, already_processed: true });
   }
 
-  const orderId = await ensureCreditOrder(session, metadata);
+  const { data: existingOrder, error: orderError } = await sb
+    .from("credit_orders")
+    .select("id, user_id, credits, status")
+    .eq("stripe_checkout_session_id", session.id)
+    .maybeSingle();
+
+  if (orderError) {
+    throw ApiError.internal(
+      `Failed to load credit order by checkout session: ${orderError.message}`,
+      "credit_order_lookup_failed"
+    );
+  }
+
+  if (!existingOrder) {
+    throw ApiError.internal(
+      `Credit order not found for checkout session ${session.id}`,
+      "credit_order_not_found"
+    );
+  }
+
+  const order = {
+    id: (existingOrder as { id: string }).id,
+    userId: (existingOrder as { user_id: string }).user_id,
+    credits: (existingOrder as { credits: string | number }).credits,
+    status: (existingOrder as { status: string }).status,
+  } satisfies CreditOrder;
+
   const { data: balanceAfter, error: completeError } = await sb.rpc(
     "complete_credit_order",
     {
-      p_order_id: orderId,
-      p_user_id: metadata.userId,
+      p_order_id: order.id,
+      p_user_id: order.userId,
       p_stripe_checkout_session_id: session.id,
       p_stripe_payment_intent_id: paymentIntentId(session),
     }
@@ -198,7 +125,9 @@ export async function handleStripeWebhook(c: Context) {
   log.info("stripe_checkout_completed", {
     eventId: event.id,
     sessionId: session.id,
-    orderId,
+    orderId: order.id,
+    orderStatus: order.status,
+    credits: order.credits,
   });
 
   return c.json({
