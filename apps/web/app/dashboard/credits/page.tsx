@@ -35,6 +35,17 @@ const LEDGER_COLUMNS =
   "id, created_at, type, amount, balance_after, reason, reference_id";
 const PROFILE_COLUMNS =
   "id, email, credits_balance, total_credits_purchased, total_credits_used, updated_at";
+const ORDER_COLUMNS =
+  "id, created_at, status, credits, paid_at, stripe_checkout_session_id";
+
+type CreditOrderRow = {
+  id: string;
+  created_at: string;
+  status: string | null;
+  credits: number | null;
+  paid_at: string | null;
+  stripe_checkout_session_id: string | null;
+};
 
 export default async function CreditsPage({
   searchParams,
@@ -52,7 +63,7 @@ export default async function CreditsPage({
     redirect("/login?redirect=/dashboard/credits");
   }
 
-  const [profileRes, ledgerRes] = await Promise.all([
+  const [profileRes, ledgerRes, ordersRes] = await Promise.all([
     supabase
       .from("profiles")
       .select(PROFILE_COLUMNS)
@@ -63,15 +74,22 @@ export default async function CreditsPage({
       .select(LEDGER_COLUMNS)
       .order("created_at", { ascending: false })
       .limit(50),
+    supabase
+      .from("credit_orders")
+      .select(ORDER_COLUMNS)
+      .order("created_at", { ascending: false })
+      .limit(10),
   ]);
 
   const queryErrors = collectErrors([
     ["profiles", profileRes.error],
     ["credit_ledger", ledgerRes.error],
+    ["credit_orders", ordersRes.error],
   ]);
 
   const profile = (profileRes.data ?? null) as ProfileRow | null;
   const ledger = (ledgerRes.data ?? []) as CreditLedgerRow[];
+  const orders = (ordersRes.data ?? []) as CreditOrderRow[];
   const profileMissing = !profileRes.error && !profile;
   const checkoutSucceeded =
     searchParams.success === "true" || Boolean(searchParams.session_id);
@@ -137,6 +155,8 @@ export default async function CreditsPage({
 
       <CreditsTopUpClient />
 
+      <RecentOrdersCard orders={orders} />
+
       <Card>
         <CardHeader>
           <CardTitle>Recent ledger entries</CardTitle>
@@ -196,6 +216,59 @@ export default async function CreditsPage({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function RecentOrdersCard({ orders }: { orders: CreditOrderRow[] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Recent orders</CardTitle>
+        <CardDescription>
+          Checkout orders are shown for payment status only. Pending orders do
+          not affect your balance.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {orders.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No checkout orders yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                  <th className="py-2 pr-4 font-medium">Created</th>
+                  <th className="py-2 pr-4 font-medium">Status</th>
+                  <th className="py-2 pr-4 text-right font-medium">Credits</th>
+                  <th className="py-2 pr-4 font-medium">Paid at</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order) => (
+                  <tr key={order.id} className="border-b last:border-0">
+                    <td
+                      className="py-2 pr-4 text-muted-foreground"
+                      title={order.stripe_checkout_session_id ?? undefined}
+                    >
+                      {formatDateTime(order.created_at)}
+                    </td>
+                    <td className="py-2 pr-4">
+                      <OrderStatusBadge status={order.status} />
+                    </td>
+                    <td className="py-2 pr-4 text-right font-mono text-xs">
+                      {formatCredits(order.credits)}
+                    </td>
+                    <td className="py-2 pr-4 text-muted-foreground">
+                      {order.paid_at ? formatDateTime(order.paid_at) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -295,6 +368,20 @@ function TypeBadge({ type }: { type: string | null | undefined }) {
     return <Badge variant="warning">{type}</Badge>;
   }
   return <Badge variant="outline">{type}</Badge>;
+}
+
+function OrderStatusBadge({ status }: { status: string | null }) {
+  const value = status?.toLowerCase();
+  if (value === "pending") {
+    return <Badge variant="warning">Waiting for payment</Badge>;
+  }
+  if (value === "paid") {
+    return <Badge variant="success">Paid</Badge>;
+  }
+  if (value === "cancelled" || value === "failed") {
+    return <Badge variant="outline">{status}</Badge>;
+  }
+  return <Badge variant="outline">{status ?? "unknown"}</Badge>;
 }
 
 function EmptyState() {
