@@ -19,6 +19,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  DmitServerError,
+  type MeCreditLedgerEntry,
+  type MeCredits,
   getMyCredits,
   listMyCreditLedger,
 } from "@/lib/dmit/server";
@@ -57,10 +60,7 @@ export default async function CreditsPage({
     redirect("/login?redirect=/dashboard/credits");
   }
 
-  const [profile, ledger] = await Promise.all([
-    getMyCredits(session.access_token),
-    listMyCreditLedger(session.access_token, 50),
-  ]);
+  const creditsState = await loadCreditsState(session.access_token);
   const checkoutSucceeded =
     searchParams.success === "true" || Boolean(searchParams.session_id);
 
@@ -84,34 +84,42 @@ export default async function CreditsPage({
         checkoutSucceeded={checkoutSucceeded}
       />
 
+      {creditsState.error ? (
+        <CreditsLoadErrorCard error={creditsState.error} />
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardDescription>Current balance</CardDescription>
           <CardTitle className="text-4xl">
-            {profile ? formatCredits(profile.credits_balance) : "Unavailable"}
+            {creditsState.profile
+              ? formatCredits(creditsState.profile.credits_balance)
+              : "Unavailable"}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-2 text-sm text-muted-foreground">
           <div>
             Total purchased:{" "}
             <span className="font-medium text-foreground">
-              {profile
-                ? formatCredits(profile.total_credits_purchased)
+              {creditsState.profile
+                ? formatCredits(creditsState.profile.total_credits_purchased)
                 : "Unavailable"}
             </span>
           </div>
           <div>
             Total used:{" "}
             <span className="font-medium text-foreground">
-              {profile
-                ? formatCredits(profile.total_credits_used)
+              {creditsState.profile
+                ? formatCredits(creditsState.profile.total_credits_used)
                 : "Unavailable"}
             </span>
           </div>
           <div>
             Last updated:{" "}
             <span className="font-medium text-foreground">
-              {profile ? formatDateTime(profile.updated_at) : "Unavailable"}
+              {creditsState.profile
+                ? formatDateTime(creditsState.profile.updated_at)
+                : "Unavailable"}
             </span>
           </div>
         </CardContent>
@@ -128,7 +136,7 @@ export default async function CreditsPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {ledger.length === 0 ? (
+          {creditsState.ledger.length === 0 ? (
             <EmptyState />
           ) : (
             <div className="overflow-x-auto">
@@ -147,7 +155,7 @@ export default async function CreditsPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {ledger.map((entry) => (
+                  {creditsState.ledger.map((entry) => (
                     <tr key={entry.id} className="border-b last:border-0">
                       <td className="py-2 pr-4">
                         <TypeBadge type={entry.type} />
@@ -175,6 +183,48 @@ export default async function CreditsPage({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+type CreditsLoadErrorKind = "auth" | "temporary";
+
+interface CreditsLoadState {
+  profile: MeCredits | null;
+  ledger: MeCreditLedgerEntry[];
+  error: CreditsLoadErrorKind | null;
+}
+
+async function loadCreditsState(accessToken: string): Promise<CreditsLoadState> {
+  try {
+    const [profile, ledger] = await Promise.all([
+      getMyCredits(accessToken),
+      listMyCreditLedger(accessToken, 50),
+    ]);
+    return { profile, ledger, error: null };
+  } catch (err) {
+    if (err instanceof DmitServerError && (err.status === 401 || err.status === 403)) {
+      return { profile: null, ledger: [], error: "auth" };
+    }
+    return { profile: null, ledger: [], error: "temporary" };
+  }
+}
+
+function CreditsLoadErrorCard({ error }: { error: CreditsLoadErrorKind }) {
+  const isAuth = error === "auth";
+  return (
+    <Card className="border-destructive/30 bg-destructive/5">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <AlertCircle className="h-4 w-4 text-destructive" />
+          {isAuth ? "登录或鉴权异常" : "Credits 暂时无法加载"}
+        </CardTitle>
+        <CardDescription>
+          {isAuth
+            ? "请刷新页面，或退出后重新登录。"
+            : "Credits 暂时无法加载，请稍后重试。"}
+        </CardDescription>
+      </CardHeader>
+    </Card>
   );
 }
 

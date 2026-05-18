@@ -21,9 +21,9 @@ function parseLimit(raw: string | undefined): number {
 
 export const meRoutes = new Hono();
 
-meRoutes.use("/v1/me/*", requireSupabaseJwt);
+meRoutes.use("*", requireSupabaseJwt);
 
-meRoutes.get("/v1/me/credits", async (c) => {
+meRoutes.get("/credits", async (c) => {
   const user = authedUser(c);
   const { data, error } = await supabase()
     .from("profiles")
@@ -56,7 +56,7 @@ meRoutes.get("/v1/me/credits", async (c) => {
   });
 });
 
-meRoutes.get("/v1/me/credits/ledger", async (c) => {
+meRoutes.get("/credits/ledger", async (c) => {
   const user = authedUser(c);
   const limit = parseLimit(c.req.query("limit"));
   const { data, error } = await supabase()

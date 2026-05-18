@@ -25,7 +25,7 @@ export function buildApp() {
 
   app.route("/", healthRoutes);
   app.route("/", keyRoutes);
-  app.route("/", meRoutes);
+  app.route("/v1/me", meRoutes);
   app.route("/", billingRoutes);
   app.post("/v1/webhooks/stripe", handleStripeWebhook);
   app.route("/v1/webhooks", webhookRoutes);
