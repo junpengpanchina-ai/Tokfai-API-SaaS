@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { ApiError } from "../errors.js";
 import { requireSupabaseJwt } from "../middleware/supabaseJwt.js";
 import { supabase } from "../supabase.js";
-import type { AuthedUser, CreditLedgerRow, ProfileRow } from "../types.js";
+import type { ApiKeyRow, AuthedUser, CreditLedgerRow, ProfileRow } from "../types.js";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
@@ -74,4 +74,34 @@ meRoutes.get("/credits/ledger", async (c) => {
   }
 
   return c.json({ data: (data ?? []) as CreditLedgerRow[] });
+});
+
+meRoutes.get("/api-keys", async (c) => {
+  const user = authedUser(c);
+  const { data, error } = await supabase()
+    .from("api_keys")
+    .select("id, name, prefix, created_at, last_used_at, revoked_at")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw ApiError.internal(
+      `Failed to list API keys: ${error.message}`,
+      "me_api_keys_failed"
+    );
+  }
+
+  const keys = ((data ?? []) as Pick<
+    ApiKeyRow,
+    "id" | "name" | "prefix" | "created_at" | "last_used_at" | "revoked_at"
+  >[]).map((key) => ({
+    id: key.id,
+    name: key.name,
+    key_prefix: key.prefix,
+    status: key.revoked_at ? "revoked" : "active",
+    created_at: key.created_at,
+    last_used_at: key.last_used_at,
+  }));
+
+  return c.json({ ok: true, keys });
 });
