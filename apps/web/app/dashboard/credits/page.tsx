@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   AlertCircle,
@@ -22,11 +23,13 @@ import { formatCredits, formatDateTime } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import type { CreditLedgerRow, ProfileRow } from "@/lib/supabase/types";
 
+import { CreditsReturnRefresh } from "./credits-return-refresh";
 import { CreditsTopUpClient } from "./credits-top-up-client";
 
 export const metadata = {
   title: "Credits",
 };
+export const dynamic = "force-dynamic";
 
 const LEDGER_COLUMNS =
   "id, created_at, type, amount, balance_after, reason, reference_id";
@@ -36,8 +39,10 @@ const PROFILE_COLUMNS =
 export default async function CreditsPage({
   searchParams,
 }: {
-  searchParams: { status?: string };
+  searchParams: { status?: string; success?: string; session_id?: string };
 }) {
+  noStore();
+
   const supabase = createClient();
   const {
     data: { user },
@@ -68,9 +73,16 @@ export default async function CreditsPage({
   const profile = (profileRes.data ?? null) as ProfileRow | null;
   const ledger = (ledgerRes.data ?? []) as CreditLedgerRow[];
   const profileMissing = !profileRes.error && !profile;
+  const checkoutSucceeded =
+    searchParams.success === "true" || Boolean(searchParams.session_id);
 
   return (
     <div className="flex flex-col gap-6">
+      <CreditsReturnRefresh
+        shouldRefresh={checkoutSucceeded}
+        sessionId={searchParams.session_id}
+      />
+
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Credits</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -79,7 +91,10 @@ export default async function CreditsPage({
         </p>
       </div>
 
-      <CheckoutStatusBanner status={searchParams.status} />
+      <CheckoutStatusBanner
+        status={searchParams.status}
+        checkoutSucceeded={checkoutSucceeded}
+      />
 
       {queryErrors.length > 0 ? (
         <QueryErrorCard errors={queryErrors} />
@@ -206,19 +221,23 @@ function MissingProfileCard({ userId }: { userId: string }) {
   );
 }
 
-function CheckoutStatusBanner({ status }: { status?: string }) {
-  if (status === "success") {
+function CheckoutStatusBanner({
+  status,
+  checkoutSucceeded,
+}: {
+  status?: string;
+  checkoutSucceeded: boolean;
+}) {
+  if (checkoutSucceeded || status === "success") {
     return (
       <Card className="border-emerald-300 bg-emerald-50 dark:border-emerald-900/60 dark:bg-emerald-950/30">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            Payment started or completed
+            Payment received
           </CardTitle>
           <CardDescription className="text-emerald-900/80 dark:text-emerald-100/80">
-            Your balance will update after Stripe confirms the payment — DMIT
-            will write the ledger entry from the Stripe webhook. Refresh in a
-            few seconds if you don&apos;t see it yet.
+            Payment received. Credits have been added.
           </CardDescription>
         </CardHeader>
       </Card>

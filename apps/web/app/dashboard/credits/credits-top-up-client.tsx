@@ -71,7 +71,7 @@ export function CreditsTopUpClient() {
         plan_id: plan.plan_id,
         package_code: plan.package_code,
         accessToken,
-        success_url: `${window.location.origin}/dashboard/credits?status=success&session_id={CHECKOUT_SESSION_ID}`,
+        success_url: `${window.location.origin}/dashboard/credits?success=true&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${window.location.origin}/dashboard/credits?status=cancelled`,
       });
       window.location.assign(session.url);
