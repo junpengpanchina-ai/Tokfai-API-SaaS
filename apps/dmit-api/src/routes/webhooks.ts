@@ -70,14 +70,6 @@ export async function handleStripeWebhook(c: Context) {
     );
   }
 
-  if (existingLedger) {
-    log.info("stripe_checkout_already_ledgered", {
-      eventId: event.id,
-      sessionId: session.id,
-    });
-    return c.json({ received: true, already_processed: true });
-  }
-
   const { data: existingOrder, error: orderError } = await sb
     .from("credit_orders")
     .select("id, user_id, credits, status")
@@ -120,6 +112,15 @@ export async function handleStripeWebhook(c: Context) {
       `Failed to complete credit order: ${completeError.message}`,
       "credit_order_complete_failed"
     );
+  }
+
+  if (existingLedger) {
+    log.info("stripe_checkout_already_ledgered", {
+      eventId: event.id,
+      sessionId: session.id,
+      orderId: order.id,
+    });
+    return c.json({ received: true, already_processed: true });
   }
 
   log.info("stripe_checkout_completed", {
