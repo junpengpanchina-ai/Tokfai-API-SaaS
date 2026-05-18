@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/card";
 import {
   DmitServerError,
+  getDmitBaseUrl,
   type MeCreditLedgerEntry,
   type MeCredits,
   getMyCredits,
@@ -57,7 +58,15 @@ export default async function CreditsPage({
   } = await supabase.auth.getSession();
 
   if (!session?.access_token) {
-    redirect("/login?redirect=/dashboard/credits");
+    const creditsState = missingSessionCreditsState();
+    return (
+      <CreditsContent
+        creditsState={creditsState}
+        checkoutSucceeded={false}
+        checkoutStatus={searchParams.status}
+        sessionId={searchParams.session_id}
+      />
+    );
   }
 
   const creditsState = await loadCreditsState(session.access_token);
@@ -65,10 +74,31 @@ export default async function CreditsPage({
     searchParams.success === "true" || Boolean(searchParams.session_id);
 
   return (
+    <CreditsContent
+      creditsState={creditsState}
+      checkoutSucceeded={checkoutSucceeded}
+      checkoutStatus={searchParams.status}
+      sessionId={searchParams.session_id}
+    />
+  );
+}
+
+function CreditsContent({
+  creditsState,
+  checkoutSucceeded,
+  checkoutStatus,
+  sessionId,
+}: {
+  creditsState: CreditsLoadState;
+  checkoutSucceeded: boolean;
+  checkoutStatus?: string;
+  sessionId?: string;
+}) {
+  return (
     <div className="flex flex-col gap-6">
       <CreditsReturnRefresh
         shouldRefresh={checkoutSucceeded}
-        sessionId={searchParams.session_id}
+        sessionId={sessionId}
       />
 
       <div>
@@ -80,12 +110,12 @@ export default async function CreditsPage({
       </div>
 
       <CheckoutStatusBanner
-        status={searchParams.status}
+        status={checkoutStatus}
         checkoutSucceeded={checkoutSucceeded}
       />
 
       {creditsState.error ? (
-        <CreditsLoadErrorCard error={creditsState.error} />
+        <CreditsLoadErrorCard state={creditsState} />
       ) : null}
 
       <Card>
@@ -188,29 +218,137 @@ export default async function CreditsPage({
 
 type CreditsLoadErrorKind = "auth" | "temporary";
 
+interface CreditsRequestDebug {
+  endpoint: string;
+  url: string;
+  status: number | null;
+  code: string | null;
+  message: string | null;
+}
+
 interface CreditsLoadState {
   profile: MeCredits | null;
   ledger: MeCreditLedgerEntry[];
   error: CreditsLoadErrorKind | null;
+  debug: CreditsRequestDebug[];
 }
 
 async function loadCreditsState(accessToken: string): Promise<CreditsLoadState> {
+  const [profileResult, ledgerResult] = await Promise.all([
+    readCredits(accessToken),
+    readLedger(accessToken),
+  ]);
+  const debug = [profileResult.debug, ledgerResult.debug];
+  const failed = [profileResult, ledgerResult].find((result) => !result.ok);
+  if (failed) {
+    return {
+      profile: profileResult.ok ? profileResult.data : null,
+      ledger: ledgerResult.ok ? ledgerResult.data : [],
+      error:
+        failed.debug.status === 401 || failed.debug.status === 403
+          ? "auth"
+          : "temporary",
+      debug,
+    };
+  }
+
+  if (!profileResult.ok || !ledgerResult.ok) {
+    return {
+      profile: null,
+      ledger: [],
+      error: "temporary",
+      debug,
+    };
+  }
+
+  return {
+    profile: profileResult.data,
+    ledger: ledgerResult.data,
+    error: null,
+    debug,
+  };
+}
+
+function missingSessionCreditsState(): CreditsLoadState {
+  return {
+    profile: null,
+    ledger: [],
+    error: "auth",
+    debug: [
+      {
+        endpoint: "Supabase session",
+        url: "dashboard server session",
+        status: 401,
+        code: "missing_session",
+        message: "Missing Supabase session.access_token.",
+      },
+    ],
+  };
+}
+
+async function readCredits(accessToken: string) {
+  const endpoint = "/v1/me/credits";
   try {
-    const [profile, ledger] = await Promise.all([
-      getMyCredits(accessToken),
-      listMyCreditLedger(accessToken, 50),
-    ]);
-    return { profile, ledger, error: null };
+    return {
+      ok: true as const,
+      data: await getMyCredits(accessToken),
+      debug: okDebug(endpoint),
+    };
   } catch (err) {
-    if (err instanceof DmitServerError && (err.status === 401 || err.status === 403)) {
-      return { profile: null, ledger: [], error: "auth" };
-    }
-    return { profile: null, ledger: [], error: "temporary" };
+    return {
+      ok: false as const,
+      debug: errorDebug(endpoint, err),
+    };
   }
 }
 
-function CreditsLoadErrorCard({ error }: { error: CreditsLoadErrorKind }) {
-  const isAuth = error === "auth";
+async function readLedger(accessToken: string) {
+  const endpoint = "/v1/me/credits/ledger?limit=50";
+  try {
+    return {
+      ok: true as const,
+      data: await listMyCreditLedger(accessToken, 50),
+      debug: okDebug(endpoint),
+    };
+  } catch (err) {
+    return {
+      ok: false as const,
+      debug: errorDebug(endpoint, err),
+    };
+  }
+}
+
+function okDebug(endpoint: string): CreditsRequestDebug {
+  return {
+    endpoint,
+    url: `${getDmitBaseUrl()}${endpoint}`,
+    status: 200,
+    code: null,
+    message: null,
+  };
+}
+
+function errorDebug(endpoint: string, err: unknown): CreditsRequestDebug {
+  if (err instanceof DmitServerError) {
+    return {
+      endpoint,
+      url: `${getDmitBaseUrl()}${endpoint}`,
+      status: err.status,
+      code: err.code ?? null,
+      message: err.message,
+    };
+  }
+  return {
+    endpoint,
+    url: `${getDmitBaseUrl()}${endpoint}`,
+    status: null,
+    code: "request_failed",
+    message: err instanceof Error ? err.message : "Unknown request error.",
+  };
+}
+
+function CreditsLoadErrorCard({ state }: { state: CreditsLoadState }) {
+  const isAuth = state.error === "auth";
   return (
     <Card className="border-destructive/30 bg-destructive/5">
       <CardHeader className="pb-3">
@@ -224,6 +362,26 @@ function CreditsLoadErrorCard({ error }: { error: CreditsLoadErrorKind }) {
             : "Credits 暂时无法加载，请稍后重试。"}
         </CardDescription>
       </CardHeader>
+      <CardContent>
+        <div className="rounded-md border bg-background p-3 text-xs">
+          <div className="mb-2 font-medium text-foreground">DMIT debug</div>
+          <div className="flex flex-col gap-2">
+            {state.debug.map((item) => (
+              <div key={`${item.endpoint}-${item.status}`} className="font-mono">
+                <div className="break-all text-muted-foreground">{item.url}</div>
+                <div>
+                  status={item.status ?? "n/a"} code={item.code ?? "n/a"}
+                </div>
+                {item.message ? (
+                  <div className="break-words text-muted-foreground">
+                    {item.message}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
     </Card>
   );
 }

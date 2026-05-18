@@ -14,7 +14,9 @@ export class DmitServerError extends Error {
 
 export function getDmitBaseUrl(): string {
   return (
-    process.env.NEXT_PUBLIC_DMIT_API_BASE?.replace(/\/+$/, "") ?? DEFAULT_BASE
+    process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ??
+    process.env.NEXT_PUBLIC_DMIT_API_BASE?.replace(/\/+$/, "") ??
+    DEFAULT_BASE
   );
 }
 
