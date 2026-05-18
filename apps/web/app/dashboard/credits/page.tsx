@@ -216,11 +216,11 @@ function CreditsLoadErrorCard({ error }: { error: CreditsLoadErrorKind }) {
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <AlertCircle className="h-4 w-4 text-destructive" />
-          {isAuth ? "登录或鉴权异常" : "Credits 暂时无法加载"}
+          {isAuth ? "登录状态异常，请重新登录" : "Credits 暂时无法加载"}
         </CardTitle>
         <CardDescription>
           {isAuth
-            ? "请刷新页面，或退出后重新登录。"
+            ? "登录状态异常，请重新登录。"
             : "Credits 暂时无法加载，请稍后重试。"}
         </CardDescription>
       </CardHeader>
