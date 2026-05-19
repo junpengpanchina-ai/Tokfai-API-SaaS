@@ -172,15 +172,18 @@ meRoutes.post("/api-keys", async (c) => {
 
   return c.json(
     {
+      ok: true,
+      /** One-time plaintext secret — never returned by GET /api-keys. */
+      secret: material.fullKey,
       api_key: {
         id: data.id,
         name: data.name,
         prefix: data.prefix,
+        key_prefix: data.prefix,
         status: data.revoked_at ? "revoked" : "active",
         created_at: data.created_at,
         last_used_at: data.last_used_at,
       },
-      secret: material.fullKey,
     },
     201
   );

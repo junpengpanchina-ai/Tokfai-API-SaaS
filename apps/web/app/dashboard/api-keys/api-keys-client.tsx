@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   Check,
@@ -94,8 +94,19 @@ export function ApiKeysClient({
   }
 
   function applyCreateResult(result: CreateMeApiKeyResponse) {
+    const secret = result.secret.trim();
+    if (!secret) {
+      setCreateError({
+        message:
+          "API key was created but the one-time secret was missing. Please try again or contact support.",
+        status: 500,
+        code: "missing_create_secret",
+      });
+      return;
+    }
+
     const listItem = meKeyToListItem(result.api_key);
-    setOneTimeSecret(result.secret);
+    setOneTimeSecret(secret);
     setKeys((prev) => {
       const without = prev.filter((k) => k.id !== listItem.id);
       return [listItem, ...without];
@@ -138,6 +149,15 @@ export function ApiKeysClient({
 
   return (
     <div className="flex flex-col gap-6">
+      {oneTimeSecret ? (
+        <OneTimeSecretCard
+          secret={oneTimeSecret}
+          copied={copiedFullKey}
+          onCopy={handleCopyFullKey}
+          onDismiss={dismissOneTimeSecret}
+        />
+      ) : null}
+
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">API Keys</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -146,53 +166,6 @@ export function ApiKeysClient({
           Full secrets are shown only once at creation.
         </p>
       </div>
-
-      {oneTimeSecret ? (
-        <Card className="border-emerald-300 bg-emerald-50 dark:border-emerald-900/60 dark:bg-emerald-950/30">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base text-emerald-900 dark:text-emerald-100">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-              API key created
-            </CardTitle>
-            <CardDescription className="text-emerald-900/90 dark:text-emerald-100/90">
-              This key is shown only once. Copy it now. You will not be able to
-              view it again.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <Input
-              id="one-time-secret"
-              readOnly
-              value={oneTimeSecret}
-              onFocus={(e) => e.currentTarget.select()}
-              className="font-mono text-xs"
-              aria-label="Full API key secret"
-            />
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={handleCopyFullKey}>
-                {copiedFullKey ? (
-                  <>
-                    <Check className="h-4 w-4" />
-                    Copied
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4" />
-                    Copy full key
-                  </>
-                )}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={dismissOneTimeSecret}
-              >
-                I&apos;ve saved my key
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
 
       <Card id="create-api-key">
         <CardHeader>
@@ -256,6 +229,77 @@ export function ApiKeysClient({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function OneTimeSecretCard({
+  secret,
+  copied,
+  onCopy,
+  onDismiss,
+}: {
+  secret: string;
+  copied: boolean;
+  onCopy: () => void;
+  onDismiss: () => void;
+}) {
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [secret]);
+
+  return (
+    <Card
+      ref={cardRef}
+      id="one-time-secret-card"
+      className="border-2 border-emerald-400 bg-emerald-50 shadow-md ring-2 ring-emerald-400/30 dark:border-emerald-700 dark:bg-emerald-950/40 dark:ring-emerald-700/40"
+    >
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-lg text-emerald-950 dark:text-emerald-50">
+          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
+          API key created
+        </CardTitle>
+        <CardDescription className="text-base text-emerald-900/90 dark:text-emerald-100/90">
+          This key is shown only once. Copy it now. You will not be able to view
+          it again.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <pre
+          id="one-time-secret"
+          className="max-h-40 overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-emerald-200 bg-white p-4 font-mono text-sm leading-relaxed text-foreground dark:border-emerald-800 dark:bg-background"
+          tabIndex={0}
+          onFocus={(e) => {
+            const range = document.createRange();
+            range.selectNodeContents(e.currentTarget);
+            const sel = window.getSelection();
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+          }}
+        >
+          {secret}
+        </pre>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" size="lg" onClick={onCopy}>
+            {copied ? (
+              <>
+                <Check className="h-4 w-4" />
+                Copied
+              </>
+            ) : (
+              <>
+                <Copy className="h-4 w-4" />
+                Copy full key
+              </>
+            )}
+          </Button>
+          <Button type="button" size="lg" variant="outline" onClick={onDismiss}>
+            I&apos;ve saved my key
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

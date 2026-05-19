@@ -327,16 +327,110 @@ export interface CreateMeApiKeyInput {
   name?: string;
 }
 
+function readNonEmptyString(
+  obj: Record<string, unknown>,
+  key: string
+): string | undefined {
+  const value = obj[key];
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+/**
+ * Normalizes POST /v1/me/api-keys create responses.
+ * Full secret is returned once at creation — never from list endpoints.
+ */
+export function parseCreateMeApiKeyResponse(raw: unknown): CreateMeApiKeyResponse {
+  if (!raw || typeof raw !== "object") {
+    throw new DmitApiError({
+      status: 500,
+      message: "Invalid API key create response.",
+      code: "invalid_create_response",
+    });
+  }
+
+  let body = raw as Record<string, unknown>;
+  if (
+    body.data &&
+    typeof body.data === "object" &&
+    !Array.isArray(body.data)
+  ) {
+    body = body.data as Record<string, unknown>;
+  }
+
+  const apiKeyRaw =
+    body.api_key && typeof body.api_key === "object"
+      ? (body.api_key as Record<string, unknown>)
+      : null;
+
+  const secret =
+    readNonEmptyString(body, "secret") ??
+    readNonEmptyString(body, "full_key") ??
+    readNonEmptyString(body, "fullKey") ??
+    readNonEmptyString(body, "token") ??
+    (typeof body.key === "string" && !apiKeyRaw ? body.key.trim() : undefined) ??
+    (apiKeyRaw ? readNonEmptyString(apiKeyRaw, "secret") : undefined) ??
+    (apiKeyRaw ? readNonEmptyString(apiKeyRaw, "full_key") : undefined);
+
+  if (!secret) {
+    throw new DmitApiError({
+      status: 500,
+      message:
+        "API key was created but the one-time secret was missing from the server response.",
+      code: "missing_create_secret",
+    });
+  }
+
+  if (!apiKeyRaw || typeof apiKeyRaw.id !== "string") {
+    throw new DmitApiError({
+      status: 500,
+      message: "API key metadata missing from create response.",
+      code: "missing_create_metadata",
+    });
+  }
+
+  const prefix =
+    readNonEmptyString(apiKeyRaw, "key_prefix") ??
+    readNonEmptyString(apiKeyRaw, "prefix") ??
+    "";
+
+  const statusField = apiKeyRaw.status;
+  const status =
+    statusField === "revoked" || apiKeyRaw.revoked_at
+      ? "revoked"
+      : "active";
+
+  const api_key: MeApiKeyMetadata = {
+    id: apiKeyRaw.id,
+    name:
+      typeof apiKeyRaw.name === "string" ? apiKeyRaw.name : "API Key",
+    prefix,
+    status,
+    created_at:
+      typeof apiKeyRaw.created_at === "string"
+        ? apiKeyRaw.created_at
+        : new Date().toISOString(),
+    last_used_at:
+      typeof apiKeyRaw.last_used_at === "string"
+        ? apiKeyRaw.last_used_at
+        : null,
+  };
+
+  return { api_key, secret };
+}
+
 export async function createMeApiKey(
   input: CreateMeApiKeyInput,
   auth: DmitSessionAuth
 ): Promise<CreateMeApiKeyResponse> {
   const accessToken = requireDmitAccessToken(auth.accessToken);
-  return dmitFetch<CreateMeApiKeyResponse>("/v1/me/api-keys", {
+  const raw = await dmitFetch<unknown>("/v1/me/api-keys", {
     method: "POST",
     json: input,
     accessToken,
   });
+  return parseCreateMeApiKeyResponse(raw);
 }
 
 export interface RevokeMeApiKeyResponse {
