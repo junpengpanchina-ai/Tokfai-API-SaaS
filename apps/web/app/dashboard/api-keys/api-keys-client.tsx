@@ -84,6 +84,8 @@ export function ApiKeysClient({
         trimmed ? { name: trimmed } : {},
         { accessToken }
       );
+      setOneTimeSecret(result.one_time_secret);
+      setCopiedFullKey(false);
       applyCreateResult(result);
       setNewName("");
     } catch (err) {
@@ -94,19 +96,7 @@ export function ApiKeysClient({
   }
 
   function applyCreateResult(result: CreateMeApiKeyResponse) {
-    const secret = result.one_time_secret.trim();
-    if (!secret) {
-      setCreateError({
-        message:
-          "API key was created but the one-time secret was missing. Please try again or contact support.",
-        status: 500,
-        code: "missing_create_secret",
-      });
-      return;
-    }
-
     const listItem = meKeyToListItem(result.api_key);
-    setOneTimeSecret(secret);
     setKeys((prev) => {
       const without = prev.filter((k) => k.id !== listItem.id);
       return [listItem, ...without];

@@ -14,6 +14,7 @@
  */
 
 import { createClient as createBrowserSupabase } from "@/lib/supabase/client";
+import { isFullTokfaiApiKey } from "@/lib/tokfai-api";
 
 const DEFAULT_BASE = "https://api.tokfai.com";
 
@@ -380,6 +381,15 @@ export function parseCreateMeApiKeyResponse(raw: unknown): CreateMeApiKeyRespons
       message:
         "API key was created but the one-time secret was missing from the server response.",
       code: "missing_create_secret",
+    });
+  }
+
+  if (!isFullTokfaiApiKey(oneTimeSecret)) {
+    throw new DmitApiError({
+      status: 500,
+      message:
+        "API key was created but the one-time secret in the response was incomplete. Deploy the latest api.tokfai.com and try again.",
+      code: "invalid_create_secret",
     });
   }
 
