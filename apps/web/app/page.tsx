@@ -75,7 +75,7 @@ const DEV_SNIPPET = [
 
 const FOOTER_LINKS = [
   { href: "/pricing", label: "Pricing" },
-  { href: "/dashboard/docs", label: "Docs" },
+  { href: "/docs", label: "Docs" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/dashboard/docs", label: "API reference" },
 ] as const;
