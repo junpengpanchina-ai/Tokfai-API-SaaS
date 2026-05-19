@@ -110,3 +110,26 @@ export async function listMyCreditLedger(
   );
   return res.data;
 }
+
+export interface MeUsageLogEntry {
+  id: string;
+  created_at: string;
+  model: string | null;
+  status: string;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  credits_charged: number | string | null;
+  request_id: string | null;
+}
+
+export async function listMyUsage(
+  accessToken: string,
+  limit = 50
+): Promise<MeUsageLogEntry[]> {
+  const res = await dmitServerFetch<DataResponse<MeUsageLogEntry[]>>(
+    `/v1/me/usage?limit=${limit}`,
+    accessToken
+  );
+  return res.data;
+}

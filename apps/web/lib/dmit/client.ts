@@ -306,6 +306,40 @@ export async function revokeApiKey(
 }
 
 // ---------------------------------------------------------------------------
+// Me API Keys — POST /v1/me/api-keys (dashboard V0.6)
+// ---------------------------------------------------------------------------
+
+export interface MeApiKeyMetadata {
+  id: string;
+  name: string;
+  prefix: string;
+  status: "active" | "revoked" | string;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+export interface CreateMeApiKeyResponse {
+  api_key: MeApiKeyMetadata;
+  secret: string;
+}
+
+export interface CreateMeApiKeyInput {
+  name?: string;
+}
+
+export async function createMeApiKey(
+  input: CreateMeApiKeyInput,
+  auth: DmitSessionAuth
+): Promise<CreateMeApiKeyResponse> {
+  const accessToken = requireDmitAccessToken(auth.accessToken);
+  return dmitFetch<CreateMeApiKeyResponse>("/v1/me/api-keys", {
+    method: "POST",
+    json: input,
+    accessToken,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Billing — Stripe Checkout (UI wired in /dashboard/credits)
 // ---------------------------------------------------------------------------
 
@@ -348,10 +382,8 @@ export async function createCheckoutSession(
 // ---------------------------------------------------------------------------
 // Chat completions — POST /v1/chat/completions
 //
-// IMPORTANT: this endpoint is NOT called with the user's Supabase JWT. It
-// uses the user's own `sk-tokfai_...` API key — the exact same auth path an
-// external customer hits. The Playground simulates that customer flow so
-// normal billing / rate limiting / usage logging applies.
+// Auth: sk-tokfai_ API key (external customers) or Supabase access JWT
+// (dashboard Playground). DMIT runs the same billing / usage logging for both.
 // ---------------------------------------------------------------------------
 
 export type ChatRole = "system" | "user" | "assistant";
@@ -428,6 +460,33 @@ export async function listModels(apiKey: string): Promise<ModelListItem[]> {
     }
   );
   return Array.isArray(res) ? res : res.data;
+}
+
+/**
+ * Dashboard Playground — POST /v1/chat/completions with the Supabase JWT.
+ */
+export async function playgroundChatCompletions(
+  accessToken: string,
+  body: Pick<ChatCompletionRequest, "model" | "messages">
+): Promise<ChatCompletionResponse> {
+  const token = requireDmitAccessToken(accessToken);
+  const res = await dmitFetchWithHeaders<ChatCompletionResponse>(
+    "/v1/chat/completions",
+    {
+      method: "POST",
+      json: { ...body, stream: false },
+      accessToken: token,
+    }
+  );
+  const requestId = res.headers.get("x-request-id");
+  if (!requestId) return res.data;
+  return {
+    ...res.data,
+    tokfai: {
+      ...res.data.tokfai,
+      request_id: res.data.tokfai?.request_id ?? requestId,
+    },
+  };
 }
 
 /**

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
 import { AlertTriangle, Gauge } from "lucide-react";
 
@@ -12,27 +13,31 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  formatCredits,
+  DmitServerError,
+  type MeUsageLogEntry,
+  listMyUsage,
+} from "@/lib/dmit/server";
+import {
   formatCreditsPrecise,
   formatDateTime,
   formatInt,
   toneForStatus,
 } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
-import type { ProfileRow, UsageLogRow } from "@/lib/supabase/types";
 
 export const metadata = {
   title: "Usage",
 };
 
-const SUCCESS_STATUSES = ["succeeded", "success", "ok"];
+export const dynamic = "force-dynamic";
 
-const LOG_COLUMNS =
-  "id, created_at, model, status, prompt_tokens, completion_tokens, total_tokens, credits_charged, request_id";
-const PROFILE_COLUMNS =
-  "id, email, credits_balance, total_credits_purchased, total_credits_used";
+type UsageState =
+  | { status: "ready"; logs: MeUsageLogEntry[] }
+  | { status: "error"; message: string; code?: string; httpStatus?: number };
 
 export default async function UsagePage() {
+  noStore();
+
   const supabase = createClient();
   const {
     data: { user },
@@ -42,77 +47,68 @@ export default async function UsagePage() {
     redirect("/login?redirect=/dashboard/usage");
   }
 
-  const [logsRes, totalCountRes, successCountRes, failedCountRes, profileRes] =
-    await Promise.all([
-      supabase
-        .from("usage_logs")
-        .select(LOG_COLUMNS)
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(50),
-      supabase
-        .from("usage_logs")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id),
-      supabase
-        .from("usage_logs")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .in("status", SUCCESS_STATUSES),
-      supabase
-        .from("usage_logs")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .not("status", "in", `(${SUCCESS_STATUSES.join(",")})`),
-      supabase
-        .from("profiles")
-        .select(PROFILE_COLUMNS)
-        .eq("id", user.id)
-        .maybeSingle(),
-    ]);
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  const queryErrors = collectErrors([
-    ["usage_logs (recent rows)", logsRes.error],
-    ["usage_logs (total count)", totalCountRes.error],
-    ["usage_logs (success count)", successCountRes.error],
-    ["usage_logs (failed count)", failedCountRes.error],
-    ["profiles", profileRes.error],
-  ]);
+  if (!session?.access_token) {
+    return (
+      <UsageView
+        state={{
+          status: "error",
+          message: "请重新登录",
+          code: "missing_session",
+          httpStatus: 401,
+        }}
+      />
+    );
+  }
 
-  const logs = (logsRes.data ?? []) as UsageLogRow[];
-  const profile = (profileRes.data ?? null) as ProfileRow | null;
-  const totalRequests = totalCountRes.count ?? 0;
-  const successRequests = successCountRes.count ?? 0;
-  const failedRequests = failedCountRes.count ?? 0;
-  const totalCreditsUsed = profile?.total_credits_used ?? 0;
+  const state = await loadUsage(session.access_token);
+  return <UsageView state={state} />;
+}
 
+async function loadUsage(accessToken: string): Promise<UsageState> {
+  try {
+    const logs = await listMyUsage(accessToken, 50);
+    return { status: "ready", logs };
+  } catch (err) {
+    if (err instanceof DmitServerError) {
+      return {
+        status: "error",
+        message:
+          err.status === 401 || err.status === 403
+            ? "请重新登录"
+            : "Usage 暂时无法加载，请稍后重试",
+        code: err.code,
+        httpStatus: err.status,
+      };
+    }
+    return {
+      status: "error",
+      message: "Usage 暂时无法加载，请稍后重试",
+    };
+  }
+}
+
+function UsageView({ state }: { state: UsageState }) {
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Usage</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Per-request activity from your{" "}
-          <code className="rounded bg-muted px-1 text-xs">usage_logs</code>{" "}
-          table. Reads are RLS-scoped to your account.
+          Recent API activity for your account. Data is loaded from Tokfai API
+          and scoped to your login.
         </p>
       </div>
 
-      {queryErrors.length > 0 ? (
-        <QueryErrorCard errors={queryErrors} />
-      ) : null}
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <Stat label="Total requests" value={formatInt(totalRequests)} />
-        <Stat label="Succeeded" value={formatInt(successRequests)} />
-        <Stat label="Failed" value={formatInt(failedRequests)} />
-        <Stat label="Credits used" value={formatCredits(totalCreditsUsed)} />
-      </div>
+      {state.status === "error" ? <UsageError state={state} /> : null}
 
       <Card>
         <CardHeader>
           <CardTitle>Recent requests</CardTitle>
           <CardDescription>
-            Last 50 entries, newest first. Hit the API in the{" "}
+            Last 50 entries, newest first. Run a request in the{" "}
             <Link
               href="/dashboard/playground"
               className="underline underline-offset-4"
@@ -123,112 +119,96 @@ export default async function UsagePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {logs.length === 0 ? (
+          {state.status === "ready" && state.logs.length > 0 ? (
+            <UsageTable logs={state.logs} />
+          ) : state.status === "ready" ? (
             <EmptyState />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-                    <th className="py-2 pr-4 font-medium">When</th>
-                    <th className="py-2 pr-4 font-medium">Model</th>
-                    <th className="py-2 pr-4 font-medium">Status</th>
-                    <th className="py-2 pr-4 text-right font-medium">
-                      Prompt
-                    </th>
-                    <th className="py-2 pr-4 text-right font-medium">
-                      Completion
-                    </th>
-                    <th className="py-2 pr-4 text-right font-medium">Total</th>
-                    <th className="py-2 pr-4 text-right font-medium">
-                      Credits
-                    </th>
-                    <th className="py-2 pr-4 font-medium">Request ID</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {logs.map((row) => (
-                    <tr key={row.id} className="border-b last:border-0">
-                      <td className="py-2 pr-4 text-muted-foreground">
-                        {formatDateTime(row.created_at)}
-                      </td>
-                      <td className="py-2 pr-4 font-mono text-xs">
-                        {row.model ?? "—"}
-                      </td>
-                      <td className="py-2 pr-4">
-                        <StatusBadge status={row.status} />
-                      </td>
-                      <td className="py-2 pr-4 text-right font-mono text-xs">
-                        {row.prompt_tokens != null
-                          ? formatInt(row.prompt_tokens)
-                          : "—"}
-                      </td>
-                      <td className="py-2 pr-4 text-right font-mono text-xs">
-                        {row.completion_tokens != null
-                          ? formatInt(row.completion_tokens)
-                          : "—"}
-                      </td>
-                      <td className="py-2 pr-4 text-right font-mono text-xs">
-                        {row.total_tokens != null
-                          ? formatInt(row.total_tokens)
-                          : "—"}
-                      </td>
-                      <td className="py-2 pr-4 text-right font-mono text-xs">
-                        {row.credits_charged != null
-                          ? formatCreditsPrecise(row.credits_charged)
-                          : "—"}
-                      </td>
-                      <td
-                        className="max-w-[12rem] truncate py-2 pr-4 font-mono text-xs text-muted-foreground"
-                      >
-                        {truncateRequestId(row.request_id)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          ) : null}
         </CardContent>
       </Card>
     </div>
   );
 }
 
-function truncateRequestId(requestId: string | null | undefined) {
-  if (!requestId) return "—";
-  if (requestId.length <= 16) return requestId;
-  return `${requestId.slice(0, 8)}...${requestId.slice(-6)}`;
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
+function UsageError({
+  state,
+}: {
+  state: Extract<UsageState, { status: "error" }>;
+}) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardDescription>{label}</CardDescription>
+    <Card className="border-destructive/30 bg-destructive/5">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <AlertTriangle className="h-4 w-4 text-destructive" />
+          Could not load usage
+        </CardTitle>
+        <CardDescription>{state.message}</CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-semibold tracking-tight">{value}</div>
+      <CardContent className="font-mono text-xs text-muted-foreground">
+        status={state.httpStatus ?? "n/a"} code={state.code ?? "n/a"}
       </CardContent>
     </Card>
   );
 }
 
-function StatusBadge({ status }: { status: string | null | undefined }) {
+function UsageTable({ logs }: { logs: MeUsageLogEntry[] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <th className="py-2 pr-4 font-medium">When</th>
+            <th className="py-2 pr-4 font-medium">Model</th>
+            <th className="py-2 pr-4 font-medium">Status</th>
+            <th className="py-2 pr-4 text-right font-medium">Prompt</th>
+            <th className="py-2 pr-4 text-right font-medium">Completion</th>
+            <th className="py-2 pr-4 text-right font-medium">Total</th>
+            <th className="py-2 pr-4 text-right font-medium">Credits</th>
+            <th className="py-2 pr-4 font-medium">Request ID</th>
+          </tr>
+        </thead>
+        <tbody>
+          {logs.map((row) => (
+            <tr key={row.id} className="border-b last:border-0">
+              <td className="py-2 pr-4 text-muted-foreground">
+                {formatDateTime(row.created_at)}
+              </td>
+              <td className="py-2 pr-4 font-mono text-xs">
+                {row.model ?? "—"}
+              </td>
+              <td className="py-2 pr-4">
+                <StatusBadge status={row.status} />
+              </td>
+              <td className="py-2 pr-4 text-right font-mono text-xs">
+                {formatNullableInt(row.prompt_tokens)}
+              </td>
+              <td className="py-2 pr-4 text-right font-mono text-xs">
+                {formatNullableInt(row.completion_tokens)}
+              </td>
+              <td className="py-2 pr-4 text-right font-mono text-xs">
+                {formatNullableInt(row.total_tokens)}
+              </td>
+              <td className="py-2 pr-4 text-right font-mono text-xs">
+                {formatNullableCredits(row.credits_charged)}
+              </td>
+              <td className="max-w-[12rem] truncate py-2 pr-4 font-mono text-xs text-muted-foreground">
+                {truncateRequestId(row.request_id)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
   const tone = toneForStatus(status);
-  if (!status) {
-    return <Badge variant="outline">unknown</Badge>;
-  }
+  const label = tone === "success" ? "succeeded" : "failed";
   if (tone === "success") {
-    return <Badge variant="success">{status}</Badge>;
+    return <Badge variant="success">{label}</Badge>;
   }
-  if (tone === "warning") {
-    return <Badge variant="warning">{status}</Badge>;
-  }
-  if (tone === "destructive") {
-    return <Badge variant="destructive">{status}</Badge>;
-  }
-  return <Badge variant="outline">{status}</Badge>;
+  return <Badge variant="destructive">{label}</Badge>;
 }
 
 function EmptyState() {
@@ -247,44 +227,22 @@ function EmptyState() {
   );
 }
 
-function QueryErrorCard({
-  errors,
-}: {
-  errors: Array<{ source: string; message: string }>;
-}) {
-  return (
-    <Card className="border-destructive/30 bg-destructive/5">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <AlertTriangle className="h-4 w-4 text-destructive" />
-          Some data could not be loaded
-        </CardTitle>
-        <CardDescription>
-          Supabase returned the errors below. Stats may be partial until the
-          schema or RLS policy is fixed.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ul className="flex flex-col gap-1 text-xs">
-          {errors.map((e) => (
-            <li key={e.source} className="font-mono text-muted-foreground">
-              <span className="text-foreground">{e.source}:</span> {e.message}
-            </li>
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
-  );
+function formatNullableInt(value: number | null | undefined): string {
+  if (value == null) return "-";
+  return formatInt(value);
 }
 
-function collectErrors(
-  pairs: Array<readonly [string, { message: string } | null | undefined]>
-) {
-  const out: Array<{ source: string; message: string }> = [];
-  for (const [source, err] of pairs) {
-    if (err && typeof err.message === "string") {
-      out.push({ source, message: err.message });
-    }
-  }
-  return out;
+function formatNullableCredits(
+  value: number | string | null | undefined
+): string {
+  if (value == null || value === "") return "-";
+  const n = typeof value === "number" ? value : Number(value);
+  if (Number.isNaN(n)) return "-";
+  return formatCreditsPrecise(n);
+}
+
+function truncateRequestId(requestId: string | null | undefined) {
+  if (!requestId) return "-";
+  if (requestId.length <= 16) return requestId;
+  return `${requestId.slice(0, 8)}...${requestId.slice(-6)}`;
 }

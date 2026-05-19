@@ -46,6 +46,19 @@ export interface UsageLogInsert {
   latency_ms: number | null;
 }
 
+/** Read-only fields returned by GET /v1/me/usage */
+export interface UsageLogRow {
+  id: string;
+  created_at: string;
+  model: string | null;
+  status: string;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  credits_charged: string | number | null;
+  request_id: string | null;
+}
+
 export type CreditLedgerType =
   | "purchase"
   | "topup"

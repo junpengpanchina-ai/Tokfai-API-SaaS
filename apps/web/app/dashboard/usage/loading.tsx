@@ -16,21 +16,6 @@ export default function UsageLoading() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        {["Total requests", "Succeeded", "Failed", "Cost used"].map(
-          (label) => (
-            <Card key={label}>
-              <CardHeader className="pb-2">
-                <CardDescription>{label}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-9 w-24 animate-pulse rounded bg-muted" />
-              </CardContent>
-            </Card>
-          )
-        )}
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Recent requests</CardTitle>

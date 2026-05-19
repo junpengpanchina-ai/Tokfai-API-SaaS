@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import {
   AlertTriangle,
   Check,
@@ -8,7 +9,6 @@ import {
   KeyRound,
   Loader2,
   Plus,
-  Trash2,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -23,190 +23,144 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  createApiKey,
+  createMeApiKey,
   DmitApiError,
-  listApiKeys,
-  revealApiKey,
-  revokeApiKey,
-  type ApiKey,
-  type ApiKeyWithSecret,
+  type CreateMeApiKeyResponse,
 } from "@/lib/dmit/client";
 
-type ListState =
-  | { status: "loading" }
-  | { status: "ready"; keys: ApiKey[] }
-  | { status: "error"; message: string };
+export interface ApiKeyListItem {
+  id: string;
+  name: string;
+  key_prefix: string;
+  status: "active" | "revoked" | string;
+  created_at: string;
+  last_used_at: string | null;
+}
 
-const DMIT_AUTH_FAILED =
-  "Could not authenticate with api.tokfai.com. Refresh this page. If it persists, sign out and sign in again (DMIT must use the same Supabase JWT secret).";
+interface CreateErrorState {
+  message: string;
+  status: number;
+  code?: string;
+}
 
-export function ApiKeysClient({ accessToken }: { accessToken: string }) {
-  const [list, setList] = useState<ListState>({ status: "loading" });
-
+export function ApiKeysClient({
+  accessToken,
+  initialKeys,
+}: {
+  accessToken: string;
+  initialKeys: ApiKeyListItem[];
+}) {
+  const router = useRouter();
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-
-  const [revealed, setRevealed] = useState<ApiKeyWithSecret | null>(null);
+  const [createError, setCreateError] = useState<CreateErrorState | null>(null);
+  const [created, setCreated] = useState<CreateMeApiKeyResponse | null>(null);
   const [copied, setCopied] = useState(false);
-  const [copyingKeyId, setCopyingKeyId] = useState<string | null>(null);
-  const [copyNotice, setCopyNotice] = useState<string | null>(null);
-  const noticeTimer = useRef<number | null>(null);
-
-  const [revokingId, setRevokingId] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setList({ status: "loading" });
-    try {
-      const keys = await listApiKeys({ accessToken });
-      setList({ status: "ready", keys });
-    } catch (err) {
-      if (err instanceof DmitApiError && err.isAuth) {
-        setList({ status: "error", message: dmitAuthErrorMessage(err) });
-        return;
-      }
-      setList({ status: "error", message: formatError(err) });
-    }
-  }, [accessToken]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  useEffect(() => {
-    return () => {
-      if (noticeTimer.current) {
-        window.clearTimeout(noticeTimer.current);
-      }
-    };
-  }, []);
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (creating) return;
-    const name = newName.trim();
-    if (!name) {
-      setCreateError("Name is required.");
-      return;
-    }
+
     setCreating(true);
     setCreateError(null);
     setCopied(false);
+
     try {
-      const created = await createApiKey({ name }, { accessToken });
-      setRevealed(created);
+      const trimmed = newName.trim();
+      const result = await createMeApiKey(
+        trimmed ? { name: trimmed } : {},
+        { accessToken }
+      );
+      setCreated(result);
       setNewName("");
-      await load();
+      router.refresh();
     } catch (err) {
-      if (err instanceof DmitApiError && err.isAuth) {
-        setCreateError(dmitAuthErrorMessage(err));
-        return;
+      if (err instanceof DmitApiError) {
+        setCreateError({
+          message: err.message,
+          status: err.status,
+          code: err.code,
+        });
+      } else if (err instanceof Error) {
+        setCreateError({
+          message: err.message,
+          status: 0,
+        });
+      } else {
+        setCreateError({
+          message: "Failed to create API key.",
+          status: 0,
+        });
       }
-      setCreateError(formatError(err));
     } finally {
       setCreating(false);
     }
   }
 
-  async function handleRevoke(key: ApiKey) {
-    if (key.revoked_at) return;
-
-    const ok = window.confirm(
-      `Revoke "${key.name}"? Any traffic using this key will start failing immediately.`
-    );
-    if (!ok) return;
-
-    setRevokingId(key.id);
-    try {
-      await revokeApiKey(key.id, { accessToken });
-      await load();
-    } catch (err) {
-      if (err instanceof DmitApiError && err.isAuth) {
-        window.alert(`Revoke failed: ${dmitAuthErrorMessage(err)}`);
-        return;
-      }
-      window.alert(`Revoke failed: ${formatError(err)}`);
-    } finally {
-      setRevokingId(null);
-    }
-  }
-
   async function handleCopy() {
-    if (!revealed) return;
+    if (!created?.secret) return;
     try {
-      await navigator.clipboard.writeText(revealed.secret);
+      await navigator.clipboard.writeText(created.secret);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Some browsers (or insecure contexts) block clipboard. Fall back to
-      // selecting the text so the user can copy manually.
-      const el = document.getElementById("revealed-key") as HTMLInputElement | null;
+      const el = document.getElementById("one-time-secret") as HTMLInputElement | null;
       el?.select();
-    }
-  }
-
-  function showCopyNotice(message: string) {
-    setCopyNotice(message);
-    if (noticeTimer.current) {
-      window.clearTimeout(noticeTimer.current);
-    }
-    noticeTimer.current = window.setTimeout(() => {
-      setCopyNotice(null);
-    }, 2500);
-  }
-
-  async function handleCopyKey(key: ApiKey) {
-    setCopyingKeyId(key.id);
-    try {
-      const secret = await revealApiKey(key.id, { accessToken });
-      await navigator.clipboard.writeText(secret);
-      showCopyNotice("API key copied.");
-    } catch (err) {
-      if (err instanceof DmitApiError && err.code === "old_key_not_recoverable") {
-        showCopyNotice(
-          "This old key cannot be revealed. Revoke it and create a new one."
-        );
-        return;
-      }
-      showCopyNotice(formatError(err));
-    } finally {
-      setCopyingKeyId(null);
     }
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">API Keys</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Create keys to authenticate against{" "}
-            <code className="rounded bg-muted px-1 text-xs">
-              api.tokfai.com
-            </code>
-            .
-          </p>
-        </div>
+      <div>
+        <h1 className="text-3xl font-semibold tracking-tight">API Keys</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Create keys to authenticate against{" "}
+          <code className="rounded bg-muted px-1 text-xs">api.tokfai.com</code>.
+          Full secrets are shown only once at creation.
+        </p>
       </div>
 
-      {revealed ? (
-        <RevealedKeyBanner
-          revealed={revealed}
-          copied={copied}
-          onCopy={handleCopy}
-          onDismiss={() => {
-            setRevealed(null);
-            setCopied(false);
-          }}
-        />
+      {created ? (
+        <Card className="border-amber-300 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              One-time secret
+            </CardTitle>
+            <CardDescription className="text-amber-900/80 dark:text-amber-100/80">
+              Copy this key now. You won&apos;t be able to see it again.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Input
+              id="one-time-secret"
+              readOnly
+              value={created.secret}
+              onFocus={(e) => e.currentTarget.select()}
+              className="font-mono text-xs"
+            />
+            <Button onClick={handleCopy} className="shrink-0">
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" />
+                  Copy
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
       ) : null}
 
       <Card>
         <CardHeader>
-          <CardTitle>Create a new key</CardTitle>
+          <CardTitle>Create API key</CardTitle>
           <CardDescription>
-            Give it a name you&apos;ll recognise. The full key is encrypted for
-            owner-only copy later.
+            Optional name for your reference. Leave blank to use the default name.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -218,12 +172,11 @@ export function ApiKeysClient({ accessToken }: { accessToken: string }) {
               <Label htmlFor="key-name">Key name</Label>
               <Input
                 id="key-name"
-                placeholder="e.g. production"
+                placeholder="e.g. playground"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 disabled={creating}
                 maxLength={64}
-                required
               />
             </div>
             <Button type="submit" disabled={creating}>
@@ -232,94 +185,45 @@ export function ApiKeysClient({ accessToken }: { accessToken: string }) {
               ) : (
                 <Plus className="h-4 w-4" />
               )}
-              {creating ? "Creating…" : "Create key"}
+              {creating ? "Creating…" : "Create API key"}
             </Button>
           </form>
           {createError ? (
-            <p className="mt-3 text-sm text-destructive" role="alert">
-              {createError}
-            </p>
+            <Card className="mt-4 border-destructive/30 bg-destructive/5">
+              <CardContent className="pt-4">
+                <p className="text-sm text-destructive" role="alert">
+                  {createError.message}
+                </p>
+                <p className="mt-2 font-mono text-xs text-muted-foreground">
+                  status={createError.status} code={createError.code ?? "n/a"}
+                </p>
+              </CardContent>
+            </Card>
           ) : null}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Your keys</CardTitle>
+          <CardTitle>Your API keys</CardTitle>
           <CardDescription>
-            Your <code>sk-tokfai_...</code> tokens. Full API keys are
-            encrypted and can be copied by the owner. For security, revoked or
-            legacy keys cannot be revealed.
+            Only prefixes and usage metadata are shown. Full secrets cannot be
+            retrieved after creation.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <KeyList
-            state={list}
-            revokingId={revokingId}
-            copyingKeyId={copyingKeyId}
-            onCopyKey={handleCopyKey}
-            onRevoke={handleRevoke}
-          />
+          {initialKeys.length > 0 ? (
+            <ApiKeysTable keys={initialKeys} />
+          ) : (
+            <EmptyState />
+          )}
         </CardContent>
       </Card>
-
-      {copyNotice ? (
-        <div
-          role="status"
-          className="fixed bottom-4 right-4 z-50 rounded-md border bg-background px-4 py-3 text-sm shadow-lg"
-        >
-          {copyNotice}
-        </div>
-      ) : null}
     </div>
   );
 }
 
-function KeyList({
-  state,
-  revokingId,
-  copyingKeyId,
-  onCopyKey,
-  onRevoke,
-}: {
-  state: ListState;
-  revokingId: string | null;
-  copyingKeyId: string | null;
-  onCopyKey: (key: ApiKey) => void;
-  onRevoke: (key: ApiKey) => void;
-}) {
-  if (state.status === "loading") {
-    return (
-      <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Loading keys…
-      </div>
-    );
-  }
-
-  if (state.status === "error") {
-    return (
-      <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 py-12 text-center">
-        <AlertTriangle className="h-5 w-5 text-destructive" />
-        <p className="text-sm font-medium">Could not load API keys</p>
-        <p className="max-w-md text-xs text-muted-foreground">{state.message}</p>
-      </div>
-    );
-  }
-
-  if (state.keys.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed py-16 text-center">
-        <div className="grid h-10 w-10 place-items-center rounded-full bg-muted text-muted-foreground">
-          <KeyRound className="h-5 w-5" />
-        </div>
-        <p className="text-sm text-muted-foreground">
-          No keys yet. Create one above to start calling the API.
-        </p>
-      </div>
-    );
-  }
-
+function ApiKeysTable({ keys }: { keys: ApiKeyListItem[] }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -330,126 +234,48 @@ function KeyList({
             <th className="py-2 pr-4 font-medium">Status</th>
             <th className="py-2 pr-4 font-medium">Last used</th>
             <th className="py-2 pr-4 font-medium">Created</th>
-            <th className="py-2 pr-2 text-right font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {state.keys.map((key) => {
-            const isRevoked = Boolean(key.revoked_at);
-            return (
-              <tr key={key.id} className="border-b last:border-0">
-                <td className="py-3 pr-4 font-medium">{key.name}</td>
-                <td className="py-3 pr-4 font-mono text-xs text-muted-foreground">
-                  {key.prefix}
-                </td>
-                <td className="py-3 pr-4">
-                  {isRevoked ? (
-                    <Badge variant="outline">Revoked</Badge>
-                  ) : (
-                    <Badge variant="success">Active</Badge>
-                  )}
-                </td>
-                <td className="py-3 pr-4 text-muted-foreground">
-                  {key.last_used_at ? (
-                    formatDate(key.last_used_at)
-                  ) : (
-                    <Badge variant="outline">Never</Badge>
-                  )}
-                </td>
-                <td className="py-3 pr-4 text-muted-foreground">
-                  {formatDate(key.created_at)}
-                </td>
-                <td className="py-3 pr-2 text-right">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => onCopyKey(key)}
-                    disabled={copyingKeyId === key.id || isRevoked}
-                    className="mr-1"
-                    aria-label={`Copy API key for ${key.name}`}
-                  >
-                    {copyingKeyId === key.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                    Copy key
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => onRevoke(key)}
-                    disabled={revokingId === key.id || isRevoked}
-                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  >
-                    {revokingId === key.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                    {isRevoked ? "Revoked" : "Revoke"}
-                  </Button>
-                </td>
-              </tr>
-            );
-          })}
+          {keys.map((key) => (
+            <tr key={key.id} className="border-b last:border-0">
+              <td className="py-3 pr-4 font-medium">{key.name}</td>
+              <td className="py-3 pr-4 font-mono text-xs text-muted-foreground">
+                {key.key_prefix}
+              </td>
+              <td className="py-3 pr-4">
+                <StatusBadge status={key.status} />
+              </td>
+              <td className="py-3 pr-4 text-muted-foreground">
+                {key.last_used_at ? formatDate(key.last_used_at) : "Never"}
+              </td>
+              <td className="py-3 pr-4 text-muted-foreground">
+                {formatDate(key.created_at)}
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
   );
 }
 
-function RevealedKeyBanner({
-  revealed,
-  copied,
-  onCopy,
-  onDismiss,
-}: {
-  revealed: ApiKeyWithSecret;
-  copied: boolean;
-  onCopy: () => void;
-  onDismiss: () => void;
-}) {
+function StatusBadge({ status }: { status: string }) {
+  if (status === "active") return <Badge variant="success">Active</Badge>;
+  if (status === "revoked") return <Badge variant="outline">Revoked</Badge>;
+  return <Badge variant="outline">{status}</Badge>;
+}
+
+function EmptyState() {
   return (
-    <Card className="border-amber-300 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <AlertTriangle className="h-4 w-4 text-amber-600" />
-          Save your new key now
-        </CardTitle>
-        <CardDescription className="text-amber-900/80 dark:text-amber-100/80">
-          Save <strong>{revealed.name}</strong> now or copy it later from the
-          encrypted key list. Revoked or legacy keys cannot be revealed.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Input
-          id="revealed-key"
-          readOnly
-          value={revealed.secret}
-          onFocus={(e) => e.currentTarget.select()}
-          className="font-mono text-xs"
-        />
-        <div className="flex shrink-0 gap-2">
-          <Button onClick={onCopy} variant="default">
-            {copied ? (
-              <>
-                <Check className="h-4 w-4" />
-                Copied
-              </>
-            ) : (
-              <>
-                <Copy className="h-4 w-4" />
-                Copy
-              </>
-            )}
-          </Button>
-          <Button onClick={onDismiss} variant="outline">
-            I&apos;ve saved it
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed py-16 text-center">
+      <div className="grid h-10 w-10 place-items-center rounded-full bg-muted text-muted-foreground">
+        <KeyRound className="h-5 w-5" />
+      </div>
+      <p className="text-sm text-muted-foreground">
+        No API keys yet. Create one above to start calling the API.
+      </p>
+    </div>
   );
 }
 
@@ -463,25 +289,4 @@ function formatDate(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function dmitAuthErrorMessage(err: DmitApiError): string {
-  if (err.code === "missing_access_token") {
-    return err.message;
-  }
-  return `${DMIT_AUTH_FAILED} (${err.message})`;
-}
-
-function formatError(err: unknown): string {
-  if (err instanceof DmitApiError) {
-    if (err.status === 0) {
-      return "Could not reach api.tokfai.com. Check your network or CORS config.";
-    }
-    return err.message;
-  }
-  if (err instanceof TypeError) {
-    return "Network error reaching api.tokfai.com.";
-  }
-  if (err instanceof Error) return err.message;
-  return "Unknown error.";
 }

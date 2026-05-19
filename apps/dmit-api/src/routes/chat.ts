@@ -2,10 +2,12 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import { ApiError } from "../errors.js";
-import { type VerifiedApiKey } from "../auth/apiKey.js";
 import { env } from "../env.js";
 import { log } from "../logger.js";
-import { requireApiKey } from "../middleware/apiKey.js";
+import {
+  getChatCaller,
+  requireApiKeyOrSupabaseJwt,
+} from "../middleware/chatAuth.js";
 import { supabase } from "../supabase.js";
 import type { UsageLogInsert } from "../types.js";
 import { grsaiFetch } from "../upstream/grsai.js";
@@ -46,16 +48,17 @@ interface ChatCompletionResponse {
 /**
  * /v1/chat/completions — OpenAI-compatible chat completions, customer-facing.
  *
- * Auth is handled by requireApiKey. The route proxies non-streaming
+ * Auth is handled by requireApiKeyOrSupabaseJwt (sk-tokfai_ or Supabase JWT).
+ * The route proxies non-streaming
  * OpenAI-compatible requests to GRSAI and records usage after completion.
  */
 export const chatRoutes = new Hono();
 
-chatRoutes.use("/v1/chat/completions", requireApiKey);
+chatRoutes.use("/v1/chat/completions", requireApiKeyOrSupabaseJwt);
 
 chatRoutes.post("/v1/chat/completions", async (c) => {
   const startedAt = Date.now();
-  const apiKey = c.get("apiKey" as never) as VerifiedApiKey;
+  const caller = getChatCaller(c);
   const requestId = c.get("requestId" as never) as string;
 
   const body = await readJsonBody(c.req.json());
@@ -72,8 +75,8 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
 
   if (stream) {
     await writeUsageLog({
-      user_id: apiKey.userId,
-      api_key_id: apiKey.apiKeyId,
+      user_id: caller.userId,
+      api_key_id: caller.apiKeyId,
       model: resolvedModel,
       status: "failed",
       prompt_tokens: null,
@@ -114,7 +117,7 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
   };
 
   try {
-    await assertHasCredits(apiKey.userId);
+    await assertHasCredits(caller.userId);
 
     const { data, upstreamId } = await grsaiFetch<ChatCompletionResponse>(
       env.GRSAI_CHAT_COMPLETIONS_PATH,
@@ -129,8 +132,8 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     const creditsCharged = calculateCreditsCharged(billedModel, usage);
 
     await recordSuccessfulUsageAndDebit({
-      user_id: apiKey.userId,
-      api_key_id: apiKey.apiKeyId,
+      user_id: caller.userId,
+      api_key_id: caller.apiKeyId,
       model: billedModel,
       status: "succeeded",
       prompt_tokens: usage.promptTokens,
@@ -156,8 +159,8 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
   } catch (err) {
     if (err instanceof ApiError) {
       await writeUsageLog({
-        user_id: apiKey.userId,
-        api_key_id: apiKey.apiKeyId,
+        user_id: caller.userId,
+        api_key_id: caller.apiKeyId,
         model: resolvedModel,
         status: err.code === "upstream_rate_limited" ? "rate_limited" : "failed",
         prompt_tokens: null,
@@ -183,8 +186,8 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     }
 
     await writeUsageLog({
-      user_id: apiKey.userId,
-      api_key_id: apiKey.apiKeyId,
+      user_id: caller.userId,
+      api_key_id: caller.apiKeyId,
       model: resolvedModel,
       status: "failed",
       prompt_tokens: null,

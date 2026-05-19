@@ -1,12 +1,22 @@
 import { Hono } from "hono";
 
+import { generateApiKey } from "../auth/apiKey.js";
+import { encryptSecret } from "../auth/keyEncryption.js";
 import { ApiError } from "../errors.js";
 import { requireSupabaseJwt } from "../middleware/supabaseJwt.js";
 import { supabase } from "../supabase.js";
-import type { ApiKeyRow, AuthedUser, CreditLedgerRow, ProfileRow } from "../types.js";
+import type {
+  ApiKeyRow,
+  AuthedUser,
+  CreditLedgerRow,
+  ProfileRow,
+  UsageLogRow,
+} from "../types.js";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
+const MAX_KEY_NAME_LEN = 64;
+const DEFAULT_KEY_NAME = "API Key";
 
 function authedUser(c: { get: (key: never) => unknown }): AuthedUser {
   return c.get("user" as never) as AuthedUser;
@@ -104,4 +114,96 @@ meRoutes.get("/api-keys", async (c) => {
   }));
 
   return c.json({ ok: true, keys });
+});
+
+meRoutes.post("/api-keys", async (c) => {
+  const user = authedUser(c);
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw ApiError.badRequest("Invalid JSON body.", "invalid_json");
+  }
+
+  if (body !== null && typeof body !== "object") {
+    throw ApiError.badRequest("Request body must be a JSON object.", "invalid_body");
+  }
+
+  const nameField = (body as Record<string, unknown> | null)?.name;
+  let name = DEFAULT_KEY_NAME;
+  if (nameField !== undefined && nameField !== null) {
+    if (typeof nameField !== "string") {
+      throw ApiError.badRequest("name must be a string.", "name_invalid_type");
+    }
+    const trimmed = nameField.trim();
+    if (trimmed) {
+      name = trimmed;
+    }
+  }
+
+  if (name.length > MAX_KEY_NAME_LEN) {
+    throw ApiError.badRequest(
+      `name must be at most ${MAX_KEY_NAME_LEN} characters.`,
+      "name_too_long"
+    );
+  }
+
+  const material = generateApiKey();
+  const encryptedSecret = encryptSecret(material.fullKey);
+  const { data, error } = await supabase()
+    .from("api_keys")
+    .insert({
+      user_id: user.id,
+      name,
+      key_id: material.keyId,
+      prefix: material.prefix,
+      hash: material.hash,
+      encrypted_secret: encryptedSecret,
+    })
+    .select("id, name, prefix, created_at, last_used_at, revoked_at")
+    .single();
+
+  if (error) {
+    throw ApiError.internal(
+      `Failed to create API key: ${error.message}`,
+      "me_api_keys_create_failed"
+    );
+  }
+
+  return c.json(
+    {
+      api_key: {
+        id: data.id,
+        name: data.name,
+        prefix: data.prefix,
+        status: data.revoked_at ? "revoked" : "active",
+        created_at: data.created_at,
+        last_used_at: data.last_used_at,
+      },
+      secret: material.fullKey,
+    },
+    201
+  );
+});
+
+meRoutes.get("/usage", async (c) => {
+  const user = authedUser(c);
+  const limit = parseLimit(c.req.query("limit"));
+  const { data, error } = await supabase()
+    .from("usage_logs")
+    .select(
+      "id, created_at, model, status, prompt_tokens, completion_tokens, total_tokens, credits_charged, request_id"
+    )
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw ApiError.internal(
+      `Failed to load usage logs: ${error.message}`,
+      "me_usage_failed"
+    );
+  }
+
+  return c.json({ data: (data ?? []) as UsageLogRow[] });
 });
