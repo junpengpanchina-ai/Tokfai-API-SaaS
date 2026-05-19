@@ -46,8 +46,14 @@ export function userMessageForDashboardError(
   code?: string | null,
   fallback?: string
 ): string {
+  const normalized = code?.toLowerCase() ?? "";
+
   if (status === 401 || status === 403) {
     return "Please sign in again";
+  }
+
+  if (status === 409 && normalized === "api_key_name_exists") {
+    return "Active key with this name already exists.";
   }
 
   if (
