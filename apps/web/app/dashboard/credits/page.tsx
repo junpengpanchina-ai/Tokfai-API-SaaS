@@ -468,10 +468,18 @@ function EmptyState() {
       <div className="grid h-10 w-10 place-items-center rounded-full bg-muted text-muted-foreground">
         <CreditCard className="h-5 w-5" />
       </div>
-      <p className="text-sm text-muted-foreground">No credit activity yet.</p>
-      <Button asChild size="sm" variant="outline">
-        <Link href="/pricing">See pricing</Link>
-      </Button>
+      <p className="max-w-sm text-sm text-muted-foreground">
+        No credit activity yet. Recharge above to add credits, or view plans on
+        the pricing page.
+      </p>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <Button asChild size="sm" variant="default">
+          <a href="#recharge-credits">Recharge credits</a>
+        </Button>
+        <Button asChild size="sm" variant="outline">
+          <Link href="/pricing">View pricing</Link>
+        </Button>
+      </div>
     </div>
   );
 }

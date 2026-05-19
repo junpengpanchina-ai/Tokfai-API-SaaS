@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { createCheckoutSession, DmitApiError } from "@/lib/dmit/client";
+import { userMessageForDmitError } from "@/lib/dmit-messages";
 import { createClient } from "@/lib/supabase/client";
 
 interface CreditPlan {
@@ -75,7 +76,7 @@ export function CreditsTopUpClient() {
     } catch (err) {
       setError(
         err instanceof DmitApiError
-          ? err.message
+          ? userMessageForDmitError(err.status, err.code, err.message)
           : "Unable to start Stripe Checkout. Please try again."
       );
       setLoadingPlanId(null);
@@ -83,7 +84,7 @@ export function CreditsTopUpClient() {
   }
 
   return (
-    <Card>
+    <Card id="recharge-credits">
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle>Recharge credits</CardTitle>

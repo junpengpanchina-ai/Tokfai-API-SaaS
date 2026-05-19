@@ -217,8 +217,9 @@ function EmptyState() {
       <div className="grid h-10 w-10 place-items-center rounded-full bg-muted text-muted-foreground">
         <Gauge className="h-5 w-5" />
       </div>
-      <p className="text-sm text-muted-foreground">
-        No API usage yet. Run your first request in Playground.
+      <p className="max-w-sm text-sm text-muted-foreground">
+        No API usage yet. Send your first chat completion from the Playground to
+        see requests here.
       </p>
       <Button asChild size="sm" variant="outline">
         <Link href="/dashboard/playground">Open Playground</Link>

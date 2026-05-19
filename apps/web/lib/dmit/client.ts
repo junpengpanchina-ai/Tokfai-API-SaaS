@@ -339,6 +339,32 @@ export async function createMeApiKey(
   });
 }
 
+export interface RevokeMeApiKeyResponse {
+  ok: true;
+  api_key: {
+    id: string;
+    name: string;
+    key_prefix: string;
+    status: "revoked";
+    created_at: string;
+    last_used_at: string | null;
+  };
+}
+
+export async function revokeMeApiKey(
+  id: string,
+  auth: DmitSessionAuth
+): Promise<RevokeMeApiKeyResponse> {
+  const accessToken = requireDmitAccessToken(auth.accessToken);
+  return dmitFetch<RevokeMeApiKeyResponse>(
+    `/v1/me/api-keys/${encodeURIComponent(id)}/revoke`,
+    {
+      method: "POST",
+      accessToken,
+    }
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Billing — Stripe Checkout (UI wired in /dashboard/credits)
 // ---------------------------------------------------------------------------

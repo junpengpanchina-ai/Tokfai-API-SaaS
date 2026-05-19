@@ -1,7 +1,6 @@
-import Link from "next/link";
-
+import { ApiReferenceLink } from "@/components/api-reference-link";
+import { DashboardMobileNav, DashboardSidebar } from "@/components/dashboard-nav";
 import { Button } from "@/components/ui/button";
-import { DashboardSidebar } from "@/components/dashboard-sidebar";
 import { createClient } from "@/lib/supabase/server";
 
 export async function DashboardShell({
@@ -17,11 +16,12 @@ export async function DashboardShell({
   const email = user?.email ?? "";
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen flex-col md:flex-row">
       <DashboardSidebar />
-      <div className="flex flex-1 flex-col">
-        <header className="flex h-16 items-center justify-between border-b bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="text-sm text-muted-foreground">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <DashboardMobileNav />
+        <header className="flex h-16 items-center justify-between border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:px-6">
+          <div className="truncate text-sm text-muted-foreground">
             Signed in as{" "}
             <span className="font-medium text-foreground">{email}</span>
           </div>
@@ -31,18 +31,13 @@ export async function DashboardShell({
             </Button>
           </form>
         </header>
-        <main className="flex-1 p-6 md:p-10">
+        <main className="flex-1 p-4 sm:p-6 md:p-10">
           <div className="mx-auto w-full max-w-6xl">{children}</div>
         </main>
-        <footer className="border-t px-6 py-4 text-xs text-muted-foreground">
-          <div className="mx-auto flex w-full max-w-6xl items-center justify-between">
+        <footer className="border-t px-4 py-4 text-xs text-muted-foreground sm:px-6">
+          <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <span>Tokfai · OpenAI-compatible image &amp; chat API</span>
-            <Link
-              href="/dashboard/docs"
-              className="transition-colors hover:text-foreground"
-            >
-              API reference →
-            </Link>
+            <ApiReferenceLink />
           </div>
         </footer>
       </div>

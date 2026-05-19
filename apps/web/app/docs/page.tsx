@@ -1,4 +1,5 @@
 import { DocsContent } from "@/components/docs-content";
+import { PublicFooter } from "@/components/public-footer";
 import { PublicHeader } from "@/components/public-header";
 
 export default function DocsPage() {
@@ -8,9 +9,11 @@ export default function DocsPage() {
 
       <main className="container flex-1 py-16">
         <div className="mx-auto max-w-4xl">
-          <DocsContent />
+          <DocsContent showDashboardLinks={false} />
         </div>
       </main>
+
+      <PublicFooter />
     </div>
   );
 }

@@ -10,7 +10,13 @@ import {
   Wallet,
 } from "lucide-react";
 
+import { PublicFooter } from "@/components/public-footer";
 import { PublicHeader } from "@/components/public-header";
+import {
+  TOKFAI_API_BASE_URL,
+  TOKFAI_API_KEY_PLACEHOLDER,
+  TOKFAI_CHAT_COMPLETIONS_ENDPOINT,
+} from "@/lib/tokfai-api";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -45,7 +51,7 @@ const FEATURES = [
   {
     icon: BarChart3,
     title: "Usage logs and ledger",
-    body: "Every call is recorded. Track token usage and credit balance in one place.",
+    body: "Every call is recorded. Track API usage and your credit balance in one place.",
   },
   {
     icon: FlaskConical,
@@ -64,20 +70,17 @@ const STEPS = [
   { step: 2, title: "Buy credits", body: "Top up from the credits page — prepaid balance powers every API call." },
   { step: 3, title: "Create API key", body: "Issue a sk-tokfai_ key from the dashboard and store it securely." },
   { step: 4, title: "Call /v1/chat/completions", body: "Point OpenAI SDK, Cursor, Cherry Studio, or your app at api.tokfai.com." },
-  { step: 5, title: "Monitor usage", body: "Watch requests, token counts, and ledger entries update in real time." },
+  {
+    step: 5,
+    title: "Monitor usage",
+    body: "Watch requests, credits charged, and ledger entries update in real time.",
+  },
 ];
 
 const DEV_SNIPPET = [
-  { label: "Base URL", value: "https://api.tokfai.com/v1" },
-  { label: "Endpoint", value: "POST /chat/completions" },
-  { label: "Authorization", value: "Bearer sk-tokfai_xxx" },
-] as const;
-
-const FOOTER_LINKS = [
-  { href: "/pricing", label: "Pricing" },
-  { href: "/docs", label: "Docs" },
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/dashboard/docs", label: "API reference" },
+  { label: "Base URL", value: TOKFAI_API_BASE_URL },
+  { label: "Endpoint", value: TOKFAI_CHAT_COMPLETIONS_ENDPOINT },
+  { label: "Authorization", value: `Bearer ${TOKFAI_API_KEY_PLACEHOLDER}` },
 ] as const;
 
 export default function HomePage() {
@@ -203,22 +206,7 @@ export default function HomePage() {
         </section>
       </main>
 
-      <footer className="border-t">
-        <div className="container flex flex-col gap-4 py-6 text-xs text-muted-foreground sm:h-16 sm:flex-row sm:items-center sm:justify-between sm:py-0">
-          <span>© {new Date().getFullYear()} Tokfai</span>
-          <nav className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            {FOOTER_LINKS.map((link) => (
-              <Link
-                key={link.label}
-                href={link.href}
-                className="hover:text-foreground"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

@@ -13,8 +13,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-const BASE_URL = "https://api.tokfai.com/v1";
-const API_KEY_PLACEHOLDER = "sk-tokfai_xxx";
+import {
+  TOKFAI_API_BASE_URL,
+  TOKFAI_API_KEY_PLACEHOLDER,
+  TOKFAI_CHAT_COMPLETIONS_ENDPOINT,
+} from "@/lib/tokfai-api";
+
+const BASE_URL = TOKFAI_API_BASE_URL;
+const API_KEY_PLACEHOLDER = TOKFAI_API_KEY_PLACEHOLDER;
 const DEFAULT_MODEL = "gemini-3.1-pro";
 
 const AUTH_HEADER = `Authorization: Bearer ${API_KEY_PLACEHOLDER}`;
@@ -50,22 +56,22 @@ const ERROR_CODES = [
   {
     status: "401",
     code: "invalid_token",
-    meaning: "API Key 无效或格式错误",
+    meaning: "Invalid token",
   },
   {
     status: "402",
     code: "insufficient_credits",
-    meaning: "余额不足",
+    meaning: "Not enough credits",
   },
   {
     status: "404",
     code: "route_not_found",
-    meaning: "接口路径错误",
+    meaning: "Route not found",
   },
   {
     status: "5xx",
     code: "upstream_error",
-    meaning: "上游模型暂不可用",
+    meaning: "Model temporarily unavailable",
   },
 ];
 
@@ -123,14 +129,14 @@ export function DocsContent({
           id="endpoint"
           title="Chat Completions"
           description="OpenAI-compatible chat endpoint."
-          value="POST /chat/completions"
+          value={TOKFAI_CHAT_COMPLETIONS_ENDPOINT}
           copied={copiedId === "endpoint"}
           onCopy={copyText}
         />
         <CopyableCard
           id="auth"
           title="Authorization"
-          description="Include your Tokfai API key as a Bearer token."
+          description="Include your Tokfai API key in the Authorization header."
           value={AUTH_HEADER}
           copied={copiedId === "auth"}
           onCopy={copyText}
@@ -214,7 +220,7 @@ export function DocsContent({
 
       <Card>
         <CardHeader>
-          <CardTitle>常见错误码</CardTitle>
+          <CardTitle>Error codes</CardTitle>
           <CardDescription>
             Handle these responses when integrating Tokfai.
           </CardDescription>

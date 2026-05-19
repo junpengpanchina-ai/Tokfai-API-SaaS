@@ -24,7 +24,9 @@ import {
   playgroundChatCompletions,
   type ChatCompletionResponse,
 } from "@/lib/dmit/client";
+import { userMessageForDmitError } from "@/lib/dmit-messages";
 import { formatCreditsPrecise } from "@/lib/format";
+import { TOKFAI_CHAT_COMPLETIONS_ENDPOINT } from "@/lib/tokfai-api";
 import { createClient } from "@/lib/supabase/client";
 
 const DEFAULT_MODEL = "gemini-3.1-pro";
@@ -69,7 +71,7 @@ export function PlaygroundClient() {
 
     const accessToken = session?.access_token;
     if (!accessToken) {
-      setError({ status: 401, message: "请重新登录" });
+      setError({ status: 401, message: "Please sign in again" });
       return;
     }
 
@@ -97,7 +99,7 @@ export function PlaygroundClient() {
             token is sent to DMIT only — no API keys or secrets in the browser.
           </p>
         </div>
-        <Badge variant="secondary">POST /v1/chat/completions</Badge>
+        <Badge variant="secondary">{TOKFAI_CHAT_COMPLETIONS_ENDPOINT}</Badge>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr,280px]">
@@ -220,6 +222,11 @@ function ResponsePanel({
           ) : null}
         </div>
         <p className="text-sm">{error.message}</p>
+        {error.status === 402 || error.code === "insufficient_credits" ? (
+          <Button asChild size="sm" variant="outline" className="w-fit">
+            <Link href="/dashboard/credits">Add credits</Link>
+          </Button>
+        ) : null}
       </div>
     );
   }
@@ -310,42 +317,23 @@ function toPlaygroundError(err: unknown): PlaygroundError {
     return {
       status: err.status,
       code: err.code,
-      message: messageForPlayground(err.status, err.code, err.message),
+      message: userMessageForDmitError(err.status, err.code, err.message),
     };
   }
   if (err instanceof TypeError) {
     return {
       status: 0,
-      message: "模型暂时不可用，请稍后重试",
+      message: userMessageForDmitError(503),
     };
   }
   if (err instanceof Error) {
-    return { status: 0, message: err.message };
+    return {
+      status: 0,
+      message: userMessageForDmitError(0, undefined, err.message),
+    };
   }
-  return { status: 0, message: "模型暂时不可用，请稍后重试" };
-}
-
-function messageForPlayground(
-  status: number,
-  code: string | undefined,
-  fallback: string
-): string {
-  if (status === 401 || status === 403) {
-    return "请重新登录";
-  }
-  if (status === 402 || code === "insufficient_credits") {
-    return "余额不足，请先充值";
-  }
-  if (
-    status >= 500 ||
-    status === 502 ||
-    status === 503 ||
-    status === 504 ||
-    code === "upstream_error" ||
-    code === "upstream_auth_error" ||
-    code === "upstream_rate_limited"
-  ) {
-    return "模型暂时不可用，请稍后重试";
-  }
-  return fallback;
+  return {
+    status: 0,
+    message: userMessageForDmitError(503),
+  };
 }

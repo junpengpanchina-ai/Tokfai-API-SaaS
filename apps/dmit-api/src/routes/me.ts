@@ -186,6 +186,42 @@ meRoutes.post("/api-keys", async (c) => {
   );
 });
 
+meRoutes.post("/api-keys/:id/revoke", async (c) => {
+  const user = authedUser(c);
+  const id = c.req.param("id");
+  const revokedAt = new Date().toISOString();
+
+  const { data, error } = await supabase()
+    .from("api_keys")
+    .update({ revoked_at: revokedAt })
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .select("id, name, prefix, created_at, last_used_at, revoked_at")
+    .maybeSingle();
+
+  if (error) {
+    throw ApiError.internal(
+      `Failed to revoke API key: ${error.message}`,
+      "me_api_keys_revoke_failed"
+    );
+  }
+  if (!data) {
+    throw ApiError.notFound("API key not found.", "key_not_found");
+  }
+
+  return c.json({
+    ok: true,
+    api_key: {
+      id: data.id,
+      name: data.name,
+      key_prefix: data.prefix,
+      status: "revoked" as const,
+      created_at: data.created_at,
+      last_used_at: data.last_used_at,
+    },
+  });
+});
+
 meRoutes.get("/usage", async (c) => {
   const user = authedUser(c);
   const limit = parseLimit(c.req.query("limit"));

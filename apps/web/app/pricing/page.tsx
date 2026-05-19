@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Code2, Gauge, Wallet } from "lucide-react";
 
+import { PublicFooter } from "@/components/public-footer";
 import { PublicHeader } from "@/components/public-header";
+import {
+  TOKFAI_API_BASE_URL,
+  TOKFAI_CHAT_COMPLETIONS_ENDPOINT,
+} from "@/lib/tokfai-api";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -52,7 +57,7 @@ const USAGE_POINTS = [
   {
     id: "model-cost",
     icon: Wallet,
-    text: "Actual cost depends on model, input tokens, and output tokens.",
+    text: "Actual cost depends on model and request size (input and output).",
   },
   {
     id: "usage-dashboard",
@@ -89,8 +94,8 @@ const USAGE_POINTS = [
 ];
 
 const DEV_ITEMS = [
-  { label: "Base URL", value: "https://api.tokfai.com/v1" },
-  { label: "Endpoint", value: "POST /chat/completions" },
+  { label: "Base URL", value: TOKFAI_API_BASE_URL },
+  { label: "Endpoint", value: TOKFAI_CHAT_COMPLETIONS_ENDPOINT },
   {
     label: "API Keys",
     value: "/dashboard/api-keys",
@@ -221,19 +226,7 @@ export default function PricingPage() {
         </section>
       </main>
 
-      <footer className="border-t">
-        <div className="container flex h-16 items-center justify-between text-xs text-muted-foreground">
-          <span>© {new Date().getFullYear()} Tokfai</span>
-          <div className="flex items-center gap-4">
-            <Link href="/pricing" className="hover:text-foreground">
-              Pricing
-            </Link>
-            <Link href="/docs" className="hover:text-foreground">
-              Docs
-            </Link>
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }
