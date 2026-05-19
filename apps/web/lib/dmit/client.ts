@@ -39,6 +39,8 @@ export class DmitApiError extends Error {
   readonly code?: string;
   readonly type?: string;
   readonly body: unknown;
+  readonly requestMethod?: string;
+  readonly requestUrl?: string;
 
   constructor(args: {
     status: number;
@@ -46,6 +48,8 @@ export class DmitApiError extends Error {
     code?: string;
     type?: string;
     body?: unknown;
+    requestMethod?: string;
+    requestUrl?: string;
   }) {
     super(args.message);
     this.name = "DmitApiError";
@@ -53,6 +57,8 @@ export class DmitApiError extends Error {
     this.code = args.code;
     this.type = args.type;
     this.body = args.body;
+    this.requestMethod = args.requestMethod;
+    this.requestUrl = args.requestUrl;
   }
 
   /** True if the user's session is invalid / expired. */
@@ -465,14 +471,30 @@ export async function revokeApiKey(
   auth: DmitSessionAuth
 ): Promise<RevokeApiKeyResponse> {
   const accessToken = requireDmitAccessToken(auth.accessToken);
-  const raw = await dmitFetch<unknown>(
-    `/v1/me/api-keys/${encodeURIComponent(id)}/revoke`,
-    {
-      method: "POST",
+  const path = `/v1/me/api-keys/${encodeURIComponent(id)}/revoke`;
+  const requestUrl = `${getDmitBaseUrl()}${path}`;
+  const requestMethod = "POST";
+
+  try {
+    const raw = await dmitFetch<unknown>(path, {
+      method: requestMethod,
       accessToken,
+    });
+    return parseRevokeApiKeyResponse(raw);
+  } catch (err) {
+    if (err instanceof DmitApiError) {
+      throw new DmitApiError({
+        status: err.status,
+        message: err.message,
+        code: err.code,
+        type: err.type,
+        body: err.body,
+        requestMethod,
+        requestUrl,
+      });
     }
-  );
-  return parseRevokeApiKeyResponse(raw);
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -96,6 +96,7 @@ meRoutes.post("/api-keys/:id/revoke", async (c) => {
     .update({ revoked_at: new Date().toISOString() })
     .eq("id", id)
     .eq("user_id", userId)
+    .is("revoked_at", null)
     .select("id, name, prefix, created_at, last_used_at, revoked_at")
     .single();
 

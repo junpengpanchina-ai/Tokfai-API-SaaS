@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import {
   createApiKey,
   DmitApiError,
+  getDmitBaseUrl,
   revokeApiKey,
   type CreateApiKeyResponse,
   type MeApiKeyMetadata,
@@ -49,6 +50,8 @@ interface ActionErrorState {
   message: string;
   status: number;
   code?: string;
+  method?: string;
+  url?: string;
 }
 
 const REVOKE_CONFIRM_MESSAGE =
@@ -122,7 +125,7 @@ export function ApiKeysClient({
         prev.map((row) => (row.id === key.id ? updated : row))
       );
     } catch (err) {
-      setRevokeError(toActionError(err));
+      setRevokeError(toRevokeActionError(err, key.id));
     } finally {
       setRevokingId(null);
     }
@@ -411,6 +414,13 @@ function ActionErrorAlert({
             {error.message}
           </p>
           <p className="mt-1 font-mono text-xs text-muted-foreground">
+            {error.method ? <>method={error.method} </> : null}
+            {error.url ? (
+              <>
+                url={error.url}
+                <br />
+              </>
+            ) : null}
             status={error.status} code={error.code ?? "n/a"}
           </p>
         </div>
@@ -465,12 +475,26 @@ function meKeyToListItem(key: MeKeyLike): ApiKeyListItem {
   };
 }
 
+function toRevokeActionError(err: unknown, keyId: string): ActionErrorState {
+  const base = toActionError(err);
+  if (base.method && base.url) return base;
+  return {
+    ...base,
+    method: base.method ?? "POST",
+    url:
+      base.url ??
+      `${getDmitBaseUrl()}/v1/me/api-keys/${encodeURIComponent(keyId)}/revoke`,
+  };
+}
+
 function toActionError(err: unknown): ActionErrorState {
   if (err instanceof DmitApiError) {
     return {
       message: userMessageForDashboardError(err.status, err.code, err.message),
       status: err.status,
       code: err.code,
+      method: err.requestMethod,
+      url: err.requestUrl,
     };
   }
   if (err instanceof Error) {
