@@ -149,15 +149,18 @@ meRoutes.post("/api-keys", async (c) => {
   }
 
   const material = generateApiKey();
-  const encryptedSecret = encryptSecret(material.fullKey);
+  const plainKey = material.fullKey;
+  const keyHash = material.hash;
+  const keyPrefix = material.prefix;
+  const encryptedSecret = encryptSecret(plainKey);
   const { data, error } = await supabase()
     .from("api_keys")
     .insert({
       user_id: user.id,
       name,
       key_id: material.keyId,
-      prefix: material.prefix,
-      hash: material.hash,
+      prefix: keyPrefix,
+      hash: keyHash,
       encrypted_secret: encryptedSecret,
     })
     .select("id, name, prefix, created_at, last_used_at, revoked_at")
@@ -175,13 +178,13 @@ meRoutes.post("/api-keys", async (c) => {
       api_key: {
         id: data.id,
         name: data.name,
-        key_prefix: data.prefix,
+        key_prefix: keyPrefix,
         status: data.revoked_at ? "revoked" : "active",
         created_at: data.created_at,
         last_used_at: data.last_used_at,
       },
-      /** One-time plaintext secret — never returned by GET /api-keys. */
-      one_time_secret: material.fullKey,
+      /** Full plaintext key — only on POST create; never on GET list. */
+      one_time_secret: plainKey,
     },
     201
   );

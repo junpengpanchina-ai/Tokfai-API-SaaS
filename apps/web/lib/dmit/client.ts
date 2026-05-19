@@ -264,22 +264,6 @@ export interface CreateApiKeyInput {
   name: string;
 }
 
-export async function createApiKey(
-  input: CreateApiKeyInput,
-  auth: DmitSessionAuth
-): Promise<ApiKeyWithSecret> {
-  const accessToken = requireDmitAccessToken(auth.accessToken);
-  const res = await dmitFetch<ApiKeyWithSecret | ApiKeyWithSecretResponse>(
-    "/v1/keys",
-    {
-      method: "POST",
-      json: input,
-      accessToken,
-    }
-  );
-  return "data" in res ? res.data : res;
-}
-
 export async function revealApiKey(
   id: string,
   auth: DmitSessionAuth
@@ -313,16 +297,16 @@ export async function revokeApiKey(
 export interface MeApiKeyMetadata {
   id: string;
   name: string;
-  prefix: string;
+  key_prefix: string;
   status: "active" | "revoked" | string;
   created_at: string;
   last_used_at: string | null;
 }
 
-export interface CreateMeApiKeyResponse {
+export type CreateApiKeyResponse = {
   api_key: MeApiKeyMetadata;
   one_time_secret: string;
-}
+};
 
 export interface CreateMeApiKeyInput {
   name?: string;
@@ -342,7 +326,7 @@ function readNonEmptyString(
  * Normalizes POST /v1/me/api-keys create responses.
  * Full secret is returned once at creation — never from list endpoints.
  */
-export function parseCreateMeApiKeyResponse(raw: unknown): CreateMeApiKeyResponse {
+export function parseCreateApiKeyResponse(raw: unknown): CreateApiKeyResponse {
   if (!raw || typeof raw !== "object") {
     throw new DmitApiError({
       status: 500,
@@ -351,30 +335,9 @@ export function parseCreateMeApiKeyResponse(raw: unknown): CreateMeApiKeyRespons
     });
   }
 
-  let body = raw as Record<string, unknown>;
-  if (
-    body.data &&
-    typeof body.data === "object" &&
-    !Array.isArray(body.data)
-  ) {
-    body = body.data as Record<string, unknown>;
-  }
+  const body = raw as Record<string, unknown>;
 
-  const apiKeyRaw =
-    body.api_key && typeof body.api_key === "object"
-      ? (body.api_key as Record<string, unknown>)
-      : null;
-
-  const oneTimeSecret =
-    readNonEmptyString(body, "one_time_secret") ??
-    readNonEmptyString(body, "secret") ??
-    readNonEmptyString(body, "full_key") ??
-    readNonEmptyString(body, "fullKey") ??
-    readNonEmptyString(body, "token") ??
-    (typeof body.key === "string" && !apiKeyRaw ? body.key.trim() : undefined) ??
-    (apiKeyRaw ? readNonEmptyString(apiKeyRaw, "one_time_secret") : undefined) ??
-    (apiKeyRaw ? readNonEmptyString(apiKeyRaw, "secret") : undefined);
-
+  const oneTimeSecret = readNonEmptyString(body, "one_time_secret");
   if (!oneTimeSecret) {
     throw new DmitApiError({
       status: 500,
@@ -393,6 +356,11 @@ export function parseCreateMeApiKeyResponse(raw: unknown): CreateMeApiKeyRespons
     });
   }
 
+  const apiKeyRaw =
+    body.api_key && typeof body.api_key === "object"
+      ? (body.api_key as Record<string, unknown>)
+      : null;
+
   if (!apiKeyRaw || typeof apiKeyRaw.id !== "string") {
     throw new DmitApiError({
       status: 500,
@@ -401,7 +369,7 @@ export function parseCreateMeApiKeyResponse(raw: unknown): CreateMeApiKeyRespons
     });
   }
 
-  const prefix =
+  const key_prefix =
     readNonEmptyString(apiKeyRaw, "key_prefix") ??
     readNonEmptyString(apiKeyRaw, "prefix") ??
     "";
@@ -416,7 +384,7 @@ export function parseCreateMeApiKeyResponse(raw: unknown): CreateMeApiKeyRespons
     id: apiKeyRaw.id,
     name:
       typeof apiKeyRaw.name === "string" ? apiKeyRaw.name : "API Key",
-    prefix,
+    key_prefix,
     status,
     created_at:
       typeof apiKeyRaw.created_at === "string"
@@ -431,17 +399,18 @@ export function parseCreateMeApiKeyResponse(raw: unknown): CreateMeApiKeyRespons
   return { api_key, one_time_secret: oneTimeSecret };
 }
 
-export async function createMeApiKey(
+/** POST /v1/me/api-keys — returns full secret once in `one_time_secret`. */
+export async function createApiKey(
   input: CreateMeApiKeyInput,
   auth: DmitSessionAuth
-): Promise<CreateMeApiKeyResponse> {
+): Promise<CreateApiKeyResponse> {
   const accessToken = requireDmitAccessToken(auth.accessToken);
   const raw = await dmitFetch<unknown>("/v1/me/api-keys", {
     method: "POST",
     json: input,
     accessToken,
   });
-  return parseCreateMeApiKeyResponse(raw);
+  return parseCreateApiKeyResponse(raw);
 }
 
 export interface RevokeMeApiKeyResponse {

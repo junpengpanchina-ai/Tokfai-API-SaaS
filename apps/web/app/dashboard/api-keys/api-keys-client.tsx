@@ -23,10 +23,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  createMeApiKey,
+  createApiKey,
   DmitApiError,
   revokeMeApiKey,
-  type CreateMeApiKeyResponse,
+  type CreateApiKeyResponse,
 } from "@/lib/dmit/client";
 import {
   userMessageForDashboardError,
@@ -66,7 +66,9 @@ export function ApiKeysClient({
   const [revokeError, setRevokeError] = useState<ActionErrorState | null>(null);
   /** Full secret — React state only; never persisted. */
   const [oneTimeSecret, setOneTimeSecret] = useState<string | null>(null);
-  const [copiedFullKey, setCopiedFullKey] = useState(false);
+  const [copyFullKeyStatus, setCopyFullKeyStatus] = useState<"idle" | "copied">(
+    "idle"
+  );
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
@@ -76,16 +78,15 @@ export function ApiKeysClient({
     setCreating(true);
     setCreateError(null);
     setRevokeError(null);
-    setCopiedFullKey(false);
 
     try {
       const trimmed = newName.trim();
-      const result = await createMeApiKey(
+      const result = await createApiKey(
         trimmed ? { name: trimmed } : {},
         { accessToken }
       );
       setOneTimeSecret(result.one_time_secret);
-      setCopiedFullKey(false);
+      setCopyFullKeyStatus("idle");
       applyCreateResult(result);
       setNewName("");
     } catch (err) {
@@ -95,7 +96,7 @@ export function ApiKeysClient({
     }
   }
 
-  function applyCreateResult(result: CreateMeApiKeyResponse) {
+  function applyCreateResult(result: CreateApiKeyResponse) {
     const listItem = meKeyToListItem(result.api_key);
     setKeys((prev) => {
       const without = prev.filter((k) => k.id !== listItem.id);
@@ -125,16 +126,18 @@ export function ApiKeysClient({
 
   async function handleCopyFullKey() {
     if (!oneTimeSecret) return;
-    const ok = await copyToClipboard(oneTimeSecret);
-    if (ok) {
-      setCopiedFullKey(true);
-      window.setTimeout(() => setCopiedFullKey(false), 2000);
+    try {
+      await navigator.clipboard.writeText(oneTimeSecret);
+      setCopyFullKeyStatus("copied");
+      window.setTimeout(() => setCopyFullKeyStatus("idle"), 2000);
+    } catch {
+      setCopyFullKeyStatus("idle");
     }
   }
 
   function dismissOneTimeSecret() {
     setOneTimeSecret(null);
-    setCopiedFullKey(false);
+    setCopyFullKeyStatus("idle");
   }
 
   return (
@@ -142,7 +145,7 @@ export function ApiKeysClient({
       {oneTimeSecret ? (
         <OneTimeSecretCard
           secret={oneTimeSecret}
-          copied={copiedFullKey}
+          copyStatus={copyFullKeyStatus}
           onCopy={handleCopyFullKey}
           onDismiss={dismissOneTimeSecret}
         />
@@ -224,12 +227,12 @@ export function ApiKeysClient({
 
 function OneTimeSecretCard({
   secret,
-  copied,
+  copyStatus,
   onCopy,
   onDismiss,
 }: {
   secret: string;
-  copied: boolean;
+  copyStatus: "idle" | "copied";
   onCopy: () => void;
   onDismiss: () => void;
 }) {
@@ -256,23 +259,15 @@ function OneTimeSecretCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <pre
+        <code
           id="one-time-secret"
-          className="max-h-40 overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-emerald-200 bg-white p-4 font-mono text-sm leading-relaxed text-foreground dark:border-emerald-800 dark:bg-background"
-          tabIndex={0}
-          onFocus={(e) => {
-            const range = document.createRange();
-            range.selectNodeContents(e.currentTarget);
-            const sel = window.getSelection();
-            sel?.removeAllRanges();
-            sel?.addRange(range);
-          }}
+          className="block max-h-40 overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-emerald-200 bg-white p-4 font-mono text-sm leading-relaxed text-foreground dark:border-emerald-800 dark:bg-background"
         >
           {secret}
-        </pre>
+        </code>
         <div className="flex flex-wrap gap-2">
           <Button type="button" size="lg" onClick={onCopy}>
-            {copied ? (
+            {copyStatus === "copied" ? (
               <>
                 <Check className="h-4 w-4" />
                 Copied
