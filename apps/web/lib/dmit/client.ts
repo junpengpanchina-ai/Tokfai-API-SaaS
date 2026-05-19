@@ -294,6 +294,7 @@ export interface MeApiKeyMetadata {
   status: "active" | "revoked" | string;
   created_at: string;
   last_used_at: string | null;
+  revoked_at?: string | null;
 }
 
 export type CreateApiKeyResponse = {
@@ -433,6 +434,9 @@ export function parseRevokeApiKeyResponse(raw: unknown): RevokeApiKeyResponse {
     });
   }
 
+  const revoked_at =
+    typeof apiKeyRaw.revoked_at === "string" ? apiKeyRaw.revoked_at : null;
+
   const api_key: MeApiKeyMetadata = {
     id: apiKeyRaw.id,
     name:
@@ -441,7 +445,7 @@ export function parseRevokeApiKeyResponse(raw: unknown): RevokeApiKeyResponse {
       readNonEmptyString(apiKeyRaw, "key_prefix") ??
       readNonEmptyString(apiKeyRaw, "prefix") ??
       "",
-    status: "revoked",
+    status: revoked_at ? "revoked" : "active",
     created_at:
       typeof apiKeyRaw.created_at === "string"
         ? apiKeyRaw.created_at
@@ -450,6 +454,7 @@ export function parseRevokeApiKeyResponse(raw: unknown): RevokeApiKeyResponse {
       typeof apiKeyRaw.last_used_at === "string"
         ? apiKeyRaw.last_used_at
         : null,
+    revoked_at,
   };
 
   return { api_key };

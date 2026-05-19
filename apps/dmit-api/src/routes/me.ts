@@ -88,14 +88,14 @@ meRoutes.get("/credits/ledger", async (c) => {
 
 /** POST /v1/me/api-keys/:id/revoke — soft-revoke (sets revoked_at, never deletes). */
 meRoutes.post("/api-keys/:id/revoke", async (c) => {
-  const authUser = authedUser(c);
+  const userId = c.get("userId" as never) as string;
   const id = c.req.param("id");
 
   const { data, error } = await supabase()
     .from("api_keys")
     .update({ revoked_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("user_id", authUser.id)
+    .eq("user_id", userId)
     .select("id, name, prefix, created_at, last_used_at, revoked_at")
     .single();
 
@@ -117,9 +117,11 @@ meRoutes.post("/api-keys/:id/revoke", async (c) => {
       id: data.id,
       name: data.name,
       key_prefix: data.prefix,
-      status: "revoked" as const,
+      prefix: data.prefix,
       created_at: data.created_at,
       last_used_at: data.last_used_at,
+      revoked_at: data.revoked_at,
+      status: data.revoked_at ? "revoked" : "active",
     },
   });
 });

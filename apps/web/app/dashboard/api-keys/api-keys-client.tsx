@@ -42,6 +42,7 @@ export interface ApiKeyListItem {
   status: "active" | "revoked" | string;
   created_at: string;
   last_used_at: string | null;
+  revoked_at?: string | null;
 }
 
 interface ActionErrorState {
@@ -116,10 +117,7 @@ export function ApiKeysClient({
 
     try {
       const res = await revokeApiKey(key.id, { accessToken });
-      const updated: ApiKeyListItem = {
-        ...meKeyToListItem(res.api_key),
-        status: "revoked",
-      };
+      const updated = meKeyToListItem(res.api_key);
       setKeys((prev) =>
         prev.map((row) => (row.id === key.id ? updated : row))
       );
@@ -450,6 +448,7 @@ type MeKeyLike = {
   status: string;
   created_at: string;
   last_used_at: string | null;
+  revoked_at?: string | null;
   prefix?: string;
   key_prefix?: string;
 };
@@ -459,9 +458,10 @@ function meKeyToListItem(key: MeKeyLike): ApiKeyListItem {
     id: key.id,
     name: key.name,
     key_prefix: key.key_prefix ?? key.prefix ?? "",
-    status: key.status,
+    status: key.revoked_at ? "revoked" : key.status,
     created_at: key.created_at,
     last_used_at: key.last_used_at,
+    revoked_at: key.revoked_at ?? null,
   };
 }
 
