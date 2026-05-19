@@ -116,9 +116,12 @@ export function ApiKeysClient({
 
     try {
       const res = await revokeApiKey(key.id, { accessToken });
-      const updated = meKeyToListItem(res.api_key);
+      const updated: ApiKeyListItem = {
+        ...meKeyToListItem(res.api_key),
+        status: "revoked",
+      };
       setKeys((prev) =>
-        prev.map((row) => (row.id === updated.id ? updated : row))
+        prev.map((row) => (row.id === key.id ? updated : row))
       );
     } catch (err) {
       setRevokeError(toActionError(err));

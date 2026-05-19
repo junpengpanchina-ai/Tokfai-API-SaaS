@@ -86,6 +86,44 @@ meRoutes.get("/credits/ledger", async (c) => {
   return c.json({ data: (data ?? []) as CreditLedgerRow[] });
 });
 
+/** POST /v1/me/api-keys/:id/revoke — soft-revoke (sets revoked_at, never deletes). */
+meRoutes.post("/api-keys/:id/revoke", async (c) => {
+  const authUser = authedUser(c);
+  const id = c.req.param("id");
+
+  const { data, error } = await supabase()
+    .from("api_keys")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("user_id", authUser.id)
+    .select("id, name, prefix, created_at, last_used_at, revoked_at")
+    .single();
+
+  if (error || !data) {
+    return c.json(
+      {
+        error: {
+          message: "API key not found.",
+          code: "api_key_not_found",
+          type: "not_found",
+        },
+      },
+      404
+    );
+  }
+
+  return c.json({
+    api_key: {
+      id: data.id,
+      name: data.name,
+      key_prefix: data.prefix,
+      status: "revoked" as const,
+      created_at: data.created_at,
+      last_used_at: data.last_used_at,
+    },
+  });
+});
+
 meRoutes.get("/api-keys", async (c) => {
   const user = authedUser(c);
   const { data, error } = await supabase()
@@ -188,43 +226,6 @@ meRoutes.post("/api-keys", async (c) => {
     },
     201
   );
-});
-
-meRoutes.post("/api-keys/:id/revoke", async (c) => {
-  const authUser = authedUser(c);
-  const id = c.req.param("id");
-
-  const { data, error } = await supabase()
-    .from("api_keys")
-    .update({ revoked_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("user_id", authUser.id)
-    .select("id, name, prefix, created_at, last_used_at, revoked_at")
-    .single();
-
-  if (error || !data) {
-    return c.json(
-      {
-        error: {
-          message: "API key not found",
-          code: "api_key_not_found",
-          type: "not_found",
-        },
-      },
-      404
-    );
-  }
-
-  return c.json({
-    api_key: {
-      id: data.id,
-      name: data.name,
-      key_prefix: data.prefix,
-      status: "revoked" as const,
-      created_at: data.created_at,
-      last_used_at: data.last_used_at,
-    },
-  });
 });
 
 meRoutes.get("/usage", async (c) => {

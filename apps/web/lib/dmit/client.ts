@@ -409,19 +409,65 @@ export async function createApiKey(
   return parseCreateApiKeyResponse(raw);
 }
 
+/** POST /v1/me/api-keys/:id/revoke — soft-revoke; key stays in the list. */
+export function parseRevokeApiKeyResponse(raw: unknown): RevokeApiKeyResponse {
+  if (!raw || typeof raw !== "object") {
+    throw new DmitApiError({
+      status: 500,
+      message: "Invalid API key revoke response.",
+      code: "invalid_revoke_response",
+    });
+  }
+
+  const body = raw as Record<string, unknown>;
+  const apiKeyRaw =
+    body.api_key && typeof body.api_key === "object"
+      ? (body.api_key as Record<string, unknown>)
+      : null;
+
+  if (!apiKeyRaw || typeof apiKeyRaw.id !== "string") {
+    throw new DmitApiError({
+      status: 500,
+      message: "API key metadata missing from revoke response.",
+      code: "missing_revoke_metadata",
+    });
+  }
+
+  const api_key: MeApiKeyMetadata = {
+    id: apiKeyRaw.id,
+    name:
+      typeof apiKeyRaw.name === "string" ? apiKeyRaw.name : "API Key",
+    key_prefix:
+      readNonEmptyString(apiKeyRaw, "key_prefix") ??
+      readNonEmptyString(apiKeyRaw, "prefix") ??
+      "",
+    status: "revoked",
+    created_at:
+      typeof apiKeyRaw.created_at === "string"
+        ? apiKeyRaw.created_at
+        : new Date().toISOString(),
+    last_used_at:
+      typeof apiKeyRaw.last_used_at === "string"
+        ? apiKeyRaw.last_used_at
+        : null,
+  };
+
+  return { api_key };
+}
+
 export async function revokeApiKey(
   id: string,
   auth: DmitSessionAuth
 ): Promise<RevokeApiKeyResponse> {
   const accessToken = requireDmitAccessToken(auth.accessToken);
-  const baseUrl = getDmitBaseUrl();
-  return dmitFetch<RevokeApiKeyResponse>(
-    `${baseUrl}/v1/me/api-keys/${encodeURIComponent(id)}/revoke`,
+  const raw = await dmitFetch<unknown>(
+    `/v1/me/api-keys/${encodeURIComponent(id)}/revoke`,
     {
       method: "POST",
       accessToken,
     }
   );
+  return parseRevokeApiKeyResponse(raw);
 }
 
 // ---------------------------------------------------------------------------
