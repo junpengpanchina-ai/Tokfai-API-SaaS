@@ -26,6 +26,7 @@ import {
   createApiKey,
   DmitApiError,
   getDmitBaseUrl,
+  revealMeApiKey,
   revokeApiKey,
   type CreateApiKeyResponse,
   type MeApiKeyMetadata,
@@ -44,6 +45,7 @@ export interface ApiKeyListItem {
   created_at: string;
   last_used_at: string | null;
   revoked_at?: string | null;
+  can_reveal: boolean;
 }
 
 interface ActionErrorState {
@@ -75,6 +77,8 @@ export function ApiKeysClient({
   const [copyFullKeyStatus, setCopyFullKeyStatus] = useState<"idle" | "copied">(
     "idle"
   );
+  const [copiedFullKeyId, setCopiedFullKeyId] = useState<string | null>(null);
+  const [revealingId, setRevealingId] = useState<string | null>(null);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
@@ -91,13 +95,18 @@ export function ApiKeysClient({
         trimmed ? { name: trimmed } : {},
         { accessToken }
       );
-      setOneTimeSecret(result.one_time_secret);
+      setOneTimeSecret(result.secret);
       setCreatedKey(result.api_key);
       setCopyFullKeyStatus("idle");
       applyCreateResult(result);
       setNewName("");
     } catch (err) {
-      setCreateError(toActionError(err));
+      setCreateError(
+        toActionError(err, {
+          method: "POST",
+          url: `${getDmitBaseUrl()}/v1/me/api-keys`,
+        })
+      );
     } finally {
       setCreating(false);
     }
@@ -125,6 +134,7 @@ export function ApiKeysClient({
         ...key,
         status: "revoked",
         revoked_at: revokedAt,
+        can_reveal: false,
       };
       setKeys((prev) =>
         prev.map((row) => (row.id === key.id ? updated : row))
@@ -133,6 +143,33 @@ export function ApiKeysClient({
       setRevokeError(toRevokeActionError(err));
     } finally {
       setRevokingId(null);
+    }
+  }
+
+  async function handleRevealAndCopy(key: ApiKeyListItem) {
+    if (key.status !== "active" || !key.can_reveal || revealingId) return;
+
+    setRevealingId(key.id);
+    setRevokeError(null);
+
+    try {
+      const secret = await revealMeApiKey(key.id, { accessToken });
+      const ok = await copyToClipboard(secret);
+      if (ok) {
+        setCopiedFullKeyId(key.id);
+        window.setTimeout(() => setCopiedFullKeyId(null), 2000);
+      }
+    } catch (err) {
+      setRevokeError(
+        toActionError(err, {
+          method: "POST",
+          url: `${getDmitBaseUrl()}/v1/me/api-keys/${encodeURIComponent(
+            key.id
+          )}/reveal`,
+        })
+      );
+    } finally {
+      setRevealingId(null);
     }
   }
 
@@ -170,7 +207,7 @@ export function ApiKeysClient({
         <p className="mt-1 text-sm text-muted-foreground">
           Create keys to authenticate against{" "}
           <code className="rounded bg-muted px-1 text-xs">{TOKFAI_API_BASE_URL}</code>.
-          Full secrets are shown only once at creation.
+          Full active keys can be copied again while encrypted storage is available.
         </p>
       </div>
 
@@ -216,9 +253,8 @@ export function ApiKeysClient({
         <CardHeader>
           <CardTitle>Your API keys</CardTitle>
           <CardDescription>
-            Only prefixes are shown here. Full secrets cannot be retrieved after
-            creation. Full keys are shown only once after creation. Existing
-            keys cannot be copied again.
+            Prefixes are safe labels. Use Copy full key for active keys that can
+            still be revealed.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -228,7 +264,10 @@ export function ApiKeysClient({
           {keys.length > 0 ? (
             <ApiKeysTable
               keys={keys}
+              copiedFullKeyId={copiedFullKeyId}
+              revealingId={revealingId}
               revokingId={revokingId}
+              onRevealAndCopy={handleRevealAndCopy}
               onRevoke={handleRevoke}
             />
           ) : (
@@ -306,11 +345,17 @@ function OneTimeSecretCard({
 
 function ApiKeysTable({
   keys,
+  copiedFullKeyId,
+  revealingId,
   revokingId,
+  onRevealAndCopy,
   onRevoke,
 }: {
   keys: ApiKeyListItem[];
+  copiedFullKeyId: string | null;
+  revealingId: string | null;
   revokingId: string | null;
+  onRevealAndCopy: (key: ApiKeyListItem) => void;
   onRevoke: (key: ApiKeyListItem) => void;
 }) {
   const [copiedPrefixId, setCopiedPrefixId] = useState<string | null>(null);
@@ -339,6 +384,7 @@ function ApiKeysTable({
         <tbody>
           {keys.map((key) => {
             const isRevoking = revokingId === key.id;
+            const isRevealing = revealingId === key.id;
             const isActive = key.status === "active";
             return (
               <tr key={key.id} className="border-b last:border-0">
@@ -376,23 +422,65 @@ function ApiKeysTable({
                       )}
                     </Button>
                     {isActive ? (
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        disabled={revokingId != null}
-                        onClick={() => onRevoke(key)}
-                      >
-                        {isRevoking ? (
-                          <>
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            Revoking...
-                          </>
+                      <>
+                        {key.can_reveal ? (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            disabled={revealingId != null}
+                            onClick={() => onRevealAndCopy(key)}
+                          >
+                            {isRevealing ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                Copying...
+                              </>
+                            ) : copiedFullKeyId === key.id ? (
+                              <>
+                                <Check className="h-3.5 w-3.5" />
+                                Copied
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-3.5 w-3.5" />
+                                Copy full key
+                              </>
+                            )}
+                          </Button>
                         ) : (
-                          "Revoke"
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled
+                            title="This key cannot be revealed. Please create a new one."
+                          >
+                            Secret unavailable
+                          </Button>
                         )}
-                      </Button>
-                    ) : null}
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          disabled={revokingId != null}
+                          onClick={() => onRevoke(key)}
+                        >
+                          {isRevoking ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              Revoking...
+                            </>
+                          ) : (
+                            "Revoke"
+                          )}
+                        </Button>
+                      </>
+                    ) : (
+                      <span className="text-xs font-medium text-muted-foreground">
+                        Revoked
+                      </span>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -428,6 +516,8 @@ function ActionErrorAlert({
               </>
             ) : null}
             status={error.status} code={error.code ?? "n/a"}
+            <br />
+            message={error.message}
           </p>
         </div>
       </CardContent>
@@ -448,8 +538,8 @@ function EmptyState() {
         <KeyRound className="h-5 w-5" />
       </div>
       <p className="max-w-sm text-sm text-muted-foreground">
-        No API keys yet. Create your first key above, then use the prefix shown
-        here — full secrets are never displayed again.
+        No API keys yet. Create your first key above, then use it from the
+        creation card or copy it later from this list.
       </p>
       <Button type="button" size="sm" variant="outline" asChild>
         <a href="#create-api-key">Create API key</a>
@@ -467,6 +557,7 @@ type MeKeyLike = {
   revoked_at?: string | null;
   prefix?: string;
   key_prefix?: string;
+  can_reveal?: boolean;
 };
 
 function meKeyToListItem(key: MeKeyLike): ApiKeyListItem {
@@ -478,11 +569,15 @@ function meKeyToListItem(key: MeKeyLike): ApiKeyListItem {
     created_at: key.created_at,
     last_used_at: key.last_used_at,
     revoked_at: key.revoked_at ?? null,
+    can_reveal: Boolean(key.can_reveal && !key.revoked_at),
   };
 }
 
 function toRevokeActionError(err: unknown): ActionErrorState {
-  const base = toActionError(err);
+  const base = toActionError(err, {
+    method: "POST",
+    url: `${getDmitBaseUrl()}/v1/me/api-keys/revoke`,
+  });
   if (base.method && base.url) return base;
   return {
     ...base,
@@ -493,25 +588,32 @@ function toRevokeActionError(err: unknown): ActionErrorState {
   };
 }
 
-function toActionError(err: unknown): ActionErrorState {
+function toActionError(
+  err: unknown,
+  fallback?: { method: string; url: string }
+): ActionErrorState {
   if (err instanceof DmitApiError) {
     return {
       message: userMessageForDashboardError(err.status, err.code, err.message),
       status: err.status,
       code: err.code,
-      method: err.requestMethod,
-      url: err.requestUrl,
+      method: err.requestMethod ?? fallback?.method,
+      url: err.requestUrl ?? fallback?.url,
     };
   }
   if (err instanceof Error) {
     return {
       message: userMessageForDmitError(0, undefined, err.message),
       status: 0,
+      method: fallback?.method,
+      url: fallback?.url,
     };
   }
   return {
     message: userMessageForDashboardError(500),
     status: 500,
+    method: fallback?.method,
+    url: fallback?.url,
   };
 }
 

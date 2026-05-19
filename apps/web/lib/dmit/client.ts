@@ -156,7 +156,7 @@ export async function dmitFetch<T = unknown>(
   const parsed = parseJson(text);
 
   if (!res.ok) {
-    throw toApiError(res.status, parsed);
+    throw toApiError(res.status, parsed, init.method, url);
   }
 
   return parsed as T;
@@ -190,7 +190,12 @@ function parseJson(text: string): unknown {
   }
 }
 
-function toApiError(status: number, body: unknown): DmitApiError {
+function toApiError(
+  status: number,
+  body: unknown,
+  method?: string,
+  url?: string
+): DmitApiError {
   let message = `DMIT request failed (HTTP ${status}).`;
   let code: string | undefined;
   let type: string | undefined;
@@ -209,7 +214,15 @@ function toApiError(status: number, body: unknown): DmitApiError {
     message = body;
   }
 
-  return new DmitApiError({ status, message, code, type, body });
+  return new DmitApiError({
+    status,
+    message,
+    code,
+    type,
+    body,
+    requestMethod: method,
+    requestUrl: url,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -286,6 +299,11 @@ export async function revealApiKey(
 }
 
 export interface RevokeApiKeyResponse {
+  api_key?: {
+    id: string;
+    status: "revoked";
+    revoked_at: string;
+  };
   data: {
     id: string;
     status: "revoked";
@@ -305,10 +323,13 @@ export interface MeApiKeyMetadata {
   created_at: string;
   last_used_at: string | null;
   revoked_at?: string | null;
+  can_reveal: boolean;
 }
 
 export type CreateApiKeyResponse = {
   api_key: MeApiKeyMetadata;
+  secret: string;
+  /** Backwards-compatible alias for older dashboard callers. */
   one_time_secret: string;
 };
 
@@ -341,10 +362,10 @@ export function parseCreateApiKeyResponse(raw: unknown): CreateApiKeyResponse {
 
   const body = raw as Record<string, unknown>;
 
-  // Prefer one_time_secret; accept legacy top-level secret until api.tokfai.com is redeployed.
+  // Prefer the current top-level secret; accept one_time_secret from older DMIT builds.
   const oneTimeSecret =
-    readNonEmptyString(body, "one_time_secret") ??
-    readNonEmptyString(body, "secret");
+    readNonEmptyString(body, "secret") ??
+    readNonEmptyString(body, "one_time_secret");
   if (!oneTimeSecret) {
     throw new DmitApiError({
       status: 500,
@@ -401,12 +422,18 @@ export function parseCreateApiKeyResponse(raw: unknown): CreateApiKeyResponse {
       typeof apiKeyRaw.last_used_at === "string"
         ? apiKeyRaw.last_used_at
         : null,
+    revoked_at:
+      typeof apiKeyRaw.revoked_at === "string" ? apiKeyRaw.revoked_at : null,
+    can_reveal:
+      typeof apiKeyRaw.can_reveal === "boolean"
+        ? apiKeyRaw.can_reveal
+        : status === "active",
   };
 
-  return { api_key, one_time_secret: oneTimeSecret };
+  return { api_key, secret: oneTimeSecret, one_time_secret: oneTimeSecret };
 }
 
-/** POST /v1/me/api-keys — returns full secret once in `one_time_secret`. */
+/** POST /v1/me/api-keys — returns the full secret in `secret`. */
 export async function createApiKey(
   input: CreateMeApiKeyInput,
   auth: DmitSessionAuth
@@ -434,6 +461,8 @@ export function parseRevokeApiKeyResponse(raw: unknown): RevokeApiKeyResponse {
   const dataRaw =
     body.data && typeof body.data === "object"
       ? (body.data as Record<string, unknown>)
+      : body.api_key && typeof body.api_key === "object"
+        ? (body.api_key as Record<string, unknown>)
       : null;
 
   if (
@@ -448,12 +477,15 @@ export function parseRevokeApiKeyResponse(raw: unknown): RevokeApiKeyResponse {
     });
   }
 
+  const apiKey = {
+    id: dataRaw.id,
+    status: "revoked" as const,
+    revoked_at: dataRaw.revoked_at,
+  };
+
   return {
-    data: {
-      id: dataRaw.id,
-      status: "revoked",
-      revoked_at: dataRaw.revoked_at,
-    },
+    api_key: apiKey,
+    data: apiKey,
   };
 }
 
@@ -487,6 +519,42 @@ export async function revokeApiKey(
     }
     throw err;
   }
+}
+
+export interface RevealMeApiKeyResponse {
+  ok?: boolean;
+  secret?: string;
+  data?: {
+    secret?: string;
+  };
+}
+
+/** POST /v1/me/api-keys/:id/reveal — explicit owner copy request. */
+export async function revealMeApiKey(
+  id: string,
+  auth: DmitSessionAuth
+): Promise<string> {
+  const accessToken = requireDmitAccessToken(auth.accessToken);
+  const raw = await dmitFetch<RevealMeApiKeyResponse>(
+    `/v1/me/api-keys/${encodeURIComponent(id)}/reveal`,
+    {
+      method: "POST",
+      accessToken,
+    }
+  );
+  const secret = raw.secret ?? raw.data?.secret;
+  if (!secret) {
+    throw new DmitApiError({
+      status: 500,
+      message: "API key secret missing from reveal response.",
+      code: "missing_reveal_secret",
+      requestMethod: "POST",
+      requestUrl: `${getDmitBaseUrl()}/v1/me/api-keys/${encodeURIComponent(
+        id
+      )}/reveal`,
+    });
+  }
+  return secret;
 }
 
 // ---------------------------------------------------------------------------
@@ -723,7 +791,7 @@ async function dmitFetchWithHeaders<T = unknown>(
   const parsed = parseJson(text);
 
   if (!response.ok) {
-    throw toApiError(response.status, parsed);
+    throw toApiError(response.status, parsed, init.method, url);
   }
 
   return { data: parsed as T, headers: response.headers };

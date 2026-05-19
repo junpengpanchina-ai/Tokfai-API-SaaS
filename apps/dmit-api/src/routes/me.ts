@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 
 import { generateApiKey } from "../auth/apiKey.js";
-import { encryptSecret } from "../auth/keyEncryption.js";
+import { decryptSecret, encryptSecret } from "../auth/keyEncryption.js";
 import { ApiError } from "../errors.js";
 import { requireSupabaseJwt } from "../middleware/supabaseJwt.js";
 import { supabase } from "../supabase.js";
@@ -131,6 +131,12 @@ meRoutes.post("/api-keys/revoke", async (c) => {
   }
 
   return c.json({
+    ok: true,
+    api_key: {
+      id: data.id,
+      status: "revoked",
+      revoked_at: data.revoked_at,
+    },
     data: {
       id: data.id,
       status: "revoked",
@@ -184,7 +190,7 @@ meRoutes.get("/api-keys", async (c) => {
   const user = authedUser(c);
   const { data, error } = await supabase()
     .from("api_keys")
-    .select("id, name, prefix, created_at, last_used_at, revoked_at")
+    .select("id, name, prefix, created_at, last_used_at, revoked_at, encrypted_secret")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
@@ -197,7 +203,13 @@ meRoutes.get("/api-keys", async (c) => {
 
   const keys = ((data ?? []) as Pick<
     ApiKeyRow,
-    "id" | "name" | "prefix" | "created_at" | "last_used_at" | "revoked_at"
+    | "id"
+    | "name"
+    | "prefix"
+    | "created_at"
+    | "last_used_at"
+    | "revoked_at"
+    | "encrypted_secret"
   >[]).map((key) => ({
     id: key.id,
     name: key.name,
@@ -205,9 +217,11 @@ meRoutes.get("/api-keys", async (c) => {
     status: key.revoked_at ? "revoked" : "active",
     created_at: key.created_at,
     last_used_at: key.last_used_at,
+    revoked_at: key.revoked_at,
+    can_reveal: Boolean(key.encrypted_secret && !key.revoked_at),
   }));
 
-  return c.json({ ok: true, keys });
+  return c.json({ data: keys });
 });
 
 meRoutes.post("/api-keys", async (c) => {
@@ -242,6 +256,30 @@ meRoutes.post("/api-keys", async (c) => {
     );
   }
 
+  const { data: existingKey, error: existingKeyError } = await supabase()
+    .from("api_keys")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("name", name)
+    .is("revoked_at", null)
+    .maybeSingle();
+
+  if (existingKeyError) {
+    throw ApiError.internal(
+      `Failed to check API key name uniqueness: ${existingKeyError.message}`,
+      "me_api_keys_name_check_failed"
+    );
+  }
+
+  if (existingKey) {
+    throw new ApiError({
+      status: 409,
+      message: "An active API key with this name already exists.",
+      code: "api_key_name_exists",
+      type: "validation_error",
+    });
+  }
+
   const material = generateApiKey();
   const plainKey = material.fullKey;
   const keyHash = material.hash;
@@ -269,6 +307,7 @@ meRoutes.post("/api-keys", async (c) => {
 
   return c.json(
     {
+      ok: true,
       api_key: {
         id: data.id,
         name: data.name,
@@ -276,12 +315,57 @@ meRoutes.post("/api-keys", async (c) => {
         status: data.revoked_at ? "revoked" : "active",
         created_at: data.created_at,
         last_used_at: data.last_used_at,
+        revoked_at: data.revoked_at,
+        can_reveal: !data.revoked_at,
       },
-      /** Full plaintext key — only on POST create; never on GET list. */
-      one_time_secret: plainKey,
+      /** Full plaintext key — only on POST create or explicit owner reveal. */
+      secret: plainKey,
     },
     201
   );
+});
+
+meRoutes.post("/api-keys/:id/reveal", async (c) => {
+  const user = authedUser(c);
+  const id = c.req.param("id");
+
+  const { data, error } = await supabase()
+    .from("api_keys")
+    .select<string, { encrypted_secret: string | null; revoked_at: string | null }>(
+      "encrypted_secret, revoked_at"
+    )
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (error) {
+    throw ApiError.internal(
+      `Failed to reveal API key: ${error.message}`,
+      "me_api_keys_reveal_failed"
+    );
+  }
+  if (!data) {
+    throw ApiError.notFound("API key not found.", "api_key_not_found");
+  }
+  if (data.revoked_at) {
+    throw ApiError.forbidden(
+      "Revoked API keys cannot be revealed.",
+      "api_key_revoked"
+    );
+  }
+  if (!data.encrypted_secret) {
+    throw new ApiError({
+      status: 409,
+      message: "This key cannot be revealed. Please create a new one.",
+      code: "api_key_secret_unavailable",
+      type: "validation_error",
+    });
+  }
+
+  return c.json({
+    ok: true,
+    secret: decryptSecret(data.encrypted_secret),
+  });
 });
 
 meRoutes.get("/usage", async (c) => {

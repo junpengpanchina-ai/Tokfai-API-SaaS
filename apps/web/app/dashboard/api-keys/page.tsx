@@ -9,7 +9,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { DmitServerError, dmitServerFetch } from "@/lib/dmit/server";
+import {
+  DmitServerError,
+  dmitServerFetch,
+  getDmitBaseUrl,
+} from "@/lib/dmit/server";
 import { createClient } from "@/lib/supabase/server";
 
 import {
@@ -25,10 +29,18 @@ export const dynamic = "force-dynamic";
 
 type ApiKeysState =
   | { status: "ready"; keys: ApiKeyListItem[] }
-  | { status: "error"; message: string; code?: string; httpStatus?: number };
+  | {
+      status: "error";
+      message: string;
+      code?: string;
+      httpStatus?: number;
+      method: string;
+      url: string;
+    };
 
 export default async function ApiKeysPage() {
   noStore();
+  const apiKeysUrl = `${getDmitBaseUrl()}/v1/me/api-keys`;
 
   const supabase = createClient();
   const {
@@ -51,6 +63,8 @@ export default async function ApiKeysPage() {
           message: "登录状态异常，请重新登录。",
           code: "missing_session",
           httpStatus: 401,
+          method: "GET",
+          url: apiKeysUrl,
         }}
       />
     );
@@ -71,12 +85,16 @@ export default async function ApiKeysPage() {
 }
 
 async function loadApiKeys(accessToken: string): Promise<ApiKeysState> {
+  const path = "/v1/me/api-keys";
+  const url = `${getDmitBaseUrl()}${path}`;
   try {
-    const res = await dmitServerFetch<{ ok: true; keys: ApiKeyListItem[] }>(
-      "/v1/me/api-keys",
-      accessToken
-    );
-    return { status: "ready", keys: res.keys };
+    const res = await dmitServerFetch<
+      { data: ApiKeyListItem[] } | { ok: true; keys: ApiKeyListItem[] }
+    >(path, accessToken);
+    return {
+      status: "ready",
+      keys: "data" in res ? res.data : res.keys,
+    };
   } catch (err) {
     if (err instanceof DmitServerError) {
       return {
@@ -87,11 +105,15 @@ async function loadApiKeys(accessToken: string): Promise<ApiKeysState> {
             : "API Keys 暂时无法加载，请稍后重试。",
         code: err.code,
         httpStatus: err.status,
+        method: "GET",
+        url,
       };
     }
     return {
       status: "error",
       message: "API Keys 暂时无法加载，请稍后重试。",
+      method: "GET",
+      url,
     };
   }
 }
@@ -126,7 +148,11 @@ function ApiKeysError({
         <CardDescription>{state.message}</CardDescription>
       </CardHeader>
       <CardContent className="font-mono text-xs text-muted-foreground">
+        method={state.method} url={state.url}
+        <br />
         status={state.httpStatus ?? "n/a"} code={state.code ?? "n/a"}
+        <br />
+        message={state.message}
       </CardContent>
     </Card>
   );
