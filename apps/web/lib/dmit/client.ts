@@ -330,7 +330,10 @@ export function parseCreateApiKeyResponse(raw: unknown): CreateApiKeyResponse {
 
   const body = raw as Record<string, unknown>;
 
-  const oneTimeSecret = readNonEmptyString(body, "one_time_secret");
+  // Prefer one_time_secret; accept legacy top-level secret until api.tokfai.com is redeployed.
+  const oneTimeSecret =
+    readNonEmptyString(body, "one_time_secret") ??
+    readNonEmptyString(body, "secret");
   if (!oneTimeSecret) {
     throw new DmitApiError({
       status: 500,

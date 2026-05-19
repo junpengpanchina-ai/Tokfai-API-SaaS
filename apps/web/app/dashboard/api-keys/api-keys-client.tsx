@@ -27,6 +27,7 @@ import {
   DmitApiError,
   revokeApiKey,
   type CreateApiKeyResponse,
+  type MeApiKeyMetadata,
 } from "@/lib/dmit/client";
 import {
   userMessageForDashboardError,
@@ -66,6 +67,7 @@ export function ApiKeysClient({
   const [revokeError, setRevokeError] = useState<ActionErrorState | null>(null);
   /** Full secret — React state only; never persisted. */
   const [oneTimeSecret, setOneTimeSecret] = useState<string | null>(null);
+  const [createdKey, setCreatedKey] = useState<MeApiKeyMetadata | null>(null);
   const [copyFullKeyStatus, setCopyFullKeyStatus] = useState<"idle" | "copied">(
     "idle"
   );
@@ -86,6 +88,7 @@ export function ApiKeysClient({
         { accessToken }
       );
       setOneTimeSecret(result.one_time_secret);
+      setCreatedKey(result.api_key);
       setCopyFullKeyStatus("idle");
       applyCreateResult(result);
       setNewName("");
@@ -137,6 +140,7 @@ export function ApiKeysClient({
 
   function dismissOneTimeSecret() {
     setOneTimeSecret(null);
+    setCreatedKey(null);
     setCopyFullKeyStatus("idle");
   }
 
@@ -145,6 +149,7 @@ export function ApiKeysClient({
       {oneTimeSecret ? (
         <OneTimeSecretCard
           secret={oneTimeSecret}
+          keyName={createdKey?.name}
           copyStatus={copyFullKeyStatus}
           onCopy={handleCopyFullKey}
           onDismiss={dismissOneTimeSecret}
@@ -227,11 +232,13 @@ export function ApiKeysClient({
 
 function OneTimeSecretCard({
   secret,
+  keyName,
   copyStatus,
   onCopy,
   onDismiss,
 }: {
   secret: string;
+  keyName?: string;
   copyStatus: "idle" | "copied";
   onCopy: () => void;
   onDismiss: () => void;
@@ -251,7 +258,7 @@ function OneTimeSecretCard({
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-lg text-emerald-950 dark:text-emerald-50">
           <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
-          API key created
+          {keyName ? `API key created: ${keyName}` : "API key created"}
         </CardTitle>
         <CardDescription className="text-base text-emerald-900/90 dark:text-emerald-100/90">
           This key is shown only once. Copy it now.
