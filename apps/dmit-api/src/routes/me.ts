@@ -191,30 +191,31 @@ meRoutes.post("/api-keys", async (c) => {
 });
 
 meRoutes.post("/api-keys/:id/revoke", async (c) => {
-  const user = authedUser(c);
+  const authUser = authedUser(c);
   const id = c.req.param("id");
-  const revokedAt = new Date().toISOString();
 
   const { data, error } = await supabase()
     .from("api_keys")
-    .update({ revoked_at: revokedAt })
+    .update({ revoked_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", authUser.id)
     .select("id, name, prefix, created_at, last_used_at, revoked_at")
-    .maybeSingle();
+    .single();
 
-  if (error) {
-    throw ApiError.internal(
-      `Failed to revoke API key: ${error.message}`,
-      "me_api_keys_revoke_failed"
+  if (error || !data) {
+    return c.json(
+      {
+        error: {
+          message: "API key not found",
+          code: "api_key_not_found",
+          type: "not_found",
+        },
+      },
+      404
     );
-  }
-  if (!data) {
-    throw ApiError.notFound("API key not found.", "key_not_found");
   }
 
   return c.json({
-    ok: true,
     api_key: {
       id: data.id,
       name: data.name,

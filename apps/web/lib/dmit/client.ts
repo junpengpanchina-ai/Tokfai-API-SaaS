@@ -279,15 +279,8 @@ export async function revealApiKey(
   return res.data.secret;
 }
 
-export async function revokeApiKey(
-  id: string,
-  auth: DmitSessionAuth
-): Promise<void> {
-  const accessToken = requireDmitAccessToken(auth.accessToken);
-  await dmitFetch<void>(`/v1/keys/${encodeURIComponent(id)}`, {
-    method: "DELETE",
-    accessToken,
-  });
+export interface RevokeApiKeyResponse {
+  api_key: MeApiKeyMetadata;
 }
 
 // ---------------------------------------------------------------------------
@@ -413,25 +406,14 @@ export async function createApiKey(
   return parseCreateApiKeyResponse(raw);
 }
 
-export interface RevokeMeApiKeyResponse {
-  ok: true;
-  api_key: {
-    id: string;
-    name: string;
-    key_prefix: string;
-    status: "revoked";
-    created_at: string;
-    last_used_at: string | null;
-  };
-}
-
-export async function revokeMeApiKey(
+export async function revokeApiKey(
   id: string,
   auth: DmitSessionAuth
-): Promise<RevokeMeApiKeyResponse> {
+): Promise<RevokeApiKeyResponse> {
   const accessToken = requireDmitAccessToken(auth.accessToken);
-  return dmitFetch<RevokeMeApiKeyResponse>(
-    `/v1/me/api-keys/${encodeURIComponent(id)}/revoke`,
+  const baseUrl = getDmitBaseUrl();
+  return dmitFetch<RevokeApiKeyResponse>(
+    `${baseUrl}/v1/me/api-keys/${encodeURIComponent(id)}/revoke`,
     {
       method: "POST",
       accessToken,

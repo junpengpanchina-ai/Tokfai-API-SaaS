@@ -25,7 +25,7 @@ import { Label } from "@/components/ui/label";
 import {
   createApiKey,
   DmitApiError,
-  revokeMeApiKey,
+  revokeApiKey,
   type CreateApiKeyResponse,
 } from "@/lib/dmit/client";
 import {
@@ -112,7 +112,7 @@ export function ApiKeysClient({
     setRevokeError(null);
 
     try {
-      const res = await revokeMeApiKey(key.id, { accessToken });
+      const res = await revokeApiKey(key.id, { accessToken });
       const updated = meKeyToListItem(res.api_key);
       setKeys((prev) =>
         prev.map((row) => (row.id === updated.id ? updated : row))
@@ -254,8 +254,7 @@ function OneTimeSecretCard({
           API key created
         </CardTitle>
         <CardDescription className="text-base text-emerald-900/90 dark:text-emerald-100/90">
-          This key is shown only once. Copy it now. You will not be able to view
-          it again.
+          This key is shown only once. Copy it now.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
