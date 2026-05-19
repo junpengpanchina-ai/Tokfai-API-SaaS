@@ -86,6 +86,59 @@ meRoutes.get("/credits/ledger", async (c) => {
   return c.json({ data: (data ?? []) as CreditLedgerRow[] });
 });
 
+/** POST /v1/me/api-keys/revoke — stable body route for dashboard revoke. */
+meRoutes.post("/api-keys/revoke", async (c) => {
+  const user = authedUser(c);
+  const body = (await c.req.json().catch(() => null)) as
+    | { id?: unknown }
+    | null;
+  const id = typeof body?.id === "string" ? body.id.trim() : "";
+
+  if (!id) {
+    return c.json(
+      {
+        error: {
+          message: "Missing API key id",
+          code: "missing_api_key_id",
+          type: "bad_request",
+        },
+      },
+      400
+    );
+  }
+
+  const revokedAt = new Date().toISOString();
+  const { data, error } = await supabase()
+    .from("api_keys")
+    .update({ revoked_at: revokedAt })
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .is("revoked_at", null)
+    .select("id, revoked_at")
+    .single();
+
+  if (error || !data) {
+    return c.json(
+      {
+        error: {
+          message: "API key not found",
+          code: "api_key_not_found",
+          type: "not_found",
+        },
+      },
+      404
+    );
+  }
+
+  return c.json({
+    data: {
+      id: data.id,
+      status: "revoked",
+      revoked_at: data.revoked_at,
+    },
+  });
+});
+
 /** POST /v1/me/api-keys/:id/revoke — soft-revoke (sets revoked_at, never deletes). */
 meRoutes.post("/api-keys/:id/revoke", async (c) => {
   const userId = c.get("userId" as never) as string;

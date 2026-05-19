@@ -286,7 +286,11 @@ export async function revealApiKey(
 }
 
 export interface RevokeApiKeyResponse {
-  api_key: MeApiKeyMetadata;
+  data: {
+    id: string;
+    status: "revoked";
+    revoked_at: string;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -416,7 +420,7 @@ export async function createApiKey(
   return parseCreateApiKeyResponse(raw);
 }
 
-/** POST /v1/me/api-keys/:id/revoke — soft-revoke; key stays in the list. */
+/** POST /v1/me/api-keys/revoke — soft-revoke; key stays in the list. */
 export function parseRevokeApiKeyResponse(raw: unknown): RevokeApiKeyResponse {
   if (!raw || typeof raw !== "object") {
     throw new DmitApiError({
@@ -427,12 +431,16 @@ export function parseRevokeApiKeyResponse(raw: unknown): RevokeApiKeyResponse {
   }
 
   const body = raw as Record<string, unknown>;
-  const apiKeyRaw =
-    body.api_key && typeof body.api_key === "object"
-      ? (body.api_key as Record<string, unknown>)
+  const dataRaw =
+    body.data && typeof body.data === "object"
+      ? (body.data as Record<string, unknown>)
       : null;
 
-  if (!apiKeyRaw || typeof apiKeyRaw.id !== "string") {
+  if (
+    !dataRaw ||
+    typeof dataRaw.id !== "string" ||
+    typeof dataRaw.revoked_at !== "string"
+  ) {
     throw new DmitApiError({
       status: 500,
       message: "API key metadata missing from revoke response.",
@@ -440,30 +448,13 @@ export function parseRevokeApiKeyResponse(raw: unknown): RevokeApiKeyResponse {
     });
   }
 
-  const revoked_at =
-    typeof apiKeyRaw.revoked_at === "string" ? apiKeyRaw.revoked_at : null;
-
-  const api_key: MeApiKeyMetadata = {
-    id: apiKeyRaw.id,
-    name:
-      typeof apiKeyRaw.name === "string" ? apiKeyRaw.name : "API Key",
-    key_prefix:
-      readNonEmptyString(apiKeyRaw, "key_prefix") ??
-      readNonEmptyString(apiKeyRaw, "prefix") ??
-      "",
-    status: revoked_at ? "revoked" : "active",
-    created_at:
-      typeof apiKeyRaw.created_at === "string"
-        ? apiKeyRaw.created_at
-        : new Date().toISOString(),
-    last_used_at:
-      typeof apiKeyRaw.last_used_at === "string"
-        ? apiKeyRaw.last_used_at
-        : null,
-    revoked_at,
+  return {
+    data: {
+      id: dataRaw.id,
+      status: "revoked",
+      revoked_at: dataRaw.revoked_at,
+    },
   };
-
-  return { api_key };
 }
 
 export async function revokeApiKey(
@@ -471,13 +462,14 @@ export async function revokeApiKey(
   auth: DmitSessionAuth
 ): Promise<RevokeApiKeyResponse> {
   const accessToken = requireDmitAccessToken(auth.accessToken);
-  const path = `/v1/me/api-keys/${encodeURIComponent(id)}/revoke`;
+  const path = "/v1/me/api-keys/revoke";
   const requestUrl = `${getDmitBaseUrl()}${path}`;
   const requestMethod = "POST";
 
   try {
     const raw = await dmitFetch<unknown>(path, {
       method: requestMethod,
+      json: { id },
       accessToken,
     });
     return parseRevokeApiKeyResponse(raw);

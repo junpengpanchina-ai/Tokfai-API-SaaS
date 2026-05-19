@@ -120,12 +120,17 @@ export function ApiKeysClient({
 
     try {
       const res = await revokeApiKey(key.id, { accessToken });
-      const updated = meKeyToListItem(res.api_key);
+      const revokedAt = res.data.revoked_at || new Date().toISOString();
+      const updated: ApiKeyListItem = {
+        ...key,
+        status: "revoked",
+        revoked_at: revokedAt,
+      };
       setKeys((prev) =>
         prev.map((row) => (row.id === key.id ? updated : row))
       );
     } catch (err) {
-      setRevokeError(toRevokeActionError(err, key.id));
+      setRevokeError(toRevokeActionError(err));
     } finally {
       setRevokingId(null);
     }
@@ -212,7 +217,8 @@ export function ApiKeysClient({
           <CardTitle>Your API keys</CardTitle>
           <CardDescription>
             Only prefixes are shown here. Full secrets cannot be retrieved after
-            creation.
+            creation. Full keys are shown only once after creation. Existing
+            keys cannot be copied again.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -475,7 +481,7 @@ function meKeyToListItem(key: MeKeyLike): ApiKeyListItem {
   };
 }
 
-function toRevokeActionError(err: unknown, keyId: string): ActionErrorState {
+function toRevokeActionError(err: unknown): ActionErrorState {
   const base = toActionError(err);
   if (base.method && base.url) return base;
   return {
@@ -483,7 +489,7 @@ function toRevokeActionError(err: unknown, keyId: string): ActionErrorState {
     method: base.method ?? "POST",
     url:
       base.url ??
-      `${getDmitBaseUrl()}/v1/me/api-keys/${encodeURIComponent(keyId)}/revoke`,
+      `${getDmitBaseUrl()}/v1/me/api-keys/revoke`,
   };
 }
 
