@@ -320,7 +320,7 @@ export interface MeApiKeyMetadata {
 
 export interface CreateMeApiKeyResponse {
   api_key: MeApiKeyMetadata;
-  secret: string;
+  one_time_secret: string;
 }
 
 export interface CreateMeApiKeyInput {
@@ -364,16 +364,17 @@ export function parseCreateMeApiKeyResponse(raw: unknown): CreateMeApiKeyRespons
       ? (body.api_key as Record<string, unknown>)
       : null;
 
-  const secret =
+  const oneTimeSecret =
+    readNonEmptyString(body, "one_time_secret") ??
     readNonEmptyString(body, "secret") ??
     readNonEmptyString(body, "full_key") ??
     readNonEmptyString(body, "fullKey") ??
     readNonEmptyString(body, "token") ??
     (typeof body.key === "string" && !apiKeyRaw ? body.key.trim() : undefined) ??
-    (apiKeyRaw ? readNonEmptyString(apiKeyRaw, "secret") : undefined) ??
-    (apiKeyRaw ? readNonEmptyString(apiKeyRaw, "full_key") : undefined);
+    (apiKeyRaw ? readNonEmptyString(apiKeyRaw, "one_time_secret") : undefined) ??
+    (apiKeyRaw ? readNonEmptyString(apiKeyRaw, "secret") : undefined);
 
-  if (!secret) {
+  if (!oneTimeSecret) {
     throw new DmitApiError({
       status: 500,
       message:
@@ -417,7 +418,7 @@ export function parseCreateMeApiKeyResponse(raw: unknown): CreateMeApiKeyRespons
         : null,
   };
 
-  return { api_key, secret };
+  return { api_key, one_time_secret: oneTimeSecret };
 }
 
 export async function createMeApiKey(

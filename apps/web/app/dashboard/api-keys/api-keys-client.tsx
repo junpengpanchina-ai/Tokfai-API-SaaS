@@ -94,7 +94,7 @@ export function ApiKeysClient({
   }
 
   function applyCreateResult(result: CreateMeApiKeyResponse) {
-    const secret = result.secret.trim();
+    const secret = result.one_time_secret.trim();
     if (!secret) {
       setCreateError({
         message:
