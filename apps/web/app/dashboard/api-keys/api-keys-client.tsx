@@ -40,7 +40,7 @@ import { TOKFAI_API_BASE_URL } from "@/lib/tokfai-api";
 export interface ApiKeyListItem {
   id: string;
   name: string;
-  key_prefix: string;
+  prefix: string;
   status: "active" | "revoked" | string;
   created_at: string;
   last_used_at: string | null;
@@ -163,9 +163,7 @@ export function ApiKeysClient({
       setRevokeError(
         toActionError(err, {
           method: "POST",
-          url: `${getDmitBaseUrl()}/v1/me/api-keys/${encodeURIComponent(
-            key.id
-          )}/reveal`,
+          url: `${getDmitBaseUrl()}/v1/me/api-keys/reveal`,
         })
       );
     } finally {
@@ -361,7 +359,7 @@ function ApiKeysTable({
   const [copiedPrefixId, setCopiedPrefixId] = useState<string | null>(null);
 
   async function handleCopyPrefix(key: ApiKeyListItem) {
-    const ok = await copyToClipboard(key.key_prefix);
+    const ok = await copyToClipboard(key.prefix);
     if (ok) {
       setCopiedPrefixId(key.id);
       window.setTimeout(() => setCopiedPrefixId(null), 2000);
@@ -390,7 +388,7 @@ function ApiKeysTable({
               <tr key={key.id} className="border-b last:border-0">
                 <td className="py-3 pr-4 font-medium">{key.name}</td>
                 <td className="py-3 pr-4 font-mono text-xs text-muted-foreground">
-                  {key.key_prefix}
+                  {key.prefix}
                 </td>
                 <td className="py-3 pr-4">
                   <StatusBadge status={key.status} />
@@ -556,7 +554,6 @@ type MeKeyLike = {
   last_used_at: string | null;
   revoked_at?: string | null;
   prefix?: string;
-  key_prefix?: string;
   can_reveal?: boolean;
 };
 
@@ -564,7 +561,7 @@ function meKeyToListItem(key: MeKeyLike): ApiKeyListItem {
   return {
     id: key.id,
     name: key.name,
-    key_prefix: key.key_prefix ?? key.prefix ?? "",
+    prefix: key.prefix ?? "",
     status: key.revoked_at ? "revoked" : key.status,
     created_at: key.created_at,
     last_used_at: key.last_used_at,

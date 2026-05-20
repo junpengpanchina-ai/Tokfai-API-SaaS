@@ -131,57 +131,10 @@ meRoutes.post("/api-keys/revoke", async (c) => {
   }
 
   return c.json({
-    ok: true,
     api_key: {
       id: data.id,
       status: "revoked",
       revoked_at: data.revoked_at,
-    },
-    data: {
-      id: data.id,
-      status: "revoked",
-      revoked_at: data.revoked_at,
-    },
-  });
-});
-
-/** POST /v1/me/api-keys/:id/revoke — soft-revoke (sets revoked_at, never deletes). */
-meRoutes.post("/api-keys/:id/revoke", async (c) => {
-  const userId = c.get("userId" as never) as string;
-  const id = c.req.param("id");
-
-  const { data, error } = await supabase()
-    .from("api_keys")
-    .update({ revoked_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("user_id", userId)
-    .is("revoked_at", null)
-    .select("id, name, prefix, created_at, last_used_at, revoked_at")
-    .single();
-
-  if (error || !data) {
-    return c.json(
-      {
-        error: {
-          message: "API key not found.",
-          code: "api_key_not_found",
-          type: "not_found",
-        },
-      },
-      404
-    );
-  }
-
-  return c.json({
-    api_key: {
-      id: data.id,
-      name: data.name,
-      key_prefix: data.prefix,
-      prefix: data.prefix,
-      created_at: data.created_at,
-      last_used_at: data.last_used_at,
-      revoked_at: data.revoked_at,
-      status: data.revoked_at ? "revoked" : "active",
     },
   });
 });
@@ -213,7 +166,7 @@ meRoutes.get("/api-keys", async (c) => {
   >[]).map((key) => ({
     id: key.id,
     name: key.name,
-    key_prefix: key.prefix,
+    prefix: key.prefix,
     status: key.revoked_at ? "revoked" : "active",
     created_at: key.created_at,
     last_used_at: key.last_used_at,
@@ -307,11 +260,10 @@ meRoutes.post("/api-keys", async (c) => {
 
   return c.json(
     {
-      ok: true,
       api_key: {
         id: data.id,
         name: data.name,
-        key_prefix: keyPrefix,
+        prefix: keyPrefix,
         status: data.revoked_at ? "revoked" : "active",
         created_at: data.created_at,
         last_used_at: data.last_used_at,
@@ -320,14 +272,32 @@ meRoutes.post("/api-keys", async (c) => {
       },
       /** Full plaintext key — only on POST create or explicit owner reveal. */
       secret: plainKey,
+      one_time_secret: plainKey,
     },
     201
   );
 });
 
-meRoutes.post("/api-keys/:id/reveal", async (c) => {
+/** POST /v1/me/api-keys/reveal — explicit owner copy request. */
+meRoutes.post("/api-keys/reveal", async (c) => {
   const user = authedUser(c);
-  const id = c.req.param("id");
+  const body = (await c.req.json().catch(() => null)) as
+    | { id?: unknown }
+    | null;
+  const id = typeof body?.id === "string" ? body.id.trim() : "";
+
+  if (!id) {
+    return c.json(
+      {
+        error: {
+          message: "Missing API key id",
+          code: "missing_api_key_id",
+          type: "bad_request",
+        },
+      },
+      400
+    );
+  }
 
   const { data, error } = await supabase()
     .from("api_keys")
@@ -350,22 +320,19 @@ meRoutes.post("/api-keys/:id/reveal", async (c) => {
   if (data.revoked_at) {
     throw ApiError.forbidden(
       "Revoked API keys cannot be revealed.",
-      "api_key_revoked"
+      "key_revoked"
     );
   }
   if (!data.encrypted_secret) {
     throw new ApiError({
-      status: 409,
+      status: 404,
       message: "This key cannot be revealed. Please create a new one.",
-      code: "api_key_secret_unavailable",
-      type: "validation_error",
+      code: "secret_unavailable",
+      type: "not_found",
     });
   }
 
-  return c.json({
-    ok: true,
-    secret: decryptSecret(data.encrypted_secret),
-  });
+  return c.json({ secret: decryptSecret(data.encrypted_secret) });
 });
 
 meRoutes.get("/usage", async (c) => {

@@ -9,8 +9,8 @@ export function registerDebugRoutes(app: Hono): void {
         meMountedAt: "/v1/me",
         apiKeysList: "GET /v1/me/api-keys",
         apiKeysCreate: "POST /v1/me/api-keys",
-        apiKeysRevokeBody: "POST /v1/me/api-keys/revoke",
-        apiKeysRevokeLegacy: "POST /v1/me/api-keys/:id/revoke",
+        apiKeysReveal: "POST /v1/me/api-keys/reveal",
+        apiKeysRevoke: "POST /v1/me/api-keys/revoke",
       },
       now: new Date().toISOString(),
     })
