@@ -254,8 +254,8 @@ export function ApiKeysClient({
         <CardHeader>
           <CardTitle>Your API keys</CardTitle>
           <CardDescription>
-            Prefixes are labels only. Use Reveal / Copy full key when the secret
-            can still be recovered from encrypted storage.
+            New keys show the full secret once at the top. Older keys can use
+            Reveal full key only when encrypted storage is still available.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -404,26 +404,6 @@ function ApiKeysTable({
                 </td>
                 <td className="py-3 pr-0 text-right">
                   <div className="flex flex-wrap items-center justify-end gap-2">
-                    {isActive && key.can_reveal ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleCopyPrefix(key)}
-                      >
-                        {copiedPrefixId === key.id ? (
-                          <>
-                            <Check className="h-3.5 w-3.5" />
-                            Copied
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-3.5 w-3.5" />
-                            Copy prefix
-                          </>
-                        )}
-                      </Button>
-                    ) : null}
                     {isActive ? (
                       <>
                         {key.can_reveal ? (
@@ -437,7 +417,7 @@ function ApiKeysTable({
                             {isRevealing ? (
                               <>
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                Copying...
+                                Revealing...
                               </>
                             ) : copiedFullKeyId === key.id ? (
                               <>
@@ -446,18 +426,39 @@ function ApiKeysTable({
                               </>
                             ) : (
                               <>
-                                <Copy className="h-3.5 w-3.5" />
-                                Reveal / Copy full key
+                                <KeyRound className="h-3.5 w-3.5" />
+                                Reveal full key
                               </>
                             )}
                           </Button>
                         ) : (
-                          <span
-                            className="text-xs font-medium text-muted-foreground"
-                            title="This key cannot be revealed. Please create a new one."
-                          >
-                            Secret unavailable
-                          </span>
+                          <>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleCopyPrefix(key)}
+                            >
+                              {copiedPrefixId === key.id ? (
+                                <>
+                                  <Check className="h-3.5 w-3.5" />
+                                  Copied
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-3.5 w-3.5" />
+                                  Copy prefix
+                                </>
+                              )}
+                            </Button>
+                            <span
+                              className="max-w-[11rem] text-left text-xs leading-snug text-muted-foreground"
+                              title="Full secret was not stored for this key."
+                            >
+                              Existing keys cannot be copied again. Secret
+                              unavailable.
+                            </span>
+                          </>
                         )}
                         <Button
                           type="button"
