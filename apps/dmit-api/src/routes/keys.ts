@@ -1,11 +1,16 @@
 import { Hono } from "hono";
 
 import { generateApiKey } from "../auth/apiKey.js";
-import { decryptSecret, encryptSecret } from "../auth/keyEncryption.js";
+import { encryptSecret } from "../auth/keyEncryption.js";
 import { ApiError } from "../errors.js";
 import { requireSupabaseJwt } from "../middleware/supabaseJwt.js";
 import { supabase } from "../supabase.js";
 import type { AuthedUser } from "../types.js";
+import {
+  readApiKeyId,
+  revealApiKey,
+  revokeApiKey,
+} from "./apiKeyActions.js";
 
 const MAX_NAME_LEN = 64;
 
@@ -110,70 +115,13 @@ keyRoutes.post("/v1/keys", async (c) => {
 });
 
 keyRoutes.post("/v1/keys/:id/reveal", async (c) => {
-  const user = authedUser(c);
-  const id = c.req.param("id");
-  const sb = supabase();
-  const { data, error } = await sb
-    .from("api_keys")
-    .select<string, { encrypted_secret: string | null; revoked_at: string | null }>(
-      "encrypted_secret, revoked_at"
-    )
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .maybeSingle();
+  return revealApiKey(c, await readApiKeyId(c));
+});
 
-  if (error) {
-    throw ApiError.internal(
-      `Failed to reveal API key: ${error.message}`,
-      "keys_reveal_failed"
-    );
-  }
-  if (!data) {
-    throw ApiError.notFound("API key not found.", "key_not_found");
-  }
-  if (data.revoked_at) {
-    throw ApiError.forbidden("Revoked API keys cannot be revealed.", "key_revoked");
-  }
-  if (!data.encrypted_secret) {
-    throw new ApiError({
-      status: 409,
-      message:
-        "This key was created before encrypted storage. Please revoke it and create a new one.",
-      code: "old_key_not_recoverable",
-      type: "validation_error",
-    });
-  }
-
-  return c.json({
-    data: {
-      secret: decryptSecret(data.encrypted_secret),
-    },
-  });
+keyRoutes.post("/v1/keys/:id/revoke", async (c) => {
+  return revokeApiKey(c, await readApiKeyId(c));
 });
 
 keyRoutes.delete("/v1/keys/:id", async (c) => {
-  const user = authedUser(c);
-  const id = c.req.param("id");
-  const sb = supabase();
-  const revokedAt = new Date().toISOString();
-
-  const { data, error } = await sb
-    .from("api_keys")
-    .update({ revoked_at: revokedAt })
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .select("id")
-    .maybeSingle();
-
-  if (error) {
-    throw ApiError.internal(
-      `Failed to revoke API key: ${error.message}`,
-      "keys_revoke_failed"
-    );
-  }
-  if (!data) {
-    throw ApiError.notFound("API key not found.", "key_not_found");
-  }
-
-  return c.body(null, 204);
+  return revokeApiKey(c, await readApiKeyId(c));
 });

@@ -254,8 +254,8 @@ export function ApiKeysClient({
         <CardHeader>
           <CardTitle>Your API keys</CardTitle>
           <CardDescription>
-            Prefixes are safe labels. Use Copy full key for active keys that can
-            still be revealed.
+            Prefixes are labels only. Use Reveal / Copy full key when the secret
+            can still be recovered from encrypted storage.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -404,24 +404,26 @@ function ApiKeysTable({
                 </td>
                 <td className="py-3 pr-0 text-right">
                   <div className="flex flex-wrap items-center justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleCopyPrefix(key)}
-                    >
-                      {copiedPrefixId === key.id ? (
-                        <>
-                          <Check className="h-3.5 w-3.5" />
-                          Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-3.5 w-3.5" />
-                          Copy prefix
-                        </>
-                      )}
-                    </Button>
+                    {isActive && key.can_reveal ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCopyPrefix(key)}
+                      >
+                        {copiedPrefixId === key.id ? (
+                          <>
+                            <Check className="h-3.5 w-3.5" />
+                            Copied
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3.5 w-3.5" />
+                            Copy prefix
+                          </>
+                        )}
+                      </Button>
+                    ) : null}
                     {isActive ? (
                       <>
                         {key.can_reveal ? (
@@ -450,15 +452,12 @@ function ApiKeysTable({
                             )}
                           </Button>
                         ) : (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled
+                          <span
+                            className="text-xs font-medium text-muted-foreground"
                             title="This key cannot be revealed. Please create a new one."
                           >
                             Secret unavailable
-                          </Button>
+                          </span>
                         )}
                         <Button
                           type="button"

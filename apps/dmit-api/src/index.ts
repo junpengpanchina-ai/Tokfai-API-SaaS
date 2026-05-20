@@ -8,14 +8,20 @@ import { handleStripeWebhook } from "./routes/webhooks.js";
 const app = buildApp();
 app.post("/v1/webhooks/stripe", handleStripeWebhook);
 
+const port = env.PORT;
+const hostname = process.env.HOST?.trim() || "127.0.0.1";
+
 const server = serve(
   {
     fetch: app.fetch,
-    port: env.PORT,
+    port,
+    hostname,
   },
   (info) => {
     log.info("dmit_listening", {
+      address: info.address,
       port: info.port,
+      hostname,
       env: env.NODE_ENV,
       cors: env.CORS_ALLOWED_ORIGINS,
     });

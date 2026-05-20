@@ -226,16 +226,12 @@ function toApiError(
 }
 
 // ---------------------------------------------------------------------------
-// Legacy API key metadata shapes
+// Me API Keys — dashboard
 // ---------------------------------------------------------------------------
 
 /** Pass `accessToken` from the server session for reliable dashboard auth. */
 export interface DmitSessionAuth {
   accessToken: string;
-}
-
-export interface CreateApiKeyInput {
-  name: string;
 }
 
 export interface RevokeApiKeyResponse {
@@ -250,10 +246,6 @@ export interface RevokeApiKeyResponse {
     revoked_at: string;
   };
 }
-
-// ---------------------------------------------------------------------------
-// Me API Keys — dashboard V0.6
-// ---------------------------------------------------------------------------
 
 export const ME_API_KEYS_PATH = "/v1/me/api-keys";
 export const ME_API_KEYS_REVEAL_PATH = `${ME_API_KEYS_PATH}/reveal`;
@@ -399,13 +391,9 @@ export function parseRevokeApiKeyResponse(raw: unknown): RevokeApiKeyResponse {
       ? (body.data as Record<string, unknown>)
       : body.api_key && typeof body.api_key === "object"
         ? (body.api_key as Record<string, unknown>)
-      : null;
+        : null;
 
-  if (
-    !dataRaw ||
-    typeof dataRaw.id !== "string" ||
-    typeof dataRaw.revoked_at !== "string"
-  ) {
+  if (!dataRaw || typeof dataRaw.id !== "string") {
     throw new DmitApiError({
       status: 500,
       message: "API key metadata missing from revoke response.",
@@ -413,10 +401,15 @@ export function parseRevokeApiKeyResponse(raw: unknown): RevokeApiKeyResponse {
     });
   }
 
+  const revokedAt =
+    typeof dataRaw.revoked_at === "string"
+      ? dataRaw.revoked_at
+      : new Date().toISOString();
+
   const apiKey = {
     id: dataRaw.id,
     status: "revoked" as const,
-    revoked_at: dataRaw.revoked_at,
+    revoked_at: revokedAt,
   };
 
   return {
@@ -460,6 +453,10 @@ export async function revokeApiKey(
 export interface RevealMeApiKeyResponse {
   ok?: boolean;
   secret?: string;
+  api_key?: {
+    id?: string;
+    secret?: string;
+  };
   data?: {
     secret?: string;
   };
@@ -477,7 +474,7 @@ export async function revealMeApiKey(
     json: { id },
     accessToken,
   });
-  const secret = raw.secret ?? raw.data?.secret;
+  const secret = raw.secret ?? raw.api_key?.secret ?? raw.data?.secret;
   if (!secret) {
     throw new DmitApiError({
       status: 500,

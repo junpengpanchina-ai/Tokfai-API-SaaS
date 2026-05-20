@@ -1,10 +1,15 @@
 import { Hono } from "hono";
 
 import { generateApiKey } from "../auth/apiKey.js";
-import { decryptSecret, encryptSecret } from "../auth/keyEncryption.js";
+import { encryptSecret } from "../auth/keyEncryption.js";
 import { ApiError } from "../errors.js";
 import { requireSupabaseJwt } from "../middleware/supabaseJwt.js";
 import { supabase } from "../supabase.js";
+import {
+  readApiKeyId,
+  revealApiKey,
+  revokeApiKey,
+} from "./apiKeyActions.js";
 import type {
   ApiKeyRow,
   AuthedUser,
@@ -88,55 +93,15 @@ meRoutes.get("/credits/ledger", async (c) => {
 
 /** POST /v1/me/api-keys/revoke — stable body route for dashboard revoke. */
 meRoutes.post("/api-keys/revoke", async (c) => {
-  const user = authedUser(c);
-  const body = (await c.req.json().catch(() => null)) as
-    | { id?: unknown }
-    | null;
-  const id = typeof body?.id === "string" ? body.id.trim() : "";
+  return revokeApiKey(c, await readApiKeyId(c));
+});
 
-  if (!id) {
-    return c.json(
-      {
-        error: {
-          message: "Missing API key id",
-          code: "missing_api_key_id",
-          type: "bad_request",
-        },
-      },
-      400
-    );
-  }
+meRoutes.post("/api-keys/:id/revoke", async (c) => {
+  return revokeApiKey(c, await readApiKeyId(c));
+});
 
-  const revokedAt = new Date().toISOString();
-  const { data, error } = await supabase()
-    .from("api_keys")
-    .update({ revoked_at: revokedAt })
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .is("revoked_at", null)
-    .select("id, revoked_at")
-    .single();
-
-  if (error || !data) {
-    return c.json(
-      {
-        error: {
-          message: "API key not found",
-          code: "api_key_not_found",
-          type: "not_found",
-        },
-      },
-      404
-    );
-  }
-
-  return c.json({
-    api_key: {
-      id: data.id,
-      status: "revoked",
-      revoked_at: data.revoked_at,
-    },
-  });
+meRoutes.delete("/api-keys/:id", async (c) => {
+  return revokeApiKey(c, await readApiKeyId(c));
 });
 
 meRoutes.get("/api-keys", async (c) => {
@@ -280,59 +245,11 @@ meRoutes.post("/api-keys", async (c) => {
 
 /** POST /v1/me/api-keys/reveal — explicit owner copy request. */
 meRoutes.post("/api-keys/reveal", async (c) => {
-  const user = authedUser(c);
-  const body = (await c.req.json().catch(() => null)) as
-    | { id?: unknown }
-    | null;
-  const id = typeof body?.id === "string" ? body.id.trim() : "";
+  return revealApiKey(c, await readApiKeyId(c));
+});
 
-  if (!id) {
-    return c.json(
-      {
-        error: {
-          message: "Missing API key id",
-          code: "missing_api_key_id",
-          type: "bad_request",
-        },
-      },
-      400
-    );
-  }
-
-  const { data, error } = await supabase()
-    .from("api_keys")
-    .select<string, { encrypted_secret: string | null; revoked_at: string | null }>(
-      "encrypted_secret, revoked_at"
-    )
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (error) {
-    throw ApiError.internal(
-      `Failed to reveal API key: ${error.message}`,
-      "me_api_keys_reveal_failed"
-    );
-  }
-  if (!data) {
-    throw ApiError.notFound("API key not found.", "api_key_not_found");
-  }
-  if (data.revoked_at) {
-    throw ApiError.forbidden(
-      "Revoked API keys cannot be revealed.",
-      "key_revoked"
-    );
-  }
-  if (!data.encrypted_secret) {
-    throw new ApiError({
-      status: 404,
-      message: "This key cannot be revealed. Please create a new one.",
-      code: "secret_unavailable",
-      type: "not_found",
-    });
-  }
-
-  return c.json({ secret: decryptSecret(data.encrypted_secret) });
+meRoutes.post("/api-keys/:id/reveal", async (c) => {
+  return revealApiKey(c, await readApiKeyId(c));
 });
 
 meRoutes.get("/usage", async (c) => {
