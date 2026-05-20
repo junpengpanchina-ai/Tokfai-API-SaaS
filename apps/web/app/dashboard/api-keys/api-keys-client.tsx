@@ -26,6 +26,9 @@ import {
   createApiKey,
   DmitApiError,
   getDmitBaseUrl,
+  ME_API_KEYS_PATH,
+  ME_API_KEYS_REVEAL_PATH,
+  ME_API_KEYS_REVOKE_PATH,
   revealMeApiKey,
   revokeApiKey,
   type CreateApiKeyResponse,
@@ -104,7 +107,7 @@ export function ApiKeysClient({
       setCreateError(
         toActionError(err, {
           method: "POST",
-          url: `${getDmitBaseUrl()}/v1/me/api-keys`,
+          url: dmitUrl(ME_API_KEYS_PATH),
         })
       );
     } finally {
@@ -163,7 +166,7 @@ export function ApiKeysClient({
       setRevokeError(
         toActionError(err, {
           method: "POST",
-          url: `${getDmitBaseUrl()}/v1/me/api-keys/reveal`,
+          url: dmitUrl(ME_API_KEYS_REVEAL_PATH),
         })
       );
     } finally {
@@ -573,16 +576,18 @@ function meKeyToListItem(key: MeKeyLike): ApiKeyListItem {
 function toRevokeActionError(err: unknown): ActionErrorState {
   const base = toActionError(err, {
     method: "POST",
-    url: `${getDmitBaseUrl()}/v1/me/api-keys/revoke`,
+    url: dmitUrl(ME_API_KEYS_REVOKE_PATH),
   });
   if (base.method && base.url) return base;
   return {
     ...base,
     method: base.method ?? "POST",
-    url:
-      base.url ??
-      `${getDmitBaseUrl()}/v1/me/api-keys/revoke`,
+    url: base.url ?? dmitUrl(ME_API_KEYS_REVOKE_PATH),
   };
+}
+
+function dmitUrl(path: string): string {
+  return `${getDmitBaseUrl()}${path}`;
 }
 
 function toActionError(

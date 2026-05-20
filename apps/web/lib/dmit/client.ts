@@ -252,8 +252,12 @@ export interface RevokeApiKeyResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Me API Keys — POST /v1/me/api-keys (dashboard V0.6)
+// Me API Keys — dashboard V0.6
 // ---------------------------------------------------------------------------
+
+export const ME_API_KEYS_PATH = "/v1/me/api-keys";
+export const ME_API_KEYS_REVEAL_PATH = `${ME_API_KEYS_PATH}/reveal`;
+export const ME_API_KEYS_REVOKE_PATH = `${ME_API_KEYS_PATH}/revoke`;
 
 export interface MeApiKeyMetadata {
   id: string;
@@ -371,7 +375,7 @@ export async function createApiKey(
   auth: DmitSessionAuth
 ): Promise<CreateApiKeyResponse> {
   const accessToken = requireDmitAccessToken(auth.accessToken);
-  const raw = await dmitFetch<unknown>("/v1/me/api-keys", {
+  const raw = await dmitFetch<unknown>(ME_API_KEYS_PATH, {
     method: "POST",
     json: input,
     accessToken,
@@ -426,7 +430,7 @@ export async function revokeApiKey(
   auth: DmitSessionAuth
 ): Promise<RevokeApiKeyResponse> {
   const accessToken = requireDmitAccessToken(auth.accessToken);
-  const path = "/v1/me/api-keys/revoke";
+  const path = ME_API_KEYS_REVOKE_PATH;
   const requestUrl = `${getDmitBaseUrl()}${path}`;
   const requestMethod = "POST";
 
@@ -467,7 +471,7 @@ export async function revealMeApiKey(
   auth: DmitSessionAuth
 ): Promise<string> {
   const accessToken = requireDmitAccessToken(auth.accessToken);
-  const path = "/v1/me/api-keys/reveal";
+  const path = ME_API_KEYS_REVEAL_PATH;
   const raw = await dmitFetch<RevealMeApiKeyResponse>(path, {
     method: "POST",
     json: { id },
