@@ -3,12 +3,7 @@ import { z } from "zod";
 import { ApiError } from "../errors.js";
 import { supabase } from "../supabase.js";
 
-const MODEL_PATCH_FIELDS = [
-  "display_name",
-  "enabled",
-  "visible",
-  "sort_order",
-] as const;
+const MODEL_PATCH_FIELDS = ["enabled", "visible"] as const;
 
 const PRICING_PATCH_FIELDS = [
   "input_per_1k",
@@ -19,10 +14,8 @@ const PRICING_PATCH_FIELDS = [
 
 const ModelPatchSchema = z
   .object({
-    display_name: z.string().min(1).max(200).optional(),
     enabled: z.boolean().optional(),
     visible: z.boolean().optional(),
-    sort_order: z.number().int().optional(),
   })
   .strict();
 
@@ -48,6 +41,7 @@ export type AdminModelListItem = {
   output_per_1k: number | null;
   billable: boolean | null;
   markup_multiplier: number | null;
+  updated_at: string | null;
 };
 
 type ModelDbRow = {
@@ -58,6 +52,7 @@ type ModelDbRow = {
   enabled: boolean | null;
   visible: boolean | null;
   sort_order: number | string | null;
+  updated_at: string | null;
   model_pricing:
     | ModelPricingDbRow
     | ModelPricingDbRow[]
@@ -71,6 +66,7 @@ type ModelPricingDbRow = {
   output_per_1k: number | string | null;
   billable: boolean | null;
   markup_multiplier: number | string | null;
+  updated_at: string | null;
 };
 
 const MODEL_LIST_SELECT = `
@@ -81,12 +77,14 @@ const MODEL_LIST_SELECT = `
   enabled,
   visible,
   sort_order,
+  updated_at,
   model_pricing (
     billing_mode,
     input_per_1k,
     output_per_1k,
     billable,
-    markup_multiplier
+    markup_multiplier,
+    updated_at
   )
 `;
 
@@ -115,6 +113,18 @@ function pickPricingRow(
   return pricing;
 }
 
+function resolveUpdatedAt(
+  modelUpdatedAt: string | null | undefined,
+  pricingUpdatedAt: string | null | undefined
+): string | null {
+  if (!modelUpdatedAt && !pricingUpdatedAt) return null;
+  if (!modelUpdatedAt) return pricingUpdatedAt ?? null;
+  if (!pricingUpdatedAt) return modelUpdatedAt;
+  return Date.parse(modelUpdatedAt) >= Date.parse(pricingUpdatedAt)
+    ? modelUpdatedAt
+    : pricingUpdatedAt;
+}
+
 export function flattenAdminModelRow(row: ModelDbRow): AdminModelListItem {
   const pricing = pickPricingRow(row.model_pricing);
 
@@ -131,6 +141,7 @@ export function flattenAdminModelRow(row: ModelDbRow): AdminModelListItem {
     output_per_1k: toNumberOrNull(pricing?.output_per_1k),
     billable: pricing?.billable ?? null,
     markup_multiplier: toNumberOrNull(pricing?.markup_multiplier),
+    updated_at: resolveUpdatedAt(row.updated_at, pricing?.updated_at),
   };
 }
 
@@ -158,10 +169,6 @@ function partitionPatchBody(body: Record<string, unknown>):
       pricing: z.infer<typeof PricingPatchSchema>;
     }
   | { ok: false; error: string; detail?: unknown } {
-  if (Object.prototype.hasOwnProperty.call(body, "id")) {
-    return { ok: false, error: "id_not_mutable" };
-  }
-
   const modelBody: Record<string, unknown> = {};
   const pricingBody: Record<string, unknown> = {};
 
@@ -199,7 +206,7 @@ function partitionPatchBody(body: Record<string, unknown>):
     Object.keys(modelParsed.data).length === 0 &&
     Object.keys(pricingParsed.data).length === 0
   ) {
-    return { ok: false, error: "empty_patch_body" };
+    return { ok: false, error: "empty_patch" };
   }
 
   return {
