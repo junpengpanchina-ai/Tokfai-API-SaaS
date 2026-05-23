@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
@@ -165,6 +166,14 @@ export default async function AdminPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             Internal usage overview served by DMIT. This page does not hold
             service-role credentials.
+          </p>
+          <p className="mt-3">
+            <Link
+              href="/admin/models"
+              className="text-sm font-medium underline-offset-4 hover:underline"
+            >
+              Manage model catalog →
+            </Link>
           </p>
         </div>
 

@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { ApiError } from "../errors.js";
 import { supabase } from "../supabase.js";
+import { listAdminModels, patchAdminModel } from "./adminModels.js";
 
 const SUCCESS_STATUSES = ["succeeded", "success", "ok"];
 const PAGE_SIZE = 1000;
@@ -667,4 +668,30 @@ adminRoutes.get("/api-keys", async (c) => {
       revoked_at: row.revoked_at,
     })),
   });
+});
+
+adminRoutes.get("/models", async (c) => {
+  const models = await listAdminModels();
+  return c.json({ data: models });
+});
+
+adminRoutes.patch("/models/:id", async (c) => {
+  const id = c.req.param("id").trim();
+  if (!id) {
+    return jsonError(c, 400, "missing_model_id");
+  }
+
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const result = await patchAdminModel(id, body);
+
+  if (!result.ok) {
+    return jsonError(
+      c,
+      result.status,
+      result.error,
+      result.detail ? { detail: result.detail } : undefined
+    );
+  }
+
+  return c.json({ data: result.data });
 });
