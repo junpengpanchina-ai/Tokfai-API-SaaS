@@ -25,29 +25,13 @@ export default async function AdminModelsPage() {
   noStore();
   const supabase = createClient();
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login?redirect=/admin/models");
-  }
-
-  const {
     data: { session },
   } = await supabase.auth.getSession();
 
   const accessToken = session?.access_token;
 
   if (!accessToken) {
-    return (
-      <DashboardShell>
-        <AdminModelsClient
-          accessToken={null}
-          initialModels={[]}
-          initialError="Missing session token. Please sign in again."
-        />
-      </DashboardShell>
-    );
+    redirect("/login?redirect=/admin/models");
   }
 
   let initialModels: AdminModel[] = [];

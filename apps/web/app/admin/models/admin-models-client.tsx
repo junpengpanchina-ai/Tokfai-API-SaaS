@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ export type AdminModel = {
   id: string;
   display_name: string | null;
   provider: string | null;
+  model_type: string | null;
   enabled: boolean | null;
   visible: boolean | null;
   billing_mode: string | null;
@@ -34,26 +36,29 @@ type ModelsResponse = {
   models?: AdminModel[];
 };
 
-type ModelPatchBody = Partial<
-  Pick<
-    AdminModel,
-    | "enabled"
-    | "visible"
-    | "billable"
-    | "input_per_1k"
-    | "output_per_1k"
-    | "markup_multiplier"
-  >
->;
+type ModelPatchBody = {
+  enabled: boolean;
+  visible: boolean;
+  billable: boolean;
+  input_per_1k: number;
+  output_per_1k: number;
+  markup_multiplier: number;
+};
 
-type PricingDraft = {
+type RowDraft = {
+  enabled: boolean;
+  visible: boolean;
+  billable: boolean;
   input_per_1k: string;
   output_per_1k: string;
   markup_multiplier: string;
 };
 
-function pricingDraftFromModel(model: AdminModel): PricingDraft {
+function rowDraftFromModel(model: AdminModel): RowDraft {
   return {
+    enabled: model.enabled === true,
+    visible: model.visible === true,
+    billable: model.billable === true,
     input_per_1k: formatDraftNumber(model.input_per_1k),
     output_per_1k: formatDraftNumber(model.output_per_1k),
     markup_multiplier: formatDraftNumber(model.markup_multiplier),
@@ -69,38 +74,33 @@ function formatDisplayNumber(value: number | null): string {
   return Number.isInteger(value) ? String(value) : value.toString();
 }
 
-function boolLabel(value: boolean | null): string {
-  if (value === true) return "yes";
-  if (value === false) return "no";
-  return "—";
-}
-
 export function AdminModelsClient({
+  accessToken,
   initialModels,
   initialError,
 }: {
-  accessToken: string | null;
+  accessToken: string;
   initialModels: AdminModel[];
   initialError: string | null;
 }) {
+  const router = useRouter();
   const [models, setModels] = useState(initialModels);
   const [error, setError] = useState<string | null>(initialError);
   const [rowError, setRowError] = useState<Record<string, string>>({});
-  const [pricingDrafts, setPricingDrafts] = useState<Record<string, PricingDraft>>(
-    () => Object.fromEntries(initialModels.map((m) => [m.id, pricingDraftFromModel(m)]))
+  const [drafts, setDrafts] = useState<Record<string, RowDraft>>(() =>
+    Object.fromEntries(initialModels.map((m) => [m.id, rowDraftFromModel(m)]))
   );
   const [savingRowId, setSavingRowId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(
-    initialModels.length === 0 && !initialError
-  );
+  const [loading, setLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   const syncDrafts = useCallback((rows: AdminModel[]) => {
-    setPricingDrafts(
-      Object.fromEntries(rows.map((m) => [m.id, pricingDraftFromModel(m)]))
-    );
+    setDrafts(Object.fromEntries(rows.map((m) => [m.id, rowDraftFromModel(m)])));
   }, []);
 
   const resolveAccessToken = useCallback(async (): Promise<string> => {
+    if (accessToken) return accessToken;
+
     const supabase = createClient();
     const { data: sessionData, error: sessionError } =
       await supabase.auth.getSession();
@@ -109,7 +109,7 @@ export function AdminModelsClient({
       throw new Error("Please sign in again before managing models.");
     }
     return token;
-  }, []);
+  }, [accessToken]);
 
   const loadModels = useCallback(async () => {
     setLoading(true);
@@ -140,10 +140,10 @@ export function AdminModelsClient({
   }, [resolveAccessToken, syncDrafts]);
 
   useEffect(() => {
-    if (initialModels.length === 0 && !initialError) {
-      void loadModels();
-    }
-  }, [initialModels.length, initialError, loadModels]);
+    setModels(initialModels);
+    syncDrafts(initialModels);
+    setError(initialError);
+  }, [initialModels, initialError, syncDrafts]);
 
   async function patchModel(id: string, patch: ModelPatchBody) {
     const token = await resolveAccessToken();
@@ -154,55 +154,35 @@ export function AdminModelsClient({
       return next;
     });
 
-    const response = await fetch(`${getDmitBaseUrl()}/admin/models/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(patch),
-    });
+    const response = await fetch(
+      `${getDmitBaseUrl()}/admin/models/${encodeURIComponent(id)}`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(patch),
+      }
+    );
     const body = await parseJson(response);
 
     if (!response.ok) {
       throw new Error(errorMessageFromBody(body, response.status));
     }
 
-    const updated = (body as { data?: AdminModel }).data;
-    let mergedRow: AdminModel | null = null;
     setModels((prev) =>
-      prev.map((row) => {
-        if (row.id !== id) return row;
-        mergedRow = updated ? { ...row, ...updated } : { ...row, ...patch };
-        return mergedRow;
-      })
+      prev.map((row) => (row.id === id ? { ...row, ...patch } : row))
     );
-    if (mergedRow) {
-      setPricingDrafts((prev) => ({
-        ...prev,
-        [id]: pricingDraftFromModel(mergedRow as AdminModel),
-      }));
-    }
+    startTransition(() => {
+      router.refresh();
+    });
   }
 
-  async function handleToggle(
-    id: string,
-    field: "enabled" | "visible" | "billable",
-    checked: boolean
-  ) {
-    try {
-      await patchModel(id, { [field]: checked });
-    } catch (err) {
-      setRowError((prev) => ({
-        ...prev,
-        [id]: err instanceof Error ? err.message : "Update failed.",
-      }));
-    }
-  }
-
-  async function handleSavePricing(id: string) {
-    const draft = pricingDrafts[id];
-    if (!draft) return;
+  async function handleSaveRow(id: string) {
+    const draft = drafts[id];
+    const row = models.find((m) => m.id === id);
+    if (!draft || !row) return;
 
     const input_per_1k = parseNonNegative(draft.input_per_1k);
     const output_per_1k = parseNonNegative(draft.output_per_1k);
@@ -220,22 +200,26 @@ export function AdminModelsClient({
       return;
     }
 
-    const patch: ModelPatchBody = {};
-    if (input_per_1k !== "empty") patch.input_per_1k = input_per_1k;
-    if (output_per_1k !== "empty") patch.output_per_1k = output_per_1k;
-    if (markup_multiplier !== "empty") patch.markup_multiplier = markup_multiplier;
-
-    if (Object.keys(patch).length === 0) {
-      setRowError((prev) => ({
-        ...prev,
-        [id]: "No pricing fields to save.",
-      }));
-      return;
-    }
+    const patch: ModelPatchBody = {
+      enabled: draft.enabled,
+      visible: draft.visible,
+      billable: draft.billable,
+      input_per_1k: input_per_1k === "empty" ? row.input_per_1k ?? 0 : input_per_1k,
+      output_per_1k:
+        output_per_1k === "empty" ? row.output_per_1k ?? 0 : output_per_1k,
+      markup_multiplier:
+        markup_multiplier === "empty"
+          ? row.markup_multiplier ?? 1
+          : markup_multiplier,
+    };
 
     setSavingRowId(id);
     try {
       await patchModel(id, patch);
+      setDrafts((prev) => ({
+        ...prev,
+        [id]: rowDraftFromModel({ ...row, ...patch }),
+      }));
     } catch (err) {
       setRowError((prev) => ({
         ...prev,
@@ -246,7 +230,7 @@ export function AdminModelsClient({
     }
   }
 
-  const isBusy = loading;
+  const isBusy = loading || isPending;
 
   return (
     <div className="flex flex-col gap-6">
@@ -285,8 +269,7 @@ export function AdminModelsClient({
         <CardHeader>
           <CardTitle>Models</CardTitle>
           <CardDescription>
-            Toggle availability flags inline. Edit per-1k rates and markup, then
-            save each row.
+            Edit flags and pricing per row, then save each row individually.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -300,6 +283,7 @@ export function AdminModelsClient({
                     <th className="py-2 pr-4 font-medium">ID</th>
                     <th className="py-2 pr-4 font-medium">Display name</th>
                     <th className="py-2 pr-4 font-medium">Provider</th>
+                    <th className="py-2 pr-4 font-medium">Model type</th>
                     <th className="py-2 pr-4 font-medium">Enabled</th>
                     <th className="py-2 pr-4 font-medium">Visible</th>
                     <th className="py-2 pr-4 font-medium">Billing mode</th>
@@ -312,7 +296,7 @@ export function AdminModelsClient({
                 </thead>
                 <tbody>
                   {models.map((row) => {
-                    const draft = pricingDrafts[row.id] ?? pricingDraftFromModel(row);
+                    const draft = drafts[row.id] ?? rowDraftFromModel(row);
                     const rowBusy = isBusy || savingRowId === row.id;
 
                     return (
@@ -320,20 +304,35 @@ export function AdminModelsClient({
                         <td className="py-2 pr-4 font-mono text-xs">{row.id}</td>
                         <td className="py-2 pr-4">{row.display_name ?? "—"}</td>
                         <td className="py-2 pr-4">{row.provider ?? "—"}</td>
+                        <td className="py-2 pr-4 font-mono text-xs">
+                          {row.model_type ?? "—"}
+                        </td>
                         <td className="py-2 pr-4">
-                          <BoolToggle
-                            checked={row.enabled === true}
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border border-input"
+                            checked={draft.enabled}
                             disabled={rowBusy}
-                            label={boolLabel(row.enabled)}
-                            onChange={(checked) => void handleToggle(row.id, "enabled", checked)}
+                            onChange={(event) =>
+                              setDrafts((prev) => ({
+                                ...prev,
+                                [row.id]: { ...draft, enabled: event.target.checked },
+                              }))
+                            }
                           />
                         </td>
                         <td className="py-2 pr-4">
-                          <BoolToggle
-                            checked={row.visible === true}
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border border-input"
+                            checked={draft.visible}
                             disabled={rowBusy}
-                            label={boolLabel(row.visible)}
-                            onChange={(checked) => void handleToggle(row.id, "visible", checked)}
+                            onChange={(event) =>
+                              setDrafts((prev) => ({
+                                ...prev,
+                                [row.id]: { ...draft, visible: event.target.checked },
+                              }))
+                            }
                           />
                         </td>
                         <td className="py-2 pr-4 font-mono text-xs">
@@ -346,7 +345,7 @@ export function AdminModelsClient({
                             value={draft.input_per_1k}
                             disabled={rowBusy}
                             onChange={(event) =>
-                              setPricingDrafts((prev) => ({
+                              setDrafts((prev) => ({
                                 ...prev,
                                 [row.id]: {
                                   ...draft,
@@ -364,7 +363,7 @@ export function AdminModelsClient({
                             value={draft.output_per_1k}
                             disabled={rowBusy}
                             onChange={(event) =>
-                              setPricingDrafts((prev) => ({
+                              setDrafts((prev) => ({
                                 ...prev,
                                 [row.id]: {
                                   ...draft,
@@ -376,11 +375,17 @@ export function AdminModelsClient({
                           />
                         </td>
                         <td className="py-2 pr-4">
-                          <BoolToggle
-                            checked={row.billable === true}
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border border-input"
+                            checked={draft.billable}
                             disabled={rowBusy}
-                            label={boolLabel(row.billable)}
-                            onChange={(checked) => void handleToggle(row.id, "billable", checked)}
+                            onChange={(event) =>
+                              setDrafts((prev) => ({
+                                ...prev,
+                                [row.id]: { ...draft, billable: event.target.checked },
+                              }))
+                            }
                           />
                         </td>
                         <td className="py-2 pr-4">
@@ -390,7 +395,7 @@ export function AdminModelsClient({
                             value={draft.markup_multiplier}
                             disabled={rowBusy}
                             onChange={(event) =>
-                              setPricingDrafts((prev) => ({
+                              setDrafts((prev) => ({
                                 ...prev,
                                 [row.id]: {
                                   ...draft,
@@ -407,9 +412,9 @@ export function AdminModelsClient({
                             size="sm"
                             variant="outline"
                             disabled={rowBusy}
-                            onClick={() => void handleSavePricing(row.id)}
+                            onClick={() => void handleSaveRow(row.id)}
                           >
-                            {savingRowId === row.id ? "Saving…" : "Save pricing"}
+                            {savingRowId === row.id ? "Saving…" : "Save"}
                           </Button>
                           {rowError[row.id] ? (
                             <p className="mt-1 max-w-[12rem] text-xs text-destructive">
@@ -431,31 +436,6 @@ export function AdminModelsClient({
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function BoolToggle({
-  checked,
-  disabled,
-  label,
-  onChange,
-}: {
-  checked: boolean;
-  disabled: boolean;
-  label: string;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <label className="inline-flex items-center gap-2">
-      <input
-        type="checkbox"
-        className="h-4 w-4 rounded border border-input"
-        checked={checked}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      <span className="text-xs text-muted-foreground">{label}</span>
-    </label>
   );
 }
 
