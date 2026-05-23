@@ -5,66 +5,49 @@ import { supabase } from "../supabase.js";
 
 const MODEL_PATCH_FIELDS = [
   "display_name",
-  "provider",
-  "model_type",
   "enabled",
   "visible",
-  "owned_by",
   "sort_order",
 ] as const;
 
 const PRICING_PATCH_FIELDS = [
-  "billing_mode",
   "input_per_1k",
   "output_per_1k",
-  "per_call_credits",
   "billable",
   "markup_multiplier",
-  "currency",
 ] as const;
 
 const ModelPatchSchema = z
   .object({
     display_name: z.string().min(1).max(200).optional(),
-    provider: z.string().min(1).max(100).optional(),
-    model_type: z.string().min(1).max(50).optional(),
     enabled: z.boolean().optional(),
     visible: z.boolean().optional(),
-    owned_by: z.string().min(1).max(100).optional(),
     sort_order: z.number().int().optional(),
   })
   .strict();
 
 const PricingPatchSchema = z
   .object({
-    billing_mode: z.enum(["token", "per_call"]).optional(),
     input_per_1k: z.number().nonnegative().optional(),
     output_per_1k: z.number().nonnegative().optional(),
-    per_call_credits: z.number().nonnegative().optional(),
     billable: z.boolean().optional(),
     markup_multiplier: z.number().positive().optional(),
-    currency: z.string().min(1).max(10).optional(),
   })
   .strict();
 
-export type AdminModelRow = {
+export type AdminModelListItem = {
   id: string;
   display_name: string | null;
   provider: string | null;
   model_type: string | null;
   enabled: boolean | null;
   visible: boolean | null;
-  owned_by: string | null;
   sort_order: number | null;
   billing_mode: string | null;
   input_per_1k: number | null;
   output_per_1k: number | null;
-  per_call_credits: number | null;
   billable: boolean | null;
   markup_multiplier: number | null;
-  currency: string | null;
-  created_at: string | null;
-  updated_at: string | null;
 };
 
 type ModelDbRow = {
@@ -74,10 +57,7 @@ type ModelDbRow = {
   model_type: string | null;
   enabled: boolean | null;
   visible: boolean | null;
-  owned_by: string | null;
   sort_order: number | string | null;
-  created_at: string | null;
-  updated_at: string | null;
   model_pricing:
     | ModelPricingDbRow
     | ModelPricingDbRow[]
@@ -89,10 +69,8 @@ type ModelPricingDbRow = {
   billing_mode: string | null;
   input_per_1k: number | string | null;
   output_per_1k: number | string | null;
-  per_call_credits: number | string | null;
   billable: boolean | null;
   markup_multiplier: number | string | null;
-  currency: string | null;
 };
 
 const MODEL_LIST_SELECT = `
@@ -102,18 +80,13 @@ const MODEL_LIST_SELECT = `
   model_type,
   enabled,
   visible,
-  owned_by,
   sort_order,
-  created_at,
-  updated_at,
   model_pricing (
     billing_mode,
     input_per_1k,
     output_per_1k,
-    per_call_credits,
     billable,
-    markup_multiplier,
-    currency
+    markup_multiplier
   )
 `;
 
@@ -142,7 +115,7 @@ function pickPricingRow(
   return pricing;
 }
 
-export function flattenAdminModelRow(row: ModelDbRow): AdminModelRow {
+export function flattenAdminModelRow(row: ModelDbRow): AdminModelListItem {
   const pricing = pickPricingRow(row.model_pricing);
 
   return {
@@ -152,21 +125,16 @@ export function flattenAdminModelRow(row: ModelDbRow): AdminModelRow {
     model_type: row.model_type,
     enabled: row.enabled,
     visible: row.visible,
-    owned_by: row.owned_by,
     sort_order: toIntOrNull(row.sort_order),
     billing_mode: pricing?.billing_mode ?? null,
     input_per_1k: toNumberOrNull(pricing?.input_per_1k),
     output_per_1k: toNumberOrNull(pricing?.output_per_1k),
-    per_call_credits: toNumberOrNull(pricing?.per_call_credits),
     billable: pricing?.billable ?? null,
     markup_multiplier: toNumberOrNull(pricing?.markup_multiplier),
-    currency: pricing?.currency ?? null,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
   };
 }
 
-export async function listAdminModels(): Promise<AdminModelRow[]> {
+export async function listAdminModels(): Promise<AdminModelListItem[]> {
   const { data, error } = await supabase()
     .from("models")
     .select(MODEL_LIST_SELECT)
@@ -181,24 +149,6 @@ export async function listAdminModels(): Promise<AdminModelRow[]> {
   }
 
   return ((data ?? []) as ModelDbRow[]).map(flattenAdminModelRow);
-}
-
-async function fetchAdminModelById(id: string): Promise<AdminModelRow | null> {
-  const { data, error } = await supabase()
-    .from("models")
-    .select(MODEL_LIST_SELECT)
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error) {
-    throw ApiError.internal(
-      `Failed to load model: ${error.message}`,
-      "admin_model_load_failed"
-    );
-  }
-
-  if (!data) return null;
-  return flattenAdminModelRow(data as ModelDbRow);
 }
 
 function partitionPatchBody(body: Record<string, unknown>):
@@ -263,7 +213,7 @@ export async function patchAdminModel(
   id: string,
   body: Record<string, unknown>
 ): Promise<
-  | { ok: true; data: AdminModelRow }
+  | { ok: true }
   | { ok: false; status: 400 | 404; error: string; detail?: unknown }
 > {
   const parsed = partitionPatchBody(body);
@@ -329,10 +279,5 @@ export async function patchAdminModel(
     }
   }
 
-  const data = await fetchAdminModelById(id);
-  if (!data) {
-    return { ok: false, status: 404, error: "model_not_found" };
-  }
-
-  return { ok: true, data };
+  return { ok: true };
 }

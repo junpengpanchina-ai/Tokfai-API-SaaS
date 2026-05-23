@@ -672,7 +672,7 @@ adminRoutes.get("/api-keys", async (c) => {
 
 adminRoutes.get("/models", async (c) => {
   const models = await listAdminModels();
-  return c.json({ data: models });
+  return c.json({ models });
 });
 
 adminRoutes.patch("/models/:id", async (c) => {
@@ -693,5 +693,5 @@ adminRoutes.patch("/models/:id", async (c) => {
     );
   }
 
-  return c.json({ data: result.data });
+  return c.json({ ok: true });
 });
