@@ -1,3 +1,4 @@
+import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard-shell";
@@ -13,11 +14,14 @@ export const metadata = {
   title: "Admin — Models",
 };
 
+export const dynamic = "force-dynamic";
+
 type ModelsResponse = {
   data: AdminModel[];
 };
 
 export default async function AdminModelsPage() {
+  noStore();
   const supabase = createClient();
   const {
     data: { user },
@@ -32,47 +36,57 @@ export default async function AdminModelsPage() {
   } = await supabase.auth.getSession();
 
   const accessToken = session?.access_token;
+
+  if (!accessToken) {
+    return (
+      <DashboardShell>
+        <AdminModelsClient
+          accessToken={null}
+          initialModels={[]}
+          initialError="Missing session token. Please sign in again."
+        />
+      </DashboardShell>
+    );
+  }
+
   let initialModels: AdminModel[] = [];
   let initialError: string | null = null;
 
-  if (!accessToken) {
-    initialError = "Missing session token. Please sign in again.";
-  } else {
-    try {
-      const res = await fetch(`${getDmitBaseUrl()}/admin/models`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-        cache: "no-store",
-      });
+  try {
+    const res = await fetch(`${getDmitBaseUrl()}/admin/models`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    });
 
-      const text = await res.text();
-      const body = parseJson(text);
+    const text = await res.text();
+    const body = parseJson(text);
 
-      if (!res.ok) {
-        throw toDmitServerError(res.status, body);
-      }
+    if (!res.ok) {
+      throw toDmitServerError(res.status, body);
+    }
 
-      const parsed = body as ModelsResponse;
-      initialModels = Array.isArray(parsed.data) ? parsed.data : [];
-    } catch (error) {
-      if (error instanceof DmitServerError) {
-        initialError =
-          error.status === 403
-            ? "Current user is not in the TOKFAI_ADMIN_EMAILS allowlist."
-            : error.message;
-      } else if (error instanceof Error) {
-        initialError = error.message;
-      } else {
-        initialError = "Models could not be loaded.";
-      }
+    const parsed = body as ModelsResponse;
+    initialModels = Array.isArray(parsed.data) ? parsed.data : [];
+  } catch (error) {
+    if (error instanceof DmitServerError) {
+      initialError =
+        error.status === 403
+          ? "Current user is not in the TOKFAI_ADMIN_EMAILS allowlist."
+          : error.message;
+    } else if (error instanceof Error) {
+      initialError = error.message;
+    } else {
+      initialError = "Models could not be loaded.";
     }
   }
 
   return (
     <DashboardShell>
       <AdminModelsClient
+        accessToken={accessToken}
         initialModels={initialModels}
         initialError={initialError}
       />

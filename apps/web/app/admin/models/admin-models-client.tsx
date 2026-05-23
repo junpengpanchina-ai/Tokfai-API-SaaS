@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { getDmitBaseUrl } from "@/lib/dmit/client";
-import { createClient } from "@/lib/supabase/client";
 
 export type AdminModel = {
   id: string;
@@ -76,9 +75,11 @@ function boolLabel(value: boolean | null): string {
 }
 
 export function AdminModelsClient({
+  accessToken,
   initialModels,
   initialError,
 }: {
+  accessToken: string | null;
   initialModels: AdminModel[];
   initialError: string | null;
 }) {
@@ -102,10 +103,15 @@ export function AdminModelsClient({
   }, []);
 
   const loadModels = useCallback(async () => {
+    if (!accessToken) {
+      setError("Please sign in again before managing models.");
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      const accessToken = await getAccessToken();
       const response = await fetch(`${getDmitBaseUrl()}/admin/models`, {
         method: "GET",
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -127,7 +133,7 @@ export function AdminModelsClient({
     } finally {
       setLoading(false);
     }
-  }, [syncDrafts]);
+  }, [accessToken, syncDrafts]);
 
   useEffect(() => {
     if (initialModels.length === 0 && !initialError) {
@@ -136,13 +142,16 @@ export function AdminModelsClient({
   }, [initialModels.length, initialError, loadModels]);
 
   async function patchModel(id: string, patch: ModelPatchBody) {
+    if (!accessToken) {
+      throw new Error("Please sign in again before managing models.");
+    }
+
     setRowError((prev) => {
       const next = { ...prev };
       delete next[id];
       return next;
     });
 
-    const accessToken = await getAccessToken();
     const response = await fetch(`${getDmitBaseUrl()}/admin/models/${encodeURIComponent(id)}`, {
       method: "PATCH",
       headers: {
@@ -445,16 +454,6 @@ function BoolToggle({
       <span className="text-xs text-muted-foreground">{label}</span>
     </label>
   );
-}
-
-async function getAccessToken(): Promise<string> {
-  const supabase = createClient();
-  const { data, error } = await supabase.auth.getSession();
-  const accessToken = data?.session?.access_token;
-  if (error || !accessToken) {
-    throw new Error("Please sign in again before managing models.");
-  }
-  return accessToken;
 }
 
 async function parseJson(response: Response): Promise<unknown> {
