@@ -36,14 +36,24 @@ interface ChatCompletionUsage {
   total_tokens?: number;
 }
 
+interface ChatCompletionChoice {
+  finish_reason?: string | null;
+}
+
 interface ChatCompletionResponse {
   id?: string;
   object?: string;
   created?: number;
   model?: string;
-  choices?: unknown[];
+  choices?: ChatCompletionChoice[];
   usage?: ChatCompletionUsage;
 }
+
+const UPSTREAM_ERROR_CODES = new Set([
+  "upstream_auth_error",
+  "upstream_rate_limited",
+  "upstream_error",
+]);
 
 /**
  * /v1/chat/completions — OpenAI-compatible chat completions, customer-facing.
@@ -74,21 +84,18 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
   const stream = parsed.data.stream ?? false;
 
   if (stream) {
-    await writeUsageLog({
-      user_id: caller.userId,
-      api_key_id: caller.apiKeyId,
-      model: resolvedModel,
-      status: "failed",
-      prompt_tokens: null,
-      completion_tokens: null,
-      total_tokens: null,
-      credits_charged: null,
-      request_id: requestId,
-      upstream_id: null,
-      error_code: "stream_not_supported",
-      error_message: "Streaming is not supported yet.",
-      latency_ms: Date.now() - startedAt,
-    });
+    await writeUsageLog(
+      failedUsageLog({
+        user_id: caller.userId,
+        api_key_id: caller.apiKeyId,
+        model: resolvedModel,
+        status: "failed",
+        request_id: requestId,
+        error_code: "stream_not_supported",
+        error_message: "Streaming is not supported yet.",
+        latency_ms: Date.now() - startedAt,
+      })
+    );
 
     log.warn("chat_completion_rejected", {
       requestId,
@@ -145,6 +152,11 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       error_code: null,
       error_message: null,
       latency_ms: Date.now() - startedAt,
+      billable: true,
+      finish_reason: extractFinishReason(data),
+      upstream_status: null,
+      upstream_error_code: null,
+      safety_reason: null,
     });
 
     log.info("chat_completion_succeeded", {
@@ -158,21 +170,20 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     return c.json(data);
   } catch (err) {
     if (err instanceof ApiError) {
-      await writeUsageLog({
-        user_id: caller.userId,
-        api_key_id: caller.apiKeyId,
-        model: resolvedModel,
-        status: err.code === "upstream_rate_limited" ? "rate_limited" : "failed",
-        prompt_tokens: null,
-        completion_tokens: null,
-        total_tokens: null,
-        credits_charged: null,
-        request_id: requestId,
-        upstream_id: null,
-        error_code: err.code ?? null,
-        error_message: err.publicMessage,
-        latency_ms: Date.now() - startedAt,
-      });
+      await writeUsageLog(
+        failedUsageLog({
+          user_id: caller.userId,
+          api_key_id: caller.apiKeyId,
+          model: resolvedModel,
+          status:
+            err.code === "upstream_rate_limited" ? "rate_limited" : "failed",
+          request_id: requestId,
+          error_code: err.code ?? null,
+          error_message: err.publicMessage,
+          latency_ms: Date.now() - startedAt,
+          ...upstreamFailureFields(err),
+        })
+      );
 
       log.warn("chat_completion_failed", {
         requestId,
@@ -185,21 +196,18 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       throw err;
     }
 
-    await writeUsageLog({
-      user_id: caller.userId,
-      api_key_id: caller.apiKeyId,
-      model: resolvedModel,
-      status: "failed",
-      prompt_tokens: null,
-      completion_tokens: null,
-      total_tokens: null,
-      credits_charged: null,
-      request_id: requestId,
-      upstream_id: null,
-      error_code: "server_error",
-      error_message: "Internal error.",
-      latency_ms: Date.now() - startedAt,
-    });
+    await writeUsageLog(
+      failedUsageLog({
+        user_id: caller.userId,
+        api_key_id: caller.apiKeyId,
+        model: resolvedModel,
+        status: "failed",
+        request_id: requestId,
+        error_code: "server_error",
+        error_message: "Internal error.",
+        latency_ms: Date.now() - startedAt,
+      })
+    );
 
     log.error("chat_completion_failed", {
       requestId,
@@ -284,6 +292,63 @@ function toNumber(value: string | number | null | undefined): number {
   return 0;
 }
 
+function extractFinishReason(data: ChatCompletionResponse): string | null {
+  const reason = data.choices?.[0]?.finish_reason;
+  return typeof reason === "string" ? reason : null;
+}
+
+type FailedUsageLogFields = Pick<
+  UsageLogInsert,
+  | "user_id"
+  | "api_key_id"
+  | "model"
+  | "status"
+  | "request_id"
+  | "error_code"
+  | "error_message"
+  | "latency_ms"
+> &
+  Partial<
+    Pick<UsageLogInsert, "upstream_status" | "upstream_error_code">
+  >;
+
+function failedUsageLog(fields: FailedUsageLogFields): UsageLogInsert {
+  return {
+    prompt_tokens: null,
+    completion_tokens: null,
+    total_tokens: null,
+    credits_charged: null,
+    upstream_id: null,
+    billable: false,
+    finish_reason: null,
+    upstream_status: fields.upstream_status ?? null,
+    upstream_error_code: fields.upstream_error_code ?? null,
+    safety_reason: null,
+    ...fields,
+  };
+}
+
+function upstreamFailureFields(
+  err: ApiError
+): Pick<UsageLogInsert, "upstream_status" | "upstream_error_code"> {
+  const code = err.code;
+  if (!code || !UPSTREAM_ERROR_CODES.has(code)) {
+    return { upstream_status: null, upstream_error_code: null };
+  }
+
+  const upstreamStatus =
+    code === "upstream_rate_limited"
+      ? 429
+      : code === "upstream_auth_error"
+        ? 403
+        : 502;
+
+  return {
+    upstream_status: upstreamStatus,
+    upstream_error_code: code,
+  };
+}
+
 async function recordSuccessfulUsageAndDebit(
   entry: UsageLogInsert
 ): Promise<void> {
@@ -298,6 +363,11 @@ async function recordSuccessfulUsageAndDebit(
     p_request_id: entry.request_id,
     p_upstream_id: entry.upstream_id,
     p_latency_ms: entry.latency_ms,
+    p_billable: entry.billable,
+    p_finish_reason: entry.finish_reason,
+    p_upstream_status: entry.upstream_status,
+    p_upstream_error_code: entry.upstream_error_code,
+    p_safety_reason: entry.safety_reason,
   });
 
   if (!error) return;

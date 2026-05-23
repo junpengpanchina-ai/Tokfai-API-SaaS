@@ -44,6 +44,11 @@ export interface UsageLogInsert {
   error_code: string | null;
   error_message: string | null;
   latency_ms: number | null;
+  billable: boolean;
+  finish_reason: string | null;
+  upstream_status: number | null;
+  upstream_error_code: string | null;
+  safety_reason: string | null;
 }
 
 /** Read-only fields returned by GET /v1/me/usage */
