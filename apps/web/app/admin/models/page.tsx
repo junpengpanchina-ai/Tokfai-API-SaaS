@@ -17,7 +17,8 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 type ModelsResponse = {
-  data: AdminModel[];
+  data?: AdminModel[];
+  models?: AdminModel[];
 };
 
 export default async function AdminModelsPage() {
@@ -68,8 +69,7 @@ export default async function AdminModelsPage() {
       throw toDmitServerError(res.status, body);
     }
 
-    const parsed = body as ModelsResponse;
-    initialModels = Array.isArray(parsed.data) ? parsed.data : [];
+    initialModels = modelsFromResponse(body as ModelsResponse);
   } catch (error) {
     if (error instanceof DmitServerError) {
       initialError =
@@ -92,6 +92,13 @@ export default async function AdminModelsPage() {
       />
     </DashboardShell>
   );
+}
+
+function modelsFromResponse(body: ModelsResponse | null | undefined): AdminModel[] {
+  if (!body || typeof body !== "object") return [];
+  if (Array.isArray(body.data)) return body.data;
+  if (Array.isArray(body.models)) return body.models;
+  return [];
 }
 
 function parseJson(text: string): unknown {

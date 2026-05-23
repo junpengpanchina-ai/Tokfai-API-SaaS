@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { getDmitBaseUrl } from "@/lib/dmit/client";
+import { createClient } from "@/lib/supabase/client";
 
 export type AdminModel = {
   id: string;
@@ -30,7 +30,8 @@ export type AdminModel = {
 };
 
 type ModelsResponse = {
-  data: AdminModel[];
+  data?: AdminModel[];
+  models?: AdminModel[];
 };
 
 type ModelPatchBody = Partial<
@@ -75,7 +76,6 @@ function boolLabel(value: boolean | null): string {
 }
 
 export function AdminModelsClient({
-  accessToken,
   initialModels,
   initialError,
 }: {
@@ -83,7 +83,6 @@ export function AdminModelsClient({
   initialModels: AdminModel[];
   initialError: string | null;
 }) {
-  const router = useRouter();
   const [models, setModels] = useState(initialModels);
   const [error, setError] = useState<string | null>(initialError);
   const [rowError, setRowError] = useState<Record<string, string>>({});
@@ -94,7 +93,6 @@ export function AdminModelsClient({
   const [loading, setLoading] = useState(
     initialModels.length === 0 && !initialError
   );
-  const [isPending, startTransition] = useTransition();
 
   const syncDrafts = useCallback((rows: AdminModel[]) => {
     setPricingDrafts(
@@ -102,19 +100,25 @@ export function AdminModelsClient({
     );
   }, []);
 
-  const loadModels = useCallback(async () => {
-    if (!accessToken) {
-      setError("Please sign in again before managing models.");
-      setLoading(false);
-      return;
+  const resolveAccessToken = useCallback(async (): Promise<string> => {
+    const supabase = createClient();
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (sessionError || !token) {
+      throw new Error("Please sign in again before managing models.");
     }
+    return token;
+  }, []);
 
+  const loadModels = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
+      const token = await resolveAccessToken();
       const response = await fetch(`${getDmitBaseUrl()}/admin/models`, {
         method: "GET",
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: { Authorization: `Bearer ${token}` },
         cache: "no-store",
       });
       const body = (await parseJson(response)) as ModelsResponse & {
@@ -125,7 +129,7 @@ export function AdminModelsClient({
         throw new Error(errorMessageFromBody(body, response.status));
       }
 
-      const rows = Array.isArray(body.data) ? body.data : [];
+      const rows = modelsFromResponse(body);
       setModels(rows);
       syncDrafts(rows);
     } catch (err) {
@@ -133,7 +137,7 @@ export function AdminModelsClient({
     } finally {
       setLoading(false);
     }
-  }, [accessToken, syncDrafts]);
+  }, [resolveAccessToken, syncDrafts]);
 
   useEffect(() => {
     if (initialModels.length === 0 && !initialError) {
@@ -142,9 +146,7 @@ export function AdminModelsClient({
   }, [initialModels.length, initialError, loadModels]);
 
   async function patchModel(id: string, patch: ModelPatchBody) {
-    if (!accessToken) {
-      throw new Error("Please sign in again before managing models.");
-    }
+    const token = await resolveAccessToken();
 
     setRowError((prev) => {
       const next = { ...prev };
@@ -155,7 +157,7 @@ export function AdminModelsClient({
     const response = await fetch(`${getDmitBaseUrl()}/admin/models/${encodeURIComponent(id)}`, {
       method: "PATCH",
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(patch),
@@ -167,18 +169,19 @@ export function AdminModelsClient({
     }
 
     const updated = (body as { data?: AdminModel }).data;
-    if (updated) {
-      setModels((prev) =>
-        prev.map((row) => (row.id === id ? { ...row, ...updated } : row))
-      );
+    let mergedRow: AdminModel | null = null;
+    setModels((prev) =>
+      prev.map((row) => {
+        if (row.id !== id) return row;
+        mergedRow = updated ? { ...row, ...updated } : { ...row, ...patch };
+        return mergedRow;
+      })
+    );
+    if (mergedRow) {
       setPricingDrafts((prev) => ({
         ...prev,
-        [id]: pricingDraftFromModel(updated),
+        [id]: pricingDraftFromModel(mergedRow as AdminModel),
       }));
-    } else {
-      startTransition(() => {
-        router.refresh();
-      });
     }
   }
 
@@ -243,7 +246,7 @@ export function AdminModelsClient({
     }
   }
 
-  const isBusy = loading || isPending;
+  const isBusy = loading;
 
   return (
     <div className="flex flex-col gap-6">
@@ -299,10 +302,10 @@ export function AdminModelsClient({
                     <th className="py-2 pr-4 font-medium">Provider</th>
                     <th className="py-2 pr-4 font-medium">Enabled</th>
                     <th className="py-2 pr-4 font-medium">Visible</th>
-                    <th className="py-2 pr-4 font-medium">Billable</th>
                     <th className="py-2 pr-4 font-medium">Billing mode</th>
                     <th className="py-2 pr-4 font-medium">Input / 1k</th>
                     <th className="py-2 pr-4 font-medium">Output / 1k</th>
+                    <th className="py-2 pr-4 font-medium">Billable</th>
                     <th className="py-2 pr-4 font-medium">Markup</th>
                     <th className="py-2 pr-4 font-medium">Actions</th>
                   </tr>
@@ -331,14 +334,6 @@ export function AdminModelsClient({
                             disabled={rowBusy}
                             label={boolLabel(row.visible)}
                             onChange={(checked) => void handleToggle(row.id, "visible", checked)}
-                          />
-                        </td>
-                        <td className="py-2 pr-4">
-                          <BoolToggle
-                            checked={row.billable === true}
-                            disabled={rowBusy}
-                            label={boolLabel(row.billable)}
-                            onChange={(checked) => void handleToggle(row.id, "billable", checked)}
                           />
                         </td>
                         <td className="py-2 pr-4 font-mono text-xs">
@@ -378,6 +373,14 @@ export function AdminModelsClient({
                               }))
                             }
                             placeholder={formatDisplayNumber(row.output_per_1k)}
+                          />
+                        </td>
+                        <td className="py-2 pr-4">
+                          <BoolToggle
+                            checked={row.billable === true}
+                            disabled={rowBusy}
+                            label={boolLabel(row.billable)}
+                            onChange={(checked) => void handleToggle(row.id, "billable", checked)}
                           />
                         </td>
                         <td className="py-2 pr-4">
@@ -497,4 +500,11 @@ function parsePositive(raw: string): ParseResult {
   const value = Number(trimmed);
   if (!Number.isFinite(value) || value <= 0) return "invalid";
   return value;
+}
+
+function modelsFromResponse(body: ModelsResponse | null | undefined): AdminModel[] {
+  if (!body || typeof body !== "object") return [];
+  if (Array.isArray(body.data)) return body.data;
+  if (Array.isArray(body.models)) return body.models;
+  return [];
 }
