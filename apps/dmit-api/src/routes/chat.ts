@@ -10,8 +10,11 @@ import {
 } from "../middleware/chatAuth.js";
 import { supabase } from "../supabase.js";
 import type { UsageLogInsert } from "../types.js";
+import {
+  isModelAllowedForChat,
+  priceCreditsFor,
+} from "../catalog/modelCatalog.js";
 import { grsaiFetch } from "../upstream/grsai.js";
-import { priceFor } from "../upstream/pricing.js";
 
 const ChatMessageSchema = z
   .object({
@@ -83,6 +86,34 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
   const resolvedModel = parsed.data.model || env.BOT_MODEL;
   const stream = parsed.data.stream ?? false;
 
+  if (!(await isModelAllowedForChat(resolvedModel))) {
+    await writeUsageLog(
+      failedUsageLog({
+        user_id: caller.userId,
+        api_key_id: caller.apiKeyId,
+        model: resolvedModel,
+        status: "failed",
+        request_id: requestId,
+        error_code: "model_not_found",
+        error_message: `The model \`${resolvedModel}\` does not exist.`,
+        latency_ms: Date.now() - startedAt,
+      })
+    );
+
+    log.warn("chat_completion_rejected", {
+      requestId,
+      route: "/v1/chat/completions",
+      status: 404,
+      code: "model_not_found",
+      message: `The model \`${resolvedModel}\` does not exist.`,
+    });
+
+    throw ApiError.notFound(
+      `The model \`${resolvedModel}\` does not exist.`,
+      "model_not_found"
+    );
+  }
+
   if (stream) {
     await writeUsageLog(
       failedUsageLog({
@@ -136,7 +167,7 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
 
     const usage = normalizeUsage(data.usage);
     const billedModel = data.model ?? resolvedModel;
-    const creditsCharged = calculateCreditsCharged(billedModel, usage);
+    const creditsCharged = await calculateCreditsCharged(billedModel, usage);
 
     await recordSuccessfulUsageAndDebit({
       user_id: caller.userId,
@@ -269,11 +300,11 @@ async function assertHasCredits(userId: string): Promise<void> {
   }
 }
 
-function calculateCreditsCharged(
+async function calculateCreditsCharged(
   model: string,
   usage: ReturnType<typeof normalizeUsage>
-): number {
-  const raw = priceFor(
+): Promise<number> {
+  const raw = await priceCreditsFor(
     model,
     usage.promptTokens ?? 0,
     usage.completionTokens ?? 0
