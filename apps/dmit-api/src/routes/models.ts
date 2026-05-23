@@ -14,6 +14,7 @@ modelRoutes.use("/v1/models", requireApiKey);
 
 modelRoutes.get("/v1/models", async (c) => {
   const data = await listCatalogModels();
+
   return c.json({
     object: "list",
     data,
