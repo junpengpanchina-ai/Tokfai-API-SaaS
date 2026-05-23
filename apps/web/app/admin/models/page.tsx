@@ -24,13 +24,22 @@ type ModelsResponse = {
 export default async function AdminModelsPage() {
   noStore();
   const supabase = createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login?redirect=/admin/models");
+  }
+
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
   const accessToken = session?.access_token;
 
-  if (!accessToken) {
+  if (!session || !accessToken) {
     redirect("/login?redirect=/admin/models");
   }
 

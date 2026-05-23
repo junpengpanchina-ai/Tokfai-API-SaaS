@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { getDmitBaseUrl } from "@/lib/dmit/client";
-import { createClient } from "@/lib/supabase/client";
 
 export type AdminModel = {
   id: string;
@@ -98,27 +97,13 @@ export function AdminModelsClient({
     setDrafts(Object.fromEntries(rows.map((m) => [m.id, rowDraftFromModel(m)])));
   }, []);
 
-  const resolveAccessToken = useCallback(async (): Promise<string> => {
-    if (accessToken) return accessToken;
-
-    const supabase = createClient();
-    const { data: sessionData, error: sessionError } =
-      await supabase.auth.getSession();
-    const token = sessionData?.session?.access_token;
-    if (sessionError || !token) {
-      throw new Error("Please sign in again before managing models.");
-    }
-    return token;
-  }, [accessToken]);
-
   const loadModels = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const token = await resolveAccessToken();
       const response = await fetch(`${getDmitBaseUrl()}/admin/models`, {
         method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${accessToken}` },
         cache: "no-store",
       });
       const body = (await parseJson(response)) as ModelsResponse & {
@@ -137,7 +122,7 @@ export function AdminModelsClient({
     } finally {
       setLoading(false);
     }
-  }, [resolveAccessToken, syncDrafts]);
+  }, [accessToken, syncDrafts]);
 
   useEffect(() => {
     setModels(initialModels);
@@ -146,8 +131,6 @@ export function AdminModelsClient({
   }, [initialModels, initialError, syncDrafts]);
 
   async function patchModel(id: string, patch: ModelPatchBody) {
-    const token = await resolveAccessToken();
-
     setRowError((prev) => {
       const next = { ...prev };
       delete next[id];
@@ -159,10 +142,11 @@ export function AdminModelsClient({
       {
         method: "PATCH",
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(patch),
+        cache: "no-store",
       }
     );
     const body = await parseJson(response);
