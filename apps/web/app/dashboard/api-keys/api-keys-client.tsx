@@ -1,11 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
+  BookOpen,
   Check,
   CheckCircle2,
   Copy,
+  ExternalLink,
   KeyRound,
   Loader2,
   Plus,
@@ -27,9 +30,7 @@ import {
   DmitApiError,
   getDmitBaseUrl,
   ME_API_KEYS_PATH,
-  ME_API_KEYS_REVEAL_PATH,
   ME_API_KEYS_REVOKE_PATH,
-  revealMeApiKey,
   revokeApiKey,
   type CreateApiKeyResponse,
   type MeApiKeyMetadata,
@@ -38,7 +39,10 @@ import {
   userMessageForDashboardError,
   userMessageForDmitError,
 } from "@/lib/dmit-messages";
-import { TOKFAI_API_BASE_URL } from "@/lib/tokfai-api";
+import {
+  TOKFAI_API_BASE_URL,
+  TOKFAI_API_KEY_PLACEHOLDER,
+} from "@/lib/tokfai-api";
 
 export interface ApiKeyListItem {
   id: string;
@@ -48,7 +52,7 @@ export interface ApiKeyListItem {
   created_at: string;
   last_used_at: string | null;
   revoked_at?: string | null;
-  can_reveal: boolean;
+  can_reveal?: boolean;
 }
 
 interface ActionErrorState {
@@ -80,8 +84,6 @@ export function ApiKeysClient({
   const [copyFullKeyStatus, setCopyFullKeyStatus] = useState<"idle" | "copied">(
     "idle"
   );
-  const [copiedFullKeyId, setCopiedFullKeyId] = useState<string | null>(null);
-  const [revealingId, setRevealingId] = useState<string | null>(null);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
@@ -137,7 +139,6 @@ export function ApiKeysClient({
         ...key,
         status: "revoked",
         revoked_at: revokedAt,
-        can_reveal: false,
       };
       setKeys((prev) =>
         prev.map((row) => (row.id === key.id ? updated : row))
@@ -146,31 +147,6 @@ export function ApiKeysClient({
       setRevokeError(toRevokeActionError(err));
     } finally {
       setRevokingId(null);
-    }
-  }
-
-  async function handleRevealAndCopy(key: ApiKeyListItem) {
-    if (key.status !== "active" || !key.can_reveal || revealingId) return;
-
-    setRevealingId(key.id);
-    setRevokeError(null);
-
-    try {
-      const secret = await revealMeApiKey(key.id, { accessToken });
-      const ok = await copyToClipboard(secret);
-      if (ok) {
-        setCopiedFullKeyId(key.id);
-        window.setTimeout(() => setCopiedFullKeyId(null), 2000);
-      }
-    } catch (err) {
-      setRevokeError(
-        toActionError(err, {
-          method: "POST",
-          url: dmitUrl(ME_API_KEYS_REVEAL_PATH),
-        })
-      );
-    } finally {
-      setRevealingId(null);
     }
   }
 
@@ -193,6 +169,18 @@ export function ApiKeysClient({
 
   return (
     <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="text-3xl font-semibold tracking-tight">API Keys</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Create keys to authenticate requests to{" "}
+          <code className="rounded bg-muted px-1 text-xs">{TOKFAI_API_BASE_URL}</code>.
+          The full secret is shown only once at creation — copy and store it
+          immediately.
+        </p>
+      </div>
+
+      <IntegrationGuide />
+
       {oneTimeSecret ? (
         <OneTimeSecretCard
           secret={oneTimeSecret}
@@ -202,15 +190,6 @@ export function ApiKeysClient({
           onDismiss={dismissOneTimeSecret}
         />
       ) : null}
-
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">API Keys</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Create keys to authenticate against{" "}
-          <code className="rounded bg-muted px-1 text-xs">{TOKFAI_API_BASE_URL}</code>.
-          Full active keys can be copied again while encrypted storage is available.
-        </p>
-      </div>
 
       <Card id="create-api-key">
         <CardHeader>
@@ -254,8 +233,8 @@ export function ApiKeysClient({
         <CardHeader>
           <CardTitle>Your API keys</CardTitle>
           <CardDescription>
-            New keys show the full secret once at the top. Older keys can use
-            Reveal full key only when encrypted storage is still available.
+            Only the key prefix is stored here. Full secrets cannot be retrieved
+            after creation.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -265,10 +244,7 @@ export function ApiKeysClient({
           {keys.length > 0 ? (
             <ApiKeysTable
               keys={keys}
-              copiedFullKeyId={copiedFullKeyId}
-              revealingId={revealingId}
               revokingId={revokingId}
-              onRevealAndCopy={handleRevealAndCopy}
               onRevoke={handleRevoke}
             />
           ) : (
@@ -277,6 +253,38 @@ export function ApiKeysClient({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function IntegrationGuide() {
+  return (
+    <Card className="border-muted bg-muted/30">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <BookOpen className="h-4 w-4 shrink-0" />
+          Quick start
+        </CardTitle>
+        <CardDescription>
+          Send your key on every request to the Tokfai API.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">
+          Use this key in{" "}
+          <code className="rounded bg-background px-1.5 py-0.5 font-mono text-xs">
+            Authorization: Bearer {TOKFAI_API_KEY_PLACEHOLDER}
+          </code>
+        </p>
+        <div>
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/docs">
+              View API docs
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -311,16 +319,29 @@ function OneTimeSecretCard({
           {keyName ? `API key created: ${keyName}` : "API key created"}
         </CardTitle>
         <CardDescription className="text-base text-emerald-900/90 dark:text-emerald-100/90">
-          This key is shown only once. Copy it now.
+          Copy this key now. It will not be shown again.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <code
-          id="one-time-secret"
-          className="block max-h-40 overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-emerald-200 bg-white p-4 font-mono text-sm leading-relaxed text-foreground dark:border-emerald-800 dark:bg-background"
-        >
-          {secret}
-        </code>
+        <div className="flex flex-col gap-2">
+          <Label className="text-xs uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
+            Your API key
+          </Label>
+          <code
+            id="one-time-secret"
+            className="block max-h-40 overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-emerald-200 bg-white p-4 font-mono text-sm leading-relaxed text-foreground dark:border-emerald-800 dark:bg-background"
+          >
+            {secret}
+          </code>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label className="text-xs uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
+            Authorization header
+          </Label>
+          <code className="block overflow-x-auto rounded-md border border-emerald-200 bg-white p-3 font-mono text-xs leading-relaxed text-foreground dark:border-emerald-800 dark:bg-background">
+            Authorization: Bearer {secret}
+          </code>
+        </div>
         <div className="flex flex-wrap gap-2">
           <Button type="button" size="lg" onClick={onCopy}>
             {copyStatus === "copied" ? (
@@ -338,6 +359,12 @@ function OneTimeSecretCard({
           <Button type="button" size="lg" variant="outline" onClick={onDismiss}>
             I&apos;ve saved my key
           </Button>
+          <Button type="button" size="lg" variant="ghost" asChild>
+            <Link href="/docs">
+              Read the docs
+              <ExternalLink className="h-4 w-4" />
+            </Link>
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -346,22 +373,17 @@ function OneTimeSecretCard({
 
 function ApiKeysTable({
   keys,
-  copiedFullKeyId,
-  revealingId,
   revokingId,
-  onRevealAndCopy,
   onRevoke,
 }: {
   keys: ApiKeyListItem[];
-  copiedFullKeyId: string | null;
-  revealingId: string | null;
   revokingId: string | null;
-  onRevealAndCopy: (key: ApiKeyListItem) => void;
   onRevoke: (key: ApiKeyListItem) => void;
 }) {
   const [copiedPrefixId, setCopiedPrefixId] = useState<string | null>(null);
 
   async function handleCopyPrefix(key: ApiKeyListItem) {
+    if (!key.prefix) return;
     const ok = await copyToClipboard(key.prefix);
     if (ok) {
       setCopiedPrefixId(key.id);
@@ -377,112 +399,82 @@ function ApiKeysTable({
             <th className="py-2 pr-4 font-medium">Name</th>
             <th className="py-2 pr-4 font-medium">Prefix</th>
             <th className="py-2 pr-4 font-medium">Status</th>
-            <th className="py-2 pr-4 font-medium">Last used</th>
             <th className="py-2 pr-4 font-medium">Created</th>
-            <th className="py-2 pr-4 text-right font-medium">Actions</th>
+            <th className="py-2 pr-4 font-medium">Last used</th>
+            <th className="py-2 pr-0 text-right font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
           {keys.map((key) => {
             const isRevoking = revokingId === key.id;
-            const isRevealing = revealingId === key.id;
             const isActive = key.status === "active";
+            const prefixCopied = copiedPrefixId === key.id;
+
             return (
               <tr key={key.id} className="border-b last:border-0">
                 <td className="py-3 pr-4 font-medium">{key.name}</td>
-                <td className="py-3 pr-4 font-mono text-xs text-muted-foreground">
-                  {key.prefix}
+                <td className="py-3 pr-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <code className="font-mono text-xs text-muted-foreground">
+                      {key.prefix || "—"}
+                    </code>
+                    {key.prefix ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2"
+                        onClick={() => handleCopyPrefix(key)}
+                      >
+                        {prefixCopied ? (
+                          <>
+                            <Check className="h-3.5 w-3.5" />
+                            Copied
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3.5 w-3.5" />
+                            Copy
+                          </>
+                        )}
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
                 <td className="py-3 pr-4">
                   <StatusBadge status={key.status} />
                 </td>
                 <td className="py-3 pr-4 text-muted-foreground">
-                  {key.last_used_at ? formatDate(key.last_used_at) : "Never"}
-                </td>
-                <td className="py-3 pr-4 text-muted-foreground">
                   {formatDate(key.created_at)}
                 </td>
+                <td className="py-3 pr-4 text-muted-foreground">
+                  {key.last_used_at
+                    ? formatDate(key.last_used_at)
+                    : "Never used"}
+                </td>
                 <td className="py-3 pr-0 text-right">
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    {isActive ? (
-                      <>
-                        {key.can_reveal ? (
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            disabled={revealingId != null}
-                            onClick={() => onRevealAndCopy(key)}
-                          >
-                            {isRevealing ? (
-                              <>
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                Revealing...
-                              </>
-                            ) : copiedFullKeyId === key.id ? (
-                              <>
-                                <Check className="h-3.5 w-3.5" />
-                                Copied
-                              </>
-                            ) : (
-                              <>
-                                <KeyRound className="h-3.5 w-3.5" />
-                                Reveal full key
-                              </>
-                            )}
-                          </Button>
-                        ) : (
-                          <>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleCopyPrefix(key)}
-                            >
-                              {copiedPrefixId === key.id ? (
-                                <>
-                                  <Check className="h-3.5 w-3.5" />
-                                  Copied
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="h-3.5 w-3.5" />
-                                  Copy prefix
-                                </>
-                              )}
-                            </Button>
-                            <span
-                              className="max-w-[11rem] text-left text-xs leading-snug text-muted-foreground"
-                              title="Full secret was not stored for this key."
-                            >
-                              Existing keys cannot be copied again. Secret
-                              unavailable.
-                            </span>
-                          </>
-                        )}
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          disabled={revokingId != null}
-                          onClick={() => onRevoke(key)}
-                        >
-                          {isRevoking ? (
-                            <>
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              Revoking...
-                            </>
-                          ) : (
-                            "Revoke"
-                          )}
-                        </Button>
-                      </>
-                    ) : (
-                      <span className="text-xs font-medium text-muted-foreground">
-                        Revoked
-                      </span>
-                    )}
-                  </div>
+                  {isActive ? (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      disabled={revokingId != null}
+                      onClick={() => onRevoke(key)}
+                    >
+                      {isRevoking ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Revoking...
+                        </>
+                      ) : (
+                        "Revoke"
+                      )}
+                    </Button>
+                  ) : (
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Revoked
+                    </span>
+                  )}
                 </td>
               </tr>
             );
@@ -539,12 +531,17 @@ function EmptyState() {
         <KeyRound className="h-5 w-5" />
       </div>
       <p className="max-w-sm text-sm text-muted-foreground">
-        No API keys yet. Create your first key above, then use it from the
-        creation card or copy it later from this list.
+        No API keys yet. Create your first key above — the full secret is shown
+        once, so copy it immediately.
       </p>
-      <Button type="button" size="sm" variant="outline" asChild>
-        <a href="#create-api-key">Create API key</a>
-      </Button>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <Button type="button" size="sm" variant="outline" asChild>
+          <a href="#create-api-key">Create API key</a>
+        </Button>
+        <Button type="button" size="sm" variant="ghost" asChild>
+          <Link href="/docs">View docs</Link>
+        </Button>
+      </div>
     </div>
   );
 }
@@ -569,7 +566,6 @@ function meKeyToListItem(key: MeKeyLike): ApiKeyListItem {
     created_at: key.created_at,
     last_used_at: key.last_used_at,
     revoked_at: key.revoked_at ?? null,
-    can_reveal: Boolean(key.can_reveal && !key.revoked_at),
   };
 }
 
