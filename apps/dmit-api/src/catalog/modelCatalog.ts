@@ -1,5 +1,6 @@
 import { log } from "../logger.js";
 import { supabase } from "../supabase.js";
+import { getModelConfig } from "../upstream/modelCatalog.js";
 import {
   isAllowedModel,
   listAllowedModels,
@@ -181,4 +182,105 @@ function toNumber(value: string | number | null | undefined): number {
     if (Number.isFinite(parsed)) return parsed;
   }
   return 0;
+}
+
+/** Static per-image credit pricing (placeholder — admin can tune later). */
+const IMAGE_MODEL_CREDITS: Record<string, number> = {
+  "nano-banana": 1,
+  "nano-banana-fast": 1,
+  "nano-banana-pro": 5,
+  "nano-banana-2": 3,
+  "gpt-image-2": 2,
+};
+
+const IMAGE_MODEL_ALLOWLIST = new Set(Object.keys(IMAGE_MODEL_CREDITS));
+
+/**
+ * Whether the model may be used for image generation.
+ * DB row wins when present; query errors / missing rows fall back to static catalog.
+ */
+export async function isModelAllowedForImage(model: string): Promise<boolean> {
+  const fromDb = await isModelAllowedForImageFromDb(model);
+  if (fromDb !== null) return fromDb;
+
+  const config = getModelConfig(model);
+  return Boolean(
+    config?.enabled &&
+      config.kind === "image" &&
+      IMAGE_MODEL_ALLOWLIST.has(model)
+  );
+}
+
+async function isModelAllowedForImageFromDb(
+  model: string
+): Promise<boolean | null> {
+  const [modelResult, pricingResult] = await Promise.all([
+    supabase()
+      .from("models")
+      .select("enabled, model_type")
+      .eq("id", model)
+      .maybeSingle(),
+    supabase()
+      .from("model_pricing")
+      .select("billable, billing_mode")
+      .eq("model_id", model)
+      .maybeSingle(),
+  ]);
+
+  if (modelResult.error || pricingResult.error) {
+    log.warn("image_model_allowlist_query_failed", {
+      code: "image_model_allowlist_query_failed",
+      message: modelResult.error?.message ?? pricingResult.error?.message,
+      model,
+    });
+    return null;
+  }
+
+  if (!modelResult.data || !pricingResult.data) return null;
+
+  const modelType = modelResult.data.model_type;
+  const billingMode = pricingResult.data.billing_mode;
+
+  return (
+    modelResult.data.enabled === true &&
+    pricingResult.data.billable === true &&
+    (modelType === "image" || billingMode === "per_image")
+  );
+}
+
+/** Fixed per-image credit cost — DB per_image pricing first, then static catalog. */
+export async function priceCreditsForImage(model: string): Promise<number> {
+  const fromDb = await priceCreditsForImageFromDb(model);
+  if (fromDb !== null) return fromDb;
+
+  return IMAGE_MODEL_CREDITS[model] ?? 0;
+}
+
+async function priceCreditsForImageFromDb(
+  model: string
+): Promise<number | null> {
+  const { data, error } = await supabase()
+    .from("model_pricing")
+    .select("input_per_1k, markup_multiplier")
+    .eq("model_id", model)
+    .eq("billable", true)
+    .eq("billing_mode", "per_image")
+    .maybeSingle();
+
+  if (error) {
+    log.warn("image_model_pricing_query_failed", {
+      code: "image_model_pricing_query_failed",
+      message: error.message,
+      model,
+    });
+    return null;
+  }
+
+  if (!data) return null;
+
+  const row = data as Pick<ModelPricingRow, "input_per_1k" | "markup_multiplier">;
+  const base = toNumber(row.input_per_1k);
+  const markup = toNumber(row.markup_multiplier);
+  const multiplier = markup > 0 ? markup : 1;
+  return base * multiplier;
 }

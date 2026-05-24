@@ -14,6 +14,7 @@ import {
 } from "./routes/webhooks.js";
 import { modelRoutes } from "./routes/models.js";
 import { chatRoutes } from "./routes/chat.js";
+import { imageRoutes } from "./routes/images.js";
 import { adminRoutes } from "./routes/admin.js";
 import { meRoutes } from "./routes/me.js";
 import { registerDebugRoutes } from "./routes/debug.js";
@@ -33,6 +34,7 @@ export function buildApp() {
   app.route("/", legacyStripeWebhookRoutes);
   app.route("/", modelRoutes);
   app.route("/", chatRoutes);
+  app.route("/", imageRoutes);
   app.route("/admin", adminRoutes);
 
   registerDebugRoutes(app);

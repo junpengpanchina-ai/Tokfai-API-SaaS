@@ -183,6 +183,19 @@ export const MODEL_CATALOG: Record<string, TokfaiModelCatalogItem> = {
     note: "Pro image model placeholder pricing."
   },
 
+  "nano-banana-2": {
+    id: "nano-banana-2",
+    object: "model",
+    owned_by: "tokfai",
+    provider: "grsai",
+    upstream_model: "nano-banana-2",
+    enabled: true,
+    kind: "image",
+    input_per_1k: 0.0001,
+    output_per_1k: 0.0002,
+    note: "Image model placeholder pricing."
+  },
+
   "gpt-image-2": {
     id: "gpt-image-2",
     object: "model",

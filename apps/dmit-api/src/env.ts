@@ -47,6 +47,15 @@ const Schema = z
     .string()
     .min(1)
     .default("/v1/chat/completions"),
+  GRSAI_IMAGE_GENERATE_PATH: z
+    .string()
+    .min(1)
+    .default("/v1/api/generate"),
+  IMAGE_REQUEST_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(120_000),
   BOT_MODEL: z.string().min(1).default("gemini-3.1-pro"),
 
   STRIPE_SECRET_KEY: z.string().min(1).optional(),
@@ -79,6 +88,9 @@ const Schema = z
     )
       ? data.GRSAI_CHAT_COMPLETIONS_PATH
       : `/${data.GRSAI_CHAT_COMPLETIONS_PATH}`,
+    GRSAI_IMAGE_GENERATE_PATH: data.GRSAI_IMAGE_GENERATE_PATH.startsWith("/")
+      ? data.GRSAI_IMAGE_GENERATE_PATH
+      : `/${data.GRSAI_IMAGE_GENERATE_PATH}`,
   }));
 
 export type Env = z.infer<typeof Schema>;
