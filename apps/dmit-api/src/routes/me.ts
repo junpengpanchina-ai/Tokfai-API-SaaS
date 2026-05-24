@@ -258,7 +258,7 @@ meRoutes.get("/usage", async (c) => {
   const { data, error } = await supabase()
     .from("usage_logs")
     .select(
-      "id, created_at, model, status, prompt_tokens, completion_tokens, total_tokens, credits_charged, request_id"
+      "id, created_at, model, status, prompt_tokens, completion_tokens, total_tokens, credits_charged, request_id, error_code"
     )
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })

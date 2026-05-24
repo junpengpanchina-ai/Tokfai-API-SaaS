@@ -181,6 +181,7 @@ function CreditsContent({
                       Balance after
                     </th>
                     <th className="py-2 pr-4 font-medium">Reason</th>
+                    <th className="py-2 pr-4 font-medium">Reference</th>
                     <th className="py-2 pr-4 font-medium">Created</th>
                   </tr>
                 </thead>
@@ -200,6 +201,12 @@ function CreditsContent({
                       </td>
                       <td className="py-2 pr-4 text-muted-foreground">
                         {displayReason(entry.reason)}
+                      </td>
+                      <td
+                        className="max-w-[10rem] truncate py-2 pr-4 font-mono text-xs text-muted-foreground"
+                        title={entry.reference_id ?? undefined}
+                      >
+                        {entry.reference_id ?? "—"}
                       </td>
                       <td className="py-2 pr-4 text-muted-foreground">
                         {formatDateTime(entry.created_at)}

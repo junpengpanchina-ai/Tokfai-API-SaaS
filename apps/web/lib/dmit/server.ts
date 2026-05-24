@@ -121,6 +121,7 @@ export interface MeUsageLogEntry {
   total_tokens: number | null;
   credits_charged: number | string | null;
   request_id: string | null;
+  error_code: string | null;
 }
 
 export async function listMyUsage(

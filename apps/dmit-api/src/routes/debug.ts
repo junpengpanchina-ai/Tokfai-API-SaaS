@@ -11,6 +11,9 @@ export function registerDebugRoutes(app: Hono): void {
         apiKeysCreate: "POST /v1/me/api-keys",
         apiKeysReveal: "POST /v1/me/api-keys/reveal",
         apiKeysRevoke: "POST /v1/me/api-keys/revoke",
+        credits: "GET /v1/me/credits",
+        creditsLedger: "GET /v1/me/credits/ledger",
+        usage: "GET /v1/me/usage",
       },
       now: new Date().toISOString(),
     })

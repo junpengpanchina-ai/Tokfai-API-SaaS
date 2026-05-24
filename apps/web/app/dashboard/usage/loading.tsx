@@ -36,12 +36,13 @@ export default function UsageLoading() {
                   <th className="py-2 pr-4 text-right font-medium">Total</th>
                   <th className="py-2 pr-4 text-right font-medium">Credits</th>
                   <th className="py-2 pr-4 font-medium">Request ID</th>
+                  <th className="py-2 pr-4 font-medium">Error</th>
                 </tr>
               </thead>
               <tbody>
                 {Array.from({ length: 5 }).map((_, index) => (
                   <tr key={index} className="border-b last:border-0">
-                    {Array.from({ length: 8 }).map((__, cellIndex) => (
+                    {Array.from({ length: 9 }).map((__, cellIndex) => (
                       <td key={cellIndex} className="py-3 pr-4">
                         <div className="h-4 w-20 animate-pulse rounded bg-muted" />
                       </td>

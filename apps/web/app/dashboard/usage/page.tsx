@@ -165,6 +165,7 @@ function UsageTable({ logs }: { logs: MeUsageLogEntry[] }) {
             <th className="py-2 pr-4 text-right font-medium">Total</th>
             <th className="py-2 pr-4 text-right font-medium">Credits</th>
             <th className="py-2 pr-4 font-medium">Request ID</th>
+            <th className="py-2 pr-4 font-medium">Error</th>
           </tr>
         </thead>
         <tbody>
@@ -193,6 +194,9 @@ function UsageTable({ logs }: { logs: MeUsageLogEntry[] }) {
               </td>
               <td className="max-w-[12rem] truncate py-2 pr-4 font-mono text-xs text-muted-foreground">
                 {truncateRequestId(row.request_id)}
+              </td>
+              <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">
+                {row.error_code ?? "—"}
               </td>
             </tr>
           ))}
