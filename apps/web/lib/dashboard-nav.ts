@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BookOpen,
+  Boxes,
   CreditCard,
   Gauge,
   KeyRound,
@@ -35,6 +36,12 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
     label: "Playground",
     icon: Terminal,
     prefetch: false,
+  },
+  {
+    href: "/dashboard/models",
+    label: "Models",
+    icon: Boxes,
+    prefetch: true,
   },
   { href: "/dashboard/usage", label: "Usage", icon: Gauge, prefetch: true },
   {

@@ -15,7 +15,11 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function PlaygroundPage() {
+export default async function PlaygroundPage({
+  searchParams,
+}: {
+  searchParams?: { model?: string };
+}) {
   noStore();
 
   const supabase = createClient();
@@ -35,7 +39,11 @@ export default async function PlaygroundPage() {
   const activeKeys = accessToken ? await loadActiveKeys(accessToken) : [];
 
   return (
-    <PlaygroundClient accessToken={accessToken} activeKeys={activeKeys} />
+    <PlaygroundClient
+      accessToken={accessToken}
+      activeKeys={activeKeys}
+      initialModel={searchParams?.model}
+    />
   );
 }
 

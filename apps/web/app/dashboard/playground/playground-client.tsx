@@ -29,6 +29,7 @@ import {
   type ChatCompletionResponse,
 } from "@/lib/dmit/client";
 import { userMessageForDmitError } from "@/lib/dmit-messages";
+import { isAvailableChatModel } from "@/lib/model-catalog";
 import {
   isFullTokfaiApiKey,
   TOKFAI_API_KEY_PLACEHOLDER,
@@ -37,6 +38,13 @@ import {
 
 const DEFAULT_MODEL = "gemini-3.1-pro";
 const MODEL_OPTIONS = ["gemini-3.1-pro", "gemini-3-pro"] as const;
+
+function resolveInitialModel(initialModel?: string): string {
+  if (initialModel && isAvailableChatModel(initialModel)) {
+    return initialModel;
+  }
+  return DEFAULT_MODEL;
+}
 const DEFAULT_PROMPT = "Say hello from Tokfai.";
 
 export interface PlaygroundApiKeyOption {
@@ -58,11 +66,13 @@ type ApiKeyMode = "paste" | "select";
 export function PlaygroundClient({
   accessToken,
   activeKeys,
+  initialModel,
 }: {
   accessToken: string;
   activeKeys: PlaygroundApiKeyOption[];
+  initialModel?: string;
 }) {
-  const [model, setModel] = useState(DEFAULT_MODEL);
+  const [model, setModel] = useState(() => resolveInitialModel(initialModel));
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
   const [apiKeyMode, setApiKeyMode] = useState<ApiKeyMode>(
     activeKeys.length > 0 ? "select" : "paste"
