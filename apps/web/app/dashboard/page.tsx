@@ -14,8 +14,23 @@ import {
 import { formatCredits, formatInt } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import type { ProfileRow } from "@/lib/supabase/types";
+import {
+  TOKFAI_API_BASE_URL,
+  TOKFAI_API_KEY_FORMAT,
+  TOKFAI_BILLING_POLICY,
+  TOKFAI_PLAYGROUND_POLICY,
+  TOKFAI_STARTER_PLAN,
+} from "@/lib/tokfai-api";
 
 const PROFILE_COLUMNS = "id, email, credits_balance";
+
+const QUICK_REFERENCE = [
+  { label: "Base URL", value: TOKFAI_API_BASE_URL },
+  { label: "API key format", value: TOKFAI_API_KEY_FORMAT },
+  { label: "Starter", value: TOKFAI_STARTER_PLAN },
+  { label: "Billing", value: TOKFAI_BILLING_POLICY },
+  { label: "Playground", value: TOKFAI_PLAYGROUND_POLICY },
+] as const;
 
 export default async function DashboardOverviewPage() {
   const supabase = createClient();
@@ -88,8 +103,9 @@ export default async function DashboardOverviewPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Overview</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Welcome to Tokfai. Live numbers will appear here once you start
-            sending traffic.
+            OpenAI-compatible image &amp; chat API — one API for chat, image,
+            and AI apps. Live numbers will appear here once you start sending
+            traffic.
           </p>
         </div>
         <Badge variant="secondary">V1 preview</Badge>
@@ -128,6 +144,51 @@ export default async function DashboardOverviewPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Developer quick reference</CardTitle>
+          <CardDescription>
+            Swap your base URL and Authorization header — keep the rest of your
+            OpenAI-compatible code unchanged.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="divide-y rounded-lg border p-0">
+          {QUICK_REFERENCE.map((row) => (
+            <div
+              key={row.label}
+              className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <span className="text-sm font-medium text-foreground">
+                {row.label}
+              </span>
+              <code className="break-all font-mono text-sm text-muted-foreground sm:text-right">
+                {row.value}
+              </code>
+            </div>
+          ))}
+          <div className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-sm font-medium text-foreground">Models</span>
+            <Link
+              href="/dashboard/models"
+              className="font-mono text-sm text-primary underline-offset-4 hover:underline sm:text-right"
+            >
+              /dashboard/models
+            </Link>
+          </div>
+          <div className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-sm font-medium text-foreground">
+              Chat Playground
+            </span>
+            <Link
+              href="/dashboard/playground"
+              className="font-mono text-sm text-primary underline-offset-4 hover:underline sm:text-right"
+            >
+              /dashboard/playground
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Get started in 3 steps</CardTitle>
           <CardDescription>
             Same flow as OpenAI: get a key, top up, start calling.
@@ -138,19 +199,19 @@ export default async function DashboardOverviewPage() {
             n={1}
             title="Create an API key"
             href="/dashboard/api-keys"
-            body="Generate a sk-tokfai_... key. You will only see the secret once."
+            body={`Generate a ${TOKFAI_API_KEY_FORMAT} key. You will only see the secret once.`}
           />
           <Step
             n={2}
             title="Add credits"
             href="/dashboard/credits"
-            body="Credits are consumed per request. No subscription."
+            body={`${TOKFAI_STARTER_PLAN}. ${TOKFAI_BILLING_POLICY}`}
           />
           <Step
             n={3}
-            title="Try the Playground"
+            title="Try the Chat Playground"
             href="/dashboard/playground"
-            body="Send your first chat completion straight from the browser."
+            body={TOKFAI_PLAYGROUND_POLICY}
           />
         </CardContent>
       </Card>

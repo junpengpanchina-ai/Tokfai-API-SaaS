@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     template: "%s · Tokfai",
   },
   description:
-    "OpenAI-compatible API for image generation and chat completions. Drop-in replacement, pay only for what you use.",
+    "OpenAI-compatible image & chat API — one API for chat, image, and AI apps.",
 };
 
 export default function RootLayout({

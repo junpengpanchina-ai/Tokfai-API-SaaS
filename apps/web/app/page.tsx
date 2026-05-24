@@ -14,8 +14,12 @@ import { PublicFooter } from "@/components/public-footer";
 import { PublicHeader } from "@/components/public-header";
 import {
   TOKFAI_API_BASE_URL,
+  TOKFAI_API_KEY_FORMAT,
   TOKFAI_API_KEY_PLACEHOLDER,
-  TOKFAI_CHAT_COMPLETIONS_ENDPOINT,
+  TOKFAI_BILLING_POLICY,
+  TOKFAI_PLAYGROUND_POLICY,
+  TOKFAI_PRODUCT_TAGLINE,
+  TOKFAI_STARTER_PLAN,
 } from "@/lib/tokfai-api";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,25 +32,24 @@ import {
 
 export const metadata: Metadata = {
   title: "Tokfai — OpenAI-compatible image & chat API",
-  description:
-    "One API for chat, image, and AI apps. Prepaid credits, API keys, usage logs, and OpenAI SDK compatibility.",
+  description: TOKFAI_PRODUCT_TAGLINE,
 };
 
 const FEATURES = [
   {
     icon: Sparkles,
     title: "OpenAI-compatible API",
-    body: "Drop in your existing OpenAI client — same endpoints and request shapes at api.tokfai.com.",
+    body: `Drop in your existing OpenAI client — same endpoints and request shapes at ${TOKFAI_API_BASE_URL}.`,
   },
   {
     icon: Wallet,
     title: "Prepaid credits billing",
-    body: "Buy credits upfront, spend per request. No surprise invoices or seat licenses.",
+    body: TOKFAI_BILLING_POLICY,
   },
   {
     icon: KeyRound,
     title: "API key management",
-    body: "Create, label, and revoke keys from your dashboard whenever you need to rotate secrets.",
+    body: `Create, label, and revoke ${TOKFAI_API_KEY_FORMAT} keys from your dashboard whenever you need to rotate secrets.`,
   },
   {
     icon: BarChart3,
@@ -56,7 +59,7 @@ const FEATURES = [
   {
     icon: FlaskConical,
     title: "Playground testing",
-    body: "Try models in the browser before you wire them into production code.",
+    body: "Try chat models in the Chat Playground before you wire them into production code.",
   },
   {
     icon: BookOpen,
@@ -66,10 +69,26 @@ const FEATURES = [
 ];
 
 const STEPS = [
-  { step: 1, title: "Sign in", body: "Create a Tokfai account or log in with your existing credentials." },
-  { step: 2, title: "Buy credits", body: "Top up from the credits page — prepaid balance powers every API call." },
-  { step: 3, title: "Create API key", body: "Issue a sk-tokfai_ key from the dashboard and store it securely." },
-  { step: 4, title: "Call /v1/chat/completions", body: "Point OpenAI SDK, Cursor, Cherry Studio, or your app at api.tokfai.com." },
+  {
+    step: 1,
+    title: "Sign in",
+    body: "Create a Tokfai account or log in with your existing credentials.",
+  },
+  {
+    step: 2,
+    title: "Buy credits",
+    body: `${TOKFAI_STARTER_PLAN} — prepaid balance powers every API call.`,
+  },
+  {
+    step: 3,
+    title: "Create API key",
+    body: `Issue a ${TOKFAI_API_KEY_FORMAT} key from the dashboard and store it securely.`,
+  },
+  {
+    step: 4,
+    title: "Call the API",
+    body: `Point OpenAI SDK, Cursor, Cherry Studio, or your app at ${TOKFAI_API_BASE_URL}.`,
+  },
   {
     step: 5,
     title: "Monitor usage",
@@ -79,8 +98,14 @@ const STEPS = [
 
 const DEV_SNIPPET = [
   { label: "Base URL", value: TOKFAI_API_BASE_URL },
-  { label: "Endpoint", value: TOKFAI_CHAT_COMPLETIONS_ENDPOINT },
-  { label: "Authorization", value: `Bearer ${TOKFAI_API_KEY_PLACEHOLDER}` },
+  { label: "API key format", value: TOKFAI_API_KEY_FORMAT },
+  { label: "Starter", value: TOKFAI_STARTER_PLAN },
+  { label: "Billing", value: TOKFAI_BILLING_POLICY },
+  { label: "Playground", value: TOKFAI_PLAYGROUND_POLICY },
+  {
+    label: "Authorization example",
+    value: `Bearer ${TOKFAI_API_KEY_PLACEHOLDER}`,
+  },
 ] as const;
 
 export default function HomePage() {
@@ -192,6 +217,28 @@ export default function HomePage() {
                     </code>
                   </div>
                 ))}
+                <div className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                  <span className="text-sm font-medium text-foreground">
+                    Models
+                  </span>
+                  <Link
+                    href="/dashboard/models"
+                    className="font-mono text-sm text-primary underline-offset-4 hover:underline sm:text-right"
+                  >
+                    /dashboard/models
+                  </Link>
+                </div>
+                <div className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                  <span className="text-sm font-medium text-foreground">
+                    Chat Playground
+                  </span>
+                  <Link
+                    href="/dashboard/playground"
+                    className="font-mono text-sm text-primary underline-offset-4 hover:underline sm:text-right"
+                  >
+                    /dashboard/playground
+                  </Link>
+                </div>
               </CardContent>
             </Card>
             <div className="mt-6 flex justify-center">

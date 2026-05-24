@@ -15,10 +15,15 @@ import {
 
 import {
   TOKFAI_API_BASE_URL,
+  TOKFAI_API_KEY_FORMAT,
   TOKFAI_API_KEY_PLACEHOLDER,
+  TOKFAI_BILLING_POLICY,
   TOKFAI_CHAT_COMPLETIONS_ENDPOINT,
   TOKFAI_MODELS_ENDPOINT,
+  TOKFAI_PLAYGROUND_POLICY,
+  TOKFAI_PRODUCT_TAGLINE,
   TOKFAI_RECOMMENDED_MODEL,
+  TOKFAI_STARTER_PLAN,
 } from "@/lib/tokfai-api";
 
 const BASE_URL = TOKFAI_API_BASE_URL;
@@ -121,9 +126,12 @@ export function DocsContent({
             API Documentation
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Tokfai exposes an OpenAI-compatible API. Point your client at{" "}
+            {TOKFAI_PRODUCT_TAGLINE} Point your client at{" "}
             <code className="rounded bg-muted px-1 text-xs">{BASE_URL}</code>,
-            send a <code className="rounded bg-muted px-1 text-xs">sk-tokfai_...</code>{" "}
+            send a{" "}
+            <code className="rounded bg-muted px-1 text-xs">
+              {TOKFAI_API_KEY_FORMAT}
+            </code>{" "}
             API key, and use the same request shape as OpenAI.
           </p>
         </div>
@@ -138,11 +146,17 @@ export function DocsContent({
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <AlertCircle className="h-4 w-4 text-amber-600" />
-            Credits are consumed on every call
+            Billing
           </CardTitle>
           <CardDescription className="text-amber-900/80 dark:text-amber-100/80">
-            Each successful API request debits credits from your account. Review
-            per-request usage in{" "}
+            {TOKFAI_BILLING_POLICY} {TOKFAI_STARTER_PLAN} is available on{" "}
+            <Link
+              href="/pricing"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              Pricing
+            </Link>
+            . Review per-request usage in{" "}
             <Link
               href="/dashboard/usage"
               className="font-medium text-foreground underline-offset-4 hover:underline"
@@ -174,7 +188,7 @@ export function DocsContent({
           id="api-key-format"
           title="API key format"
           description="Create keys in the dashboard; shown once at creation."
-          value="sk-tokfai_..."
+          value={TOKFAI_API_KEY_FORMAT}
           copied={copiedId === "api-key-format"}
           onCopy={copyText}
         />
@@ -195,6 +209,30 @@ export function DocsContent({
           onCopy={copyText}
         />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Models</CardTitle>
+          <CardDescription>
+            Browse chat, image, and video model IDs in{" "}
+            <Link
+              href="/dashboard/models"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              Models
+            </Link>
+            . Image and video models are currently coming soon; chat models are
+            available via the API and{" "}
+            <Link
+              href="/dashboard/playground"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              Chat Playground
+            </Link>
+            . {TOKFAI_PLAYGROUND_POLICY}
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -340,7 +378,9 @@ export function DocsContent({
               Settings → Provider → OpenAI-compatible → set API Host to{" "}
               <code className="rounded bg-muted px-1 text-xs">{BASE_URL}</code>,
               API Key to your{" "}
-              <code className="rounded bg-muted px-1 text-xs">sk-tokfai_...</code>{" "}
+              <code className="rounded bg-muted px-1 text-xs">
+                {TOKFAI_API_KEY_FORMAT}
+              </code>{" "}
               key, and default model to{" "}
               <code className="rounded bg-muted px-1 text-xs">{DEFAULT_MODEL}</code>.
             </p>

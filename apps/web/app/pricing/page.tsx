@@ -6,7 +6,11 @@ import { PublicFooter } from "@/components/public-footer";
 import { PublicHeader } from "@/components/public-header";
 import {
   TOKFAI_API_BASE_URL,
-  TOKFAI_CHAT_COMPLETIONS_ENDPOINT,
+  TOKFAI_API_KEY_FORMAT,
+  TOKFAI_BILLING_POLICY,
+  TOKFAI_PLAYGROUND_POLICY,
+  TOKFAI_PRODUCT_TAGLINE,
+  TOKFAI_STARTER_PLAN,
 } from "@/lib/tokfai-api";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,8 +23,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Pricing",
-  description:
-    "Tokfai prepaid credit plans for OpenAI-compatible chat and image APIs.",
+  description: TOKFAI_PRODUCT_TAGLINE,
 };
 
 const PLANS = [
@@ -50,9 +53,9 @@ const PLANS = [
 
 const USAGE_POINTS = [
   {
-    id: "per-request",
+    id: "billing-policy",
     icon: Gauge,
-    text: "Credits are consumed per API request.",
+    text: TOKFAI_BILLING_POLICY,
   },
   {
     id: "model-cost",
@@ -95,7 +98,20 @@ const USAGE_POINTS = [
 
 const DEV_ITEMS = [
   { label: "Base URL", value: TOKFAI_API_BASE_URL },
-  { label: "Endpoint", value: TOKFAI_CHAT_COMPLETIONS_ENDPOINT },
+  { label: "API key format", value: TOKFAI_API_KEY_FORMAT },
+  { label: "Starter", value: TOKFAI_STARTER_PLAN },
+  { label: "Billing", value: TOKFAI_BILLING_POLICY },
+  { label: "Playground", value: TOKFAI_PLAYGROUND_POLICY },
+  {
+    label: "Models",
+    value: "/dashboard/models",
+    href: "/dashboard/models",
+  },
+  {
+    label: "Chat Playground",
+    value: "/dashboard/playground",
+    href: "/dashboard/playground",
+  },
   {
     label: "API Keys",
     value: "/dashboard/api-keys",
@@ -116,8 +132,8 @@ export default function PricingPage() {
               OpenAI-compatible image &amp; chat API
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-balance text-lg text-muted-foreground">
-              Use Tokfai API with Cursor, Cherry Studio, OpenAI SDK, or your
-              own app.
+              One API for chat, image, and AI apps. Use Tokfai with Cursor,
+              Cherry Studio, OpenAI SDK, or your own app.
             </p>
           </div>
 
@@ -209,12 +225,12 @@ export default function PricingPage() {
                     {"href" in item && item.href ? (
                       <Link
                         href={item.href}
-                        className="font-mono text-sm text-primary underline-offset-4 hover:underline"
+                        className="break-all font-mono text-sm text-primary underline-offset-4 hover:underline sm:text-right"
                       >
                         {item.value}
                       </Link>
                     ) : (
-                      <code className="font-mono text-sm text-muted-foreground">
+                      <code className="break-all font-mono text-sm text-muted-foreground sm:text-right">
                         {item.value}
                       </code>
                     )}
