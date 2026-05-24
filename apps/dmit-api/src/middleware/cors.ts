@@ -2,7 +2,13 @@ import { cors } from "hono/cors";
 
 import { env } from "../env.js";
 
-const allowed = new Set(env.CORS_ALLOWED_ORIGINS);
+const BASELINE_ORIGINS = [
+  "https://tokfai.com",
+  "https://www.tokfai.com",
+  "http://localhost:3000",
+] as const;
+
+const allowed = new Set([...BASELINE_ORIGINS, ...env.CORS_ALLOWED_ORIGINS]);
 
 /**
  * CORS for browser callers (tokfai.com + dev). DMIT is also called by
@@ -16,8 +22,8 @@ export const corsMiddleware = cors({
     if (!origin) return null;
     return allowed.has(origin) ? origin : null;
   },
-  allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
-  allowHeaders: ["Authorization", "Content-Type", "Stripe-Signature"],
+  allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+  allowHeaders: ["Authorization", "Content-Type", "X-Request-Id"],
   exposeHeaders: ["X-Request-Id"],
   maxAge: 86400,
   credentials: false,

@@ -24,7 +24,9 @@ const Schema = z
 
   CORS_ALLOWED_ORIGINS: z
     .string()
-    .default("https://tokfai.com,http://localhost:3000")
+    .default(
+      "https://tokfai.com,https://www.tokfai.com,http://localhost:3000",
+    )
     .transform(csv),
 
   SUPABASE_URL: z.string().url(),
