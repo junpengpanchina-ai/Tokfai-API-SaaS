@@ -36,7 +36,7 @@ export function ModelsClient() {
           <h1 className="text-3xl font-semibold tracking-tight">Models</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Browse Tokfai model IDs, types, and availability. Use these IDs in
-            your API requests or the Chat Playground.
+            your API requests or the Chat / Image Playgrounds.
           </p>
         </div>
         <Badge variant="secondary">{TOKFAI_MODELS_ENDPOINT}</Badge>
@@ -50,9 +50,8 @@ export function ModelsClient() {
           <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
             <li>Failed calls are not charged.</li>
             <li>Chat Playground only supports chat models.</li>
-            <li>
-              Image and video models will use separate playgrounds later.
-            </li>
+            <li>Image Playground only supports image models.</li>
+            <li>Video models will use a separate playground later.</li>
           </ul>
         </CardContent>
       </Card>
@@ -66,9 +65,16 @@ export function ModelsClient() {
 
       <ModelSection
         title="Image Models"
-        description="Coming soon — image generation models planned for a dedicated Image Playground."
+        description="Image generation models available through the API and Image Playground."
         icon={ImageIcon}
-        models={IMAGE_MODELS}
+        models={IMAGE_MODELS.filter((model) => model.id !== "gpt-image-2-vip")}
+      />
+
+      <ModelSection
+        title="Image Models (coming soon)"
+        description="Additional image models planned for future release."
+        icon={ImageIcon}
+        models={IMAGE_MODELS.filter((model) => model.id === "gpt-image-2-vip")}
         comingSoon
       />
 
@@ -187,14 +193,28 @@ function ModelCard({ model }: { model: ModelCatalogEntry }) {
                 Try in Chat Playground
               </Link>
             </Button>
+          ) : model.type === "image" && model.status === "available" ? (
+            <Button asChild size="sm">
+              <Link
+                href={`/dashboard/image-playground?model=${encodeURIComponent(model.id)}`}
+              >
+                <ImageIcon className="h-4 w-4" />
+                Try in Image Playground
+              </Link>
+            </Button>
           ) : (
             <Button type="button" size="sm" variant="secondary" disabled>
               {model.type === "video" ? (
-                <Video className="h-4 w-4" />
+                <>
+                  <Video className="h-4 w-4" />
+                  Video Playground coming soon
+                </>
               ) : (
-                <ImageIcon className="h-4 w-4" />
+                <>
+                  <ImageIcon className="h-4 w-4" />
+                  Coming soon
+                </>
               )}
-              Image Playground coming soon
             </Button>
           )}
         </div>

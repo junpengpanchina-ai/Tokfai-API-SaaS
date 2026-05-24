@@ -2,6 +2,7 @@
 export const TOKFAI_API_BASE_URL = "https://api.tokfai.com/v1";
 export const TOKFAI_MODELS_ENDPOINT = "GET /models";
 export const TOKFAI_CHAT_COMPLETIONS_ENDPOINT = "POST /chat/completions";
+export const TOKFAI_IMAGES_GENERATIONS_ENDPOINT = "POST /images/generations";
 export const TOKFAI_API_KEY_FORMAT = "sk-tokfai_...";
 export const TOKFAI_API_KEY_PLACEHOLDER = "sk-tokfai_xxx";
 export const TOKFAI_RECOMMENDED_MODEL = "gemini-3.1-pro";

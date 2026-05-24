@@ -35,7 +35,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     id: "nano-banana",
     displayName: "Nano Banana",
     type: "image",
-    status: "coming_soon",
+    status: "available",
     billingUnit: "Per image",
     description: "Image generation model.",
   },
@@ -43,7 +43,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     id: "nano-banana-fast",
     displayName: "Nano Banana Fast",
     type: "image",
-    status: "coming_soon",
+    status: "available",
     billingUnit: "Per image",
     description: "Fast image generation with lower latency.",
   },
@@ -51,15 +51,23 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     id: "nano-banana-pro",
     displayName: "Nano Banana Pro",
     type: "image",
-    status: "coming_soon",
+    status: "available",
     billingUnit: "Per image",
     description: "Higher-quality image generation model.",
+  },
+  {
+    id: "nano-banana-2",
+    displayName: "Nano Banana 2",
+    type: "image",
+    status: "available",
+    billingUnit: "Per image",
+    description: "Next-generation Nano Banana image model.",
   },
   {
     id: "gpt-image-2",
     displayName: "GPT Image 2",
     type: "image",
-    status: "coming_soon",
+    status: "available",
     billingUnit: "Per image",
     description: "OpenAI-compatible image generation model.",
   },
@@ -72,6 +80,25 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     description: "Premium tier of GPT Image 2.",
   },
 ];
+
+/** Image models exposed in the Image Playground dropdown. */
+export const IMAGE_PLAYGROUND_MODEL_IDS = [
+  "nano-banana",
+  "nano-banana-fast",
+  "nano-banana-pro",
+  "nano-banana-2",
+  "gpt-image-2",
+] as const;
+
+export type ImagePlaygroundModelId = (typeof IMAGE_PLAYGROUND_MODEL_IDS)[number];
+
+export const IMAGE_PLAYGROUND_SIZES = [
+  "1024x1024",
+  "1792x1024",
+  "1024x1792",
+] as const;
+
+export type ImagePlaygroundSize = (typeof IMAGE_PLAYGROUND_SIZES)[number];
 
 export const VIDEO_MODELS: ModelCatalogEntry[] = [
   {
@@ -90,4 +117,10 @@ export const AVAILABLE_CHAT_MODEL_IDS = CHAT_MODELS.filter(
 
 export function isAvailableChatModel(modelId: string): boolean {
   return AVAILABLE_CHAT_MODEL_IDS.includes(modelId);
+}
+
+export function isAvailableImageModel(
+  modelId: string
+): modelId is ImagePlaygroundModelId {
+  return (IMAGE_PLAYGROUND_MODEL_IDS as readonly string[]).includes(modelId);
 }

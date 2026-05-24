@@ -4,10 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
+  Check,
   CheckCircle2,
+  Copy,
+  ImageIcon,
   KeyRound,
   Loader2,
-  Send,
   Sparkles,
 } from "lucide-react";
 
@@ -23,31 +25,37 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  chatCompletions,
   DmitApiError,
+  imageGenerations,
   revealMeApiKey,
-  type ChatCompletionResponse,
+  type ImageGenerationResponse,
 } from "@/lib/dmit/client";
 import { userMessageForDmitError } from "@/lib/dmit-messages";
-import { isAvailableChatModel } from "@/lib/model-catalog";
+import {
+  IMAGE_PLAYGROUND_MODEL_IDS,
+  IMAGE_PLAYGROUND_SIZES,
+  isAvailableImageModel,
+  type ImagePlaygroundModelId,
+  type ImagePlaygroundSize,
+} from "@/lib/model-catalog";
 import {
   isFullTokfaiApiKey,
   TOKFAI_API_KEY_PLACEHOLDER,
-  TOKFAI_CHAT_COMPLETIONS_ENDPOINT,
+  TOKFAI_IMAGES_GENERATIONS_ENDPOINT,
 } from "@/lib/tokfai-api";
 
-const DEFAULT_MODEL = "gemini-3.1-pro";
-const MODEL_OPTIONS = ["gemini-3.1-pro", "gemini-3-pro"] as const;
+const DEFAULT_MODEL: ImagePlaygroundModelId = "nano-banana";
+const DEFAULT_SIZE: ImagePlaygroundSize = "1024x1024";
+const DEFAULT_PROMPT = "A serene mountain landscape at sunset, digital art.";
 
-function resolveInitialModel(initialModel?: string): string {
-  if (initialModel && isAvailableChatModel(initialModel)) {
+function resolveInitialModel(initialModel?: string): ImagePlaygroundModelId {
+  if (initialModel && isAvailableImageModel(initialModel)) {
     return initialModel;
   }
   return DEFAULT_MODEL;
 }
-const DEFAULT_PROMPT = "Say hello from Tokfai.";
 
-export interface PlaygroundApiKeyOption {
+export interface ImagePlaygroundApiKeyOption {
   id: string;
   name: string;
   prefix: string;
@@ -63,16 +71,17 @@ interface PlaygroundError {
 
 type ApiKeyMode = "paste" | "select";
 
-export function PlaygroundClient({
+export function ImagePlaygroundClient({
   accessToken,
   activeKeys,
   initialModel,
 }: {
   accessToken: string;
-  activeKeys: PlaygroundApiKeyOption[];
+  activeKeys: ImagePlaygroundApiKeyOption[];
   initialModel?: string;
 }) {
   const [model, setModel] = useState(() => resolveInitialModel(initialModel));
+  const [size, setSize] = useState<ImagePlaygroundSize>(DEFAULT_SIZE);
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
   const [apiKeyMode, setApiKeyMode] = useState<ApiKeyMode>(
     activeKeys.length > 0 ? "select" : "paste"
@@ -80,10 +89,10 @@ export function PlaygroundClient({
   const [apiKey, setApiKey] = useState("");
   const [selectedKeyId, setSelectedKeyId] = useState(activeKeys[0]?.id ?? "");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<ChatCompletionResponse | null>(null);
+  const [result, setResult] = useState<ImageGenerationResponse | null>(null);
   const [error, setError] = useState<PlaygroundError | null>(null);
 
-  async function handleRun(event: React.FormEvent<HTMLFormElement>) {
+  async function handleGenerate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (loading) return;
 
@@ -92,7 +101,11 @@ export function PlaygroundClient({
 
     const trimmedPrompt = prompt.trim();
     if (!trimmedPrompt) {
-      setError({ status: 0, code: "missing_prompt", message: "Prompt is required." });
+      setError({
+        status: 0,
+        code: "missing_prompt",
+        message: "Prompt is required.",
+      });
       return;
     }
 
@@ -106,10 +119,12 @@ export function PlaygroundClient({
 
     setLoading(true);
     try {
-      const res = await chatCompletions(resolvedKey, {
+      const res = await imageGenerations(resolvedKey, {
         model,
-        messages: [{ role: "user", content: trimmedPrompt }],
-        stream: false,
+        prompt: trimmedPrompt,
+        size,
+        n: 1,
+        response_format: "url",
       });
       setResult(res);
     } catch (err) {
@@ -167,30 +182,23 @@ export function PlaygroundClient({
   }
 
   return (
-    <form onSubmit={handleRun} className="flex flex-col gap-6">
+    <form onSubmit={handleGenerate} className="flex flex-col gap-6">
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">
-            Chat Playground
+            Image Playground
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Chat Playground only supports chat models. Send a single-turn
-            completion through the Tokfai API using your own{" "}
-            <code className="rounded bg-muted px-1 text-xs">sk-tokfai_</code> key
-            — the same path external clients use, so normal billing applies.
+            Image Playground uses image models only. Successful generations debit
+            credits. Failed calls are not charged.
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            For image models, use{" "}
-            <Link
-              href="/dashboard/image-playground"
-              className="underline underline-offset-4"
-            >
-              Image Playground
-            </Link>
-            .
+            Send a generation request through the Tokfai API using your own{" "}
+            <code className="rounded bg-muted px-1 text-xs">sk-tokfai_</code>{" "}
+            key — the same path external clients use.
           </p>
         </div>
-        <Badge variant="secondary">{TOKFAI_CHAT_COMPLETIONS_ENDPOINT}</Badge>
+        <Badge variant="secondary">{TOKFAI_IMAGES_GENERATIONS_ENDPOINT}</Badge>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr,280px]">
@@ -198,8 +206,8 @@ export function PlaygroundClient({
           <CardHeader>
             <CardTitle>Request</CardTitle>
             <CardDescription>
-              One user message, non-streaming. Successful calls are recorded in
-              Usage and debited from Credits.
+              One prompt, one image. Successful calls are recorded in Usage and
+              debited from Credits.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -218,7 +226,7 @@ export function PlaygroundClient({
               <Label htmlFor="prompt">Prompt</Label>
               <textarea
                 id="prompt"
-                rows={8}
+                rows={6}
                 required
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
@@ -232,12 +240,12 @@ export function PlaygroundClient({
                 {loading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Running…
+                    Generating…
                   </>
                 ) : (
                   <>
-                    <Send className="h-4 w-4" />
-                    Run
+                    <ImageIcon className="h-4 w-4" />
+                    Generate
                   </>
                 )}
               </Button>
@@ -251,7 +259,7 @@ export function PlaygroundClient({
           <CardHeader>
             <CardTitle>Settings</CardTitle>
             <CardDescription>
-              Chat models only. The selected model is passed in the JSON body to{" "}
+              Image models only. Values are sent in the JSON body to{" "}
               <code className="rounded bg-muted px-1 text-xs">
                 api.tokfai.com
               </code>
@@ -264,17 +272,35 @@ export function PlaygroundClient({
               <select
                 id="model"
                 value={model}
-                onChange={(e) => setModel(e.target.value)}
+                onChange={(e) => setModel(e.target.value as ImagePlaygroundModelId)}
                 disabled={loading}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {MODEL_OPTIONS.map((m) => (
+                {IMAGE_PLAYGROUND_MODEL_IDS.map((m) => (
                   <option key={m} value={m}>
                     {m}
                   </option>
                 ))}
               </select>
             </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="size">Size</Label>
+              <select
+                id="size"
+                value={size}
+                onChange={(e) => setSize(e.target.value as ImagePlaygroundSize)}
+                disabled={loading}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {IMAGE_PLAYGROUND_SIZES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <p className="text-xs text-muted-foreground">
               Need a key?{" "}
               <Link
@@ -310,7 +336,7 @@ function ApiKeyField({
   onSelectedKeyChange,
 }: {
   mode: ApiKeyMode;
-  activeKeys: PlaygroundApiKeyOption[];
+  activeKeys: ImagePlaygroundApiKeyOption[];
   apiKey: string;
   selectedKeyId: string;
   loading: boolean;
@@ -423,13 +449,13 @@ function ResponsePanel({
 }: {
   loading: boolean;
   error: PlaygroundError | null;
-  result: ChatCompletionResponse | null;
+  result: ImageGenerationResponse | null;
 }) {
   if (loading) {
     return (
       <div className="flex items-center gap-2 rounded-md border bg-muted/40 p-4 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Waiting for the model…
+        Generating image…
       </div>
     );
   }
@@ -469,16 +495,12 @@ function ResponsePanel({
     return (
       <div className="flex items-center gap-2 rounded-md border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
         <Sparkles className="h-4 w-4" />
-        Response will appear here.
+        Generated image will appear here.
       </div>
     );
   }
 
-  const content =
-    result.choices?.[0]?.message?.content ?? "(no content returned)";
-  const usage = result.usage;
-  const requestId =
-    result.tokfai?.request_id ?? result.request_id ?? null;
+  const imageUrl = result.data?.[0]?.url ?? null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -503,62 +525,102 @@ function ResponsePanel({
         </p>
       </div>
 
-      <div className="rounded-md border bg-muted/40 p-4">
-        <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-          <Badge variant="secondary">assistant</Badge>
+      {imageUrl ? (
+        <div className="overflow-hidden rounded-md border bg-muted/20">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={imageUrl}
+            alt="Generated image"
+            className="mx-auto max-h-[480px] w-full object-contain"
+          />
         </div>
-        <pre className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-          {content}
-        </pre>
-      </div>
+      ) : (
+        <div className="rounded-md border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
+          No image URL returned.
+        </div>
+      )}
 
-      <UsageRow model={result.model} usage={usage} requestId={requestId} />
+      <MetadataPanel result={result} imageUrl={imageUrl} />
     </div>
   );
 }
 
-function UsageRow({
-  model,
-  usage,
-  requestId,
+function MetadataPanel({
+  result,
+  imageUrl,
 }: {
-  model: string;
-  usage?: ChatCompletionResponse["usage"];
-  requestId: string | null;
+  result: ImageGenerationResponse;
+  imageUrl: string | null;
 }) {
-  const items: Array<{ label: string; value: string }> = [
-    { label: "model", value: model },
-  ];
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
 
-  if (usage) {
-    items.push({
-      label: "prompt_tokens",
-      value: usage.prompt_tokens.toString(),
-    });
-    items.push({
-      label: "completion_tokens",
-      value: usage.completion_tokens.toString(),
-    });
-    items.push({
-      label: "total_tokens",
-      value: usage.total_tokens.toString(),
-    });
+  async function handleCopyUrl() {
+    if (!imageUrl) return;
+    try {
+      await navigator.clipboard.writeText(imageUrl);
+      setCopyStatus("copied");
+      window.setTimeout(() => setCopyStatus("idle"), 2000);
+    } catch {
+      setCopyStatus("idle");
+    }
   }
 
+  const items: Array<{ label: string; value: string | number | null | undefined }> =
+    [
+      { label: "model", value: result.model },
+      { label: "request_id", value: result.request_id },
+      { label: "upstream_id", value: result.upstream_id },
+      {
+        label: "credits_charged",
+        value:
+          result.credits_charged != null
+            ? String(result.credits_charged)
+            : null,
+      },
+    ];
+
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border bg-card px-4 py-2 text-xs text-muted-foreground">
-      {items.map((item) => (
-        <div key={item.label} className="flex items-center gap-1">
-          <span>{item.label}:</span>
-          <span className="font-mono text-foreground">{item.value}</span>
-        </div>
-      ))}
-      {requestId ? (
-        <div className="ml-auto flex items-center gap-1">
-          <span>request_id:</span>
-          <span className="font-mono text-foreground">{requestId}</span>
+    <div className="flex flex-col gap-3 rounded-md border bg-card p-4">
+      {imageUrl ? (
+        <div className="flex flex-col gap-2">
+          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+            Image URL
+          </Label>
+          <code className="block overflow-x-auto rounded-md border bg-muted/40 p-3 font-mono text-xs break-all">
+            {imageUrl}
+          </code>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="w-fit"
+            onClick={handleCopyUrl}
+          >
+            {copyStatus === "copied" ? (
+              <>
+                <Check className="h-4 w-4" />
+                Copied
+              </>
+            ) : (
+              <>
+                <Copy className="h-4 w-4" />
+                Copy image URL
+              </>
+            )}
+          </Button>
         </div>
       ) : null}
+
+      <dl className="grid gap-2 text-sm">
+        {items.map((item) =>
+          item.value != null && item.value !== "" ? (
+            <div key={item.label} className="flex flex-wrap gap-x-2">
+              <dt className="text-muted-foreground">{item.label}:</dt>
+              <dd className="font-mono">{item.value}</dd>
+            </div>
+          ) : null
+        )}
+      </dl>
     </div>
   );
 }

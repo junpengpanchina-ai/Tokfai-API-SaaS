@@ -740,6 +740,62 @@ async function dmitFetchWithHeaders<T = unknown>(
 }
 
 // ---------------------------------------------------------------------------
+// Image generations — POST /v1/images/generations
+//
+// Auth: sk-tokfai_ API key only (same as external customers).
+// ---------------------------------------------------------------------------
+
+export interface ImageGenerationRequest {
+  model: string;
+  prompt: string;
+  size?: string;
+  n?: number;
+  response_format?: "url";
+}
+
+export interface ImageGenerationDataItem {
+  url?: string;
+  b64_json?: string;
+}
+
+export interface ImageGenerationResponse {
+  created: number;
+  data: ImageGenerationDataItem[];
+  model: string;
+  request_id?: string;
+  upstream_id?: string;
+  credits_charged?: number;
+}
+
+/**
+ * Call POST /v1/images/generations using the user's own sk-tokfai_... key.
+ *
+ * The api key is passed through to the Authorization header and never logged,
+ * stored, or persisted by this module.
+ */
+export async function imageGenerations(
+  apiKey: string,
+  body: ImageGenerationRequest
+): Promise<ImageGenerationResponse> {
+  if (!apiKey) {
+    throw new DmitApiError({
+      status: 400,
+      message: "Missing API key.",
+      code: "no_api_key",
+    });
+  }
+  return dmitFetch<ImageGenerationResponse>("/v1/images/generations", {
+    method: "POST",
+    json: {
+      ...body,
+      n: body.n ?? 1,
+      response_format: body.response_format ?? "url",
+    },
+    accessToken: apiKey,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Health — useful for debug + status pages
 // ---------------------------------------------------------------------------
 

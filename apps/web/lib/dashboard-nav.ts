@@ -4,6 +4,7 @@ import {
   Boxes,
   CreditCard,
   Gauge,
+  ImageIcon,
   KeyRound,
   LayoutDashboard,
   Terminal,
@@ -35,6 +36,12 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
     href: "/dashboard/playground",
     label: "Playground",
     icon: Terminal,
+    prefetch: false,
+  },
+  {
+    href: "/dashboard/image-playground",
+    label: "Image Playground",
+    icon: ImageIcon,
     prefetch: false,
   },
   {
