@@ -30,6 +30,22 @@ type UsageAdminRow = {
   request_id: string | null;
 };
 
+type UsageAdminDetailRow = {
+  id: string;
+  user_id: string;
+  api_key_id: string | null;
+  created_at: string;
+  model: string | null;
+  status: string | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  credits_charged: number | string | null;
+  request_id: string | null;
+  error_code: string | null;
+  error_message: string | null;
+};
+
 type UsageCreditRow = {
   credits_charged: number | string | null;
 };
@@ -379,6 +395,102 @@ async function listRecentUsageLogs() {
   }));
 }
 
+async function listAdminUsageLogs() {
+  const { data, error } = await supabase()
+    .from("usage_logs")
+    .select(
+      "id, user_id, api_key_id, created_at, model, status, prompt_tokens, completion_tokens, total_tokens, credits_charged, request_id, error_code, error_message"
+    )
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (error) {
+    throw ApiError.internal(
+      `Failed to list admin usage logs: ${error.message}`,
+      "admin_usage_list_failed"
+    );
+  }
+
+  const logs = (data ?? []) as UsageAdminDetailRow[];
+  const userIds = [...new Set(logs.map((row) => row.user_id))];
+  const apiKeyIds = [
+    ...new Set(
+      logs
+        .map((row) => row.api_key_id)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+
+  const emails = new Map<string, string | null>();
+  const apiKeys = new Map<
+    string,
+    { prefix: string | null; name: string | null }
+  >();
+
+  if (userIds.length > 0) {
+    const { data: profiles, error: profileError } = await supabase()
+      .from("profiles")
+      .select("id, email")
+      .in("id", userIds);
+
+    if (profileError) {
+      throw ApiError.internal(
+        `Failed to map usage emails: ${profileError.message}`,
+        "admin_usage_email_map_failed"
+      );
+    }
+
+    for (const profile of (profiles ?? []) as Array<{
+      id: string;
+      email: string | null;
+    }>) {
+      emails.set(profile.id, profile.email);
+    }
+  }
+
+  if (apiKeyIds.length > 0) {
+    const { data: keys, error: apiKeyError } = await supabase()
+      .from("api_keys")
+      .select("id, prefix, name")
+      .in("id", apiKeyIds);
+
+    if (apiKeyError) {
+      throw ApiError.internal(
+        `Failed to map usage API keys: ${apiKeyError.message}`,
+        "admin_usage_api_key_map_failed"
+      );
+    }
+
+    for (const key of (keys ?? []) as Array<{
+      id: string;
+      prefix: string | null;
+      name: string | null;
+    }>) {
+      apiKeys.set(key.id, { prefix: key.prefix, name: key.name });
+    }
+  }
+
+  return logs.map((row) => {
+    const apiKey = row.api_key_id ? apiKeys.get(row.api_key_id) : null;
+
+    return {
+      created_at: row.created_at,
+      email: emails.get(row.user_id) ?? null,
+      api_key_prefix: apiKey?.prefix ?? null,
+      api_key_name: apiKey?.name ?? null,
+      model: row.model,
+      status: row.status,
+      prompt_tokens: row.prompt_tokens,
+      completion_tokens: row.completion_tokens,
+      total_tokens: row.total_tokens,
+      credits_charged: toNumber(row.credits_charged),
+      request_id: row.request_id,
+      error_code: row.error_code,
+      error_message: row.error_message,
+    };
+  });
+}
+
 async function listAllApiKeys(): Promise<ApiKeyAdminRow[]> {
   const rows: ApiKeyAdminRow[] = [];
 
@@ -673,6 +785,11 @@ adminRoutes.get("/api-keys", async (c) => {
 adminRoutes.get("/models", async (c) => {
   const models = await listAdminModels();
   return c.json({ models });
+});
+
+adminRoutes.get("/usage", async (c) => {
+  const usageLogs = await listAdminUsageLogs();
+  return c.json({ data: usageLogs });
 });
 
 adminRoutes.patch("/models/:id", async (c) => {

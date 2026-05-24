@@ -12,6 +12,9 @@ const PRICING_PATCH_FIELDS = [
   "markup_multiplier",
 ] as const;
 
+const PER_1K_MAX = 0.1;
+const MARKUP_MULTIPLIER_MAX = 20;
+
 const ModelPatchSchema = z
   .object({
     enabled: z.boolean().optional(),
@@ -21,10 +24,10 @@ const ModelPatchSchema = z
 
 const PricingPatchSchema = z
   .object({
-    input_per_1k: z.number().nonnegative().optional(),
-    output_per_1k: z.number().nonnegative().optional(),
+    input_per_1k: z.number().min(0).max(PER_1K_MAX).optional(),
+    output_per_1k: z.number().min(0).max(PER_1K_MAX).optional(),
     billable: z.boolean().optional(),
-    markup_multiplier: z.number().positive().optional(),
+    markup_multiplier: z.number().min(0).max(MARKUP_MULTIPLIER_MAX).optional(),
   })
   .strict();
 
@@ -197,7 +200,7 @@ function partitionPatchBody(body: Record<string, unknown>):
   if (!pricingParsed.success) {
     return {
       ok: false,
-      error: "invalid_pricing_fields",
+      error: "invalid_pricing_value",
       detail: pricingParsed.error.flatten(),
     };
   }

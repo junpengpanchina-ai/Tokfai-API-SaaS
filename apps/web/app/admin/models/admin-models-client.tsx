@@ -44,6 +44,10 @@ type ModelPatchBody = {
   markup_multiplier: number;
 };
 
+const PER_1K_MAX = 0.1;
+const PER_1K_HIGH_THRESHOLD = 0.05;
+const MARKUP_MULTIPLIER_MAX = 20;
+
 type RowDraft = {
   enabled: boolean;
   visible: boolean;
@@ -168,34 +172,26 @@ export function AdminModelsClient({
     const row = models.find((m) => m.id === id);
     if (!draft || !row) return;
 
-    const input_per_1k = parseNonNegative(draft.input_per_1k);
-    const output_per_1k = parseNonNegative(draft.output_per_1k);
-    const markup_multiplier = parsePositive(draft.markup_multiplier);
-
-    if (
-      input_per_1k === "invalid" ||
-      output_per_1k === "invalid" ||
-      markup_multiplier === "invalid"
-    ) {
+    const validated = validateModelPatch(draft, row);
+    if (!validated.ok) {
       setRowError((prev) => ({
         ...prev,
-        [id]: "Enter valid non-negative pricing values; markup must be > 0.",
+        [id]: validated.message,
       }));
       return;
     }
 
-    const patch: ModelPatchBody = {
-      enabled: draft.enabled,
-      visible: draft.visible,
-      billable: draft.billable,
-      input_per_1k: input_per_1k === "empty" ? row.input_per_1k ?? 0 : input_per_1k,
-      output_per_1k:
-        output_per_1k === "empty" ? row.output_per_1k ?? 0 : output_per_1k,
-      markup_multiplier:
-        markup_multiplier === "empty"
-          ? row.markup_multiplier ?? 1
-          : markup_multiplier,
-    };
+    const patch = validated.patch;
+
+    if (
+      patch.input_per_1k > PER_1K_HIGH_THRESHOLD ||
+      patch.output_per_1k > PER_1K_HIGH_THRESHOLD
+    ) {
+      const confirmed = window.confirm(
+        "This price is unusually high. Confirm save?"
+      );
+      if (!confirmed) return;
+    }
 
     setSavingRowId(id);
     try {
@@ -458,12 +454,98 @@ function parseNonNegative(raw: string): ParseResult {
   return value;
 }
 
-function parsePositive(raw: string): ParseResult {
-  const trimmed = raw.trim();
-  if (!trimmed) return "empty";
-  const value = Number(trimmed);
-  if (!Number.isFinite(value) || value <= 0) return "invalid";
-  return value;
+function parseBoundedNumber(
+  raw: string,
+  max: number
+): ParseResult | "out_of_range" {
+  const parsed = parseNonNegative(raw);
+  if (parsed === "empty" || parsed === "invalid") return parsed;
+  if (parsed > max) return "out_of_range";
+  return parsed;
+}
+
+function validateModelPatch(
+  draft: RowDraft,
+  row: AdminModel
+):
+  | { ok: true; patch: ModelPatchBody }
+  | { ok: false; message: string } {
+  if (
+    typeof draft.enabled !== "boolean" ||
+    typeof draft.visible !== "boolean" ||
+    typeof draft.billable !== "boolean"
+  ) {
+    return {
+      ok: false,
+      message: "Enabled, visible, and billable must be boolean values.",
+    };
+  }
+
+  const inputParsed = parseBoundedNumber(draft.input_per_1k, PER_1K_MAX);
+  const outputParsed = parseBoundedNumber(draft.output_per_1k, PER_1K_MAX);
+  const markupParsed = parseBoundedNumber(
+    draft.markup_multiplier,
+    MARKUP_MULTIPLIER_MAX
+  );
+
+  if (
+    inputParsed === "invalid" ||
+    outputParsed === "invalid" ||
+    markupParsed === "invalid"
+  ) {
+    return {
+      ok: false,
+      message: "Enter valid numeric pricing values (0 or greater).",
+    };
+  }
+
+  if (
+    inputParsed === "out_of_range" ||
+    outputParsed === "out_of_range" ||
+    markupParsed === "out_of_range"
+  ) {
+    return {
+      ok: false,
+      message: `Pricing must be within limits: input/output per 1k ≤ ${PER_1K_MAX}, markup ≤ ${MARKUP_MULTIPLIER_MAX}.`,
+    };
+  }
+
+  const patch: ModelPatchBody = {
+    enabled: draft.enabled,
+    visible: draft.visible,
+    billable: draft.billable,
+    input_per_1k:
+      inputParsed === "empty" ? (row.input_per_1k ?? 0) : inputParsed,
+    output_per_1k:
+      outputParsed === "empty" ? (row.output_per_1k ?? 0) : outputParsed,
+    markup_multiplier:
+      markupParsed === "empty"
+        ? (row.markup_multiplier ?? 1)
+        : markupParsed,
+  };
+
+  if (patch.input_per_1k < 0 || patch.input_per_1k > PER_1K_MAX) {
+    return {
+      ok: false,
+      message: `Input per 1k must be between 0 and ${PER_1K_MAX}.`,
+    };
+  }
+
+  if (patch.output_per_1k < 0 || patch.output_per_1k > PER_1K_MAX) {
+    return {
+      ok: false,
+      message: `Output per 1k must be between 0 and ${PER_1K_MAX}.`,
+    };
+  }
+
+  if (patch.markup_multiplier < 0 || patch.markup_multiplier > MARKUP_MULTIPLIER_MAX) {
+    return {
+      ok: false,
+      message: `Markup multiplier must be between 0 and ${MARKUP_MULTIPLIER_MAX}.`,
+    };
+  }
+
+  return { ok: true, patch };
 }
 
 function modelsFromResponse(body: ModelsResponse | null | undefined): AdminModel[] {

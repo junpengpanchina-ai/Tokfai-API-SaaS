@@ -167,12 +167,18 @@ export default async function AdminPage() {
             Internal usage overview served by DMIT. This page does not hold
             service-role credentials.
           </p>
-          <p className="mt-3">
+          <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
             <Link
               href="/admin/models"
               className="text-sm font-medium underline-offset-4 hover:underline"
             >
               Manage model catalog →
+            </Link>
+            <Link
+              href="/admin/usage"
+              className="text-sm font-medium underline-offset-4 hover:underline"
+            >
+              Manage usage logs →
             </Link>
           </p>
         </div>
