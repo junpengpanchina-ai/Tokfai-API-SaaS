@@ -486,6 +486,16 @@ export async function revealMeApiKey(
       requestUrl: `${getDmitBaseUrl()}${path}`,
     });
   }
+  if (!isFullTokfaiApiKey(secret)) {
+    throw new DmitApiError({
+      status: 500,
+      message:
+        "The server returned an incomplete key. Create a new key to copy the full secret.",
+      code: "invalid_reveal_secret",
+      requestMethod: "POST",
+      requestUrl: `${getDmitBaseUrl()}${path}`,
+    });
+  }
   return secret;
 }
 

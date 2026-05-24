@@ -30,11 +30,14 @@ import {
   DmitApiError,
   getDmitBaseUrl,
   ME_API_KEYS_PATH,
+  ME_API_KEYS_REVEAL_PATH,
   ME_API_KEYS_REVOKE_PATH,
+  revealMeApiKey,
   revokeApiKey,
   type CreateApiKeyResponse,
   type MeApiKeyMetadata,
 } from "@/lib/dmit/client";
+import { isFullTokfaiApiKey } from "@/lib/tokfai-api";
 import {
   userMessageForDashboardError,
   userMessageForDmitError,
@@ -139,6 +142,7 @@ export function ApiKeysClient({
         ...key,
         status: "revoked",
         revoked_at: revokedAt,
+        can_reveal: false,
       };
       setKeys((prev) =>
         prev.map((row) => (row.id === key.id ? updated : row))
@@ -174,8 +178,8 @@ export function ApiKeysClient({
         <p className="mt-1 text-sm text-muted-foreground">
           Create keys to authenticate requests to{" "}
           <code className="rounded bg-muted px-1 text-xs">{TOKFAI_API_BASE_URL}</code>.
-          The full secret is shown only once at creation — copy and store it
-          immediately.
+          Active keys can be copied anytime with{" "}
+          <span className="font-medium">Copy key</span>.
         </p>
       </div>
 
@@ -233,8 +237,8 @@ export function ApiKeysClient({
         <CardHeader>
           <CardTitle>Your API keys</CardTitle>
           <CardDescription>
-            Only the key prefix is stored here. Full secrets cannot be retrieved
-            after creation.
+            Prefixes are shown for identification. Use Copy key to copy the full
+            secret for active keys.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -244,6 +248,7 @@ export function ApiKeysClient({
           {keys.length > 0 ? (
             <ApiKeysTable
               keys={keys}
+              accessToken={accessToken}
               revokingId={revokingId}
               onRevoke={handleRevoke}
             />
@@ -319,7 +324,8 @@ function OneTimeSecretCard({
           {keyName ? `API key created: ${keyName}` : "API key created"}
         </CardTitle>
         <CardDescription className="text-base text-emerald-900/90 dark:text-emerald-100/90">
-          Copy this key now. It will not be shown again.
+          Copy and store this key now. You can also copy it later from the list
+          with Copy key.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -371,23 +377,56 @@ function OneTimeSecretCard({
   );
 }
 
+const LEGACY_KEY_MESSAGE =
+  "This legacy key cannot be revealed. Create a new key to copy the full secret.";
+
 function ApiKeysTable({
   keys,
+  accessToken,
   revokingId,
   onRevoke,
 }: {
   keys: ApiKeyListItem[];
+  accessToken: string;
   revokingId: string | null;
   onRevoke: (key: ApiKeyListItem) => void;
 }) {
-  const [copiedPrefixId, setCopiedPrefixId] = useState<string | null>(null);
+  const [copyingId, setCopyingId] = useState<string | null>(null);
+  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState<ActionErrorState | null>(null);
 
-  async function handleCopyPrefix(key: ApiKeyListItem) {
-    if (!key.prefix) return;
-    const ok = await copyToClipboard(key.prefix);
-    if (ok) {
-      setCopiedPrefixId(key.id);
-      window.setTimeout(() => setCopiedPrefixId(null), 2000);
+  async function handleCopyKey(key: ApiKeyListItem) {
+    if (key.status !== "active" || copyingId) return;
+
+    setCopyingId(key.id);
+    setCopyError(null);
+
+    try {
+      const secret = await revealMeApiKey(key.id, { accessToken });
+      if (!isFullTokfaiApiKey(secret)) {
+        throw new DmitApiError({
+          status: 500,
+          message:
+            "The server returned an incomplete key. Create a new key to copy the full secret.",
+          code: "invalid_reveal_secret",
+          requestMethod: "POST",
+          requestUrl: dmitUrl(ME_API_KEYS_REVEAL_PATH),
+        });
+      }
+      const ok = await copyToClipboard(secret);
+      if (ok) {
+        setCopiedKeyId(key.id);
+        window.setTimeout(() => setCopiedKeyId(null), 2000);
+      }
+    } catch (err) {
+      setCopyError(
+        toActionError(err, {
+          method: "POST",
+          url: dmitUrl(ME_API_KEYS_REVEAL_PATH),
+        })
+      );
+    } finally {
+      setCopyingId(null);
     }
   }
 
@@ -405,28 +444,43 @@ function ApiKeysTable({
           </tr>
         </thead>
         <tbody>
+          {copyError ? (
+            <tr>
+              <td colSpan={6} className="pb-3">
+                <ActionErrorAlert error={copyError} />
+              </td>
+            </tr>
+          ) : null}
           {keys.map((key) => {
             const isRevoking = revokingId === key.id;
             const isActive = key.status === "active";
-            const prefixCopied = copiedPrefixId === key.id;
+            const isCopying = copyingId === key.id;
+            const keyCopied = copiedKeyId === key.id;
+            const canReveal = key.can_reveal !== false;
 
             return (
               <tr key={key.id} className="border-b last:border-0">
                 <td className="py-3 pr-4 font-medium">{key.name}</td>
                 <td className="py-3 pr-4">
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-col gap-2">
                     <code className="font-mono text-xs text-muted-foreground">
                       {key.prefix || "—"}
                     </code>
-                    {key.prefix ? (
+                    {isActive && canReveal ? (
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="h-7 px-2"
-                        onClick={() => handleCopyPrefix(key)}
+                        className="h-7 w-fit px-2"
+                        disabled={copyingId != null}
+                        onClick={() => handleCopyKey(key)}
                       >
-                        {prefixCopied ? (
+                        {isCopying ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Copying...
+                          </>
+                        ) : keyCopied ? (
                           <>
                             <Check className="h-3.5 w-3.5" />
                             Copied
@@ -434,10 +488,14 @@ function ApiKeysTable({
                         ) : (
                           <>
                             <Copy className="h-3.5 w-3.5" />
-                            Copy
+                            Copy key
                           </>
                         )}
                       </Button>
+                    ) : isActive && !canReveal ? (
+                      <p className="max-w-xs text-xs text-muted-foreground">
+                        {LEGACY_KEY_MESSAGE}
+                      </p>
                     ) : null}
                   </div>
                 </td>
@@ -558,14 +616,18 @@ type MeKeyLike = {
 };
 
 function meKeyToListItem(key: MeKeyLike): ApiKeyListItem {
+  const status = key.revoked_at ? "revoked" : key.status;
   return {
     id: key.id,
     name: key.name,
     prefix: key.prefix ?? "",
-    status: key.revoked_at ? "revoked" : key.status,
+    status,
     created_at: key.created_at,
     last_used_at: key.last_used_at,
     revoked_at: key.revoked_at ?? null,
+    can_reveal:
+      key.can_reveal ??
+      (status === "active" ? true : false),
   };
 }
 
