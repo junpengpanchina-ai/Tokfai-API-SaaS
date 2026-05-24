@@ -8,6 +8,7 @@ export interface ImageGenerateRequest {
   prompt: string;
   aspectRatio: string;
   imageSize: string;
+  imageUrls?: string[];
 }
 
 export interface GrsaiImageGenerateResponse {
@@ -58,7 +59,7 @@ export async function generateImage(
       body: JSON.stringify({
         model: request.model,
         prompt: request.prompt,
-        images: [],
+        images: request.imageUrls ?? [],
         aspectRatio: request.aspectRatio,
         imageSize: request.imageSize,
         replyType: "json",

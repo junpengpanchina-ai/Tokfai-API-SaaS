@@ -25,6 +25,7 @@ const ImageGenerationRequestSchema = z
     n: z.number().int().positive().optional(),
     size: z.string().optional(),
     response_format: z.string().optional(),
+    image_urls: z.array(z.string().url().max(2048)).max(4).optional(),
   })
   .passthrough();
 
@@ -63,6 +64,7 @@ imageRoutes.post("/v1/images/generations", async (c) => {
   const prompt = parsed.data.prompt?.trim();
   const n = parsed.data.n ?? 1;
   const responseFormat = parsed.data.response_format ?? "url";
+  const imageUrls = parsed.data.image_urls ?? [];
 
   if (!prompt) {
     await writeUsageLog(
@@ -169,6 +171,7 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       prompt,
       aspectRatio,
       imageSize,
+      imageUrls,
     });
 
     const creditsCharged = await priceCreditsForImage(resolvedModel);

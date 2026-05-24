@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -10,7 +10,10 @@ import {
   ImageIcon,
   KeyRound,
   Loader2,
+  Plus,
   Sparkles,
+  Upload,
+  X,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +46,13 @@ import {
   TOKFAI_API_KEY_PLACEHOLDER,
   TOKFAI_IMAGES_GENERATIONS_ENDPOINT,
 } from "@/lib/tokfai-api";
+import {
+  isValidImageUrl,
+  MAX_PLAYGROUND_INPUT_IMAGES,
+  PlaygroundImageUploadError,
+  uploadPlaygroundImage,
+  validatePlaygroundImageFile,
+} from "@/lib/storage/upload-image";
 
 const DEFAULT_MODEL: ImagePlaygroundModelId = "nano-banana";
 const DEFAULT_SIZE: ImagePlaygroundSize = "1024x1024";
@@ -71,12 +81,27 @@ interface PlaygroundError {
 
 type ApiKeyMode = "paste" | "select";
 
+type ImageInputSource = "upload" | "url";
+
+type ImageInputStatus = "uploading" | "ready" | "error";
+
+interface ImageInputItem {
+  id: string;
+  url: string;
+  label: string;
+  source: ImageInputSource;
+  status: ImageInputStatus;
+  error?: string;
+}
+
 export function ImagePlaygroundClient({
   accessToken,
+  userId,
   activeKeys,
   initialModel,
 }: {
   accessToken: string;
+  userId: string;
   activeKeys: ImagePlaygroundApiKeyOption[];
   initialModel?: string;
 }) {
@@ -91,6 +116,165 @@ export function ImagePlaygroundClient({
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImageGenerationResponse | null>(null);
   const [error, setError] = useState<PlaygroundError | null>(null);
+  const [imageInputs, setImageInputs] = useState<ImageInputItem[]>([]);
+  const [imageUrlDraft, setImageUrlDraft] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const readyImageUrls = imageInputs
+    .filter((item) => item.status === "ready")
+    .map((item) => item.url);
+
+  const hasUploadingImages = imageInputs.some(
+    (item) => item.status === "uploading"
+  );
+
+  const addImageUrl = useCallback(
+    (rawUrl: string) => {
+      const trimmed = rawUrl.trim();
+      if (!trimmed) return;
+
+      if (!isValidImageUrl(trimmed)) {
+        setError({
+          status: 0,
+          code: "invalid_image_url",
+          message: "Enter a valid http or https image URL.",
+        });
+        return;
+      }
+
+      setImageInputs((current) => {
+        if (current.length >= MAX_PLAYGROUND_INPUT_IMAGES) {
+          setError({
+            status: 0,
+            code: "too_many_images",
+            message: `Up to ${MAX_PLAYGROUND_INPUT_IMAGES} input images are allowed.`,
+          });
+          return current;
+        }
+        if (current.some((item) => item.url === trimmed)) {
+          return current;
+        }
+
+        setError(null);
+        return [
+          ...current,
+          {
+            id: crypto.randomUUID(),
+            url: trimmed,
+            label: "Image URL",
+            source: "url",
+            status: "ready",
+          },
+        ];
+      });
+      setImageUrlDraft("");
+    },
+    []
+  );
+
+  const uploadFiles = useCallback(
+    async (files: FileList | File[]) => {
+      const fileArray = Array.from(files);
+      if (fileArray.length === 0) return;
+
+      setError(null);
+
+      let batch: Array<{
+        id: string;
+        file: File;
+        item: ImageInputItem;
+      }> = [];
+
+      setImageInputs((current) => {
+        const remaining = MAX_PLAYGROUND_INPUT_IMAGES - current.length;
+        const slice = fileArray.slice(0, remaining);
+
+        if (slice.length < fileArray.length) {
+          setError({
+            status: 0,
+            code: "too_many_images",
+            message: `Up to ${MAX_PLAYGROUND_INPUT_IMAGES} input images are allowed.`,
+          });
+        }
+
+        batch = slice.map((file) => {
+          const id = crypto.randomUUID();
+          return {
+            id,
+            file,
+            item: {
+              id,
+              url: "",
+              label: file.name,
+              source: "upload" as const,
+              status: "uploading" as const,
+            },
+          };
+        });
+
+        return batch.length > 0
+          ? [...current, ...batch.map((entry) => entry.item)]
+          : current;
+      });
+
+      for (const entry of batch) {
+        try {
+          validatePlaygroundImageFile(entry.file);
+          const publicUrl = await uploadPlaygroundImage(entry.file, userId);
+          setImageInputs((current) =>
+            current.map((item) =>
+              item.id === entry.id
+                ? {
+                    ...item,
+                    url: publicUrl,
+                    status: "ready",
+                    error: undefined,
+                  }
+                : item
+            )
+          );
+        } catch (err) {
+          const message =
+            err instanceof PlaygroundImageUploadError
+              ? err.message
+              : err instanceof Error
+                ? err.message
+                : "Upload failed.";
+          setImageInputs((current) =>
+            current.map((item) =>
+              item.id === entry.id
+                ? { ...item, status: "error", error: message }
+                : item
+            )
+          );
+          setError({
+            status: 0,
+            code:
+              err instanceof PlaygroundImageUploadError
+                ? err.code
+                : "upload_failed",
+            message,
+          });
+        }
+      }
+    },
+    [userId]
+  );
+
+  const removeImageInput = useCallback((id: string) => {
+    setImageInputs((current) => current.filter((item) => item.id !== id));
+  }, []);
+
+  const handleDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      setIsDragging(false);
+      if (loading) return;
+      void uploadFiles(event.dataTransfer.files);
+    },
+    [loading, uploadFiles]
+  );
 
   async function handleGenerate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -109,6 +293,15 @@ export function ImagePlaygroundClient({
       return;
     }
 
+    if (hasUploadingImages) {
+      setError({
+        status: 0,
+        code: "upload_in_progress",
+        message: "Wait for image uploads to finish before generating.",
+      });
+      return;
+    }
+
     let resolvedKey: string;
     try {
       resolvedKey = await resolveApiKey();
@@ -119,13 +312,18 @@ export function ImagePlaygroundClient({
 
     setLoading(true);
     try {
-      const res = await imageGenerations(resolvedKey, {
+      const payload: Parameters<typeof imageGenerations>[1] = {
         model,
         prompt: trimmedPrompt,
         size,
         n: 1,
         response_format: "url",
-      });
+      };
+      if (readyImageUrls.length > 0) {
+        payload.image_urls = readyImageUrls;
+      }
+
+      const res = await imageGenerations(resolvedKey, payload);
       setResult(res);
     } catch (err) {
       setError(toPlaygroundError(err));
@@ -189,7 +387,8 @@ export function ImagePlaygroundClient({
             Image Playground
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Image Playground uses image models only. Successful generations debit
+            Drag images or paste an image URL for image-to-image. Up to 4
+            images. Supported: PNG, JPG, WEBP. Successful generations debit
             credits. Failed calls are not charged.
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -206,8 +405,9 @@ export function ImagePlaygroundClient({
           <CardHeader>
             <CardTitle>Request</CardTitle>
             <CardDescription>
-              One prompt, one image. Successful calls are recorded in Usage and
-              debited from Credits.
+              Text-to-image works with prompt only. Add input images for
+              image-to-image. Successful calls are recorded in Usage and debited
+              from Credits.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -220,6 +420,32 @@ export function ImagePlaygroundClient({
               onModeChange={setApiKeyMode}
               onApiKeyChange={setApiKey}
               onSelectedKeyChange={setSelectedKeyId}
+            />
+
+            <ImageInputsPanel
+              imageInputs={imageInputs}
+              imageUrlDraft={imageUrlDraft}
+              isDragging={isDragging}
+              loading={loading}
+              fileInputRef={fileInputRef}
+              onImageUrlDraftChange={setImageUrlDraft}
+              onAddImageUrl={() => addImageUrl(imageUrlDraft)}
+              onRemoveImage={removeImageInput}
+              onDragEnter={() => {
+                if (!loading) setIsDragging(true);
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDragOver={(event) => {
+                event.preventDefault();
+              }}
+              onDrop={handleDrop}
+              onBrowseClick={() => fileInputRef.current?.click()}
+              onFileInputChange={(event) => {
+                if (event.target.files) {
+                  void uploadFiles(event.target.files);
+                  event.target.value = "";
+                }
+              }}
             />
 
             <div className="flex flex-col gap-2">
@@ -236,7 +462,10 @@ export function ImagePlaygroundClient({
             </div>
 
             <div className="flex justify-end">
-              <Button type="submit" disabled={loading}>
+              <Button
+                type="submit"
+                disabled={loading || hasUploadingImages}
+              >
                 {loading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -322,6 +551,183 @@ export function ImagePlaygroundClient({
         </Card>
       </div>
     </form>
+  );
+}
+
+function ImageInputsPanel({
+  imageInputs,
+  imageUrlDraft,
+  isDragging,
+  loading,
+  fileInputRef,
+  onImageUrlDraftChange,
+  onAddImageUrl,
+  onRemoveImage,
+  onDragEnter,
+  onDragLeave,
+  onDragOver,
+  onDrop,
+  onBrowseClick,
+  onFileInputChange,
+}: {
+  imageInputs: ImageInputItem[];
+  imageUrlDraft: string;
+  isDragging: boolean;
+  loading: boolean;
+  fileInputRef: React.RefObject<HTMLInputElement>;
+  onImageUrlDraftChange: (value: string) => void;
+  onAddImageUrl: () => void;
+  onRemoveImage: (id: string) => void;
+  onDragEnter: () => void;
+  onDragLeave: () => void;
+  onDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
+  onDrop: (event: React.DragEvent<HTMLDivElement>) => void;
+  onBrowseClick: () => void;
+  onFileInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  const atLimit = imageInputs.length >= MAX_PLAYGROUND_INPUT_IMAGES;
+
+  return (
+    <div className="flex flex-col gap-3 rounded-md border bg-muted/20 p-4">
+      <div className="flex items-center gap-2 text-sm font-medium">
+        <Upload className="h-4 w-4 text-muted-foreground" />
+        Input images
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        Drag images or paste an image URL. Up to {MAX_PLAYGROUND_INPUT_IMAGES}{" "}
+        images. Supported: PNG, JPG, WEBP. Leave empty for text-to-image.
+      </p>
+
+      <div
+        onDragEnter={onDragEnter}
+        onDragLeave={onDragLeave}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        className={`flex flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 py-8 text-center transition-colors ${
+          isDragging
+            ? "border-primary bg-primary/5"
+            : "border-muted-foreground/30 bg-background"
+        } ${loading || atLimit ? "opacity-60" : "cursor-pointer"}`}
+        onClick={() => {
+          if (!loading && !atLimit) onBrowseClick();
+        }}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            if (!loading && !atLimit) onBrowseClick();
+          }
+        }}
+      >
+        <Upload className="h-5 w-5 text-muted-foreground" />
+        <p className="text-sm font-medium">Drag images here or click to upload</p>
+        <p className="text-xs text-muted-foreground">
+          PNG, JPG, WEBP · max 10 MB each
+        </p>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          multiple
+          className="hidden"
+          disabled={loading || atLimit}
+          onChange={onFileInputChange}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Input
+          type="url"
+          placeholder="https://example.com/image.png"
+          value={imageUrlDraft}
+          onChange={(event) => onImageUrlDraftChange(event.target.value)}
+          disabled={loading || atLimit}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              onAddImageUrl();
+            }
+          }}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          disabled={loading || atLimit || !imageUrlDraft.trim()}
+          onClick={onAddImageUrl}
+          className="shrink-0"
+        >
+          <Plus className="h-4 w-4" />
+          Add URL
+        </Button>
+      </div>
+
+      {imageInputs.length > 0 ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {imageInputs.map((item) => (
+            <ImageInputThumbnail
+              key={item.id}
+              item={item}
+              loading={loading}
+              onRemove={() => onRemoveImage(item.id)}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ImageInputThumbnail({
+  item,
+  loading,
+  onRemove,
+}: {
+  item: ImageInputItem;
+  loading: boolean;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-md border bg-background">
+      <div className="aspect-square bg-muted/30">
+        {item.status === "ready" && item.url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={item.url}
+            alt={item.label}
+            className="h-full w-full object-cover"
+          />
+        ) : item.status === "uploading" ? (
+          <div className="flex h-full items-center justify-center text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        ) : (
+          <div className="flex h-full items-center justify-center px-2 text-center text-xs text-destructive">
+            {item.error ?? "Upload failed"}
+          </div>
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-2 border-t px-2 py-1.5">
+        <span className="truncate text-[11px] text-muted-foreground">
+          {item.source === "url" ? "URL" : item.label}
+        </span>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-6 w-6 shrink-0"
+          disabled={loading}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRemove();
+          }}
+          aria-label={`Remove ${item.label}`}
+        >
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </div>
   );
 }
 

@@ -41,6 +41,7 @@ export default async function ImagePlaygroundPage({
   return (
     <ImagePlaygroundClient
       accessToken={accessToken}
+      userId={user.id}
       activeKeys={activeKeys}
       initialModel={searchParams?.model}
     />

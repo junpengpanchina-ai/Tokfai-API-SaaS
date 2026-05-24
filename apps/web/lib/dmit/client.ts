@@ -751,6 +751,7 @@ export interface ImageGenerationRequest {
   size?: string;
   n?: number;
   response_format?: "url";
+  image_urls?: string[];
 }
 
 export interface ImageGenerationDataItem {
