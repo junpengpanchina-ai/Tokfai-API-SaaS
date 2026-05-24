@@ -40,6 +40,9 @@ const CREDIT_PLANS: Record<PlanId, CreditPlan> = {
   },
 };
 
+/** Plans that may create a new Stripe Checkout session. */
+const CHECKOUT_AVAILABLE_PLANS = new Set<PlanId>(["starter"]);
+
 let _billingStripe: Stripe | null = null;
 
 function authedUser(c: { get: (key: never) => unknown }): AuthedUser {
@@ -104,6 +107,24 @@ function parsePlanId(body: unknown): PlanId {
   return planId;
 }
 
+function assertCheckoutPlanAvailable(
+  body: Record<string, unknown>,
+  planId: PlanId
+): void {
+  if (CHECKOUT_AVAILABLE_PLANS.has(planId)) {
+    return;
+  }
+
+  const usedPackageCode =
+    body.package_code !== undefined && body.package_code !== null;
+  throw ApiError.badRequest(
+    usedPackageCode
+      ? `The ${planId} credit package is not available for purchase yet.`
+      : `The ${planId} plan is not available for purchase yet.`,
+    usedPackageCode ? "package_not_available" : "plan_not_available"
+  );
+}
+
 function allowedRedirectUrl(raw: unknown, fallbackPath: string): string {
   if (raw !== undefined && typeof raw !== "string") {
     throw ApiError.badRequest("Redirect URL must be a string.", "invalid_redirect_url");
@@ -140,13 +161,16 @@ async function createCheckoutSession(c: Context) {
   }
 
   try {
-    const plan = CREDIT_PLANS[parsePlanId(body)];
+    const bodyObj = body as Record<string, unknown>;
+    const planId = parsePlanId(body);
+    assertCheckoutPlanAvailable(bodyObj, planId);
+    const plan = CREDIT_PLANS[planId];
     const successUrl = allowedRedirectUrl(
-      (body as Record<string, unknown>).success_url,
+      bodyObj.success_url,
       "/dashboard/credits?status=success&session_id={CHECKOUT_SESSION_ID}"
     );
     const cancelUrl = allowedRedirectUrl(
-      (body as Record<string, unknown>).cancel_url,
+      bodyObj.cancel_url,
       "/dashboard/credits?status=cancelled"
     );
     const sb = supabase();
