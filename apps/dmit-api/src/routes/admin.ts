@@ -71,6 +71,16 @@ type SupabaseAuthUser = {
   email?: string | null;
 };
 
+type CreditLedgerAdminRow = {
+  id: string;
+  created_at: string;
+  type: string;
+  amount: number | string | null;
+  balance_after: number | string | null;
+  reason: string | null;
+  reference_id: string | null;
+};
+
 type ParsedCreditAdjustment =
   | {
       userId: string;
@@ -84,8 +94,12 @@ type ParsedCreditAdjustment =
         | "invalid_user_id"
         | "invalid_amount"
         | "invalid_direction"
+        | "missing_reason"
         | "invalid_reason";
     };
+
+const DEFAULT_LEDGER_LIMIT = 50;
+const MAX_LEDGER_LIMIT = 100;
 
 function normalizeEmail(email: string | null | undefined): string {
   return (email ?? "").trim().toLowerCase();
@@ -223,15 +237,20 @@ function jsonError(
   return c.json({ error, ...(extra ?? {}) }, status);
 }
 
+function parseLedgerLimit(raw: string | undefined): number {
+  if (!raw) return DEFAULT_LEDGER_LIMIT;
+  const parsed = Number.parseInt(raw, 10);
+  if (Number.isNaN(parsed) || parsed < 1) return DEFAULT_LEDGER_LIMIT;
+  return Math.min(parsed, MAX_LEDGER_LIMIT);
+}
+
 function parseCreditAdjustment(
   body: AdminCreditAdjustmentInput
 ): ParsedCreditAdjustment {
   const userId = typeof body.user_id === "string" ? body.user_id.trim() : "";
   const amount = Number(body.amount);
   const reason =
-    typeof body.reason === "string" && body.reason.trim()
-      ? body.reason.trim()
-      : "admin_adjustment";
+    typeof body.reason === "string" ? body.reason.trim() : "";
 
   if (!userId) {
     return { error: "missing_user_id" as const };
@@ -250,6 +269,10 @@ function parseCreditAdjustment(
   }
 
   const direction = body.direction;
+
+  if (!reason) {
+    return { error: "missing_reason" as const };
+  }
 
   if (reason.length > 200) {
     return { error: "invalid_reason" as const };
@@ -598,6 +621,59 @@ async function verifyAdminForCreditAdjustment(c: Context): Promise<
   };
 }
 
+async function getAdminCreditsByEmail(email: string, ledgerLimit: number) {
+  const { data: profile, error: profileError } = await supabase()
+    .from("profiles")
+    .select("id, email, credits_balance, total_credits_used, updated_at")
+    .ilike("email", email)
+    .maybeSingle();
+
+  if (profileError) {
+    throw ApiError.internal(
+      `Failed to load profile for admin credits lookup: ${profileError.message}`,
+      "admin_credits_profile_failed"
+    );
+  }
+
+  if (!profile) {
+    return { error: "user_not_found" as const };
+  }
+
+  const profileRow = profile as ProfileAdminRow;
+  const { data: ledger, error: ledgerError } = await supabase()
+    .from("credit_ledger")
+    .select("id, created_at, type, amount, balance_after, reason, reference_id")
+    .eq("user_id", profileRow.id)
+    .order("created_at", { ascending: false })
+    .limit(ledgerLimit);
+
+  if (ledgerError) {
+    throw ApiError.internal(
+      `Failed to load credit ledger for admin credits lookup: ${ledgerError.message}`,
+      "admin_credits_ledger_failed"
+    );
+  }
+
+  return {
+    profile: {
+      id: profileRow.id,
+      email: profileRow.email,
+      credits_balance: toNumber(profileRow.credits_balance),
+      total_credits_used: toNumber(profileRow.total_credits_used),
+      updated_at: profileRow.updated_at,
+    },
+    ledger: ((ledger ?? []) as CreditLedgerAdminRow[]).map((row) => ({
+      id: row.id,
+      created_at: row.created_at,
+      type: row.type,
+      amount: toNumber(row.amount),
+      balance_after: toNumber(row.balance_after),
+      reason: row.reason,
+      reference_id: row.reference_id,
+    })),
+  };
+}
+
 async function adjustUserCredits(input: {
   userId: string;
   amount: number;
@@ -790,6 +866,24 @@ adminRoutes.get("/models", async (c) => {
 adminRoutes.get("/usage", async (c) => {
   const usageLogs = await listAdminUsageLogs();
   return c.json({ data: usageLogs });
+});
+
+adminRoutes.get("/credits", async (c) => {
+  const email = normalizeEmail(c.req.query("email"));
+  if (!email) {
+    return jsonError(c, 400, "missing_email");
+  }
+
+  const result = await getAdminCreditsByEmail(
+    email,
+    parseLedgerLimit(c.req.query("limit"))
+  );
+
+  if ("error" in result) {
+    return jsonError(c, 404, result.error as "user_not_found");
+  }
+
+  return c.json({ data: result });
 });
 
 adminRoutes.patch("/models/:id", async (c) => {

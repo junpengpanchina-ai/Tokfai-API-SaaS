@@ -180,6 +180,12 @@ export default async function AdminPage() {
             >
               Manage usage logs →
             </Link>
+            <Link
+              href="/admin/credits"
+              className="text-sm font-medium underline-offset-4 hover:underline"
+            >
+              Manage credits →
+            </Link>
           </p>
         </div>
 

@@ -17,6 +17,7 @@ healthRoutes.get("/debug/routes", (c) =>
     cwd: process.cwd(),
     adminCreditsAdjustRoute: true,
     routes: [
+      "GET /admin/credits",
       "POST /admin/credits/adjust",
       "POST /v1/webhooks/stripe",
       "GET /debug/routes",
@@ -38,6 +39,7 @@ healthRoutes.get("/__version", (c) =>
       "POST /billing/create-checkout-session",
       "POST /v1/webhooks/stripe",
       "POST /stripe/webhook",
+      "GET /admin/credits",
       "POST /admin/credits/adjust",
     ],
     buildTime: process.env.BUILD_TIME || null,

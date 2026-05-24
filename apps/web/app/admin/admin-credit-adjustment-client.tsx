@@ -52,6 +52,12 @@ export function AdminCreditAdjustmentClient({ userId }: { userId: string }) {
       return;
     }
 
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) {
+      setError("Reason is required.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const supabase = createClient();
@@ -76,7 +82,7 @@ export function AdminCreditAdjustmentClient({ userId }: { userId: string }) {
             user_id: userId,
             amount: parsedAmount,
             direction,
-            reason,
+            reason: trimmedReason,
           }),
         }
       );
@@ -141,14 +147,15 @@ export function AdminCreditAdjustmentClient({ userId }: { userId: string }) {
           </div>
           <div>
             <Label className="text-xs" htmlFor={`reason-${userId}`}>
-              Reason
+              Reason (required)
             </Label>
             <Input
               id={`reason-${userId}`}
               value={reason}
               maxLength={200}
+              required
               onChange={(event) => setReason(event.target.value)}
-              placeholder="admin_adjustment"
+              placeholder="Manual top-up for support ticket"
               disabled={isBusy}
             />
           </div>
