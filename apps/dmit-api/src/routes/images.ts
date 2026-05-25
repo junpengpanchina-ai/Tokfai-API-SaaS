@@ -5,6 +5,7 @@ import {
   isModelAllowedForImage,
   priceCreditsForImage,
 } from "../catalog/modelCatalog.js";
+import { env } from "../env.js";
 import { ApiError } from "../errors.js";
 import { log } from "../logger.js";
 import {
@@ -200,12 +201,13 @@ imageRoutes.post("/v1/images/generations", async (c) => {
 
     await assertHasCredits(caller.userId);
 
-    const { url, upstreamId } = await generateImage({
+    const { url, upstreamId, debug } = await generateImage({
       model: resolvedModel,
       prompt,
       aspectRatio,
       imageSize,
       imageUrls: resolvedImageUrls,
+      imageUrlSources,
     });
 
     const creditsCharged = await priceCreditsForImage(resolvedModel);
@@ -241,6 +243,8 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       input_images_count: imageUrls.length,
       resolved_images_count: resolvedImageUrls.length,
       image_url_sources: imageUrlSources,
+      upstream_payload_keys: debug.upstream_payload_keys,
+      adapter_mode: debug.adapter_mode,
       input_image_url_hints: imageUrls.map(sanitizeImageUrlForLog),
     });
 
@@ -254,6 +258,16 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       input_images_count: imageUrls.length,
       resolved_images_count: resolvedImageUrls.length,
       image_url_sources: imageUrlSources,
+      ...(env.NODE_ENV !== "production"
+        ? {
+            debug: {
+              resolved_images_count: debug.resolved_images_count,
+              image_url_sources: debug.image_url_sources,
+              upstream_payload_keys: debug.upstream_payload_keys,
+              adapter_mode: debug.adapter_mode,
+            },
+          }
+        : {}),
     });
   } catch (err) {
     if (err instanceof ApiError) {

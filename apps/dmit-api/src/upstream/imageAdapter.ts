@@ -1,11 +1,26 @@
 import { env } from "../env.js";
 import { ApiError } from "../errors.js";
 import { log } from "../logger.js";
+import {
+  fetchImageAsDataUrl,
+  sanitizeImageUrlForLog,
+  type ImageUrlResolveSource,
+} from "./imageUrlResolver.js";
 
 const IMAGE_TO_IMAGE_PROMPT_PREFIX =
-  "Use the uploaded image as the primary visual reference. Keep the main subject from the uploaded image. Preserve the subject identity, category/species/object type, main silhouette, pose, outfit/key visual elements, and facial/object characteristics. Do not replace the subject with an unrelated object. Apply the requested style only to the existing subject and scene.";
+  "Use the input image as the visual reference. Preserve the main subject unless the user explicitly asks to change it.";
 
 const BASE = env.GRSAI_BASE_URL.replace(/\/+$/, "");
+
+export type GrsaiImageInputMode =
+  | "images_url"
+  | "image_url"
+  | "imageUrl"
+  | "input_image"
+  | "referenceImages"
+  | "images_data_url";
+
+export type GrsaiAdapterMode = GrsaiImageInputMode | "legacy_draw";
 
 export interface ImageGenerateRequest {
   model: string;
@@ -13,6 +28,7 @@ export interface ImageGenerateRequest {
   aspectRatio: string;
   imageSize: string;
   imageUrls?: string[];
+  imageUrlSources?: ImageUrlResolveSource[];
 }
 
 export interface GrsaiImageGenerateResponse {
@@ -22,9 +38,32 @@ export interface GrsaiImageGenerateResponse {
   progress?: number;
 }
 
+export interface ImageGenerateDebugInfo {
+  resolved_images_count: number;
+  image_url_sources: ImageUrlResolveSource[];
+  upstream_payload_keys: string[];
+  adapter_mode: GrsaiAdapterMode;
+}
+
 export interface ImageGenerateResult {
   url: string;
   upstreamId: string | null;
+  debug: ImageGenerateDebugInfo;
+}
+
+export interface BuildGrsaiImagePayloadParams {
+  model: string;
+  prompt: string;
+  aspectRatio: string;
+  imageSize: string;
+  resolvedImageUrls: string[];
+}
+
+export interface GrsaiImagePayloadResult {
+  payload: Record<string, unknown>;
+  adapterMode: GrsaiAdapterMode;
+  upstreamPayloadKeys: string[];
+  inputImagesForLog: string[];
 }
 
 export function mapSizeToGrsai(size: string | undefined): {
@@ -54,21 +93,161 @@ export function buildImageGenerationPrompt(
   return `${IMAGE_TO_IMAGE_PROMPT_PREFIX}\n\n${prompt}`;
 }
 
+export async function buildGrsaiImagePayload(
+  params: BuildGrsaiImagePayloadParams
+): Promise<GrsaiImagePayloadResult> {
+  const { model, prompt, aspectRatio, imageSize, resolvedImageUrls } = params;
+  const mode = env.GRSAI_IMAGE_INPUT_MODE;
+
+  const base: Record<string, unknown> = {
+    model,
+    prompt,
+    aspectRatio,
+    imageSize,
+    replyType: "json",
+  };
+
+  if (resolvedImageUrls.length === 0) {
+    return {
+      payload: base,
+      adapterMode: "legacy_draw",
+      upstreamPayloadKeys: Object.keys(base),
+      inputImagesForLog: [],
+    };
+  }
+
+  switch (mode) {
+    case "images_url":
+      return finishPayload(base, "images_url", {
+        images: resolvedImageUrls,
+      }, resolvedImageUrls);
+
+    case "image_url":
+      return finishPayload(base, "image_url", {
+        image: resolvedImageUrls[0],
+      }, resolvedImageUrls);
+
+    case "imageUrl":
+      return finishPayload(base, "imageUrl", {
+        imageUrl: resolvedImageUrls[0],
+      }, resolvedImageUrls);
+
+    case "input_image":
+      return finishPayload(base, "input_image", {
+        input_image: resolvedImageUrls[0],
+      }, resolvedImageUrls);
+
+    case "referenceImages":
+      return finishPayload(base, "referenceImages", {
+        referenceImages: resolvedImageUrls,
+      }, resolvedImageUrls);
+
+    case "images_data_url": {
+      const dataUrls: string[] = [];
+      for (const imageUrl of resolvedImageUrls) {
+        dataUrls.push(await fetchImageAsDataUrl(imageUrl));
+      }
+      return finishPayload(base, "images_data_url", {
+        images: dataUrls,
+      }, dataUrls);
+    }
+
+    default: {
+      const _exhaustive: never = mode;
+      throw ApiError.internal(
+        `Unsupported GRSAI_IMAGE_INPUT_MODE: ${String(_exhaustive)}`,
+        "server_error"
+      );
+    }
+  }
+}
+
+function finishPayload(
+  base: Record<string, unknown>,
+  adapterMode: GrsaiAdapterMode,
+  imageFields: Record<string, unknown>,
+  inputImagesForLog: string[]
+): GrsaiImagePayloadResult {
+  const payload = { ...base, ...imageFields };
+  return {
+    payload,
+    adapterMode,
+    upstreamPayloadKeys: Object.keys(payload),
+    inputImagesForLog,
+  };
+}
+
+function describeFirstImageForLog(imageRef: string | undefined): {
+  first_image_host: string | null;
+  first_image_path_prefix: string | null;
+  is_data_url: boolean;
+} {
+  if (!imageRef) {
+    return {
+      first_image_host: null,
+      first_image_path_prefix: null,
+      is_data_url: false,
+    };
+  }
+
+  if (imageRef.startsWith("data:")) {
+    return {
+      first_image_host: null,
+      first_image_path_prefix: imageRef.slice(0, 80),
+      is_data_url: true,
+    };
+  }
+
+  try {
+    const parsed = new URL(imageRef);
+    const pathWithQuery = `${parsed.pathname}${parsed.search}`;
+    return {
+      first_image_host: parsed.host,
+      first_image_path_prefix: pathWithQuery.slice(0, 80),
+      is_data_url: false,
+    };
+  } catch {
+    return {
+      first_image_host: null,
+      first_image_path_prefix: sanitizeImageUrlForLog(imageRef).slice(0, 80),
+      is_data_url: false,
+    };
+  }
+}
+
 export async function generateImage(
   request: ImageGenerateRequest
 ): Promise<ImageGenerateResult> {
   const path = env.GRSAI_IMAGE_GENERATE_PATH;
   const url = `${BASE}${path.startsWith("/") ? path : `/${path}`}`;
   const imageUrls = request.imageUrls ?? [];
+  const imageUrlSources = request.imageUrlSources ?? [];
   const upstreamPrompt = buildImageGenerationPrompt(
     request.prompt,
     imageUrls.length
   );
 
+  const { payload, adapterMode, upstreamPayloadKeys, inputImagesForLog } =
+    await buildGrsaiImagePayload({
+      model: request.model,
+      prompt: upstreamPrompt,
+      aspectRatio: request.aspectRatio,
+      imageSize: request.imageSize,
+      resolvedImageUrls: imageUrls,
+    });
+
+  const firstImage = inputImagesForLog[0];
+  const firstImageMeta = describeFirstImageForLog(firstImage);
+
   log.info("image_generation_upstream_request", {
     model: request.model,
     has_input_images: imageUrls.length > 0,
     input_images_count: imageUrls.length,
+    image_url_sources: imageUrlSources,
+    upstream_payload_keys: upstreamPayloadKeys,
+    adapter_mode: adapterMode,
+    ...firstImageMeta,
+    prompt_prefix: upstreamPrompt.slice(0, 120),
   });
 
   let res: Response;
@@ -79,14 +258,7 @@ export async function generateImage(
         Authorization: `Bearer ${env.GRSAI_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: request.model,
-        prompt: upstreamPrompt,
-        images: imageUrls,
-        aspectRatio: request.aspectRatio,
-        imageSize: request.imageSize,
-        replyType: "json",
-      }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(env.IMAGE_REQUEST_TIMEOUT_MS),
     });
   } catch (err) {
@@ -146,7 +318,16 @@ export async function generateImage(
     });
   }
 
-  return { url: imageUrl, upstreamId };
+  return {
+    url: imageUrl,
+    upstreamId,
+    debug: {
+      resolved_images_count: imageUrls.length,
+      image_url_sources: imageUrlSources,
+      upstream_payload_keys: upstreamPayloadKeys,
+      adapter_mode: adapterMode,
+    },
+  };
 }
 
 function isTimeoutError(err: unknown): boolean {

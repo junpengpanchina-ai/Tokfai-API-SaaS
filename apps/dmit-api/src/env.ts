@@ -51,6 +51,16 @@ const Schema = z
     .string()
     .min(1)
     .default("/v1/api/generate"),
+  GRSAI_IMAGE_INPUT_MODE: z
+    .enum([
+      "images_url",
+      "image_url",
+      "imageUrl",
+      "input_image",
+      "referenceImages",
+      "images_data_url",
+    ])
+    .default("images_url"),
   IMAGE_REQUEST_TIMEOUT_MS: z.coerce
     .number()
     .int()

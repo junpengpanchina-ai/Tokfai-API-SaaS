@@ -13,7 +13,9 @@ export interface ResolvedImageInputUrl {
 }
 
 const RESOLVE_FETCH_TIMEOUT_MS = 8_000;
+const FETCH_IMAGE_AS_DATA_URL_TIMEOUT_MS = 10_000;
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
+const MAX_IMAGE_DATA_URL_BYTES = 10 * 1024 * 1024;
 const MAX_REDIRECTS = 5;
 
 const IMAGE_EXTENSIONS = /\.(png|jpe?g|webp)(\?|$)/i;
@@ -123,6 +125,142 @@ export async function resolveImageInputUrls(
     resolved.push(await resolveImageInputUrl(rawUrl));
   }
   return resolved;
+}
+
+export async function fetchImageAsDataUrl(url: string): Promise<string> {
+  const trimmed = url.trim();
+  if (!trimmed) {
+    throw imageFetchError("image_fetch_failed", "Could not fetch the image.");
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw imageFetchError("image_fetch_failed", "Could not fetch the image.");
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw imageFetchError(
+      "image_fetch_failed",
+      "Only http and https image URLs are supported."
+    );
+  }
+
+  if (isBlockedHostname(parsed.hostname)) {
+    throw imageFetchError("image_fetch_failed", "This image URL is not allowed.");
+  }
+
+  let response: Response;
+  try {
+    response = await fetchImageBytes(parsed.toString());
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
+    throw imageFetchError("image_fetch_failed", "Could not fetch the image.");
+  }
+
+  if (!response.ok) {
+    throw imageFetchError("image_fetch_failed", "Could not fetch the image.");
+  }
+
+  const contentType = normalizeContentType(
+    response.headers.get("content-type")
+  );
+  if (!contentType || !ALLOWED_IMAGE_CONTENT_TYPES.has(contentType)) {
+    throw imageFetchError(
+      "unsupported_image_content_type",
+      "URL does not point to a supported image (PNG, JPG, or WEBP)."
+    );
+  }
+
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength > MAX_IMAGE_DATA_URL_BYTES) {
+    throw imageFetchError(
+      "image_too_large",
+      "Image exceeds the 10 MB size limit."
+    );
+  }
+
+  const base64 = Buffer.from(bytes).toString("base64");
+  return `data:${contentType};base64,${base64}`;
+}
+
+async function fetchImageBytes(
+  url: string,
+  redirectCount = 0
+): Promise<Response> {
+  if (redirectCount > MAX_REDIRECTS) {
+    throw imageFetchError("image_fetch_failed", "Too many redirects.");
+  }
+
+  const validated = validateUrlBeforeFetch(url, redirectCount);
+
+  const response = await fetch(validated, {
+    method: "GET",
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: "image/png,image/jpeg,image/webp,*/*;q=0.8",
+    },
+    redirect: "manual",
+    signal: AbortSignal.timeout(FETCH_IMAGE_AS_DATA_URL_TIMEOUT_MS),
+  });
+
+  if (response.status >= 300 && response.status < 400) {
+    const location = response.headers.get("location");
+    if (!location) {
+      throw imageFetchError(
+        "image_fetch_failed",
+        "Redirect response missing location."
+      );
+    }
+    const nextUrl = new URL(location, validated).toString();
+    return fetchImageBytes(nextUrl, redirectCount + 1);
+  }
+
+  const contentLength = response.headers.get("content-length");
+  if (contentLength) {
+    const size = Number(contentLength);
+    if (Number.isFinite(size) && size > MAX_IMAGE_DATA_URL_BYTES) {
+      throw imageFetchError(
+        "image_too_large",
+        "Image exceeds the 10 MB size limit."
+      );
+    }
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    return response;
+  }
+
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    total += value.byteLength;
+    if (total > MAX_IMAGE_DATA_URL_BYTES) {
+      await reader.cancel();
+      throw imageFetchError(
+        "image_too_large",
+        "Image exceeds the 10 MB size limit."
+      );
+    }
+    chunks.push(value);
+  }
+
+  const combined = concatUint8Arrays(chunks, total);
+  return new Response(combined, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
+
+function imageFetchError(code: string, publicMessage: string): ApiError {
+  return ApiError.badRequest(publicMessage, code);
 }
 
 function resolveError(code: string, publicMessage: string): ApiError {
