@@ -1,6 +1,6 @@
 import { ApiReferenceLink } from "@/components/api-reference-link";
+import { DashboardHeader } from "@/components/dashboard-header";
 import { DashboardMobileNav, DashboardSidebar } from "@/components/dashboard-nav";
-import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 
 export async function DashboardShell({
@@ -20,17 +20,7 @@ export async function DashboardShell({
       <DashboardSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <DashboardMobileNav />
-        <header className="flex h-16 items-center justify-between border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:px-6">
-          <div className="truncate text-sm text-muted-foreground">
-            Signed in as{" "}
-            <span className="font-medium text-foreground">{email}</span>
-          </div>
-          <form action="/auth/sign-out" method="post">
-            <Button type="submit" variant="ghost" size="sm">
-              Sign out
-            </Button>
-          </form>
-        </header>
+        <DashboardHeader email={email} />
         <main className="flex-1 p-4 sm:p-6 md:p-10">
           <div className="mx-auto w-full max-w-6xl">{children}</div>
         </main>

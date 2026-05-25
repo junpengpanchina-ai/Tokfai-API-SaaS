@@ -11,6 +11,7 @@ import {
   Wallet,
 } from "lucide-react";
 
+import { HomeHero } from "@/components/home-hero";
 import { PublicFooter } from "@/components/public-footer";
 import { PublicHeader } from "@/components/public-header";
 import {
@@ -120,41 +121,7 @@ export default function HomePage() {
       <PublicHeader />
 
       <main className="flex-1">
-        <section className="container py-20 md:py-28">
-          <div className="mx-auto max-w-3xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-widest text-primary">
-              Tokfai
-            </p>
-            <h1 className="mt-3 text-balance text-4xl font-semibold tracking-tight md:text-5xl lg:text-6xl">
-              OpenAI-compatible image &amp; chat API
-            </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-balance text-lg text-muted-foreground">
-              One API for chat, image, and AI apps. Works with OpenAI SDK,
-              Cursor, Cherry Studio, and your own products. Try image generation
-              in the Image Playground.
-            </p>
-            <div className="mt-10 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-              <Button asChild size="lg" className="w-full sm:w-auto">
-                <Link href="/dashboard/credits">
-                  Start with credits
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
-                <Link href="/dashboard/image-playground">
-                  Try Image Playground
-                  <ImageIcon className="h-4 w-4" />
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
-                <Link href="/pricing">View pricing</Link>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
-                <Link href="/dashboard/docs">Read docs</Link>
-              </Button>
-            </div>
-          </div>
-        </section>
+        <HomeHero />
 
         <section className="container pb-20 md:pb-28">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

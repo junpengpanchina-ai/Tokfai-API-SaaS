@@ -7,10 +7,12 @@ import {
   DASHBOARD_NAV_ITEMS,
   isDashboardNavActive,
 } from "@/lib/dashboard-nav";
+import { useI18n } from "@/lib/i18n/i18n-provider";
 import { cn } from "@/lib/utils";
 
 export function DashboardMobileNav() {
   const pathname = usePathname();
+  const { t } = useI18n();
 
   return (
     <nav
@@ -31,7 +33,7 @@ export function DashboardMobileNav() {
                 : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
             )}
           >
-            {item.label}
+            {t(item.labelKey)}
           </Link>
         );
       })}
@@ -41,6 +43,7 @@ export function DashboardMobileNav() {
 
 export function DashboardSidebar() {
   const pathname = usePathname();
+  const { t } = useI18n();
 
   return (
     <aside className="hidden w-60 shrink-0 border-r bg-muted/30 md:block">
@@ -70,7 +73,7 @@ export function DashboardSidebar() {
               )}
             >
               <Icon className="h-4 w-4" />
-              {item.label}
+              {t(item.labelKey)}
             </Link>
           );
         })}

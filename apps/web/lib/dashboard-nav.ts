@@ -12,7 +12,7 @@ import {
 
 export interface DashboardNavItem {
   href: string;
-  label: string;
+  labelKey: string;
   icon: LucideIcon;
   exact?: boolean;
   prefetch?: boolean;
@@ -21,43 +21,43 @@ export interface DashboardNavItem {
 export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
   {
     href: "/dashboard",
-    label: "Overview",
+    labelKey: "nav.overview",
     icon: LayoutDashboard,
     exact: true,
     prefetch: true,
   },
   {
     href: "/dashboard/api-keys",
-    label: "API Keys",
+    labelKey: "nav.apiKeys",
     icon: KeyRound,
     prefetch: false,
   },
   {
     href: "/dashboard/playground",
-    label: "Playground",
+    labelKey: "nav.playground",
     icon: Terminal,
     prefetch: false,
   },
   {
     href: "/dashboard/image-playground",
-    label: "Image Playground",
+    labelKey: "nav.imagePlayground",
     icon: ImageIcon,
     prefetch: false,
   },
   {
     href: "/dashboard/models",
-    label: "Models",
+    labelKey: "nav.models",
     icon: Boxes,
     prefetch: true,
   },
-  { href: "/dashboard/usage", label: "Usage", icon: Gauge, prefetch: true },
+  { href: "/dashboard/usage", labelKey: "nav.usage", icon: Gauge, prefetch: true },
   {
     href: "/dashboard/credits",
-    label: "Credits",
+    labelKey: "nav.credits",
     icon: CreditCard,
     prefetch: false,
   },
-  { href: "/dashboard/docs", label: "Docs", icon: BookOpen, prefetch: true },
+  { href: "/dashboard/docs", labelKey: "nav.docs", icon: BookOpen, prefetch: true },
 ];
 
 export function isDashboardNavActive(
