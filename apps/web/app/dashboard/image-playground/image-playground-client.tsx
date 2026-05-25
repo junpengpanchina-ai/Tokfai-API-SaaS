@@ -101,12 +101,10 @@ interface ImageInputItem {
 
 export function ImagePlaygroundClient({
   accessToken,
-  userId,
   activeKeys,
   initialModel,
 }: {
   accessToken: string;
-  userId: string;
   activeKeys: ImagePlaygroundApiKeyOption[];
   initialModel?: string;
 }) {
@@ -122,6 +120,8 @@ export function ImagePlaygroundClient({
   const [result, setResult] = useState<ImageGenerationResponse | null>(null);
   const [error, setError] = useState<PlaygroundError | null>(null);
   const [imageInputs, setImageInputs] = useState<ImageInputItem[]>([]);
+  const imageInputsRef = useRef(imageInputs);
+  imageInputsRef.current = imageInputs;
   const [imageUrlDraft, setImageUrlDraft] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [lastRequestInputCount, setLastRequestInputCount] = useState<
@@ -187,94 +187,93 @@ export function ImagePlaygroundClient({
     []
   );
 
-  const uploadFiles = useCallback(
-    async (files: FileList | File[]) => {
-      const fileArray = Array.from(files);
-      if (fileArray.length === 0) return;
+  const uploadFiles = useCallback(async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
 
-      setError(null);
+    setError(null);
 
-      let batch: Array<{
-        id: string;
-        file: File;
-        item: ImageInputItem;
-      }> = [];
+    const current = imageInputsRef.current;
+    const remaining = MAX_PLAYGROUND_INPUT_IMAGES - current.length;
+    const slice = fileArray.slice(0, remaining);
 
-      setImageInputs((current) => {
-        const remaining = MAX_PLAYGROUND_INPUT_IMAGES - current.length;
-        const slice = fileArray.slice(0, remaining);
-
-        if (slice.length < fileArray.length) {
-          setError({
-            status: 0,
-            code: "too_many_images",
-            message: `Up to ${MAX_PLAYGROUND_INPUT_IMAGES} input images are allowed.`,
-          });
-        }
-
-        batch = slice.map((file) => {
-          const id = crypto.randomUUID();
-          return {
-            id,
-            file,
-            item: {
-              id,
-              url: "",
-              label: file.name,
-              source: "upload" as const,
-              status: "uploading" as const,
-            },
-          };
-        });
-
-        return batch.length > 0
-          ? [...current, ...batch.map((entry) => entry.item)]
-          : current;
+    if (slice.length < fileArray.length) {
+      setError({
+        status: 0,
+        code: "too_many_images",
+        message: `Up to ${MAX_PLAYGROUND_INPUT_IMAGES} input images are allowed.`,
       });
+    }
 
-      for (const entry of batch) {
-        try {
-          validatePlaygroundImageFile(entry.file);
-          const publicUrl = await uploadPlaygroundImage(entry.file, userId);
-          setImageInputs((current) =>
-            current.map((item) =>
-              item.id === entry.id
-                ? {
-                    ...item,
-                    url: publicUrl,
-                    status: "ready",
-                    error: undefined,
-                  }
-                : item
-            )
-          );
-        } catch (err) {
-          const message =
-            err instanceof PlaygroundImageUploadError
+    const entries = slice.map((file) => {
+      const id = crypto.randomUUID();
+      return {
+        id,
+        file,
+        item: {
+          id,
+          url: "",
+          label: file.name,
+          source: "upload" as const,
+          status: "uploading" as const,
+        },
+      };
+    });
+
+    if (entries.length === 0) return;
+
+    setImageInputs((prev) => [...prev, ...entries.map((entry) => entry.item)]);
+
+    for (const entry of entries) {
+      let uploadStatus: "ready" | "error" = "error";
+      let publicUrl = "";
+      let errorMessage = "Upload failed.";
+
+      try {
+        validatePlaygroundImageFile(entry.file);
+        publicUrl = await uploadPlaygroundImage(entry.file);
+        uploadStatus = "ready";
+      } catch (err) {
+        errorMessage =
+          err instanceof PlaygroundImageUploadError
+            ? err.message
+            : err instanceof Error
               ? err.message
-              : err instanceof Error
-                ? err.message
-                : "Upload failed.";
-          setImageInputs((current) =>
-            current.map((item) =>
-              item.id === entry.id
-                ? { ...item, status: "error", error: message }
-                : item
-            )
-          );
-          setError({
-            status: 0,
-            code:
-              err instanceof PlaygroundImageUploadError
-                ? err.code
-                : "upload_failed",
-            message,
-          });
-        }
+              : "Upload failed.";
+        console.error("[image-upload] failed", err);
+        setError({
+          status: 0,
+          code:
+            err instanceof PlaygroundImageUploadError
+              ? err.code
+              : "upload_failed",
+          message: errorMessage,
+        });
+      } finally {
+        setImageInputs((currentItems) =>
+          currentItems.map((item) => {
+            if (item.id !== entry.id || item.status !== "uploading") {
+              return item;
+            }
+            if (uploadStatus === "ready" && publicUrl) {
+              return {
+                ...item,
+                url: publicUrl,
+                status: "ready",
+                error: undefined,
+              };
+            }
+            return {
+              ...item,
+              url: "",
+              status: "error",
+              error: errorMessage,
+            };
+          })
+        );
       }
-    },
-    [userId]
-  );
+    }
+  }, []);
 
   const removeImageInput = useCallback((id: string) => {
     setImageInputs((current) => current.filter((item) => item.id !== id));
@@ -504,7 +503,12 @@ export function ImagePlaygroundClient({
               Input images: {inputImageCount}
             </p>
 
-            <div className="flex justify-end">
+            <div className="flex flex-col items-end gap-1">
+              {hasUploadingImages ? (
+                <p className="text-xs text-muted-foreground">
+                  Uploading input images…
+                </p>
+              ) : null}
               <Button
                 type="submit"
                 disabled={loading || hasUploadingImages}
@@ -513,6 +517,11 @@ export function ImagePlaygroundClient({
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Generating…
+                  </>
+                ) : hasUploadingImages ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Uploading input images…
                   </>
                 ) : (
                   <>

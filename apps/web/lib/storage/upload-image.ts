@@ -54,10 +54,21 @@ export function isValidImageUrl(value: string): boolean {
   }
 }
 
-export async function uploadPlaygroundImage(
-  file: File,
-  userId: string
-): Promise<string> {
+function resolveStorageErrorMessage(message: string): string {
+  const normalized = message.trim();
+  if (!normalized) {
+    return "Upload failed.";
+  }
+  return normalized;
+}
+
+export async function uploadPlaygroundImage(file: File): Promise<string> {
+  console.info("[image-upload] start", {
+    name: file.name,
+    type: file.type,
+    size: file.size,
+  });
+
   validatePlaygroundImageFile(file);
 
   const ext = EXT_BY_MIME[file.type];
@@ -68,26 +79,48 @@ export async function uploadPlaygroundImage(
     );
   }
 
-  const objectPath = `${userId}/${crypto.randomUUID()}.${ext}`;
   const supabase = createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
 
-  const { error } = await supabase.storage
+  if (authError || !user) {
+    const message = authError?.message ?? "Please sign in again.";
+    console.error("[image-upload] failed", authError ?? new Error(message));
+    throw new PlaygroundImageUploadError(message, "not_authenticated");
+  }
+
+  const objectPath = `${user.id}/${crypto.randomUUID()}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
     .from(PLAYGROUND_INPUTS_BUCKET)
     .upload(objectPath, file, {
       contentType: file.type,
       upsert: false,
     });
 
-  if (error) {
-    throw new PlaygroundImageUploadError(
-      error.message || "Upload failed.",
-      "upload_failed"
-    );
+  if (uploadError) {
+    const message = resolveStorageErrorMessage(uploadError.message);
+    console.error("[image-upload] failed", uploadError);
+    throw new PlaygroundImageUploadError(message, "upload_failed");
   }
 
   const { data } = supabase.storage
     .from(PLAYGROUND_INPUTS_BUCKET)
     .getPublicUrl(objectPath);
 
-  return data.publicUrl;
+  const publicUrl = data.publicUrl?.trim();
+  if (!publicUrl) {
+    const message = "Upload failed.";
+    console.error("[image-upload] failed", new Error(message));
+    throw new PlaygroundImageUploadError(message, "upload_failed");
+  }
+
+  console.info("[image-upload] success", {
+    path: objectPath,
+    publicUrlPresent: true,
+  });
+
+  return publicUrl;
 }
