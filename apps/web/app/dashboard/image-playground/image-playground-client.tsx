@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -99,6 +100,48 @@ interface ImageInputItem {
   previewError?: string;
 }
 
+function resolveUploadedImageInput(
+  entry: { id: string; item: ImageInputItem },
+  uploadStatus: "ready" | "error",
+  publicUrl: string,
+  errorMessage: string
+): ImageInputItem {
+  if (uploadStatus === "ready" && publicUrl) {
+    return {
+      ...entry.item,
+      url: publicUrl,
+      status: "ready",
+      error: undefined,
+    };
+  }
+
+  return {
+    ...entry.item,
+    url: "",
+    status: "error",
+    error: errorMessage,
+  };
+}
+
+function mergeImageInputUploadResult(
+  currentItems: ImageInputItem[],
+  entryId: string,
+  resolved: ImageInputItem
+): ImageInputItem[] {
+  const index = currentItems.findIndex((item) => item.id === entryId);
+  if (index === -1) {
+    return [...currentItems, resolved];
+  }
+
+  return currentItems.map((item) => (item.id === entryId ? resolved : item));
+}
+
+function getReadyImageUrls(items: ImageInputItem[]): string[] {
+  return items
+    .filter((item) => item.status === "ready" && item.url)
+    .map((item) => item.url);
+}
+
 export function ImagePlaygroundClient({
   accessToken,
   activeKeys,
@@ -129,9 +172,7 @@ export function ImagePlaygroundClient({
   >(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const readyImageUrls = imageInputs
-    .filter((item) => item.status === "ready" && item.url)
-    .map((item) => item.url);
+  const readyImageUrls = getReadyImageUrls(imageInputs);
 
   const inputImageCount = readyImageUrls.length;
   const isImageToImage = inputImageCount > 0;
@@ -222,61 +263,68 @@ export function ImagePlaygroundClient({
 
     if (entries.length === 0) return;
 
-    setImageInputs((prev) => [...prev, ...entries.map((entry) => entry.item)]);
+    flushSync(() => {
+      setImageInputs((prev) => {
+        const next = [...prev, ...entries.map((entry) => entry.item)];
+        imageInputsRef.current = next;
+        return next;
+      });
+    });
 
-    for (const entry of entries) {
-      let uploadStatus: "ready" | "error" = "error";
-      let publicUrl = "";
-      let errorMessage = "Upload failed.";
+    await Promise.all(
+      entries.map(async (entry) => {
+        let uploadStatus: "ready" | "error" = "error";
+        let publicUrl = "";
+        let errorMessage = "Upload failed.";
 
-      try {
-        validatePlaygroundImageFile(entry.file);
-        publicUrl = await uploadPlaygroundImage(entry.file);
-        uploadStatus = "ready";
-      } catch (err) {
-        errorMessage =
-          err instanceof PlaygroundImageUploadError
-            ? err.message
-            : err instanceof Error
-              ? err.message
-              : "Upload failed.";
-        console.error("[image-upload] failed", err);
-        setError({
-          status: 0,
-          code:
+        try {
+          validatePlaygroundImageFile(entry.file);
+          publicUrl = await uploadPlaygroundImage(entry.file);
+          uploadStatus = "ready";
+        } catch (err) {
+          errorMessage =
             err instanceof PlaygroundImageUploadError
-              ? err.code
-              : "upload_failed",
-          message: errorMessage,
-        });
-      } finally {
-        setImageInputs((currentItems) =>
-          currentItems.map((item) => {
-            if (item.id !== entry.id || item.status !== "uploading") {
-              return item;
-            }
-            if (uploadStatus === "ready" && publicUrl) {
-              return {
-                ...item,
-                url: publicUrl,
-                status: "ready",
-                error: undefined,
-              };
-            }
-            return {
-              ...item,
-              url: "",
-              status: "error",
-              error: errorMessage,
-            };
-          })
-        );
-      }
-    }
+              ? err.message
+              : err instanceof Error
+                ? err.message
+                : "Upload failed.";
+          console.error("[image-upload] failed", err);
+          setError({
+            status: 0,
+            code:
+              err instanceof PlaygroundImageUploadError
+                ? err.code
+                : "upload_failed",
+            message: errorMessage,
+          });
+        } finally {
+          const resolved = resolveUploadedImageInput(
+            entry,
+            uploadStatus,
+            publicUrl,
+            errorMessage
+          );
+
+          setImageInputs((currentItems) => {
+            const next = mergeImageInputUploadResult(
+              currentItems,
+              entry.id,
+              resolved
+            );
+            imageInputsRef.current = next;
+            return next;
+          });
+        }
+      })
+    );
   }, []);
 
   const removeImageInput = useCallback((id: string) => {
-    setImageInputs((current) => current.filter((item) => item.id !== id));
+    setImageInputs((current) => {
+      const next = current.filter((item) => item.id !== id);
+      imageInputsRef.current = next;
+      return next;
+    });
   }, []);
 
   const markPreviewError = useCallback((id: string, message: string) => {
@@ -314,7 +362,11 @@ export function ImagePlaygroundClient({
       return;
     }
 
-    if (hasUploadingImages) {
+    const currentInputs = imageInputsRef.current;
+    const uploadingNow = currentInputs.some(
+      (item) => item.status === "uploading"
+    );
+    if (uploadingNow) {
       setError({
         status: 0,
         code: "upload_in_progress",
@@ -322,6 +374,8 @@ export function ImagePlaygroundClient({
       });
       return;
     }
+
+    const imageUrlsForRequest = getReadyImageUrls(currentInputs);
 
     let resolvedKey: string;
     try {
@@ -339,10 +393,10 @@ export function ImagePlaygroundClient({
         size,
         n: 1,
         response_format: "url",
-        image_urls: readyImageUrls,
+        image_urls: imageUrlsForRequest,
       };
 
-      setLastRequestInputCount(readyImageUrls.length);
+      setLastRequestInputCount(imageUrlsForRequest.length);
       const res = await imageGenerations(resolvedKey, payload);
       setResult(res);
     } catch (err) {
