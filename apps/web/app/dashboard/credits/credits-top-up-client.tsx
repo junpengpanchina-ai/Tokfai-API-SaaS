@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { createCheckoutSession, DmitApiError } from "@/lib/dmit/client";
 import { userMessageForDmitError } from "@/lib/dmit-messages";
+import { useI18n } from "@/lib/i18n/i18n-provider";
 import { createClient } from "@/lib/supabase/client";
 
 interface CreditPlan {
@@ -49,6 +50,7 @@ const CREDIT_PLANS: CreditPlan[] = [
 ];
 
 export function CreditsTopUpClient() {
+  const { t } = useI18n();
   const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,7 +65,7 @@ export function CreditsTopUpClient() {
       const accessToken = sessionData.session?.access_token;
 
       if (!accessToken) {
-        setError("Please sign in again");
+        setError(t("dashboard.credits.loadErrorAuthDesc"));
         setLoadingPlanId(null);
         return;
       }
@@ -87,13 +89,10 @@ export function CreditsTopUpClient() {
     <Card id="recharge-credits">
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle>Recharge credits</CardTitle>
+          <CardTitle>{t("dashboard.credits.rechargeCredits")}</CardTitle>
           <Badge variant="secondary">Stripe Checkout</Badge>
         </div>
-        <CardDescription>
-          Choose a fixed one-time package. Payments are handled by Stripe, and
-          credits are added only after DMIT receives the signed webhook.
-        </CardDescription>
+        <CardDescription>{t("dashboard.credits.rechargeDesc")}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="grid gap-3 md:grid-cols-3">
@@ -116,7 +115,7 @@ export function CreditsTopUpClient() {
                     ¥{plan.amount_cny}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {formatCredits(plan.credits)} credits
+                    {formatCredits(plan.credits)} {t("dashboard.credits.creditsUnit")}
                   </p>
                 </div>
 
@@ -125,13 +124,15 @@ export function CreditsTopUpClient() {
                   variant={plan.package_code === "starter" ? "default" : "outline"}
                   disabled={isDisabled}
                   onClick={() => handleRecharge(plan)}
-                  aria-label={`Recharge ${plan.name}`}
+                  aria-label={`${t("dashboard.credits.rechargeCredits")} ${plan.name}`}
                   className="mt-auto"
                 >
                   {isLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : null}
-                  {plan.enabled ? "Buy starter" : "Coming soon"}
+                  {plan.enabled
+                    ? t("dashboard.credits.buyStarter")
+                    : t("dashboard.credits.comingSoon")}
                 </Button>
               </div>
             );
@@ -141,9 +142,7 @@ export function CreditsTopUpClient() {
         {error ? <CheckoutError message={error} /> : null}
 
         <p className="text-xs text-muted-foreground">
-          The frontend never writes <code>profiles.credits_balance</code>.
-          Checkout success only shows a pending confirmation message until the
-          Stripe webhook credits the account.
+          {t("dashboard.credits.billingNote")}
         </p>
       </CardContent>
     </Card>

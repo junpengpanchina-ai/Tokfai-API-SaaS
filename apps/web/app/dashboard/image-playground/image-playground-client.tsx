@@ -35,6 +35,8 @@ import {
   type ImageGenerationResponse,
 } from "@/lib/dmit/client";
 import { userMessageForDmitError } from "@/lib/dmit-messages";
+import { useI18n } from "@/lib/i18n/i18n-provider";
+import { formatMessage } from "@/lib/i18n/messages";
 import {
   IMAGE_PLAYGROUND_MODEL_IDS,
   IMAGE_PLAYGROUND_SIZES,
@@ -172,6 +174,7 @@ export function ImagePlaygroundClient({
   activeKeys: ImagePlaygroundApiKeyOption[];
   initialModel?: string;
 }) {
+  const { t } = useI18n();
   const [model, setModel] = useState(() => resolveInitialModel(initialModel));
   const [size, setSize] = useState<ImagePlaygroundSize>(DEFAULT_SIZE);
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
@@ -521,20 +524,15 @@ export function ImagePlaygroundClient({
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">
-            Image Playground
+            {t("dashboard.imagePlayground.title")}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Test text-to-image and image-to-image through{" "}
-            <code className="rounded bg-muted px-1 text-xs">
-              {TOKFAI_IMAGES_GENERATIONS_FULL_PATH}
-            </code>
-            . Drag images, paste URLs, or use prompt-only for text-to-image.
-            Successful generations debit credits. Failed calls are not charged.
+            {formatMessage(t("dashboard.imagePlayground.subtitle"), {
+              endpoint: TOKFAI_IMAGES_GENERATIONS_FULL_PATH,
+            })}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Uses your own{" "}
-            <code className="rounded bg-muted px-1 text-xs">sk-tokfai_</code>{" "}
-            key — the same path external clients use.
+            {t("dashboard.imagePlayground.usesOwnKey")}
           </p>
         </div>
         <Badge variant="secondary" className="shrink-0 whitespace-nowrap font-mono text-xs">
@@ -545,20 +543,17 @@ export function ImagePlaygroundClient({
       <div className="grid gap-6 lg:grid-cols-[1fr,280px]">
         <Card>
           <CardHeader>
-            <CardTitle>Request</CardTitle>
-            <CardDescription>
-              Text-to-image works with prompt only. Add input images for
-              image-to-image via upload or URL. Successful calls are recorded in
-              Usage and debited from Credits.
-            </CardDescription>
+            <CardTitle>{t("dashboard.imagePlayground.request")}</CardTitle>
+            <CardDescription>{t("dashboard.imagePlayground.requestDesc")}</CardDescription>
             <div className="mt-3 flex flex-col gap-1">
               <Badge variant={isImageToImage ? "default" : "secondary"}>
-                {isImageToImage ? "Image to Image" : "Text to Image"}
+                {isImageToImage
+                  ? t("dashboard.imagePlayground.imageToImage")
+                  : t("dashboard.imagePlayground.textToImage")}
               </Badge>
               {isImageToImage ? (
                 <p className="text-xs text-muted-foreground">
-                  Input images added — generation will use them as visual
-                  reference.
+                  {t("dashboard.imagePlayground.inputImagesReference")}
                 </p>
               ) : null}
             </div>
@@ -600,8 +595,7 @@ export function ImagePlaygroundClient({
               <Label htmlFor="prompt">Prompt</Label>
               {isImageToImage ? (
                 <p className="text-xs text-muted-foreground">
-                  Image-to-image mode: Tokfai will preserve the uploaded subject
-                  and apply your prompt as style/edit instructions.
+                  {t("dashboard.imagePlayground.imageToImageHint")}
                 </p>
               ) : null}
               <PromptPresets
@@ -624,7 +618,7 @@ export function ImagePlaygroundClient({
             <div className="flex flex-col items-end gap-2">
               {hasUploadingImages ? (
                 <p className="text-xs text-muted-foreground">
-                  Waiting for input images to finish uploading or resolving…
+                  {t("dashboard.imagePlayground.waitingForImages")}
                 </p>
               ) : null}
               <div className="flex flex-wrap items-center justify-end gap-2">
@@ -637,12 +631,12 @@ export function ImagePlaygroundClient({
                   {copyRequestStatus === "copied" ? (
                     <>
                       <Check className="h-4 w-4" />
-                      Copied
+                      {t("dashboard.apiKeys.copied")}
                     </>
                   ) : (
                     <>
                       <Copy className="h-4 w-4" />
-                      Copy API request
+                      {t("dashboard.imagePlayground.copyApiRequest")}
                     </>
                   )}
                 </Button>
@@ -653,36 +647,37 @@ export function ImagePlaygroundClient({
                   {loading ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Generating…
+                      {t("dashboard.imagePlayground.generating")}
                     </>
                   ) : hasUploadingImages ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Preparing input images…
+                      {t("dashboard.imagePlayground.preparingImages")}
                     </>
                   ) : (
                     <>
                       <ImageIcon className="h-4 w-4" />
-                      Generate
+                      {t("dashboard.imagePlayground.generate")}
                     </>
                   )}
                 </Button>
               </div>
               {copyRequestStatus === "copied" ? (
                 <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                  curl copied — replace {TOKFAI_API_KEY_PLACEHOLDER} with your
-                  API key.
+                  {formatMessage(t("dashboard.imagePlayground.curlCopied"), {
+                    placeholder: TOKFAI_API_KEY_PLACEHOLDER,
+                  })}
                 </p>
               ) : null}
               <div className="flex w-full flex-col items-end gap-1 text-right">
                 <p className="text-xs text-muted-foreground">
-                  Input images: {inputImageCount}
+                  {formatMessage(t("dashboard.imagePlayground.inputImagesCount"), {
+                    count: inputImageCount,
+                  })}
                 </p>
                 {inputImageCount > 0 ? (
                   <p className="max-w-md text-xs text-muted-foreground">
-                    Tokfai will use your uploaded or linked image as visual
-                    reference. Results may vary depending on upstream model
-                    behavior.
+                    {t("dashboard.imagePlayground.visualReferenceNote")}
                   </p>
                 ) : null}
               </div>
@@ -695,20 +690,15 @@ export function ImagePlaygroundClient({
               inputImagesCount={
                 result?.input_images_count ?? lastRequestInputCount
               }
+              t={t}
             />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Settings</CardTitle>
-            <CardDescription>
-              Image models only. Values are sent in the JSON body to{" "}
-              <code className="rounded bg-muted px-1 text-xs">
-                api.tokfai.com
-              </code>
-              .
-            </CardDescription>
+            <CardTitle>{t("dashboard.imagePlayground.settings")}</CardTitle>
+            <CardDescription>{t("dashboard.imagePlayground.settingsDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
@@ -729,7 +719,7 @@ export function ImagePlaygroundClient({
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="size">Size</Label>
+              <Label htmlFor="size">{t("dashboard.imagePlayground.size")}</Label>
               <select
                 id="size"
                 value={size}
@@ -746,19 +736,19 @@ export function ImagePlaygroundClient({
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Need a key?{" "}
+              {t("dashboard.imagePlayground.needKey")}{" "}
               <Link
                 href="/dashboard/api-keys"
                 className="underline underline-offset-4"
               >
-                Create an API key
+                {t("dashboard.imagePlayground.createApiKey")}
               </Link>
-              . Need more credits?{" "}
+              . {t("dashboard.imagePlayground.needCredits")}{" "}
               <Link
                 href="/dashboard/credits"
                 className="underline underline-offset-4"
               >
-                Top up
+                {t("dashboard.imagePlayground.topUp")}
               </Link>
               .
             </p>
@@ -1251,17 +1241,19 @@ function ResponsePanel({
   error,
   result,
   inputImagesCount,
+  t,
 }: {
   loading: boolean;
   error: PlaygroundError | null;
   result: ImageGenerationResponse | null;
   inputImagesCount: number | null | undefined;
+  t: (key: string) => string;
 }) {
   if (loading) {
     return (
       <div className="flex items-center gap-2 rounded-md border bg-muted/40 p-4 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Generating image…
+        {t("dashboard.imagePlayground.generatingImage")}
       </div>
     );
   }
@@ -1271,7 +1263,7 @@ function ResponsePanel({
       <div className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-4">
         <div className="flex items-center gap-2 text-sm font-medium text-destructive">
           <AlertTriangle className="h-4 w-4" />
-          Request failed
+          {t("dashboard.playground.requestFailed")}
           {error.status > 0 ? (
             <Badge variant="outline" className="ml-1">
               HTTP {error.status}
@@ -1280,17 +1272,17 @@ function ResponsePanel({
         </div>
         <dl className="grid gap-1 text-sm">
           <div className="flex flex-wrap gap-x-2">
-            <dt className="text-muted-foreground">Error code:</dt>
+            <dt className="text-muted-foreground">{t("dashboard.playground.errorCode")}</dt>
             <dd className="font-mono">{error.code ?? "n/a"}</dd>
           </div>
           <div className="flex flex-wrap gap-x-2">
-            <dt className="text-muted-foreground">Error message:</dt>
+            <dt className="text-muted-foreground">{t("dashboard.playground.errorMessage")}</dt>
             <dd>{error.message}</dd>
           </div>
         </dl>
         {error.status === 402 || error.code === "insufficient_credits" ? (
           <Button asChild size="sm" variant="outline" className="w-fit">
-            <Link href="/dashboard/credits">Add credits</Link>
+            <Link href="/dashboard/credits">{t("dashboard.playground.addCredits")}</Link>
           </Button>
         ) : null}
       </div>
@@ -1301,7 +1293,7 @@ function ResponsePanel({
     return (
       <div className="flex items-center gap-2 rounded-md border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
         <Sparkles className="h-4 w-4" />
-        Generated image will appear here.
+        {t("dashboard.imagePlayground.generatedImagePlaceholder")}
       </div>
     );
   }
@@ -1312,23 +1304,7 @@ function ResponsePanel({
     <div className="flex flex-col gap-3">
       <div className="flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
         <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-        <p>
-          This request has been recorded. View it in{" "}
-          <Link
-            href="/dashboard/usage"
-            className="font-medium underline underline-offset-4"
-          >
-            Usage
-          </Link>{" "}
-          and{" "}
-          <Link
-            href="/dashboard/credits"
-            className="font-medium underline underline-offset-4"
-          >
-            Credits
-          </Link>
-          .
-        </p>
+        <p>{t("dashboard.playground.recordedInUsage")}</p>
       </div>
 
       {imageUrl ? (

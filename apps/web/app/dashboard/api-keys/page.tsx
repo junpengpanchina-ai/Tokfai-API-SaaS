@@ -1,14 +1,7 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
-import { AlertTriangle } from "lucide-react";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { ApiKeysErrorView } from "@/components/api-keys-error-view";
 import {
   DmitServerError,
   dmitServerFetch,
@@ -57,15 +50,12 @@ export default async function ApiKeysPage() {
 
   if (!session?.access_token) {
     return (
-      <ApiKeysView
-        state={{
-          status: "error",
-          message: "登录状态异常，请重新登录。",
-          code: "missing_session",
-          httpStatus: 401,
-          method: "GET",
-          url: apiKeysUrl,
-        }}
+      <ApiKeysErrorView
+        message="登录状态异常，请重新登录。"
+        code="missing_session"
+        httpStatus={401}
+        method="GET"
+        url={apiKeysUrl}
       />
     );
   }
@@ -81,7 +71,15 @@ export default async function ApiKeysPage() {
     );
   }
 
-  return <ApiKeysView state={state} />;
+  return (
+    <ApiKeysErrorView
+      message={state.message}
+      code={state.code}
+      httpStatus={state.httpStatus}
+      method={state.method}
+      url={state.url}
+    />
+  );
 }
 
 async function loadApiKeys(accessToken: string): Promise<ApiKeysState> {
@@ -116,44 +114,4 @@ async function loadApiKeys(accessToken: string): Promise<ApiKeysState> {
       url,
     };
   }
-}
-
-function ApiKeysView({ state }: { state: ApiKeysState }) {
-  return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">API Keys</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          View API key metadata for your Tokfai account.
-        </p>
-      </div>
-
-      {state.status === "error" ? <ApiKeysError state={state} /> : null}
-    </div>
-  );
-}
-
-function ApiKeysError({
-  state,
-}: {
-  state: Extract<ApiKeysState, { status: "error" }>;
-}) {
-  return (
-    <Card className="border-destructive/30 bg-destructive/5">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <AlertTriangle className="h-4 w-4 text-destructive" />
-          Could not load API keys
-        </CardTitle>
-        <CardDescription>{state.message}</CardDescription>
-      </CardHeader>
-      <CardContent className="font-mono text-xs text-muted-foreground">
-        method={state.method} url={state.url}
-        <br />
-        status={state.httpStatus ?? "n/a"} code={state.code ?? "n/a"}
-        <br />
-        message={state.message}
-      </CardContent>
-    </Card>
-  );
 }

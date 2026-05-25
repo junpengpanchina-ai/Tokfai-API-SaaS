@@ -42,6 +42,8 @@ import {
   userMessageForDashboardError,
   userMessageForDmitError,
 } from "@/lib/dmit-messages";
+import { useI18n } from "@/lib/i18n/i18n-provider";
+import { formatMessage } from "@/lib/i18n/messages";
 import {
   TOKFAI_API_BASE_URL,
   TOKFAI_API_KEY_PLACEHOLDER,
@@ -66,8 +68,7 @@ interface ActionErrorState {
   url?: string;
 }
 
-const REVOKE_CONFIRM_MESSAGE =
-  "Revoke this API key? Existing apps using this key will stop working.";
+const LEGACY_KEY_MESSAGE_KEY = "dashboard.apiKeys.legacyKeyMessage";
 
 export function ApiKeysClient({
   accessToken,
@@ -76,6 +77,7 @@ export function ApiKeysClient({
   accessToken: string;
   initialKeys: ApiKeyListItem[];
 }) {
+  const { t } = useI18n();
   const [keys, setKeys] = useState<ApiKeyListItem[]>(initialKeys);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -130,7 +132,7 @@ export function ApiKeysClient({
 
   async function handleRevoke(key: ApiKeyListItem) {
     if (key.status === "revoked" || revokingId) return;
-    if (!window.confirm(REVOKE_CONFIRM_MESSAGE)) return;
+    if (!window.confirm(t("dashboard.apiKeys.revokeConfirm"))) return;
 
     setRevokingId(key.id);
     setRevokeError(null);
@@ -174,17 +176,17 @@ export function ApiKeysClient({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">API Keys</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">
+          {t("dashboard.apiKeys.title")}
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Create keys to authenticate requests to{" "}
-          <code className="rounded bg-muted px-1 text-xs">{TOKFAI_API_BASE_URL}</code>.
-          The full secret is shown once when created. Active keys can be revealed
-          and copied again with{" "}
-          <span className="font-medium">Copy key</span>.
+          {formatMessage(t("dashboard.apiKeys.subtitleCreate"), {
+            baseUrl: TOKFAI_API_BASE_URL,
+          })}
         </p>
       </div>
 
-      <IntegrationGuide />
+      <IntegrationGuide t={t} />
 
       {oneTimeSecret ? (
         <OneTimeSecretCard
@@ -193,15 +195,14 @@ export function ApiKeysClient({
           copyStatus={copyFullKeyStatus}
           onCopy={handleCopyFullKey}
           onDismiss={dismissOneTimeSecret}
+          t={t}
         />
       ) : null}
 
       <Card id="create-api-key">
         <CardHeader>
-          <CardTitle>Create API key</CardTitle>
-          <CardDescription>
-            Optional name for your reference. Leave blank to use the default name.
-          </CardDescription>
+          <CardTitle>{t("dashboard.apiKeys.createApiKey")}</CardTitle>
+          <CardDescription>{t("dashboard.apiKeys.createApiKeyDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form
@@ -209,10 +210,10 @@ export function ApiKeysClient({
             className="flex flex-col gap-3 sm:flex-row sm:items-end"
           >
             <div className="flex flex-1 flex-col gap-2">
-              <Label htmlFor="key-name">Key name</Label>
+              <Label htmlFor="key-name">{t("dashboard.apiKeys.keyName")}</Label>
               <Input
                 id="key-name"
-                placeholder="e.g. production"
+                placeholder={t("dashboard.apiKeys.keyNamePlaceholder")}
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 disabled={creating}
@@ -225,7 +226,7 @@ export function ApiKeysClient({
               ) : (
                 <Plus className="h-4 w-4" />
               )}
-              {creating ? "Creating..." : "Create API key"}
+              {creating ? t("dashboard.apiKeys.creating") : t("dashboard.apiKeys.createApiKey")}
             </Button>
           </form>
           {createError ? (
@@ -236,11 +237,8 @@ export function ApiKeysClient({
 
       <Card>
         <CardHeader>
-          <CardTitle>Your API keys</CardTitle>
-          <CardDescription>
-            Prefixes are shown for identification. Use Copy key to copy the full
-            secret for active keys.
-          </CardDescription>
+          <CardTitle>{t("dashboard.apiKeys.yourApiKeys")}</CardTitle>
+          <CardDescription>{t("dashboard.apiKeys.yourApiKeysDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           {revokeError ? (
@@ -252,9 +250,10 @@ export function ApiKeysClient({
               accessToken={accessToken}
               revokingId={revokingId}
               onRevoke={handleRevoke}
+              t={t}
             />
           ) : (
-            <EmptyState />
+            <EmptyState t={t} />
           )}
         </CardContent>
       </Card>
@@ -262,29 +261,22 @@ export function ApiKeysClient({
   );
 }
 
-function IntegrationGuide() {
+function IntegrationGuide({ t }: { t: (key: string) => string }) {
   return (
     <Card className="border-muted bg-muted/30">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <BookOpen className="h-4 w-4 shrink-0" />
-          Quick start
+          {t("dashboard.apiKeys.quickStart")}
         </CardTitle>
-        <CardDescription>
-          Send your key on every request to the Tokfai API.
-        </CardDescription>
+        <CardDescription>{t("dashboard.apiKeys.quickStartDesc")}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
-          <li>Full secret is shown once when created.</li>
-          <li>Active keys can be revealed and copied again from the list.</li>
-          <li>
-            Use this key in Cursor, Cherry Studio, OpenAI SDK, or curl.
-          </li>
-          <li>
-            Legacy keys that cannot be revealed: create a new key to copy the
-            full secret.
-          </li>
+          <li>{t("dashboard.apiKeys.quickStartItem1")}</li>
+          <li>{t("dashboard.apiKeys.quickStartItem2")}</li>
+          <li>{t("dashboard.apiKeys.quickStartItem3")}</li>
+          <li>{t("dashboard.apiKeys.quickStartItem4")}</li>
         </ul>
         <p className="text-sm text-muted-foreground">
           Use this key in{" "}
@@ -295,12 +287,14 @@ function IntegrationGuide() {
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
             <Link href="/docs">
-              View API docs
+              {t("dashboard.apiKeys.viewApiDocs")}
               <ExternalLink className="h-3.5 w-3.5" />
             </Link>
           </Button>
           <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/dashboard/image-playground">Try Image Playground</Link>
+            <Link href="/dashboard/image-playground">
+              {t("dashboard.apiKeys.tryImagePlayground")}
+            </Link>
           </Button>
         </div>
       </CardContent>
@@ -314,12 +308,14 @@ function OneTimeSecretCard({
   copyStatus,
   onCopy,
   onDismiss,
+  t,
 }: {
   secret: string;
   keyName?: string;
   copyStatus: "idle" | "copied";
   onCopy: () => void;
   onDismiss: () => void;
+  t: (key: string) => string;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -336,17 +332,20 @@ function OneTimeSecretCard({
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-lg text-emerald-950 dark:text-emerald-50">
           <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
-          {keyName ? `API key created: ${keyName}` : "API key created"}
+          {keyName
+            ? formatMessage(t("dashboard.apiKeys.apiKeyCreatedNamed"), {
+                name: keyName,
+              })
+            : t("dashboard.apiKeys.apiKeyCreated")}
         </CardTitle>
         <CardDescription className="text-base text-emerald-900/90 dark:text-emerald-100/90">
-          Copy and store this key now. The full secret is shown once at creation.
-          You can also copy it later from the list with Copy key.
+          {t("dashboard.apiKeys.oneTimeSecretDesc")}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <Label className="text-xs uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
-            Your API key
+            {t("dashboard.apiKeys.yourApiKey")}
           </Label>
           <code
             id="one-time-secret"
@@ -357,7 +356,7 @@ function OneTimeSecretCard({
         </div>
         <div className="flex flex-col gap-2">
           <Label className="text-xs uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
-            Authorization header
+            {t("dashboard.apiKeys.authorizationHeader")}
           </Label>
           <code className="block overflow-x-auto rounded-md border border-emerald-200 bg-white p-3 font-mono text-xs leading-relaxed text-foreground dark:border-emerald-800 dark:bg-background">
             Authorization: Bearer {secret}
@@ -368,21 +367,21 @@ function OneTimeSecretCard({
             {copyStatus === "copied" ? (
               <>
                 <Check className="h-4 w-4" />
-                Copied
+                {t("dashboard.apiKeys.copied")}
               </>
             ) : (
               <>
                 <Copy className="h-4 w-4" />
-                Copy full key
+                {t("dashboard.apiKeys.copyFullKey")}
               </>
             )}
           </Button>
           <Button type="button" size="lg" variant="outline" onClick={onDismiss}>
-            I&apos;ve saved my key
+            {t("dashboard.apiKeys.savedMyKey")}
           </Button>
           <Button type="button" size="lg" variant="ghost" asChild>
             <Link href="/docs">
-              Read the docs
+              {t("dashboard.apiKeys.readDocs")}
               <ExternalLink className="h-4 w-4" />
             </Link>
           </Button>
@@ -392,19 +391,18 @@ function OneTimeSecretCard({
   );
 }
 
-const LEGACY_KEY_MESSAGE =
-  "Create a new key to copy the full secret. Legacy keys that cannot be revealed must be replaced.";
-
 function ApiKeysTable({
   keys,
   accessToken,
   revokingId,
   onRevoke,
+  t,
 }: {
   keys: ApiKeyListItem[];
   accessToken: string;
   revokingId: string | null;
   onRevoke: (key: ApiKeyListItem) => void;
+  t: (key: string) => string;
 }) {
   const [copyingId, setCopyingId] = useState<string | null>(null);
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
@@ -450,12 +448,12 @@ function ApiKeysTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-            <th className="py-2 pr-4 font-medium">Name</th>
-            <th className="py-2 pr-4 font-medium">Prefix</th>
-            <th className="py-2 pr-4 font-medium">Status</th>
-            <th className="py-2 pr-4 font-medium">Created</th>
-            <th className="py-2 pr-4 font-medium">Last used</th>
-            <th className="py-2 pr-0 text-right font-medium">Actions</th>
+            <th className="py-2 pr-4 font-medium">{t("dashboard.apiKeys.colName")}</th>
+            <th className="py-2 pr-4 font-medium">{t("dashboard.apiKeys.colPrefix")}</th>
+            <th className="py-2 pr-4 font-medium">{t("dashboard.apiKeys.colStatus")}</th>
+            <th className="py-2 pr-4 font-medium">{t("dashboard.apiKeys.colCreated")}</th>
+            <th className="py-2 pr-4 font-medium">{t("dashboard.apiKeys.colLastUsed")}</th>
+            <th className="py-2 pr-0 text-right font-medium">{t("dashboard.apiKeys.colActions")}</th>
           </tr>
         </thead>
         <tbody>
@@ -493,29 +491,29 @@ function ApiKeysTable({
                         {isCopying ? (
                           <>
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            Copying...
+                            {t("dashboard.apiKeys.copying")}
                           </>
                         ) : keyCopied ? (
                           <>
                             <Check className="h-3.5 w-3.5" />
-                            Copied
+                            {t("dashboard.apiKeys.copied")}
                           </>
                         ) : (
                           <>
                             <Copy className="h-3.5 w-3.5" />
-                            Copy key
+                            {t("dashboard.apiKeys.copyKey")}
                           </>
                         )}
                       </Button>
                     ) : isActive && !canReveal ? (
                       <p className="max-w-xs text-xs text-muted-foreground">
-                        {LEGACY_KEY_MESSAGE}
+                        {t(LEGACY_KEY_MESSAGE_KEY)}
                       </p>
                     ) : null}
                   </div>
                 </td>
                 <td className="py-3 pr-4">
-                  <StatusBadge status={key.status} />
+                  <StatusBadge status={key.status} t={t} />
                 </td>
                 <td className="py-3 pr-4 text-muted-foreground">
                   {formatDate(key.created_at)}
@@ -523,7 +521,7 @@ function ApiKeysTable({
                 <td className="py-3 pr-4 text-muted-foreground">
                   {key.last_used_at
                     ? formatDate(key.last_used_at)
-                    : "Never used"}
+                    : t("dashboard.apiKeys.neverUsed")}
                 </td>
                 <td className="py-3 pr-0 text-right">
                   {isActive ? (
@@ -537,15 +535,15 @@ function ApiKeysTable({
                       {isRevoking ? (
                         <>
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          Revoking...
+                          {t("dashboard.apiKeys.revoking")}
                         </>
                       ) : (
-                        "Revoke"
+                        t("dashboard.apiKeys.revoke")
                       )}
                     </Button>
                   ) : (
                     <span className="text-xs font-medium text-muted-foreground">
-                      Revoked
+                      {t("dashboard.apiKeys.revoked")}
                     </span>
                   )}
                 </td>
@@ -591,28 +589,37 @@ function ActionErrorAlert({
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  if (status === "active") return <Badge variant="success">Active</Badge>;
-  if (status === "revoked") return <Badge variant="outline">Revoked</Badge>;
+function StatusBadge({
+  status,
+  t,
+}: {
+  status: string;
+  t: (key: string) => string;
+}) {
+  if (status === "active") {
+    return <Badge variant="success">{t("dashboard.apiKeys.active")}</Badge>;
+  }
+  if (status === "revoked") {
+    return <Badge variant="outline">{t("dashboard.apiKeys.revoked")}</Badge>;
+  }
   return <Badge variant="outline">{status}</Badge>;
 }
 
-function EmptyState() {
+function EmptyState({ t }: { t: (key: string) => string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed py-16 text-center">
       <div className="grid h-10 w-10 place-items-center rounded-full bg-muted text-muted-foreground">
         <KeyRound className="h-5 w-5" />
       </div>
       <p className="max-w-sm text-sm text-muted-foreground">
-        No API keys yet. Create your first key above — the full secret is shown
-        once, so copy it immediately.
+        {t("dashboard.apiKeys.emptyTitle")}
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2">
         <Button type="button" size="sm" variant="outline" asChild>
-          <a href="#create-api-key">Create API key</a>
+          <a href="#create-api-key">{t("dashboard.apiKeys.createApiKey")}</a>
         </Button>
         <Button type="button" size="sm" variant="ghost" asChild>
-          <Link href="/docs">View docs</Link>
+          <Link href="/docs">{t("dashboard.apiKeys.viewDocs")}</Link>
         </Button>
       </div>
     </div>

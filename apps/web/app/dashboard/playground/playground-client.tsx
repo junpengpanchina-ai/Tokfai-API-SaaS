@@ -29,6 +29,7 @@ import {
   type ChatCompletionResponse,
 } from "@/lib/dmit/client";
 import { userMessageForDmitError } from "@/lib/dmit-messages";
+import { useI18n } from "@/lib/i18n/i18n-provider";
 import { isAvailableChatModel } from "@/lib/model-catalog";
 import {
   isFullTokfaiApiKey,
@@ -72,6 +73,7 @@ export function PlaygroundClient({
   activeKeys: PlaygroundApiKeyOption[];
   initialModel?: string;
 }) {
+  const { t } = useI18n();
   const [model, setModel] = useState(() => resolveInitialModel(initialModel));
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
   const [apiKeyMode, setApiKeyMode] = useState<ApiKeyMode>(
@@ -171,21 +173,18 @@ export function PlaygroundClient({
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">
-            Chat Playground
+            {t("dashboard.playground.title")}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Chat Playground only supports chat models. Send a single-turn
-            completion through the Tokfai API using your own{" "}
-            <code className="rounded bg-muted px-1 text-xs">sk-tokfai_</code> key
-            — the same path external clients use, so normal billing applies.
+            {t("dashboard.playground.subtitle")}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            For image models, use{" "}
+            {t("dashboard.playground.forImageModels")}{" "}
             <Link
               href="/dashboard/image-playground"
               className="underline underline-offset-4"
             >
-              Image Playground
+              {t("common.imagePlayground")}
             </Link>
             .
           </p>
@@ -196,11 +195,8 @@ export function PlaygroundClient({
       <div className="grid gap-6 lg:grid-cols-[1fr,280px]">
         <Card>
           <CardHeader>
-            <CardTitle>Request</CardTitle>
-            <CardDescription>
-              One user message, non-streaming. Successful calls are recorded in
-              Usage and debited from Credits.
-            </CardDescription>
+            <CardTitle>{t("dashboard.playground.request")}</CardTitle>
+            <CardDescription>{t("dashboard.playground.requestDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <ApiKeyField
@@ -212,6 +208,7 @@ export function PlaygroundClient({
               onModeChange={setApiKeyMode}
               onApiKeyChange={setApiKey}
               onSelectedKeyChange={setSelectedKeyId}
+              t={t}
             />
 
             <div className="flex flex-col gap-2">
@@ -232,31 +229,25 @@ export function PlaygroundClient({
                 {loading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Running…
+                    {t("dashboard.playground.running")}
                   </>
                 ) : (
                   <>
                     <Send className="h-4 w-4" />
-                    Run
+                    {t("dashboard.playground.run")}
                   </>
                 )}
               </Button>
             </div>
 
-            <ResponsePanel loading={loading} error={error} result={result} />
+            <ResponsePanel loading={loading} error={error} result={result} t={t} />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Settings</CardTitle>
-            <CardDescription>
-              Chat models only. The selected model is passed in the JSON body to{" "}
-              <code className="rounded bg-muted px-1 text-xs">
-                api.tokfai.com
-              </code>
-              .
-            </CardDescription>
+            <CardTitle>{t("dashboard.playground.settings")}</CardTitle>
+            <CardDescription>{t("dashboard.playground.settingsDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
@@ -276,19 +267,19 @@ export function PlaygroundClient({
               </select>
             </div>
             <p className="text-xs text-muted-foreground">
-              Need a key?{" "}
+              {t("dashboard.playground.needKey")}{" "}
               <Link
                 href="/dashboard/api-keys"
                 className="underline underline-offset-4"
               >
-                Create an API key
+                {t("dashboard.playground.createApiKey")}
               </Link>
-              . Need more credits?{" "}
+              . {t("dashboard.playground.needCredits")}{" "}
               <Link
                 href="/dashboard/credits"
                 className="underline underline-offset-4"
               >
-                Top up
+                {t("dashboard.playground.topUp")}
               </Link>
               .
             </p>
@@ -308,6 +299,7 @@ function ApiKeyField({
   onModeChange,
   onApiKeyChange,
   onSelectedKeyChange,
+  t,
 }: {
   mode: ApiKeyMode;
   activeKeys: PlaygroundApiKeyOption[];
@@ -317,6 +309,7 @@ function ApiKeyField({
   onModeChange: (mode: ApiKeyMode) => void;
   onApiKeyChange: (value: string) => void;
   onSelectedKeyChange: (id: string) => void;
+  t: (key: string) => string;
 }) {
   const revealableKeys = activeKeys.filter((row) => row.can_reveal !== false);
 
@@ -324,7 +317,7 @@ function ApiKeyField({
     <div className="flex flex-col gap-3 rounded-md border bg-muted/20 p-4">
       <div className="flex items-center gap-2 text-sm font-medium">
         <KeyRound className="h-4 w-4 text-muted-foreground" />
-        API key
+        {t("dashboard.playground.apiKey")}
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -335,7 +328,7 @@ function ApiKeyField({
           disabled={loading || revealableKeys.length === 0}
           onClick={() => onModeChange("select")}
         >
-          Select key
+          {t("dashboard.playground.selectKey")}
         </Button>
         <Button
           type="button"
@@ -344,14 +337,14 @@ function ApiKeyField({
           disabled={loading}
           onClick={() => onModeChange("paste")}
         >
-          Paste key
+          {t("dashboard.playground.pasteKey")}
         </Button>
       </div>
 
       {mode === "select" ? (
         revealableKeys.length > 0 ? (
           <div className="flex flex-col gap-2">
-            <Label htmlFor="api-key-select">Your active keys</Label>
+            <Label htmlFor="api-key-select">{t("dashboard.playground.yourActiveKeys")}</Label>
             <select
               id="api-key-select"
               value={selectedKeyId}
@@ -366,33 +359,32 @@ function ApiKeyField({
               ))}
             </select>
             <p className="text-xs text-muted-foreground">
-              The full secret is loaded only for this request and is not stored
-              in the browser.
+              {t("dashboard.playground.secretNotStored")}
             </p>
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
-            No revealable keys found.{" "}
+            {t("dashboard.playground.noRevealableKeys")}{" "}
             <button
               type="button"
               className="underline underline-offset-4"
               onClick={() => onModeChange("paste")}
             >
-              Paste your key
+              {t("dashboard.playground.pasteYourKey")}
             </button>{" "}
             or{" "}
             <Link
               href="/dashboard/api-keys"
               className="underline underline-offset-4"
             >
-              create one
+              {t("dashboard.playground.orCreateOne")}
             </Link>
             .
           </p>
         )
       ) : (
         <div className="flex flex-col gap-2">
-          <Label htmlFor="api-key">Full API key</Label>
+          <Label htmlFor="api-key">{t("dashboard.playground.fullApiKey")}</Label>
           <Input
             id="api-key"
             type="password"
@@ -404,11 +396,7 @@ function ApiKeyField({
             disabled={loading}
           />
           <p className="text-xs text-muted-foreground">
-            Sent as{" "}
-            <code className="rounded bg-background px-1 text-[11px]">
-              Authorization: Bearer sk-tokfai_…
-            </code>
-            . Never logged or persisted by this page.
+            {t("dashboard.playground.sentAsBearer")}
           </p>
         </div>
       )}
@@ -420,16 +408,18 @@ function ResponsePanel({
   loading,
   error,
   result,
+  t,
 }: {
   loading: boolean;
   error: PlaygroundError | null;
   result: ChatCompletionResponse | null;
+  t: (key: string) => string;
 }) {
   if (loading) {
     return (
       <div className="flex items-center gap-2 rounded-md border bg-muted/40 p-4 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Waiting for the model…
+        {t("dashboard.playground.waitingForModel")}
       </div>
     );
   }
@@ -439,7 +429,7 @@ function ResponsePanel({
       <div className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-4">
         <div className="flex items-center gap-2 text-sm font-medium text-destructive">
           <AlertTriangle className="h-4 w-4" />
-          Request failed
+          {t("dashboard.playground.requestFailed")}
           {error.status > 0 ? (
             <Badge variant="outline" className="ml-1">
               HTTP {error.status}
@@ -448,17 +438,17 @@ function ResponsePanel({
         </div>
         <dl className="grid gap-1 text-sm">
           <div className="flex flex-wrap gap-x-2">
-            <dt className="text-muted-foreground">Error code:</dt>
+            <dt className="text-muted-foreground">{t("dashboard.playground.errorCode")}</dt>
             <dd className="font-mono">{error.code ?? "n/a"}</dd>
           </div>
           <div className="flex flex-wrap gap-x-2">
-            <dt className="text-muted-foreground">Error message:</dt>
+            <dt className="text-muted-foreground">{t("dashboard.playground.errorMessage")}</dt>
             <dd>{error.message}</dd>
           </div>
         </dl>
         {error.status === 402 || error.code === "insufficient_credits" ? (
           <Button asChild size="sm" variant="outline" className="w-fit">
-            <Link href="/dashboard/credits">Add credits</Link>
+            <Link href="/dashboard/credits">{t("dashboard.playground.addCredits")}</Link>
           </Button>
         ) : null}
       </div>
@@ -469,7 +459,7 @@ function ResponsePanel({
     return (
       <div className="flex items-center gap-2 rounded-md border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
         <Sparkles className="h-4 w-4" />
-        Response will appear here.
+        {t("dashboard.playground.responsePlaceholder")}
       </div>
     );
   }
@@ -485,21 +475,7 @@ function ResponsePanel({
       <div className="flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
         <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
         <p>
-          This request has been recorded. View it in{" "}
-          <Link
-            href="/dashboard/usage"
-            className="font-medium underline underline-offset-4"
-          >
-            Usage
-          </Link>{" "}
-          and{" "}
-          <Link
-            href="/dashboard/credits"
-            className="font-medium underline underline-offset-4"
-          >
-            Credits
-          </Link>
-          .
+          {t("dashboard.playground.recordedInUsage")}
         </p>
       </div>
 
