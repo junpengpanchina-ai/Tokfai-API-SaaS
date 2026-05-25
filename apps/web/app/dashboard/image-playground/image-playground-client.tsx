@@ -142,6 +142,25 @@ function getReadyImageUrls(items: ImageInputItem[]): string[] {
     .map((item) => item.url);
 }
 
+function isFileDragEvent(dataTransfer: DataTransfer): boolean {
+  return Array.from(dataTransfer.types).includes("Files");
+}
+
+function getDroppedFiles(dataTransfer: DataTransfer): File[] {
+  const fromFileList = Array.from(dataTransfer.files ?? []);
+  if (fromFileList.length > 0) {
+    return fromFileList;
+  }
+
+  const fromItems: File[] = [];
+  for (const item of Array.from(dataTransfer.items ?? [])) {
+    if (item.kind !== "file") continue;
+    const file = item.getAsFile();
+    if (file) fromItems.push(file);
+  }
+  return fromItems;
+}
+
 export function ImagePlaygroundClient({
   accessToken,
   activeKeys,
@@ -166,7 +185,6 @@ export function ImagePlaygroundClient({
   const imageInputsRef = useRef(imageInputs);
   imageInputsRef.current = imageInputs;
   const [imageUrlDraft, setImageUrlDraft] = useState("");
-  const [isDragging, setIsDragging] = useState(false);
   const [lastRequestInputCount, setLastRequestInputCount] = useState<
     number | null
   >(null);
@@ -335,15 +353,13 @@ export function ImagePlaygroundClient({
     );
   }, []);
 
-  const handleDrop = useCallback(
-    (event: React.DragEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      setIsDragging(false);
-      if (loading) return;
-      void uploadFiles(event.dataTransfer.files);
-    },
-    [loading, uploadFiles]
-  );
+  const reportDropError = useCallback((message: string, code: string) => {
+    setError({
+      status: 0,
+      code,
+      message,
+    });
+  }, []);
 
   async function handleGenerate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -454,7 +470,16 @@ export function ImagePlaygroundClient({
   }
 
   return (
-    <form onSubmit={handleGenerate} className="flex flex-col gap-6">
+    <form
+      onSubmit={handleGenerate}
+      onDragOver={(event) => {
+        event.preventDefault();
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+      }}
+      className="flex flex-col gap-6"
+    >
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">
@@ -510,21 +535,14 @@ export function ImagePlaygroundClient({
             <ImageInputsPanel
               imageInputs={imageInputs}
               imageUrlDraft={imageUrlDraft}
-              isDragging={isDragging}
               loading={loading}
               fileInputRef={fileInputRef}
               onImageUrlDraftChange={setImageUrlDraft}
               onAddImageUrl={() => addImageUrl(imageUrlDraft)}
               onRemoveImage={removeImageInput}
               onPreviewError={markPreviewError}
-              onDragEnter={() => {
-                if (!loading) setIsDragging(true);
-              }}
-              onDragLeave={() => setIsDragging(false)}
-              onDragOver={(event) => {
-                event.preventDefault();
-              }}
-              onDrop={handleDrop}
+              onUploadFiles={uploadFiles}
+              onDropInvalid={reportDropError}
               onBrowseClick={() => fileInputRef.current?.click()}
               onFileInputChange={(event) => {
                 if (event.target.files) {
@@ -711,37 +729,99 @@ function PromptPresets({
 function ImageInputsPanel({
   imageInputs,
   imageUrlDraft,
-  isDragging,
   loading,
   fileInputRef,
   onImageUrlDraftChange,
   onAddImageUrl,
   onRemoveImage,
   onPreviewError,
-  onDragEnter,
-  onDragLeave,
-  onDragOver,
-  onDrop,
+  onUploadFiles,
+  onDropInvalid,
   onBrowseClick,
   onFileInputChange,
 }: {
   imageInputs: ImageInputItem[];
   imageUrlDraft: string;
-  isDragging: boolean;
   loading: boolean;
   fileInputRef: React.RefObject<HTMLInputElement>;
   onImageUrlDraftChange: (value: string) => void;
   onAddImageUrl: () => void;
   onRemoveImage: (id: string) => void;
   onPreviewError: (id: string, message: string) => void;
-  onDragEnter: () => void;
-  onDragLeave: () => void;
-  onDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
-  onDrop: (event: React.DragEvent<HTMLDivElement>) => void;
+  onUploadFiles: (files: FileList | File[]) => Promise<void>;
+  onDropInvalid: (message: string, code: string) => void;
   onBrowseClick: () => void;
   onFileInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
   const atLimit = imageInputs.length >= MAX_PLAYGROUND_INPUT_IMAGES;
+  const [isDragging, setIsDragging] = useState(false);
+  const dragDepthRef = useRef(0);
+  const suppressClickRef = useRef(false);
+
+  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (loading || atLimit || !isFileDragEvent(event.dataTransfer)) return;
+
+    dragDepthRef.current += 1;
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (loading || atLimit || !isFileDragEvent(event.dataTransfer)) return;
+
+    event.dataTransfer.dropEffect = "copy";
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    dragDepthRef.current = 0;
+    setIsDragging(false);
+    suppressClickRef.current = true;
+    window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 0);
+
+    if (loading) return;
+
+    if (atLimit) {
+      onDropInvalid(
+        `Up to ${MAX_PLAYGROUND_INPUT_IMAGES} input images are allowed.`,
+        "too_many_images"
+      );
+      return;
+    }
+
+    const files = getDroppedFiles(event.dataTransfer);
+    if (files.length === 0) {
+      onDropInvalid(
+        "Drop PNG, JPG, or WEBP image files.",
+        "invalid_drop"
+      );
+      return;
+    }
+
+    void onUploadFiles(files);
+  };
+
+  const handleZoneClick = () => {
+    if (suppressClickRef.current || loading || atLimit) return;
+    onBrowseClick();
+  };
 
   return (
     <div className="flex flex-col gap-3 rounded-md border bg-muted/20 p-4">
@@ -756,32 +836,32 @@ function ImageInputsPanel({
       </p>
 
       <div
-        onDragEnter={onDragEnter}
-        onDragLeave={onDragLeave}
-        onDragOver={onDragOver}
-        onDrop={onDrop}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
         className={`flex flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 py-8 text-center transition-colors ${
           isDragging
             ? "border-primary bg-primary/10 ring-2 ring-primary/30"
             : "border-muted-foreground/30 bg-background"
         } ${loading || atLimit ? "opacity-60" : "cursor-pointer"}`}
-        onClick={() => {
-          if (!loading && !atLimit) onBrowseClick();
-        }}
+        onClick={handleZoneClick}
         role="button"
         tabIndex={0}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            if (!loading && !atLimit) onBrowseClick();
+            handleZoneClick();
           }
         }}
       >
-        <Upload className="h-5 w-5 text-muted-foreground" />
-        <p className="text-sm font-medium">Drag images here or click to upload</p>
-        <p className="text-xs text-muted-foreground">
-          PNG, JPG, WEBP · max 10 MB each
-        </p>
+        <div className="pointer-events-none flex flex-col items-center gap-2">
+          <Upload className="h-5 w-5 text-muted-foreground" />
+          <p className="text-sm font-medium">Drag images here or click to upload</p>
+          <p className="text-xs text-muted-foreground">
+            PNG, JPG, WEBP · max 10 MB each
+          </p>
+        </div>
         <input
           ref={fileInputRef}
           type="file"
