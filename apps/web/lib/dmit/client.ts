@@ -759,6 +759,13 @@ export interface ImageGenerationDataItem {
   b64_json?: string;
 }
 
+export type ImageUrlResolveSource =
+  | "direct"
+  | "google_imgres"
+  | "html_og_image"
+  | "html_twitter_image"
+  | "html_first_image";
+
 export interface ImageGenerationResponse {
   created: number;
   data: ImageGenerationDataItem[];
@@ -767,6 +774,8 @@ export interface ImageGenerationResponse {
   upstream_id?: string;
   credits_charged?: number;
   input_images_count?: number;
+  resolved_images_count?: number;
+  image_url_sources?: ImageUrlResolveSource[];
 }
 
 /**

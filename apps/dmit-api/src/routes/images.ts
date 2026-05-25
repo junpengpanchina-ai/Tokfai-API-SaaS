@@ -17,6 +17,11 @@ import {
   generateImage,
   mapSizeToGrsai,
 } from "../upstream/imageAdapter.js";
+import {
+  resolveImageInputUrls,
+  sanitizeImageUrlForLog,
+  type ImageUrlResolveSource,
+} from "../upstream/imageUrlResolver.js";
 
 const ImageGenerationRequestSchema = z
   .object({
@@ -183,7 +188,16 @@ imageRoutes.post("/v1/images/generations", async (c) => {
     throw err;
   }
 
+  let resolvedImageUrls: string[] = [];
+  let imageUrlSources: ImageUrlResolveSource[] = [];
+
   try {
+    if (imageUrls.length > 0) {
+      const resolved = await resolveImageInputUrls(imageUrls);
+      resolvedImageUrls = resolved.map((item) => item.url);
+      imageUrlSources = resolved.map((item) => item.source);
+    }
+
     await assertHasCredits(caller.userId);
 
     const { url, upstreamId } = await generateImage({
@@ -191,7 +205,7 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       prompt,
       aspectRatio,
       imageSize,
-      imageUrls,
+      imageUrls: resolvedImageUrls,
     });
 
     const creditsCharged = await priceCreditsForImage(resolvedModel);
@@ -225,6 +239,9 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       message: "Image generation succeeded.",
       has_input_images: imageUrls.length > 0,
       input_images_count: imageUrls.length,
+      resolved_images_count: resolvedImageUrls.length,
+      image_url_sources: imageUrlSources,
+      input_image_url_hints: imageUrls.map(sanitizeImageUrlForLog),
     });
 
     return c.json({
@@ -235,6 +252,8 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       upstream_id: upstreamId,
       credits_charged: creditsCharged,
       input_images_count: imageUrls.length,
+      resolved_images_count: resolvedImageUrls.length,
+      image_url_sources: imageUrlSources,
     });
   } catch (err) {
     if (err instanceof ApiError) {
@@ -261,6 +280,9 @@ imageRoutes.post("/v1/images/generations", async (c) => {
         message: err.publicMessage,
         has_input_images: imageUrls.length > 0,
         input_images_count: imageUrls.length,
+        resolved_images_count: resolvedImageUrls.length,
+        image_url_sources: imageUrlSources,
+        input_image_url_hints: imageUrls.map(sanitizeImageUrlForLog),
       });
 
       throw err;
@@ -287,6 +309,9 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       message: "Internal error.",
       has_input_images: imageUrls.length > 0,
       input_images_count: imageUrls.length,
+      resolved_images_count: resolvedImageUrls.length,
+      image_url_sources: imageUrlSources,
+      input_image_url_hints: imageUrls.map(sanitizeImageUrlForLog),
     });
 
     throw ApiError.internal(

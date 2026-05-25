@@ -211,7 +211,7 @@ export function ImagePlaygroundClient({
         setError({
           status: 0,
           code: "invalid_image_url",
-          message: "Enter a valid http or https image URL.",
+          message: "Enter a valid http or https URL.",
         });
         return;
       }
@@ -486,8 +486,8 @@ export function ImagePlaygroundClient({
             Image Playground
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Drag images or paste an image URL for image-to-image. Up to 4
-            images. Supported: PNG, JPG, WEBP. Successful generations debit
+            Drag images or paste an image or webpage URL for image-to-image.
+            Up to 4 images. Uploads: PNG, JPG, WEBP. Successful generations debit
             credits. Failed calls are not charged.
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -882,7 +882,7 @@ function ImageInputsPanel({
       <div className="flex flex-col gap-2 sm:flex-row">
         <Input
           type="url"
-          placeholder="https://example.com/image.png"
+          placeholder="Paste an image URL or a webpage URL. Tokfai will try to extract the image automatically."
           value={imageUrlDraft}
           onChange={(event) => onImageUrlDraftChange(event.target.value)}
           disabled={loading || atLimit}
@@ -1311,6 +1311,14 @@ class PlaygroundValidationError extends Error {
   }
 }
 
+const IMAGE_PAGE_RESOLVE_ERROR_CODES = new Set([
+  "no_image_found_on_page",
+  "unsupported_image_content_type",
+]);
+
+const IMAGE_PAGE_RESOLVE_ERROR_MESSAGE =
+  "Tokfai could not find a usable image on this page. Try another URL or upload the image directly.";
+
 function toPlaygroundError(err: unknown): PlaygroundError {
   if (err instanceof PlaygroundValidationError) {
     return {
@@ -1320,6 +1328,14 @@ function toPlaygroundError(err: unknown): PlaygroundError {
     };
   }
   if (err instanceof DmitApiError) {
+    const code = err.code?.toLowerCase();
+    if (code && IMAGE_PAGE_RESOLVE_ERROR_CODES.has(code)) {
+      return {
+        status: err.status,
+        code: err.code,
+        message: IMAGE_PAGE_RESOLVE_ERROR_MESSAGE,
+      };
+    }
     return {
       status: err.status,
       code: err.code,
