@@ -1,24 +1,22 @@
-import type { NextRequest } from "next/server";
-
 /**
- * Canonical site origin for OAuth redirects. Prefer NEXT_PUBLIC_SITE_URL so
- * www.tokfai.com vs tokfai.com does not split sessions.
+ * Canonical site origin for OAuth redirectTo only.
+ * Callback redirects must use request.nextUrl.origin so Set-Cookie domain
+ * matches the host that received the OAuth code (avoids www / non-www split).
  */
-export function getServerSiteOrigin(request: NextRequest | Request): string {
+export function getOAuthRedirectOrigin(): string {
   const configured = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
   if (configured) {
     return configured;
   }
 
-  return new URL(request.url).origin;
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+
+  return "";
 }
 
-/** Browser OAuth redirect origin (client components). */
+/** @deprecated Use getOAuthRedirectOrigin in client code. */
 export function getBrowserSiteOrigin(): string {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
-  if (configured) {
-    return configured;
-  }
-
-  return window.location.origin;
+  return getOAuthRedirectOrigin();
 }

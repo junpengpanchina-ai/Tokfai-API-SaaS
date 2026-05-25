@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getBrowserSiteOrigin } from "@/lib/auth/site-url";
+import { getOAuthRedirectOrigin } from "@/lib/auth/site-url";
 import { createClient } from "@/lib/supabase/client";
 
 export function SignupForm() {
@@ -29,7 +29,7 @@ export function SignupForm() {
     setLoading(true);
 
     const supabase = createClient();
-    const origin = getBrowserSiteOrigin();
+    const origin = getOAuthRedirectOrigin();
     const { data, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -60,7 +60,7 @@ export function SignupForm() {
   async function handleGoogle() {
     setError(null);
     const supabase = createClient();
-    const origin = getBrowserSiteOrigin();
+    const origin = getOAuthRedirectOrigin();
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {

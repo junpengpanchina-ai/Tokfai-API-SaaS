@@ -1,12 +1,14 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { copySupabaseCookies } from "@/lib/supabase/cookies";
+
 /**
  * Supabase client for Route Handlers where auth cookies must be copied onto
  * the final redirect response (exchangeCodeForSession / signOut).
  */
 export function createRouteHandlerClient(request: NextRequest) {
-  let response = NextResponse.next({
+  let supabaseResponse = NextResponse.next({
     request: {
       headers: request.headers,
     },
@@ -17,33 +19,39 @@ export function createRouteHandlerClient(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
+        getAll() {
+          return request.cookies.getAll();
         },
-        set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({ name, value, ...options });
-          response = NextResponse.next({
+        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+          cookiesToSet.forEach(({ name, value }) => {
+            if (value) {
+              request.cookies.set(name, value);
+            } else {
+              request.cookies.delete(name);
+            }
+          });
+
+          supabaseResponse = NextResponse.next({
             request: { headers: request.headers },
           });
-          response.cookies.set({ name, value, ...options });
-        },
-        remove(name: string, options: CookieOptions) {
-          request.cookies.set({ name, value: "", ...options });
-          response = NextResponse.next({
-            request: { headers: request.headers },
+
+          cookiesToSet.forEach(({ name, value, options }) => {
+            if (value) {
+              supabaseResponse.cookies.set(name, value, options);
+            } else {
+              supabaseResponse.cookies.delete(name);
+            }
           });
-          response.cookies.set({ name, value: "", ...options });
         },
       },
     }
   );
 
-  function applyCookiesTo(target: NextResponse) {
-    for (const cookie of response.cookies.getAll()) {
-      target.cookies.set(cookie);
-    }
-    return target;
+  function redirectWithCookies(url: URL | string, init?: number | ResponseInit) {
+    const redirectResponse = NextResponse.redirect(url, init);
+    copySupabaseCookies(supabaseResponse, redirectResponse);
+    return redirectResponse;
   }
 
-  return { supabase, applyCookiesTo };
+  return { supabase, supabaseResponse, redirectWithCookies };
 }

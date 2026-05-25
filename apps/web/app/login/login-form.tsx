@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getBrowserSiteOrigin } from "@/lib/auth/site-url";
+import { getOAuthRedirectOrigin } from "@/lib/auth/site-url";
 import { createClient } from "@/lib/supabase/client";
 
 const LOGIN_ERRORS: Record<string, string> = {
@@ -79,7 +79,7 @@ export function LoginForm({
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${getBrowserSiteOrigin()}/auth/callback`,
+        redirectTo: `${getOAuthRedirectOrigin()}/auth/callback`,
       },
     });
 
