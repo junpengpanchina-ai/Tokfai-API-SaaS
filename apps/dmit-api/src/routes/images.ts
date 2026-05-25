@@ -223,6 +223,7 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       status: 200,
       code: "succeeded",
       message: "Image generation succeeded.",
+      has_input_images: imageUrls.length > 0,
       input_images_count: imageUrls.length,
     });
 
@@ -258,6 +259,8 @@ imageRoutes.post("/v1/images/generations", async (c) => {
         status: err.status,
         code: err.code ?? "failed",
         message: err.publicMessage,
+        has_input_images: imageUrls.length > 0,
+        input_images_count: imageUrls.length,
       });
 
       throw err;
@@ -282,6 +285,8 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       status: 500,
       code: "server_error",
       message: "Internal error.",
+      has_input_images: imageUrls.length > 0,
+      input_images_count: imageUrls.length,
     });
 
     throw ApiError.internal(

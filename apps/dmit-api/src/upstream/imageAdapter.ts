@@ -1,8 +1,9 @@
 import { env } from "../env.js";
 import { ApiError } from "../errors.js";
+import { log } from "../logger.js";
 
-const IMAGE_REFERENCE_PROMPT_SUFFIX =
-  "Use the input image(s) as visual reference. Preserve the main subject unless the user asks otherwise.";
+const IMAGE_TO_IMAGE_PROMPT_PREFIX =
+  "Use the uploaded image as the primary visual reference. Keep the main subject from the uploaded image. Preserve the subject identity, category/species/object type, main silhouette, pose, outfit/key visual elements, and facial/object characteristics. Do not replace the subject with an unrelated object. Apply the requested style only to the existing subject and scene.";
 
 const BASE = env.GRSAI_BASE_URL.replace(/\/+$/, "");
 
@@ -50,7 +51,7 @@ export function buildImageGenerationPrompt(
   imageUrlCount: number
 ): string {
   if (imageUrlCount <= 0) return prompt;
-  return `${prompt}\n\n${IMAGE_REFERENCE_PROMPT_SUFFIX}`;
+  return `${IMAGE_TO_IMAGE_PROMPT_PREFIX}\n\n${prompt}`;
 }
 
 export async function generateImage(
@@ -63,6 +64,12 @@ export async function generateImage(
     request.prompt,
     imageUrls.length
   );
+
+  log.info("image_generation_upstream_request", {
+    model: request.model,
+    has_input_images: imageUrls.length > 0,
+    input_images_count: imageUrls.length,
+  });
 
   let res: Response;
   try {

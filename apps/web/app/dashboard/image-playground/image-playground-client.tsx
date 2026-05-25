@@ -554,6 +554,12 @@ export function ImagePlaygroundClient({
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="prompt">Prompt</Label>
+              {isImageToImage ? (
+                <p className="text-xs text-muted-foreground">
+                  Image-to-image mode: Tokfai will preserve the uploaded subject
+                  and apply your prompt as style/edit instructions.
+                </p>
+              ) : null}
               <PromptPresets
                 inputImageCount={inputImageCount}
                 loading={loading}
