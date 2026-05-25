@@ -9,6 +9,8 @@ export interface ModelCatalogEntry {
   status: ModelStatus;
   billingUnit: string;
   description: string;
+  /** Image models only — capabilities shown on the Models page. */
+  supports?: string[];
 }
 
 export const CHAT_MODELS: ModelCatalogEntry[] = [
@@ -30,6 +32,12 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
   },
 ];
 
+const IMAGE_MODEL_SUPPORTS = [
+  "Text to image",
+  "Image to image",
+  "URL reference",
+] as const;
+
 export const IMAGE_MODELS: ModelCatalogEntry[] = [
   {
     id: "nano-banana",
@@ -38,6 +46,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     status: "available",
     billingUnit: "Per image",
     description: "Image generation model.",
+    supports: [...IMAGE_MODEL_SUPPORTS],
   },
   {
     id: "nano-banana-fast",
@@ -46,6 +55,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     status: "available",
     billingUnit: "Per image",
     description: "Fast image generation with lower latency.",
+    supports: [...IMAGE_MODEL_SUPPORTS],
   },
   {
     id: "nano-banana-pro",
@@ -54,6 +64,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     status: "available",
     billingUnit: "Per image",
     description: "Higher-quality image generation model.",
+    supports: [...IMAGE_MODEL_SUPPORTS],
   },
   {
     id: "nano-banana-2",
@@ -62,6 +73,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     status: "available",
     billingUnit: "Per image",
     description: "Next-generation Nano Banana image model.",
+    supports: [...IMAGE_MODEL_SUPPORTS],
   },
   {
     id: "gpt-image-2",
@@ -70,6 +82,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     status: "available",
     billingUnit: "Per image",
     description: "OpenAI-compatible image generation model.",
+    supports: [...IMAGE_MODEL_SUPPORTS],
   },
   {
     id: "gpt-image-2-vip",
@@ -78,6 +91,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     status: "coming_soon",
     billingUnit: "Per image",
     description: "Premium tier of GPT Image 2.",
+    supports: [...IMAGE_MODEL_SUPPORTS],
   },
 ];
 

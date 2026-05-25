@@ -19,6 +19,7 @@ import {
   TOKFAI_API_KEY_PLACEHOLDER,
   TOKFAI_BILLING_POLICY,
   TOKFAI_CHAT_COMPLETIONS_ENDPOINT,
+  TOKFAI_IMAGES_GENERATIONS_ENDPOINT,
   TOKFAI_MODELS_ENDPOINT,
   TOKFAI_PLAYGROUND_POLICY,
   TOKFAI_PRODUCT_TAGLINE,
@@ -44,6 +45,27 @@ const CHAT_COMPLETIONS_CURL = `curl https://api.tokfai.com/v1/chat/completions \
       { "role": "user", "content": "Hello from Tokfai" }
     ],
     "stream": false
+  }'`;
+
+const IMAGE_TEXT_TO_IMAGE_CURL = `curl https://api.tokfai.com/v1/images/generations \\
+  -H "Authorization: Bearer sk-tokfai_xxx" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "nano-banana",
+    "prompt": "A serene mountain landscape at sunset, digital art",
+    "size": "1024x1024",
+    "response_format": "url"
+  }'`;
+
+const IMAGE_TO_IMAGE_CURL = `curl https://api.tokfai.com/v1/images/generations \\
+  -H "Authorization: Bearer sk-tokfai_xxx" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "nano-banana",
+    "prompt": "Restyle as watercolor illustration",
+    "image_urls": ["https://example.com/reference.jpg"],
+    "size": "1024x1024",
+    "response_format": "url"
   }'`;
 
 const OPENAI_JS_EXAMPLE = `import OpenAI from "openai";
@@ -91,9 +113,34 @@ const ERROR_CODES = [
     meaning: "Route not found",
   },
   {
+    status: "400",
+    code: "invalid_image_url",
+    meaning: "The image URL is malformed or not allowed",
+  },
+  {
+    status: "400",
+    code: "image_url_unreachable",
+    meaning: "Tokfai could not fetch the image from the provided URL",
+  },
+  {
+    status: "400",
+    code: "unsupported_image_content_type",
+    meaning: "The URL does not point to a supported image type (PNG, JPG, WEBP)",
+  },
+  {
+    status: "400",
+    code: "image_too_large",
+    meaning: "The input image exceeds the size limit",
+  },
+  {
     status: "5xx",
     code: "upstream_error",
     meaning: "Model temporarily unavailable",
+  },
+  {
+    status: "504",
+    code: "upstream_timeout",
+    meaning: "The upstream model timed out",
   },
 ];
 
@@ -175,7 +222,7 @@ export function DocsContent({
         </CardHeader>
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <CopyableCard
           id="base-url"
           title="Base URL"
@@ -208,6 +255,14 @@ export function DocsContent({
           copied={copiedId === "chat-endpoint"}
           onCopy={copyText}
         />
+        <CopyableCard
+          id="images-endpoint"
+          title="Image Generations"
+          description="Text-to-image and image-to-image endpoint."
+          value={TOKFAI_IMAGES_GENERATIONS_ENDPOINT}
+          copied={copiedId === "images-endpoint"}
+          onCopy={copyText}
+        />
       </div>
 
       <Card>
@@ -221,8 +276,14 @@ export function DocsContent({
             >
               Models
             </Link>
-            . Image and video models are currently coming soon; chat models are
-            available via the API and{" "}
+            . Image models are available via the API and{" "}
+            <Link
+              href="/dashboard/image-playground"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              Image Playground
+            </Link>
+            . Chat models are available via the API and{" "}
             <Link
               href="/dashboard/playground"
               className="font-medium text-foreground underline-offset-4 hover:underline"
@@ -313,6 +374,43 @@ export function DocsContent({
             copied={copiedId === "chat-completions-curl"}
             onCopy={copyText}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>POST /v1/images/generations</CardTitle>
+          <CardDescription>
+            Generate images from a text prompt. Add{" "}
+            <code className="rounded bg-muted px-1 text-xs">image_urls</code> for
+            image-to-image or URL reference.{" "}
+            <code className="rounded bg-muted px-1 text-xs">image_urls</code>{" "}
+            supports direct image URLs or uploaded image URLs from Image
+            Playground. Successful generations debit credits. Failed calls are
+            not charged.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-6">
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">Text-to-image</h3>
+            <CodeBlock
+              id="image-text-to-image-curl"
+              label="curl"
+              code={IMAGE_TEXT_TO_IMAGE_CURL}
+              copied={copiedId === "image-text-to-image-curl"}
+              onCopy={copyText}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">Image-to-image</h3>
+            <CodeBlock
+              id="image-to-image-curl"
+              label="curl"
+              code={IMAGE_TO_IMAGE_CURL}
+              copied={copiedId === "image-to-image-curl"}
+              onCopy={copyText}
+            />
+          </div>
         </CardContent>
       </Card>
 

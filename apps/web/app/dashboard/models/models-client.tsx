@@ -169,6 +169,20 @@ function ModelCard({ model }: { model: ModelCatalogEntry }) {
             </dt>
             <dd className="text-muted-foreground">{model.description}</dd>
           </div>
+          {model.supports && model.supports.length > 0 ? (
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-xs uppercase tracking-wider text-muted-foreground">
+                Supports
+              </dt>
+              <dd>
+                <ul className="list-disc space-y-0.5 pl-4 text-muted-foreground">
+                  {model.supports.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </dd>
+            </div>
+          ) : null}
         </dl>
 
         <div className="flex flex-wrap gap-2">

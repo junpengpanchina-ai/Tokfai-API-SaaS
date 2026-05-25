@@ -18,7 +18,7 @@ export const TOKFAI_PRODUCT_TAGLINE =
 export const TOKFAI_BILLING_POLICY =
   "Successful calls debit credits. Failed calls are not charged.";
 export const TOKFAI_PLAYGROUND_POLICY =
-  "Chat Playground supports chat models only. Image and video models will use separate playgrounds later.";
+  "Chat Playground supports chat models. Image Playground supports image models. Video models will use a separate playground later.";
 export const TOKFAI_STARTER_PLAN = "Starter ¥29 = 10,000 credits";
 
 /** Full plaintext API key shown once at creation (not the display prefix). */

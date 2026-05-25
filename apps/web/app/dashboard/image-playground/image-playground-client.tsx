@@ -88,7 +88,7 @@ type ApiKeyMode = "paste" | "select";
 
 type ImageInputSource = "upload" | "url";
 
-type ImageInputStatus = "uploading" | "ready" | "error";
+type ImageInputStatus = "uploading" | "resolving" | "ready" | "error";
 
 interface ImageInputItem {
   id: string;
@@ -193,13 +193,14 @@ export function ImagePlaygroundClient({
   const readyImageUrls = getReadyImageUrls(imageInputs);
 
   const inputImageCount = readyImageUrls.length;
-  const isImageToImage = inputImageCount > 0;
+  const hasInputImages = imageInputs.some((item) => item.status !== "error");
+  const isImageToImage = hasInputImages;
   const promptPlaceholder = isImageToImage
     ? IMAGE_PLAYGROUND_IMAGE_TO_IMAGE_PLACEHOLDER
     : IMAGE_PLAYGROUND_TEXT_TO_IMAGE_PLACEHOLDER;
 
   const hasUploadingImages = imageInputs.some(
-    (item) => item.status === "uploading"
+    (item) => item.status === "uploading" || item.status === "resolving"
   );
 
   const addImageUrl = useCallback(
@@ -235,9 +236,9 @@ export function ImagePlaygroundClient({
           {
             id: crypto.randomUUID(),
             url: trimmed,
-            label: "Image URL",
+            label: formatUrlLabel(trimmed),
             source: "url",
-            status: "ready",
+            status: "resolving",
           },
         ];
       });
@@ -348,7 +349,19 @@ export function ImagePlaygroundClient({
   const markPreviewError = useCallback((id: string, message: string) => {
     setImageInputs((current) =>
       current.map((item) =>
-        item.id === id ? { ...item, previewError: message } : item
+        item.id === id
+          ? { ...item, status: "error", previewError: message, error: message }
+          : item
+      )
+    );
+  }, []);
+
+  const markPreviewReady = useCallback((id: string) => {
+    setImageInputs((current) =>
+      current.map((item) =>
+        item.id === id && item.status === "resolving"
+          ? { ...item, status: "ready", previewError: undefined, error: undefined }
+          : item
       )
     );
   }, []);
@@ -380,13 +393,13 @@ export function ImagePlaygroundClient({
 
     const currentInputs = imageInputsRef.current;
     const uploadingNow = currentInputs.some(
-      (item) => item.status === "uploading"
+      (item) => item.status === "uploading" || item.status === "resolving"
     );
     if (uploadingNow) {
       setError({
         status: 0,
         code: "upload_in_progress",
-        message: "Wait for image uploads to finish before generating.",
+        message: "Wait for input images to finish uploading or resolving.",
       });
       return;
     }
@@ -514,8 +527,8 @@ export function ImagePlaygroundClient({
               </Badge>
               {isImageToImage ? (
                 <p className="text-xs text-muted-foreground">
-                  Using {inputImageCount} input image
-                  {inputImageCount === 1 ? "" : "s"} as reference.
+                  Input images added — generation will use them as visual
+                  reference.
                 </p>
               ) : null}
             </div>
@@ -541,6 +554,7 @@ export function ImagePlaygroundClient({
               onAddImageUrl={() => addImageUrl(imageUrlDraft)}
               onRemoveImage={removeImageInput}
               onPreviewError={markPreviewError}
+              onPreviewReady={markPreviewReady}
               onUploadFiles={uploadFiles}
               onDropInvalid={reportDropError}
               onBrowseClick={() => fileInputRef.current?.click()}
@@ -577,14 +591,10 @@ export function ImagePlaygroundClient({
               />
             </div>
 
-            <p className="text-xs text-muted-foreground">
-              Input images: {inputImageCount}
-            </p>
-
-            <div className="flex flex-col items-end gap-1">
+            <div className="flex flex-col items-end gap-2">
               {hasUploadingImages ? (
                 <p className="text-xs text-muted-foreground">
-                  Uploading input images…
+                  Waiting for input images to finish uploading or resolving…
                 </p>
               ) : null}
               <Button
@@ -599,7 +609,7 @@ export function ImagePlaygroundClient({
                 ) : hasUploadingImages ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Uploading input images…
+                    Preparing input images…
                   </>
                 ) : (
                   <>
@@ -608,6 +618,18 @@ export function ImagePlaygroundClient({
                   </>
                 )}
               </Button>
+              <div className="flex w-full flex-col items-end gap-1 text-right">
+                <p className="text-xs text-muted-foreground">
+                  Input images: {inputImageCount}
+                </p>
+                {inputImageCount > 0 ? (
+                  <p className="max-w-md text-xs text-muted-foreground">
+                    Tokfai will use your uploaded or linked image as visual
+                    reference. Results may vary depending on upstream model
+                    behavior.
+                  </p>
+                ) : null}
+              </div>
             </div>
 
             <ResponsePanel
@@ -741,6 +763,7 @@ function ImageInputsPanel({
   onAddImageUrl,
   onRemoveImage,
   onPreviewError,
+  onPreviewReady,
   onUploadFiles,
   onDropInvalid,
   onBrowseClick,
@@ -754,6 +777,7 @@ function ImageInputsPanel({
   onAddImageUrl: () => void;
   onRemoveImage: (id: string) => void;
   onPreviewError: (id: string, message: string) => void;
+  onPreviewReady: (id: string) => void;
   onUploadFiles: (files: FileList | File[]) => Promise<void>;
   onDropInvalid: (message: string, code: string) => void;
   onBrowseClick: () => void;
@@ -914,6 +938,7 @@ function ImageInputsPanel({
               loading={loading}
               onRemove={() => onRemoveImage(item.id)}
               onPreviewError={(message) => onPreviewError(item.id, message)}
+              onPreviewReady={() => onPreviewReady(item.id)}
             />
           ))}
         </div>
@@ -927,14 +952,18 @@ function ImageInputThumbnail({
   loading,
   onRemove,
   onPreviewError,
+  onPreviewReady,
 }: {
   item: ImageInputItem;
   loading: boolean;
   onRemove: () => void;
   onPreviewError: (message: string) => void;
+  onPreviewReady: () => void;
 }) {
   const showPreview =
     item.status === "ready" && item.url && !item.previewError;
+
+  const referenceMessage = getInputReferenceMessage(item);
 
   return (
     <div className="relative overflow-hidden rounded-md border bg-background">
@@ -954,13 +983,32 @@ function ImageInputThumbnail({
             <Loader2 className="h-5 w-5 animate-spin" />
             <span className="text-[10px]">Uploading…</span>
           </div>
-        ) : item.previewError ? (
+        ) : item.status === "resolving" ? (
+          <>
+            <div className="flex h-full flex-col items-center justify-center gap-1 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span className="text-[10px]">Resolving…</span>
+            </div>
+            {item.url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={item.url}
+                alt=""
+                className="hidden"
+                onLoad={() => onPreviewReady()}
+                onError={() =>
+                  onPreviewError("Could not load image from this URL.")
+                }
+              />
+            ) : null}
+          </>
+        ) : item.previewError || item.error ? (
           <div className="flex h-full items-center justify-center px-2 text-center text-xs text-destructive">
-            {item.previewError}
+            {item.previewError ?? item.error ?? "Failed"}
           </div>
         ) : (
           <div className="flex h-full items-center justify-center px-2 text-center text-xs text-destructive">
-            {item.error ?? "Upload failed"}
+            Upload failed
           </div>
         )}
       </div>
@@ -968,9 +1016,17 @@ function ImageInputThumbnail({
         <span className="truncate text-[11px] text-muted-foreground">
           source: {item.source}
         </span>
+        <span className="truncate text-[11px] text-muted-foreground">
+          status: {item.status}
+        </span>
+        {referenceMessage ? (
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            {referenceMessage}
+          </p>
+        ) : null}
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-[11px] text-muted-foreground">
-            {item.source === "url" ? item.url : item.label}
+          <span className="truncate text-[11px] font-medium">
+            {item.label}
           </span>
           <Button
             type="button"
@@ -990,6 +1046,31 @@ function ImageInputThumbnail({
       </div>
     </div>
   );
+}
+
+function getInputReferenceMessage(item: ImageInputItem): string | null {
+  if (item.status === "error") {
+    return item.error ?? item.previewError ?? "This input image cannot be used.";
+  }
+  if (item.source === "upload" && item.status === "ready") {
+    return "This image will be used as visual reference.";
+  }
+  if (item.source === "url" && item.status === "ready") {
+    return "Resolved and will be used as visual reference.";
+  }
+  if (item.source === "url" && item.status === "resolving") {
+    return "Checking whether this URL can be used as a visual reference.";
+  }
+  return null;
+}
+
+function formatUrlLabel(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname;
+  } catch {
+    return "Linked image";
+  }
 }
 
 function ApiKeyField({
