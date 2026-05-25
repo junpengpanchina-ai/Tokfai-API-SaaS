@@ -19,7 +19,7 @@ import {
   TOKFAI_API_KEY_PLACEHOLDER,
   TOKFAI_BILLING_POLICY,
   TOKFAI_CHAT_COMPLETIONS_ENDPOINT,
-  TOKFAI_IMAGES_GENERATIONS_ENDPOINT,
+  TOKFAI_IMAGES_GENERATIONS_FULL_PATH,
   TOKFAI_MODELS_ENDPOINT,
   TOKFAI_PLAYGROUND_POLICY,
   TOKFAI_PRODUCT_TAGLINE,
@@ -224,7 +224,7 @@ export function DocsContent({
         </CardHeader>
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <CopyableCard
           id="base-url"
           title="Base URL"
@@ -232,6 +232,7 @@ export function DocsContent({
           value={BASE_URL}
           copied={copiedId === "base-url"}
           onCopy={copyText}
+          monospace
         />
         <CopyableCard
           id="api-key-format"
@@ -248,6 +249,7 @@ export function DocsContent({
           value={TOKFAI_MODELS_ENDPOINT}
           copied={copiedId === "models-endpoint"}
           onCopy={copyText}
+          monospace
         />
         <CopyableCard
           id="chat-endpoint"
@@ -256,14 +258,16 @@ export function DocsContent({
           value={TOKFAI_CHAT_COMPLETIONS_ENDPOINT}
           copied={copiedId === "chat-endpoint"}
           onCopy={copyText}
+          monospace
         />
         <CopyableCard
           id="images-endpoint"
           title="Image Generations"
           description="Text-to-image and image-to-image endpoint."
-          value={TOKFAI_IMAGES_GENERATIONS_ENDPOINT}
+          value={TOKFAI_IMAGES_GENERATIONS_FULL_PATH}
           copied={copiedId === "images-endpoint"}
           onCopy={copyText}
+          monospace
         />
       </div>
 
@@ -381,27 +385,92 @@ export function DocsContent({
 
       <Card>
         <CardHeader>
-          <CardTitle>POST /v1/images/generations</CardTitle>
+          <CardTitle>{TOKFAI_IMAGES_GENERATIONS_FULL_PATH}</CardTitle>
           <CardDescription>
-            Generate images from a text prompt. Add{" "}
-            <code className="rounded bg-muted px-1 text-xs">image_urls</code> for
-            image-to-image or URL reference.{" "}
-            <code className="rounded bg-muted px-1 text-xs">image_urls</code>{" "}
-            supports direct image URLs or uploaded image URLs from{" "}
-            <Link
-              href="/dashboard/image-playground"
-              className="font-medium text-foreground underline-offset-4 hover:underline"
-            >
-              Image Playground
-            </Link>
-            . Successful generations debit credits. Failed calls are not
-            charged. Image Playground supports drag-and-drop uploads, pasted
-            image or webpage URLs, and reference-image generation.
+            Generate images from a text prompt, or pass reference images for
+            image-to-image editing.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
+          <dl className="grid gap-3 text-sm">
+            <div className="flex flex-col gap-1 sm:flex-row sm:gap-3">
+              <dt className="shrink-0 font-medium text-foreground sm:w-28">
+                Endpoint
+              </dt>
+              <dd>
+                <EndpointInlineCode value={TOKFAI_IMAGES_GENERATIONS_FULL_PATH} />
+              </dd>
+            </div>
+            <div className="flex flex-col gap-1 sm:flex-row sm:gap-3">
+              <dt className="shrink-0 font-medium text-foreground sm:w-28">
+                Modes
+              </dt>
+              <dd className="text-muted-foreground">
+                <ul className="list-disc space-y-1 pl-4">
+                  <li>
+                    <span className="font-medium text-foreground">
+                      Text-to-image
+                    </span>{" "}
+                    — send <code className="rounded bg-muted px-1 text-xs">model</code>,{" "}
+                    <code className="rounded bg-muted px-1 text-xs">prompt</code>, and{" "}
+                    <code className="rounded bg-muted px-1 text-xs">size</code>.
+                  </li>
+                  <li>
+                    <span className="font-medium text-foreground">
+                      Image-to-image
+                    </span>{" "}
+                    — add{" "}
+                    <code className="rounded bg-muted px-1 text-xs">image_urls</code>{" "}
+                    alongside your prompt.
+                  </li>
+                </ul>
+              </dd>
+            </div>
+            <div className="flex flex-col gap-1 sm:flex-row sm:gap-3">
+              <dt className="shrink-0 font-medium text-foreground sm:w-28">
+                image_urls
+              </dt>
+              <dd className="text-muted-foreground">
+                Pass uploaded image URLs from{" "}
+                <Link
+                  href="/dashboard/image-playground"
+                  className="font-medium text-foreground underline-offset-4 hover:underline"
+                >
+                  Image Playground
+                </Link>{" "}
+                or external direct image URLs (PNG, JPG, WEBP).
+              </dd>
+            </div>
+            <div className="flex flex-col gap-1 sm:flex-row sm:gap-3">
+              <dt className="shrink-0 font-medium text-foreground sm:w-28">
+                Billing
+              </dt>
+              <dd className="text-muted-foreground">
+                Successful generations debit credits. Failed calls are not
+                charged.
+              </dd>
+            </div>
+            <div className="flex flex-col gap-1 sm:flex-row sm:gap-3">
+              <dt className="shrink-0 font-medium text-foreground sm:w-28">
+                Playground
+              </dt>
+              <dd className="text-muted-foreground">
+                Image Playground supports drag-and-drop uploads, pasted image or
+                webpage URLs, and reference-image generation.
+              </dd>
+            </div>
+          </dl>
+
           <div className="flex flex-col gap-2">
             <h3 className="text-sm font-medium">Text-to-image</h3>
+            <p className="text-sm text-muted-foreground">
+              Required fields:{" "}
+              <code className="rounded bg-muted px-1 text-xs">model</code>,{" "}
+              <code className="rounded bg-muted px-1 text-xs">prompt</code>,{" "}
+              <code className="rounded bg-muted px-1 text-xs">size</code>,{" "}
+              <code className="rounded bg-muted px-1 text-xs">n</code>,{" "}
+              <code className="rounded bg-muted px-1 text-xs">response_format</code>.
+            </p>
             <CodeBlock
               id="image-text-to-image-curl"
               label="curl"
@@ -412,6 +481,11 @@ export function DocsContent({
           </div>
           <div className="flex flex-col gap-2">
             <h3 className="text-sm font-medium">Image-to-image</h3>
+            <p className="text-sm text-muted-foreground">
+              Include{" "}
+              <code className="rounded bg-muted px-1 text-xs">image_urls</code>{" "}
+              with one or more reference image URLs.
+            </p>
             <CodeBlock
               id="image-to-image-curl"
               label="curl"
@@ -574,6 +648,7 @@ function CopyableCard({
   copied,
   onCopy,
   compact = false,
+  monospace = false,
 }: {
   id: string;
   title: string;
@@ -582,30 +657,25 @@ function CopyableCard({
   copied: boolean;
   onCopy: (id: string, value: string) => void;
   compact?: boolean;
+  monospace?: boolean;
 }) {
+  const valueClassName = monospace
+    ? "block w-max max-w-full whitespace-nowrap font-mono text-xs sm:text-sm"
+    : "block w-max max-w-full whitespace-nowrap text-sm";
+
+  const valueNode = (
+    <div className="min-w-0 flex-1 overflow-x-auto">
+      <code className={`rounded bg-muted px-2 py-1 ${valueClassName}`}>
+        {value}
+      </code>
+    </div>
+  );
+
   if (compact) {
     return (
       <div className="flex items-start justify-between gap-3">
-        <code className="break-all rounded bg-muted px-2 py-1 text-sm">{value}</code>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 shrink-0"
-          onClick={() => onCopy(id, value)}
-        >
-          {copied ? (
-            <>
-              <Check className="h-4 w-4" />
-              Copied
-            </>
-          ) : (
-            <>
-              <Copy className="h-4 w-4" />
-              Copy
-            </>
-          )}
-        </Button>
+        {valueNode}
+        <CopyButton copied={copied} onCopy={() => onCopy(id, value)} />
       </div>
     );
   }
@@ -617,28 +687,50 @@ function CopyableCard({
         {description ? <CardDescription>{description}</CardDescription> : null}
       </CardHeader>
       <CardContent className="flex items-start justify-between gap-3">
-        <code className="break-all rounded bg-muted px-2 py-1 text-sm">{value}</code>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 shrink-0"
-          onClick={() => onCopy(id, value)}
-        >
-          {copied ? (
-            <>
-              <Check className="h-4 w-4" />
-              Copied
-            </>
-          ) : (
-            <>
-              <Copy className="h-4 w-4" />
-              Copy
-            </>
-          )}
-        </Button>
+        {valueNode}
+        <CopyButton copied={copied} onCopy={() => onCopy(id, value)} />
       </CardContent>
     </Card>
+  );
+}
+
+function EndpointInlineCode({ value }: { value: string }) {
+  return (
+    <div className="overflow-x-auto">
+      <code className="inline-block whitespace-nowrap rounded bg-muted px-2 py-1 font-mono text-xs">
+        {value}
+      </code>
+    </div>
+  );
+}
+
+function CopyButton({
+  copied,
+  onCopy,
+}: {
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="h-8 shrink-0"
+      onClick={onCopy}
+    >
+      {copied ? (
+        <>
+          <Check className="h-4 w-4" />
+          Copied
+        </>
+      ) : (
+        <>
+          <Copy className="h-4 w-4" />
+          Copy
+        </>
+      )}
+    </Button>
   );
 }
 

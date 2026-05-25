@@ -65,7 +65,7 @@ export function ModelsClient() {
 
       <ModelSection
         title="Image Models"
-        description="Image generation models available through the API and Image Playground."
+        description="Text-to-image and image-to-image models available through POST /v1/images/generations and the Image Playground."
         icon={ImageIcon}
         models={IMAGE_MODELS.filter((model) => model.id !== "gpt-image-2-vip")}
       />
@@ -174,13 +174,17 @@ function ModelCard({ model }: { model: ModelCatalogEntry }) {
               <dt className="text-xs uppercase tracking-wider text-muted-foreground">
                 Supports
               </dt>
-              <dd>
-                <ul className="list-disc space-y-0.5 pl-4 text-muted-foreground">
-                  {model.supports.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
+              <dd className="text-muted-foreground">
+                {model.supports.join(", ")}
               </dd>
+            </div>
+          ) : null}
+          {model.playground ? (
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-xs uppercase tracking-wider text-muted-foreground">
+                Playground
+              </dt>
+              <dd>{model.playground}</dd>
             </div>
           ) : null}
         </dl>

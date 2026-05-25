@@ -11,6 +11,8 @@ export interface ModelCatalogEntry {
   description: string;
   /** Image models only — capabilities shown on the Models page. */
   supports?: string[];
+  /** Playground label for models with a dedicated UI. */
+  playground?: string;
 }
 
 export const CHAT_MODELS: ModelCatalogEntry[] = [
@@ -33,10 +35,13 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
 ];
 
 const IMAGE_MODEL_SUPPORTS = [
-  "Text to image",
-  "Image to image",
-  "URL reference",
+  "Text-to-image",
+  "Image-to-image",
+  "Uploaded image URLs",
 ] as const;
+
+const IMAGE_MODEL_PLAYGROUND = "Image Playground";
+const IMAGE_MODEL_BILLING_UNIT = "Per image / Per generation";
 
 export const IMAGE_MODELS: ModelCatalogEntry[] = [
   {
@@ -44,54 +49,60 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     displayName: "Nano Banana",
     type: "image",
     status: "available",
-    billingUnit: "Per image",
+    billingUnit: IMAGE_MODEL_BILLING_UNIT,
     description: "Image generation model.",
     supports: [...IMAGE_MODEL_SUPPORTS],
+    playground: IMAGE_MODEL_PLAYGROUND,
   },
   {
     id: "nano-banana-fast",
     displayName: "Nano Banana Fast",
     type: "image",
     status: "available",
-    billingUnit: "Per image",
+    billingUnit: IMAGE_MODEL_BILLING_UNIT,
     description: "Fast image generation with lower latency.",
     supports: [...IMAGE_MODEL_SUPPORTS],
+    playground: IMAGE_MODEL_PLAYGROUND,
   },
   {
     id: "nano-banana-pro",
     displayName: "Nano Banana Pro",
     type: "image",
     status: "available",
-    billingUnit: "Per image",
+    billingUnit: IMAGE_MODEL_BILLING_UNIT,
     description: "Higher-quality image generation model.",
     supports: [...IMAGE_MODEL_SUPPORTS],
+    playground: IMAGE_MODEL_PLAYGROUND,
   },
   {
     id: "nano-banana-2",
     displayName: "Nano Banana 2",
     type: "image",
     status: "available",
-    billingUnit: "Per image",
+    billingUnit: IMAGE_MODEL_BILLING_UNIT,
     description: "Next-generation Nano Banana image model.",
     supports: [...IMAGE_MODEL_SUPPORTS],
+    playground: IMAGE_MODEL_PLAYGROUND,
   },
   {
     id: "gpt-image-2",
     displayName: "GPT Image 2",
     type: "image",
     status: "available",
-    billingUnit: "Per image",
+    billingUnit: IMAGE_MODEL_BILLING_UNIT,
     description: "OpenAI-compatible image generation model.",
     supports: [...IMAGE_MODEL_SUPPORTS],
+    playground: IMAGE_MODEL_PLAYGROUND,
   },
   {
     id: "gpt-image-2-vip",
     displayName: "GPT Image 2 VIP",
     type: "image",
     status: "coming_soon",
-    billingUnit: "Per image",
+    billingUnit: IMAGE_MODEL_BILLING_UNIT,
     description: "Premium tier of GPT Image 2.",
     supports: [...IMAGE_MODEL_SUPPORTS],
+    playground: IMAGE_MODEL_PLAYGROUND,
   },
 ];
 

@@ -47,6 +47,7 @@ import {
   IMAGE_PLAYGROUND_IMAGE_TO_IMAGE_PLACEHOLDER,
   IMAGE_PLAYGROUND_TEXT_TO_IMAGE_PLACEHOLDER,
   TOKFAI_API_KEY_PLACEHOLDER,
+  TOKFAI_IMAGES_GENERATIONS_FULL_PATH,
   TOKFAI_IMAGES_GENERATIONS_ENDPOINT,
 } from "@/lib/tokfai-api";
 import { buildImageGenerationCurl } from "@/lib/image-api-curl";
@@ -523,17 +524,22 @@ export function ImagePlaygroundClient({
             Image Playground
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Drag images or paste an image or webpage URL for image-to-image.
-            Up to 4 images. Uploads: PNG, JPG, WEBP. Successful generations debit
-            credits. Failed calls are not charged.
+            Test text-to-image and image-to-image through{" "}
+            <code className="rounded bg-muted px-1 text-xs">
+              {TOKFAI_IMAGES_GENERATIONS_FULL_PATH}
+            </code>
+            . Drag images, paste URLs, or use prompt-only for text-to-image.
+            Successful generations debit credits. Failed calls are not charged.
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Send a generation request through the Tokfai API using your own{" "}
+            Uses your own{" "}
             <code className="rounded bg-muted px-1 text-xs">sk-tokfai_</code>{" "}
             key — the same path external clients use.
           </p>
         </div>
-        <Badge variant="secondary">{TOKFAI_IMAGES_GENERATIONS_ENDPOINT}</Badge>
+        <Badge variant="secondary" className="shrink-0 whitespace-nowrap font-mono text-xs">
+          {TOKFAI_IMAGES_GENERATIONS_ENDPOINT}
+        </Badge>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr,280px]">
@@ -542,8 +548,8 @@ export function ImagePlaygroundClient({
             <CardTitle>Request</CardTitle>
             <CardDescription>
               Text-to-image works with prompt only. Add input images for
-              image-to-image. Successful calls are recorded in Usage and debited
-              from Credits.
+              image-to-image via upload or URL. Successful calls are recorded in
+              Usage and debited from Credits.
             </CardDescription>
             <div className="mt-3 flex flex-col gap-1">
               <Badge variant={isImageToImage ? "default" : "secondary"}>
