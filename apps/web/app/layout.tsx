@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { AuthProviderWrapper } from "@/components/auth-provider-wrapper";
 import { I18nProvider } from "@/lib/i18n/i18n-provider";
 
 import "./globals.css";
@@ -21,7 +22,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans antialiased">
-        <I18nProvider>{children}</I18nProvider>
+        <I18nProvider>
+          <AuthProviderWrapper>{children}</AuthProviderWrapper>
+        </I18nProvider>
       </body>
     </html>
   );

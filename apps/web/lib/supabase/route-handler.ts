@@ -2,24 +2,15 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Refreshes the Supabase session cookie on every request, and gates routes
- * that require authentication.
- *
- * Uses anon key only. See AGENTS.md.
+ * Supabase client for Route Handlers where auth cookies must be copied onto
+ * the final redirect response (exchangeCodeForSession / signOut).
  */
-export async function updateSession(request: NextRequest) {
+export function createRouteHandlerClient(request: NextRequest) {
   let response = NextResponse.next({
     request: {
       headers: request.headers,
     },
   });
-
-  if (
-    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  ) {
-    return response;
-  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -47,32 +38,12 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const pathname = request.nextUrl.pathname;
-  const isDashboard = pathname.startsWith("/dashboard");
-  const isAuthPage = pathname === "/login" || pathname === "/signup";
-  const isAuthFlow = pathname.startsWith("/auth/");
-
-  if (isAuthFlow) {
-    return response;
+  function applyCookiesTo(target: NextResponse) {
+    for (const cookie of response.cookies.getAll()) {
+      target.cookies.set(cookie);
+    }
+    return target;
   }
 
-  if (!user && isDashboard) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(url);
-  }
-
-  if (user && isAuthPage) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    url.search = "";
-    return NextResponse.redirect(url);
-  }
-
-  return response;
+  return { supabase, applyCookiesTo };
 }

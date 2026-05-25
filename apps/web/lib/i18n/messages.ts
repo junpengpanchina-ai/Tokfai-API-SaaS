@@ -37,6 +37,7 @@ export const messages = {
     },
     common: {
       signOut: "Sign out",
+      signingOut: "Signing out…",
       signedInAs: "Signed in as",
       logIn: "Log in",
       signUp: "Sign up",
@@ -320,6 +321,7 @@ export const messages = {
     },
     common: {
       signOut: "退出登录",
+      signingOut: "正在退出…",
       signedInAs: "已登录",
       logIn: "登录",
       signUp: "注册",

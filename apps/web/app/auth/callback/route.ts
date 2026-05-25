@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { createClient } from "@/lib/supabase/server";
+import { getServerSiteOrigin } from "@/lib/auth/site-url";
+import { createRouteHandlerClient } from "@/lib/supabase/route-handler";
 
 /**
  * Supabase OAuth + email-confirmation callback.
@@ -8,21 +9,25 @@ import { createClient } from "@/lib/supabase/server";
  */
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
+  const siteOrigin = getServerSiteOrigin(request);
 
   if (!code) {
     return NextResponse.redirect(
-      new URL("/login?error=missing_code", request.url)
+      new URL("/login?error=missing_code", siteOrigin)
     );
   }
 
-  const supabase = createClient();
+  const { supabase, applyCookiesTo } = createRouteHandlerClient(request);
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
     return NextResponse.redirect(
-      new URL("/login?error=oauth_callback_failed", request.url)
+      new URL("/login?error=auth_callback_failed", siteOrigin)
     );
   }
 
-  return NextResponse.redirect(new URL("/dashboard", request.url));
+  const redirectResponse = NextResponse.redirect(
+    new URL("/dashboard", siteOrigin)
+  );
+  return applyCookiesTo(redirectResponse);
 }

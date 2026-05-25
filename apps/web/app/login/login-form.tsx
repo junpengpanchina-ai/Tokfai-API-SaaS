@@ -13,10 +13,12 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getBrowserSiteOrigin } from "@/lib/auth/site-url";
 import { createClient } from "@/lib/supabase/client";
 
 const LOGIN_ERRORS: Record<string, string> = {
   missing_code: "Missing OAuth code.",
+  auth_callback_failed: "Google login failed. Please try again.",
   oauth_callback_failed: "Google login failed. Please try again.",
 };
 
@@ -77,7 +79,7 @@ export function LoginForm({
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${getBrowserSiteOrigin()}/auth/callback`,
       },
     });
 

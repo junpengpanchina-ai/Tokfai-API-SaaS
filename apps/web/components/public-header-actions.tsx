@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth/auth-provider";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { cn } from "@/lib/utils";
 
@@ -13,8 +14,18 @@ const NAV_LINKS = [
   { href: "/docs", labelKey: "nav.docs" },
 ] as const;
 
-export function PublicHeaderDesktopNav({ user }: { user: boolean }) {
+function AuthToolbarPlaceholder() {
+  return (
+    <div
+      aria-hidden
+      className="h-9 w-28 animate-pulse rounded-md bg-muted"
+    />
+  );
+}
+
+export function PublicHeaderDesktopNav() {
   const { t } = useI18n();
+  const { user, loading } = useAuth();
 
   return (
     <nav className="hidden items-center gap-6 md:flex">
@@ -27,7 +38,7 @@ export function PublicHeaderDesktopNav({ user }: { user: boolean }) {
           {t(link.labelKey)}
         </Link>
       ))}
-      {user ? (
+      {loading ? null : user ? (
         <Link
           href="/dashboard"
           className="text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -39,13 +50,16 @@ export function PublicHeaderDesktopNav({ user }: { user: boolean }) {
   );
 }
 
-export function PublicHeaderToolbar({ user }: { user: boolean }) {
+export function PublicHeaderToolbar() {
   const { t } = useI18n();
+  const { user, loading } = useAuth();
 
   return (
     <div className="flex shrink-0 items-center gap-2">
       <LanguageSwitcher />
-      {user ? (
+      {loading ? (
+        <AuthToolbarPlaceholder />
+      ) : user ? (
         <Button asChild size="sm">
           <Link href="/dashboard">{t("nav.dashboard")}</Link>
         </Button>
@@ -68,8 +82,9 @@ export function PublicHeaderToolbar({ user }: { user: boolean }) {
   );
 }
 
-export function PublicHeaderMobileNav({ user }: { user: boolean }) {
+export function PublicHeaderMobileNav() {
   const { t } = useI18n();
+  const { user, loading } = useAuth();
 
   return (
     <nav
@@ -87,7 +102,7 @@ export function PublicHeaderMobileNav({ user }: { user: boolean }) {
           {t(link.labelKey)}
         </Link>
       ))}
-      {user ? (
+      {loading ? null : user ? (
         <Link
           href="/dashboard"
           className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
