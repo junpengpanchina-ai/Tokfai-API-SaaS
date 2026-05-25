@@ -5,6 +5,7 @@ import {
   BarChart3,
   BookOpen,
   FlaskConical,
+  ImageIcon,
   KeyRound,
   Sparkles,
   Wallet,
@@ -59,7 +60,12 @@ const FEATURES = [
   {
     icon: FlaskConical,
     title: "Playground testing",
-    body: "Try chat models in the Chat Playground before you wire them into production code.",
+    body: "Try chat models in the Chat Playground and image generation in the Image Playground before wiring them into production code.",
+  },
+  {
+    icon: ImageIcon,
+    title: "Image API",
+    body: "Generate images with text-to-image and image-to-image via POST /v1/images/generations. Video models are coming soon.",
   },
   {
     icon: BookOpen,
@@ -87,7 +93,7 @@ const STEPS = [
   {
     step: 4,
     title: "Call the API",
-    body: `Point OpenAI SDK, Cursor, Cherry Studio, or your app at ${TOKFAI_API_BASE_URL}.`,
+    body: `Point OpenAI SDK, Cursor, Cherry Studio, or your app at ${TOKFAI_API_BASE_URL}. Test chat in Chat Playground and images in Image Playground.`,
   },
   {
     step: 5,
@@ -124,13 +130,20 @@ export default function HomePage() {
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-balance text-lg text-muted-foreground">
               One API for chat, image, and AI apps. Works with OpenAI SDK,
-              Cursor, Cherry Studio, and your own products.
+              Cursor, Cherry Studio, and your own products. Try image generation
+              in the Image Playground.
             </p>
             <div className="mt-10 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               <Button asChild size="lg" className="w-full sm:w-auto">
                 <Link href="/dashboard/credits">
                   Start with credits
                   <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
+                <Link href="/dashboard/image-playground">
+                  Try Image Playground
+                  <ImageIcon className="h-4 w-4" />
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
@@ -237,6 +250,28 @@ export default function HomePage() {
                     className="font-mono text-sm text-primary underline-offset-4 hover:underline sm:text-right"
                   >
                     /dashboard/playground
+                  </Link>
+                </div>
+                <div className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                  <span className="text-sm font-medium text-foreground">
+                    Image Playground
+                  </span>
+                  <Link
+                    href="/dashboard/image-playground"
+                    className="font-mono text-sm text-primary underline-offset-4 hover:underline sm:text-right"
+                  >
+                    /dashboard/image-playground
+                  </Link>
+                </div>
+                <div className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                  <span className="text-sm font-medium text-foreground">
+                    Image API docs
+                  </span>
+                  <Link
+                    href="/docs"
+                    className="font-mono text-sm text-primary underline-offset-4 hover:underline sm:text-right"
+                  >
+                    POST /v1/images/generations
                   </Link>
                 </div>
               </CardContent>

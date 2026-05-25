@@ -54,6 +54,7 @@ const IMAGE_TEXT_TO_IMAGE_CURL = `curl https://api.tokfai.com/v1/images/generati
     "model": "nano-banana",
     "prompt": "A serene mountain landscape at sunset, digital art",
     "size": "1024x1024",
+    "n": 1,
     "response_format": "url"
   }'`;
 
@@ -65,6 +66,7 @@ const IMAGE_TO_IMAGE_CURL = `curl https://api.tokfai.com/v1/images/generations \
     "prompt": "Restyle as watercolor illustration",
     "image_urls": ["https://example.com/reference.jpg"],
     "size": "1024x1024",
+    "n": 1,
     "response_format": "url"
   }'`;
 
@@ -385,9 +387,16 @@ export function DocsContent({
             <code className="rounded bg-muted px-1 text-xs">image_urls</code> for
             image-to-image or URL reference.{" "}
             <code className="rounded bg-muted px-1 text-xs">image_urls</code>{" "}
-            supports direct image URLs or uploaded image URLs from Image
-            Playground. Successful generations debit credits. Failed calls are
-            not charged.
+            supports direct image URLs or uploaded image URLs from{" "}
+            <Link
+              href="/dashboard/image-playground"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              Image Playground
+            </Link>
+            . Successful generations debit credits. Failed calls are not
+            charged. Image Playground supports drag-and-drop uploads, pasted
+            image or webpage URLs, and reference-image generation.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">

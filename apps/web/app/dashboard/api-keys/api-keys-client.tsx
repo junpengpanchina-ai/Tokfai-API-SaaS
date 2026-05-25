@@ -178,7 +178,8 @@ export function ApiKeysClient({
         <p className="mt-1 text-sm text-muted-foreground">
           Create keys to authenticate requests to{" "}
           <code className="rounded bg-muted px-1 text-xs">{TOKFAI_API_BASE_URL}</code>.
-          Active keys can be copied anytime with{" "}
+          The full secret is shown once when created. Active keys can be revealed
+          and copied again with{" "}
           <span className="font-medium">Copy key</span>.
         </p>
       </div>
@@ -274,18 +275,32 @@ function IntegrationGuide() {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
+        <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+          <li>Full secret is shown once when created.</li>
+          <li>Active keys can be revealed and copied again from the list.</li>
+          <li>
+            Use this key in Cursor, Cherry Studio, OpenAI SDK, or curl.
+          </li>
+          <li>
+            Legacy keys that cannot be revealed: create a new key to copy the
+            full secret.
+          </li>
+        </ul>
         <p className="text-sm text-muted-foreground">
           Use this key in{" "}
           <code className="rounded bg-background px-1.5 py-0.5 font-mono text-xs">
             Authorization: Bearer {TOKFAI_API_KEY_PLACEHOLDER}
           </code>
         </p>
-        <div>
+        <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
             <Link href="/docs">
               View API docs
               <ExternalLink className="h-3.5 w-3.5" />
             </Link>
+          </Button>
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/dashboard/image-playground">Try Image Playground</Link>
           </Button>
         </div>
       </CardContent>
@@ -324,8 +339,8 @@ function OneTimeSecretCard({
           {keyName ? `API key created: ${keyName}` : "API key created"}
         </CardTitle>
         <CardDescription className="text-base text-emerald-900/90 dark:text-emerald-100/90">
-          Copy and store this key now. You can also copy it later from the list
-          with Copy key.
+          Copy and store this key now. The full secret is shown once at creation.
+          You can also copy it later from the list with Copy key.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -378,7 +393,7 @@ function OneTimeSecretCard({
 }
 
 const LEGACY_KEY_MESSAGE =
-  "This legacy key cannot be revealed. Create a new key to copy the full secret.";
+  "Create a new key to copy the full secret. Legacy keys that cannot be revealed must be replaced.";
 
 function ApiKeysTable({
   keys,

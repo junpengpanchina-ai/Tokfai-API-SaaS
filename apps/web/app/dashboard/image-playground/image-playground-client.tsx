@@ -49,6 +49,7 @@ import {
   TOKFAI_API_KEY_PLACEHOLDER,
   TOKFAI_IMAGES_GENERATIONS_ENDPOINT,
 } from "@/lib/tokfai-api";
+import { buildImageGenerationCurl } from "@/lib/image-api-curl";
 import {
   isValidImageUrl,
   MAX_PLAYGROUND_INPUT_IMAGES,
@@ -188,6 +189,9 @@ export function ImagePlaygroundClient({
   const [lastRequestInputCount, setLastRequestInputCount] = useState<
     number | null
   >(null);
+  const [copyRequestStatus, setCopyRequestStatus] = useState<"idle" | "copied">(
+    "idle"
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const readyImageUrls = getReadyImageUrls(imageInputs);
@@ -373,6 +377,26 @@ export function ImagePlaygroundClient({
       message,
     });
   }, []);
+
+  async function handleCopyApiRequest() {
+    const trimmedPrompt = prompt.trim() || DEFAULT_PROMPT;
+    const curl = buildImageGenerationCurl({
+      model,
+      prompt: trimmedPrompt,
+      size,
+      n: 1,
+      response_format: "url",
+      image_urls: readyImageUrls.length > 0 ? readyImageUrls : undefined,
+    });
+
+    try {
+      await navigator.clipboard.writeText(curl);
+      setCopyRequestStatus("copied");
+      window.setTimeout(() => setCopyRequestStatus("idle"), 2000);
+    } catch {
+      setCopyRequestStatus("idle");
+    }
+  }
 
   async function handleGenerate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -597,27 +621,53 @@ export function ImagePlaygroundClient({
                   Waiting for input images to finish uploading or resolving…
                 </p>
               ) : null}
-              <Button
-                type="submit"
-                disabled={loading || hasUploadingImages}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Generating…
-                  </>
-                ) : hasUploadingImages ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Preparing input images…
-                  </>
-                ) : (
-                  <>
-                    <ImageIcon className="h-4 w-4" />
-                    Generate
-                  </>
-                )}
-              </Button>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={loading || hasUploadingImages}
+                  onClick={() => void handleCopyApiRequest()}
+                >
+                  {copyRequestStatus === "copied" ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      Copy API request
+                    </>
+                  )}
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={loading || hasUploadingImages}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Generating…
+                    </>
+                  ) : hasUploadingImages ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Preparing input images…
+                    </>
+                  ) : (
+                    <>
+                      <ImageIcon className="h-4 w-4" />
+                      Generate
+                    </>
+                  )}
+                </Button>
+              </div>
+              {copyRequestStatus === "copied" ? (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                  curl copied — replace {TOKFAI_API_KEY_PLACEHOLDER} with your
+                  API key.
+                </p>
+              ) : null}
               <div className="flex w-full flex-col items-end gap-1 text-right">
                 <p className="text-xs text-muted-foreground">
                   Input images: {inputImageCount}

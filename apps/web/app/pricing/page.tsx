@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Code2, Gauge, Wallet } from "lucide-react";
+import { ArrowRight, Code2, Gauge, ImageIcon, MessageSquare, Wallet } from "lucide-react";
 
 import { PublicFooter } from "@/components/public-footer";
 import { PublicHeader } from "@/components/public-header";
@@ -58,9 +58,24 @@ const USAGE_POINTS = [
     text: TOKFAI_BILLING_POLICY,
   },
   {
+    id: "chat-billing",
+    icon: MessageSquare,
+    text: "Chat calls are charged by token usage (input and output tokens).",
+  },
+  {
+    id: "image-billing",
+    icon: ImageIcon,
+    text: "Image calls are charged per successful generation. Failed calls are not charged.",
+  },
+  {
+    id: "starter-credits",
+    icon: Wallet,
+    text: `${TOKFAI_STARTER_PLAN} and can be used for Chat and Image testing.`,
+  },
+  {
     id: "model-cost",
     icon: Wallet,
-    text: "Actual cost depends on model and request size (input and output).",
+    text: "Actual cost depends on model and request size.",
   },
   {
     id: "usage-dashboard",
@@ -113,6 +128,11 @@ const DEV_ITEMS = [
     href: "/dashboard/playground",
   },
   {
+    label: "Image Playground",
+    value: "/dashboard/image-playground",
+    href: "/dashboard/image-playground",
+  },
+  {
     label: "API Keys",
     value: "/dashboard/api-keys",
     href: "/dashboard/api-keys",
@@ -133,7 +153,8 @@ export default function PricingPage() {
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-balance text-lg text-muted-foreground">
               One API for chat, image, and AI apps. Use Tokfai with Cursor,
-              Cherry Studio, OpenAI SDK, or your own app.
+              Cherry Studio, OpenAI SDK, or your own app. Video models are
+              coming soon.
             </p>
           </div>
 
