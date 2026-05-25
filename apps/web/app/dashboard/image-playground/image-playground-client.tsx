@@ -56,6 +56,8 @@ import {
   validatePlaygroundImageFile,
 } from "@/lib/storage/upload-image";
 
+import { IMAGE_PLAYGROUND_PRESETS } from "./image-playground-presets";
+
 const DEFAULT_MODEL: ImagePlaygroundModelId = "nano-banana";
 const DEFAULT_SIZE: ImagePlaygroundSize = "1024x1024";
 const DEFAULT_PROMPT = "A serene mountain landscape at sunset, digital art.";
@@ -481,6 +483,11 @@ export function ImagePlaygroundClient({
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="prompt">Prompt</Label>
+              <PromptPresets
+                inputImageCount={inputImageCount}
+                loading={loading}
+                onSelect={(presetPrompt) => setPrompt(presetPrompt)}
+              />
               <textarea
                 id="prompt"
                 rows={6}
@@ -594,6 +601,47 @@ export function ImagePlaygroundClient({
         </Card>
       </div>
     </form>
+  );
+}
+
+function PromptPresets({
+  inputImageCount,
+  loading,
+  onSelect,
+}: {
+  inputImageCount: number;
+  loading: boolean;
+  onSelect: (prompt: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-xs text-muted-foreground">Quick templates</p>
+      <div className="flex flex-wrap gap-2">
+        {IMAGE_PLAYGROUND_PRESETS.map((preset) => {
+          const showInputHint =
+            preset.worksBestWithInputImage === true && inputImageCount === 0;
+
+          return (
+            <div key={preset.id} className="flex items-center gap-1.5">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={loading}
+                onClick={() => onSelect(preset.prompt)}
+              >
+                {preset.label}
+              </Button>
+              {showInputHint ? (
+                <span className="text-[10px] text-muted-foreground">
+                  Works best with an input image.
+                </span>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
