@@ -43,6 +43,8 @@ import {
 } from "@/lib/model-catalog";
 import {
   isFullTokfaiApiKey,
+  IMAGE_PLAYGROUND_IMAGE_TO_IMAGE_PLACEHOLDER,
+  IMAGE_PLAYGROUND_TEXT_TO_IMAGE_PLACEHOLDER,
   TOKFAI_API_KEY_PLACEHOLDER,
   TOKFAI_IMAGES_GENERATIONS_ENDPOINT,
 } from "@/lib/tokfai-api";
@@ -92,6 +94,7 @@ interface ImageInputItem {
   source: ImageInputSource;
   status: ImageInputStatus;
   error?: string;
+  previewError?: string;
 }
 
 export function ImagePlaygroundClient({
@@ -119,11 +122,20 @@ export function ImagePlaygroundClient({
   const [imageInputs, setImageInputs] = useState<ImageInputItem[]>([]);
   const [imageUrlDraft, setImageUrlDraft] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [lastRequestInputCount, setLastRequestInputCount] = useState<
+    number | null
+  >(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const readyImageUrls = imageInputs
-    .filter((item) => item.status === "ready")
+    .filter((item) => item.status === "ready" && item.url)
     .map((item) => item.url);
+
+  const inputImageCount = readyImageUrls.length;
+  const isImageToImage = inputImageCount > 0;
+  const promptPlaceholder = isImageToImage
+    ? IMAGE_PLAYGROUND_IMAGE_TO_IMAGE_PLACEHOLDER
+    : IMAGE_PLAYGROUND_TEXT_TO_IMAGE_PLACEHOLDER;
 
   const hasUploadingImages = imageInputs.some(
     (item) => item.status === "uploading"
@@ -266,6 +278,14 @@ export function ImagePlaygroundClient({
     setImageInputs((current) => current.filter((item) => item.id !== id));
   }, []);
 
+  const markPreviewError = useCallback((id: string, message: string) => {
+    setImageInputs((current) =>
+      current.map((item) =>
+        item.id === id ? { ...item, previewError: message } : item
+      )
+    );
+  }, []);
+
   const handleDrop = useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault();
@@ -318,11 +338,10 @@ export function ImagePlaygroundClient({
         size,
         n: 1,
         response_format: "url",
+        image_urls: readyImageUrls,
       };
-      if (readyImageUrls.length > 0) {
-        payload.image_urls = readyImageUrls;
-      }
 
+      setLastRequestInputCount(readyImageUrls.length);
       const res = await imageGenerations(resolvedKey, payload);
       setResult(res);
     } catch (err) {
@@ -409,6 +428,17 @@ export function ImagePlaygroundClient({
               image-to-image. Successful calls are recorded in Usage and debited
               from Credits.
             </CardDescription>
+            <div className="mt-3 flex flex-col gap-1">
+              <Badge variant={isImageToImage ? "default" : "secondary"}>
+                {isImageToImage ? "Image to Image" : "Text to Image"}
+              </Badge>
+              {isImageToImage ? (
+                <p className="text-xs text-muted-foreground">
+                  Using {inputImageCount} input image
+                  {inputImageCount === 1 ? "" : "s"} as reference.
+                </p>
+              ) : null}
+            </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <ApiKeyField
@@ -431,6 +461,7 @@ export function ImagePlaygroundClient({
               onImageUrlDraftChange={setImageUrlDraft}
               onAddImageUrl={() => addImageUrl(imageUrlDraft)}
               onRemoveImage={removeImageInput}
+              onPreviewError={markPreviewError}
               onDragEnter={() => {
                 if (!loading) setIsDragging(true);
               }}
@@ -457,9 +488,14 @@ export function ImagePlaygroundClient({
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 disabled={loading}
+                placeholder={promptPlaceholder}
                 className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
+
+            <p className="text-xs text-muted-foreground">
+              Input images: {inputImageCount}
+            </p>
 
             <div className="flex justify-end">
               <Button
@@ -480,7 +516,14 @@ export function ImagePlaygroundClient({
               </Button>
             </div>
 
-            <ResponsePanel loading={loading} error={error} result={result} />
+            <ResponsePanel
+              loading={loading}
+              error={error}
+              result={result}
+              inputImagesCount={
+                result?.input_images_count ?? lastRequestInputCount
+              }
+            />
           </CardContent>
         </Card>
 
@@ -563,6 +606,7 @@ function ImageInputsPanel({
   onImageUrlDraftChange,
   onAddImageUrl,
   onRemoveImage,
+  onPreviewError,
   onDragEnter,
   onDragLeave,
   onDragOver,
@@ -578,6 +622,7 @@ function ImageInputsPanel({
   onImageUrlDraftChange: (value: string) => void;
   onAddImageUrl: () => void;
   onRemoveImage: (id: string) => void;
+  onPreviewError: (id: string, message: string) => void;
   onDragEnter: () => void;
   onDragLeave: () => void;
   onDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
@@ -606,7 +651,7 @@ function ImageInputsPanel({
         onDrop={onDrop}
         className={`flex flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 py-8 text-center transition-colors ${
           isDragging
-            ? "border-primary bg-primary/5"
+            ? "border-primary bg-primary/10 ring-2 ring-primary/30"
             : "border-muted-foreground/30 bg-background"
         } ${loading || atLimit ? "opacity-60" : "cursor-pointer"}`}
         onClick={() => {
@@ -671,6 +716,7 @@ function ImageInputsPanel({
               item={item}
               loading={loading}
               onRemove={() => onRemoveImage(item.id)}
+              onPreviewError={(message) => onPreviewError(item.id, message)}
             />
           ))}
         </div>
@@ -683,24 +729,37 @@ function ImageInputThumbnail({
   item,
   loading,
   onRemove,
+  onPreviewError,
 }: {
   item: ImageInputItem;
   loading: boolean;
   onRemove: () => void;
+  onPreviewError: (message: string) => void;
 }) {
+  const showPreview =
+    item.status === "ready" && item.url && !item.previewError;
+
   return (
     <div className="relative overflow-hidden rounded-md border bg-background">
       <div className="aspect-square bg-muted/30">
-        {item.status === "ready" && item.url ? (
+        {showPreview ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={item.url}
             alt={item.label}
             className="h-full w-full object-cover"
+            onError={() =>
+              onPreviewError("Could not load image preview.")
+            }
           />
         ) : item.status === "uploading" ? (
-          <div className="flex h-full items-center justify-center text-muted-foreground">
+          <div className="flex h-full flex-col items-center justify-center gap-1 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
+            <span className="text-[10px]">Uploading…</span>
+          </div>
+        ) : item.previewError ? (
+          <div className="flex h-full items-center justify-center px-2 text-center text-xs text-destructive">
+            {item.previewError}
           </div>
         ) : (
           <div className="flex h-full items-center justify-center px-2 text-center text-xs text-destructive">
@@ -708,24 +767,29 @@ function ImageInputThumbnail({
           </div>
         )}
       </div>
-      <div className="flex items-center justify-between gap-2 border-t px-2 py-1.5">
+      <div className="flex flex-col gap-1 border-t px-2 py-1.5">
         <span className="truncate text-[11px] text-muted-foreground">
-          {item.source === "url" ? "URL" : item.label}
+          source: {item.source}
         </span>
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          className="h-6 w-6 shrink-0"
-          disabled={loading}
-          onClick={(event) => {
-            event.stopPropagation();
-            onRemove();
-          }}
-          aria-label={`Remove ${item.label}`}
-        >
-          <X className="h-3.5 w-3.5" />
-        </Button>
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-[11px] text-muted-foreground">
+            {item.source === "url" ? item.url : item.label}
+          </span>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="h-6 w-6 shrink-0"
+            disabled={loading}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRemove();
+            }}
+            aria-label={`Remove ${item.label}`}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -852,10 +916,12 @@ function ResponsePanel({
   loading,
   error,
   result,
+  inputImagesCount,
 }: {
   loading: boolean;
   error: PlaygroundError | null;
   result: ImageGenerationResponse | null;
+  inputImagesCount: number | null | undefined;
 }) {
   if (loading) {
     return (
@@ -946,7 +1012,11 @@ function ResponsePanel({
         </div>
       )}
 
-      <MetadataPanel result={result} imageUrl={imageUrl} />
+      <MetadataPanel
+        result={result}
+        imageUrl={imageUrl}
+        inputImagesCount={inputImagesCount ?? result.input_images_count ?? 0}
+      />
     </div>
   );
 }
@@ -954,9 +1024,11 @@ function ResponsePanel({
 function MetadataPanel({
   result,
   imageUrl,
+  inputImagesCount,
 }: {
   result: ImageGenerationResponse;
   imageUrl: string | null;
+  inputImagesCount: number;
 }) {
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
 
@@ -973,6 +1045,7 @@ function MetadataPanel({
 
   const items: Array<{ label: string; value: string | number | null | undefined }> =
     [
+      { label: "Input images", value: String(inputImagesCount) },
       { label: "model", value: result.model },
       { label: "request_id", value: result.request_id },
       { label: "upstream_id", value: result.upstream_id },

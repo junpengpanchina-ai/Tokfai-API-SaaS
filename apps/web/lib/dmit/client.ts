@@ -766,6 +766,7 @@ export interface ImageGenerationResponse {
   request_id?: string;
   upstream_id?: string;
   credits_charged?: number;
+  input_images_count?: number;
 }
 
 /**
@@ -791,6 +792,7 @@ export async function imageGenerations(
       ...body,
       n: body.n ?? 1,
       response_format: body.response_format ?? "url",
+      image_urls: body.image_urls ?? [],
     },
     accessToken: apiKey,
   });

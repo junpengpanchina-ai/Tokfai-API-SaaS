@@ -25,9 +25,29 @@ const ImageGenerationRequestSchema = z
     n: z.number().int().positive().optional(),
     size: z.string().optional(),
     response_format: z.string().optional(),
-    image_urls: z.array(z.string().url().max(2048)).max(4).optional(),
+    image_urls: z
+      .array(
+        z
+          .string()
+          .url()
+          .max(2048)
+          .refine(isHttpOrHttpsUrl, {
+            message: "Each image URL must use http or https.",
+          })
+      )
+      .max(4)
+      .optional(),
   })
   .passthrough();
+
+function isHttpOrHttpsUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 const UPSTREAM_ERROR_CODES = new Set([
   "upstream_auth_error",
@@ -203,6 +223,7 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       status: 200,
       code: "succeeded",
       message: "Image generation succeeded.",
+      input_images_count: imageUrls.length,
     });
 
     return c.json({
@@ -212,6 +233,7 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       request_id: requestId,
       upstream_id: upstreamId,
       credits_charged: creditsCharged,
+      input_images_count: imageUrls.length,
     });
   } catch (err) {
     if (err instanceof ApiError) {

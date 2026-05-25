@@ -3,6 +3,12 @@ export const TOKFAI_API_BASE_URL = "https://api.tokfai.com/v1";
 export const TOKFAI_MODELS_ENDPOINT = "GET /models";
 export const TOKFAI_CHAT_COMPLETIONS_ENDPOINT = "POST /chat/completions";
 export const TOKFAI_IMAGES_GENERATIONS_ENDPOINT = "POST /images/generations";
+export const IMAGE_PLAYGROUND_TEXT_TO_IMAGE_PLACEHOLDER =
+  "Describe the image you want to generate.";
+export const IMAGE_PLAYGROUND_IMAGE_TO_IMAGE_PLACEHOLDER =
+  "Describe how to transform or restyle the input image.";
+export const IMAGE_REFERENCE_SYSTEM_HINT =
+  "Use the input image(s) as visual reference. Preserve the main subject unless the user asks otherwise.";
 export const TOKFAI_API_KEY_FORMAT = "sk-tokfai_...";
 export const TOKFAI_API_KEY_PLACEHOLDER = "sk-tokfai_xxx";
 export const TOKFAI_RECOMMENDED_MODEL = "gemini-3.1-pro";

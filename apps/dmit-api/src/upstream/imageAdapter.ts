@@ -1,6 +1,9 @@
 import { env } from "../env.js";
 import { ApiError } from "../errors.js";
 
+const IMAGE_REFERENCE_PROMPT_SUFFIX =
+  "Use the input image(s) as visual reference. Preserve the main subject unless the user asks otherwise.";
+
 const BASE = env.GRSAI_BASE_URL.replace(/\/+$/, "");
 
 export interface ImageGenerateRequest {
@@ -42,11 +45,24 @@ export function mapSizeToGrsai(size: string | undefined): {
   }
 }
 
+export function buildImageGenerationPrompt(
+  prompt: string,
+  imageUrlCount: number
+): string {
+  if (imageUrlCount <= 0) return prompt;
+  return `${prompt}\n\n${IMAGE_REFERENCE_PROMPT_SUFFIX}`;
+}
+
 export async function generateImage(
   request: ImageGenerateRequest
 ): Promise<ImageGenerateResult> {
   const path = env.GRSAI_IMAGE_GENERATE_PATH;
   const url = `${BASE}${path.startsWith("/") ? path : `/${path}`}`;
+  const imageUrls = request.imageUrls ?? [];
+  const upstreamPrompt = buildImageGenerationPrompt(
+    request.prompt,
+    imageUrls.length
+  );
 
   let res: Response;
   try {
@@ -58,8 +74,8 @@ export async function generateImage(
       },
       body: JSON.stringify({
         model: request.model,
-        prompt: request.prompt,
-        images: request.imageUrls ?? [],
+        prompt: upstreamPrompt,
+        images: imageUrls,
         aspectRatio: request.aspectRatio,
         imageSize: request.imageSize,
         replyType: "json",
