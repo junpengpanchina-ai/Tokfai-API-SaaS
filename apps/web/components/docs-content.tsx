@@ -249,7 +249,7 @@ export function DocsContent({
           value={TOKFAI_MODELS_ENDPOINT}
           copied={copiedId === "models-endpoint"}
           onCopy={copyText}
-          monospace
+          labelOnly
         />
         <CopyableCard
           id="chat-endpoint"
@@ -258,7 +258,7 @@ export function DocsContent({
           value={TOKFAI_CHAT_COMPLETIONS_ENDPOINT}
           copied={copiedId === "chat-endpoint"}
           onCopy={copyText}
-          monospace
+          labelOnly
         />
         <CopyableCard
           id="images-endpoint"
@@ -267,7 +267,7 @@ export function DocsContent({
           value={TOKFAI_IMAGES_GENERATIONS_FULL_PATH}
           copied={copiedId === "images-endpoint"}
           onCopy={copyText}
-          monospace
+          labelOnly
         />
       </div>
 
@@ -649,6 +649,7 @@ function CopyableCard({
   onCopy,
   compact = false,
   monospace = false,
+  labelOnly = false,
 }: {
   id: string;
   title: string;
@@ -658,12 +659,13 @@ function CopyableCard({
   onCopy: (id: string, value: string) => void;
   compact?: boolean;
   monospace?: boolean;
+  labelOnly?: boolean;
 }) {
   const valueClassName = monospace
     ? "block w-max max-w-full whitespace-nowrap font-mono text-xs sm:text-sm"
     : "block w-max max-w-full whitespace-nowrap text-sm";
 
-  const valueNode = (
+  const valueNode = labelOnly ? null : (
     <div className="min-w-0 flex-1 overflow-x-auto">
       <code className={`rounded bg-muted px-2 py-1 ${valueClassName}`}>
         {value}
@@ -686,7 +688,13 @@ function CopyableCard({
         <CardTitle className="text-base">{title}</CardTitle>
         {description ? <CardDescription>{description}</CardDescription> : null}
       </CardHeader>
-      <CardContent className="flex items-start justify-between gap-3">
+      <CardContent
+        className={
+          labelOnly
+            ? "flex items-center justify-end"
+            : "flex items-start justify-between gap-3"
+        }
+      >
         {valueNode}
         <CopyButton copied={copied} onCopy={() => onCopy(id, value)} />
       </CardContent>

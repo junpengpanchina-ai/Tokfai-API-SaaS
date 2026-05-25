@@ -1,6 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowUpRight, CreditCard, Gauge, KeyRound } from "lucide-react";
+import {
+  ArrowUpRight,
+  CreditCard,
+  Gauge,
+  ImageIcon,
+  KeyRound,
+  MessageSquare,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +25,6 @@ import {
   TOKFAI_API_BASE_URL,
   TOKFAI_API_KEY_FORMAT,
   TOKFAI_BILLING_POLICY,
-  TOKFAI_PLAYGROUND_POLICY,
   TOKFAI_STARTER_PLAN,
 } from "@/lib/tokfai-api";
 
@@ -29,7 +35,49 @@ const QUICK_REFERENCE = [
   { label: "API key format", value: TOKFAI_API_KEY_FORMAT },
   { label: "Starter", value: TOKFAI_STARTER_PLAN },
   { label: "Billing", value: TOKFAI_BILLING_POLICY },
-  { label: "Playground", value: TOKFAI_PLAYGROUND_POLICY },
+] as const;
+
+const ONBOARDING_STEPS = [
+  {
+    step: 1,
+    title: "Create API key",
+    body: `Generate a ${TOKFAI_API_KEY_FORMAT} key. The full secret is shown once at creation and can be copied again from the list.`,
+    href: "/dashboard/api-keys",
+    buttonLabel: "Create API key",
+    icon: KeyRound,
+  },
+  {
+    step: 2,
+    title: "Try Chat Playground",
+    body: "Send a chat completion with your API key and verify the response before integrating.",
+    href: "/dashboard/playground",
+    buttonLabel: "Open Chat Playground",
+    icon: MessageSquare,
+  },
+  {
+    step: 3,
+    title: "Try Image Playground",
+    body: "Test text-to-image and image-to-image with uploads, URLs, or prompt-only requests.",
+    href: "/dashboard/image-playground",
+    buttonLabel: "Open Image Playground",
+    icon: ImageIcon,
+  },
+  {
+    step: 4,
+    title: "Review Usage",
+    body: "Confirm chat and image requests appear with model, credits charged, and request ID.",
+    href: "/dashboard/usage",
+    buttonLabel: "View Usage",
+    icon: Gauge,
+  },
+  {
+    step: 5,
+    title: "Top up Credits",
+    body: `${TOKFAI_STARTER_PLAN}. ${TOKFAI_BILLING_POLICY}`,
+    href: "/dashboard/credits",
+    buttonLabel: "Top up Credits",
+    icon: CreditCard,
+  },
 ] as const;
 
 export default async function DashboardOverviewPage() {
@@ -102,14 +150,27 @@ export default async function DashboardOverviewPage() {
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Overview</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            OpenAI-compatible image &amp; chat API — one API for chat, image,
-            and AI apps. Live numbers will appear here once you start sending
-            traffic.
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Welcome to Tokfai. Follow the steps below to create a key, test chat
+            and image generation, review usage, and top up credits.
           </p>
         </div>
         <Badge variant="secondary">V1 preview</Badge>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Get started</CardTitle>
+          <CardDescription>
+            Complete this checklist to validate your account end-to-end.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {ONBOARDING_STEPS.map((item) => (
+            <OnboardingStep key={item.step} {...item} />
+          ))}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-3">
         {stats.map((stat) => {
@@ -184,67 +245,64 @@ export default async function DashboardOverviewPage() {
               /dashboard/playground
             </Link>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Get started in 3 steps</CardTitle>
-          <CardDescription>
-            Same flow as OpenAI: get a key, top up, start calling.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <Step
-            n={1}
-            title="Create an API key"
-            href="/dashboard/api-keys"
-            body={`Generate a ${TOKFAI_API_KEY_FORMAT} key. You will only see the secret once.`}
-          />
-          <Step
-            n={2}
-            title="Add credits"
-            href="/dashboard/credits"
-            body={`${TOKFAI_STARTER_PLAN}. ${TOKFAI_BILLING_POLICY}`}
-          />
-          <Step
-            n={3}
-            title="Try the Chat Playground"
-            href="/dashboard/playground"
-            body={TOKFAI_PLAYGROUND_POLICY}
-          />
+          <div className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-sm font-medium text-foreground">
+              Image Playground
+            </span>
+            <Link
+              href="/dashboard/image-playground"
+              className="font-mono text-sm text-primary underline-offset-4 hover:underline sm:text-right"
+            >
+              /dashboard/image-playground
+            </Link>
+          </div>
+          <div className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-sm font-medium text-foreground">Docs</span>
+            <Link
+              href="/dashboard/docs"
+              className="font-mono text-sm text-primary underline-offset-4 hover:underline sm:text-right"
+            >
+              /dashboard/docs
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>
   );
 }
 
-function Step({
-  n,
+function OnboardingStep({
+  step,
   title,
   body,
   href,
+  buttonLabel,
+  icon: Icon,
 }: {
-  n: number;
+  step: number;
   title: string;
   body: string;
   href: string;
+  buttonLabel: string;
+  icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <Link
-      href={href}
-      className="flex items-start gap-4 rounded-md border bg-card p-4 transition-colors hover:bg-accent/40"
-    >
-      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-        {n}
-      </div>
-      <div className="flex-1">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          {title}
-          <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
+    <div className="flex flex-col gap-4 rounded-md border bg-card p-4 sm:flex-row sm:items-start">
+      <div className="flex items-start gap-4 sm:flex-1">
+        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+          {step}
         </div>
-        <p className="mt-0.5 text-sm text-muted-foreground">{body}</p>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Icon className="h-4 w-4 text-muted-foreground" />
+            {title}
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">{body}</p>
+        </div>
       </div>
-    </Link>
+      <Button asChild size="sm" className="shrink-0 sm:mt-0.5">
+        <Link href={href}>{buttonLabel}</Link>
+      </Button>
+    </div>
   );
 }

@@ -53,9 +53,24 @@ const PLANS = [
 
 const USAGE_POINTS = [
   {
-    id: "billing-policy",
+    id: "starter-plan",
+    icon: Wallet,
+    text: "Starter ¥29 = 10,000 credits.",
+  },
+  {
+    id: "starter-use",
     icon: Gauge,
-    text: TOKFAI_BILLING_POLICY,
+    text: "Works for chat and image API testing.",
+  },
+  {
+    id: "billing-success",
+    icon: MessageSquare,
+    text: "Successful calls debit credits.",
+  },
+  {
+    id: "billing-failed",
+    icon: ImageIcon,
+    text: "Failed calls are not charged.",
   },
   {
     id: "chat-billing",
@@ -65,17 +80,7 @@ const USAGE_POINTS = [
   {
     id: "image-billing",
     icon: ImageIcon,
-    text: "Image calls are charged per successful generation. Failed calls are not charged.",
-  },
-  {
-    id: "starter-credits",
-    icon: Wallet,
-    text: `${TOKFAI_STARTER_PLAN} and can be used for Chat and Image testing.`,
-  },
-  {
-    id: "model-cost",
-    icon: Wallet,
-    text: "Actual cost depends on model and request size.",
+    text: "Image calls are charged per successful generation.",
   },
   {
     id: "usage-dashboard",
@@ -170,7 +175,14 @@ export default function PricingPage() {
               >
                 <CardHeader>
                   <CardTitle>{plan.name}</CardTitle>
-                  <CardDescription>{plan.description}</CardDescription>
+                  <CardDescription>
+                    {plan.description}
+                    {plan.name === "Starter" ? (
+                      <span className="mt-2 block text-muted-foreground">
+                        Works for chat and image API testing.
+                      </span>
+                    ) : null}
+                  </CardDescription>
                   <div className="pt-4">
                     <div className="text-3xl font-semibold tracking-tight">
                       {plan.price}
