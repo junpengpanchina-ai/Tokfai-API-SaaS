@@ -1,33 +1,18 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { authDebug } from "@/lib/auth/debug";
-import { copySupabaseCookies } from "@/lib/supabase/cookies";
+type CookieToSet = {
+  name: string;
+  value: string;
+  options: CookieOptions;
+};
 
 /**
  * Refreshes the Supabase session cookie on every request, and gates routes
- * that require authentication.
- *
- * Uses anon key only. See AGENTS.md.
+ * that require authentication. Based on the Supabase Next.js SSR template.
  */
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
-
-  const pathname = request.nextUrl.pathname;
-  const isAuthCallback = pathname === "/auth/callback";
-  const isAuthFlow = pathname.startsWith("/auth/");
-  const isDashboard = pathname.startsWith("/dashboard");
-  const isAuthPage = pathname === "/login" || pathname === "/signup";
-
-  authDebug("middleware_path", {
-    path: pathname,
-    isAuthCallback,
-    isDashboard,
-  });
+  let supabaseResponse = NextResponse.next({ request });
 
   if (
     !process.env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -44,25 +29,15 @@ export async function updateSession(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+        setAll(cookiesToSet: CookieToSet[]) {
           cookiesToSet.forEach(({ name, value }) => {
-            if (value) {
-              request.cookies.set(name, value);
-            } else {
-              request.cookies.delete(name);
-            }
+            request.cookies.set(name, value);
           });
 
-          supabaseResponse = NextResponse.next({
-            request: { headers: request.headers },
-          });
+          supabaseResponse = NextResponse.next({ request });
 
           cookiesToSet.forEach(({ name, value, options }) => {
-            if (value) {
-              supabaseResponse.cookies.set(name, value, options);
-            } else {
-              supabaseResponse.cookies.delete(name);
-            }
+            supabaseResponse.cookies.set(name, value, options);
           });
         },
       },
@@ -73,47 +48,26 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  authDebug("middleware_has_user", {
-    path: pathname,
-    hasUser: Boolean(user),
-  });
+  const pathname = request.nextUrl.pathname;
 
-  if (isAuthCallback || isAuthFlow) {
+  if (pathname.startsWith("/auth/")) {
     return supabaseResponse;
   }
 
-  if (!user && isDashboard) {
+  if (!user && pathname.startsWith("/dashboard")) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = "";
     url.searchParams.set("redirected", "1");
     url.searchParams.set("redirect", pathname);
-
-    authDebug("middleware_redirect_reason", {
-      reason: "unauthenticated_dashboard",
-      path: pathname,
-      hasUser: false,
-    });
-
-    const redirectResponse = NextResponse.redirect(url);
-    copySupabaseCookies(supabaseResponse, redirectResponse);
-    return redirectResponse;
+    return NextResponse.redirect(url);
   }
 
-  if (user && isAuthPage) {
+  if (user && (pathname === "/login" || pathname === "/signup")) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     url.search = "";
-
-    authDebug("middleware_redirect_reason", {
-      reason: "authenticated_auth_page",
-      path: pathname,
-      hasUser: true,
-    });
-
-    const redirectResponse = NextResponse.redirect(url);
-    copySupabaseCookies(supabaseResponse, redirectResponse);
-    return redirectResponse;
+    return NextResponse.redirect(url);
   }
 
   return supabaseResponse;
