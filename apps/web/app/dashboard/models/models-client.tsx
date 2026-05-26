@@ -28,7 +28,7 @@ import {
   formatChatOutputPricePerMillion,
   formatImageCreditsPerRequest,
   getChatBillingUnitLabel,
-  getImageBillingUnitLabel,
+  getImageBillingChargeLabel,
 } from "@/lib/model-pricing-display";
 import { TOKFAI_MODELS_ENDPOINT } from "@/lib/tokfai-api";
 
@@ -183,7 +183,7 @@ function ModelCard({
   const typeLabel = MODEL_TYPE_LABELS[model.type](t);
   const billingUnitLabel =
     model.type === "image"
-      ? getImageBillingUnitLabel(locale)
+      ? getImageBillingChargeLabel(locale)
       : model.type === "chat"
         ? getChatBillingUnitLabel(locale)
         : model.billingUnit;
@@ -315,6 +315,9 @@ function PriceBlock({
         <div className="mt-1 text-lg font-semibold tracking-tight">
           {formatImageCreditsPerRequest(model.pricing, locale)}
         </div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {t("dashboard.models.imageBillingNote")}
+        </p>
       </div>
     );
   }

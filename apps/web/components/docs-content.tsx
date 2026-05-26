@@ -482,10 +482,7 @@ export function DocsContent({
               <dt className="shrink-0 font-medium text-foreground sm:w-28">
                 Billing
               </dt>
-              <dd className="text-muted-foreground">
-                Successful generations debit credits. Failed calls are not
-                charged.
-              </dd>
+              <dd className="text-muted-foreground">{t("docs.imageApiBilling")}</dd>
             </div>
             <div className="flex flex-col gap-1 sm:flex-row sm:gap-3">
               <dt className="shrink-0 font-medium text-foreground sm:w-28">

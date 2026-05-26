@@ -58,7 +58,7 @@ export function PricingContent() {
   const { t, locale } = useI18n();
 
   const usagePoints = [
-    { id: "starter-plan", icon: Wallet, text: "Starter ¥29 = 10,000 credits." },
+    { id: "starter-plan", icon: Wallet, text: t("pricing.starterPlanLine") },
     {
       id: "starter-use",
       icon: Gauge,
@@ -77,12 +77,12 @@ export function PricingContent() {
     {
       id: "chat-billing",
       icon: MessageSquare,
-      text: "Chat models: input / output · ¥ / 1M tokens (current reference price).",
+      text: t("pricing.chatBillingSummary"),
     },
     {
       id: "image-billing",
       icon: ImageIcon,
-      text: "Image models: credits / request (current reference price).",
+      text: t("pricing.imageBillingSummary"),
     },
     {
       id: "usage-dashboard",
@@ -252,14 +252,18 @@ export function PricingContent() {
           <div className="mt-8">
             <ModelPricingTables
               locale={locale}
+              t={t}
               labels={{
                 chatTitle: t("pricing.chatModelsTitle"),
                 imageTitle: t("pricing.imageModelsTitle"),
+                imageIntro: t("pricing.imageModelsIntro"),
                 colModel: t("pricing.colModel"),
+                colModelId: t("pricing.colModelId"),
                 colInput: t("pricing.colInput"),
                 colOutput: t("pricing.colOutput"),
                 colPrice: t("pricing.colPrice"),
                 colBillingUnit: t("pricing.colBillingUnit"),
+                colUseCase: t("pricing.colUseCase"),
                 colTags: t("pricing.colTags"),
                 comingSoon: t("pricing.comingSoon"),
               }}

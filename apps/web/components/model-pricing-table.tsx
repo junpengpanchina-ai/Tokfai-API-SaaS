@@ -13,25 +13,29 @@ import {
   formatChatOutputPricePerMillion,
   formatImageCreditsPerRequest,
   getChatBillingUnitLabel,
-  getImageBillingUnitLabel,
+  getImageModelUseCase,
 } from "@/lib/model-pricing-display";
 
 type ModelPricingTableProps = {
   locale: Locale;
+  t: (key: string) => string;
   labels: {
     chatTitle: string;
     imageTitle: string;
+    imageIntro?: string;
     colModel: string;
+    colModelId: string;
     colInput: string;
     colOutput: string;
     colPrice: string;
     colBillingUnit: string;
+    colUseCase: string;
     colTags: string;
     comingSoon: string;
   };
 };
 
-export function ModelPricingTables({ locale, labels }: ModelPricingTableProps) {
+export function ModelPricingTables({ locale, t, labels }: ModelPricingTableProps) {
   const availableImageModels = IMAGE_MODELS.filter(
     (model) => model.status === "available"
   );
@@ -46,6 +50,7 @@ export function ModelPricingTables({ locale, labels }: ModelPricingTableProps) {
           <thead>
             <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
               <th className="py-2 pr-4 font-medium">{labels.colModel}</th>
+              <th className="py-2 pr-4 font-medium">{labels.colModelId}</th>
               <th className="py-2 pr-4 font-medium">{labels.colInput}</th>
               <th className="py-2 pr-4 font-medium">{labels.colOutput}</th>
               <th className="py-2 pr-4 font-medium">{labels.colBillingUnit}</th>
@@ -60,25 +65,35 @@ export function ModelPricingTables({ locale, labels }: ModelPricingTableProps) {
         </table>
       </PricingSection>
 
-      <PricingSection title={labels.imageTitle}>
+      <PricingSection
+        title={labels.imageTitle}
+        description={labels.imageIntro}
+      >
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
               <th className="py-2 pr-4 font-medium">{labels.colModel}</th>
+              <th className="py-2 pr-4 font-medium">{labels.colModelId}</th>
               <th className="py-2 pr-4 font-medium">{labels.colPrice}</th>
-              <th className="py-2 pr-4 font-medium">{labels.colBillingUnit}</th>
               <th className="py-2 pr-4 font-medium">{labels.colTags}</th>
+              <th className="py-2 pr-4 font-medium">{labels.colUseCase}</th>
             </tr>
           </thead>
           <tbody>
             {availableImageModels.map((model) => (
-              <ImagePricingRow key={model.id} model={model} locale={locale} />
+              <ImagePricingRow
+                key={model.id}
+                model={model}
+                locale={locale}
+                t={t}
+              />
             ))}
             {comingSoonImageModels.map((model) => (
               <ImagePricingRow
                 key={model.id}
                 model={model}
                 locale={locale}
+                t={t}
                 comingSoonLabel={labels.comingSoon}
                 comingSoon
               />
@@ -92,14 +107,21 @@ export function ModelPricingTables({ locale, labels }: ModelPricingTableProps) {
 
 function PricingSection({
   title,
+  description,
   children,
 }: {
   title: string;
+  description?: string;
   children: React.ReactNode;
 }) {
   return (
     <section className="flex flex-col gap-4">
-      <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
+      <div>
+        <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
+        {description ? (
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        ) : null}
+      </div>
       <div className="overflow-x-auto rounded-lg border bg-background px-4">
         {children}
       </div>
@@ -120,9 +142,9 @@ function ChatPricingRow({
 
   return (
     <tr className="border-b last:border-0">
-      <td className="py-3 pr-4 align-top">
-        <div className="font-medium">{model.displayName}</div>
-        <div className="font-mono text-xs text-muted-foreground">{model.id}</div>
+      <td className="py-3 pr-4 align-top font-medium">{model.displayName}</td>
+      <td className="py-3 pr-4 align-top font-mono text-xs text-muted-foreground">
+        {model.id}
       </td>
       <td className="py-3 pr-4 align-top font-mono text-xs">
         {formatChatInputPricePerMillion(model.pricing)}
@@ -143,11 +165,13 @@ function ChatPricingRow({
 function ImagePricingRow({
   model,
   locale,
+  t,
   comingSoon = false,
   comingSoonLabel = "Coming soon",
 }: {
   model: ModelCatalogEntry;
   locale: Locale;
+  t: (key: string) => string;
   comingSoon?: boolean;
   comingSoonLabel?: string;
 }) {
@@ -166,16 +190,18 @@ function ImagePricingRow({
             </span>
           ) : null}
         </div>
-        <div className="font-mono text-xs text-muted-foreground">{model.id}</div>
+      </td>
+      <td className="py-3 pr-4 align-top font-mono text-xs text-muted-foreground">
+        {model.id}
       </td>
       <td className="py-3 pr-4 align-top font-mono text-xs font-medium text-foreground">
         {formatImageCreditsPerRequest(model.pricing, locale)}
       </td>
-      <td className="py-3 pr-4 align-top text-muted-foreground">
-        {getImageBillingUnitLabel(locale)}
-      </td>
       <td className="py-3 pr-4 align-top">
         <TagList tags={model.tags} />
+      </td>
+      <td className="py-3 pr-4 align-top text-muted-foreground">
+        {getImageModelUseCase(model.id, t)}
       </td>
     </tr>
   );

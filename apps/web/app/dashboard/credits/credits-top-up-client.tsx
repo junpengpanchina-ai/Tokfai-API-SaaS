@@ -15,6 +15,8 @@ import {
 import { createCheckoutSession, DmitApiError } from "@/lib/dmit/client";
 import { userMessageForDmitError } from "@/lib/dmit-messages";
 import { useI18n } from "@/lib/i18n/i18n-provider";
+import { formatMessage } from "@/lib/i18n/messages";
+import { formatImageModelPriceExample } from "@/lib/model-pricing-display";
 import { createClient } from "@/lib/supabase/client";
 
 interface CreditPlan {
@@ -50,7 +52,8 @@ const CREDIT_PLANS: CreditPlan[] = [
 ];
 
 export function CreditsTopUpClient() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const exampleModelPrice = formatImageModelPriceExample("nano-banana", locale);
   const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -95,6 +98,18 @@ export function CreditsTopUpClient() {
         <CardDescription>{t("dashboard.credits.rechargeDesc")}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        <div className="rounded-lg border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          <p className="font-medium text-foreground">
+            {t("dashboard.credits.rechargeStarterPlan")}
+          </p>
+          <p className="mt-1">{t("dashboard.credits.rechargeImageBillingNote")}</p>
+          <p className="mt-1">
+            {formatMessage(t("dashboard.credits.rechargeImageExample"), {
+              example: exampleModelPrice,
+            })}
+          </p>
+        </div>
+
         <div className="grid gap-3 md:grid-cols-3">
           {CREDIT_PLANS.map((plan) => {
             const isLoading = loadingPlanId === plan.package_code;

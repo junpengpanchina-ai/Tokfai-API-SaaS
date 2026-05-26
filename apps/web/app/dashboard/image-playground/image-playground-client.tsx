@@ -38,6 +38,12 @@ import { userMessageForDmitError } from "@/lib/dmit-messages";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
 import {
+  formatImageCreditsAmount,
+  formatImageModelPriceForModelId,
+  formatImageModelSelectLabel,
+} from "@/lib/model-pricing-display";
+import {
+  getImageModelCreditsPerRequest,
   IMAGE_PLAYGROUND_MODEL_IDS,
   IMAGE_PLAYGROUND_SIZES,
   isAvailableImageModel,
@@ -174,7 +180,7 @@ export function ImagePlaygroundClient({
   activeKeys: ImagePlaygroundApiKeyOption[];
   initialModel?: string;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [model, setModel] = useState(() => resolveInitialModel(initialModel));
   const [size, setSize] = useState<ImagePlaygroundSize>(DEFAULT_SIZE);
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
@@ -206,6 +212,9 @@ export function ImagePlaygroundClient({
   const promptPlaceholder = isImageToImage
     ? IMAGE_PLAYGROUND_IMAGE_TO_IMAGE_PLACEHOLDER
     : IMAGE_PLAYGROUND_TEXT_TO_IMAGE_PLACEHOLDER;
+
+  const selectedModelCredits = getImageModelCreditsPerRequest(model);
+  const selectedModelPrice = formatImageModelPriceForModelId(model, locale);
 
   const hasUploadingImages = imageInputs.some(
     (item) => item.status === "uploading" || item.status === "resolving"
@@ -662,6 +671,17 @@ export function ImagePlaygroundClient({
                   )}
                 </Button>
               </div>
+              {selectedModelCredits != null ? (
+                <p className="text-xs font-medium text-foreground">
+                  {formatMessage(t("dashboard.imagePlayground.estimatedCost"), {
+                    credits: formatImageCreditsAmount(selectedModelCredits, locale),
+                  })}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {t("dashboard.imagePlayground.priceFallback")}
+                </p>
+              )}
               {copyRequestStatus === "copied" ? (
                 <p className="text-xs text-emerald-600 dark:text-emerald-400">
                   {formatMessage(t("dashboard.imagePlayground.curlCopied"), {
@@ -712,10 +732,21 @@ export function ImagePlaygroundClient({
               >
                 {IMAGE_PLAYGROUND_MODEL_IDS.map((m) => (
                   <option key={m} value={m}>
-                    {m}
+                    {formatImageModelSelectLabel(m, locale)}
                   </option>
                 ))}
               </select>
+              {selectedModelPrice ? (
+                <p className="text-xs text-muted-foreground">
+                  {formatMessage(t("dashboard.imagePlayground.currentModelPrice"), {
+                    price: selectedModelPrice,
+                  })}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {t("dashboard.imagePlayground.priceFallback")}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-2">

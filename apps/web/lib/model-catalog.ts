@@ -75,8 +75,8 @@ function imagePricing(creditsPerRequest: number): ImageModelPricing {
   };
 }
 
-const CHAT_BILLING_UNIT = "input / output · ¥ / 1M tokens";
-const IMAGE_BILLING_UNIT = "credits / request";
+const CHAT_BILLING_UNIT = "token";
+const IMAGE_BILLING_UNIT = "per_generation";
 
 export const CHAT_MODELS: ModelCatalogEntry[] = [
   {
@@ -377,4 +377,16 @@ export function isImageModelEntry(
   model: ModelCatalogEntry
 ): model is ModelCatalogEntry & { pricing: ImageModelPricing } {
   return model.pricing.mode === "per_request";
+}
+
+export function getImageModelById(modelId: string): ModelCatalogEntry | undefined {
+  return IMAGE_MODELS.find((model) => model.id === modelId);
+}
+
+export function getImageModelCreditsPerRequest(modelId: string): number | null {
+  const entry = getImageModelById(modelId);
+  if (!entry || !isImageModelEntry(entry)) {
+    return null;
+  }
+  return entry.pricing.creditsPerRequest;
 }
