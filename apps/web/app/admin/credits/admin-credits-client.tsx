@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { AdminStatCard } from "@/components/admin/admin-stat-card";
+import { AdminRechargePlansPlaceholder } from "@/components/admin/admin-recharge-plans-placeholder";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +24,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getDmitBaseUrl } from "@/lib/dmit/client";
 import { formatCredits, formatDateTime, formatInt } from "@/lib/format";
+import { useI18n } from "@/lib/i18n/i18n-provider";
+import { formatMessage } from "@/lib/i18n/messages";
 
 export type AdminUserProfile = {
   id: string;
@@ -80,6 +83,7 @@ export function AdminCreditsClient({
   initialUsers: AdminUserProfile[];
 }) {
   const router = useRouter();
+  const { t } = useI18n();
   const [email, setEmail] = useState(initialEmail);
   const [data, setData] = useState<AdminCreditsData | null>(initialData);
   const [error, setError] = useState<string | null>(initialError);
@@ -103,7 +107,7 @@ export function AdminCreditsClient({
     async (searchEmail: string) => {
       const trimmed = searchEmail.trim();
       if (!trimmed) {
-        setError("Enter an email address to search.");
+        setError(t("admin.credits.enterEmail"));
         return;
       }
 
@@ -145,7 +149,7 @@ export function AdminCreditsClient({
         setLoading(false);
       }
     },
-    [accessToken, router]
+    [accessToken, router, t]
   );
 
   useEffect(() => {
@@ -165,42 +169,39 @@ export function AdminCreditsClient({
   return (
     <>
       <div>
-        <Badge variant="secondary">Admin tools</Badge>
+        <Badge variant="secondary">{t("admin.common.adminTools")}</Badge>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight">
-          Credits ledger
+          {t("admin.credits.title")}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Read-only balances and per-user ledger entries. Site-wide ledger
-          aggregation will ship in a later phase.
+          {t("admin.credits.subtitle")}
         </p>
       </div>
 
+      <AdminRechargePlansPlaceholder />
+
       <Card className="border-muted bg-muted/30">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Site-wide ledger</CardTitle>
-          <CardDescription>
-            Full cross-user ledger export is not available in this phase. Use
-            email search below to inspect a single account, or open Usage for
-            charge history.
-          </CardDescription>
+          <CardTitle className="text-base">{t("admin.credits.siteWideLedger")}</CardTitle>
+          <CardDescription>{t("admin.credits.siteWideLedgerDesc")}</CardDescription>
         </CardHeader>
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <AdminStatCard
-          label="Total purchased"
+          label={t("admin.credits.totalPurchased")}
           value={overviewStats.totalPurchased}
         />
         <AdminStatCard
-          label="Total debited"
+          label={t("admin.credits.totalDebited")}
           value={overviewStats.totalDebited}
         />
         <AdminStatCard
-          label="Total adjusted"
+          label={t("admin.credits.totalAdjusted")}
           value={overviewStats.totalAdjusted}
         />
         <AdminStatCard
-          label="Active users with credits"
+          label={t("admin.credits.activeUsersWithCredits")}
           value={overviewStats.activeUsers}
         />
       </div>
@@ -208,7 +209,7 @@ export function AdminCreditsClient({
       {error && !data ? (
         <Card className="border-destructive/30 bg-destructive/5">
           <CardHeader>
-            <CardTitle className="text-base">Could not load credits</CardTitle>
+            <CardTitle className="text-base">{t("admin.credits.couldNotLoad")}</CardTitle>
             <CardDescription>{error}</CardDescription>
           </CardHeader>
           {email.trim() ? (
@@ -220,7 +221,7 @@ export function AdminCreditsClient({
                 disabled={isBusy}
                 onClick={() => void loadCredits(email)}
               >
-                Retry
+                {t("admin.credits.retry")}
               </Button>
             </CardContent>
           ) : null}
@@ -229,16 +230,13 @@ export function AdminCreditsClient({
 
       <Card>
         <CardHeader>
-          <CardTitle>Search by email</CardTitle>
-          <CardDescription>
-            Loads profile balance and the 50 most recent ledger entries for one
-            user.
-          </CardDescription>
+          <CardTitle>{t("admin.credits.searchByEmail")}</CardTitle>
+          <CardDescription>{t("admin.credits.searchByEmailDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="flex flex-wrap items-end gap-3" onSubmit={handleSearch}>
             <div className="min-w-[16rem] flex-1">
-              <Label htmlFor="admin-credits-email">Email</Label>
+              <Label htmlFor="admin-credits-email">{t("admin.credits.email")}</Label>
               <Input
                 id="admin-credits-email"
                 type="email"
@@ -250,7 +248,7 @@ export function AdminCreditsClient({
               />
             </div>
             <Button type="submit" disabled={isBusy}>
-              {loading ? "Searching…" : "Search"}
+              {loading ? t("admin.credits.searching") : t("admin.credits.search")}
             </Button>
           </form>
         </CardContent>
@@ -260,26 +258,26 @@ export function AdminCreditsClient({
         <>
           <Card>
             <CardHeader>
-              <CardDescription>Current balance</CardDescription>
+              <CardDescription>{t("admin.credits.currentBalance")}</CardDescription>
               <CardTitle className="text-4xl">
                 {formatCredits(data.profile.credits_balance)}
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-2 text-sm text-muted-foreground">
               <div>
-                Email:{" "}
+                {t("admin.credits.email")}:{" "}
                 <span className="font-medium text-foreground">
                   {data.profile.email ?? "—"}
                 </span>
               </div>
               <div>
-                Total used:{" "}
+                {t("admin.credits.totalUsed")}:{" "}
                 <span className="font-medium text-foreground">
                   {formatCredits(data.profile.total_credits_used)}
                 </span>
               </div>
               <div>
-                Last updated:{" "}
+                {t("admin.credits.lastUpdated")}:{" "}
                 <span className="font-medium text-foreground">
                   {formatDateTime(data.profile.updated_at)}
                 </span>
@@ -289,7 +287,7 @@ export function AdminCreditsClient({
                   href={`/admin/usage`}
                   className="font-medium text-foreground underline-offset-4 hover:underline"
                 >
-                  View usage logs
+                  {t("admin.credits.viewUsageLogs")}
                 </Link>
               </div>
             </CardContent>
@@ -298,9 +296,11 @@ export function AdminCreditsClient({
           <Card>
             <CardHeader className="flex flex-row items-start justify-between gap-4">
               <div>
-                <CardTitle>Ledger entries</CardTitle>
+                <CardTitle>{t("admin.credits.ledgerEntries")}</CardTitle>
                 <CardDescription>
-                  Read-only view for {profileEmail || "selected user"}.
+                  {formatMessage(t("admin.credits.ledgerEntriesDesc"), {
+                    email: profileEmail || "selected user",
+                  })}
                 </CardDescription>
               </div>
               <Button
@@ -310,7 +310,7 @@ export function AdminCreditsClient({
                 disabled={isBusy}
                 onClick={() => void loadCredits(data.profile.email ?? email)}
               >
-                {loading ? "Refreshing…" : "Refresh"}
+                {loading ? t("admin.credits.refreshing") : t("admin.credits.refresh")}
               </Button>
             </CardHeader>
             <CardContent>
@@ -364,7 +364,7 @@ export function AdminCreditsClient({
                 </div>
               ) : (
                 <div className="rounded-md border border-dashed py-10 text-center text-sm text-muted-foreground">
-                  No ledger entries for this user.
+                  {t("admin.credits.noLedgerEntries")}
                 </div>
               )}
             </CardContent>

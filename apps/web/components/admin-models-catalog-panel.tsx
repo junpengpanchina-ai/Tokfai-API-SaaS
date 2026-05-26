@@ -2,8 +2,10 @@
 
 import { useMemo, useState } from "react";
 
+import { AdminFutureControlsCard } from "@/components/admin/admin-future-controls-card";
 import { AdminModelsSummary, type AdminModelsSummaryStats } from "@/components/admin-models-summary";
 import { AdminModelsTable } from "@/components/admin-models-table";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -11,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useI18n } from "@/lib/i18n/i18n-provider";
 import {
   ALL_CATALOG_MODELS,
   CHAT_MODELS,
@@ -39,6 +42,7 @@ const STATUS_FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
 ];
 
 export function AdminModelsCatalogPanel() {
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -78,13 +82,13 @@ export function AdminModelsCatalogPanel() {
     <div className="flex flex-col gap-6">
       <Card className="border-muted bg-muted/30">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Catalog pricing overview</CardTitle>
+          <div className="flex flex-wrap items-center gap-2">
+            <CardTitle className="text-base">{t("admin.models.catalogOverview")}</CardTitle>
+            <Badge variant="secondary">{t("admin.common.readOnlyPhase")}</Badge>
+          </div>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          <p>
-            Review the current model catalog and display prices. Read-only in
-            this phase. Actual charges are recorded in Usage and Credits.
-          </p>
+          <p>{t("admin.models.catalogDesc")}</p>
         </CardContent>
       </Card>
 
@@ -151,6 +155,17 @@ export function AdminModelsCatalogPanel() {
       {!showChatSection && !showImageSection && !showVideoSection ? (
         <AdminModelsTable title="Models" models={[]} />
       ) : null}
+
+      <AdminFutureControlsCard
+        titleKey="admin.models.futureControlsTitle"
+        descriptionKey="admin.models.futureControlsDesc"
+        controlLabelKeys={[
+          "admin.models.editDisplayPrice",
+          "admin.models.editModelStatus",
+          "admin.models.toggleFrontendVisibility",
+          "admin.models.editTagsCopy",
+        ]}
+      />
     </div>
   );
 }

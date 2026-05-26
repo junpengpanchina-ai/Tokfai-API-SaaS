@@ -56,7 +56,7 @@ export default async function AdminUsagePage() {
     if (error instanceof DmitServerError) {
       initialError =
         error.status === 403
-          ? "Current user is not in the TOKFAI_ADMIN_EMAILS allowlist."
+          ? "Your account is not authorized for admin access."
           : error.message;
     } else if (error instanceof Error) {
       initialError = error.message;

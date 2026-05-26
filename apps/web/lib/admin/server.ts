@@ -42,7 +42,7 @@ export function toAdminDebug(
       ...context,
       statusCode: String(error.status),
       message: isForbidden
-        ? "Current user is not in the TOKFAI_ADMIN_EMAILS allowlist."
+        ? "Your account is not authorized for admin access."
         : error.message,
       isForbidden,
     };

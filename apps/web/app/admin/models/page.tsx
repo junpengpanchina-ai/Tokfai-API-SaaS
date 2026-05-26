@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
+import { AdminModelsPageIntro } from "@/components/admin/admin-models-page-intro";
 import { AdminModelsCatalogPanel } from "@/components/admin-models-catalog-panel";
-import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
@@ -21,17 +21,7 @@ export default async function AdminModelsPage() {
 
   return (
     <>
-      <div>
-        <Badge variant="secondary">Admin tools</Badge>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight">
-          Models & pricing
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Catalog pricing overview. Read-only in this phase. Actual charges are
-          recorded in Usage and Credits.
-        </p>
-      </div>
-
+      <AdminModelsPageIntro />
       <AdminModelsCatalogPanel />
     </>
   );

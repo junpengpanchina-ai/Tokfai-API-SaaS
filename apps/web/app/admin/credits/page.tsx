@@ -65,8 +65,7 @@ export default async function AdminCreditsPage({
     initialUsers = Array.isArray(usersRes.data) ? usersRes.data : [];
   } catch (error) {
     if (error instanceof DmitServerError && error.status === 403) {
-      initialError =
-        "Current user is not in the TOKFAI_ADMIN_EMAILS allowlist.";
+      initialError = "Your account is not authorized for admin access.";
     } else if (error instanceof Error) {
       initialError = error.message;
     }
@@ -83,8 +82,7 @@ export default async function AdminCreditsPage({
     } catch (error) {
       if (error instanceof DmitServerError) {
         if (error.status === 403) {
-          initialError =
-            "Current user is not in the TOKFAI_ADMIN_EMAILS allowlist.";
+          initialError = "Your account is not authorized for admin access.";
         } else if (error.status === 404) {
           initialError = `No profile found for ${initialEmail}.`;
         } else {

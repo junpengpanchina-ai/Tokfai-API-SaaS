@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Card,
   CardContent,
@@ -6,11 +8,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { AdminDebug } from "@/lib/admin/server";
+import { useI18n } from "@/lib/i18n/i18n-provider";
 
 export function AdminDebugCard({ debug }: { debug: AdminDebug }) {
-  const title = debug.isForbidden ? "Admin access denied" : "Admin error";
+  const { t } = useI18n();
+  const title = debug.isForbidden
+    ? t("admin.common.accessDenied")
+    : t("admin.debug.adminError");
   const description = debug.isForbidden
-    ? "Current user is not in the TOKFAI_ADMIN_EMAILS allowlist."
+    ? t("admin.common.notAuthorized")
     : debug.message;
 
   return (
@@ -21,14 +27,17 @@ export function AdminDebugCard({ debug }: { debug: AdminDebug }) {
       </CardHeader>
       <CardContent>
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
-          <DebugRow label="Status code" value={debug.statusCode} />
-          <DebugRow label="Error message" value={debug.message} />
-          <DebugRow label="API base URL" value={debug.dmitBaseUrl} />
+          <DebugRow label={t("admin.debug.statusCode")} value={debug.statusCode} />
+          <DebugRow label={t("admin.debug.errorMessage")} value={debug.message} />
+          <DebugRow label={t("admin.debug.apiBaseUrl")} value={debug.dmitBaseUrl} />
           <DebugRow
-            label="Has session access token"
+            label={t("admin.debug.hasSessionToken")}
             value={debug.hasAccessToken ? "yes" : "no"}
           />
-          <DebugRow label="Current user email" value={debug.userEmail ?? "—"} />
+          <DebugRow
+            label={t("admin.debug.currentUserEmail")}
+            value={debug.userEmail ?? "—"}
+          />
         </dl>
       </CardContent>
     </Card>

@@ -4,23 +4,60 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import {
+  ADMIN_NAV_ITEMS,
+  isAdminNavActive,
+} from "@/lib/admin-nav";
+import {
   DASHBOARD_NAV_ITEMS,
   isDashboardNavActive,
 } from "@/lib/dashboard-nav";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { cn } from "@/lib/utils";
 
+function useShellNav(pathname: string) {
+  const isAdminRoute = pathname.startsWith("/admin");
+
+  if (isAdminRoute) {
+    return {
+      isAdminRoute: true as const,
+      items: ADMIN_NAV_ITEMS,
+    };
+  }
+
+  return {
+    isAdminRoute: false as const,
+    items: DASHBOARD_NAV_ITEMS,
+  };
+}
+
+function isNavItemActive(
+  pathname: string,
+  item: (typeof ADMIN_NAV_ITEMS)[number] | (typeof DASHBOARD_NAV_ITEMS)[number],
+  isAdminRoute: boolean
+): boolean {
+  if (isAdminRoute) {
+    return isAdminNavActive(pathname, item as (typeof ADMIN_NAV_ITEMS)[number]);
+  }
+
+  return isDashboardNavActive(
+    pathname,
+    item as (typeof DASHBOARD_NAV_ITEMS)[number]
+  );
+}
+
 export function DashboardMobileNav() {
   const pathname = usePathname();
   const { t } = useI18n();
+  const { items, isAdminRoute } = useShellNav(pathname);
+  const ariaLabelKey = isAdminRoute ? "admin.nav.sections" : "nav.dashboard";
 
   return (
     <nav
-      aria-label="Dashboard"
+      aria-label={t(ariaLabelKey)}
       className="flex gap-1 overflow-x-auto border-b bg-muted/30 p-2 md:hidden"
     >
-      {DASHBOARD_NAV_ITEMS.map((item) => {
-        const isActive = isDashboardNavActive(pathname, item);
+      {items.map((item) => {
+        const active = isNavItemActive(pathname, item, isAdminRoute);
         return (
           <Link
             key={item.href}
@@ -28,10 +65,11 @@ export function DashboardMobileNav() {
             prefetch={item.prefetch}
             className={cn(
               "shrink-0 rounded-md px-3 py-2 text-xs font-medium transition-colors",
-              isActive
+              active
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
             )}
+            aria-current={active ? "page" : undefined}
           >
             {t(item.labelKey)}
           </Link>
@@ -44,6 +82,8 @@ export function DashboardMobileNav() {
 export function DashboardSidebar() {
   const pathname = usePathname();
   const { t } = useI18n();
+  const { items, isAdminRoute } = useShellNav(pathname);
+  const ariaLabelKey = isAdminRoute ? "admin.nav.sections" : "nav.dashboard";
 
   return (
     <aside className="hidden w-60 shrink-0 border-r bg-muted/30 md:block">
@@ -56,25 +96,34 @@ export function DashboardSidebar() {
         </Link>
       </div>
 
-      <nav aria-label="Dashboard" className="flex flex-col gap-1 p-3">
-        {DASHBOARD_NAV_ITEMS.map((item) => {
-          const isActive = isDashboardNavActive(pathname, item);
+      <nav aria-label={t(ariaLabelKey)} className="flex flex-col gap-1 p-3">
+        {items.map((item) => {
+          const active = isNavItemActive(pathname, item, isAdminRoute);
           const Icon = item.icon;
+
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              prefetch={item.prefetch}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                isActive
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              {t(item.labelKey)}
-            </Link>
+            <div key={item.href}>
+              {"backLink" in item && item.backLink ? (
+                <div className="my-2 border-t pt-2" />
+              ) : null}
+              <Link
+                href={item.href}
+                prefetch={item.prefetch}
+                className={cn(
+                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                  active
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
+                  "backLink" in item && item.backLink
+                    ? "text-muted-foreground"
+                    : undefined
+                )}
+                aria-current={active ? "page" : undefined}
+              >
+                <Icon className="h-4 w-4" />
+                {t(item.labelKey)}
+              </Link>
+            </div>
           );
         })}
       </nav>
