@@ -20,10 +20,31 @@ export type AdminMe = {
 };
 
 export type AdminCreditsAdjustBody = {
-  email: string;
+  user_id: string;
+  direction: "add" | "deduct";
   amount: number;
-  reason?: string;
-  reference_id?: string;
+  reason: string;
+};
+
+export type AdminCreditsAdjustSuccess = {
+  ok: true;
+  user_id: string;
+  previous_credits: number;
+  delta: number;
+  credits: number;
+  balance_after: number;
+  reason: string;
+  reference_id: string;
+  credit_ledger_id: string;
+  admin_audit_log_id: string | null;
+  idempotent_replay?: boolean;
+};
+
+export type AdminCreditsAdjustErrorBody = {
+  error?: string;
+  current_credits?: number;
+  requested_amount?: number;
+  idempotent_replay?: boolean;
 };
 
 export class AdminApiError extends Error {
@@ -126,15 +147,33 @@ export async function fetchAdminMe(): Promise<AdminMe> {
   return res.data;
 }
 
+export function createAdminAdjustIdempotencyKey(): string {
+  const random = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+  return `admin-adjust-${Date.now()}-${random}`;
+}
+
 export async function adjustAdminCredits(
   body: AdminCreditsAdjustBody,
   idempotencyKey?: string
-): Promise<unknown> {
-  return fetchAdminApi("/admin/credits/adjust", {
+): Promise<AdminCreditsAdjustSuccess> {
+  return fetchAdminApi<AdminCreditsAdjustSuccess>("/admin/credits/adjust", {
     method: "POST",
     json: body,
-    idempotencyKey: idempotencyKey ?? crypto.randomUUID(),
+    idempotencyKey: idempotencyKey ?? createAdminAdjustIdempotencyKey(),
   });
+}
+
+export type AdminUserSummary = {
+  id: string;
+  email: string | null;
+  credits_balance: number;
+  total_credits_used: number;
+  updated_at: string | null;
+};
+
+export async function fetchAdminUsers(): Promise<AdminUserSummary[]> {
+  const res = await fetchAdminApi<{ data?: AdminUserSummary[] }>("/admin/users");
+  return Array.isArray(res.data) ? res.data : [];
 }
 
 function parseJson(text: string): unknown {
@@ -151,8 +190,10 @@ function toAdminApiError(status: number, body: unknown): AdminApiError {
   let code: string | undefined;
 
   if (body && typeof body === "object") {
-    const maybeError = (body as { error?: unknown }).error;
+    const record = body as Record<string, unknown>;
+    const maybeError = record.error;
     if (typeof maybeError === "string") {
+      code = maybeError;
       message = maybeError;
     } else if (maybeError && typeof maybeError === "object") {
       const err = maybeError as { message?: unknown; code?: unknown };

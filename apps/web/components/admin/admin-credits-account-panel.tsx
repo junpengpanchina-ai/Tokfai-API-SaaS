@@ -7,7 +7,7 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 
-import { AdminDisabledWriteActions } from "@/components/admin/admin-disabled-write-actions";
+import { AdminCreditsAdjustForm } from "@/components/admin/admin-credits-adjust-form";
 import { AdminLedgerMiniTable } from "@/components/admin/admin-ledger-mini-table";
 import { AdminStatCard } from "@/components/admin/admin-stat-card";
 import { Badge } from "@/components/ui/badge";
@@ -38,12 +38,14 @@ export function AdminCreditsAccountPanel({
   isBusy,
   onRefresh,
   loading,
+  onCreditsAdjusted,
 }: {
   data: AdminCreditsData;
   profileEmail: string;
   isBusy: boolean;
   onRefresh: () => void;
   loading: boolean;
+  onCreditsAdjusted?: () => void;
 }) {
   const { t } = useI18n();
 
@@ -105,11 +107,14 @@ export function AdminCreditsAccountPanel({
             </div>
           </div>
 
-          <AdminDisabledWriteActions
-            actionKeys={[
-              "admin.credits.addCredits",
-              "admin.credits.deductCredits",
-            ]}
+          <AdminCreditsAdjustForm
+            userId={data.profile.id}
+            userEmail={data.profile.email}
+            disabled={isBusy}
+            onSuccess={() => {
+              onCreditsAdjusted?.();
+              onRefresh();
+            }}
           />
         </CardContent>
       </Card>

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { AdminDebugCard } from "@/components/admin/admin-debug-card";
 import { AdminFutureControlsCard } from "@/components/admin/admin-future-controls-card";
@@ -15,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { fetchAdminUsers } from "@/lib/admin/client";
 import type { AdminDebug } from "@/lib/admin/server";
 import {
   formatCredits,
@@ -33,14 +35,41 @@ export type AdminUserRow = {
 };
 
 export function AdminUsersPanel({
-  users,
+  users: initialUsers,
   debug,
 }: {
   users: AdminUserRow[];
   debug: AdminDebug | null;
 }) {
   const { t } = useI18n();
+  const router = useRouter();
+  const [users, setUsers] = useState(initialUsers);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setUsers(initialUsers);
+  }, [initialUsers]);
+
+  const refreshUsers = useCallback(async () => {
+    try {
+      const nextUsers = await fetchAdminUsers();
+      setUsers(nextUsers);
+      router.refresh();
+    } catch {
+      // Keep the current list if refresh fails; adjust form shows its own error.
+    }
+  }, [router]);
+
+  function handleCreditsAdjusted(userId: string, balanceAfter: number) {
+    setUsers((current) =>
+      current.map((row) =>
+        row.id === userId
+          ? { ...row, credits_balance: balanceAfter, updated_at: new Date().toISOString() }
+          : row
+      )
+    );
+    void refreshUsers();
+  }
 
   function toggleUserDetails(userId: string) {
     setExpandedUserId((current) => (current === userId ? null : userId));
@@ -157,7 +186,10 @@ export function AdminUsersPanel({
                         {isExpanded ? (
                           <tr className="border-b last:border-0">
                             <td colSpan={6} className="py-3 pr-4">
-                              <AdminUserDetailPanel user={row} />
+                              <AdminUserDetailPanel
+                                user={row}
+                                onCreditsAdjusted={handleCreditsAdjusted}
+                              />
                             </td>
                           </tr>
                         ) : null}

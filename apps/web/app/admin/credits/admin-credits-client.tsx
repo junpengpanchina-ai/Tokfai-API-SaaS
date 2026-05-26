@@ -21,17 +21,13 @@ import { Label } from "@/components/ui/label";
 import {
   AdminApiError,
   fetchAdminApi,
+  fetchAdminUsers,
+  type AdminUserSummary,
 } from "@/lib/admin/client";
 import { formatInt } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 
-export type AdminUserProfile = {
-  id: string;
-  email: string | null;
-  credits_balance: number;
-  total_credits_used: number;
-  updated_at: string | null;
-};
+export type AdminUserProfile = AdminUserSummary;
 
 export type AdminCreditsProfile = {
   id: string;
@@ -84,10 +80,11 @@ export function AdminCreditsClient({
   const [data, setData] = useState<AdminCreditsData | null>(initialData);
   const [error, setError] = useState<string | null>(initialError);
   const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState<AdminUserProfile[]>(initialUsers);
   const [isPending, startTransition] = useTransition();
 
   const overviewStats = useMemo<CreditsOverviewStats>(() => {
-    const activeUsers = initialUsers.filter(
+    const activeUsers = users.filter(
       (profile) => profile.credits_balance > 0
     ).length;
 
@@ -97,7 +94,17 @@ export function AdminCreditsClient({
       totalAdjusted: "—",
       activeUsers: formatInt(activeUsers),
     };
-  }, [initialUsers]);
+  }, [users]);
+
+  const refreshSummary = useCallback(async () => {
+    try {
+      const nextUsers = await fetchAdminUsers();
+      setUsers(nextUsers);
+      router.refresh();
+    } catch {
+      // Summary refresh is best-effort; ledger refresh remains primary feedback.
+    }
+  }, [router]);
 
   const loadCredits = useCallback(
     async (searchEmail: string) => {
@@ -147,7 +154,8 @@ export function AdminCreditsClient({
     setEmail(initialEmail);
     setData(initialData);
     setError(initialError);
-  }, [initialEmail, initialData, initialError]);
+    setUsers(initialUsers);
+  }, [initialEmail, initialData, initialError, initialUsers]);
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -252,6 +260,9 @@ export function AdminCreditsClient({
           isBusy={isBusy}
           loading={loading}
           onRefresh={() => void loadCredits(data.profile.email ?? email)}
+          onCreditsAdjusted={() => {
+            void refreshSummary();
+          }}
         />
       ) : null}
     </>
