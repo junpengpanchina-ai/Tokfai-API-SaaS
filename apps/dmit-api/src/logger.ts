@@ -10,7 +10,17 @@ const LEVELS: Record<Level, number> = {
 };
 
 const threshold = LEVELS[env.LOG_LEVEL];
-const ALLOWED_FIELD_KEYS = new Set(["requestId", "route", "status", "code", "message"]);
+const ALLOWED_FIELD_KEYS = new Set([
+  "requestId",
+  "route",
+  "status",
+  "code",
+  "message",
+  "userId",
+  "adminUserId",
+  "email",
+  "authSource",
+]);
 
 /**
  * Minimal structured logger. Emits one JSON line per call so containers /

@@ -1,8 +1,13 @@
-import { createClient } from "@supabase/supabase-js";
 import { Hono, type Context } from "hono";
 import { randomUUID } from "node:crypto";
 
 import { ApiError } from "../errors.js";
+import {
+  authenticateSupabaseUser,
+  requireAdminV1,
+  resolveAdminMe,
+  respondAdminAuthError,
+} from "../middleware/requireAdminV1.js";
 import { supabase } from "../supabase.js";
 import { listAdminModels, patchAdminModel } from "./adminModels.js";
 
@@ -66,11 +71,6 @@ type AdminCreditAdjustmentInput = {
   reason?: unknown;
 };
 
-type SupabaseAuthUser = {
-  id: string;
-  email?: string | null;
-};
-
 type CreditLedgerAdminRow = {
   id: string;
   created_at: string;
@@ -103,124 +103,6 @@ const MAX_LEDGER_LIMIT = 100;
 
 function normalizeEmail(email: string | null | undefined): string {
   return (email ?? "").trim().toLowerCase();
-}
-
-function adminEmailsFromEnv(): string[] {
-  return (process.env.TOKFAI_ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function extractAccessTokenFromAuthorization(
-  header: string | null | undefined
-): string | null {
-  if (!header) return null;
-  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
-  return match ? match[1]!.trim() : null;
-}
-
-function authHeaderError(header: string | null | undefined):
-  | "missing_authorization"
-  | "invalid_authorization_format"
-  | null {
-  if (!header) return "missing_authorization";
-  return /^Bearer\s+.+$/i.test(header.trim())
-    ? null
-    : "invalid_authorization_format";
-}
-
-function adminAuthClient() {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw ApiError.internal("Missing Supabase admin auth env.", "admin_auth_env_missing");
-  }
-
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  });
-}
-
-async function requireAdmin(c: {
-  req: { raw: { headers: { get: (name: string) => string | null } } };
-  json: (data: unknown, status?: number) => Response;
-}) {
-  const authorization = c.req.raw.headers.get("authorization");
-  const headerError = authHeaderError(authorization);
-  const accessToken = extractAccessTokenFromAuthorization(authorization);
-  const adminEmails = adminEmailsFromEnv();
-  const hasToken = Boolean(accessToken);
-
-  let currentEmail = "";
-  let authUserErrorMessage: string | null = accessToken
-    ? null
-    : headerError === "missing_authorization"
-      ? "Missing Bearer token."
-      : "Invalid Authorization Bearer format.";
-
-  if (accessToken) {
-    const supabase = adminAuthClient();
-    const { data, error } = await supabase.auth.getUser(accessToken);
-    authUserErrorMessage = error?.message ?? (!data.user ? "No user returned." : null);
-    currentEmail = normalizeEmail(data.user?.email);
-  }
-
-  const matchResult = Boolean(currentEmail && adminEmails.includes(currentEmail));
-
-  if (headerError) {
-    const body = {
-      error: {
-        message:
-          headerError === "missing_authorization"
-            ? "Missing Bearer token."
-            : "Invalid Authorization Bearer format.",
-        code: headerError,
-        type: "auth_error",
-      },
-      ...(process.env.NODE_ENV !== "production"
-        ? {
-            debug: {
-              currentEmail,
-              adminEmails,
-              hasToken,
-              authUserErrorMessage,
-              matchResult,
-            },
-          }
-        : {}),
-    };
-
-    return c.json(body, 401);
-  }
-
-  if (!matchResult) {
-    const body = {
-      error: {
-        message: "Not authorized.",
-        code: "admin_not_authorized",
-        type: "auth_error",
-      },
-      ...(process.env.NODE_ENV !== "production"
-        ? {
-            debug: {
-              currentEmail,
-              adminEmails,
-              hasToken,
-              authUserErrorMessage,
-              matchResult,
-            },
-          }
-        : {}),
-    };
-
-    return c.json(body, 403);
-  }
 }
 
 function toNumber(value: number | string | null | undefined): number {
@@ -540,87 +422,6 @@ async function listAllApiKeys(): Promise<ApiKeyAdminRow[]> {
   return rows;
 }
 
-async function verifyAdminForCreditAdjustment(c: Context): Promise<
-  | { ok: true; adminUser: SupabaseAuthUser }
-  | {
-      ok: false;
-      status: 401 | 403;
-      error:
-        | "missing_authorization"
-        | "invalid_authorization_format"
-        | "invalid_supabase_token"
-        | "admin_required"
-        | "admin_profile_not_configured";
-      detail?: string;
-    }
-> {
-  const authorization = c.req.raw.headers.get("authorization");
-  const headerError = authHeaderError(authorization);
-  if (headerError) {
-    return { ok: false, status: 401, error: headerError };
-  }
-
-  const accessToken = extractAccessTokenFromAuthorization(authorization);
-  if (!accessToken) {
-    return { ok: false, status: 401, error: "invalid_authorization_format" };
-  }
-
-  const authClient = adminAuthClient();
-  const { data: userData, error: userError } =
-    await authClient.auth.getUser(accessToken);
-
-  if (userError || !userData.user) {
-    return { ok: false, status: 401, error: "invalid_supabase_token" };
-  }
-
-  const adminUser: SupabaseAuthUser = {
-    id: userData.user.id,
-    email: userData.user.email,
-  };
-
-  const { data: adminProfile, error: adminProfileError } = await supabase()
-    .from("profiles")
-    .select("*")
-    .eq("id", adminUser.id)
-    .maybeSingle();
-
-  if (adminProfileError || !adminProfile) {
-    return {
-      ok: false,
-      status: 403,
-      error: "admin_profile_not_configured",
-      detail: adminProfileError?.message,
-    };
-  }
-
-  const profile = adminProfile as Record<string, unknown>;
-  const hasProfileAdminFields = "role" in profile || "is_admin" in profile;
-  const isProfileAdmin =
-    profile.role === "admin" || profile.is_admin === true;
-
-  if (hasProfileAdminFields) {
-    return isProfileAdmin
-      ? { ok: true, adminUser }
-      : { ok: false, status: 403, error: "admin_required" };
-  }
-
-  // Current Tokfai production admin pages use this allowlist; keep it as a
-  // compatibility fallback until role/is_admin exists in profiles.
-  const isAllowlistedAdmin = adminEmailsFromEnv().includes(
-    normalizeEmail(adminUser.email)
-  );
-
-  if (isAllowlistedAdmin) {
-    return { ok: true, adminUser };
-  }
-
-  return {
-    ok: false,
-    status: 403,
-    error: "admin_profile_not_configured",
-  };
-}
-
 async function getAdminCreditsByEmail(email: string, ledgerLimit: number) {
   const { data: profile, error: profileError } = await supabase()
     .from("profiles")
@@ -757,17 +558,21 @@ async function adjustUserCredits(input: {
 
 export const adminRoutes = new Hono();
 
-adminRoutes.post("/credits/adjust", async (c) => {
-  const admin = await verifyAdminForCreditAdjustment(c);
-  if (!admin.ok) {
-    return jsonError(
-      c,
-      admin.status,
-      admin.error,
-      admin.detail ? { detail: admin.detail } : undefined
-    );
+/** JWT only — returns is_admin without requiring admin privileges. */
+adminRoutes.get("/me", async (c) => {
+  const auth = await authenticateSupabaseUser(c);
+  if (!auth.ok) {
+    return respondAdminAuthError(c, auth.status, auth.code);
   }
 
+  const data = await resolveAdminMe(auth.user);
+  return c.json({ data });
+});
+
+const protectedAdminRoutes = new Hono();
+protectedAdminRoutes.use("*", requireAdminV1);
+
+protectedAdminRoutes.post("/credits/adjust", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as AdminCreditAdjustmentInput;
   const input = parseCreditAdjustment(body);
   if ("error" in input) {
@@ -799,13 +604,7 @@ adminRoutes.post("/credits/adjust", async (c) => {
   });
 });
 
-adminRoutes.use("*", async (c, next) => {
-  const response = await requireAdmin(c);
-  if (response) return response;
-  await next();
-});
-
-adminRoutes.get("/summary", async (c) => {
+protectedAdminRoutes.get("/summary", async (c) => {
   const [totalUsers, totalRequests, successRequests, totalCreditsCharged, logs] =
     await Promise.all([
       countRows("profiles"),
@@ -829,7 +628,7 @@ adminRoutes.get("/summary", async (c) => {
   });
 });
 
-adminRoutes.get("/users", async (c) => {
+protectedAdminRoutes.get("/users", async (c) => {
   const profiles = await listAllProfiles();
 
   return c.json({
@@ -843,7 +642,7 @@ adminRoutes.get("/users", async (c) => {
   });
 });
 
-adminRoutes.get("/api-keys", async (c) => {
+protectedAdminRoutes.get("/api-keys", async (c) => {
   const apiKeys = await listAllApiKeys();
 
   return c.json({
@@ -858,17 +657,17 @@ adminRoutes.get("/api-keys", async (c) => {
   });
 });
 
-adminRoutes.get("/models", async (c) => {
+protectedAdminRoutes.get("/models", async (c) => {
   const models = await listAdminModels();
   return c.json({ models });
 });
 
-adminRoutes.get("/usage", async (c) => {
+protectedAdminRoutes.get("/usage", async (c) => {
   const usageLogs = await listAdminUsageLogs();
   return c.json({ data: usageLogs });
 });
 
-adminRoutes.get("/credits", async (c) => {
+protectedAdminRoutes.get("/credits", async (c) => {
   const email = normalizeEmail(c.req.query("email"));
   if (!email) {
     return jsonError(c, 400, "missing_email");
@@ -886,7 +685,7 @@ adminRoutes.get("/credits", async (c) => {
   return c.json({ data: result });
 });
 
-adminRoutes.patch("/models/:id", async (c) => {
+protectedAdminRoutes.patch("/models/:id", async (c) => {
   const id = c.req.param("id").trim();
   if (!id) {
     return jsonError(c, 400, "missing_model_id");
@@ -906,3 +705,5 @@ adminRoutes.patch("/models/:id", async (c) => {
 
   return c.json({ ok: true });
 });
+
+adminRoutes.route("/", protectedAdminRoutes);
