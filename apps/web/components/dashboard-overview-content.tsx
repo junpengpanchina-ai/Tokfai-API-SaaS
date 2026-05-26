@@ -29,12 +29,23 @@ import {
   TOKFAI_STARTER_PLAN,
 } from "@/lib/tokfai-api";
 
+export type OverviewStatIcon =
+  | "credit-card"
+  | "gauge"
+  | "key-round";
+
 type OverviewStat = {
   labelKey: string;
   subKey: string;
   value: string;
   href: string;
-  icon: LucideIcon;
+  icon: OverviewStatIcon;
+};
+
+const STAT_ICONS: Record<OverviewStatIcon, LucideIcon> = {
+  "credit-card": CreditCard,
+  gauge: Gauge,
+  "key-round": KeyRound,
 };
 
 type OnboardingStepConfig = {
@@ -131,7 +142,7 @@ export function DashboardOverviewContent({
 
       <div className="grid gap-4 md:grid-cols-3">
         {stats.map((stat) => {
-          const Icon = stat.icon;
+          const Icon = STAT_ICONS[stat.icon];
           return (
             <Card key={stat.labelKey}>
               <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">

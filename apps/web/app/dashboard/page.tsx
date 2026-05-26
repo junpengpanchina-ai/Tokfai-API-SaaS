@@ -1,6 +1,4 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CreditCard, Gauge, KeyRound } from "lucide-react";
 
 import {
   DashboardOverviewContent,
@@ -57,7 +55,7 @@ export default async function DashboardOverviewPage() {
         : "dashboard.overview.topUpToStart",
       value: formatCredits(profile?.credits_balance ?? 0),
       href: "/dashboard/credits",
-      icon: CreditCard,
+      icon: "credit-card",
     },
     {
       labelKey: "dashboard.overview.requestsLast24h",
@@ -67,7 +65,7 @@ export default async function DashboardOverviewPage() {
           : "dashboard.overview.noTrafficYet",
       value: formatInt(requestsLast24h),
       href: "/dashboard/usage",
-      icon: Gauge,
+      icon: "gauge",
     },
     {
       labelKey: "dashboard.overview.activeApiKeys",
@@ -77,7 +75,7 @@ export default async function DashboardOverviewPage() {
           : "dashboard.overview.createFirstKey",
       value: formatInt(activeApiKeyCount),
       href: "/dashboard/api-keys",
-      icon: KeyRound,
+      icon: "key-round",
     },
   ];
 
