@@ -1,6 +1,6 @@
 import type { Context, MiddlewareHandler } from "hono";
 
-import { extractBearer, verifySupabaseJwt } from "../auth/jwt.js";
+import { extractBearer } from "../auth/jwt.js";
 import { env } from "../env.js";
 import { log } from "../logger.js";
 import { supabase } from "../supabase.js";
@@ -40,12 +40,9 @@ type AdminUserRow = {
 const ADMIN_AUTH_LOG_KEYS = new Set([
   "requestId",
   "route",
-  "status",
   "code",
-  "message",
   "userId",
-  "adminUserId",
-  "authSource",
+  "email",
 ]);
 
 function normalizeEmail(email: string | null | undefined): string {
@@ -166,10 +163,9 @@ export async function resolveAdminUser(
   if (lookup.queryFailed) {
     if (c) {
       logAdminAuthEvent(c, "admin_users_lookup_failed", {
-        status: 500,
         code: "admin_users_lookup_failed",
-        message: "admin_users lookup failed.",
         userId: authUser.id,
+        email: authUser.email,
       });
     }
 
@@ -177,18 +173,15 @@ export async function resolveAdminUser(
     if (allowlisted) {
       if (c) {
         logAdminAuthEvent(c, "legacy_admin_allowlist_fallback", {
-          status: 200,
           code: "legacy_admin_allowlist_fallback",
-          message: "Admin authorized via legacy allowlist fallback.",
           userId: authUser.id,
-          authSource: "legacy_allowlist",
+          email: authUser.email,
         });
       } else {
         log.warn("legacy_admin_allowlist_fallback", sanitizeAdminAuthLogFields({
           code: "legacy_admin_allowlist_fallback",
-          message: "Admin authorized via legacy allowlist fallback.",
           userId: authUser.id,
-          authSource: "legacy_allowlist",
+          email: authUser.email,
         }));
       }
       return {
@@ -205,6 +198,29 @@ export async function resolveAdminUser(
   return null;
 }
 
+/**
+ * Validates a browser Supabase access_token via Supabase Auth (supports ES256
+ * signing keys). Never verifies JWTs locally with SUPABASE_JWT_SECRET.
+ */
+async function verifyAccessTokenWithSupabase(
+  token: string
+): Promise<AuthedUser | null> {
+  try {
+    const {
+      data: { user },
+      error,
+    } = await supabase().auth.getUser(token);
+
+    if (error || !user?.id) {
+      return null;
+    }
+
+    return { id: user.id, email: user.email ?? null };
+  } catch {
+    return null;
+  }
+}
+
 export async function authenticateSupabaseUser(
   c: Context
 ): Promise<
@@ -218,9 +234,7 @@ export async function authenticateSupabaseUser(
   const token = extractBearer(c.req.header("authorization"));
   if (!token) {
     logAdminAuthEvent(c, "admin_missing_token", {
-      status: 401,
       code: "missing_authorization",
-      message: ADMIN_AUTH_MESSAGES.missing_authorization,
     });
     return {
       ok: false,
@@ -229,14 +243,10 @@ export async function authenticateSupabaseUser(
     };
   }
 
-  try {
-    const user = await verifySupabaseJwt(token);
-    return { ok: true, user };
-  } catch {
+  const user = await verifyAccessTokenWithSupabase(token);
+  if (!user) {
     logAdminAuthEvent(c, "admin_invalid_token", {
-      status: 401,
       code: "invalid_token",
-      message: ADMIN_AUTH_MESSAGES.invalid_token,
     });
     return {
       ok: false,
@@ -244,6 +254,8 @@ export async function authenticateSupabaseUser(
       code: "invalid_token",
     };
   }
+
+  return { ok: true, user };
 }
 
 /**
@@ -263,22 +275,18 @@ export const requireAdminV1: MiddlewareHandler = async (c, next) => {
   const adminUser = await resolveAdminUser(auth.user, c);
   if (!adminUser) {
     logAdminAuthEvent(c, "admin_denied", {
-      status: 403,
       code: "admin_not_authorized",
-      message: ADMIN_AUTH_MESSAGES.admin_not_authorized,
       userId: auth.user.id,
+      email: auth.user.email,
     });
     return respondAdminAuthError(c, 403, "admin_not_authorized");
   }
 
   if (adminUser.authSource === "admin_users") {
     logAdminAuthEvent(c, "admin_authorized", {
-      status: 200,
       code: "admin_authorized",
-      message: "Admin authorized.",
       userId: adminUser.userId,
-      adminUserId: adminUser.adminUserId ?? undefined,
-      authSource: adminUser.authSource,
+      email: adminUser.email,
     });
   }
 

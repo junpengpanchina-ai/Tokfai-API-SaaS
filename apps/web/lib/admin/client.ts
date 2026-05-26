@@ -75,7 +75,13 @@ export async function fetchAdminApi<T>(
     });
   }
 
-  const { json, idempotencyKey, headers: extraHeaders, ...init } = options;
+  const {
+    json,
+    idempotencyKey,
+    headers: extraHeaders,
+    credentials: _credentials,
+    ...init
+  } = options;
 
   const url = path.startsWith("http")
     ? path
@@ -94,7 +100,12 @@ export async function fetchAdminApi<T>(
     body = JSON.stringify(json);
   }
 
-  const res = await fetch(url, { ...init, headers, body });
+  const res = await fetch(url, {
+    ...init,
+    headers,
+    body,
+    credentials: "omit",
+  });
 
   if (res.status === 204) {
     return undefined as T;
