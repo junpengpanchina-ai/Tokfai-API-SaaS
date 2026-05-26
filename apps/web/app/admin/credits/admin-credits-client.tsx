@@ -18,7 +18,10 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getDmitBaseUrl } from "@/lib/dmit/client";
+import {
+  AdminApiError,
+  fetchAdminApi,
+} from "@/lib/admin/client";
 import { formatInt } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 
@@ -65,13 +68,11 @@ type CreditsOverviewStats = {
 };
 
 export function AdminCreditsClient({
-  accessToken,
   initialEmail,
   initialData,
   initialError,
   initialUsers,
 }: {
-  accessToken: string;
   initialEmail: string;
   initialData: AdminCreditsData | null;
   initialError: string | null;
@@ -110,22 +111,13 @@ export function AdminCreditsClient({
       setError(null);
 
       try {
-        const url = new URL(`${getDmitBaseUrl()}/admin/credits`);
-        url.searchParams.set("email", trimmed);
-        url.searchParams.set("limit", "50");
-
-        const response = await fetch(url.toString(), {
-          method: "GET",
-          headers: { Authorization: `Bearer ${accessToken}` },
-          cache: "no-store",
+        const params = new URLSearchParams({
+          email: trimmed,
+          limit: "50",
         });
-        const body = (await parseJson(response)) as CreditsResponse & {
-          error?: unknown;
-        };
-
-        if (!response.ok) {
-          throw new Error(errorMessageFromBody(body, response.status));
-        }
+        const body = await fetchAdminApi<CreditsResponse>(
+          `/admin/credits?${params.toString()}`
+        );
 
         const nextData = body.data ?? null;
         setData(nextData);
@@ -138,13 +130,17 @@ export function AdminCreditsClient({
       } catch (err) {
         setData(null);
         setError(
-          err instanceof Error ? err.message : "Failed to load credits data."
+          err instanceof AdminApiError && err.isSessionExpired
+            ? t("admin.common.sessionExpired")
+            : err instanceof Error
+              ? err.message
+              : "Failed to load credits data."
         );
       } finally {
         setLoading(false);
       }
     },
-    [accessToken, router, t]
+    [router, t]
   );
 
   useEffect(() => {
@@ -260,37 +256,4 @@ export function AdminCreditsClient({
       ) : null}
     </>
   );
-}
-
-async function parseJson(response: Response): Promise<unknown> {
-  const text = await response.text();
-  if (!text) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
-}
-
-function errorMessageFromBody(body: unknown, status: number): string {
-  if (body && typeof body === "object") {
-    const maybeError = (body as { error?: unknown; message?: unknown }).error;
-    if (typeof maybeError === "string") {
-      if (maybeError === "user_not_found") {
-        return "No profile found for that email.";
-      }
-      if (maybeError === "missing_email") {
-        return "Email is required.";
-      }
-      return maybeError;
-    }
-    if (maybeError && typeof maybeError === "object") {
-      const message = (maybeError as { message?: unknown }).message;
-      if (typeof message === "string") return message;
-    }
-    const message = (body as { message?: unknown }).message;
-    if (typeof message === "string") return message;
-  }
-  if (typeof body === "string" && body.trim()) return body;
-  return `Request failed (HTTP ${status}).`;
 }

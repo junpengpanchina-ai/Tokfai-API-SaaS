@@ -73,7 +73,6 @@ export default async function AdminUsagePage({
 
   return (
     <AdminUsageClient
-      accessToken={accessToken}
       initialLogs={initialLogs}
       initialError={initialError}
       initialEmailFilter={initialEmailFilter}

@@ -1,5 +1,10 @@
 const DEFAULT_ADMIN_EMAILS = ["junpengpanchina@gmail.com"];
 
+/**
+ * Email allowlist for the /admin UI shell (client-side route guard).
+ * DMIT `/admin/*` auth uses JWT + server-side admin_users; see `lib/admin/client.ts`.
+ */
+
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }

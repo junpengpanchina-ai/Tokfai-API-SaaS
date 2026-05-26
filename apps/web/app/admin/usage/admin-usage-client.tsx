@@ -21,8 +21,11 @@ import {
   getUsageRequestType,
   isUsageSuccess,
 } from "@/lib/admin/usage";
+import {
+  AdminApiError,
+  fetchAdminApi,
+} from "@/lib/admin/client";
 import { formatInt } from "@/lib/format";
-import { getDmitBaseUrl } from "@/lib/dmit/client";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
 
@@ -36,12 +39,10 @@ type StatusFilter = "all" | "succeeded" | "failed";
 type TypeFilter = "all" | "chat" | "image";
 
 export function AdminUsageClient({
-  accessToken,
   initialLogs,
   initialError,
   initialEmailFilter = "",
 }: {
-  accessToken: string;
   initialLogs: AdminUsageLog[];
   initialError: string | null;
   initialEmailFilter?: string;
@@ -58,28 +59,20 @@ export function AdminUsageClient({
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${getDmitBaseUrl()}/admin/usage`, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${accessToken}` },
-        cache: "no-store",
-      });
-      const body = (await parseJson(response)) as UsageResponse & {
-        error?: unknown;
-      };
-
-      if (!response.ok) {
-        throw new Error(errorMessageFromBody(body, response.status));
-      }
-
+      const body = await fetchAdminApi<UsageResponse>("/admin/usage");
       setLogs(Array.isArray(body.data) ? body.data : []);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : t("admin.usage.loadFailed")
+        err instanceof AdminApiError && err.isSessionExpired
+          ? t("admin.common.sessionExpired")
+          : err instanceof Error
+            ? err.message
+            : t("admin.usage.loadFailed")
       );
     } finally {
       setLoading(false);
     }
-  }, [accessToken, t]);
+  }, [t]);
 
   useEffect(() => {
     setLogs(initialLogs);
@@ -283,29 +276,4 @@ function FilterSelect<T extends string>({
       </select>
     </label>
   );
-}
-
-async function parseJson(response: Response): Promise<unknown> {
-  const text = await response.text();
-  if (!text) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
-}
-
-function errorMessageFromBody(body: unknown, status: number): string {
-  if (body && typeof body === "object") {
-    const maybeError = (body as { error?: unknown; message?: unknown }).error;
-    if (typeof maybeError === "string") return maybeError;
-    if (maybeError && typeof maybeError === "object") {
-      const message = (maybeError as { message?: unknown }).message;
-      if (typeof message === "string") return message;
-    }
-    const message = (body as { message?: unknown }).message;
-    if (typeof message === "string") return message;
-  }
-  if (typeof body === "string" && body.trim()) return body;
-  return `Request failed (HTTP ${status}).`;
 }

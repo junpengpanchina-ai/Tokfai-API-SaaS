@@ -98,7 +98,6 @@ export default async function AdminCreditsPage({
 
   return (
     <AdminCreditsClient
-      accessToken={accessToken}
       initialEmail={initialEmail}
       initialData={initialData}
       initialError={initialError}

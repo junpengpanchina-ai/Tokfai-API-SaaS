@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { AdminOverviewPanel } from "@/components/admin/admin-overview-panel";
 import {
+  ADMIN_SESSION_EXPIRED,
   fetchDmitAdmin,
   toAdminDebug,
   type AdminDebug,
@@ -11,6 +12,12 @@ import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
   title: "Admin — Overview",
+};
+
+type AdminMeResponse = {
+  data: {
+    is_admin: boolean;
+  };
 };
 
 type AdminSummary = {
@@ -67,7 +74,7 @@ export default async function AdminPage() {
   if (!accessToken) {
     debug = {
       statusCode: "401",
-      message: "missing session token",
+      message: ADMIN_SESSION_EXPIRED,
       dmitBaseUrl,
       hasAccessToken,
       userEmail,
@@ -75,13 +82,29 @@ export default async function AdminPage() {
     };
   } else {
     try {
-      const summaryRes = await fetchDmitAdmin<SummaryResponse>(
-        `${dmitBaseUrl}/admin/summary`,
+      const meRes = await fetchDmitAdmin<AdminMeResponse>(
+        `${dmitBaseUrl}/admin/me`,
         accessToken
       );
 
-      summary = summaryRes.data.summary;
-      usageLogs = summaryRes.data.usage_logs;
+      if (!meRes.data.is_admin) {
+        debug = {
+          statusCode: "403",
+          message: "Your account is not authorized for admin access.",
+          dmitBaseUrl,
+          hasAccessToken,
+          userEmail,
+          isForbidden: true,
+        };
+      } else {
+        const summaryRes = await fetchDmitAdmin<SummaryResponse>(
+          `${dmitBaseUrl}/admin/summary`,
+          accessToken
+        );
+
+        summary = summaryRes.data.summary;
+        usageLogs = summaryRes.data.usage_logs;
+      }
     } catch (error) {
       debug = toAdminDebug(error, {
         dmitBaseUrl,

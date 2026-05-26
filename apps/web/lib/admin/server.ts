@@ -1,5 +1,7 @@
 import { DmitServerError } from "@/lib/dmit/server";
 
+export const ADMIN_SESSION_EXPIRED = "登录状态失效，请重新登录";
+
 export type AdminDebug = {
   statusCode: string;
   message: string;
@@ -9,15 +11,38 @@ export type AdminDebug = {
   isForbidden: boolean;
 };
 
+export type AdminServerFetchOptions = {
+  method?: string;
+  json?: unknown;
+  idempotencyKey?: string;
+};
+
 export async function fetchDmitAdmin<T>(
   url: string,
-  accessToken: string
+  accessToken: string,
+  options: AdminServerFetchOptions = {}
 ): Promise<T> {
+  if (!accessToken.trim()) {
+    throw new DmitServerError({
+      status: 401,
+      message: ADMIN_SESSION_EXPIRED,
+      code: "missing_access_token",
+    });
+  }
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+  };
+
+  if (options.idempotencyKey) {
+    headers["Idempotency-Key"] = options.idempotencyKey;
+  }
+
   const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+    method: options.method ?? "GET",
+    headers,
+    body: options.json !== undefined ? JSON.stringify(options.json) : undefined,
     cache: "no-store",
   });
 

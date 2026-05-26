@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { AdminAuthGate } from "@/components/admin/admin-auth-gate";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { isAdminEmail } from "@/lib/admin-auth";
 import { createClient } from "@/lib/supabase/server";
@@ -22,5 +23,9 @@ export default async function AdminLayout({
     redirect("/dashboard");
   }
 
-  return <AdminShell>{children}</AdminShell>;
+  return (
+    <AdminShell>
+      <AdminAuthGate>{children}</AdminAuthGate>
+    </AdminShell>
+  );
 }
