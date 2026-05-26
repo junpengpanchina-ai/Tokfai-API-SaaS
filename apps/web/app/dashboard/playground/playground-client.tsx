@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -47,6 +47,17 @@ function resolveInitialModel(initialModel?: string): string {
   return DEFAULT_MODEL;
 }
 const DEFAULT_PROMPT = "Say hello from Tokfai.";
+const REVEAL_KEY_TIMEOUT_MS = 30_000;
+
+function filterRevealableKeys(
+  keys: PlaygroundApiKeyOption[]
+): PlaygroundApiKeyOption[] {
+  return keys.filter((row) => row.can_reveal !== false);
+}
+
+function firstRevealableKeyId(keys: PlaygroundApiKeyOption[]): string {
+  return filterRevealableKeys(keys)[0]?.id ?? "";
+}
 
 export interface PlaygroundApiKeyOption {
   id: string;
@@ -74,20 +85,31 @@ export function PlaygroundClient({
   initialModel?: string;
 }) {
   const { t } = useI18n();
+  const revealableKeys = useMemo(
+    () => filterRevealableKeys(activeKeys),
+    [activeKeys]
+  );
   const [model, setModel] = useState(() => resolveInitialModel(initialModel));
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
   const [apiKeyMode, setApiKeyMode] = useState<ApiKeyMode>(
-    activeKeys.length > 0 ? "select" : "paste"
+    revealableKeys.length > 0 ? "select" : "paste"
   );
   const [apiKey, setApiKey] = useState("");
-  const [selectedKeyId, setSelectedKeyId] = useState(activeKeys[0]?.id ?? "");
+  const [selectedKeyId, setSelectedKeyId] = useState(() =>
+    firstRevealableKeyId(activeKeys)
+  );
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ChatCompletionResponse | null>(null);
   const [error, setError] = useState<PlaygroundError | null>(null);
 
   async function handleRun(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (loading) return;
+    console.log("[chat-playground] submit start");
+
+    if (loading) {
+      console.log("[chat-playground] submit ignored — already loading");
+      return;
+    }
 
     setError(null);
     setResult(null);
@@ -98,23 +120,41 @@ export function PlaygroundClient({
       return;
     }
 
-    let resolvedKey: string;
-    try {
-      resolvedKey = await resolveApiKey();
-    } catch (err) {
-      setError(toPlaygroundError(err));
-      return;
-    }
+    const selected =
+      apiKeyMode === "select"
+        ? revealableKeys.find((row) => row.id === selectedKeyId)
+        : undefined;
+    console.log(
+      "[chat-playground] selectedKeyPrefix exists:",
+      Boolean(selected?.prefix)
+    );
 
     setLoading(true);
     try {
+      const resolvedKey = await resolveApiKey();
+      const fullSecretLoaded = isFullTokfaiApiKey(resolvedKey);
+      console.log("[chat-playground] full secret loaded:", fullSecretLoaded);
+      if (!fullSecretLoaded) {
+        throw new PlaygroundValidationError(
+          t("dashboard.playground.selectOrPasteApiKey"),
+          "missing_api_key"
+        );
+      }
+
+      console.log("[chat-playground] model:", model);
+      console.log("[chat-playground] prompt length:", trimmedPrompt.length);
+      console.log("[chat-playground] request start");
+
       const res = await chatCompletions(resolvedKey, {
         model,
         messages: [{ role: "user", content: trimmedPrompt }],
         stream: false,
       });
+
+      console.log("[chat-playground] request success");
       setResult(res);
     } catch (err) {
+      console.error("[chat-playground] request failed", err);
       setError(toPlaygroundError(err));
     } finally {
       setLoading(false);
@@ -126,7 +166,7 @@ export function PlaygroundClient({
       const trimmed = apiKey.trim();
       if (!trimmed) {
         throw new PlaygroundValidationError(
-          "API key is required.",
+          t("dashboard.playground.selectOrPasteApiKey"),
           "missing_api_key"
         );
       }
@@ -139,14 +179,14 @@ export function PlaygroundClient({
       return trimmed;
     }
 
-    const selected = activeKeys.find((row) => row.id === selectedKeyId);
+    const selected = revealableKeys.find((row) => row.id === selectedKeyId);
     if (!selected) {
       throw new PlaygroundValidationError(
-        "Select an active API key or paste one manually.",
+        t("dashboard.playground.selectOrPasteApiKey"),
         "missing_api_key"
       );
     }
-    if (!selected.can_reveal) {
+    if (selected.can_reveal === false) {
       throw new PlaygroundValidationError(
         "This key cannot be loaded automatically. Switch to “Paste key” and enter the full secret.",
         "key_not_revealable"
@@ -158,14 +198,41 @@ export function PlaygroundClient({
         "missing_access_token"
       );
     }
-    const secret = await revealMeApiKey(selected.id, { accessToken });
+
+    const secret = await revealApiKeyWithTimeout(selected.id, accessToken);
     if (!isFullTokfaiApiKey(secret)) {
       throw new PlaygroundValidationError(
-        "Could not load a valid API key. Paste the full secret instead.",
-        "invalid_api_key"
+        t("dashboard.playground.selectOrPasteApiKey"),
+        "missing_api_key"
       );
     }
     return secret;
+  }
+
+  async function revealApiKeyWithTimeout(
+    keyId: string,
+    token: string
+  ): Promise<string> {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        revealMeApiKey(keyId, { accessToken: token }),
+        new Promise<string>((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(
+              new PlaygroundValidationError(
+                t("dashboard.playground.apiKeyLoadTimedOut"),
+                "key_reveal_timeout"
+              )
+            );
+          }, REVEAL_KEY_TIMEOUT_MS);
+        }),
+      ]);
+    } finally {
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+    }
   }
 
   return (
@@ -201,7 +268,7 @@ export function PlaygroundClient({
           <CardContent className="flex flex-col gap-4">
             <ApiKeyField
               mode={apiKeyMode}
-              activeKeys={activeKeys}
+              revealableKeys={revealableKeys}
               apiKey={apiKey}
               selectedKeyId={selectedKeyId}
               loading={loading}
@@ -225,7 +292,7 @@ export function PlaygroundClient({
             </div>
 
             <div className="flex justify-end">
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading} aria-busy={loading}>
                 {loading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -292,7 +359,7 @@ export function PlaygroundClient({
 
 function ApiKeyField({
   mode,
-  activeKeys,
+  revealableKeys,
   apiKey,
   selectedKeyId,
   loading,
@@ -302,7 +369,7 @@ function ApiKeyField({
   t,
 }: {
   mode: ApiKeyMode;
-  activeKeys: PlaygroundApiKeyOption[];
+  revealableKeys: PlaygroundApiKeyOption[];
   apiKey: string;
   selectedKeyId: string;
   loading: boolean;
@@ -311,8 +378,6 @@ function ApiKeyField({
   onSelectedKeyChange: (id: string) => void;
   t: (key: string) => string;
 }) {
-  const revealableKeys = activeKeys.filter((row) => row.can_reveal !== false);
-
   return (
     <div className="flex flex-col gap-3 rounded-md border bg-muted/20 p-4">
       <div className="flex items-center gap-2 text-sm font-medium">

@@ -174,6 +174,9 @@ export const messages = {
         pasteYourKey: "Paste your key",
         orCreateOne: "create one",
         fullApiKey: "Full API key",
+        selectOrPasteApiKey: "Select or paste an API key.",
+        apiKeyLoadTimedOut:
+          "Timed out loading the selected API key. Paste the full secret or try again.",
         sentAsBearer:
           "Sent as Authorization: Bearer sk-tokfai_…. Never logged or persisted by this page.",
         waitingForModel: "Waiting for the model…",
@@ -453,6 +456,9 @@ export const messages = {
         pasteYourKey: "粘贴密钥",
         orCreateOne: "创建一个",
         fullApiKey: "完整 API 密钥",
+        selectOrPasteApiKey: "请选择或粘贴 API 密钥",
+        apiKeyLoadTimedOut:
+          "加载所选 API 密钥超时。请粘贴完整 secret 或稍后重试。",
         sentAsBearer:
           "以 Authorization: Bearer sk-tokfai_… 发送。本页不会记录或持久化。",
         waitingForModel: "等待模型响应…",
