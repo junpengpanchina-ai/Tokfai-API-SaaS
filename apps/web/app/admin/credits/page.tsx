@@ -1,13 +1,14 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { DashboardShell } from "@/components/dashboard-shell";
+import { fetchDmitAdmin } from "@/lib/admin/server";
 import { DmitServerError, getDmitBaseUrl } from "@/lib/dmit/server";
 import { createClient } from "@/lib/supabase/server";
 
 import {
   AdminCreditsClient,
   type AdminCreditsData,
+  type AdminUserProfile,
 } from "./admin-credits-client";
 
 export const metadata = {
@@ -20,6 +21,10 @@ type CreditsResponse = {
   data?: AdminCreditsData;
 };
 
+type UsersResponse = {
+  data?: AdminUserProfile[];
+};
+
 export default async function AdminCreditsPage({
   searchParams,
 }: {
@@ -27,6 +32,7 @@ export default async function AdminCreditsPage({
 }) {
   noStore();
   const supabase = createClient();
+  const dmitBaseUrl = getDmitBaseUrl();
 
   const {
     data: { user },
@@ -49,29 +55,31 @@ export default async function AdminCreditsPage({
   const initialEmail = (searchParams.email ?? "").trim();
   let initialData: AdminCreditsData | null = null;
   let initialError: string | null = null;
+  let initialUsers: AdminUserProfile[] = [];
 
-  if (initialEmail) {
+  try {
+    const usersRes = await fetchDmitAdmin<UsersResponse>(
+      `${dmitBaseUrl}/admin/users`,
+      accessToken
+    );
+    initialUsers = Array.isArray(usersRes.data) ? usersRes.data : [];
+  } catch (error) {
+    if (error instanceof DmitServerError && error.status === 403) {
+      initialError =
+        "Current user is not in the TOKFAI_ADMIN_EMAILS allowlist.";
+    } else if (error instanceof Error) {
+      initialError = error.message;
+    }
+  }
+
+  if (initialEmail && !initialError) {
     try {
-      const url = new URL(`${getDmitBaseUrl()}/admin/credits`);
+      const url = new URL(`${dmitBaseUrl}/admin/credits`);
       url.searchParams.set("email", initialEmail);
       url.searchParams.set("limit", "50");
 
-      const res = await fetch(url.toString(), {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-        cache: "no-store",
-      });
-
-      const text = await res.text();
-      const body = parseJson(text);
-
-      if (!res.ok) {
-        throw toDmitServerError(res.status, body);
-      }
-
-      initialData = (body as CreditsResponse).data ?? null;
+      const body = await fetchDmitAdmin<CreditsResponse>(url.toString(), accessToken);
+      initialData = body.data ?? null;
     } catch (error) {
       if (error instanceof DmitServerError) {
         if (error.status === 403) {
@@ -91,42 +99,12 @@ export default async function AdminCreditsPage({
   }
 
   return (
-    <DashboardShell>
-      <AdminCreditsClient
-        accessToken={accessToken}
-        initialEmail={initialEmail}
-        initialData={initialData}
-        initialError={initialError}
-      />
-    </DashboardShell>
+    <AdminCreditsClient
+      accessToken={accessToken}
+      initialEmail={initialEmail}
+      initialData={initialData}
+      initialError={initialError}
+      initialUsers={initialUsers}
+    />
   );
-}
-
-function parseJson(text: string): unknown {
-  if (!text) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
-}
-
-function toDmitServerError(status: number, body: unknown): DmitServerError {
-  let message = `DMIT request failed (HTTP ${status}).`;
-  let code: string | undefined;
-
-  if (body && typeof body === "object") {
-    const maybeError = (body as { error?: unknown }).error;
-    if (maybeError && typeof maybeError === "object") {
-      const err = maybeError as { message?: unknown; code?: unknown };
-      if (typeof err.message === "string") message = err.message;
-      if (typeof err.code === "string") code = err.code;
-    } else if (typeof maybeError === "string") {
-      message = maybeError;
-    }
-  } else if (typeof body === "string" && body.trim()) {
-    message = body;
-  }
-
-  return new DmitServerError({ status, message, code });
 }

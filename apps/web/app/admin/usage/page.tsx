@@ -1,7 +1,7 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { DashboardShell } from "@/components/dashboard-shell";
+import { fetchDmitAdmin, toAdminDebug } from "@/lib/admin/server";
 import { DmitServerError, getDmitBaseUrl } from "@/lib/dmit/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -23,6 +23,7 @@ type UsageResponse = {
 export default async function AdminUsagePage() {
   noStore();
   const supabase = createClient();
+  const dmitBaseUrl = getDmitBaseUrl();
 
   const {
     data: { user },
@@ -46,24 +47,11 @@ export default async function AdminUsagePage() {
   let initialError: string | null = null;
 
   try {
-    const res = await fetch(`${getDmitBaseUrl()}/admin/usage`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-      cache: "no-store",
-    });
-
-    const text = await res.text();
-    const body = parseJson(text);
-
-    if (!res.ok) {
-      throw toDmitServerError(res.status, body);
-    }
-
-    initialLogs = Array.isArray((body as UsageResponse).data)
-      ? (body as UsageResponse).data!
-      : [];
+    const body = await fetchDmitAdmin<UsageResponse>(
+      `${dmitBaseUrl}/admin/usage`,
+      accessToken
+    );
+    initialLogs = Array.isArray(body.data) ? body.data : [];
   } catch (error) {
     if (error instanceof DmitServerError) {
       initialError =
@@ -78,41 +66,10 @@ export default async function AdminUsagePage() {
   }
 
   return (
-    <DashboardShell>
-      <AdminUsageClient
-        accessToken={accessToken}
-        initialLogs={initialLogs}
-        initialError={initialError}
-      />
-    </DashboardShell>
+    <AdminUsageClient
+      accessToken={accessToken}
+      initialLogs={initialLogs}
+      initialError={initialError}
+    />
   );
-}
-
-function parseJson(text: string): unknown {
-  if (!text) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
-}
-
-function toDmitServerError(status: number, body: unknown): DmitServerError {
-  let message = `DMIT request failed (HTTP ${status}).`;
-  let code: string | undefined;
-
-  if (body && typeof body === "object") {
-    const maybeError = (body as { error?: unknown }).error;
-    if (maybeError && typeof maybeError === "object") {
-      const err = maybeError as { message?: unknown; code?: unknown };
-      if (typeof err.message === "string") message = err.message;
-      if (typeof err.code === "string") code = err.code;
-    } else if (typeof maybeError === "string") {
-      message = maybeError;
-    }
-  } else if (typeof body === "string" && body.trim()) {
-    message = body;
-  }
-
-  return new DmitServerError({ status, message, code });
 }

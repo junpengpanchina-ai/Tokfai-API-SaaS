@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
   ArrowDownRight,
   ArrowUpRight,
 } from "lucide-react";
 
+import { AdminStatCard } from "@/components/admin/admin-stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,11 +22,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getDmitBaseUrl } from "@/lib/dmit/client";
-import {
-  formatCredits,
-  formatCreditsPrecise,
-  formatDateTime,
-} from "@/lib/format";
+import { formatCredits, formatDateTime, formatInt } from "@/lib/format";
+
+export type AdminUserProfile = {
+  id: string;
+  email: string | null;
+  credits_balance: number;
+  total_credits_used: number;
+  updated_at: string | null;
+};
 
 export type AdminCreditsProfile = {
   id: string;
@@ -54,13 +59,11 @@ type CreditsResponse = {
   data?: AdminCreditsData;
 };
 
-type Direction = "add" | "deduct";
-
-type AdminCreditAdjustmentResponse = {
-  ok?: boolean;
-  balance_after?: number;
-  credits?: number;
-  error?: string;
+type CreditsOverviewStats = {
+  totalPurchased: string;
+  totalDebited: string;
+  totalAdjusted: string;
+  activeUsers: string;
 };
 
 export function AdminCreditsClient({
@@ -68,11 +71,13 @@ export function AdminCreditsClient({
   initialEmail,
   initialData,
   initialError,
+  initialUsers,
 }: {
   accessToken: string;
   initialEmail: string;
   initialData: AdminCreditsData | null;
   initialError: string | null;
+  initialUsers: AdminUserProfile[];
 }) {
   const router = useRouter();
   const [email, setEmail] = useState(initialEmail);
@@ -81,12 +86,18 @@ export function AdminCreditsClient({
   const [loading, setLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const [amount, setAmount] = useState("");
-  const [direction, setDirection] = useState<Direction>("add");
-  const [reason, setReason] = useState("");
-  const [adjustMessage, setAdjustMessage] = useState<string | null>(null);
-  const [adjustError, setAdjustError] = useState<string | null>(null);
-  const [isAdjusting, setIsAdjusting] = useState(false);
+  const overviewStats = useMemo<CreditsOverviewStats>(() => {
+    const activeUsers = initialUsers.filter(
+      (profile) => profile.credits_balance > 0
+    ).length;
+
+    return {
+      totalPurchased: "—",
+      totalDebited: "—",
+      totalAdjusted: "—",
+      activeUsers: formatInt(activeUsers),
+    };
+  }, [initialUsers]);
 
   const loadCredits = useCallback(
     async (searchEmail: string) => {
@@ -98,8 +109,6 @@ export function AdminCreditsClient({
 
       setLoading(true);
       setError(null);
-      setAdjustMessage(null);
-      setAdjustError(null);
 
       try {
         const url = new URL(`${getDmitBaseUrl()}/admin/credits`);
@@ -150,95 +159,80 @@ export function AdminCreditsClient({
     void loadCredits(email);
   }
 
-  async function handleAdjust(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setAdjustMessage(null);
-    setAdjustError(null);
-
-    if (!data?.profile.id) {
-      setAdjustError("Search for a user before adjusting credits.");
-      return;
-    }
-
-    const parsedAmount = Number(amount);
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-      setAdjustError("Enter a credits amount greater than 0.");
-      return;
-    }
-
-    const trimmedReason = reason.trim();
-    if (!trimmedReason) {
-      setAdjustError("Reason is required.");
-      return;
-    }
-
-    setIsAdjusting(true);
-    try {
-      const response = await fetch(`${getDmitBaseUrl()}/admin/credits/adjust`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          user_id: data.profile.id,
-          amount: parsedAmount,
-          direction,
-          reason: trimmedReason,
-        }),
-      });
-      const body = (await parseJson(response)) as AdminCreditAdjustmentResponse;
-
-      if (!response.ok) {
-        throw new Error(errorMessageFromBody(body, response.status));
-      }
-
-      setAmount("");
-      setReason("");
-      const balanceAfter = body.balance_after ?? body.credits;
-      setAdjustMessage(
-        balanceAfter == null
-          ? "Adjustment applied."
-          : `Adjustment applied. New balance: ${formatCreditsPrecise(balanceAfter)} credits.`
-      );
-      await loadCredits(data.profile.email ?? email);
-    } catch (err) {
-      setAdjustError(
-        err instanceof Error ? err.message : "Credit adjustment failed."
-      );
-    } finally {
-      setIsAdjusting(false);
-    }
-  }
-
-  const isBusy = loading || isPending || isAdjusting;
+  const isBusy = loading || isPending;
+  const profileEmail = data?.profile.email ?? email;
 
   return (
-    <div className="flex flex-col gap-6">
+    <>
       <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">Admin tools</Badge>
-          <Link
-            href="/admin"
-            className="text-sm text-muted-foreground underline-offset-4 hover:underline"
-          >
-            Back to admin overview
-          </Link>
-        </div>
+        <Badge variant="secondary">Admin tools</Badge>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight">
-          Credits management
+          Credits ledger
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Look up a user by email, review their balance and ledger, and apply
-          manual adjustments through DMIT.
+          Read-only balances and per-user ledger entries. Site-wide ledger
+          aggregation will ship in a later phase.
         </p>
       </div>
+
+      <Card className="border-muted bg-muted/30">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Site-wide ledger</CardTitle>
+          <CardDescription>
+            Full cross-user ledger export is not available in this phase. Use
+            email search below to inspect a single account, or open Usage for
+            charge history.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <AdminStatCard
+          label="Total purchased"
+          value={overviewStats.totalPurchased}
+        />
+        <AdminStatCard
+          label="Total debited"
+          value={overviewStats.totalDebited}
+        />
+        <AdminStatCard
+          label="Total adjusted"
+          value={overviewStats.totalAdjusted}
+        />
+        <AdminStatCard
+          label="Active users with credits"
+          value={overviewStats.activeUsers}
+        />
+      </div>
+
+      {error && !data ? (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardHeader>
+            <CardTitle className="text-base">Could not load credits</CardTitle>
+            <CardDescription>{error}</CardDescription>
+          </CardHeader>
+          {email.trim() ? (
+            <CardContent>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isBusy}
+                onClick={() => void loadCredits(email)}
+              >
+                Retry
+              </Button>
+            </CardContent>
+          ) : null}
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>
           <CardTitle>Search by email</CardTitle>
           <CardDescription>
-            Loads profile balances and the 50 most recent ledger entries.
+            Loads profile balance and the 50 most recent ledger entries for one
+            user.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -261,28 +255,6 @@ export function AdminCreditsClient({
           </form>
         </CardContent>
       </Card>
-
-      {error ? (
-        <Card className="border-destructive/30 bg-destructive/5">
-          <CardHeader>
-            <CardTitle className="text-base">Could not load credits</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          {email.trim() ? (
-            <CardContent>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={isBusy}
-                onClick={() => void loadCredits(email)}
-              >
-                Retry
-              </Button>
-            </CardContent>
-          ) : null}
-        </Card>
-      ) : null}
 
       {data ? (
         <>
@@ -307,92 +279,28 @@ export function AdminCreditsClient({
                 </span>
               </div>
               <div>
-                User ID:{" "}
-                <span className="font-mono text-xs text-foreground">
-                  {data.profile.id}
-                </span>
-              </div>
-              <div>
                 Last updated:{" "}
                 <span className="font-medium text-foreground">
                   {formatDateTime(data.profile.updated_at)}
                 </span>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Adjust credits</CardTitle>
-              <CardDescription>
-                Amount must be greater than 0. Deductions are stored as negative
-                ledger entries. Each adjustment writes to credit_ledger.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className="grid gap-3" onSubmit={handleAdjust}>
-                <div className="grid gap-3 md:grid-cols-[8rem_8rem_1fr_auto] md:items-end">
-                  <div>
-                    <Label htmlFor="admin-adjust-amount">Credits</Label>
-                    <Input
-                      id="admin-adjust-amount"
-                      min="0"
-                      step="0.000001"
-                      inputMode="decimal"
-                      value={amount}
-                      onChange={(event) => setAmount(event.target.value)}
-                      placeholder="100"
-                      disabled={isBusy}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="admin-adjust-direction">Action</Label>
-                    <select
-                      id="admin-adjust-direction"
-                      value={direction}
-                      onChange={(event) =>
-                        setDirection(event.target.value as Direction)
-                      }
-                      disabled={isBusy}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <option value="add">add</option>
-                      <option value="deduct">deduct</option>
-                    </select>
-                  </div>
-                  <div>
-                    <Label htmlFor="admin-adjust-reason">Reason (required)</Label>
-                    <Input
-                      id="admin-adjust-reason"
-                      value={reason}
-                      maxLength={200}
-                      required
-                      onChange={(event) => setReason(event.target.value)}
-                      placeholder="Manual top-up for support ticket"
-                      disabled={isBusy}
-                    />
-                  </div>
-                  <Button type="submit" disabled={isBusy}>
-                    {isAdjusting ? "Applying…" : "Apply"}
-                  </Button>
-                </div>
-                {adjustMessage ? (
-                  <p className="text-sm text-emerald-600">{adjustMessage}</p>
-                ) : null}
-                {adjustError ? (
-                  <p className="text-sm text-destructive">{adjustError}</p>
-                ) : null}
-              </form>
+              <div>
+                <Link
+                  href={`/admin/usage`}
+                  className="font-medium text-foreground underline-offset-4 hover:underline"
+                >
+                  View usage logs
+                </Link>
+              </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-start justify-between gap-4">
               <div>
-                <CardTitle>Recent ledger</CardTitle>
+                <CardTitle>Ledger entries</CardTitle>
                 <CardDescription>
-                  Last {data.ledger.length} entries for this user.
+                  Read-only view for {profileEmail || "selected user"}.
                 </CardDescription>
               </div>
               <Button
@@ -411,6 +319,7 @@ export function AdminCreditsClient({
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                        <th className="py-2 pr-4 font-medium">Email</th>
                         <th className="py-2 pr-4 font-medium">Type</th>
                         <th className="py-2 pr-4 text-right font-medium">
                           Amount
@@ -426,6 +335,7 @@ export function AdminCreditsClient({
                     <tbody>
                       {data.ledger.map((entry) => (
                         <tr key={entry.id} className="border-b last:border-0">
+                          <td className="py-2 pr-4">{profileEmail ?? "—"}</td>
                           <td className="py-2 pr-4">
                             <TypeBadge type={entry.type} />
                           </td>
@@ -461,7 +371,7 @@ export function AdminCreditsClient({
           </Card>
         </>
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -532,9 +442,6 @@ function errorMessageFromBody(body: unknown, status: number): string {
       if (maybeError === "missing_email") {
         return "Email is required.";
       }
-      if (maybeError === "missing_reason") {
-        return "Reason is required.";
-      }
       return maybeError;
     }
     if (maybeError && typeof maybeError === "object") {
@@ -545,5 +452,5 @@ function errorMessageFromBody(body: unknown, status: number): string {
     if (typeof message === "string") return message;
   }
   if (typeof body === "string" && body.trim()) return body;
-  return `DMIT request failed (HTTP ${status}).`;
+  return `Request failed (HTTP ${status}).`;
 }

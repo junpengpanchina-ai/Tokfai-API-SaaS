@@ -380,6 +380,49 @@ export const VIDEO_MODELS: ModelCatalogEntry[] = [
   },
 ];
 
+/** Full catalog for admin read-only views. */
+export const ALL_CATALOG_MODELS: ModelCatalogEntry[] = [
+  ...CHAT_MODELS,
+  ...IMAGE_MODELS,
+  ...VIDEO_MODELS,
+];
+
+export type AdminCatalogDisplayStatus = ModelStatus | "hidden";
+
+export type AdminCatalogPlaygroundLabel =
+  | "Chat Playground"
+  | "Image Playground"
+  | "Not available";
+
+export function getAdminCatalogDisplayStatus(
+  model: ModelCatalogEntry
+): AdminCatalogDisplayStatus {
+  const override = model.catalogMeta?.adminDisplayOverride;
+  if (override && override.enabled === false) {
+    return "hidden";
+  }
+  return model.status;
+}
+
+export function isCatalogFrontendVisible(model: ModelCatalogEntry): boolean {
+  return getAdminCatalogDisplayStatus(model) !== "hidden";
+}
+
+export function getAdminCatalogPlaygroundLabel(
+  model: ModelCatalogEntry
+): AdminCatalogPlaygroundLabel {
+  if (getAdminCatalogDisplayStatus(model) !== "available") {
+    return "Not available";
+  }
+  if (model.type === "chat") {
+    return "Chat Playground";
+  }
+  if (model.type === "image" && isAvailableImageModel(model.id)) {
+    return "Image Playground";
+  }
+  return "Not available";
+}
+
 export const AVAILABLE_CHAT_MODEL_IDS = CHAT_MODELS.filter(
   (model) => model.status === "available"
 ).map((model) => model.id);

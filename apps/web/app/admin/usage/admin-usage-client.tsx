@@ -1,8 +1,12 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { AdminStatCard } from "@/components/admin/admin-stat-card";
+import {
+  AdminUsageLogsTable,
+  type AdminUsageLogRow,
+} from "@/components/admin/admin-usage-logs-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,32 +17,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  formatCreditsPrecise,
-  formatDateTime,
-  formatInt,
-  toneForStatus,
-} from "@/lib/format";
+  computeUsageLogStats,
+  getUsageRequestType,
+  isUsageSuccess,
+} from "@/lib/admin/usage";
+import { formatInt } from "@/lib/format";
 import { getDmitBaseUrl } from "@/lib/dmit/client";
 
-export type AdminUsageLog = {
-  created_at: string | null;
-  email: string | null;
-  api_key_prefix: string | null;
-  api_key_name: string | null;
-  model: string | null;
-  status: string | null;
-  prompt_tokens: number | null;
-  completion_tokens: number | null;
-  total_tokens: number | null;
-  credits_charged: number | null;
-  request_id: string | null;
-  error_code: string | null;
-  error_message: string | null;
-};
+export type AdminUsageLog = AdminUsageLogRow;
 
 type UsageResponse = {
   data?: AdminUsageLog[];
 };
+
+type StatusFilter = "all" | "succeeded" | "failed";
+type TypeFilter = "all" | "chat" | "image";
 
 export function AdminUsageClient({
   accessToken,
@@ -52,6 +45,8 @@ export function AdminUsageClient({
   const [logs, setLogs] = useState(initialLogs);
   const [error, setError] = useState<string | null>(initialError);
   const [loading, setLoading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
 
   const loadLogs = useCallback(async () => {
     setLoading(true);
@@ -83,24 +78,36 @@ export function AdminUsageClient({
     setError(initialError);
   }, [initialLogs, initialError]);
 
+  const stats = useMemo(() => computeUsageLogStats(logs), [logs]);
+
+  const filteredLogs = useMemo(() => {
+    return logs.filter((row) => {
+      if (statusFilter === "succeeded" && !isUsageSuccess(row.status)) {
+        return false;
+      }
+      if (statusFilter === "failed" && isUsageSuccess(row.status)) {
+        return false;
+      }
+
+      const requestType = getUsageRequestType(row.model);
+      if (typeFilter === "chat" && requestType !== "chat") {
+        return false;
+      }
+      if (typeFilter === "image" && requestType !== "image") {
+        return false;
+      }
+
+      return true;
+    });
+  }, [logs, statusFilter, typeFilter]);
+
   return (
-    <div className="flex flex-col gap-6">
+    <>
       <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">Admin tools</Badge>
-          <Link
-            href="/admin"
-            className="text-sm text-muted-foreground underline-offset-4 hover:underline"
-          >
-            Back to admin overview
-          </Link>
-        </div>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight">
-          Usage logs
-        </h1>
+        <Badge variant="secondary">Admin tools</Badge>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight">Usage logs</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Recent API usage across all users, served by DMIT with your Supabase
-          session token only.
+          Full-site API request history. Read-only in this phase.
         </p>
       </div>
 
@@ -123,12 +130,63 @@ export function AdminUsageClient({
         </Card>
       ) : null}
 
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <AdminStatCard
+          label="Total requests"
+          value={formatInt(stats.totalRequests)}
+        />
+        <AdminStatCard label="Succeeded" value={formatInt(stats.succeeded)} />
+        <AdminStatCard label="Failed" value={formatInt(stats.failed)} />
+        <AdminStatCard
+          label="Image requests"
+          value={formatInt(stats.imageRequests)}
+        />
+        <AdminStatCard
+          label="Chat requests"
+          value={formatInt(stats.chatRequests)}
+        />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Filters</CardTitle>
+          <CardDescription>
+            Client-side filters on the loaded batch (no server query params yet).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-4">
+            <FilterSelect
+              label="Status"
+              value={statusFilter}
+              options={[
+                { value: "all", label: "All" },
+                { value: "succeeded", label: "Succeeded" },
+                { value: "failed", label: "Failed" },
+              ]}
+              onChange={(value) => setStatusFilter(value as StatusFilter)}
+            />
+            <FilterSelect
+              label="Type"
+              value={typeFilter}
+              options={[
+                { value: "all", label: "All" },
+                { value: "chat", label: "Chat" },
+                { value: "image", label: "Image" },
+              ]}
+              onChange={(value) => setTypeFilter(value as TypeFilter)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div>
-            <CardTitle>Recent usage</CardTitle>
+            <CardTitle>Usage logs</CardTitle>
             <CardDescription>
-              Last 100 requests with profile email and API key metadata.
+              Showing {formatInt(filteredLogs.length)} of {formatInt(logs.length)}{" "}
+              loaded requests.
             </CardDescription>
           </div>
           <Button
@@ -144,110 +202,44 @@ export function AdminUsageClient({
         <CardContent>
           {loading && logs.length === 0 ? (
             <p className="text-sm text-muted-foreground">Loading usage logs…</p>
-          ) : logs.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-                    <th className="py-2 pr-4 font-medium">Created</th>
-                    <th className="py-2 pr-4 font-medium">Email</th>
-                    <th className="py-2 pr-4 font-medium">API key prefix</th>
-                    <th className="py-2 pr-4 font-medium">API key name</th>
-                    <th className="py-2 pr-4 font-medium">Model</th>
-                    <th className="py-2 pr-4 font-medium">Status</th>
-                    <th className="py-2 pr-4 text-right font-medium">Prompt</th>
-                    <th className="py-2 pr-4 text-right font-medium">
-                      Completion
-                    </th>
-                    <th className="py-2 pr-4 text-right font-medium">Total</th>
-                    <th className="py-2 pr-4 text-right font-medium">Credits</th>
-                    <th className="py-2 pr-4 font-medium">Request ID</th>
-                    <th className="py-2 pr-4 font-medium">Error code</th>
-                    <th className="py-2 pr-4 font-medium">Error message</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {logs.map((row, index) => (
-                    <tr
-                      key={rowKey(row, index)}
-                      className="border-b align-top last:border-0"
-                    >
-                      <td className="py-2 pr-4 text-muted-foreground">
-                        {formatDateTime(row.created_at)}
-                      </td>
-                      <td className="py-2 pr-4">{row.email ?? "—"}</td>
-                      <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">
-                        {row.api_key_prefix ?? "—"}
-                      </td>
-                      <td className="py-2 pr-4">{row.api_key_name ?? "—"}</td>
-                      <td className="py-2 pr-4 font-mono text-xs">
-                        {row.model ?? "—"}
-                      </td>
-                      <td className="py-2 pr-4">
-                        <StatusBadge status={row.status} />
-                      </td>
-                      <td className="py-2 pr-4 text-right font-mono text-xs">
-                        {formatMaybeInt(row.prompt_tokens)}
-                      </td>
-                      <td className="py-2 pr-4 text-right font-mono text-xs">
-                        {formatMaybeInt(row.completion_tokens)}
-                      </td>
-                      <td className="py-2 pr-4 text-right font-mono text-xs">
-                        {formatMaybeInt(row.total_tokens)}
-                      </td>
-                      <td className="py-2 pr-4 text-right font-mono text-xs">
-                        {row.credits_charged != null
-                          ? formatCreditsPrecise(row.credits_charged)
-                          : "—"}
-                      </td>
-                      <td
-                        className="max-w-[12rem] truncate py-2 pr-4 font-mono text-xs text-muted-foreground"
-                        title={row.request_id ?? undefined}
-                      >
-                        {row.request_id ?? "—"}
-                      </td>
-                      <td className="py-2 pr-4 font-mono text-xs">
-                        {row.error_code ?? "—"}
-                      </td>
-                      <td
-                        className="max-w-[16rem] truncate py-2 pr-4 text-xs text-muted-foreground"
-                        title={row.error_message ?? undefined}
-                      >
-                        {row.error_message ?? "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           ) : (
-            <div className="rounded-md border border-dashed py-10 text-center text-sm text-muted-foreground">
-              No usage logs found.
-            </div>
+            <AdminUsageLogsTable rows={filteredLogs} />
           )}
         </CardContent>
       </Card>
-    </div>
+    </>
   );
 }
 
-function StatusBadge({ status }: { status: string | null | undefined }) {
-  const tone = toneForStatus(status);
-  if (!status) return <Badge variant="outline">unknown</Badge>;
-  if (tone === "success") return <Badge variant="success">{status}</Badge>;
-  if (tone === "warning") return <Badge variant="warning">{status}</Badge>;
-  if (tone === "destructive") {
-    return <Badge variant="destructive">{status}</Badge>;
-  }
-  return <Badge variant="outline">{status}</Badge>;
-}
-
-function formatMaybeInt(value: number | null | undefined): string {
-  return value == null ? "—" : formatInt(value);
-}
-
-function rowKey(row: AdminUsageLog, index: number): string {
-  return row.request_id ?? `${row.created_at ?? "row"}-${index}`;
+function FilterSelect<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (value: T) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-2 text-sm">
+      <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value as T)}
+        className="flex h-10 min-w-[10rem] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 }
 
 async function parseJson(response: Response): Promise<unknown> {
@@ -272,5 +264,5 @@ function errorMessageFromBody(body: unknown, status: number): string {
     if (typeof message === "string") return message;
   }
   if (typeof body === "string" && body.trim()) return body;
-  return `DMIT request failed (HTTP ${status}).`;
+  return `Request failed (HTTP ${status}).`;
 }
