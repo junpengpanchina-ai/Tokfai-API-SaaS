@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { Fragment, useState } from "react";
 
 import { AdminDebugCard } from "@/components/admin/admin-debug-card";
 import { AdminFutureControlsCard } from "@/components/admin/admin-future-controls-card";
+import { AdminUserDetailPanel } from "@/components/admin/admin-user-detail-panel";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -37,6 +40,11 @@ export function AdminUsersPanel({
   debug: AdminDebug | null;
 }) {
   const { t } = useI18n();
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+
+  function toggleUserDetails(userId: string) {
+    setExpandedUserId((current) => (current === userId ? null : userId));
+  }
 
   return (
     <>
@@ -100,39 +108,62 @@ export function AdminUsersPanel({
                       {t("admin.users.totalRequests")}
                     </th>
                     <th className="py-2 pr-4 font-medium">{t("admin.users.lastActivity")}</th>
-                    <th className="py-2 pr-4 font-medium">{t("admin.users.credits")}</th>
+                    <th className="py-2 pr-4 font-medium">{t("admin.users.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((row) => (
-                    <tr key={row.id} className="border-b last:border-0">
-                      <td className="py-2 pr-4">{row.email ?? "—"}</td>
-                      <td className="py-2 pr-4 text-right font-mono text-xs">
-                        {formatCredits(row.credits_balance)}
-                      </td>
-                      <td className="py-2 pr-4 text-right text-muted-foreground">
-                        —
-                      </td>
-                      <td className="py-2 pr-4 text-right text-muted-foreground">
-                        —
-                      </td>
-                      <td className="py-2 pr-4 text-muted-foreground">
-                        {formatDateTime(row.updated_at)}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {row.email ? (
-                          <Link
-                            href={`/admin/credits?email=${encodeURIComponent(row.email)}`}
-                            className="text-sm font-medium underline-offset-4 hover:underline"
-                          >
-                            {t("admin.users.ledger")}
-                          </Link>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {users.map((row) => {
+                    const isExpanded = expandedUserId === row.id;
+
+                    return (
+                      <Fragment key={row.id}>
+                        <tr className="border-b last:border-0">
+                          <td className="py-2 pr-4">{row.email ?? "—"}</td>
+                          <td className="py-2 pr-4 text-right font-mono text-xs">
+                            {formatCredits(row.credits_balance)}
+                          </td>
+                          <td className="py-2 pr-4 text-right text-muted-foreground">
+                            —
+                          </td>
+                          <td className="py-2 pr-4 text-right text-muted-foreground">
+                            —
+                          </td>
+                          <td className="py-2 pr-4 text-muted-foreground">
+                            {formatDateTime(row.updated_at)}
+                          </td>
+                          <td className="py-2 pr-4">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => toggleUserDetails(row.id)}
+                              >
+                                {isExpanded
+                                  ? t("admin.users.hideDetails")
+                                  : t("admin.users.viewDetails")}
+                              </Button>
+                              {row.email ? (
+                                <Link
+                                  href={`/admin/credits?email=${encodeURIComponent(row.email)}`}
+                                  className="text-xs font-medium text-muted-foreground underline-offset-4 hover:underline"
+                                >
+                                  {t("admin.users.ledger")}
+                                </Link>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                        {isExpanded ? (
+                          <tr className="border-b last:border-0">
+                            <td colSpan={6} className="py-3 pr-4">
+                              <AdminUserDetailPanel user={row} />
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

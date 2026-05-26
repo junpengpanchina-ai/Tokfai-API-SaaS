@@ -20,7 +20,11 @@ type UsageResponse = {
   data?: AdminUsageLog[];
 };
 
-export default async function AdminUsagePage() {
+export default async function AdminUsagePage({
+  searchParams,
+}: {
+  searchParams: { email?: string };
+}) {
   noStore();
   const supabase = createClient();
   const dmitBaseUrl = getDmitBaseUrl();
@@ -65,11 +69,14 @@ export default async function AdminUsagePage() {
     }
   }
 
+  const initialEmailFilter = (searchParams.email ?? "").trim();
+
   return (
     <AdminUsageClient
       accessToken={accessToken}
       initialLogs={initialLogs}
       initialError={initialError}
+      initialEmailFilter={initialEmailFilter}
     />
   );
 }

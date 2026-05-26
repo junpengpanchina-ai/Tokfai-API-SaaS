@@ -39,10 +39,12 @@ export function AdminUsageClient({
   accessToken,
   initialLogs,
   initialError,
+  initialEmailFilter = "",
 }: {
   accessToken: string;
   initialLogs: AdminUsageLog[];
   initialError: string | null;
+  initialEmailFilter?: string;
 }) {
   const { t } = useI18n();
   const [logs, setLogs] = useState(initialLogs);
@@ -50,6 +52,7 @@ export function AdminUsageClient({
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [emailFilter, setEmailFilter] = useState(initialEmailFilter);
 
   const loadLogs = useCallback(async () => {
     setLoading(true);
@@ -81,12 +84,22 @@ export function AdminUsageClient({
   useEffect(() => {
     setLogs(initialLogs);
     setError(initialError);
-  }, [initialLogs, initialError]);
+    setEmailFilter(initialEmailFilter);
+  }, [initialLogs, initialError, initialEmailFilter]);
 
   const stats = useMemo(() => computeUsageLogStats(logs), [logs]);
 
   const filteredLogs = useMemo(() => {
+    const normalizedEmail = emailFilter.trim().toLowerCase();
+
     return logs.filter((row) => {
+      if (
+        normalizedEmail &&
+        (row.email ?? "").toLowerCase() !== normalizedEmail
+      ) {
+        return false;
+      }
+
       if (statusFilter === "succeeded" && !isUsageSuccess(row.status)) {
         return false;
       }
@@ -104,7 +117,7 @@ export function AdminUsageClient({
 
       return true;
     });
-  }, [logs, statusFilter, typeFilter]);
+  }, [logs, statusFilter, typeFilter, emailFilter]);
 
   return (
     <>
@@ -117,6 +130,29 @@ export function AdminUsageClient({
           {t("admin.usage.subtitle")}
         </p>
       </div>
+
+      {emailFilter ? (
+        <Card className="border-muted bg-muted/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">{t("admin.usage.emailFilterTitle")}</CardTitle>
+            <CardDescription>
+              {formatMessage(t("admin.usage.emailFilterDesc"), {
+                email: emailFilter,
+              })}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setEmailFilter("")}
+            >
+              {t("admin.usage.clearEmailFilter")}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {error ? (
         <Card className="border-destructive/30 bg-destructive/5">
