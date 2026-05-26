@@ -16,6 +16,8 @@ export type ChatModelPricing = {
 export type ImageModelPricing = {
   mode: "per_request";
   creditsPerRequest: number;
+  /** Display-only RMB reference range per generation. */
+  referenceYuanPerRequest: PriceRangeYuan;
 };
 
 export type ModelPricing = ChatModelPricing | ImageModelPricing;
@@ -68,10 +70,35 @@ function chatPricing(
   };
 }
 
-function imagePricing(creditsPerRequest: number): ImageModelPricing {
+/** Display-only anchor: nano-banana 1,400 credits ≈ ¥0.07~¥0.14 / generation. */
+const IMAGE_REFERENCE_YUAN_MIN_PER_CREDIT = 0.07 / 1400;
+const IMAGE_REFERENCE_YUAN_MAX_PER_CREDIT = 0.14 / 1400;
+
+function roundReferenceYuan(value: number): number {
+  if (value >= 1) {
+    return Math.round(value * 100) / 100;
+  }
+  if (value >= 0.1) {
+    return Math.round(value * 1000) / 1000;
+  }
+  return Math.round(value * 10000) / 10000;
+}
+
+function imagePricing(
+  creditsPerRequest: number,
+  referenceYuanOverride?: PriceRangeYuan
+): ImageModelPricing {
   return {
     mode: "per_request",
     creditsPerRequest,
+    referenceYuanPerRequest: referenceYuanOverride ?? {
+      min: roundReferenceYuan(
+        creditsPerRequest * IMAGE_REFERENCE_YUAN_MIN_PER_CREDIT
+      ),
+      max: roundReferenceYuan(
+        creditsPerRequest * IMAGE_REFERENCE_YUAN_MAX_PER_CREDIT
+      ),
+    },
   };
 }
 

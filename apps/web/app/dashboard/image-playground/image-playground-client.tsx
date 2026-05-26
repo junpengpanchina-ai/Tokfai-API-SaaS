@@ -41,6 +41,7 @@ import {
   formatImageCreditsAmount,
   formatImageModelPriceForModelId,
   formatImageModelSelectLabel,
+  formatImageReferenceYuanForModelId,
 } from "@/lib/model-pricing-display";
 import {
   getImageModelCreditsPerRequest,
@@ -215,6 +216,7 @@ export function ImagePlaygroundClient({
 
   const selectedModelCredits = getImageModelCreditsPerRequest(model);
   const selectedModelPrice = formatImageModelPriceForModelId(model, locale);
+  const selectedModelReferencePrice = formatImageReferenceYuanForModelId(model, locale);
 
   const hasUploadingImages = imageInputs.some(
     (item) => item.status === "uploading" || item.status === "resolving"
@@ -747,6 +749,13 @@ export function ImagePlaygroundClient({
                   {t("dashboard.imagePlayground.priceFallback")}
                 </p>
               )}
+              {selectedModelReferencePrice ? (
+                <p className="text-xs text-muted-foreground">
+                  {formatMessage(t("dashboard.imagePlayground.currentReferencePrice"), {
+                    price: selectedModelReferencePrice,
+                  })}
+                </p>
+              ) : null}
             </div>
 
             <div className="flex flex-col gap-2">

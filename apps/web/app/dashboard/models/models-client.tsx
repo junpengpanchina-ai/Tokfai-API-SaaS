@@ -27,8 +27,9 @@ import {
   formatChatInputPricePerMillion,
   formatChatOutputPricePerMillion,
   formatImageCreditsPerRequest,
+  formatImageReferenceYuanPerRequest,
   getChatBillingUnitLabel,
-  getImageBillingChargeLabel,
+  getImagePerRequestBillingUnitLabel,
 } from "@/lib/model-pricing-display";
 import { TOKFAI_MODELS_ENDPOINT } from "@/lib/tokfai-api";
 
@@ -183,7 +184,7 @@ function ModelCard({
   const typeLabel = MODEL_TYPE_LABELS[model.type](t);
   const billingUnitLabel =
     model.type === "image"
-      ? getImageBillingChargeLabel(locale)
+      ? getImagePerRequestBillingUnitLabel(locale)
       : model.type === "chat"
         ? getChatBillingUnitLabel(locale)
         : model.billingUnit;
@@ -213,12 +214,14 @@ function ModelCard({
         <PriceBlock model={model} t={t} locale={locale} />
 
         <dl className="grid gap-2 text-sm">
-          <div className="flex flex-col gap-0.5">
-            <dt className="text-xs uppercase tracking-wider text-muted-foreground">
-              {t("dashboard.models.billingUnit")}
-            </dt>
-            <dd>{billingUnitLabel}</dd>
-          </div>
+          {model.type !== "image" ? (
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-xs uppercase tracking-wider text-muted-foreground">
+                {t("dashboard.models.billingUnit")}
+              </dt>
+              <dd>{billingUnitLabel}</dd>
+            </div>
+          ) : null}
           <div className="flex flex-col gap-0.5">
             <dt className="text-xs uppercase tracking-wider text-muted-foreground">
               {t("dashboard.models.description")}
@@ -309,13 +312,31 @@ function PriceBlock({
   if (isImageModelEntry(model)) {
     return (
       <div className="rounded-lg border bg-muted/40 px-4 py-3">
-        <div className="text-xs uppercase tracking-wider text-muted-foreground">
-          {t("dashboard.models.price")}
-        </div>
-        <div className="mt-1 text-lg font-semibold tracking-tight">
-          {formatImageCreditsPerRequest(model.pricing, locale)}
-        </div>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <dl className="grid gap-3 text-sm">
+          <div>
+            <dt className="text-xs uppercase tracking-wider text-muted-foreground">
+              {t("dashboard.models.creditsPrice")}
+            </dt>
+            <dd className="mt-1 text-lg font-semibold tracking-tight">
+              {formatImageCreditsPerRequest(model.pricing, locale)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase tracking-wider text-muted-foreground">
+              {t("dashboard.models.referencePrice")}
+            </dt>
+            <dd className="mt-1 font-mono font-medium">
+              {formatImageReferenceYuanPerRequest(model.pricing, locale)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase tracking-wider text-muted-foreground">
+              {t("dashboard.models.billingUnit")}
+            </dt>
+            <dd>{getImagePerRequestBillingUnitLabel(locale)}</dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-sm text-muted-foreground">
           {t("dashboard.models.imageBillingNote")}
         </p>
       </div>

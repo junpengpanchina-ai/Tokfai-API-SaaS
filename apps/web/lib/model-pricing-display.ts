@@ -29,6 +29,17 @@ export function formatChatOutputPricePerMillion(pricing: ChatModelPricing): stri
   return `${formatYuanRange(pricing.outputPerMillionYuan)} / 1M tokens`;
 }
 
+export function formatImageReferenceYuanPerRequest(
+  pricing: ImageModelPricing,
+  locale: Locale
+): string {
+  const yuan = formatYuanRange(pricing.referenceYuanPerRequest);
+  if (locale === "zh") {
+    return `${yuan} / 次`;
+  }
+  return `${yuan} / generation`;
+}
+
 /** Image model price line, e.g. `600 积分/次` or `600 credits / generation`. */
 export function formatImageCreditsPerRequest(
   pricing: ImageModelPricing,
@@ -61,6 +72,11 @@ export function formatModelPriceSummary(
 /** Short unit label when price is shown separately — kept for table headers if needed. */
 export function getImagePriceUnitLabel(locale: Locale): string {
   return locale === "zh" ? "积分/次" : "credits / generation";
+}
+
+/** Billing unit for image models in pricing tables and cards. */
+export function getImagePerRequestBillingUnitLabel(locale: Locale): string {
+  return locale === "zh" ? "按次计费" : "Per generation";
 }
 
 /** Billing unit on model cards — per successful generation. */
@@ -111,6 +127,23 @@ export function formatImageModelPriceForModelId(
     return null;
   }
   return formatImageCreditsPerRequest(entry.pricing, locale);
+}
+
+export function formatImageReferenceYuanForModelId(
+  modelId: string,
+  locale: Locale
+): string | null {
+  const entry = getImageModelById(modelId);
+  if (!entry || !isImageModelEntry(entry)) {
+    return null;
+  }
+  if (
+    entry.pricing.referenceYuanPerRequest.min === 0 &&
+    entry.pricing.referenceYuanPerRequest.max === 0
+  ) {
+    return null;
+  }
+  return formatImageReferenceYuanPerRequest(entry.pricing, locale);
 }
 
 /** Credits page example, e.g. `Nano Banana is 1,400 credits / generation`. */

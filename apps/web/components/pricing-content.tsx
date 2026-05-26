@@ -261,6 +261,8 @@ export function PricingContent() {
                 colModelId: t("pricing.colModelId"),
                 colInput: t("pricing.colInput"),
                 colOutput: t("pricing.colOutput"),
+                colCreditsPrice: t("pricing.colCreditsPrice"),
+                colReferencePrice: t("pricing.colReferencePrice"),
                 colPrice: t("pricing.colPrice"),
                 colBillingUnit: t("pricing.colBillingUnit"),
                 colUseCase: t("pricing.colUseCase"),

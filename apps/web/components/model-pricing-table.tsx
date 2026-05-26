@@ -12,8 +12,10 @@ import {
   formatChatInputPricePerMillion,
   formatChatOutputPricePerMillion,
   formatImageCreditsPerRequest,
+  formatImageReferenceYuanPerRequest,
   getChatBillingUnitLabel,
   getImageModelUseCase,
+  getImagePerRequestBillingUnitLabel,
 } from "@/lib/model-pricing-display";
 
 type ModelPricingTableProps = {
@@ -27,6 +29,8 @@ type ModelPricingTableProps = {
     colModelId: string;
     colInput: string;
     colOutput: string;
+    colCreditsPrice: string;
+    colReferencePrice: string;
     colPrice: string;
     colBillingUnit: string;
     colUseCase: string;
@@ -74,7 +78,9 @@ export function ModelPricingTables({ locale, t, labels }: ModelPricingTableProps
             <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
               <th className="py-2 pr-4 font-medium">{labels.colModel}</th>
               <th className="py-2 pr-4 font-medium">{labels.colModelId}</th>
-              <th className="py-2 pr-4 font-medium">{labels.colPrice}</th>
+              <th className="py-2 pr-4 font-medium">{labels.colCreditsPrice}</th>
+              <th className="py-2 pr-4 font-medium">{labels.colReferencePrice}</th>
+              <th className="py-2 pr-4 font-medium">{labels.colBillingUnit}</th>
               <th className="py-2 pr-4 font-medium">{labels.colTags}</th>
               <th className="py-2 pr-4 font-medium">{labels.colUseCase}</th>
             </tr>
@@ -196,6 +202,12 @@ function ImagePricingRow({
       </td>
       <td className="py-3 pr-4 align-top font-mono text-xs font-medium text-foreground">
         {formatImageCreditsPerRequest(model.pricing, locale)}
+      </td>
+      <td className="py-3 pr-4 align-top font-mono text-xs">
+        {formatImageReferenceYuanPerRequest(model.pricing, locale)}
+      </td>
+      <td className="py-3 pr-4 align-top text-muted-foreground">
+        {getImagePerRequestBillingUnitLabel(locale)}
       </td>
       <td className="py-3 pr-4 align-top">
         <TagList tags={model.tags} />
