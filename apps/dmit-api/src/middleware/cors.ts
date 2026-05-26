@@ -8,6 +8,18 @@ const BASELINE_ORIGINS = [
   "http://localhost:3000",
 ];
 
+/**
+ * Canonical CORS request headers. Browsers match these case-insensitively, so
+ * `Idempotency-Key` covers `idempotency-key` on preflight and actual requests.
+ */
+export const CORS_ALLOW_HEADERS = [
+  "Authorization",
+  "Content-Type",
+  "Idempotency-Key",
+  "X-Request-Id",
+  "Stripe-Signature",
+] as const;
+
 function allowedOrigins(): Set<string> {
   const fromEnv = Array.isArray(env.CORS_ALLOWED_ORIGINS)
     ? env.CORS_ALLOWED_ORIGINS
@@ -26,12 +38,7 @@ export const corsMiddleware = cors({
     return allowed.has(origin) ? origin : null;
   },
   allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-  allowHeaders: [
-    "Authorization",
-    "Content-Type",
-    "X-Request-Id",
-    "Stripe-Signature",
-  ],
+  allowHeaders: [...CORS_ALLOW_HEADERS],
   exposeHeaders: ["X-Request-Id"],
   credentials: false,
   maxAge: 86400,
