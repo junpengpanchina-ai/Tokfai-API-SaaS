@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useI18n } from "@/lib/i18n/i18n-provider";
 
 import {
   TOKFAI_API_BASE_URL,
@@ -142,7 +143,7 @@ const ERROR_CODES = [
   {
     status: "504",
     code: "upstream_timeout",
-    meaning: "The upstream model timed out",
+    meaning: "The model service timed out",
   },
 ];
 
@@ -151,6 +152,7 @@ export function DocsContent({
 }: {
   showDashboardLinks?: boolean;
 }) {
+  const { t } = useI18n();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const timeoutRef = useRef<number | null>(null);
 
@@ -222,6 +224,41 @@ export function DocsContent({
             .
           </CardDescription>
         </CardHeader>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">{t("docs.billingRatesTitle")}</CardTitle>
+          <CardDescription>{t("docs.billingRatesDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 text-sm text-muted-foreground">
+          <div>
+            <h3 className="font-medium text-foreground">
+              {t("docs.chatBillingTitle")}
+            </h3>
+            <p className="mt-1">{t("docs.chatBillingDesc")}</p>
+          </div>
+          <div>
+            <h3 className="font-medium text-foreground">
+              {t("docs.imageBillingTitle")}
+            </h3>
+            <p className="mt-1">{t("docs.imageBillingDesc")}</p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/pricing"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              {t("docs.viewModelRates")}
+            </Link>
+            <Link
+              href="/dashboard/models"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              {t("docs.viewModelsPage")}
+            </Link>
+          </div>
+        </CardContent>
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

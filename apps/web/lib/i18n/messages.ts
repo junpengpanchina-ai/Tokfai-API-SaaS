@@ -89,6 +89,51 @@ export const messages = {
         apiKeyFormat: "API key format",
         starter: "Starter",
         billing: "Billing",
+        pricingAnnouncementTitle: "Model pricing & capabilities updated",
+        pricingAnnouncementDesc:
+          "Model pricing and capability notes have been updated. Image models are billed per generation, while chat models are billed by tokens. Successful requests debit credits; failed requests are not charged. Usage and Credits remain the source of truth.",
+      },
+      models: {
+        title: "Models",
+        subtitle:
+          "Browse Tokfai model IDs, current reference prices, and availability. Use these IDs in your API requests or the Chat / Image Playgrounds.",
+        billingNoticeTitle: "Billing & playgrounds",
+        billingNoticeItem1:
+          "Current reference prices are shown for planning. Usage and Credits are the source of truth for actual charges.",
+        billingNoticeItem2: "Failed calls are not charged.",
+        billingNoticeItem3: "Chat Playground only supports chat models.",
+        billingNoticeItem4: "Image Playground only supports image models.",
+        billingNoticeItem5:
+          "Video models will use a separate playground later.",
+        chatSectionTitle: "Chat Models",
+        chatSectionDesc:
+          "Verified chat models available through the API and Chat Playground.",
+        imageSectionTitle: "Image Models",
+        imageSectionDesc:
+          "Text-to-image and image-to-image models available through POST /v1/images/generations and the Image Playground.",
+        imageComingSoonTitle: "Image Models (coming soon)",
+        imageComingSoonDesc: "Additional image models planned for future release.",
+        videoSectionTitle: "Video Models",
+        videoSectionDesc:
+          "Coming soon — video generation models planned for a dedicated Video Playground.",
+        comingSoon: "Coming soon",
+        available: "Available",
+        price: "Current reference price",
+        billingUnit: "Billing unit",
+        description: "Description",
+        supports: "Supports",
+        tags: "Tags",
+        playground: "Playground",
+        copyModelId: "Copy model id",
+        copied: "Copied",
+        tryChatPlayground: "Try in Chat Playground",
+        tryImagePlayground: "Try in Image Playground",
+        videoPlaygroundSoon: "Video Playground coming soon",
+        typeChat: "Chat",
+        typeImage: "Image",
+        typeVideo: "Video",
+        inputPrice: "Input",
+        outputPrice: "Output",
       },
       apiKeys: {
         title: "API Keys",
@@ -212,7 +257,7 @@ export const messages = {
         curlCopied: "curl copied — replace {placeholder} with your API key.",
         inputImagesCount: "Input images: {count}",
         visualReferenceNote:
-          "Tokfai will use your uploaded or linked image as visual reference. Results may vary depending on upstream model behavior.",
+          "Tokfai will use your uploaded or linked image as visual reference. Results may vary depending on model behavior.",
         settings: "Settings",
         settingsDesc:
           "Image models only. Values are sent in the JSON body to api.tokfai.com.",
@@ -298,6 +343,46 @@ export const messages = {
           "No API usage yet. Send your first chat completion or image generation from the Playgrounds to see requests here.",
       },
     },
+    pricing: {
+      heroTitle: "OpenAI-compatible image & chat API",
+      heroDesc:
+        "One API for chat, image, and AI apps. Use Tokfai with Cursor, Cherry Studio, OpenAI SDK, or your own app. Video models are coming soon.",
+      usageTitle: "Usage-based billing",
+      usageDesc:
+        "Prepaid credits power every API call. You only pay for what you use.",
+      modelRatesTitle: "Model pricing",
+      modelRatesDesc:
+        "Current reference prices for chat and image models. Usage and Credits are the source of truth for actual charges.",
+      disclaimer:
+        "Current reference prices are shown for planning. Usage and Credits are the source of truth for actual charges. Failed requests are not charged.",
+      chatModelsTitle: "Chat Models",
+      imageModelsTitle: "Image Models",
+      colModel: "Model",
+      colInput: "Input",
+      colOutput: "Output",
+      colPrice: "Price",
+      colBillingUnit: "Billing unit",
+      colTags: "Tags",
+      forDevelopersTitle: "For developers",
+      forDevelopersDesc:
+        "Point any OpenAI-compatible client at Tokfai and start calling models with your API key.",
+      starterUse: "Works for chat and image API testing.",
+      getStarter: "Get Starter",
+      comingSoon: "Coming soon",
+    },
+    docs: {
+      billingRatesTitle: "Billing & pricing",
+      billingRatesDesc:
+        "Successful calls debit credits. Failed calls are not charged. Current reference prices are shown for planning — review per-request charges in Usage and ledger entries in Credits.",
+      chatBillingTitle: "Chat models",
+      chatBillingDesc:
+        "Chat models are billed by token usage. Display uses current reference input and output prices per 1M tokens (¥). Actual credits charged per request appear in Usage.",
+      imageBillingTitle: "Image models",
+      imageBillingDesc:
+        "Image models are billed per successful generation. Display uses current reference credits per request. Actual credits charged per request appear in Usage.",
+      viewModelRates: "View full pricing on Pricing",
+      viewModelsPage: "Browse models and tags",
+    },
   },
   zh: {
     nav: {
@@ -375,6 +460,49 @@ export const messages = {
         apiKeyFormat: "API 密钥格式",
         starter: "Starter",
         billing: "计费说明",
+        pricingAnnouncementTitle: "模型价格与能力说明已更新",
+        pricingAnnouncementDesc:
+          "模型价格与能力说明已更新。图片模型按次计费，对话模型按 token 计费。成功请求会扣除 credits，失败请求不扣费，实际记录以 Usage 与 Credits 为准。",
+      },
+      models: {
+        title: "模型",
+        subtitle:
+          "浏览 Tokfai model ID、当前参考价格与可用性。可在 API 请求或 Chat / Image Playground 中使用这些 ID。",
+        billingNoticeTitle: "计费与 Playground",
+        billingNoticeItem1:
+          "展示当前参考价格供规划使用，实际扣费以 Usage 与 Credits 记录为准。",
+        billingNoticeItem2: "失败请求不扣费。",
+        billingNoticeItem3: "Chat Playground 仅支持对话模型。",
+        billingNoticeItem4: "Image Playground 仅支持图像模型。",
+        billingNoticeItem5: "视频模型将使用独立的 Playground。",
+        chatSectionTitle: "对话模型",
+        chatSectionDesc:
+          "可通过 API 与 Chat Playground 使用的已验证对话模型。",
+        imageSectionTitle: "图像模型",
+        imageSectionDesc:
+          "可通过 POST /v1/images/generations 与 Image Playground 使用的文生图/图生图模型。",
+        imageComingSoonTitle: "图像模型（即将上线）",
+        imageComingSoonDesc: "更多图像模型计划在未来发布。",
+        videoSectionTitle: "视频模型",
+        videoSectionDesc: "即将上线——视频生成模型将使用独立 Video Playground。",
+        comingSoon: "即将上线",
+        available: "可用",
+        price: "当前参考价格",
+        billingUnit: "计费单位",
+        description: "说明",
+        supports: "Supports",
+        tags: "Tags",
+        playground: "Playground",
+        copyModelId: "复制 model id",
+        copied: "已复制",
+        tryChatPlayground: "在 Chat Playground 试用",
+        tryImagePlayground: "在 Image Playground 试用",
+        videoPlaygroundSoon: "Video Playground 即将上线",
+        typeChat: "对话",
+        typeImage: "图像",
+        typeVideo: "视频",
+        inputPrice: "Input",
+        outputPrice: "Output",
       },
       apiKeys: {
         title: "API 密钥",
@@ -490,7 +618,7 @@ export const messages = {
         curlCopied: "curl 已复制——将 {placeholder} 替换为你的 API 密钥。",
         inputImagesCount: "输入图：{count}",
         visualReferenceNote:
-          "Tokfai 会使用你上传或链接的图片作为视觉参考，效果因上游模型而异。",
+          "Tokfai 会使用你上传或链接的图片作为视觉参考，效果因模型而异。",
         settings: "设置",
         settingsDesc:
           "仅图像模型。参数通过 JSON body 发送至 api.tokfai.com。",
@@ -569,6 +697,45 @@ export const messages = {
         emptyTitle:
           "暂无 API 用量。在 Playground 发送第一次对话或图像生成后，记录会显示在这里。",
       },
+    },
+    pricing: {
+      heroTitle: "OpenAI 兼容的图像与对话 API",
+      heroDesc:
+        "一个 API 覆盖对话、图像与 AI 应用。可用于 Cursor、Cherry Studio、OpenAI SDK 或自研产品。视频模型即将上线。",
+      usageTitle: "按量计费",
+      usageDesc: "预付费积分驱动每次 API 调用，按实际使用扣费。",
+      modelRatesTitle: "模型价格",
+      modelRatesDesc:
+        "对话与图像模型的当前参考价格。实际扣费以 Usage 与 Credits 记录为准。",
+      disclaimer:
+        "展示当前参考价格供规划使用，实际扣费以 Usage 与 Credits 记录为准。失败请求不扣费。",
+      chatModelsTitle: "对话模型",
+      imageModelsTitle: "图像模型",
+      colModel: "Model",
+      colInput: "Input",
+      colOutput: "Output",
+      colPrice: "价格",
+      colBillingUnit: "计费单位",
+      colTags: "Tags",
+      forDevelopersTitle: "开发者",
+      forDevelopersDesc:
+        "将任意 OpenAI 兼容客户端指向 Tokfai，使用 API 密钥即可调用模型。",
+      starterUse: "适用于对话与图像 API 测试。",
+      getStarter: "购买 Starter",
+      comingSoon: "即将上线",
+    },
+    docs: {
+      billingRatesTitle: "计费与价格",
+      billingRatesDesc:
+        "成功调用扣费，失败调用不扣费。展示当前参考价格供规划使用——请在 Usage 查看每次请求扣费，在 Credits 查看账本记录。",
+      chatBillingTitle: "对话模型",
+      chatBillingDesc:
+        "对话模型按 token 用量计费。展示当前参考 input / output 每 1M tokens 的 ¥ 价格区间。每次请求实际扣除积分见 Usage。",
+      imageBillingTitle: "图像模型",
+      imageBillingDesc:
+        "图像模型按成功生成次数计费。展示当前参考的每次请求积分价格。每次请求实际扣除积分见 Usage。",
+      viewModelRates: "在 Pricing 查看完整模型价格",
+      viewModelsPage: "浏览模型与 Tags",
     },
   },
 } as const;

@@ -19,6 +19,8 @@ export const TOKFAI_PRODUCT_TAGLINE =
   "OpenAI-compatible image & chat API — one API for chat, image, and AI apps.";
 export const TOKFAI_BILLING_POLICY =
   "Successful calls debit credits. Failed calls are not charged.";
+export const TOKFAI_PRICING_DISCLAIMER =
+  "Current reference prices are shown for planning. Usage and Credits are the source of truth for actual charges.";
 export const TOKFAI_PLAYGROUND_POLICY =
   "Chat Playground supports chat models. Image Playground supports image models. Video models will use a separate playground later.";
 export const TOKFAI_STARTER_PLAN = "Starter ¥29 = 10,000 credits";
