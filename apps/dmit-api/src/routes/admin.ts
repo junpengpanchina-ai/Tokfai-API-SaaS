@@ -1,5 +1,4 @@
 import { Hono, type Context } from "hono";
-import { randomUUID } from "node:crypto";
 
 import { ApiError } from "../errors.js";
 import {
@@ -9,6 +8,7 @@ import {
   respondAdminAuthError,
 } from "../middleware/requireAdminV1.js";
 import { supabase } from "../supabase.js";
+import { handleAdminCreditsAdjust } from "./adminCreditsAdjust.js";
 import { listAdminModels, patchAdminModel } from "./adminModels.js";
 
 const SUCCESS_STATUSES = ["succeeded", "success", "ok"];
@@ -64,13 +64,6 @@ type ApiKeyAdminRow = {
   revoked_at: string | null;
 };
 
-type AdminCreditAdjustmentInput = {
-  user_id?: unknown;
-  amount?: unknown;
-  direction?: unknown;
-  reason?: unknown;
-};
-
 type CreditLedgerAdminRow = {
   id: string;
   created_at: string;
@@ -80,23 +73,6 @@ type CreditLedgerAdminRow = {
   reason: string | null;
   reference_id: string | null;
 };
-
-type ParsedCreditAdjustment =
-  | {
-      userId: string;
-      amount: number;
-      direction: "add" | "deduct";
-      reason: string;
-    }
-  | {
-      error:
-        | "missing_user_id"
-        | "invalid_user_id"
-        | "invalid_amount"
-        | "invalid_direction"
-        | "missing_reason"
-        | "invalid_reason";
-    };
 
 const DEFAULT_LEDGER_LIMIT = 50;
 const MAX_LEDGER_LIMIT = 100;
@@ -124,43 +100,6 @@ function parseLedgerLimit(raw: string | undefined): number {
   const parsed = Number.parseInt(raw, 10);
   if (Number.isNaN(parsed) || parsed < 1) return DEFAULT_LEDGER_LIMIT;
   return Math.min(parsed, MAX_LEDGER_LIMIT);
-}
-
-function parseCreditAdjustment(
-  body: AdminCreditAdjustmentInput
-): ParsedCreditAdjustment {
-  const userId = typeof body.user_id === "string" ? body.user_id.trim() : "";
-  const amount = Number(body.amount);
-  const reason =
-    typeof body.reason === "string" ? body.reason.trim() : "";
-
-  if (!userId) {
-    return { error: "missing_user_id" as const };
-  }
-
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
-    return { error: "invalid_user_id" as const };
-  }
-
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return { error: "invalid_amount" as const };
-  }
-
-  if (body.direction !== "add" && body.direction !== "deduct") {
-    return { error: "invalid_direction" as const };
-  }
-
-  const direction = body.direction;
-
-  if (!reason) {
-    return { error: "missing_reason" as const };
-  }
-
-  if (reason.length > 200) {
-    return { error: "invalid_reason" as const };
-  }
-
-  return { userId, amount, direction, reason };
 }
 
 async function countRows(table: "profiles" | "api_keys" | "usage_logs") {
@@ -475,87 +414,6 @@ async function getAdminCreditsByEmail(email: string, ledgerLimit: number) {
   };
 }
 
-async function adjustUserCredits(input: {
-  userId: string;
-  amount: number;
-  direction: "add" | "deduct";
-  reason: string;
-}) {
-  const { userId, amount, direction, reason } = input;
-  const signedAmount = direction === "add" ? amount : -amount;
-
-  const { data: profile, error: profileError } = await supabase()
-    .from("profiles")
-    .select("id, credits_balance")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (profileError) {
-    throw ApiError.internal(
-      `Failed to load profile for credit adjustment: ${profileError.message}`,
-      "admin_credit_profile_load_failed"
-    );
-  }
-
-  if (!profile) {
-    return { error: "target_user_not_found" as const };
-  }
-
-  const currentBalance = toNumber(
-    (profile as { credits_balance?: number | string | null }).credits_balance
-  );
-  const newBalance = currentBalance + signedAmount;
-
-  if (newBalance < 0) {
-    return {
-      error: "insufficient_credits" as const,
-      current_credits: currentBalance,
-      requested_amount: amount,
-    };
-  }
-
-  const { error: updateError } = await supabase()
-    .from("profiles")
-    .update({
-      credits_balance: newBalance,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", userId);
-
-  if (updateError) {
-    throw ApiError.internal(
-      `Failed to update profile credits: ${updateError.message}`,
-      "admin_credit_update_failed"
-    );
-  }
-
-  const referenceId = `admin_adjustment:${randomUUID()}`;
-  const { error: ledgerError } = await supabase().from("credit_ledger").insert({
-    user_id: userId,
-    type: "adjustment",
-    amount: signedAmount,
-    balance_after: newBalance,
-    reason,
-    reference_id: referenceId,
-  });
-
-  if (ledgerError) {
-    throw ApiError.internal(
-      `Failed to write credit adjustment ledger: ${ledgerError.message}`,
-      "admin_credit_ledger_failed"
-    );
-  }
-
-  return {
-    previous_credits: currentBalance,
-    user_id: userId,
-    delta: signedAmount,
-    credits: newBalance,
-    reason,
-    reference_id: referenceId,
-  };
-}
-
 export const adminRoutes = new Hono();
 
 /** JWT only — returns is_admin without requiring admin privileges. */
@@ -572,37 +430,7 @@ adminRoutes.get("/me", async (c) => {
 const protectedAdminRoutes = new Hono();
 protectedAdminRoutes.use("*", requireAdminV1);
 
-protectedAdminRoutes.post("/credits/adjust", async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as AdminCreditAdjustmentInput;
-  const input = parseCreditAdjustment(body);
-  if ("error" in input) {
-    return jsonError(c, 400, input.error);
-  }
-
-  const adjustment = await adjustUserCredits(input);
-  if ("error" in adjustment) {
-    if (adjustment.error === "target_user_not_found") {
-      return jsonError(c, 404, adjustment.error);
-    }
-    if (adjustment.error === "insufficient_credits") {
-      return jsonError(c, 400, adjustment.error, {
-        current_credits: adjustment.current_credits,
-        requested_amount: adjustment.requested_amount,
-      });
-    }
-  }
-
-  return c.json({
-    ok: true,
-    user_id: adjustment.user_id,
-    previous_credits: adjustment.previous_credits,
-    delta: adjustment.delta,
-    credits: adjustment.credits,
-    balance_after: adjustment.credits,
-    reason: adjustment.reason,
-    reference_id: adjustment.reference_id,
-  });
-});
+protectedAdminRoutes.post("/credits/adjust", handleAdminCreditsAdjust);
 
 protectedAdminRoutes.get("/summary", async (c) => {
   const [totalUsers, totalRequests, successRequests, totalCreditsCharged, logs] =
