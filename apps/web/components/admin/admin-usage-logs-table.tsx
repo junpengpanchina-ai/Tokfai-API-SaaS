@@ -1,3 +1,5 @@
+"use client";
+
 import { Badge } from "@/components/ui/badge";
 import {
   formatCreditsPrecise,
@@ -5,6 +7,7 @@ import {
   formatInt,
   toneForStatus,
 } from "@/lib/format";
+import { useI18n } from "@/lib/i18n/i18n-provider";
 
 export type AdminUsageLogRow = {
   id?: string;
@@ -20,10 +23,12 @@ export type AdminUsageLogRow = {
 };
 
 export function AdminUsageLogsTable({ rows }: { rows: AdminUsageLogRow[] }) {
+  const { t } = useI18n();
+
   if (rows.length === 0) {
     return (
       <div className="rounded-md border border-dashed py-10 text-center text-sm text-muted-foreground">
-        No usage logs found.
+        {t("admin.usage.empty")}
       </div>
     );
   }
@@ -33,15 +38,23 @@ export function AdminUsageLogsTable({ rows }: { rows: AdminUsageLogRow[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-            <th className="py-2 pr-4 font-medium">Email</th>
-            <th className="py-2 pr-4 font-medium">Model</th>
-            <th className="py-2 pr-4 font-medium">Status</th>
-            <th className="py-2 pr-4 text-right font-medium">Prompt</th>
-            <th className="py-2 pr-4 text-right font-medium">Completion</th>
-            <th className="py-2 pr-4 text-right font-medium">Total</th>
-            <th className="py-2 pr-4 text-right font-medium">Credits</th>
-            <th className="py-2 pr-4 font-medium">Request ID</th>
-            <th className="py-2 pr-4 font-medium">Created</th>
+            <th className="py-2 pr-4 font-medium">{t("admin.usage.colEmail")}</th>
+            <th className="py-2 pr-4 font-medium">{t("admin.usage.colModel")}</th>
+            <th className="py-2 pr-4 font-medium">{t("admin.usage.colStatus")}</th>
+            <th className="py-2 pr-4 text-right font-medium">
+              {t("admin.usage.colPrompt")}
+            </th>
+            <th className="py-2 pr-4 text-right font-medium">
+              {t("admin.usage.colCompletion")}
+            </th>
+            <th className="py-2 pr-4 text-right font-medium">
+              {t("admin.usage.colTotal")}
+            </th>
+            <th className="py-2 pr-4 text-right font-medium">
+              {t("admin.usage.colCredits")}
+            </th>
+            <th className="py-2 pr-4 font-medium">{t("admin.usage.colRequestId")}</th>
+            <th className="py-2 pr-4 font-medium">{t("admin.usage.colCreated")}</th>
           </tr>
         </thead>
         <tbody>
@@ -87,8 +100,9 @@ export function AdminUsageLogsTable({ rows }: { rows: AdminUsageLogRow[] }) {
 }
 
 function StatusBadge({ status }: { status: string | null | undefined }) {
+  const { t } = useI18n();
   const tone = toneForStatus(status);
-  if (!status) return <Badge variant="outline">unknown</Badge>;
+  if (!status) return <Badge variant="outline">{t("admin.common.unknown")}</Badge>;
   if (tone === "success") return <Badge variant="success">{status}</Badge>;
   if (tone === "warning") return <Badge variant="warning">{status}</Badge>;
   if (tone === "destructive") {

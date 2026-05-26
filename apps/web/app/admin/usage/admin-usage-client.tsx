@@ -23,6 +23,8 @@ import {
 } from "@/lib/admin/usage";
 import { formatInt } from "@/lib/format";
 import { getDmitBaseUrl } from "@/lib/dmit/client";
+import { useI18n } from "@/lib/i18n/i18n-provider";
+import { formatMessage } from "@/lib/i18n/messages";
 
 export type AdminUsageLog = AdminUsageLogRow;
 
@@ -42,6 +44,7 @@ export function AdminUsageClient({
   initialLogs: AdminUsageLog[];
   initialError: string | null;
 }) {
+  const { t } = useI18n();
   const [logs, setLogs] = useState(initialLogs);
   const [error, setError] = useState<string | null>(initialError);
   const [loading, setLoading] = useState(false);
@@ -67,11 +70,13 @@ export function AdminUsageClient({
 
       setLogs(Array.isArray(body.data) ? body.data : []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load usage logs.");
+      setError(
+        err instanceof Error ? err.message : t("admin.usage.loadFailed")
+      );
     } finally {
       setLoading(false);
     }
-  }, [accessToken]);
+  }, [accessToken, t]);
 
   useEffect(() => {
     setLogs(initialLogs);
@@ -104,17 +109,19 @@ export function AdminUsageClient({
   return (
     <>
       <div>
-        <Badge variant="secondary">Admin tools</Badge>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight">Usage logs</h1>
+        <Badge variant="secondary">{t("admin.common.adminTools")}</Badge>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight">
+          {t("admin.usage.title")}
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Full-site API request history. Read-only in this phase.
+          {t("admin.usage.subtitle")}
         </p>
       </div>
 
       {error ? (
         <Card className="border-destructive/30 bg-destructive/5">
           <CardHeader>
-            <CardTitle className="text-base">Could not load usage logs</CardTitle>
+            <CardTitle className="text-base">{t("admin.usage.couldNotLoad")}</CardTitle>
             <CardDescription>{error}</CardDescription>
           </CardHeader>
           <CardContent>
@@ -124,7 +131,7 @@ export function AdminUsageClient({
               size="sm"
               onClick={() => void loadLogs()}
             >
-              Retry
+              {t("admin.common.retry")}
             </Button>
           </CardContent>
         </Card>
@@ -132,47 +139,45 @@ export function AdminUsageClient({
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <AdminStatCard
-          label="Total requests"
+          label={t("admin.usage.totalRequests")}
           value={formatInt(stats.totalRequests)}
         />
-        <AdminStatCard label="Succeeded" value={formatInt(stats.succeeded)} />
-        <AdminStatCard label="Failed" value={formatInt(stats.failed)} />
+        <AdminStatCard label={t("admin.usage.succeeded")} value={formatInt(stats.succeeded)} />
+        <AdminStatCard label={t("admin.usage.failed")} value={formatInt(stats.failed)} />
         <AdminStatCard
-          label="Image requests"
+          label={t("admin.usage.imageRequests")}
           value={formatInt(stats.imageRequests)}
         />
         <AdminStatCard
-          label="Chat requests"
+          label={t("admin.usage.chatRequests")}
           value={formatInt(stats.chatRequests)}
         />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Filters</CardTitle>
-          <CardDescription>
-            Client-side filters on the loaded batch (no server query params yet).
-          </CardDescription>
+          <CardTitle className="text-base">{t("admin.usage.filtersTitle")}</CardTitle>
+          <CardDescription>{t("admin.usage.filtersDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4">
             <FilterSelect
-              label="Status"
+              label={t("admin.usage.filterStatus")}
               value={statusFilter}
               options={[
-                { value: "all", label: "All" },
-                { value: "succeeded", label: "Succeeded" },
-                { value: "failed", label: "Failed" },
+                { value: "all", label: t("admin.common.all") },
+                { value: "succeeded", label: t("admin.usage.filterSucceeded") },
+                { value: "failed", label: t("admin.usage.filterFailed") },
               ]}
               onChange={(value) => setStatusFilter(value as StatusFilter)}
             />
             <FilterSelect
-              label="Type"
+              label={t("admin.usage.filterType")}
               value={typeFilter}
               options={[
-                { value: "all", label: "All" },
-                { value: "chat", label: "Chat" },
-                { value: "image", label: "Image" },
+                { value: "all", label: t("admin.common.all") },
+                { value: "chat", label: t("admin.usage.filterChat") },
+                { value: "image", label: t("admin.usage.filterImage") },
               ]}
               onChange={(value) => setTypeFilter(value as TypeFilter)}
             />
@@ -183,10 +188,12 @@ export function AdminUsageClient({
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div>
-            <CardTitle>Usage logs</CardTitle>
+            <CardTitle>{t("admin.usage.tableTitle")}</CardTitle>
             <CardDescription>
-              Showing {formatInt(filteredLogs.length)} of {formatInt(logs.length)}{" "}
-              loaded requests.
+              {formatMessage(t("admin.usage.showingCount"), {
+                filtered: formatInt(filteredLogs.length),
+                total: formatInt(logs.length),
+              })}
             </CardDescription>
           </div>
           <Button
@@ -196,12 +203,12 @@ export function AdminUsageClient({
             disabled={loading}
             onClick={() => void loadLogs()}
           >
-            {loading ? "Refreshing…" : "Refresh"}
+            {loading ? t("admin.common.refreshing") : t("admin.common.refresh")}
           </Button>
         </CardHeader>
         <CardContent>
           {loading && logs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Loading usage logs…</p>
+            <p className="text-sm text-muted-foreground">{t("admin.usage.loading")}</p>
           ) : (
             <AdminUsageLogsTable rows={filteredLogs} />
           )}

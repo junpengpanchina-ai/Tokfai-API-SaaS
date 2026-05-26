@@ -319,17 +319,19 @@ export function AdminCreditsClient({
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-                        <th className="py-2 pr-4 font-medium">Email</th>
-                        <th className="py-2 pr-4 font-medium">Type</th>
+                        <th className="py-2 pr-4 font-medium">{t("admin.credits.email")}</th>
+                        <th className="py-2 pr-4 font-medium">{t("admin.credits.colType")}</th>
                         <th className="py-2 pr-4 text-right font-medium">
-                          Amount
+                          {t("admin.credits.colAmount")}
                         </th>
                         <th className="py-2 pr-4 text-right font-medium">
-                          Balance after
+                          {t("admin.credits.colBalanceAfter")}
                         </th>
-                        <th className="py-2 pr-4 font-medium">Reason</th>
-                        <th className="py-2 pr-4 font-medium">Reference</th>
-                        <th className="py-2 pr-4 font-medium">Created</th>
+                        <th className="py-2 pr-4 font-medium">{t("admin.credits.colReason")}</th>
+                        <th className="py-2 pr-4 font-medium">
+                          {t("admin.credits.colReference")}
+                        </th>
+                        <th className="py-2 pr-4 font-medium">{t("admin.credits.colCreated")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -346,7 +348,7 @@ export function AdminCreditsClient({
                             {formatCredits(entry.balance_after)}
                           </td>
                           <td className="py-2 pr-4 text-muted-foreground">
-                            {displayReason(entry.reason)}
+                            <LedgerReason reason={entry.reason} />
                           </td>
                           <td
                             className="max-w-[12rem] truncate py-2 pr-4 font-mono text-xs text-muted-foreground"
@@ -396,30 +398,44 @@ function AmountCell({ amount }: { amount: number | null }) {
   );
 }
 
+function LedgerReason({ reason }: { reason: string | null | undefined }) {
+  const { t } = useI18n();
+
+  if (!reason) return <>—</>;
+  if (reason === "stripe_checkout_completed") {
+    return <>{t("admin.credits.reasonStripeTopUp")}</>;
+  }
+  if (reason === "Chat completion usage") {
+    return <>{t("admin.credits.reasonChatUsage")}</>;
+  }
+  if (reason === "admin_adjustment") {
+    return <>{t("admin.credits.reasonAdminAdjustment")}</>;
+  }
+  if (reason === "reverse_duplicate_stripe_topup_ledger_only") {
+    return <>{t("admin.credits.reasonSystemFix")}</>;
+  }
+  return <>{reason}</>;
+}
+
 function TypeBadge({ type }: { type: string | null | undefined }) {
-  if (!type) return <Badge variant="outline">unknown</Badge>;
-  const t = type.toLowerCase();
-  if (t === "purchase" || t === "topup" || t === "grant" || t === "refund") {
+  const { t } = useI18n();
+  if (!type) return <Badge variant="outline">{t("admin.common.unknown")}</Badge>;
+  const normalized = type.toLowerCase();
+  if (
+    normalized === "purchase" ||
+    normalized === "topup" ||
+    normalized === "grant" ||
+    normalized === "refund"
+  ) {
     return <Badge variant="success">{type}</Badge>;
   }
-  if (t === "debit") {
+  if (normalized === "debit") {
     return <Badge variant="destructive">{type}</Badge>;
   }
-  if (t === "adjustment") {
+  if (normalized === "adjustment") {
     return <Badge variant="warning">{type}</Badge>;
   }
   return <Badge variant="outline">{type}</Badge>;
-}
-
-function displayReason(reason: string | null | undefined) {
-  if (!reason) return "—";
-  if (reason === "stripe_checkout_completed") return "Stripe top-up";
-  if (reason === "Chat completion usage") return "API usage debit";
-  if (reason === "admin_adjustment") return "Admin adjustment";
-  if (reason === "reverse_duplicate_stripe_topup_ledger_only") {
-    return "System correction";
-  }
-  return reason;
 }
 
 async function parseJson(response: Response): Promise<unknown> {

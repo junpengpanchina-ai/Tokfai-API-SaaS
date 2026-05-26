@@ -27,25 +27,36 @@ import {
 type TypeFilter = "all" | ModelType;
 type StatusFilter = "all" | AdminCatalogDisplayStatus;
 
-const TYPE_FILTER_OPTIONS: { value: TypeFilter; label: string }[] = [
-  { value: "all", label: "All types" },
-  { value: "chat", label: "chat" },
-  { value: "image", label: "image" },
-  { value: "video", label: "video" },
-];
-
-const STATUS_FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
-  { value: "all", label: "All statuses" },
-  { value: "available", label: "available" },
-  { value: "coming_soon", label: "coming soon" },
-  { value: "hidden", label: "hidden" },
-];
-
 export function AdminModelsCatalogPanel() {
   const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+  const typeFilterOptions = useMemo(
+    () =>
+      [
+        { value: "all" as TypeFilter, labelKey: "admin.models.filterAllTypes" },
+        { value: "chat" as TypeFilter, labelKey: "admin.models.typeChat" },
+        { value: "image" as TypeFilter, labelKey: "admin.models.typeImage" },
+        { value: "video" as TypeFilter, labelKey: "admin.models.typeVideo" },
+      ] as const,
+    []
+  );
+
+  const statusFilterOptions = useMemo(
+    () =>
+      [
+        { value: "all" as StatusFilter, labelKey: "admin.models.filterAllStatuses" },
+        { value: "available" as StatusFilter, labelKey: "admin.models.statusAvailable" },
+        {
+          value: "coming_soon" as StatusFilter,
+          labelKey: "admin.models.statusComingSoon",
+        },
+        { value: "hidden" as StatusFilter, labelKey: "admin.models.statusHidden" },
+      ] as const,
+    []
+  );
 
   const summaryStats = useMemo<AdminModelsSummaryStats>(() => {
     const available = ALL_CATALOG_MODELS.filter(
@@ -96,32 +107,38 @@ export function AdminModelsCatalogPanel() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Search & filters</CardTitle>
+          <CardTitle className="text-base">{t("admin.models.searchFilters")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
-            <FilterField label="Search model name or model ID">
+            <FilterField label={t("admin.models.searchLabel")}>
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="e.g. gemini-3.1-pro"
+                placeholder={t("admin.models.searchPlaceholder")}
                 className="font-mono text-xs"
               />
             </FilterField>
 
-            <FilterField label="Type">
+            <FilterField label={t("admin.models.filterType")}>
               <NativeSelect
                 value={typeFilter}
                 onChange={(value) => setTypeFilter(value as TypeFilter)}
-                options={TYPE_FILTER_OPTIONS}
+                options={typeFilterOptions.map((option) => ({
+                  value: option.value,
+                  label: t(option.labelKey),
+                }))}
               />
             </FilterField>
 
-            <FilterField label="Status">
+            <FilterField label={t("admin.models.filterStatus")}>
               <NativeSelect
                 value={statusFilter}
                 onChange={(value) => setStatusFilter(value as StatusFilter)}
-                options={STATUS_FILTER_OPTIONS}
+                options={statusFilterOptions.map((option) => ({
+                  value: option.value,
+                  label: t(option.labelKey),
+                }))}
               />
             </FilterField>
           </div>
@@ -130,30 +147,30 @@ export function AdminModelsCatalogPanel() {
 
       {showChatSection ? (
         <AdminModelsTable
-          title="Chat Models"
-          description="Token-based chat models from the frontend catalog."
+          title={t("admin.models.chatSectionTitle")}
+          description={t("admin.models.chatSectionDesc")}
           models={chatModels}
         />
       ) : null}
 
       {showImageSection ? (
         <AdminModelsTable
-          title="Image Models"
-          description="Per-generation image models from the frontend catalog."
+          title={t("admin.models.imageSectionTitle")}
+          description={t("admin.models.imageSectionDesc")}
           models={imageModels}
         />
       ) : null}
 
       {showVideoSection ? (
         <AdminModelsTable
-          title="Video Models"
-          description="Video models reserved for future Playground support."
+          title={t("admin.models.videoSectionTitle")}
+          description={t("admin.models.videoSectionDesc")}
           models={videoModels}
         />
       ) : null}
 
       {!showChatSection && !showImageSection && !showVideoSection ? (
-        <AdminModelsTable title="Models" models={[]} />
+        <AdminModelsTable title={t("admin.models.modelsSectionTitle")} models={[]} />
       ) : null}
 
       <AdminFutureControlsCard

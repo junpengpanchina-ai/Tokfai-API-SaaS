@@ -59,7 +59,7 @@ export function AdminRechargePlansPlaceholder() {
                 {plan.price}
               </div>
               <div className="mt-1 text-sm text-muted-foreground">
-                {formatInt(plan.credits)} credits
+                {formatInt(plan.credits)} {t("admin.credits.creditsUnit")}
               </div>
             </div>
           ))}
