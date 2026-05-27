@@ -78,6 +78,7 @@ type AdminModelWriteContext = {
   adminUser: AdminUserContext;
   ipAddress: string | null;
   userAgent: string | null;
+  idempotencyKey: string;
 };
 
 const ADMIN_MODEL_RESOURCE_TYPE = "models";
@@ -110,6 +111,32 @@ function resolveModelAuditAction(
   return "models.update";
 }
 
+function resolveArchiveAuditAction(
+  usageLogCount: number
+): "models.archive" | "models.delete_attempt" {
+  return usageLogCount > 0 ? "models.delete_attempt" : "models.archive";
+}
+
+function buildModelAuditResultPayload(args: {
+  ok: boolean;
+  action: string;
+  modelId: string;
+  modelStatus?: AdminModelStatus | null;
+  changedFields?: string[];
+  error?: string | null;
+  extra?: Record<string, unknown>;
+}): Record<string, unknown> {
+  return {
+    ok: args.ok,
+    model_id: args.modelId,
+    action: args.action,
+    status: args.modelStatus ?? null,
+    changed_fields: args.changedFields ?? [],
+    error: args.error ?? null,
+    ...(args.extra ?? {}),
+  };
+}
+
 async function auditAdminModelWrite(
   ctx: AdminModelWriteContext,
   args: {
@@ -117,7 +144,11 @@ async function auditAdminModelWrite(
     resourceId: string;
     requestPayload: Record<string, unknown>;
     status: "succeeded" | "failed";
-    resultPayload: Record<string, unknown>;
+    modelId: string;
+    modelStatus?: AdminModelStatus | null;
+    changedFields?: string[];
+    error?: string | null;
+    extra?: Record<string, unknown>;
   }
 ): Promise<void> {
   await recordAdminAuditLog({
@@ -128,9 +159,18 @@ async function auditAdminModelWrite(
     resourceId: args.resourceId,
     requestPayload: args.requestPayload,
     status: args.status,
-    resultPayload: args.resultPayload,
+    resultPayload: buildModelAuditResultPayload({
+      ok: args.status === "succeeded",
+      action: args.action,
+      modelId: args.modelId,
+      modelStatus: args.modelStatus,
+      changedFields: args.changedFields,
+      error: args.error,
+      extra: args.extra,
+    }),
     ipAddress: ctx.ipAddress,
     userAgent: ctx.userAgent,
+    idempotencyKey: ctx.idempotencyKey || undefined,
   });
 }
 
@@ -431,11 +471,8 @@ export async function createAdminModel(
       resourceId: resolveModelResourceId(undefined, body),
       requestPayload: body,
       status: "failed",
-      resultPayload: {
-        ok: false,
-        model_id: resolveModelResourceId(undefined, body),
-        error: "invalid_model_fields",
-      },
+      modelId: resolveModelResourceId(undefined, body),
+      error: "invalid_model_fields",
     });
     return {
       ok: false,
@@ -475,11 +512,8 @@ export async function createAdminModel(
       resourceId: id,
       requestPayload: input,
       status: "failed",
-      resultPayload: {
-        ok: false,
-        model_id: id,
-        error: "model_already_exists",
-      },
+      modelId: id,
+      error: "model_already_exists",
     });
     return { ok: false, status: 409, error: "model_already_exists" };
   }
@@ -535,12 +569,9 @@ export async function createAdminModel(
     resourceId: id,
     requestPayload: input,
     status: "succeeded",
-    resultPayload: {
-      ok: true,
-      model_id: id,
-      status: model.status,
-      changed_fields: Object.keys(input),
-    },
+    modelId: id,
+    modelStatus: model.status,
+    changedFields: Object.keys(input),
   });
 
   return { ok: true, model };
@@ -563,11 +594,8 @@ export async function updateAdminModel(
       resourceId: id,
       requestPayload: body,
       status: "failed",
-      resultPayload: {
-        ok: false,
-        model_id: id,
-        error: parsed.error,
-      },
+      modelId: id,
+      error: parsed.error,
     });
     return {
       ok: false,
@@ -584,11 +612,8 @@ export async function updateAdminModel(
       resourceId: id,
       requestPayload: body,
       status: "failed",
-      resultPayload: {
-        ok: false,
-        model_id: id,
-        error: "model_not_found",
-      },
+      modelId: id,
+      error: "model_not_found",
     });
     return { ok: false, status: 404, error: "model_not_found" };
   }
@@ -605,12 +630,9 @@ export async function updateAdminModel(
       resourceId: id,
       requestPayload: body,
       status: "failed",
-      resultPayload: {
-        ok: false,
-        model_id: id,
-        error: "model_not_found",
-        changed_fields: changedFields,
-      },
+      modelId: id,
+      changedFields,
+      error: "model_not_found",
     });
     return { ok: false, status: 404, error: "model_not_found" };
   }
@@ -620,12 +642,9 @@ export async function updateAdminModel(
     resourceId: id,
     requestPayload: body,
     status: "succeeded",
-    resultPayload: {
-      ok: true,
-      model_id: id,
-      status: model.status,
-      changed_fields: changedFields,
-    },
+    modelId: id,
+    modelStatus: model.status,
+    changedFields,
   });
 
   return { ok: true, model, action };
@@ -684,16 +703,14 @@ export async function archiveAdminModel(
       resourceId: id,
       requestPayload: { soft_delete: true },
       status: "failed",
-      resultPayload: {
-        ok: false,
-        model_id: id,
-        error: "model_not_found",
-      },
+      modelId: id,
+      error: "model_not_found",
     });
     return { ok: false, status: 404, error: "model_not_found" };
   }
 
   const usageLogCount = await countModelUsageLogs(id);
+  const archiveAction = resolveArchiveAuditAction(usageLogCount);
   const changedFields = ["enabled", "visible"];
 
   await applyModelPatch(
@@ -705,31 +722,27 @@ export async function archiveAdminModel(
   const model = await getAdminModelById(id);
   if (!model) {
     await auditAdminModelWrite(ctx, {
-      action: "models.archive",
+      action: archiveAction,
       resourceId: id,
       requestPayload: { soft_delete: true },
       status: "failed",
-      resultPayload: {
-        ok: false,
-        model_id: id,
-        error: "model_not_found",
-        changed_fields: changedFields,
-        usage_log_count: usageLogCount,
-      },
+      modelId: id,
+      changedFields,
+      error: "model_not_found",
+      extra: { usage_log_count: usageLogCount },
     });
     return { ok: false, status: 404, error: "model_not_found" };
   }
 
   await auditAdminModelWrite(ctx, {
-    action: "models.archive",
+    action: archiveAction,
     resourceId: id,
     requestPayload: { soft_delete: true },
     status: "succeeded",
-    resultPayload: {
-      ok: true,
-      model_id: id,
-      status: model.status,
-      changed_fields: changedFields,
+    modelId: id,
+    modelStatus: model.status,
+    changedFields,
+    extra: {
       usage_log_count: usageLogCount,
       archived: true,
     },

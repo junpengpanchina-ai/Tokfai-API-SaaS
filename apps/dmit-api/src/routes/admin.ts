@@ -129,17 +129,21 @@ function adminModelWriteContext(c: Context): {
   adminUser: AdminUserContext;
   ipAddress: string | null;
   userAgent: string | null;
+  idempotencyKey: string;
 } {
   const adminUser = c.get("adminUser" as never) as AdminUserContext;
   const forwarded = c.req.header("x-forwarded-for");
   const ipAddress = forwarded
     ? (forwarded.split(",")[0]?.trim() ?? null)
     : (c.req.header("x-real-ip") ?? null);
+  const idempotencyKey =
+    c.req.header("idempotency-key") ?? c.req.header("Idempotency-Key") ?? "";
 
   return {
     adminUser,
     ipAddress,
     userAgent: c.req.header("user-agent") ?? null,
+    idempotencyKey: idempotencyKey.trim(),
   };
 }
 
