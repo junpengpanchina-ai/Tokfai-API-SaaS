@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { AdminModelsPageIntro } from "@/components/admin/admin-models-page-intro";
-import { AdminModelsCatalogPanel } from "@/components/admin-models-catalog-panel";
+import { AdminModelsManagePanel } from "@/components/admin/admin-models-manage-panel";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
@@ -22,7 +22,7 @@ export default async function AdminModelsPage() {
   return (
     <>
       <AdminModelsPageIntro />
-      <AdminModelsCatalogPanel />
+      <AdminModelsManagePanel />
     </>
   );
 }

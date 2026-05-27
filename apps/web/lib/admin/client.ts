@@ -47,6 +47,51 @@ export type AdminCreditsAdjustErrorBody = {
   idempotent_replay?: boolean;
 };
 
+export type AdminModelStatus =
+  | "available"
+  | "disabled"
+  | "coming_soon"
+  | "archived";
+
+export type AdminModelListItem = {
+  id: string;
+  display_name: string | null;
+  provider: string | null;
+  model_type: string | null;
+  enabled: boolean | null;
+  visible: boolean | null;
+  status: AdminModelStatus;
+  sort_order: number | null;
+  billing_mode: string | null;
+  input_per_1k: number | null;
+  output_per_1k: number | null;
+  billable: boolean | null;
+  markup_multiplier: number | null;
+  updated_at: string | null;
+};
+
+export type AdminModelCreateBody = {
+  id: string;
+  display_name: string;
+  provider?: string;
+  model_type: "chat" | "image" | "video" | "other";
+  enabled?: boolean;
+  visible?: boolean;
+  sort_order?: number;
+  billing_mode: "token" | "per_image";
+  input_per_1k?: number;
+  output_per_1k?: number;
+  billable?: boolean;
+  markup_multiplier?: number;
+};
+
+export type AdminModelUpdateBody = Partial<
+  Omit<AdminModelCreateBody, "id" | "billing_mode">
+> & {
+  billing_mode?: "token" | "per_image";
+  action?: "restore";
+};
+
 export class AdminApiError extends Error {
   readonly status: number;
   readonly code?: string;
@@ -174,6 +219,63 @@ export type AdminUserSummary = {
 export async function fetchAdminUsers(): Promise<AdminUserSummary[]> {
   const res = await fetchAdminApi<{ data?: AdminUserSummary[] }>("/admin/users");
   return Array.isArray(res.data) ? res.data : [];
+}
+
+export async function fetchAdminModels(): Promise<AdminModelListItem[]> {
+  const res = await fetchAdminApi<{ data?: AdminModelListItem[] }>("/admin/models");
+  return Array.isArray(res.data) ? res.data : [];
+}
+
+export async function createAdminModel(
+  body: AdminModelCreateBody
+): Promise<AdminModelListItem> {
+  const res = await fetchAdminApi<{ data: AdminModelListItem }>("/admin/models", {
+    method: "POST",
+    json: body,
+  });
+  return res.data;
+}
+
+export async function updateAdminModel(
+  id: string,
+  body: AdminModelUpdateBody
+): Promise<AdminModelListItem> {
+  const res = await fetchAdminApi<{ data: AdminModelListItem }>(
+    `/admin/models/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      json: body,
+    }
+  );
+  return res.data;
+}
+
+export async function archiveAdminModel(id: string): Promise<{
+  model: AdminModelListItem;
+  usage_log_count: number;
+  archived: boolean;
+}> {
+  const res = await fetchAdminApi<{
+    data: {
+      model: AdminModelListItem;
+      usage_log_count: number;
+      archived: boolean;
+    };
+  }>(`/admin/models/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  return res.data;
+}
+
+export async function restoreAdminModel(id: string): Promise<AdminModelListItem> {
+  const res = await fetchAdminApi<{ data: AdminModelListItem }>(
+    `/admin/models/${encodeURIComponent(id)}/restore`,
+    {
+      method: "POST",
+      json: {},
+    }
+  );
+  return res.data;
 }
 
 function parseJson(text: string): unknown {

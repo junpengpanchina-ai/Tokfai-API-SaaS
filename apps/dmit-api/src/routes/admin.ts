@@ -9,7 +9,14 @@ import {
 } from "../middleware/requireAdminV1.js";
 import { supabase } from "../supabase.js";
 import { handleAdminCreditsAdjust } from "./adminCreditsAdjust.js";
-import { listAdminModels, patchAdminModel } from "./adminModels.js";
+import {
+  archiveAdminModel,
+  createAdminModel,
+  listAdminModels,
+  restoreAdminModel,
+  updateAdminModel,
+} from "./adminModels.js";
+import type { AdminUserContext } from "../middleware/requireAdminV1.js";
 
 const SUCCESS_STATUSES = ["succeeded", "success", "ok"];
 const PAGE_SIZE = 1000;
@@ -93,6 +100,68 @@ function jsonError(
   extra?: Record<string, unknown>
 ) {
   return c.json({ error, ...(extra ?? {}) }, status);
+}
+
+function adminApiError(
+  c: Context,
+  status: 400 | 401 | 403 | 404 | 409 | 500,
+  message: string,
+  code: string,
+  type:
+    | "auth_error"
+    | "validation_error"
+    | "not_found"
+    | "server_error" = "validation_error"
+) {
+  return c.json(
+    {
+      error: {
+        message,
+        code,
+        type,
+      },
+    },
+    status as never
+  );
+}
+
+function adminModelWriteContext(c: Context): {
+  adminUser: AdminUserContext;
+  ipAddress: string | null;
+  userAgent: string | null;
+} {
+  const adminUser = c.get("adminUser" as never) as AdminUserContext;
+  const forwarded = c.req.header("x-forwarded-for");
+  const ipAddress = forwarded
+    ? (forwarded.split(",")[0]?.trim() ?? null)
+    : (c.req.header("x-real-ip") ?? null);
+
+  return {
+    adminUser,
+    ipAddress,
+    userAgent: c.req.header("user-agent") ?? null,
+  };
+}
+
+function adminModelErrorMessage(code: string): string {
+  switch (code) {
+    case "model_not_found":
+      return "Model not found.";
+    case "model_already_exists":
+      return "A model with this ID already exists.";
+    case "invalid_model_fields":
+      return "Invalid model fields.";
+    case "invalid_pricing_value":
+      return "Invalid pricing value.";
+    case "empty_patch":
+      return "No fields to update.";
+    case "unknown_field":
+      return "Unknown field in request body.";
+    case "missing_model_id":
+      return "Model ID is required.";
+    default:
+      return code;
+  }
 }
 
 function parseLedgerLimit(raw: string | undefined): number {
@@ -487,7 +556,94 @@ protectedAdminRoutes.get("/api-keys", async (c) => {
 
 protectedAdminRoutes.get("/models", async (c) => {
   const models = await listAdminModels();
-  return c.json({ models });
+  return c.json({ data: models });
+});
+
+protectedAdminRoutes.post("/models", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const result = await createAdminModel(body, adminModelWriteContext(c));
+
+  if (!result.ok) {
+    return adminApiError(
+      c,
+      result.status,
+      adminModelErrorMessage(result.error),
+      result.error,
+      result.status === 409 ? "validation_error" : "validation_error"
+    );
+  }
+
+  return c.json({ data: result.model }, 201);
+});
+
+protectedAdminRoutes.patch("/models/:id", async (c) => {
+  const id = c.req.param("id").trim();
+  if (!id) {
+    return adminApiError(c, 400, "Model ID is required.", "missing_model_id");
+  }
+
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const result = await updateAdminModel(id, body, adminModelWriteContext(c));
+
+  if (!result.ok) {
+    return adminApiError(
+      c,
+      result.status,
+      adminModelErrorMessage(result.error),
+      result.error,
+      result.status === 404 ? "not_found" : "validation_error"
+    );
+  }
+
+  return c.json({ data: result.model });
+});
+
+protectedAdminRoutes.delete("/models/:id", async (c) => {
+  const id = c.req.param("id").trim();
+  if (!id) {
+    return adminApiError(c, 400, "Model ID is required.", "missing_model_id");
+  }
+
+  const result = await archiveAdminModel(id, adminModelWriteContext(c));
+
+  if (!result.ok) {
+    return adminApiError(
+      c,
+      result.status,
+      adminModelErrorMessage(result.error),
+      result.error,
+      "not_found"
+    );
+  }
+
+  return c.json({
+    data: {
+      model: result.model,
+      usage_log_count: result.usage_log_count,
+      archived: true,
+    },
+  });
+});
+
+protectedAdminRoutes.post("/models/:id/restore", async (c) => {
+  const id = c.req.param("id").trim();
+  if (!id) {
+    return adminApiError(c, 400, "Model ID is required.", "missing_model_id");
+  }
+
+  const result = await restoreAdminModel(id, adminModelWriteContext(c));
+
+  if (!result.ok) {
+    return adminApiError(
+      c,
+      result.status,
+      adminModelErrorMessage(result.error),
+      result.error,
+      "not_found"
+    );
+  }
+
+  return c.json({ data: result.model });
 });
 
 protectedAdminRoutes.get("/usage", async (c) => {
@@ -511,27 +667,6 @@ protectedAdminRoutes.get("/credits", async (c) => {
   }
 
   return c.json({ data: result });
-});
-
-protectedAdminRoutes.patch("/models/:id", async (c) => {
-  const id = c.req.param("id").trim();
-  if (!id) {
-    return jsonError(c, 400, "missing_model_id");
-  }
-
-  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const result = await patchAdminModel(id, body);
-
-  if (!result.ok) {
-    return jsonError(
-      c,
-      result.status,
-      result.error,
-      result.detail ? { detail: result.detail } : undefined
-    );
-  }
-
-  return c.json({ ok: true });
 });
 
 adminRoutes.route("/", protectedAdminRoutes);
