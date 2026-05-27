@@ -80,6 +80,60 @@ type AdminModelWriteContext = {
   userAgent: string | null;
 };
 
+const ADMIN_MODEL_RESOURCE_TYPE = "models";
+
+function resolveModelResourceId(
+  id: string | undefined,
+  body?: Record<string, unknown>
+): string {
+  if (id?.trim()) return id.trim();
+  const bodyId = body?.id;
+  if (typeof bodyId === "string" && bodyId.trim()) return bodyId.trim();
+  return "unknown";
+}
+
+function collectChangedFieldNames(
+  model: z.infer<typeof ModelPatchSchema>,
+  pricing: z.infer<typeof PricingPatchSchema>
+): string[] {
+  return [...Object.keys(model), ...Object.keys(pricing)];
+}
+
+function resolveModelAuditAction(
+  body: Record<string, unknown>,
+  modelPatch: z.infer<typeof ModelPatchSchema>
+): "models.update" | "models.restore" {
+  if (body.action === "restore") return "models.restore";
+  if (modelPatch.enabled === true && modelPatch.visible === true) {
+    return "models.restore";
+  }
+  return "models.update";
+}
+
+async function auditAdminModelWrite(
+  ctx: AdminModelWriteContext,
+  args: {
+    action: string;
+    resourceId: string;
+    requestPayload: Record<string, unknown>;
+    status: "succeeded" | "failed";
+    resultPayload: Record<string, unknown>;
+  }
+): Promise<void> {
+  await recordAdminAuditLog({
+    actorUserId: ctx.adminUser.userId,
+    actorEmail: ctx.adminUser.email,
+    action: args.action,
+    resourceType: ADMIN_MODEL_RESOURCE_TYPE,
+    resourceId: args.resourceId,
+    requestPayload: args.requestPayload,
+    status: args.status,
+    resultPayload: args.resultPayload,
+    ipAddress: ctx.ipAddress,
+    userAgent: ctx.userAgent,
+  });
+}
+
 const ModelPatchSchema = z
   .object({
     enabled: z.boolean().optional(),
@@ -372,6 +426,17 @@ export async function createAdminModel(
 > {
   const parsed = CreateModelSchema.safeParse(body);
   if (!parsed.success) {
+    await auditAdminModelWrite(ctx, {
+      action: "models.create",
+      resourceId: resolveModelResourceId(undefined, body),
+      requestPayload: body,
+      status: "failed",
+      resultPayload: {
+        ok: false,
+        model_id: resolveModelResourceId(undefined, body),
+        error: "invalid_model_fields",
+      },
+    });
     return {
       ok: false,
       status: 400,
@@ -405,6 +470,17 @@ export async function createAdminModel(
   }
 
   if (existing) {
+    await auditAdminModelWrite(ctx, {
+      action: "models.create",
+      resourceId: id,
+      requestPayload: input,
+      status: "failed",
+      resultPayload: {
+        ok: false,
+        model_id: id,
+        error: "model_already_exists",
+      },
+    });
     return { ok: false, status: 409, error: "model_already_exists" };
   }
 
@@ -454,17 +530,17 @@ export async function createAdminModel(
     throw ApiError.internal("Created model could not be loaded.", "admin_model_load_failed");
   }
 
-  await recordAdminAuditLog({
-    actorUserId: ctx.adminUser.userId,
-    actorEmail: ctx.adminUser.email,
+  await auditAdminModelWrite(ctx, {
     action: "models.create",
-    resourceType: "model",
     resourceId: id,
     requestPayload: input,
     status: "succeeded",
-    resultPayload: { model_id: id, status: model.status },
-    ipAddress: ctx.ipAddress,
-    userAgent: ctx.userAgent,
+    resultPayload: {
+      ok: true,
+      model_id: id,
+      status: model.status,
+      changed_fields: Object.keys(input),
+    },
   });
 
   return { ok: true, model };
@@ -479,7 +555,20 @@ export async function updateAdminModel(
   | { ok: false; status: 400 | 404; error: string; detail?: unknown }
 > {
   const parsed = partitionPatchBody(body);
+  const auditAction = resolveModelAuditAction(body, parsed.ok ? parsed.model : {});
+
   if (!parsed.ok) {
+    await auditAdminModelWrite(ctx, {
+      action: auditAction,
+      resourceId: id,
+      requestPayload: body,
+      status: "failed",
+      resultPayload: {
+        ok: false,
+        model_id: id,
+        error: parsed.error,
+      },
+    });
     return {
       ok: false,
       status: 400,
@@ -490,33 +579,53 @@ export async function updateAdminModel(
 
   const existing = await getAdminModelById(id);
   if (!existing) {
+    await auditAdminModelWrite(ctx, {
+      action: auditAction,
+      resourceId: id,
+      requestPayload: body,
+      status: "failed",
+      resultPayload: {
+        ok: false,
+        model_id: id,
+        error: "model_not_found",
+      },
+    });
     return { ok: false, status: 404, error: "model_not_found" };
   }
 
-  const isRestore =
-    body.action === "restore" ||
-    (parsed.model.enabled === true && parsed.model.visible === true);
+  const action = resolveModelAuditAction(body, parsed.model);
+  const changedFields = collectChangedFieldNames(parsed.model, parsed.pricing);
 
   await applyModelPatch(id, parsed.model, parsed.pricing);
 
   const model = await getAdminModelById(id);
   if (!model) {
+    await auditAdminModelWrite(ctx, {
+      action,
+      resourceId: id,
+      requestPayload: body,
+      status: "failed",
+      resultPayload: {
+        ok: false,
+        model_id: id,
+        error: "model_not_found",
+        changed_fields: changedFields,
+      },
+    });
     return { ok: false, status: 404, error: "model_not_found" };
   }
 
-  const action = isRestore ? "models.restore" : "models.update";
-
-  await recordAdminAuditLog({
-    actorUserId: ctx.adminUser.userId,
-    actorEmail: ctx.adminUser.email,
+  await auditAdminModelWrite(ctx, {
     action,
-    resourceType: "model",
     resourceId: id,
     requestPayload: body,
     status: "succeeded",
-    resultPayload: { model_id: id, status: model.status },
-    ipAddress: ctx.ipAddress,
-    userAgent: ctx.userAgent,
+    resultPayload: {
+      ok: true,
+      model_id: id,
+      status: model.status,
+      changed_fields: changedFields,
+    },
   });
 
   return { ok: true, model, action };
@@ -570,12 +679,22 @@ export async function archiveAdminModel(
 > {
   const existing = await getAdminModelById(id);
   if (!existing) {
+    await auditAdminModelWrite(ctx, {
+      action: "models.archive",
+      resourceId: id,
+      requestPayload: { soft_delete: true },
+      status: "failed",
+      resultPayload: {
+        ok: false,
+        model_id: id,
+        error: "model_not_found",
+      },
+    });
     return { ok: false, status: 404, error: "model_not_found" };
   }
 
   const usageLogCount = await countModelUsageLogs(id);
-  const auditAction =
-    usageLogCount > 0 ? "models.delete_attempt" : "models.archive";
+  const changedFields = ["enabled", "visible"];
 
   await applyModelPatch(
     id,
@@ -585,25 +704,35 @@ export async function archiveAdminModel(
 
   const model = await getAdminModelById(id);
   if (!model) {
+    await auditAdminModelWrite(ctx, {
+      action: "models.archive",
+      resourceId: id,
+      requestPayload: { soft_delete: true },
+      status: "failed",
+      resultPayload: {
+        ok: false,
+        model_id: id,
+        error: "model_not_found",
+        changed_fields: changedFields,
+        usage_log_count: usageLogCount,
+      },
+    });
     return { ok: false, status: 404, error: "model_not_found" };
   }
 
-  await recordAdminAuditLog({
-    actorUserId: ctx.adminUser.userId,
-    actorEmail: ctx.adminUser.email,
-    action: auditAction,
-    resourceType: "model",
+  await auditAdminModelWrite(ctx, {
+    action: "models.archive",
     resourceId: id,
     requestPayload: { soft_delete: true },
     status: "succeeded",
     resultPayload: {
+      ok: true,
       model_id: id,
       status: model.status,
+      changed_fields: changedFields,
       usage_log_count: usageLogCount,
       archived: true,
     },
-    ipAddress: ctx.ipAddress,
-    userAgent: ctx.userAgent,
   });
 
   return { ok: true, model, usage_log_count: usageLogCount };
@@ -616,11 +745,8 @@ export async function restoreAdminModel(
   | { ok: true; model: AdminModelListItem }
   | { ok: false; status: 400 | 404; error: string }
 > {
-  const result = await updateAdminModel(
-    id,
-    { enabled: true, visible: true, action: "restore" },
-    ctx
-  );
+  const requestPayload = { enabled: true, visible: true, action: "restore" };
+  const result = await updateAdminModel(id, requestPayload, ctx);
 
   if (!result.ok) {
     return { ok: false, status: result.status, error: result.error };
