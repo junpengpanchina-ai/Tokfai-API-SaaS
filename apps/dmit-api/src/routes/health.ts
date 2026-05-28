@@ -1,6 +1,20 @@
 import { Hono } from "hono";
 
+import { env } from "../env.js";
+
 export const healthRoutes = new Hono();
+
+function healthCheckPayload() {
+  return {
+    ok: true as const,
+    service: "dmit-api",
+    env: env.NODE_ENV || "unknown",
+    timestamp: new Date().toISOString(),
+  };
+}
+
+/** Production load-balancer / uptime probe — no auth. */
+healthRoutes.get("/health", (c) => c.json(healthCheckPayload()));
 
 healthRoutes.get("/v1/health", (c) =>
   c.json({
