@@ -2,7 +2,16 @@
 
 > **用途：** 记录 MVP 封板时已通过的生产主链、已知非阻塞项与上线前安全提醒。  
 > **范围：** 只读文档；**不引入新功能、不改业务代码。**  
-> **最后更新：** 2026-05-27（MVP P5 封板）
+> **最后更新：** 2026-05-28（MVP P5 **最终生产验收完成**）
+
+---
+
+## 当前状态
+
+| 项 | 状态 |
+|----|------|
+| MVP P5 最终生产验收 | ✅ **已完成**（2026-05-28） |
+| 观察期 | ⏳ **48 小时内测观察期**（见 §7） |
 
 ---
 
@@ -13,6 +22,7 @@
 | ✅ 已通过 | 生产或等价生产环境已跑通，可作为 MVP 交付基线 |
 | ⚠️ 已知非阻塞 | 不影响 MVP 主链；后续迭代处理 |
 | 🔒 安全提醒 | 上线前必须遵守 |
+| ⏳ 观察期 | 封板后短期监控；仅修阻塞 bug |
 
 ---
 
@@ -26,13 +36,14 @@
 | Dashboard 鉴权 | ✅ | 未登录访问 `/dashboard/*` 重定向至 `/login` |
 | DMIT `/v1/me/*` | ✅ | 前端携带 Supabase `access_token`；DMIT 用 service role 校验用户身份 |
 
-### 1.2 API Key：创建、复制、吊销
+### 1.2 API Key：创建、使用、吊销
 
 | 项 | 状态 | 说明 |
 |----|------|------|
 | 创建 | ✅ | `/dashboard/api-keys` → `POST /v1/me/api-keys` → 返回 `sk-tokfai_<48 hex>` |
 | 一次性展示 | ✅ | 完整 key 仅在创建时展示一次；列表只显示 `prefix` |
 | 复制 / Reveal | ✅ | 后续复制走 `POST /v1/me/api-keys/reveal`（owner only） |
+| 使用 | ✅ | Playground / 外部客户端 Bearer `sk-tokfai_...` 调用受保护接口 |
 | 吊销 | ✅ | `POST /v1/me/api-keys/revoke`；DB 写 `revoked_at` |
 | 吊销后拦截 | ✅ | DMIT `verifyApiKeyToken` 拒绝 `revoked_at` 非空的 key |
 | 存储 | ✅ | DB 存 `hash` + `encrypted_secret`；**不存明文 key** |
@@ -88,12 +99,41 @@
 | Admin 鉴权 | ✅ | 前端 Supabase session → DMIT `/admin/*`；`admin_users` 校验 |
 | Credits 调账 | ✅ | add / deduct；`insufficient_credits` 拦截；`profiles` / `credit_ledger` / `admin_audit_logs` 一致 |
 | Models 管理 | ✅ | create / edit / archive / restore；软删除（`enabled` / `visible`）；审计写入 `admin_audit_logs` |
+| 审计日志 | ✅ | Admin 写操作可追溯 actor、action、resource |
 
 Admin Models 写操作审计：`action` 为 `models.create|update|archive|restore|delete_attempt`，`resource_type=models`。
 
 ---
 
-## 2. 架构边界（封板基线）
+## 2. 生产 API 可用性（最终验收 2026-05-28）
+
+### 2.1 Health check
+
+| 项 | 状态 | 说明 |
+|----|------|------|
+| `GET /health` | ✅ | `https://api.tokfai.com/health` |
+| 响应 | ✅ | `ok=true`，`service=dmit-api`，`env=production` |
+
+### 2.2 OpenAI-compatible models（公开）
+
+| 项 | 状态 | 说明 |
+|----|------|------|
+| `GET /v1/models` | ✅ | `https://api.tokfai.com/v1/models` |
+| Authorization | ✅ | **无需** Bearer / API Key |
+| 响应格式 | ✅ | `object=list` |
+| 模型数量 | ✅ | `data` 长度当前为 **15** |
+
+### 2.3 受保护接口鉴权（仍生效）
+
+| 端点 | 鉴权要求 | 状态 |
+|------|----------|------|
+| `POST /v1/chat/completions` | Bearer `sk-tokfai_...` API Key | ✅ |
+| `/admin/*` | Supabase session + `admin_users` 权限 | ✅ |
+| `POST /v1/webhooks/stripe` | `Stripe-Signature` header | ✅ |
+
+---
+
+## 3. 架构边界（封板基线）
 
 ```
 apps/web (tokfai.com)     — anon key + 用户 session；只读 RLS 数据 + 调 DMIT 公开 API
@@ -107,7 +147,7 @@ supabase/migrations       — DB 结构 source of truth
 
 ---
 
-## 3. 已知非阻塞项（⚠️ MVP 不挡板）
+## 4. 已知非阻塞项（⚠️ MVP 不挡板）
 
 | # | 项 | 说明 |
 |---|-----|------|
@@ -121,15 +161,15 @@ supabase/migrations       — DB 结构 source of truth
 
 ---
 
-## 4. 上线前安全提醒（🔒）
+## 5. 上线前安全提醒（🔒）
 
-### 4.1 API Key
+### 5.1 API Key
 
 - **不要截图、录屏、粘贴完整 `sk-tokfai_...` key** 到工单、聊天、公开文档。
 - 已在聊天 / 日志 / 截图中 **暴露过的 key 必须立即 revoke**，并新建 replacement key。
 - 列表页、Usage、Playground UI 只展示 **prefix** 或截断 request_id；完整 secret 仅创建瞬间或 owner reveal。
 
-### 4.2 Secrets 与部署
+### 5.2 Secrets 与部署
 
 | Secret | 允许位置 | 禁止位置 |
 |--------|----------|----------|
@@ -142,19 +182,19 @@ supabase/migrations       — DB 结构 source of truth
 - Vercel（web）只配置 `NEXT_PUBLIC_*` 与 Supabase **anon** key。
 - Stripe Webhook URL 指向 **`https://api.tokfai.com/v1/webhooks/stripe`**（POST）；secret 只在 DMIT 配置。
 
-### 4.3 日志与响应
+### 5.3 日志与响应
 
 - DMIT / Admin **不得**在 HTTP 响应或日志中输出：完整 API key、JWT 原文、Stripe payload 全文、service role key。
 - Admin 调试信息走结构化日志字段白名单（见 `apps/dmit-api/src/logger.ts`）。
 
-### 4.4 Admin
+### 5.4 Admin
 
 - `admin_users` 仅 service role 可写；前端不得直连 `admin_audit_logs` / `admin_users` 表。
 - 生产 Admin 操作保留审计：`admin_audit_logs` 可追溯 actor、action、resource。
 
 ---
 
-## 5. 封板后回归 smoke（可选）
+## 6. 封板后回归 smoke（可选）
 
 上线或发版后，用 **非生产 key / 小额度** 快速确认：
 
@@ -163,10 +203,26 @@ supabase/migrations       — DB 结构 source of truth
 3. Usage / Credits 页可见对应记录  
 4. （可选）最小档 Stripe Checkout → webhook → balance 增加  
 5. （可选）Admin 调账 ±小额度 → 三表一致  
+6. `GET https://api.tokfai.com/health` → `ok=true`  
+7. `GET https://api.tokfai.com/v1/models` → `object=list`，无需 Authorization  
 
 ---
 
-## 6. 相关文档
+## 7. 48 小时观察期（2026-05-28 起）
+
+MVP P5 最终生产验收完成后，进入 **48 小时内测观察期**：
+
+| 规则 | 说明 |
+|------|------|
+| 不开发新功能 | 观察期内冻结功能 scope |
+| 只修阻塞 bug | 仅处理影响主链可用性的 P0 问题 |
+| 冻结主链路改动 | **不再改** billing / usage / credits / Stripe 相关代码路径 |
+
+观察期结束后，按产品排期进入下一迭代。
+
+---
+
+## 8. 相关文档
 
 | 文档 | 内容 |
 |------|------|
@@ -176,4 +232,4 @@ supabase/migrations       — DB 结构 source of truth
 
 ---
 
-**MVP P5 封板结论：** 用户侧 API 调用 → 扣费 → Dashboard 展示、Stripe 充值、Admin Credits/Models 主链均已通过生产验收，可作为 Tokfai MVP 交付基线。
+**MVP P5 最终结论（2026-05-28）：** 用户登录、API Key 创建/使用/吊销、Chat Playground 扣费、`usage_logs` / `credit_ledger` / `profiles.credits_balance` 对账、Usage / Credits Dashboard、Stripe Checkout 充值入账、Admin Models CRUD + archive/restore、Admin Credits 调账与审计日志均已通过生产验收；`GET /health` 与公开 `GET /v1/models` 已可用，受保护接口鉴权保持有效。**Tokfai MVP 可作为交付基线；当前处于 48 小时观察期，仅修阻塞 bug。**
