@@ -308,6 +308,8 @@ export const messages = {
         creditsUnit: "credits",
         buyStarter: "Buy starter",
         buyPlan: "Buy plan",
+        checkoutUnavailable:
+          "Checkout temporarily unavailable. Please try again or contact support.",
         noRechargePlans: "No recharge plans are available right now.",
         includesBonusCredits: "Includes {bonus} bonus credits",
         comingSoon: "Coming soon",
@@ -1052,6 +1054,7 @@ export const messages = {
         creditsUnit: "积分",
         buyStarter: "购买 Starter",
         buyPlan: "购买套餐",
+        checkoutUnavailable: "充值通道暂时不可用，请稍后重试或联系支持。",
         noRechargePlans: "当前没有可用的充值套餐。",
         includesBonusCredits: "含 {bonus} 赠送积分",
         comingSoon: "即将开放",

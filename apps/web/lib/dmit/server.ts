@@ -115,6 +115,7 @@ export interface BillingRechargePlan {
   plan_id: string;
   name: string;
   amount_cents: number;
+  currency: string;
   credits: number;
   bonus_credits: number;
   total_credits: number;

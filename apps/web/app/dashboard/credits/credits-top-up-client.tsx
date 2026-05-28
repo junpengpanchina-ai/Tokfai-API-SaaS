@@ -12,11 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  createCheckoutSession,
-  DmitApiError,
-  type BillingRechargePlan,
-} from "@/lib/dmit/client";
+import { createCheckoutSession, DmitApiError, type BillingRechargePlan } from "@/lib/dmit/client";
 import { userMessageForDmitError } from "@/lib/dmit-messages";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
@@ -57,11 +53,7 @@ export function CreditsTopUpClient({
       });
       window.location.assign(session.url);
     } catch (err) {
-      setError(
-        err instanceof DmitApiError
-          ? userMessageForDmitError(err.status, err.code, err.message)
-          : "Unable to start Stripe Checkout. Please try again."
-      );
+      setError(checkoutErrorMessage(err, t));
       setLoadingPlanId(null);
     }
   }
@@ -169,6 +161,24 @@ export function CreditsTopUpClient({
       </CardContent>
     </Card>
   );
+}
+
+function checkoutErrorMessage(
+  err: unknown,
+  t: (key: string) => string
+): string {
+  if (err instanceof DmitApiError) {
+    if (
+      err.status >= 500 ||
+      err.status === 502 ||
+      err.status === 503 ||
+      err.status === 504
+    ) {
+      return t("dashboard.credits.checkoutUnavailable");
+    }
+    return userMessageForDmitError(err.status, err.code, err.message);
+  }
+  return t("dashboard.credits.checkoutUnavailable");
 }
 
 function CheckoutError({ message }: { message: string }) {
