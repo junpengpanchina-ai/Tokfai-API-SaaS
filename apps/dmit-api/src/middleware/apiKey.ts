@@ -11,8 +11,8 @@ import {
  * Requires a sk-tokfai_... Bearer token. Resolves the api_keys row in
  * constant time and stashes it on the context as `c.get('apiKey')`.
  *
- * Use this for OpenAI-compatible customer-facing endpoints:
- * /v1/chat/completions, /v1/models, /v1/embeddings, etc.
+ * Use this for OpenAI-compatible customer-facing endpoints that require a key:
+ * /v1/embeddings, etc. Public catalog: GET /v1/models (no auth).
  */
 export const requireApiKey: MiddlewareHandler = async (c, next) => {
   const token = extractBearer(c.req.header("authorization"));
