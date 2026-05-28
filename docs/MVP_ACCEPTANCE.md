@@ -2,7 +2,7 @@
 
 > **用途：** 记录 MVP 封板时已通过的生产主链、已知非阻塞项与上线前安全提醒。  
 > **范围：** 只读文档；**不引入新功能、不改业务代码。**  
-> **最后更新：** 2026-05-29（MVP P6 **充值套餐与自主定价后台验收完成**）
+> **最后更新：** 2026-05-29（MVP P6 **充值套餐与自主定价后台最终验收完成**）
 
 ---
 
@@ -11,9 +11,10 @@
 | 项 | 状态 |
 |----|------|
 | MVP P5 最终生产验收 | ✅ **已完成**（2026-05-28） |
-| MVP P6 充值套餐与定价后台 | ✅ **已完成**（2026-05-29） |
+| MVP P6 充值套餐与定价后台 | ✅ **最终验收完成**（2026-05-29） |
+| P6 生产状态 | ✅ **生产可用** — Starter Checkout 已跑通 |
 | P6 封板 | 🔒 **已封板** — 当前不继续新增功能 |
-| 观察期 | ⏳ **48 小时内测观察期**（见 §7；P5 起算，P6 封板后仍仅修阻塞 bug） |
+| 观察期 | ⏳ **观察期**（见 §7；P6 生产可用后进入，仅修阻塞 bug） |
 
 ---
 
@@ -87,9 +88,11 @@
 
 | 项 | 状态 | 说明 |
 |----|------|------|
-| 套餐数据源 | ✅ | `public.recharge_plans`（migration `0014_recharge_plans.sql`） |
-| 用户侧套餐列表 | ✅ | `/dashboard/credits` ← `GET /v1/billing/plans`；**不再**前端写死套餐 |
-| Checkout | ✅ | `POST /v1/billing/checkout` 仅接受 `plan_id`；金额、credits、`stripe_price_id` 由 DMIT 从 `recharge_plans` 解析 |
+| 套餐数据源 | ✅ | `public.recharge_plans` 已上线（`0014_recharge_plans.sql` + `0015_recharge_plans_currency.sql`） |
+| 用户侧套餐列表 | ✅ | `/dashboard/credits` ← `GET /v1/billing/plans` 动态读取；**不再**前端写死 |
+| Admin 套餐管理 | ✅ | `/admin/credits` 可管理 Starter / Pro / Business（见 §1.7） |
+| Checkout | ✅ | `POST /v1/billing/checkout` **只信任 `plan_id`**；价格与 credits 均从 DB 读取 |
+| Inline Stripe Price | ✅ | `stripe_price_id` 为空时 fallback 到 inline `price_data`；前台 **Buy plan** 可成功打开 Stripe Checkout |
 | 防篡改 | ✅ | 前端不得传 `amount` / `amount_cents` / `credits`；服务端拒绝此类字段 |
 | Webhook | ✅ | `POST /v1/webhooks/stripe` 处理 `checkout.session.completed`（**未改动**） |
 | 入账 | ✅ | `credit_orders.status=paid` + `credit_ledger` topup + `profiles.credits_balance` 增加（**未改动**） |
@@ -119,17 +122,17 @@ Admin Models 写操作审计：`action` 为 `models.create|update|archive|restor
 
 Admin Recharge plans 写操作审计：`action` 为 `recharge_plans.update`，`resource_type=recharge_plans`。
 
-### 1.7 P6 充值套餐与自主定价后台（2026-05-29 验收）
+### 1.7 P6 充值套餐与自主定价后台（2026-05-29 最终验收）
 
 | # | 验收项 | 状态 | 说明 |
 |---|--------|------|------|
-| 1 | `public.recharge_plans` 表 | ✅ | 已创建并初始化 3 个套餐（见 §1.5 表格） |
-| 2 | 用户侧动态套餐 | ✅ | `/dashboard/credits` 从 DMIT `GET /v1/billing/plans` 读取；不再依赖前端写死 |
-| 3 | Admin 编辑能力 | ✅ | `/admin/credits` 支持编辑：`name`、`credits`、`bonus_credits`、`enabled`、`visible`、`sort_order`、`badge`、`stripe_price_id` |
-| 4 | Checkout plan_id 驱动 | ✅ | 前端只传 `plan_id`；`amount_cents`、credits、`stripe_price_id` 均由 DMIT 服务端解析 |
-| 5 | 主链路未改动 | ✅ | Stripe webhook、`credit_ledger`、`profiles.credits_balance`、`usage_logs` **未改动** |
-| 6 | 当前上线状态 | ✅ | Starter 可购买；Pro / Business 保持 Coming soon；Admin 可后续填入 `stripe_price_id` 后启用 |
-| 7 | P6 封板 | 🔒 | **当前不继续新增功能**；P6 进入封板状态 |
+| 1 | `recharge_plans` 上线 | ✅ | Starter / Pro / Business 三档已初始化；Admin 后台可查看与编辑 |
+| 2 | 前台动态套餐 | ✅ | `/dashboard/credits` 从 `GET /v1/billing/plans` 读取；不再依赖前端写死 |
+| 3 | Checkout plan_id 驱动 | ✅ | `POST /v1/billing/checkout` 只信任 `plan_id`；价格与 credits 均从 DB 解析 |
+| 4 | Inline Stripe Price | ✅ | `stripe_price_id` 为空时使用 inline `price_data`；**Buy plan** 可成功跳转 Stripe Checkout |
+| 5 | 主链路未改动 | ✅ | Stripe webhook 入账、`credit_ledger`、`profiles.credits_balance`、`usage_logs` **未改动** |
+| 6 | 当前上线状态 | ✅ | Starter 可购买；Pro / Business 保持 Coming soon；Admin 可填 `stripe_price_id` 后启用 |
+| 7 | P6 生产状态 | ⏳ | **生产可用，进入观察期**；封板后仅修阻塞 bug |
 
 **Admin API（P6 新增）：**
 
@@ -143,7 +146,7 @@ Admin Recharge plans 写操作审计：`action` 为 `recharge_plans.update`，`r
 | 端点 | 说明 |
 |------|------|
 | `GET /v1/billing/plans` | 返回 `visible=true` 的套餐（JWT） |
-| `POST /v1/billing/checkout` | 请求体仅 `plan_id`（+ 可选 redirect URLs）；拒绝客户端传入 pricing 字段 |
+| `POST /v1/billing/checkout` | 请求体仅 `plan_id`（+ 可选 redirect URLs）；拒绝客户端传入 pricing 字段；`stripe_price_id` 为空时 inline `price_data` |
 
 **P6 明确不在 scope：**
 
@@ -252,8 +255,8 @@ supabase/migrations       — DB 结构 source of truth
 1. 登录 → Dashboard 可进  
 2. 创建 API Key → Playground 跑一条 chat → 记 `request_id`  
 3. Usage / Credits 页可见对应记录  
-4. `/dashboard/credits` 展示 Starter / Pro / Business 套餐（Starter 可点购买）  
-5. （可选）Starter Stripe Checkout → webhook → balance 增加  
+4. `/dashboard/credits` 展示 Starter / Pro / Business 套餐（Starter 可点 **Buy plan**）  
+5. Starter Stripe Checkout 可成功打开（`stripe_price_id` 为空时 inline `price_data`）→ webhook → balance 增加  
 6. （可选）Admin 调账 ±小额度 → 三表一致  
 7. （可选）Admin 编辑 recharge plan 字段 → `admin_audit_logs` 有 `recharge_plans.update`  
 8. `GET https://api.tokfai.com/health` → `ok=true`  
@@ -261,15 +264,15 @@ supabase/migrations       — DB 结构 source of truth
 
 ---
 
-## 7. 48 小时观察期（2026-05-28 起）
+## 7. 观察期（P6 生产可用后）
 
-MVP P5 最终生产验收完成后，进入 **48 小时内测观察期**：
+MVP P5 最终生产验收（2026-05-28）与 P6 最终验收（2026-05-29）完成后，进入 **观察期**：
 
 | 规则 | 说明 |
 |------|------|
-| 不开发新功能 | 观察期内冻结功能 scope；**P6 已于 2026-05-29 封板，当前不继续新增功能** |
+| 不开发新功能 | P6 已封板；**当前不继续新增功能** |
 | 只修阻塞 bug | 仅处理影响主链可用性的 P0 问题 |
-| 冻结主链路改动 | **不再改** billing webhook / `credit_ledger` / `usage_logs` / credits 入账主链 |
+| 冻结主链路改动 | **不再改** Stripe webhook 入账 / `credit_ledger` / `usage_logs` / `profiles.credits_balance` 主链 |
 
 观察期结束后，按产品排期进入下一迭代。
 
@@ -283,7 +286,8 @@ MVP P5 最终生产验收完成后，进入 **48 小时内测观察期**：
 | [`docs/credit-topup-production-check.md`](./credit-topup-production-check.md) | Stripe 充值 SQL 验收 |
 | [`docs/production-checklist.md`](./production-checklist.md) | 早期生产清单（部分条目已被本文档 supersede） |
 | [`supabase/migrations/0014_recharge_plans.sql`](../supabase/migrations/0014_recharge_plans.sql) | P6 `recharge_plans` 表与 seed |
+| [`supabase/migrations/0015_recharge_plans_currency.sql`](../supabase/migrations/0015_recharge_plans_currency.sql) | P6 `currency` 列与 `credit_orders` 兼容列 |
 
 ---
 
-**MVP P6 最终结论（2026-05-29）：** 在 P5 基线上，`public.recharge_plans` 已创建并初始化 Starter / Pro / Business 三档套餐；`/dashboard/credits` 已从 DMIT 动态读取套餐；`/admin/credits` 支持查看与编辑 recharge plans；`POST /v1/billing/checkout` 已改为 `plan_id` 驱动（前端不可篡改 amount / credits）；Stripe webhook、`credit_ledger`、`profiles.credits_balance`、`usage_logs` 主链路未改动。当前 **Starter 可购买**，Pro / Business 保持 Coming soon，Admin 可后续填入 `stripe_price_id` 后启用。**P6 已进入封板状态，当前不继续新增功能；观察期内仅修阻塞 bug。**
+**MVP P6 最终结论（2026-05-29）：** `recharge_plans` 已上线，Starter / Pro / Business 可由 Admin 后台管理；`/dashboard/credits` 从 `GET /v1/billing/plans` 动态读取套餐；`POST /v1/billing/checkout` 只信任 `plan_id`，价格与 credits 均从 DB 读取；`stripe_price_id` 为空时已支持 inline `price_data`，前台 **Buy plan** 可成功打开 Stripe Checkout；Stripe webhook 入账、`credit_ledger`、`profiles.credits_balance` 主链路未改动。**P6 生产可用，已进入观察期**；封板后仅修阻塞 bug。
