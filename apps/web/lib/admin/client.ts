@@ -92,6 +92,32 @@ export type AdminModelUpdateBody = Partial<
   action?: "restore";
 };
 
+export type AdminRechargePlanListItem = {
+  id: string;
+  name: string;
+  amount_cents: number;
+  credits: number;
+  bonus_credits: number;
+  total_credits: number;
+  stripe_price_id: string | null;
+  enabled: boolean;
+  visible: boolean;
+  sort_order: number;
+  badge: string | null;
+  updated_at: string | null;
+};
+
+export type AdminRechargePlanUpdateBody = {
+  name?: string;
+  credits?: number;
+  bonus_credits?: number;
+  enabled?: boolean;
+  visible?: boolean;
+  sort_order?: number;
+  badge?: string | null;
+  stripe_price_id?: string | null;
+};
+
 export class AdminApiError extends Error {
   readonly status: number;
   readonly code?: string;
@@ -273,6 +299,35 @@ export async function restoreAdminModel(id: string): Promise<AdminModelListItem>
     {
       method: "POST",
       json: {},
+    }
+  );
+  return res.data;
+}
+
+export function createAdminRechargePlanIdempotencyKey(): string {
+  const random = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+  return `admin-recharge-plan-${Date.now()}-${random}`;
+}
+
+export async function fetchAdminRechargePlans(): Promise<AdminRechargePlanListItem[]> {
+  const res = await fetchAdminApi<{ data?: AdminRechargePlanListItem[] }>(
+    "/admin/recharge-plans"
+  );
+  return Array.isArray(res.data) ? res.data : [];
+}
+
+export async function updateAdminRechargePlan(
+  id: string,
+  body: AdminRechargePlanUpdateBody,
+  idempotencyKey?: string
+): Promise<AdminRechargePlanListItem> {
+  const res = await fetchAdminApi<{ data: AdminRechargePlanListItem }>(
+    `/admin/recharge-plans/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      json: body,
+      idempotencyKey:
+        idempotencyKey ?? createAdminRechargePlanIdempotencyKey(),
     }
   );
   return res.data;

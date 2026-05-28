@@ -503,8 +503,21 @@ export async function revealMeApiKey(
 // Billing — Stripe Checkout (UI wired in /dashboard/credits)
 // ---------------------------------------------------------------------------
 
+export interface BillingRechargePlan {
+  plan_id: string;
+  name: string;
+  amount_cents: number;
+  credits: number;
+  bonus_credits: number;
+  total_credits: number;
+  enabled: boolean;
+  visible: boolean;
+  sort_order: number;
+  badge: string | null;
+}
+
 export interface CreateCheckoutSessionInput {
-  package_code: "starter" | "pro" | "business";
+  plan_id: string;
   accessToken: string;
 }
 
@@ -513,9 +526,25 @@ export interface CreateCheckoutSessionResponse {
   url: string;
   session_id: string;
   order_id: string;
-  plan_id: CreateCheckoutSessionInput["package_code"];
+  plan_id: string;
   amount_cents: number;
   credits: number;
+}
+
+/**
+ * List visible recharge plans for the credits dashboard.
+ */
+export async function listBillingRechargePlans(
+  accessToken: string
+): Promise<BillingRechargePlan[]> {
+  const res = await dmitFetch<{ data?: BillingRechargePlan[] }>(
+    "/v1/billing/plans",
+    {
+      method: "GET",
+      accessToken,
+    }
+  );
+  return Array.isArray(res.data) ? res.data : [];
 }
 
 /**
@@ -528,13 +557,13 @@ export interface CreateCheckoutSessionResponse {
 export async function createCheckoutSession(
   input: CreateCheckoutSessionInput
 ): Promise<CreateCheckoutSessionResponse> {
-  const { accessToken, package_code } = input;
+  const { accessToken, plan_id } = input;
   return dmitFetch<CreateCheckoutSessionResponse>(
     "/v1/billing/checkout",
     {
       method: "POST",
       accessToken,
-      json: { package_code },
+      json: { plan_id },
     }
   );
 }

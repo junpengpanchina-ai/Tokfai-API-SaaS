@@ -9,6 +9,7 @@ import {
   DmitServerError,
   getDmitBaseUrl,
   getMyCredits,
+  listBillingRechargePlans,
   listMyCreditLedger,
 } from "@/lib/dmit/server";
 import { createClient } from "@/lib/supabase/server";
@@ -62,16 +63,19 @@ export default async function CreditsPage({
 }
 
 async function loadCreditsState(accessToken: string): Promise<CreditsLoadState> {
-  const [profileResult, ledgerResult] = await Promise.all([
+  const [profileResult, ledgerResult, plansResult] = await Promise.all([
     readCredits(accessToken),
     readLedger(accessToken),
+    readBillingPlans(accessToken),
   ]);
-  const debug = [profileResult.debug, ledgerResult.debug];
+  const debug = [profileResult.debug, ledgerResult.debug, plansResult.debug];
   const failed = [profileResult, ledgerResult].find((result) => !result.ok);
   if (failed) {
     return {
       profile: profileResult.ok ? profileResult.data : null,
       ledger: ledgerResult.ok ? ledgerResult.data : [],
+      plans: plansResult.ok ? plansResult.data : [],
+      plansError: plansResult.ok ? null : plansResult.errorMessage,
       error:
         failed.debug.status === 401 || failed.debug.status === 403
           ? "auth"
@@ -84,6 +88,8 @@ async function loadCreditsState(accessToken: string): Promise<CreditsLoadState> 
     return {
       profile: null,
       ledger: [],
+      plans: plansResult.ok ? plansResult.data : [],
+      plansError: plansResult.ok ? null : plansResult.errorMessage,
       error: "temporary",
       debug,
     };
@@ -92,6 +98,8 @@ async function loadCreditsState(accessToken: string): Promise<CreditsLoadState> 
   return {
     profile: profileResult.data,
     ledger: ledgerResult.data,
+    plans: plansResult.ok ? plansResult.data : [],
+    plansError: plansResult.ok ? null : plansResult.errorMessage,
     error: null,
     debug,
   };
@@ -101,6 +109,8 @@ function missingSessionCreditsState(): CreditsLoadState {
   return {
     profile: null,
     ledger: [],
+    plans: [],
+    plansError: null,
     error: "auth",
     debug: [
       {
@@ -142,6 +152,27 @@ async function readLedger(accessToken: string) {
     return {
       ok: false as const,
       debug: errorDebug(endpoint, err),
+    };
+  }
+}
+
+async function readBillingPlans(accessToken: string) {
+  const endpoint = "/v1/billing/plans";
+  try {
+    return {
+      ok: true as const,
+      data: await listBillingRechargePlans(accessToken),
+      errorMessage: null,
+      debug: okDebug(endpoint),
+    };
+  } catch (err) {
+    const debug = errorDebug(endpoint, err);
+    return {
+      ok: false as const,
+      data: [] as Awaited<ReturnType<typeof listBillingRechargePlans>>,
+      errorMessage:
+        err instanceof DmitServerError ? err.message : "Failed to load recharge plans.",
+      debug,
     };
   }
 }

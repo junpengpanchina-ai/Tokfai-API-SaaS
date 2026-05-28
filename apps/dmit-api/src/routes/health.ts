@@ -33,6 +33,10 @@ healthRoutes.get("/debug/routes", (c) =>
     routes: [
       "GET /admin/credits",
       "POST /admin/credits/adjust",
+      "GET /admin/recharge-plans",
+      "PATCH /admin/recharge-plans/:id",
+      "GET /v1/billing/plans",
+      "POST /v1/billing/checkout",
       "POST /v1/webhooks/stripe",
       "GET /debug/routes",
     ],
@@ -47,6 +51,7 @@ healthRoutes.get("/__version", (c) =>
     routes: [
       "GET /v1/models",
       "POST /v1/chat/completions",
+      "GET /v1/billing/plans",
       "POST /v1/billing/checkout",
       "GET /api/system/health",
       "GET /admin/health",
@@ -55,6 +60,8 @@ healthRoutes.get("/__version", (c) =>
       "POST /stripe/webhook",
       "GET /admin/credits",
       "POST /admin/credits/adjust",
+      "GET /admin/recharge-plans",
+      "PATCH /admin/recharge-plans/:id",
     ],
     buildTime: process.env.BUILD_TIME || null,
     commitSha: process.env.COMMIT_SHA || null,

@@ -16,6 +16,10 @@ import {
   restoreAdminModel,
   updateAdminModel,
 } from "./adminModels.js";
+import {
+  listAdminRechargePlans,
+  updateAdminRechargePlan,
+} from "./adminRechargePlans.js";
 import type { AdminUserContext } from "../middleware/requireAdminV1.js";
 
 const SUCCESS_STATUSES = ["succeeded", "success", "ok"];
@@ -556,6 +560,41 @@ protectedAdminRoutes.get("/api-keys", async (c) => {
       revoked_at: row.revoked_at,
     })),
   });
+});
+
+protectedAdminRoutes.get("/recharge-plans", async (c) => {
+  const plans = await listAdminRechargePlans();
+  return c.json({ data: plans });
+});
+
+protectedAdminRoutes.patch("/recharge-plans/:id", async (c) => {
+  const id = c.req.param("id").trim();
+  if (!id) {
+    return adminApiError(c, 400, "Plan ID is required.", "missing_plan_id");
+  }
+
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const result = await updateAdminRechargePlan(id, body, adminModelWriteContext(c));
+
+  if (!result.ok) {
+    const message =
+      result.error === "recharge_plan_not_found"
+        ? "Recharge plan not found."
+        : result.error === "empty_patch"
+          ? "No fields to update."
+          : result.error === "invalid_recharge_plan_fields"
+            ? "Invalid recharge plan fields."
+            : "Failed to update recharge plan.";
+    return adminApiError(
+      c,
+      result.status,
+      message,
+      result.error,
+      result.status === 404 ? "not_found" : "validation_error"
+    );
+  }
+
+  return c.json({ data: result.plan });
 });
 
 protectedAdminRoutes.get("/models", async (c) => {

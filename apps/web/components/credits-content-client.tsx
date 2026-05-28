@@ -19,7 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n/i18n-provider";
-import type { MeCreditLedgerEntry, MeCredits } from "@/lib/dmit/server";
+import type { BillingRechargePlan, MeCreditLedgerEntry, MeCredits } from "@/lib/dmit/server";
 import { formatCredits, formatDateTime } from "@/lib/format";
 
 import { CreditsTopUpClient } from "@/app/dashboard/credits/credits-top-up-client";
@@ -37,6 +37,8 @@ interface CreditsRequestDebug {
 export interface CreditsLoadState {
   profile: MeCredits | null;
   ledger: MeCreditLedgerEntry[];
+  plans: BillingRechargePlan[];
+  plansError: string | null;
   error: CreditsLoadErrorKind | null;
   debug: CreditsRequestDebug[];
 }
@@ -110,7 +112,10 @@ export function CreditsContentClient({
         </CardContent>
       </Card>
 
-      <CreditsTopUpClient />
+      <CreditsTopUpClient
+        plans={creditsState.plans}
+        plansError={creditsState.plansError}
+      />
 
       <Card>
         <CardHeader>

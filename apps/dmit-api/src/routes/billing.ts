@@ -3,45 +3,23 @@ import Stripe from "stripe";
 
 import { ApiError } from "../errors.js";
 import { requireSupabaseJwt } from "../middleware/supabaseJwt.js";
+import {
+  listBillingRechargePlans,
+  loadCheckoutRechargePlan,
+} from "./adminRechargePlans.js";
 import { supabase } from "../supabase.js";
 import type { AuthedUser } from "../types.js";
 
-type PlanId = "starter" | "pro" | "business";
-
-interface CreditPlan {
-  plan_id: PlanId;
-  package_code: PlanId;
-  name: string;
-  amount_cents: number;
-  credits: number;
-}
-
-const CREDIT_PLANS: Record<PlanId, CreditPlan> = {
-  starter: {
-    plan_id: "starter",
-    package_code: "starter",
-    name: "Tokfai Starter Credits",
-    amount_cents: 2900,
-    credits: 10_000,
-  },
-  pro: {
-    plan_id: "pro",
-    package_code: "pro",
-    name: "Tokfai Pro Credits",
-    amount_cents: 9900,
-    credits: 50_000,
-  },
-  business: {
-    plan_id: "business",
-    package_code: "business",
-    name: "Tokfai Business Credits",
-    amount_cents: 29900,
-    credits: 200_000,
-  },
-};
-
-/** Plans that may create a new Stripe Checkout session. */
-const CHECKOUT_AVAILABLE_PLANS = new Set<PlanId>(["starter"]);
+const FORBIDDEN_CHECKOUT_FIELDS = [
+  "amount",
+  "amount_cents",
+  "amount_cny",
+  "credits",
+  "bonus_credits",
+  "total_credits",
+  "stripe_price_id",
+  "currency",
+] as const;
 
 let _billingStripe: Stripe | null = null;
 
@@ -85,44 +63,31 @@ function billingStripe(): Stripe {
   return _billingStripe;
 }
 
-function parsePlanId(body: unknown): PlanId {
+function assertNoClientPricingFields(body: Record<string, unknown>): void {
+  for (const field of FORBIDDEN_CHECKOUT_FIELDS) {
+    if (body[field] !== undefined) {
+      throw ApiError.badRequest(
+        `Field "${field}" is not accepted. Send plan_id only.`,
+        "forbidden_checkout_field"
+      );
+    }
+  }
+}
+
+function parsePlanId(body: unknown): string {
   if (body === null || typeof body !== "object" || Array.isArray(body)) {
     throw ApiError.badRequest("Request body must be a JSON object.", "invalid_body");
   }
 
-  const planId =
-    (body as Record<string, unknown>).package_code ??
-    (body as Record<string, unknown>).plan_id;
-  if (
-    planId !== "starter" &&
-    planId !== "pro" &&
-    planId !== "business"
-  ) {
-    throw ApiError.badRequest(
-      "package_code must be one of starter, pro, or business.",
-      "invalid_plan_id"
-    );
+  const bodyObj = body as Record<string, unknown>;
+  assertNoClientPricingFields(bodyObj);
+
+  const rawPlanId = bodyObj.plan_id ?? bodyObj.package_code;
+  if (typeof rawPlanId !== "string" || !rawPlanId.trim()) {
+    throw ApiError.badRequest("plan_id is required.", "missing_plan_id");
   }
 
-  return planId;
-}
-
-function assertCheckoutPlanAvailable(
-  body: Record<string, unknown>,
-  planId: PlanId
-): void {
-  if (CHECKOUT_AVAILABLE_PLANS.has(planId)) {
-    return;
-  }
-
-  const usedPackageCode =
-    body.package_code !== undefined && body.package_code !== null;
-  throw ApiError.badRequest(
-    usedPackageCode
-      ? `The ${planId} credit package is not available for purchase yet.`
-      : `The ${planId} plan is not available for purchase yet.`,
-    usedPackageCode ? "package_not_available" : "plan_not_available"
-  );
+  return rawPlanId.trim();
 }
 
 function allowedRedirectUrl(raw: unknown, fallbackPath: string): string {
@@ -151,6 +116,48 @@ function allowedRedirectUrl(raw: unknown, fallbackPath: string): string {
   return url.toString();
 }
 
+function amountCnyFromCents(amountCents: number): number {
+  if (amountCents % 100 !== 0) {
+    throw ApiError.internal(
+      "Recharge plan amount_cents must be a whole-yuan value.",
+      "invalid_plan_amount_cents"
+    );
+  }
+  return amountCents / 100;
+}
+
+function buildCheckoutLineItem(
+  plan: Awaited<ReturnType<typeof loadCheckoutRechargePlan>>
+): Stripe.Checkout.SessionCreateParams.LineItem {
+  if (!plan) {
+    throw ApiError.internal("Missing recharge plan for checkout.", "plan_missing");
+  }
+
+  if (plan.stripe_price_id) {
+    return {
+      quantity: 1,
+      price: plan.stripe_price_id,
+    };
+  }
+
+  return {
+    quantity: 1,
+    price_data: {
+      currency: "cny",
+      unit_amount: plan.amount_cents,
+      product_data: {
+        name: plan.name,
+        description: `${plan.total_credits.toLocaleString("en-US")} Tokfai credits`,
+      },
+    },
+  };
+}
+
+async function listBillingPlans(c: Context) {
+  const plans = await listBillingRechargePlans();
+  return c.json({ data: plans });
+}
+
 async function createCheckoutSession(c: Context) {
   const user = authedUser(c);
   let body: unknown;
@@ -163,8 +170,18 @@ async function createCheckoutSession(c: Context) {
   try {
     const bodyObj = body as Record<string, unknown>;
     const planId = parsePlanId(body);
-    assertCheckoutPlanAvailable(bodyObj, planId);
-    const plan = CREDIT_PLANS[planId];
+    const plan = await loadCheckoutRechargePlan(planId);
+
+    if (!plan) {
+      throw ApiError.badRequest("Unknown recharge plan.", "invalid_plan_id");
+    }
+    if (!plan.enabled) {
+      throw ApiError.badRequest(
+        `The ${planId} plan is not available for purchase yet.`,
+        "plan_not_available"
+      );
+    }
+
     const successUrl = allowedRedirectUrl(
       bodyObj.success_url,
       "/dashboard/credits?status=success&session_id={CHECKOUT_SESSION_ID}"
@@ -175,6 +192,8 @@ async function createCheckoutSession(c: Context) {
     );
     const sb = supabase();
     const stripe = billingStripe();
+    const totalCredits = plan.total_credits;
+    const amountCny = amountCnyFromCents(plan.amount_cents);
 
     const { data: profile, error: profileError } = await sb
       .from("profiles")
@@ -223,12 +242,11 @@ async function createCheckoutSession(c: Context) {
       .from("credit_orders")
       .insert({
         user_id: user.id,
-        email: user.email ?? (profile as { email?: string | null }).email ?? null,
-        package_code: plan.package_code,
+        plan_id: plan.id,
         status: "pending",
         currency: "cny",
-        amount_cents: plan.amount_cents,
-        credits: plan.credits,
+        amount_cny: amountCny,
+        credits: totalCredits,
       })
       .select("id")
       .single();
@@ -247,32 +265,20 @@ async function createCheckoutSession(c: Context) {
       client_reference_id: user.id,
       success_url: successUrl,
       cancel_url: cancelUrl,
-      line_items: [
-        {
-          quantity: 1,
-          price_data: {
-            currency: "cny",
-            unit_amount: plan.amount_cents,
-            product_data: {
-              name: plan.name,
-              description: `${plan.credits.toLocaleString("en-US")} Tokfai credits`,
-            },
-          },
-        },
-      ],
+      line_items: [buildCheckoutLineItem(plan)],
       metadata: {
         credit_order_id: orderId,
         tokfai_user_id: user.id,
-        package_code: plan.package_code,
-        plan_id: plan.plan_id,
-        credits: String(plan.credits),
+        plan_id: plan.id,
+        package_code: plan.id,
+        credits: String(totalCredits),
       },
       payment_intent_data: {
         metadata: {
           credit_order_id: orderId,
           tokfai_user_id: user.id,
-          package_code: plan.package_code,
-          plan_id: plan.plan_id,
+          plan_id: plan.id,
+          package_code: plan.id,
         },
       },
     });
@@ -299,9 +305,9 @@ async function createCheckoutSession(c: Context) {
       url: session.url,
       session_id: session.id,
       order_id: orderId,
-      plan_id: plan.plan_id,
+      plan_id: plan.id,
       amount_cents: plan.amount_cents,
-      credits: plan.credits,
+      credits: totalCredits,
     });
   } catch (err) {
     if (err instanceof ApiError) {
@@ -324,5 +330,6 @@ export const billingRoutes = new Hono();
 billingRoutes.use("/billing/*", requireSupabaseJwt);
 billingRoutes.use("/v1/billing/*", requireSupabaseJwt);
 
+billingRoutes.get("/v1/billing/plans", listBillingPlans);
 billingRoutes.post("/v1/billing/checkout", createCheckoutSession);
 billingRoutes.post("/billing/create-checkout-session", createCheckoutSession);

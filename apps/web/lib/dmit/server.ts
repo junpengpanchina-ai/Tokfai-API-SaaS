@@ -111,6 +111,29 @@ export async function listMyCreditLedger(
   return res.data;
 }
 
+export interface BillingRechargePlan {
+  plan_id: string;
+  name: string;
+  amount_cents: number;
+  credits: number;
+  bonus_credits: number;
+  total_credits: number;
+  enabled: boolean;
+  visible: boolean;
+  sort_order: number;
+  badge: string | null;
+}
+
+export async function listBillingRechargePlans(
+  accessToken: string
+): Promise<BillingRechargePlan[]> {
+  const res = await dmitServerFetch<DataResponse<BillingRechargePlan[]>>(
+    "/v1/billing/plans",
+    accessToken
+  );
+  return res.data ?? [];
+}
+
 export interface MeUsageLogEntry {
   id: string;
   created_at: string;
