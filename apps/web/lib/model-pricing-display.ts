@@ -9,23 +9,62 @@ import {
   isImageModelEntry,
 } from "@/lib/model-catalog";
 
+/** Starter recharge plan — used for dashboard RMB examples only (display). */
+export const STARTER_PLAN_CNY = 29;
+export const STARTER_PLAN_CREDITS = 10_000;
+
+export function getCreditUnitPriceCny(): number {
+  return STARTER_PLAN_CNY / STARTER_PLAN_CREDITS;
+}
+
+export function yuanFromCredits(credits: number): number {
+  return credits * getCreditUnitPriceCny();
+}
+
+function formatYuanValue(yuan: number): string {
+  if (!Number.isFinite(yuan)) return "0";
+  if (yuan >= 10) return yuan.toFixed(2);
+  if (yuan >= 1) return yuan.toFixed(2);
+  if (yuan >= 0.1) return yuan.toFixed(3);
+  if (yuan >= 0.01) return yuan.toFixed(4);
+  return yuan.toFixed(5);
+}
+
+export function formatStarterChatInputYuanExample(
+  millionCredits: number,
+  locale: Locale
+): string {
+  const yuan = formatYuanValue(yuanFromCredits(millionCredits));
+  if (locale === "zh") {
+    return `Input: 约 ¥${yuan} / 100万 tokens`;
+  }
+  return `Input: ~¥${yuan} / 1M tokens`;
+}
+
+export function formatStarterChatOutputYuanExample(
+  millionCredits: number,
+  locale: Locale
+): string {
+  const yuan = formatYuanValue(yuanFromCredits(millionCredits));
+  if (locale === "zh") {
+    return `Output: 约 ¥${yuan} / 100万 tokens`;
+  }
+  return `Output: ~¥${yuan} / 1M tokens`;
+}
+
+export function formatStarterImageYuanExample(
+  creditsPerGeneration: number,
+  locale: Locale
+): string {
+  const yuan = formatYuanValue(yuanFromCredits(creditsPerGeneration));
+  if (locale === "zh") {
+    return `约 ¥${yuan} / 次`;
+  }
+  return `~¥${yuan} / generation`;
+}
+
 function formatCreditsAmount(value: number, locale: Locale): string {
   return value.toLocaleString(locale === "zh" ? "zh-CN" : "en-US");
-}
-
-function formatCreditsDecimal(value: number, locale: Locale): string {
-  if (!Number.isFinite(value)) return "0";
-  const rounded =
-    value >= 1
-      ? Math.round(value * 1000) / 1000
-      : Math.round(value * 1_000_000) / 1_000_000;
-  return rounded.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
-    maximumFractionDigits: 6,
-  });
-}
-
-function creditsPer1kFromMillion(millionCredits: number): number {
-  return millionCredits / 1000;
 }
 
 export function formatDbChatInputCreditsPerMillion(
@@ -50,28 +89,6 @@ export function formatDbChatOutputCreditsPerMillion(
   return `Output: ${amount} credits / 1M tokens`;
 }
 
-export function formatDbChatInputCreditsPer1kExample(
-  millionCredits: number,
-  locale: Locale
-): string {
-  const per1k = formatCreditsDecimal(creditsPer1kFromMillion(millionCredits), locale);
-  if (locale === "zh") {
-    return `约 ${per1k} 积分 / 1K input tokens`;
-  }
-  return `~ ${per1k} credits / 1K input tokens`;
-}
-
-export function formatDbChatOutputCreditsPer1kExample(
-  millionCredits: number,
-  locale: Locale
-): string {
-  const per1k = formatCreditsDecimal(creditsPer1kFromMillion(millionCredits), locale);
-  if (locale === "zh") {
-    return `约 ${per1k} 积分 / 1K output tokens`;
-  }
-  return `~ ${per1k} credits / 1K output tokens`;
-}
-
 export function formatDbImageCreditsPerGeneration(
   credits: number,
   locale: Locale
@@ -81,20 +98,6 @@ export function formatDbImageCreditsPerGeneration(
     return `${amount} 积分 / 次`;
   }
   return `${amount} credits / generation`;
-}
-
-export function formatDbImageYuanExample(credits: number, locale: Locale): string | null {
-  if (locale !== "zh") return null;
-  const yuan = formatCreditsDecimal(credits / 1000, locale);
-  return `约 ¥${yuan} / 次`;
-}
-
-export function formatDbImageCreditsExample(credits: number, locale: Locale): string {
-  const amount = formatCreditsAmount(credits, locale);
-  if (locale === "zh") {
-    return `约 ${amount} 积分 / 次成功生成`;
-  }
-  return `~ ${amount} credits / successful generation`;
 }
 
 export function resolveDbImageCredits(
