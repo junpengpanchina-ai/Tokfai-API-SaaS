@@ -92,17 +92,21 @@ export function emptyAdminModelFormValues(): AdminModelFormValues {
   };
 }
 
+/** Admin edit: billing_type → model_type → chat default. */
+export function resolveAdminBillingType(model: {
+  billing_type?: string | null;
+  model_type?: string | null;
+}): "chat" | "image" {
+  if (model.billing_type === "image") return "image";
+  if (model.billing_type === "chat") return "chat";
+  if (normalizeAdminModelType(model.model_type) === "image") return "image";
+  return "chat";
+}
+
 export function adminModelToFormValues(
   model: AdminModelListItem
 ): AdminModelFormValues {
-  const billingType =
-    model.billing_type === "image"
-      ? "image"
-      : model.billing_type === "chat"
-        ? "chat"
-        : normalizeAdminModelType(model.model_type) === "image"
-          ? "image"
-          : "chat";
+  const billingType = resolveAdminBillingType(model);
 
   return {
     id: model.id,
@@ -133,19 +137,9 @@ export function adminModelToFormValues(
   };
 }
 
-export function formValuesToCreateBody(values: AdminModelFormValues) {
+function sharedModelPricingFields(values: AdminModelFormValues) {
   return {
-    id: values.id.trim(),
-    display_name: values.display_name.trim(),
-    provider: values.provider.trim() || "tokfai",
-    model_type: values.model_type,
-    enabled: values.enabled,
-    visible: values.visible,
-    sort_order: values.sort_order,
     billing_type: values.billing_type,
-    input_credits_per_million_tokens: Number(values.input_credits_per_million_tokens),
-    output_credits_per_million_tokens: Number(values.output_credits_per_million_tokens),
-    image_credits_per_generation: Number(values.image_credits_per_generation),
     upstream_cost_note: values.upstream_cost_note.trim() || null,
     markup_ratio: Number(values.markup_ratio),
     pricing_enabled: values.pricing_enabled,
@@ -153,21 +147,56 @@ export function formValuesToCreateBody(values: AdminModelFormValues) {
   };
 }
 
-export function formValuesToUpdateBody(values: AdminModelFormValues) {
+function chatPricingFields(values: AdminModelFormValues) {
   return {
+    input_credits_per_million_tokens: Number(
+      values.input_credits_per_million_tokens
+    ),
+    output_credits_per_million_tokens: Number(
+      values.output_credits_per_million_tokens
+    ),
+  };
+}
+
+function imagePricingFields(values: AdminModelFormValues) {
+  return {
+    image_credits_per_generation: Number(values.image_credits_per_generation),
+  };
+}
+
+export function formValuesToCreateBody(values: AdminModelFormValues) {
+  const base = {
+    id: values.id.trim(),
     display_name: values.display_name.trim(),
     provider: values.provider.trim() || "tokfai",
     model_type: values.model_type,
     enabled: values.enabled,
     visible: values.visible,
     sort_order: values.sort_order,
-    billing_type: values.billing_type,
-    input_credits_per_million_tokens: Number(values.input_credits_per_million_tokens),
-    output_credits_per_million_tokens: Number(values.output_credits_per_million_tokens),
-    image_credits_per_generation: Number(values.image_credits_per_generation),
-    upstream_cost_note: values.upstream_cost_note.trim() || null,
-    markup_ratio: Number(values.markup_ratio),
-    pricing_enabled: values.pricing_enabled,
-    pricing_visible: values.pricing_visible,
+    ...sharedModelPricingFields(values),
   };
+
+  if (values.billing_type === "image") {
+    return { ...base, ...imagePricingFields(values) };
+  }
+
+  return { ...base, ...chatPricingFields(values) };
+}
+
+export function formValuesToUpdateBody(values: AdminModelFormValues) {
+  const base = {
+    display_name: values.display_name.trim(),
+    provider: values.provider.trim() || "tokfai",
+    model_type: values.model_type,
+    enabled: values.enabled,
+    visible: values.visible,
+    sort_order: values.sort_order,
+    ...sharedModelPricingFields(values),
+  };
+
+  if (values.billing_type === "image") {
+    return { ...base, ...imagePricingFields(values) };
+  }
+
+  return { ...base, ...chatPricingFields(values) };
 }

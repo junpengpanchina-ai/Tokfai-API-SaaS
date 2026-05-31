@@ -38,13 +38,11 @@ function formatYuanValue(yuan: number): string {
   return yuan.toFixed(5);
 }
 
-function formatDisplayYuanRange(range: PriceRangeYuan): string {
+function formatDisplayYuanRange(range: PriceRangeYuan, locale: Locale): string {
   const min = formatYuanValue(range.min);
   const max = formatYuanValue(range.max);
-  if (min === max) {
-    return `¥${min}`;
-  }
-  return `¥${min}~¥${max}`;
+  const yuan = min === max ? `¥${min}` : `¥${min} ~ ¥${max}`;
+  return locale === "zh" ? `约 ${yuan}` : yuan;
 }
 
 function chatYuanExampleUnit(locale: Locale): string {
@@ -61,7 +59,8 @@ export function formatChatInputYuanExample(
 ): string | null {
   const range = creditsToDisplayYuanRange(millionCredits);
   if (!hasDisplayYuanExample(range)) return null;
-  return `input: ${formatDisplayYuanRange(range!)} ${chatYuanExampleUnit(locale)}`;
+  const label = locale === "zh" ? "Input" : "Input";
+  return `${label}: ${formatDisplayYuanRange(range!, locale)} ${chatYuanExampleUnit(locale)}`;
 }
 
 export function formatChatOutputYuanExample(
@@ -70,7 +69,8 @@ export function formatChatOutputYuanExample(
 ): string | null {
   const range = creditsToDisplayYuanRange(millionCredits);
   if (!hasDisplayYuanExample(range)) return null;
-  return `output: ${formatDisplayYuanRange(range!)} ${chatYuanExampleUnit(locale)}`;
+  const label = locale === "zh" ? "Output" : "Output";
+  return `${label}: ${formatDisplayYuanRange(range!, locale)} ${chatYuanExampleUnit(locale)}`;
 }
 
 export function formatImageYuanExample(
@@ -79,7 +79,7 @@ export function formatImageYuanExample(
 ): string | null {
   const range = creditsToDisplayYuanRange(creditsPerGeneration);
   if (!hasDisplayYuanExample(range)) return null;
-  return `${formatDisplayYuanRange(range!)} ${imageYuanExampleUnit(locale)}`;
+  return `${formatDisplayYuanRange(range!, locale)} ${imageYuanExampleUnit(locale)}`;
 }
 
 export function formatChatInputYuanExampleFromRange(
@@ -87,7 +87,8 @@ export function formatChatInputYuanExampleFromRange(
   locale: Locale
 ): string | null {
   if (!hasDisplayYuanExample(range)) return null;
-  return `input: ${formatDisplayYuanRange(range)} ${chatYuanExampleUnit(locale)}`;
+  const label = locale === "zh" ? "Input" : "Input";
+  return `${label}: ${formatDisplayYuanRange(range, locale)} ${chatYuanExampleUnit(locale)}`;
 }
 
 export function formatChatOutputYuanExampleFromRange(
@@ -95,7 +96,8 @@ export function formatChatOutputYuanExampleFromRange(
   locale: Locale
 ): string | null {
   if (!hasDisplayYuanExample(range)) return null;
-  return `output: ${formatDisplayYuanRange(range)} ${chatYuanExampleUnit(locale)}`;
+  const label = locale === "zh" ? "Output" : "Output";
+  return `${label}: ${formatDisplayYuanRange(range, locale)} ${chatYuanExampleUnit(locale)}`;
 }
 
 function formatCreditsAmount(value: number, locale: Locale): string {
@@ -135,29 +137,39 @@ export function formatDbImageCreditsPerGeneration(
   return `${amount} credits / generation`;
 }
 
-export function resolveDbImageCredits(
-  dbPricing: CatalogModelPricingItem | null | undefined
-): number | null {
-  if (!dbPricing) return null;
-  if (
-    dbPricing.billing_type === "image" ||
-    dbPricing.image_credits_per_generation != null
-  ) {
-    const credits = dbPricing.image_credits_per_generation;
-    return credits == null ? null : credits;
+/** Dashboard display: billing_type → model_type → chat. */
+export function resolveCatalogBillingType(
+  dbPricing: CatalogModelPricingItem | null | undefined,
+  modelType?: string | null
+): "chat" | "image" | null {
+  if (dbPricing?.billing_type === "image" || dbPricing?.billing_type === "chat") {
+    return dbPricing.billing_type;
   }
-  return null;
+  const normalized = (modelType ?? dbPricing?.model_type ?? "").toLowerCase();
+  if (normalized === "image") return "image";
+  if (normalized === "chat") return "chat";
+  return dbPricing ? "chat" : null;
+}
+
+export function resolveDbImageCredits(
+  dbPricing: CatalogModelPricingItem | null | undefined,
+  modelType?: string | null
+): number | null {
+  if (resolveCatalogBillingType(dbPricing, modelType) !== "image") return null;
+  const credits = dbPricing?.image_credits_per_generation;
+  return credits == null ? null : credits;
 }
 
 export function resolveDbChatCredits(
-  dbPricing: CatalogModelPricingItem | null | undefined
+  dbPricing: CatalogModelPricingItem | null | undefined,
+  modelType?: string | null
 ): {
   inputPerMillion: number;
   outputPerMillion: number;
 } | null {
-  if (!dbPricing || dbPricing.billing_type !== "chat") return null;
-  const input = dbPricing.input_credits_per_million_tokens;
-  const output = dbPricing.output_credits_per_million_tokens;
+  if (resolveCatalogBillingType(dbPricing, modelType) !== "chat") return null;
+  const input = dbPricing?.input_credits_per_million_tokens;
+  const output = dbPricing?.output_credits_per_million_tokens;
   if (input == null || output == null) return null;
   return { inputPerMillion: input, outputPerMillion: output };
 }

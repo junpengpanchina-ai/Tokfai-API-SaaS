@@ -335,7 +335,7 @@ function PriceBlock({
   locale: "en" | "zh";
 }) {
   if (isImageModelEntry(model)) {
-    const dbCredits = resolveDbImageCredits(dbPricing);
+    const dbCredits = resolveDbImageCredits(dbPricing, model.type);
     const credits =
       dbCredits ?? (isImageModelEntry(model) ? model.pricing.creditsPerRequest : null);
 
@@ -356,7 +356,7 @@ function PriceBlock({
   }
 
   if (isChatModelEntry(model)) {
-    const dbChat = resolveDbChatCredits(dbPricing);
+    const dbChat = resolveDbChatCredits(dbPricing, model.type);
 
     if (dbChat) {
       const exampleLines = [

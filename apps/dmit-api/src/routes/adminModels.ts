@@ -488,6 +488,7 @@ function normalizeBillingType(input: {
   billing_type?: "chat" | "image";
   billing_mode?: "token" | "per_image";
   model_type?: "chat" | "image" | "video" | "other";
+  existing?: AdminModelListItem | null;
 }): "chat" | "image" {
   if (input.billing_type === "chat" || input.billing_type === "image") {
     return input.billing_type;
@@ -495,6 +496,9 @@ function normalizeBillingType(input: {
   if (input.billing_mode === "per_image") return "image";
   if (input.billing_mode === "token") return "chat";
   if (input.model_type === "image") return "image";
+  if (input.existing?.billing_type === "image") return "image";
+  if (input.existing?.billing_type === "chat") return "chat";
+  if (input.existing?.model_type === "image") return "image";
   return "chat";
 }
 
@@ -509,6 +513,97 @@ type NormalizedPricingWrite = {
   visible: boolean;
 };
 
+function readInputCreditsPerMillion(
+  input: Record<string, unknown>,
+  fallback: number
+): number {
+  if (typeof input.input_credits_per_million_tokens === "number") {
+    return input.input_credits_per_million_tokens;
+  }
+  if (typeof input.input_per_1k === "number") {
+    return input.input_per_1k * 1000;
+  }
+  return fallback;
+}
+
+function readOutputCreditsPerMillion(
+  input: Record<string, unknown>,
+  fallback: number
+): number {
+  if (typeof input.output_credits_per_million_tokens === "number") {
+    return input.output_credits_per_million_tokens;
+  }
+  if (typeof input.output_per_1k === "number") {
+    return input.output_per_1k * 1000;
+  }
+  return fallback;
+}
+
+function readImageCreditsPerGeneration(
+  input: Record<string, unknown>,
+  billingType: "chat" | "image",
+  fallback: number
+): number {
+  if (typeof input.image_credits_per_generation === "number") {
+    return input.image_credits_per_generation;
+  }
+  if (billingType === "image" && typeof input.input_per_1k === "number") {
+    const markup =
+      typeof input.markup_ratio === "number"
+        ? input.markup_ratio
+        : typeof input.markup_multiplier === "number"
+          ? input.markup_multiplier
+          : 1;
+    return input.input_per_1k * markup;
+  }
+  return fallback;
+}
+
+function readMarkupRatio(
+  input: Record<string, unknown>,
+  fallback: number
+): number {
+  if (typeof input.markup_ratio === "number") {
+    return input.markup_ratio > 0 ? input.markup_ratio : 1;
+  }
+  if (typeof input.markup_multiplier === "number") {
+    return input.markup_multiplier > 0 ? input.markup_multiplier : 1;
+  }
+  return fallback > 0 ? fallback : 1;
+}
+
+function readPricingEnabled(
+  input: Record<string, unknown>,
+  fallback: boolean
+): boolean {
+  if (typeof input.pricing_enabled === "boolean") return input.pricing_enabled;
+  if (typeof input.enabled === "boolean") return input.enabled;
+  if (typeof input.billable === "boolean") return input.billable;
+  return fallback;
+}
+
+function readPricingVisible(
+  input: Record<string, unknown>,
+  fallback: boolean
+): boolean {
+  if (typeof input.pricing_visible === "boolean") return input.pricing_visible;
+  if (typeof input.visible === "boolean") return input.visible;
+  if (typeof input.billable === "boolean") return input.billable;
+  return fallback;
+}
+
+function readUpstreamCostNote(
+  input: Record<string, unknown>,
+  fallback: string | null
+): string | null {
+  if (input.upstream_cost_note === null) return null;
+  if (typeof input.upstream_cost_note === "string") {
+    return input.upstream_cost_note.trim() || null;
+  }
+  return fallback;
+}
+
+/** Full row for create — unused billing family zeroed. */
 function normalizePricingWrite(
   input: Record<string, unknown>,
   defaults?: Partial<NormalizedPricingWrite>
@@ -528,74 +623,153 @@ function normalizePricingWrite(
         : undefined,
   });
 
-  const inputPerMillion =
-    typeof input.input_credits_per_million_tokens === "number"
-      ? input.input_credits_per_million_tokens
-      : typeof input.input_per_1k === "number"
-        ? input.input_per_1k * 1000
-        : (defaults?.input_credits_per_million_tokens ?? 0);
-
-  const outputPerMillion =
-    typeof input.output_credits_per_million_tokens === "number"
-      ? input.output_credits_per_million_tokens
-      : typeof input.output_per_1k === "number"
-        ? input.output_per_1k * 1000
-        : (defaults?.output_credits_per_million_tokens ?? 0);
-
-  const imageCredits =
-    typeof input.image_credits_per_generation === "number"
-      ? input.image_credits_per_generation
-      : billingType === "image" && typeof input.input_per_1k === "number"
-        ? input.input_per_1k *
-          (typeof input.markup_ratio === "number"
-            ? input.markup_ratio
-            : typeof input.markup_multiplier === "number"
-              ? input.markup_multiplier
-              : 1)
-        : (defaults?.image_credits_per_generation ?? 0);
-
-  const markupRatio =
-    typeof input.markup_ratio === "number"
-      ? input.markup_ratio
-      : typeof input.markup_multiplier === "number"
-        ? input.markup_multiplier
-        : (defaults?.markup_ratio ?? 1);
-
-  const pricingEnabled =
-    typeof input.pricing_enabled === "boolean"
-      ? input.pricing_enabled
-      : typeof input.enabled === "boolean"
-        ? input.enabled
-        : typeof input.billable === "boolean"
-          ? input.billable
-          : (defaults?.enabled ?? false);
-
-  const pricingVisible =
-    typeof input.pricing_visible === "boolean"
-      ? input.pricing_visible
-      : typeof input.visible === "boolean"
-        ? input.visible
-        : typeof input.billable === "boolean"
-          ? input.billable
-          : (defaults?.visible ?? false);
-
-  const upstreamNote =
-    input.upstream_cost_note === null
-      ? null
-      : typeof input.upstream_cost_note === "string"
-        ? input.upstream_cost_note.trim() || null
-        : (defaults?.upstream_cost_note ?? null);
-
-  return {
+  const row: NormalizedPricingWrite = {
     billing_type: billingType,
-    input_credits_per_million_tokens: inputPerMillion,
-    output_credits_per_million_tokens: outputPerMillion,
-    image_credits_per_generation: imageCredits,
-    upstream_cost_note: upstreamNote,
-    markup_ratio: markupRatio > 0 ? markupRatio : 1,
-    enabled: pricingEnabled,
-    visible: pricingVisible,
+    input_credits_per_million_tokens: readInputCreditsPerMillion(
+      input,
+      defaults?.input_credits_per_million_tokens ?? 0
+    ),
+    output_credits_per_million_tokens: readOutputCreditsPerMillion(
+      input,
+      defaults?.output_credits_per_million_tokens ?? 0
+    ),
+    image_credits_per_generation: readImageCreditsPerGeneration(
+      input,
+      billingType,
+      defaults?.image_credits_per_generation ?? 0
+    ),
+    upstream_cost_note: readUpstreamCostNote(
+      input,
+      defaults?.upstream_cost_note ?? null
+    ),
+    markup_ratio: readMarkupRatio(input, defaults?.markup_ratio ?? 1),
+    enabled: readPricingEnabled(input, defaults?.enabled ?? false),
+    visible: readPricingVisible(input, defaults?.visible ?? false),
   };
+
+  if (billingType === "image") {
+    row.input_credits_per_million_tokens = 0;
+    row.output_credits_per_million_tokens = 0;
+  } else {
+    row.image_credits_per_generation = 0;
+  }
+
+  return row;
+}
+
+/** Patch upsert — only overrides fields present in the request; scrubs opposite family when billing_type is set. */
+function buildPricingUpsertFromPatch(
+  input: Record<string, unknown>,
+  existing: AdminModelListItem | null,
+  modelTypeHint?: string
+): NormalizedPricingWrite {
+  const billingType = normalizeBillingType({
+    billing_type:
+      typeof input.billing_type === "string"
+        ? (input.billing_type as "chat" | "image")
+        : undefined,
+    billing_mode:
+      typeof input.billing_mode === "string"
+        ? (input.billing_mode as "token" | "per_image")
+        : undefined,
+    model_type:
+      typeof input.model_type === "string"
+        ? (input.model_type as "chat" | "image" | "video" | "other")
+        : modelTypeHint === "image" || modelTypeHint === "chat"
+          ? (modelTypeHint as "chat" | "image")
+          : undefined,
+    existing,
+  });
+
+  const row: NormalizedPricingWrite = {
+    billing_type: billingType,
+    input_credits_per_million_tokens:
+      existing?.input_credits_per_million_tokens ?? 0,
+    output_credits_per_million_tokens:
+      existing?.output_credits_per_million_tokens ?? 0,
+    image_credits_per_generation: existing?.image_credits_per_generation ?? 0,
+    upstream_cost_note: existing?.upstream_cost_note ?? null,
+    markup_ratio: existing?.markup_ratio ?? 1,
+    enabled: Boolean(existing?.pricing_enabled),
+    visible: Boolean(existing?.pricing_visible),
+  };
+
+  if (
+    "billing_type" in input ||
+    "billing_mode" in input ||
+    "model_type" in input
+  ) {
+    row.billing_type = billingType;
+  }
+
+  if (
+    "input_credits_per_million_tokens" in input ||
+    "input_per_1k" in input
+  ) {
+    row.input_credits_per_million_tokens = readInputCreditsPerMillion(
+      input,
+      row.input_credits_per_million_tokens
+    );
+  }
+
+  if (
+    "output_credits_per_million_tokens" in input ||
+    "output_per_1k" in input
+  ) {
+    row.output_credits_per_million_tokens = readOutputCreditsPerMillion(
+      input,
+      row.output_credits_per_million_tokens
+    );
+  }
+
+  if (
+    "image_credits_per_generation" in input ||
+    ("input_per_1k" in input && billingType === "image")
+  ) {
+    row.image_credits_per_generation = readImageCreditsPerGeneration(
+      input,
+      billingType,
+      row.image_credits_per_generation
+    );
+  }
+
+  if ("markup_ratio" in input || "markup_multiplier" in input) {
+    row.markup_ratio = readMarkupRatio(input, row.markup_ratio);
+  }
+
+  if (
+    "pricing_enabled" in input ||
+    "enabled" in input ||
+    "billable" in input
+  ) {
+    row.enabled = readPricingEnabled(input, row.enabled);
+  }
+
+  if (
+    "pricing_visible" in input ||
+    "visible" in input ||
+    "billable" in input
+  ) {
+    row.visible = readPricingVisible(input, row.visible);
+  }
+
+  if ("upstream_cost_note" in input) {
+    row.upstream_cost_note = readUpstreamCostNote(
+      input,
+      row.upstream_cost_note
+    );
+  }
+
+  if (typeof input.billing_type === "string") {
+    if (input.billing_type === "image") {
+      row.input_credits_per_million_tokens = 0;
+      row.output_credits_per_million_tokens = 0;
+    } else {
+      row.image_credits_per_generation = 0;
+    }
+  }
+
+  return row;
 }
 
 function partitionPatchBody(body: Record<string, unknown>):
@@ -685,7 +859,14 @@ async function applyModelPatch(
   }
 
   if (Object.keys(pricingRaw).length > 0) {
-    const normalized = normalizePricingWrite(pricingRaw);
+    const existing = await getAdminModelById(id);
+    const normalized = buildPricingUpsertFromPatch(
+      pricingRaw,
+      existing,
+      typeof model.model_type === "string"
+        ? model.model_type
+        : existing?.model_type ?? undefined
+    );
     const { error: pricingError } = await supabase()
       .from("model_pricing")
       .upsert(
