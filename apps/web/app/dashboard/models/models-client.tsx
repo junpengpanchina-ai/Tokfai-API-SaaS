@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, Copy, ImageIcon, MessageSquare, Terminal, Video } from "lucide-react";
+import { Check, Copy, ImageIcon, Info, MessageSquare, Terminal, Video, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,15 +27,12 @@ import {
 import {
   formatChatInputPricePerMillion,
   formatChatOutputPricePerMillion,
-  formatDbChatInputCreditsPer1kExample,
   formatDbChatInputCreditsPerMillion,
-  formatDbChatOutputCreditsPer1kExample,
   formatDbChatOutputCreditsPerMillion,
-  formatDbImageCreditsExample,
   formatDbImageCreditsPerGeneration,
-  formatDbImageYuanExample,
-  formatImageCreditsPerRequest,
-  formatImageReferenceYuanPerRequest,
+  formatStarterChatInputYuanExample,
+  formatStarterChatOutputYuanExample,
+  formatStarterImageYuanExample,
   catalogPricingByModelId,
   getImageModelUseCase,
   resolveDbChatCredits,
@@ -344,25 +341,13 @@ function PriceBlock({
 
     if (credits == null) return null;
 
-    const yuanExample =
-      dbCredits != null
-        ? formatDbImageYuanExample(dbCredits, locale)
-        : formatImageReferenceYuanPerRequest(model.pricing, locale);
-    const creditsExample =
-      dbCredits != null
-        ? formatDbImageCreditsExample(dbCredits, locale)
-        : formatImageCreditsPerRequest(model.pricing, locale);
-
     return (
       <ModelPricingPanel
         t={t}
         variant="image"
         consumptionLines={[formatDbImageCreditsPerGeneration(credits, locale)]}
-        exampleLines={
-          locale === "zh" && yuanExample
-            ? [yuanExample]
-            : [creditsExample]
-        }
+        exampleIntro={t("dashboard.models.priceExampleStarterIntro")}
+        exampleLines={[formatStarterImageYuanExample(credits, locale)]}
       />
     );
   }
@@ -379,9 +364,10 @@ function PriceBlock({
             formatDbChatInputCreditsPerMillion(dbChat.inputPerMillion, locale),
             formatDbChatOutputCreditsPerMillion(dbChat.outputPerMillion, locale),
           ]}
+          exampleIntro={t("dashboard.models.priceExampleStarterIntro")}
           exampleLines={[
-            formatDbChatInputCreditsPer1kExample(dbChat.inputPerMillion, locale),
-            formatDbChatOutputCreditsPer1kExample(dbChat.outputPerMillion, locale),
+            formatStarterChatInputYuanExample(dbChat.inputPerMillion, locale),
+            formatStarterChatOutputYuanExample(dbChat.outputPerMillion, locale),
           ]}
         />
       );
@@ -391,14 +377,11 @@ function PriceBlock({
       <ModelPricingPanel
         t={t}
         variant="chat"
-        consumptionLines={[
+        consumptionLines={[t("dashboard.models.chatCreditsUsageGeneric")]}
+        exampleIntro={t("dashboard.models.priceExampleUpstreamIntro")}
+        exampleLines={[
           `${t("dashboard.models.inputPrice")}: ${formatChatInputPricePerMillion(model.pricing)}`,
           `${t("dashboard.models.outputPrice")}: ${formatChatOutputPricePerMillion(model.pricing)}`,
-        ]}
-        exampleLines={[
-          locale === "zh"
-            ? "参考价格区间，实际扣费以 Usage / Credits 为准"
-            : "Reference price ranges; actual charges follow Usage / Credits",
         ]}
         fallbackReference
       />
@@ -412,15 +395,18 @@ function ModelPricingPanel({
   t,
   variant,
   consumptionLines,
+  exampleIntro,
   exampleLines,
   fallbackReference = false,
 }: {
   t: (key: string) => string;
   variant: "chat" | "image";
   consumptionLines: string[];
+  exampleIntro: string;
   exampleLines: string[];
   fallbackReference?: boolean;
 }) {
+  const [explainOpen, setExplainOpen] = useState(false);
   const successLabel =
     variant === "image"
       ? t("dashboard.models.billingRuleImageSuccess")
@@ -434,7 +420,7 @@ function ModelPricingPanel({
         </div>
         <ul className="mt-2 space-y-1.5 text-sm font-medium text-sky-950 dark:text-sky-50">
           {consumptionLines.map((line) => (
-            <li key={line} className="font-mono leading-relaxed">
+            <li key={line} className={fallbackReference ? "" : "font-mono leading-relaxed"}>
               {line}
             </li>
           ))}
@@ -444,15 +430,25 @@ function ModelPricingPanel({
       <div className="flex flex-wrap gap-2">
         <Badge variant="success">{successLabel}</Badge>
         <Badge variant="outline">{t("dashboard.models.billingRuleFailure")}</Badge>
-        {variant === "chat" ? (
-          <Badge variant="secondary">{t("dashboard.models.billingRuleChatTokens")}</Badge>
-        ) : null}
       </div>
 
       <div className="rounded-lg border bg-muted/50 px-4 py-3">
-        <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          {t("dashboard.models.priceExample")}
+        <div className="flex items-start justify-between gap-2">
+          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            {t("dashboard.models.priceExample")}
+          </div>
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="h-auto shrink-0 px-0 py-0 text-xs font-normal text-primary"
+            onClick={() => setExplainOpen(true)}
+          >
+            <Info className="h-3.5 w-3.5" aria-hidden />
+            {t("dashboard.models.viewExplanation")}
+          </Button>
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">{exampleIntro}</p>
         <ul
           className={`mt-2 space-y-1 text-sm ${
             fallbackReference ? "text-muted-foreground" : "font-mono text-foreground/90"
@@ -463,7 +459,100 @@ function ModelPricingPanel({
           ))}
         </ul>
       </div>
+
+      <PriceExampleExplanationDialog
+        open={explainOpen}
+        onOpenChange={setExplainOpen}
+        variant={variant}
+        t={t}
+      />
     </div>
+  );
+}
+
+function PriceExampleExplanationDialog({
+  open,
+  onOpenChange,
+  variant,
+  t,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  variant: "chat" | "image";
+  t: (key: string) => string;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open && !dialog.open) {
+      dialog.showModal();
+    } else if (!open && dialog.open) {
+      dialog.close();
+    }
+  }, [open]);
+
+  const explanationItems =
+    variant === "chat"
+      ? [
+          t("dashboard.models.priceExampleExplainChat1"),
+          t("dashboard.models.priceExampleExplainChat2"),
+          t("dashboard.models.priceExampleExplainChat3"),
+          t("dashboard.models.priceExampleExplainChat4"),
+          t("dashboard.models.priceExampleExplainChat5"),
+        ]
+      : [
+          t("dashboard.models.priceExampleExplainImage1"),
+          t("dashboard.models.priceExampleExplainImage2"),
+          t("dashboard.models.priceExampleExplainImage3"),
+          t("dashboard.models.priceExampleExplainImage4"),
+        ];
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background p-0 shadow-lg backdrop:bg-black/50 open:flex open:flex-col"
+      onClose={() => onOpenChange(false)}
+      aria-labelledby="price-example-explanation-title"
+    >
+      <div className="flex items-start justify-between gap-3 border-b px-4 py-3">
+        <h3
+          id="price-example-explanation-title"
+          className="text-sm font-semibold leading-snug"
+        >
+          {t("dashboard.models.priceExample")}
+        </h3>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0"
+          onClick={() => onOpenChange(false)}
+          aria-label={t("dashboard.models.closeExplanation")}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+      <div className="max-h-[min(60vh,24rem)] overflow-y-auto px-4 py-3">
+        <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+          {explanationItems.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      </div>
+      <div className="border-t px-4 py-3">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="w-full sm:w-auto"
+          onClick={() => onOpenChange(false)}
+        >
+          {t("dashboard.models.closeExplanation")}
+        </Button>
+      </div>
+    </dialog>
   );
 }
 
