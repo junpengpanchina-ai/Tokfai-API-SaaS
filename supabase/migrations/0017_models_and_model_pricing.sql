@@ -1,70 +1,151 @@
 -- =============================================================================
 -- Tokfai P7.10 — models catalog + per-model pricing
 --
--- Adds public.models and public.model_pricing for Admin-managed catalog and
--- billing rules. Legacy columns (billing_mode, input_per_1k, billable, …) are
--- kept when present so existing rows can be backfilled into the P7.10 shape.
+-- Production-safe / idempotent:
+--   1. create table if not exists (minimal skeleton for pre-existing tables)
+--   2. alter table add column if not exists (ALL columns, before indexes/policies)
+--   3. indexes, backfill, RLS, grants
+--
+-- Does NOT touch: credit_ledger, profiles, usage_logs, recharge_plans, credit_orders
 --
 -- Access model:
 --   - RLS enabled; authenticated users may SELECT visible catalog rows only
---   - upstream_cost_note is never exposed via RLS policies (DMIT admin only)
+--   - upstream_cost_note is never exposed via dashboard API (DMIT filters SELECT)
 --   - Writes remain service_role-only (DMIT backend)
 -- =============================================================================
 
 -- =============================================================================
--- models — catalog metadata (one row per model id)
+-- Step 1 — public.models: skeleton + column upgrades (must run first)
 -- =============================================================================
 
 create table if not exists public.models (
-  id            text primary key,
-  display_name  text,
-  provider      text,
-  model_type    text check (model_type in ('chat', 'image', 'video', 'other')),
-  enabled       boolean not null default false,
-  visible       boolean not null default false,
-  sort_order    int not null default 1000,
-  owned_by      text not null default 'tokfai',
-  created       bigint,
-  created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
+  id text primary key
 );
+
+alter table public.models add column if not exists display_name text;
+alter table public.models add column if not exists provider text;
+alter table public.models add column if not exists model_type text;
+alter table public.models add column if not exists enabled boolean not null default false;
+alter table public.models add column if not exists visible boolean not null default false;
+alter table public.models add column if not exists sort_order int not null default 1000;
+alter table public.models add column if not exists owned_by text not null default 'tokfai';
+alter table public.models add column if not exists created bigint;
+alter table public.models add column if not exists created_at timestamptz not null default now();
+alter table public.models add column if not exists updated_at timestamptz not null default now();
+
+-- Optional check constraint (skip if already present)
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'models_model_type_check'
+      and conrelid = 'public.models'::regclass
+  ) then
+    alter table public.models
+      add constraint models_model_type_check
+      check (model_type is null or model_type in ('chat', 'image', 'video', 'other'));
+  end if;
+end$$;
 
 create index if not exists models_visible_enabled_sort_idx
   on public.models (sort_order asc, id asc)
   where enabled = true and visible = true;
 
 -- =============================================================================
--- model_pricing — per-model retail billing rules
+-- Step 2 — public.model_pricing: skeleton + column upgrades
 -- =============================================================================
 
 create table if not exists public.model_pricing (
-  id                               uuid primary key default gen_random_uuid(),
-  model_id                         text not null unique references public.models (id) on delete cascade,
-  billing_type                     text not null default 'chat'
-                                     check (billing_type in ('chat', 'image')),
-  input_credits_per_million_tokens numeric(16, 6) not null default 0,
-  output_credits_per_million_tokens numeric(16, 6) not null default 0,
-  image_credits_per_generation     numeric(16, 6) not null default 0,
-  upstream_cost_note               text,
-  markup_ratio                     numeric(8, 4) not null default 1,
-  enabled                          boolean not null default false,
-  visible                          boolean not null default false,
-  created_at                       timestamptz not null default now(),
-  updated_at                       timestamptz not null default now(),
-
-  -- Legacy columns (pre-P7.10) — kept for backfill; DMIT prefers P7.10 fields
-  billing_mode     text check (billing_mode in ('token', 'per_image')),
-  input_per_1k     numeric(12, 6),
-  output_per_1k    numeric(12, 6),
-  billable         boolean,
-  markup_multiplier numeric(8, 4)
+  id uuid primary key default gen_random_uuid(),
+  model_id text not null unique
 );
+
+alter table public.model_pricing add column if not exists id uuid default gen_random_uuid();
+alter table public.model_pricing add column if not exists model_id text;
+alter table public.model_pricing add column if not exists billing_type text not null default 'chat';
+alter table public.model_pricing add column if not exists input_credits_per_million_tokens numeric(16, 6) not null default 0;
+alter table public.model_pricing add column if not exists output_credits_per_million_tokens numeric(16, 6) not null default 0;
+alter table public.model_pricing add column if not exists image_credits_per_generation numeric(16, 6) not null default 0;
+alter table public.model_pricing add column if not exists upstream_cost_note text;
+alter table public.model_pricing add column if not exists markup_ratio numeric(8, 4) not null default 1;
+alter table public.model_pricing add column if not exists enabled boolean not null default false;
+alter table public.model_pricing add column if not exists visible boolean not null default false;
+alter table public.model_pricing add column if not exists created_at timestamptz not null default now();
+alter table public.model_pricing add column if not exists updated_at timestamptz not null default now();
+
+-- Legacy columns (pre-P7.10) — kept for backfill
+alter table public.model_pricing add column if not exists billing_mode text;
+alter table public.model_pricing add column if not exists input_per_1k numeric(12, 6);
+alter table public.model_pricing add column if not exists output_per_1k numeric(12, 6);
+alter table public.model_pricing add column if not exists billable boolean;
+alter table public.model_pricing add column if not exists markup_multiplier numeric(8, 4);
+
+-- FK to models (add only when missing)
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'model_pricing_model_id_fkey'
+      and conrelid = 'public.model_pricing'::regclass
+  ) then
+    alter table public.model_pricing
+      add constraint model_pricing_model_id_fkey
+      foreign key (model_id) references public.models (id) on delete cascade;
+  end if;
+end$$;
+
+-- Unique on model_id (add only when missing)
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'model_pricing_model_id_key'
+      and conrelid = 'public.model_pricing'::regclass
+  ) then
+    alter table public.model_pricing
+      add constraint model_pricing_model_id_key unique (model_id);
+  end if;
+end$$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'model_pricing_billing_type_check'
+      and conrelid = 'public.model_pricing'::regclass
+  ) then
+    alter table public.model_pricing
+      add constraint model_pricing_billing_type_check
+      check (billing_type in ('chat', 'image'));
+  end if;
+end$$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'model_pricing_billing_mode_check'
+      and conrelid = 'public.model_pricing'::regclass
+  ) then
+    alter table public.model_pricing
+      add constraint model_pricing_billing_mode_check
+      check (billing_mode is null or billing_mode in ('token', 'per_image'));
+  end if;
+end$$;
 
 create index if not exists model_pricing_enabled_visible_idx
   on public.model_pricing (model_id)
   where enabled = true and visible = true;
 
--- Backfill P7.10 columns from legacy columns when migrating existing rows
+-- =============================================================================
+-- Step 3 — Backfill P7.10 columns from legacy columns
+-- =============================================================================
+
 do $$
 begin
   if exists (
@@ -116,16 +197,16 @@ comment on table public.models is
   'Tokfai model catalog. DMIT writes; authenticated users read visible rows via RLS.';
 
 comment on table public.model_pricing is
-  'Per-model retail billing rules. upstream_cost_note is admin-only (not in RLS SELECT).';
+  'Per-model retail billing rules. upstream_cost_note is admin-only (not in dashboard API).';
 
 comment on column public.model_pricing.upstream_cost_note is
   'Internal upstream cost note for admins. Never exposed to dashboard users.';
 
 -- =============================================================================
--- RLS — read-only catalog for signed-in users; no writes from frontend
+-- Step 4 — RLS + grants (after enabled/visible columns exist)
 -- =============================================================================
 
-alter table public.models       enable row level security;
+alter table public.models        enable row level security;
 alter table public.model_pricing enable row level security;
 
 drop policy if exists "models_select_visible" on public.models;
