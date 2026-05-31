@@ -13,6 +13,7 @@ export type AdminModelsSummaryStats = {
   total: number;
   chat: number;
   image: number;
+  video: number;
   available: number;
   comingSoon: number;
 };
@@ -21,10 +22,11 @@ export function AdminModelsSummary({ stats }: { stats: AdminModelsSummaryStats }
   const { t } = useI18n();
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       <SummaryCard label={t("admin.models.summaryTotal")} value={stats.total} />
       <SummaryCard label={t("admin.models.summaryChat")} value={stats.chat} />
       <SummaryCard label={t("admin.models.summaryImage")} value={stats.image} />
+      <SummaryCard label={t("admin.models.summaryVideo")} value={stats.video} />
       <SummaryCard label={t("admin.models.summaryAvailable")} value={stats.available} />
       <SummaryCard label={t("admin.models.summaryComingSoon")} value={stats.comingSoon} />
     </div>

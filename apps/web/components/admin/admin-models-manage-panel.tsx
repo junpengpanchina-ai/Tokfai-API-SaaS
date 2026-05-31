@@ -20,9 +20,14 @@ import {
   createAdminModel,
   fetchAdminModels,
   restoreAdminModel,
+  syncAdminCatalog,
   updateAdminModel,
   type AdminModelListItem,
 } from "@/lib/admin/client";
+import {
+  formatAdminModelPricePreview,
+  formatAdminModelPricingSummary,
+} from "@/lib/admin/model-pricing-preview";
 import {
   adminModelToFormValues,
   emptyAdminModelFormValues,
@@ -59,7 +64,7 @@ function formatModelError(error: unknown, t: (key: string) => string) {
 }
 
 export function AdminModelsManagePanel() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [models, setModels] = useState<AdminModelListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -78,6 +83,8 @@ export function AdminModelsManagePanel() {
   } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [actionModelId, setActionModelId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const loadModels = useCallback(async () => {
     setLoading(true);
@@ -179,6 +186,26 @@ export function AdminModelsManagePanel() {
     }
   }
 
+  async function handleSyncCatalog() {
+    setSyncing(true);
+    setSyncMessage(null);
+    setLoadError(null);
+    try {
+      const result = await syncAdminCatalog();
+      setSyncMessage(
+        t("admin.models.manage.syncSuccess")
+          .replace("{models}", String(result.insertedModels.length))
+          .replace("{pricing}", String(result.insertedPricing.length))
+          .replace("{skipped}", String(result.skipped.length))
+      );
+      await loadModels();
+    } catch (error) {
+      setLoadError(formatModelError(error, t).message);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <Card className="border-muted bg-muted/30">
@@ -193,8 +220,24 @@ export function AdminModelsManagePanel() {
             <Button type="button" size="sm" onClick={openCreateForm}>
               {t("admin.models.manage.addModel")}
             </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={syncing || loading}
+              onClick={() => void handleSyncCatalog()}
+            >
+              {syncing
+                ? t("admin.models.manage.syncing")
+                : t("admin.models.manage.syncCatalog")}
+            </Button>
           </div>
         </CardHeader>
+        {syncMessage ? (
+          <CardContent className="pt-0">
+            <p className="text-sm text-muted-foreground">{syncMessage}</p>
+          </CardContent>
+        ) : null}
       </Card>
 
       {loadError ? (
@@ -218,6 +261,7 @@ export function AdminModelsManagePanel() {
           total: summaryStats.total,
           chat: summaryStats.chat,
           image: summaryStats.image,
+          video: summaryStats.video,
           available: summaryStats.available,
           comingSoon: models.filter((m) => m.status === "coming_soon").length,
         }}
@@ -288,6 +332,7 @@ export function AdminModelsManagePanel() {
                   { value: "all", label: t("admin.models.filterAllTypes") },
                   { value: "chat", label: t("admin.models.typeChat") },
                   { value: "image", label: t("admin.models.typeImage") },
+                  { value: "video", label: t("admin.models.typeVideo") },
                   { value: "other", label: t("admin.models.manage.typeOther") },
                 ]}
               />
@@ -351,6 +396,9 @@ export function AdminModelsManagePanel() {
                     <th className="py-2 pr-4 font-medium">{t("admin.models.tableStatus")}</th>
                     <th className="py-2 pr-4 font-medium">{t("admin.models.manage.tableBilling")}</th>
                     <th className="py-2 pr-4 font-medium">{t("admin.models.manage.tablePricing")}</th>
+                    <th className="py-2 pr-4 font-medium">
+                      {t("admin.models.manage.tablePricePreview")}
+                    </th>
                     <th className="py-2 pr-4 font-medium">{t("admin.models.manage.tableUpdated")}</th>
                     <th className="py-2 pr-4 font-medium">{t("admin.users.actions")}</th>
                   </tr>
@@ -372,9 +420,10 @@ export function AdminModelsManagePanel() {
                         {model.billing_type ?? "—"}
                       </td>
                       <td className="py-3 pr-4 font-mono text-xs">
-                        {model.billing_type === "image"
-                          ? `${model.image_credits_per_generation ?? "—"} / gen`
-                          : `in=${model.input_credits_per_million_tokens ?? "—"} / out=${model.output_credits_per_million_tokens ?? "—"} / 1M`}
+                        {formatAdminModelPricingSummary(model, locale)}
+                      </td>
+                      <td className="py-3 pr-4 text-xs text-muted-foreground">
+                        {formatAdminModelPricePreview(model, locale) ?? "—"}
                       </td>
                       <td className="py-3 pr-4 text-muted-foreground">
                         {formatDateTime(model.updated_at)}

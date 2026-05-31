@@ -308,6 +308,23 @@ export async function restoreAdminModel(id: string): Promise<AdminModelListItem>
   return res.data;
 }
 
+export type SyncCatalogResult = {
+  insertedModels: string[];
+  insertedPricing: string[];
+  skipped: string[];
+};
+
+export async function syncAdminCatalog(): Promise<SyncCatalogResult> {
+  const res = await fetchAdminApi<{ data: SyncCatalogResult }>(
+    "/admin/models/sync-catalog",
+    {
+      method: "POST",
+      json: {},
+    }
+  );
+  return res.data;
+}
+
 export function createAdminRechargePlanIdempotencyKey(): string {
   const random = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
   return `admin-recharge-plan-${Date.now()}-${random}`;

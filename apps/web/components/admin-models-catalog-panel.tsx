@@ -18,6 +18,7 @@ import {
   ALL_CATALOG_MODELS,
   CHAT_MODELS,
   IMAGE_MODELS,
+  VIDEO_MODELS,
   getAdminCatalogDisplayStatus,
   type AdminCatalogDisplayStatus,
   type ModelCatalogEntry,
@@ -70,6 +71,7 @@ export function AdminModelsCatalogPanel() {
       total: ALL_CATALOG_MODELS.length,
       chat: CHAT_MODELS.length,
       image: IMAGE_MODELS.length,
+      video: VIDEO_MODELS.length,
       available,
       comingSoon,
     };

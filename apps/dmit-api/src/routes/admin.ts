@@ -9,6 +9,7 @@ import {
 } from "../middleware/requireAdminV1.js";
 import { supabase } from "../supabase.js";
 import { handleAdminCreditsAdjust } from "./adminCreditsAdjust.js";
+import { syncCatalogModelsAdmin } from "../catalog/seedModels.js";
 import {
   archiveAdminModel,
   createAdminModel,
@@ -670,6 +671,11 @@ protectedAdminRoutes.patch("/recharge-plans/:id", async (c) => {
 protectedAdminRoutes.get("/models", async (c) => {
   const models = await listAdminModels();
   return c.json({ data: models });
+});
+
+protectedAdminRoutes.post("/models/sync-catalog", async (c) => {
+  const result = await syncCatalogModelsAdmin(adminModelWriteContext(c));
+  return c.json({ data: result });
 });
 
 protectedAdminRoutes.post("/models", async (c) => {

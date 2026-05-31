@@ -655,6 +655,7 @@ export const messages = {
         summaryTotal: "Total models",
         summaryChat: "Chat models",
         summaryImage: "Image models",
+        summaryVideo: "Video models",
         summaryAvailable: "Available models",
         summaryComingSoon: "Coming soon models",
         chatSectionTitle: "Chat Models",
@@ -726,6 +727,17 @@ export const messages = {
           formVisible: "Model visible",
           formPricingEnabled: "Pricing enabled",
           formPricingVisible: "Pricing visible on dashboard",
+          syncCatalog: "Sync missing models",
+          syncing: "Syncing…",
+          syncSuccess:
+            "Catalog sync complete. Inserted {models} models, {pricing} pricing rows. Skipped {skipped} existing.",
+          tablePricePreview: "Price example",
+          pricePreviewDisclaimer:
+            "CNY examples are illustrative conversions from recharge tiers only. Actual cost depends on the user's package and final usage records.",
+          formPricingPreviewOnlyNotice:
+            "This model or its pricing is not fully enabled. Values below are for admin preview only — users cannot use or purchase this model yet.",
+          formVideoUnavailableNotice:
+            "Video model is not enabled yet. Per-generation credits and CNY examples are informational only and do not imply availability.",
         },
       },
       credits: {
@@ -1526,6 +1538,7 @@ export const messages = {
         summaryTotal: "模型总数",
         summaryChat: "对话模型",
         summaryImage: "图像模型",
+        summaryVideo: "视频模型",
         summaryAvailable: "可用模型",
         summaryComingSoon: "即将上线模型",
         chatSectionTitle: "对话模型",
@@ -1596,6 +1609,17 @@ export const messages = {
           formVisible: "模型前台可见",
           formPricingEnabled: "定价启用",
           formPricingVisible: "定价在 Dashboard 展示",
+          syncCatalog: "同步缺失模型",
+          syncing: "同步中…",
+          syncSuccess:
+            "目录同步完成：新增 {models} 个模型、{pricing} 条定价；跳过 {skipped} 个已存在项。",
+          tablePricePreview: "价格示例",
+          pricePreviewDisclaimer:
+            "人民币价格仅为充值积分套餐折算示例，实际以用户充值套餐和最终扣费记录为准。",
+          formPricingPreviewOnlyNotice:
+            "该模型或其定价尚未完全启用。下方数值仅供后台预览，用户尚不可调用或购买。",
+          formVideoUnavailableNotice:
+            "视频模型尚未启用。按次积分与人民币示例仅供参考，不代表已对用户开放。",
         },
       },
       credits: {

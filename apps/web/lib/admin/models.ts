@@ -1,15 +1,16 @@
 import type { AdminModelListItem } from "@/lib/admin/client";
 
 export type AdminModelStatus = AdminModelListItem["status"];
-export type AdminModelTypeFilter = "all" | "chat" | "image" | "other";
+export type AdminModelTypeFilter = "all" | "chat" | "image" | "video" | "other";
 export type AdminModelStatusFilter = "all" | AdminModelStatus;
 
 export function normalizeAdminModelType(
   modelType: string | null | undefined
-): "chat" | "image" | "other" {
+): "chat" | "image" | "video" | "other" {
   const normalized = (modelType ?? "").toLowerCase();
   if (normalized === "chat") return "chat";
   if (normalized === "image") return "image";
+  if (normalized === "video") return "video";
   return "other";
 }
 
@@ -48,6 +49,8 @@ export function summarizeAdminModels(models: AdminModelListItem[]) {
     chat: models.filter((m) => normalizeAdminModelType(m.model_type) === "chat")
       .length,
     image: models.filter((m) => normalizeAdminModelType(m.model_type) === "image")
+      .length,
+    video: models.filter((m) => normalizeAdminModelType(m.model_type) === "video")
       .length,
     available: models.filter((m) => m.status === "available").length,
     archived: models.filter((m) => m.status === "archived").length,

@@ -24,6 +24,33 @@ export function creditsToDisplayYuanRange(credits: number): PriceRangeYuan | nul
   };
 }
 
+export function getChatYuanRange(
+  inputCreditsPerMillion: number,
+  outputCreditsPerMillion: number
+): {
+  input: PriceRangeYuan | null;
+  output: PriceRangeYuan | null;
+} {
+  return {
+    input: creditsToDisplayYuanRange(inputCreditsPerMillion),
+    output: creditsToDisplayYuanRange(outputCreditsPerMillion),
+  };
+}
+
+export function getImageYuanRange(
+  imageCreditsPerGeneration: number
+): PriceRangeYuan | null {
+  return creditsToDisplayYuanRange(imageCreditsPerGeneration);
+}
+
+export function formatYuanRangeLabel(
+  range: PriceRangeYuan,
+  locale: Locale,
+  unitSuffix: string
+): string {
+  return `${formatDisplayYuanRange(range, locale)} ${unitSuffix}`;
+}
+
 export function hasDisplayYuanExample(range: PriceRangeYuan | null | undefined): boolean {
   if (!range) return false;
   return range.min > 0 && range.max > 0;
@@ -130,11 +157,15 @@ export function formatDbImageCreditsPerGeneration(
   credits: number,
   locale: Locale
 ): string {
-  const amount = formatCreditsAmount(credits, locale);
+  const amount = formatCredits(credits, locale);
   if (locale === "zh") {
     return `${amount} 积分 / 次`;
   }
   return `${amount} credits / generation`;
+}
+
+export function formatCredits(value: number, locale: Locale): string {
+  return value.toLocaleString(locale === "zh" ? "zh-CN" : "en-US");
 }
 
 /** Dashboard display: billing_type → model_type → chat. */
