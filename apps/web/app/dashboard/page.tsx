@@ -4,6 +4,7 @@ import {
   DashboardOverviewContent,
   type OverviewStat,
 } from "@/components/dashboard-overview-content";
+import { listPublicAnnouncements } from "@/lib/dmit/server";
 import { formatCredits, formatInt } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import type { ProfileRow } from "@/lib/supabase/types";
@@ -21,7 +22,7 @@ export default async function DashboardOverviewPage() {
   }
 
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const [profileRes, apiKeysRes, usageRes] = await Promise.all([
+  const [profileRes, apiKeysRes, usageRes, announcements] = await Promise.all([
     supabase
       .from("profiles")
       .select(PROFILE_COLUMNS)
@@ -37,6 +38,7 @@ export default async function DashboardOverviewPage() {
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
       .gte("created_at", since24h),
+    listPublicAnnouncements(3),
   ]);
 
   const profile = (profileRes.data ?? null) as Pick<
@@ -79,5 +81,7 @@ export default async function DashboardOverviewPage() {
     },
   ];
 
-  return <DashboardOverviewContent stats={stats} />;
+  return (
+    <DashboardOverviewContent stats={stats} announcements={announcements} />
+  );
 }

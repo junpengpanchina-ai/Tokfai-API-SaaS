@@ -17,6 +17,11 @@ import {
   updateAdminModel,
 } from "./adminModels.js";
 import {
+  createAdminAnnouncement,
+  listAdminAnnouncements,
+  updateAdminAnnouncement,
+} from "./adminAnnouncements.js";
+import {
   listAdminRechargePlans,
   updateAdminRechargePlan,
 } from "./adminRechargePlans.js";
@@ -560,6 +565,71 @@ protectedAdminRoutes.get("/api-keys", async (c) => {
       revoked_at: row.revoked_at,
     })),
   });
+});
+
+protectedAdminRoutes.get("/announcements", async (c) => {
+  const announcements = await listAdminAnnouncements();
+  return c.json({ data: announcements });
+});
+
+protectedAdminRoutes.post("/announcements", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const result = await createAdminAnnouncement(body, adminModelWriteContext(c));
+
+  if (!result.ok) {
+    const message =
+      result.error === "announcement_slug_exists"
+        ? "An announcement with this slug already exists."
+        : result.error === "invalid_announcement_fields"
+          ? "Invalid announcement fields."
+          : "Failed to create announcement.";
+    return adminApiError(
+      c,
+      result.status,
+      message,
+      result.error,
+      result.status === 409 ? "validation_error" : "validation_error"
+    );
+  }
+
+  return c.json({ data: result.announcement }, 201);
+});
+
+protectedAdminRoutes.patch("/announcements/:id", async (c) => {
+  const id = c.req.param("id").trim();
+  if (!id) {
+    return adminApiError(
+      c,
+      400,
+      "Announcement ID is required.",
+      "missing_announcement_id"
+    );
+  }
+
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const result = await updateAdminAnnouncement(id, body, adminModelWriteContext(c));
+
+  if (!result.ok) {
+    const message =
+      result.error === "announcement_not_found"
+        ? "Announcement not found."
+        : result.error === "announcement_slug_exists"
+          ? "An announcement with this slug already exists."
+          : result.error === "empty_patch"
+            ? "No fields to update."
+            : result.error === "invalid_announcement_fields"
+              ? "Invalid announcement fields."
+              : "Failed to update announcement.";
+    return adminApiError(
+      c,
+      result.status,
+      message,
+      result.error,
+      result.status === 404 ? "not_found" : "validation_error"
+    );
+  }
+
+  return c.json({ data: result.announcement });
 });
 
 protectedAdminRoutes.get("/recharge-plans", async (c) => {

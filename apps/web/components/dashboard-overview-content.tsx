@@ -6,11 +6,13 @@ import {
   CreditCard,
   Gauge,
   ImageIcon,
-  Info,
   KeyRound,
   MessageSquare,
   type LucideIcon,
 } from "lucide-react";
+
+import { DashboardAnnouncementsOverview } from "@/components/dashboard-announcements-overview";
+import type { PublicAnnouncement } from "@/lib/announcements";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -110,8 +112,10 @@ const QUICK_REFERENCE = [
 
 export function DashboardOverviewContent({
   stats,
+  announcements = [],
 }: {
   stats: OverviewStat[];
+  announcements?: PublicAnnouncement[];
 }) {
   const { t } = useI18n();
 
@@ -129,30 +133,7 @@ export function DashboardOverviewContent({
         <Badge variant="secondary">{t("dashboard.overview.v1Preview")}</Badge>
       </div>
 
-      <Card className="border-sky-300 bg-sky-50 dark:border-sky-900/60 dark:bg-sky-950/30">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Info className="h-4 w-4 text-sky-600" />
-            {t("dashboard.overview.pricingAnnouncementTitle")}
-          </CardTitle>
-          <CardDescription className="text-sky-900/80 dark:text-sky-100/80">
-            {t("dashboard.overview.pricingAnnouncementDesc")}{" "}
-            <Link
-              href="/dashboard/models"
-              className="font-medium text-foreground underline-offset-4 hover:underline"
-            >
-              {t("nav.models")}
-            </Link>
-            {" · "}
-            <Link
-              href="/pricing"
-              className="font-medium text-foreground underline-offset-4 hover:underline"
-            >
-              {t("nav.pricing")}
-            </Link>
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <DashboardAnnouncementsOverview announcements={announcements} />
 
       <Card>
         <CardHeader>

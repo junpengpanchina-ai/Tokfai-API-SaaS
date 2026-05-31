@@ -920,3 +920,52 @@ export interface DmitHealth {
 export async function getDmitHealth(): Promise<DmitHealth> {
   return dmitFetch<DmitHealth>("/v1/health", { accessToken: null });
 }
+
+// ---------------------------------------------------------------------------
+// Announcements — GET /v1/announcements (public)
+// ---------------------------------------------------------------------------
+
+import {
+  ANNOUNCEMENT_TYPE_OPTIONS,
+  type AnnouncementType,
+  type PublicAnnouncement,
+} from "@/lib/announcements";
+
+export type { AnnouncementType, PublicAnnouncement } from "@/lib/announcements";
+
+function normalizeAnnouncementType(value: string): AnnouncementType {
+  return ANNOUNCEMENT_TYPE_OPTIONS.includes(value as AnnouncementType)
+    ? (value as AnnouncementType)
+    : "notice";
+}
+
+function mapPublicAnnouncement(row: PublicAnnouncement & { type: string }): PublicAnnouncement {
+  return { ...row, type: normalizeAnnouncementType(row.type) };
+}
+
+export async function listPublicAnnouncements(
+  limit = 10
+): Promise<PublicAnnouncement[]> {
+  const res = await dmitFetch<{ data?: (PublicAnnouncement & { type: string })[] }>(
+    `/v1/announcements?limit=${limit}`,
+    { accessToken: null }
+  );
+  return Array.isArray(res.data) ? res.data.map(mapPublicAnnouncement) : [];
+}
+
+export async function getPublicAnnouncementBySlug(
+  slug: string
+): Promise<PublicAnnouncement | null> {
+  try {
+    const res = await dmitFetch<{ data: PublicAnnouncement }>(
+      `/v1/announcements/${encodeURIComponent(slug)}`,
+      { accessToken: null }
+    );
+    return res.data ? mapPublicAnnouncement(res.data) : null;
+  } catch (err) {
+    if (err instanceof DmitApiError && err.status === 404) {
+      return null;
+    }
+    throw err;
+  }
+}

@@ -7,6 +7,7 @@ import {
   ImageIcon,
   KeyRound,
   LayoutDashboard,
+  Megaphone,
   Terminal,
 } from "lucide-react";
 
@@ -48,6 +49,12 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
     href: "/dashboard/models",
     labelKey: "nav.models",
     icon: Boxes,
+    prefetch: true,
+  },
+  {
+    href: "/dashboard/announcements",
+    labelKey: "nav.announcements",
+    icon: Megaphone,
     prefetch: true,
   },
   { href: "/dashboard/usage", labelKey: "nav.usage", icon: Gauge, prefetch: true },

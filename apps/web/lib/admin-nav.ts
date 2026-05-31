@@ -5,6 +5,7 @@ import {
   Cpu,
   Gauge,
   LayoutDashboard,
+  Megaphone,
   Users,
 } from "lucide-react";
 
@@ -30,6 +31,12 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     href: "/admin/models",
     labelKey: "admin.nav.modelPricing",
     icon: Cpu,
+    prefetch: true,
+  },
+  {
+    href: "/admin/announcements",
+    labelKey: "admin.nav.announcements",
+    icon: Megaphone,
     prefetch: true,
   },
   {

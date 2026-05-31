@@ -334,6 +334,92 @@ export async function updateAdminRechargePlan(
   return res.data;
 }
 
+export type AdminAnnouncementType =
+  | "notice"
+  | "maintenance"
+  | "billing"
+  | "model"
+  | "promotion"
+  | "docs";
+
+export type AdminAnnouncementListItem = {
+  id: string;
+  title: string;
+  slug: string | null;
+  summary: string | null;
+  content: string;
+  type: AdminAnnouncementType;
+  priority: number;
+  enabled: boolean;
+  pinned: boolean;
+  visible_from: string | null;
+  visible_until: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminAnnouncementCreateBody = {
+  title: string;
+  slug?: string;
+  summary?: string | null;
+  content: string;
+  type?: AdminAnnouncementType;
+  priority?: number;
+  enabled?: boolean;
+  pinned?: boolean;
+  visible_from?: string | null;
+  visible_until?: string | null;
+};
+
+export type AdminAnnouncementUpdateBody = Partial<AdminAnnouncementCreateBody>;
+
+export function createAdminAnnouncementIdempotencyKey(): string {
+  const random = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+  return `admin-announcement-${Date.now()}-${random}`;
+}
+
+export async function fetchAdminAnnouncements(): Promise<
+  AdminAnnouncementListItem[]
+> {
+  const res = await fetchAdminApi<{ data?: AdminAnnouncementListItem[] }>(
+    "/admin/announcements"
+  );
+  return Array.isArray(res.data) ? res.data : [];
+}
+
+export async function createAdminAnnouncement(
+  body: AdminAnnouncementCreateBody,
+  idempotencyKey?: string
+): Promise<AdminAnnouncementListItem> {
+  const res = await fetchAdminApi<{ data: AdminAnnouncementListItem }>(
+    "/admin/announcements",
+    {
+      method: "POST",
+      json: body,
+      idempotencyKey:
+        idempotencyKey ?? createAdminAnnouncementIdempotencyKey(),
+    }
+  );
+  return res.data;
+}
+
+export async function updateAdminAnnouncement(
+  id: string,
+  body: AdminAnnouncementUpdateBody,
+  idempotencyKey?: string
+): Promise<AdminAnnouncementListItem> {
+  const res = await fetchAdminApi<{ data: AdminAnnouncementListItem }>(
+    `/admin/announcements/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      json: body,
+      idempotencyKey:
+        idempotencyKey ?? createAdminAnnouncementIdempotencyKey(),
+    }
+  );
+  return res.data;
+}
+
 function parseJson(text: string): unknown {
   if (!text) return null;
   try {

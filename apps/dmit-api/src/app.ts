@@ -16,6 +16,7 @@ import { modelRoutes } from "./routes/models.js";
 import { chatRoutes } from "./routes/chat.js";
 import { imageRoutes } from "./routes/images.js";
 import { adminRoutes } from "./routes/admin.js";
+import { announcementRoutes } from "./routes/announcements.js";
 import { meRoutes } from "./routes/me.js";
 import { registerDebugRoutes } from "./routes/debug.js";
 
@@ -33,6 +34,7 @@ export function buildApp() {
   app.route("/v1/webhooks", webhookRoutes);
   app.route("/", legacyStripeWebhookRoutes);
   app.route("/", modelRoutes);
+  app.route("/", announcementRoutes);
   app.route("/", chatRoutes);
   app.route("/", imageRoutes);
   app.route("/admin", adminRoutes);
