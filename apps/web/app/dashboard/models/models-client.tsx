@@ -29,6 +29,7 @@ import {
   formatImageCreditsPerRequest,
   formatImageReferenceYuanPerRequest,
   getChatBillingUnitLabel,
+  getImageModelUseCase,
   getImagePerRequestBillingUnitLabel,
 } from "@/lib/model-pricing-display";
 import { TOKFAI_MODELS_ENDPOINT } from "@/lib/tokfai-api";
@@ -70,6 +71,7 @@ export function ModelsClient() {
             <li>{t("dashboard.models.billingNoticeItem3")}</li>
             <li>{t("dashboard.models.billingNoticeItem4")}</li>
             <li>{t("dashboard.models.billingNoticeItem5")}</li>
+            <li>{t("dashboard.models.billingNoticeItem6")}</li>
           </ul>
         </CardContent>
       </Card>
@@ -235,6 +237,16 @@ function ModelCard({
               </dt>
               <dd className="text-muted-foreground">
                 {model.supports.join(", ")}
+              </dd>
+            </div>
+          ) : null}
+          {model.type === "image" ? (
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-xs uppercase tracking-wider text-muted-foreground">
+                {t("dashboard.models.recommendedUseCase")}
+              </dt>
+              <dd className="text-muted-foreground">
+                {getImageModelUseCase(model.id, t)}
               </dd>
             </div>
           ) : null}

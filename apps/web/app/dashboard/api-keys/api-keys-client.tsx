@@ -12,6 +12,7 @@ import {
   KeyRound,
   Loader2,
   Plus,
+  ShieldAlert,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -186,6 +187,8 @@ export function ApiKeysClient({
         </p>
       </div>
 
+      <SecurityGuide t={t} />
+
       <IntegrationGuide t={t} />
 
       {oneTimeSecret ? (
@@ -258,6 +261,27 @@ export function ApiKeysClient({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function SecurityGuide({ t }: { t: (key: string) => string }) {
+  return (
+    <Card className="border-amber-300/60 bg-amber-50/50 dark:border-amber-900/60 dark:bg-amber-950/20">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600" />
+          {t("dashboard.apiKeys.securityTitle")}
+        </CardTitle>
+        <CardDescription>{t("dashboard.apiKeys.securityDesc")}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+          <li>{t("dashboard.apiKeys.securityItem1")}</li>
+          <li>{t("dashboard.apiKeys.securityItem2")}</li>
+          <li>{t("dashboard.apiKeys.securityItem3")}</li>
+        </ul>
+      </CardContent>
+    </Card>
   );
 }
 

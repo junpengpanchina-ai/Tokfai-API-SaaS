@@ -26,6 +26,7 @@ import { useI18n } from "@/lib/i18n/i18n-provider";
 
 type PlanDraft = {
   name: string;
+  amount_yuan: string;
   credits: string;
   bonus_credits: string;
   enabled: boolean;
@@ -35,9 +36,25 @@ type PlanDraft = {
   stripe_price_id: string;
 };
 
+function centsToYuanInput(amountCents: number): string {
+  const yuan = amountCents / 100;
+  return Number.isInteger(yuan) ? String(yuan) : yuan.toFixed(2);
+}
+
+function yuanInputToCents(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const yuan = Number(trimmed);
+  if (!Number.isFinite(yuan) || yuan <= 0) return null;
+  const cents = Math.round(yuan * 100);
+  if (!Number.isInteger(cents) || cents < 100) return null;
+  return cents;
+}
+
 function planToDraft(plan: AdminRechargePlanListItem): PlanDraft {
   return {
     name: plan.name,
+    amount_yuan: centsToYuanInput(plan.amount_cents),
     credits: String(plan.credits),
     bonus_credits: String(plan.bonus_credits),
     enabled: plan.enabled,
@@ -49,8 +66,14 @@ function planToDraft(plan: AdminRechargePlanListItem): PlanDraft {
 }
 
 function draftToUpdateBody(draft: PlanDraft): AdminRechargePlanUpdateBody {
+  const amountCents = yuanInputToCents(draft.amount_yuan);
+  if (amountCents == null) {
+    throw new Error("invalid_amount");
+  }
+
   const body: AdminRechargePlanUpdateBody = {
     name: draft.name.trim(),
+    amount_cents: amountCents,
     credits: Number(draft.credits),
     bonus_credits: Number(draft.bonus_credits),
     enabled: draft.enabled,
@@ -124,7 +147,14 @@ export function AdminRechargePlansPanel() {
     setSaveError(null);
     setSaveMessage(null);
     try {
-      const updated = await updateAdminRechargePlan(planId, draftToUpdateBody(draft));
+      let body: AdminRechargePlanUpdateBody;
+      try {
+        body = draftToUpdateBody(draft);
+      } catch {
+        setSaveError(t("admin.credits.rechargePlansAmountInvalid"));
+        return;
+      }
+      const updated = await updateAdminRechargePlan(planId, body);
       setPlans((current) =>
         current.map((plan) => (plan.id === updated.id ? updated : plan))
       );
@@ -155,6 +185,7 @@ export function AdminRechargePlansPanel() {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <ul className="space-y-1 text-sm text-muted-foreground">
+          <li>{t("admin.credits.rechargePlansAmountHint")}</li>
           <li>{t("admin.credits.stripeSourceOfTruth")}</li>
           <li>{t("admin.credits.ledgerAfterPayment")}</li>
         </ul>
@@ -233,8 +264,15 @@ export function AdminRechargePlansPanel() {
                       <Field label={t("admin.credits.rechargePlansPlanId")}>
                         <Input value={plan.id} disabled />
                       </Field>
-                      <Field label={t("admin.credits.rechargePlansAmountReadOnly")}>
-                        <Input value={formatAmountCny(plan.amount_cents)} disabled />
+                      <Field label={t("admin.credits.rechargePlansAmount")}>
+                        <Input
+                          inputMode="decimal"
+                          placeholder="29"
+                          value={draft.amount_yuan}
+                          onChange={(event) =>
+                            setDraft({ ...draft, amount_yuan: event.target.value })
+                          }
+                        />
                       </Field>
                       <Field label={t("admin.credits.editPlan")}>
                         <Input

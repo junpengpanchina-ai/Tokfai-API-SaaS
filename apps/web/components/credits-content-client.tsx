@@ -7,6 +7,7 @@ import {
   ArrowUpRight,
   CheckCircle2,
   CreditCard,
+  Info,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -64,6 +65,24 @@ export function CreditsContentClient({
           {t("dashboard.credits.subtitle")}
         </p>
       </div>
+
+      <Card className="border-muted bg-muted/30">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Info className="h-4 w-4 shrink-0" />
+            {t("dashboard.credits.howItWorksTitle")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+            <li>{t("dashboard.credits.howItWorksItem1")}</li>
+            <li>{t("dashboard.credits.howItWorksItem2")}</li>
+            <li>{t("dashboard.credits.howItWorksItem3")}</li>
+            <li>{t("dashboard.credits.howItWorksItem4")}</li>
+            <li>{t("dashboard.credits.howItWorksItem5")}</li>
+          </ul>
+        </CardContent>
+      </Card>
 
       <CheckoutStatusBanner
         status={checkoutStatus}

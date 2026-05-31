@@ -105,12 +105,16 @@ export const messages = {
         billingNoticeItem4: "Image Playground only supports image models.",
         billingNoticeItem5:
           "Video models will use a separate playground later.",
+        billingNoticeItem6:
+          "Available models are ready for production API calls. Coming soon models are listed for planning but not yet callable.",
         chatSectionTitle: "Chat Models",
         chatSectionDesc:
-          "Verified chat models available through the API and Chat Playground.",
+          "OpenAI-compatible chat models billed by input/output tokens. Use for assistants, agents, and text generation via POST /v1/chat/completions.",
         imageSectionTitle: "Image Models",
         imageSectionDesc:
-          "Text-to-image and image-to-image models available through POST /v1/images/generations and the Image Playground.",
+          "Text-to-image and image-to-image models billed per successful generation via POST /v1/images/generations.",
+        recommendedUseCase: "Best for",
+        availability: "Availability",
         imageComingSoonTitle: "Image Models (coming soon)",
         imageComingSoonDesc: "Additional image models planned for future release.",
         videoSectionTitle: "Video Models",
@@ -156,6 +160,15 @@ export const messages = {
           "Use this key in Cursor, Cherry Studio, OpenAI SDK, or curl.",
         quickStartItem4:
           "Legacy keys that cannot be revealed: create a new key to copy the full secret.",
+        securityTitle: "Keep your keys secure",
+        securityDesc:
+          "Treat API keys like passwords. Never expose them in client-side code or public repos.",
+        securityItem1:
+          "Store keys on your server only — never embed them in mobile apps, browsers, or public frontends.",
+        securityItem2:
+          "If a key is leaked or committed to git, revoke it immediately and create a replacement.",
+        securityItem3:
+          "The full secret is shown once at creation. After that, use Copy key on active keys to copy the full secret again.",
         viewApiDocs: "View API docs",
         tryImagePlayground: "Try Image Playground",
         createApiKey: "Create API key",
@@ -283,7 +296,17 @@ export const messages = {
       credits: {
         title: "Credits",
         subtitle:
-          "Prepaid balance used by every API call. Data is loaded through DMIT with your Supabase session.",
+          "Your Tokfai prepaid balance. Every successful API call debits credits; top-ups are added after Stripe checkout is confirmed.",
+        howItWorksTitle: "How credits work",
+        howItWorksItem1:
+          "Credits are Tokfai prepaid balance — buy a package once, then spend credits on API calls.",
+        howItWorksItem2:
+          "Chat API (POST /v1/chat/completions) is billed by input and output tokens.",
+        howItWorksItem3:
+          "Image API (POST /v1/images/generations) is billed per successful generation.",
+        howItWorksItem4: "Failed requests are not charged.",
+        howItWorksItem5:
+          "After Stripe Checkout, credits are added automatically when the Stripe webhook confirms payment.",
         currentBalance: "Current balance",
         totalPurchased: "Total purchased:",
         totalUsed: "Total used:",
@@ -316,7 +339,8 @@ export const messages = {
         billingNote:
           "The frontend never writes profiles.credits_balance. Checkout success only shows a pending confirmation message until the Stripe webhook credits the account.",
         paymentReceived: "Payment received",
-        paymentReceivedDesc: "Payment received. Credits have been added.",
+        paymentReceivedDesc:
+          "Payment received. Credits are added automatically after Stripe confirms checkout (usually within seconds). Refresh this page if your balance has not updated yet.",
         checkoutCancelled: "Checkout was cancelled",
         checkoutCancelledDesc:
           "No credits were added. You can pick another amount below.",
@@ -336,11 +360,15 @@ export const messages = {
       usage: {
         title: "Usage",
         subtitle:
-          "Recent API activity for your account. Data is loaded from Tokfai API and scoped to your login.",
-        subtitleDetail:
-          "Chat calls show token usage. Image calls show credits charged.",
-        billingPolicy:
-          "Successful calls debit credits. Failed calls are not charged.",
+          "Review API requests, models, status, token counts, and credits charged for your account.",
+        howItWorksTitle: "Reading this page",
+        howItWorksItem1:
+          "Each row is one API request — chat or image — with model, status, and credits charged.",
+        howItWorksItem2:
+          "Chat rows show prompt, completion, and total tokens. Image rows show credits per generation.",
+        howItWorksItem3:
+          "Copy request_id when contacting support — it helps us trace a specific call in our logs.",
+        howItWorksItem4: "Failed requests appear here for debugging but are not charged.",
         recentRequests: "Recent requests",
         recentRequestsDesc:
           "Last 50 entries, newest first. Run a request in the Chat Playground or Image Playground to generate more.",
@@ -354,7 +382,8 @@ export const messages = {
         colTotal: "Total",
         colCredits: "Credits charged",
         colRequestId: "Request ID",
-        colError: "Error",
+        colRequestIdHint: "Use when contacting support to trace a request",
+        colError: "Error code",
         kindChat: "Chat",
         kindImage: "Image",
         statusSucceeded: "succeeded",
@@ -417,6 +446,25 @@ export const messages = {
       },
     },
     docs: {
+      quickstartTitle: "Quickstart",
+      quickstartDesc: "Get your first Tokfai API response in a few minutes.",
+      quickstartStep1:
+        "Sign up at tokfai.com and open Dashboard → API Keys to create a key. Copy the full secret — it is shown once at creation.",
+      quickstartStep2:
+        "Top up in Dashboard → Credits (Stripe Checkout). Credits are added after payment is confirmed.",
+      quickstartStep3:
+        "Point your OpenAI-compatible client at https://api.tokfai.com/v1 and send Authorization: Bearer sk-tokfai_… on every request.",
+      quickstartStep4:
+        "Call POST /v1/chat/completions for chat or POST /v1/images/generations for images. Start with model gemini-3.1-pro for chat.",
+      quickstartStep5:
+        "Review per-request charges in Dashboard → Usage and balance changes in Dashboard → Credits.",
+      authSectionDesc:
+        "Every API request must include your API key in the Authorization header. Dashboard session tokens are not accepted on /v1/chat/completions or /v1/images/generations.",
+      billingCreditsTitle: "Billing & credits",
+      billingCreditsDesc:
+        "Tokfai uses prepaid credits. Chat models debit by token usage; image models debit per successful generation. Failed requests are not charged. Purchase packages in Dashboard → Credits; ledger entries appear after Stripe webhook confirmation.",
+      errorCodesDesc:
+        "Common HTTP status codes and error.code values returned by the Tokfai API.",
       billingRatesTitle: "Billing & pricing",
       billingRatesDesc:
         "Successful calls debit credits. Failed calls are not charged. Current reference prices are shown for planning — review per-request charges in Usage and ledger entries in Credits.",
@@ -651,6 +699,11 @@ export const messages = {
         rechargePlansEdit: "Edit",
         rechargePlansCancel: "Cancel",
         rechargePlansSave: "Save",
+        rechargePlansAmount: "Amount (¥)",
+        rechargePlansAmountHint:
+          "Amount is editable here. Checkout still resolves the final amount server-side from plan_id.",
+        rechargePlansAmountInvalid:
+          "Enter a valid price in yuan (minimum ¥1).",
         rechargePlansAmountReadOnly: "Amount (read-only)",
         rechargePlansBonusCredits: "Bonus credits",
         rechargePlansStripePriceId: "Stripe price ID",
@@ -862,12 +915,16 @@ export const messages = {
         billingNoticeItem3: "Chat Playground 仅支持对话模型。",
         billingNoticeItem4: "Image Playground 仅支持图像模型。",
         billingNoticeItem5: "视频模型将使用独立的 Playground。",
+        billingNoticeItem6:
+          "可用模型可直接用于生产 API 调用；即将上线模型仅供规划，暂不可调用。",
         chatSectionTitle: "对话模型",
         chatSectionDesc:
-          "可通过 API 与 Chat Playground 使用的已验证对话模型。",
+          "OpenAI 兼容对话模型，按 input/output tokens 计费。适用于助手、Agent 与文本生成，通过 POST /v1/chat/completions 调用。",
         imageSectionTitle: "图像模型",
         imageSectionDesc:
-          "可通过 POST /v1/images/generations 与 Image Playground 使用的文生图/图生图模型。",
+          "文生图与图生图模型，按每次成功生成计费，通过 POST /v1/images/generations 调用。",
+        recommendedUseCase: "适合场景",
+        availability: "可用状态",
         imageComingSoonTitle: "图像模型（即将上线）",
         imageComingSoonDesc: "更多图像模型计划在未来发布。",
         videoSectionTitle: "视频模型",
@@ -910,6 +967,15 @@ export const messages = {
           "可在 Cursor、Cherry Studio、OpenAI SDK 或 curl 中使用。",
         quickStartItem4:
           "无法揭示的旧密钥：请创建新密钥以复制完整 secret。",
+        securityTitle: "保护你的密钥",
+        securityDesc:
+          "请将 API Key 视为密码，不要暴露在客户端代码或公开仓库中。",
+        securityItem1:
+          "API Key 只应保存在服务端——不要写入移动应用、浏览器或公开前端。",
+        securityItem2:
+          "若密钥泄露或误提交到 git，请立即 Revoke 并创建新密钥。",
+        securityItem3:
+          "完整 secret 仅在创建时完整展示；之后可通过活跃密钥的「复制密钥」再次复制完整 secret。",
         viewApiDocs: "查看 API 文档",
         tryImagePlayground: "体验 Image Playground",
         createApiKey: "创建 API 密钥",
@@ -1029,7 +1095,17 @@ export const messages = {
       credits: {
         title: "积分",
         subtitle:
-          "预付余额用于每次 API 调用。数据通过 DMIT 加载，使用你的 Supabase 会话。",
+          "Tokfai 预付余额。每次成功的 API 调用会扣除 credits；Stripe Checkout 确认后自动入账。",
+        howItWorksTitle: "Credits 如何工作",
+        howItWorksItem1:
+          "Credits 是 Tokfai 预付余额——购买套餐后，用 credits 支付 API 调用。",
+        howItWorksItem2:
+          "Chat API（POST /v1/chat/completions）按 input / output tokens 扣费。",
+        howItWorksItem3:
+          "Image API（POST /v1/images/generations）按每次成功生成扣费。",
+        howItWorksItem4: "失败请求不扣费。",
+        howItWorksItem5:
+          "Stripe Checkout 完成后，Stripe webhook 确认支付后 credits 自动入账。",
         currentBalance: "当前余额",
         totalPurchased: "累计购买：",
         totalUsed: "累计使用：",
@@ -1061,7 +1137,8 @@ export const messages = {
         billingNote:
           "前端不会写入 profiles.credits_balance。Checkout 成功仅表示待确认，需等 Stripe webhook 入账。",
         paymentReceived: "支付成功",
-        paymentReceivedDesc: "支付成功，积分已入账。",
+        paymentReceivedDesc:
+          "支付成功。Stripe 确认 checkout 后 credits 会自动入账（通常数秒内）。若余额未更新，请刷新本页。",
         checkoutCancelled: "Checkout 已取消",
         checkoutCancelledDesc: "未增加积分。可在下方选择其他套餐。",
         emptyLedger: "暂无积分记录。在上方充值，或前往定价页查看套餐。",
@@ -1077,9 +1154,16 @@ export const messages = {
       },
       usage: {
         title: "用量",
-        subtitle: "你账户的近期 API 活动。数据来自 Tokfai API，仅限当前登录用户。",
-        subtitleDetail: "对话调用展示 token 用量，图像调用展示扣除积分。",
-        billingPolicy: "成功调用扣费，失败调用不扣费。",
+        subtitle:
+          "查看 API 请求、model、状态、token 用量与 credits 消耗。",
+        howItWorksTitle: "如何阅读本页",
+        howItWorksItem1:
+          "每一行对应一次 API 请求（对话或图像），包含 model、状态与扣除积分。",
+        howItWorksItem2:
+          "对话行展示 prompt / completion / total tokens；图像行展示每次生成的 credits。",
+        howItWorksItem3:
+          "联系支持时请提供 request_id，便于我们在日志中定位具体请求。",
+        howItWorksItem4: "失败请求会显示在此便于排查，但不扣费。",
         recentRequests: "最近请求",
         recentRequestsDesc:
           "最近 50 条，按时间倒序。在 Chat Playground 或 Image Playground 发起请求以产生更多记录。",
@@ -1093,7 +1177,8 @@ export const messages = {
         colTotal: "Total",
         colCredits: "扣除积分",
         colRequestId: "请求 ID",
-        colError: "Error",
+        colRequestIdHint: "联系支持排查问题时提供",
+        colError: "错误码",
         kindChat: "对话",
         kindImage: "图像",
         statusSucceeded: "成功",
@@ -1155,6 +1240,24 @@ export const messages = {
       },
     },
     docs: {
+      quickstartTitle: "Quickstart",
+      quickstartDesc: "几分钟内完成第一次 Tokfai API 调用。",
+      quickstartStep1:
+        "在 tokfai.com 注册，打开 Dashboard → API Keys 创建密钥并复制完整 secret（创建时仅展示一次）。",
+      quickstartStep2:
+        "在 Dashboard → Credits 充值（Stripe Checkout）。支付确认后 credits 自动入账。",
+      quickstartStep3:
+        "将 OpenAI 兼容客户端的 base URL 设为 https://api.tokfai.com/v1，每次请求携带 Authorization: Bearer sk-tokfai_…。",
+      quickstartStep4:
+        "调用 POST /v1/chat/completions（对话）或 POST /v1/images/generations（图像）。对话可从 model gemini-3.1-pro 开始。",
+      quickstartStep5:
+        "在 Dashboard → Usage 查看每次请求扣费，在 Dashboard → Credits 查看余额与账本。",
+      authSectionDesc:
+        "每次 API 请求必须在 Authorization header 中携带 API Key。/v1/chat/completions 与 /v1/images/generations 不接受 Dashboard 会话 token。",
+      billingCreditsTitle: "Billing & Credits",
+      billingCreditsDesc:
+        "Tokfai 使用预付 credits。对话模型按 token 扣费，图像模型按每次成功生成扣费，失败请求不扣费。在 Dashboard → Credits 购买套餐；Stripe webhook 确认后写入账本。",
+      errorCodesDesc: "Tokfai API 常见的 HTTP 状态码与 error.code。",
       billingRatesTitle: "计费与价格",
       billingRatesDesc:
         "成功调用扣费，失败调用不扣费。展示当前参考价格供规划使用——请在 Usage 查看每次请求扣费，在 Credits 查看账本记录。",
@@ -1385,6 +1488,10 @@ export const messages = {
         rechargePlansEdit: "编辑",
         rechargePlansCancel: "取消",
         rechargePlansSave: "保存",
+        rechargePlansAmount: "售价（¥）",
+        rechargePlansAmountHint:
+          "后台可修改套餐售价，前台 Checkout 只传 plan_id，最终金额由服务端读取套餐表决定。",
+        rechargePlansAmountInvalid: "请输入有效的人民币售价（最低 ¥1）。",
         rechargePlansAmountReadOnly: "金额（只读）",
         rechargePlansBonusCredits: "赠送积分",
         rechargePlansStripePriceId: "Stripe Price ID",

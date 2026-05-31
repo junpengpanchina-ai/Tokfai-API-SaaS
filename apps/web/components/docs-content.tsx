@@ -103,17 +103,27 @@ const ERROR_CODES = [
   {
     status: "401",
     code: "invalid_token",
-    meaning: "Invalid token",
+    meaning: "Invalid or missing API key in Authorization header",
   },
   {
     status: "402",
     code: "insufficient_credits",
-    meaning: "Not enough credits",
+    meaning: "Not enough credits — top up in Dashboard → Credits",
+  },
+  {
+    status: "404",
+    code: "model_not_found",
+    meaning: "The model ID is not available or not enabled for your account",
   },
   {
     status: "404",
     code: "route_not_found",
-    meaning: "Route not found",
+    meaning: "HTTP path not found on api.tokfai.com",
+  },
+  {
+    status: "400",
+    code: "invalid_prompt",
+    meaning: "Missing or empty prompt for image generation",
   },
   {
     status: "400",
@@ -134,6 +144,11 @@ const ERROR_CODES = [
     status: "400",
     code: "image_too_large",
     meaning: "The input image exceeds the size limit",
+  },
+  {
+    status: "429",
+    code: "upstream_rate_limited",
+    meaning: "Upstream model rate limit — retry with backoff",
   },
   {
     status: "5xx",
@@ -193,6 +208,35 @@ export function DocsContent({
         ) : null}
       </div>
 
+      <Card id="quickstart">
+        <CardHeader>
+          <CardTitle>{t("docs.quickstartTitle")}</CardTitle>
+          <CardDescription>{t("docs.quickstartDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+            <li>{t("docs.quickstartStep1")}</li>
+            <li>{t("docs.quickstartStep2")}</li>
+            <li>{t("docs.quickstartStep3")}</li>
+            <li>{t("docs.quickstartStep4")}</li>
+            <li>{t("docs.quickstartStep5")}</li>
+          </ol>
+          {showDashboardLinks ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/dashboard/api-keys">API Keys</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/dashboard/credits">Credits</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/dashboard/playground">Chat Playground</Link>
+              </Button>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
       <Card className="border-amber-300 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -224,6 +268,33 @@ export function DocsContent({
             .
           </CardDescription>
         </CardHeader>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">{t("docs.billingCreditsTitle")}</CardTitle>
+          <CardDescription>{t("docs.billingCreditsDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3 text-sm">
+          <Link
+            href="/dashboard/credits"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            Dashboard → Credits
+          </Link>
+          <Link
+            href="/dashboard/usage"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            Dashboard → Usage
+          </Link>
+          <Link
+            href="/pricing"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            Pricing
+          </Link>
+        </CardContent>
       </Card>
 
       <Card>
@@ -362,14 +433,10 @@ export function DocsContent({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card id="authentication">
         <CardHeader>
-          <CardTitle>Authorization</CardTitle>
-          <CardDescription>
-            Send your API key in the{" "}
-            <code className="rounded bg-muted px-1 text-xs">Authorization</code>{" "}
-            header on every request.
-          </CardDescription>
+          <CardTitle>Authentication</CardTitle>
+          <CardDescription>{t("docs.authSectionDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           <CopyableCard
@@ -634,12 +701,10 @@ export function DocsContent({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card id="error-codes">
         <CardHeader>
           <CardTitle>Error codes</CardTitle>
-          <CardDescription>
-            Handle these responses when integrating Tokfai.
-          </CardDescription>
+          <CardDescription>{t("docs.errorCodesDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">

@@ -51,6 +51,7 @@ type AdminRechargePlanWriteContext = {
 const RechargePlanPatchSchema = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),
+    amount_cents: z.number().int().min(100).max(100_000_000).optional(),
     credits: z.number().positive().max(100_000_000).optional(),
     bonus_credits: z.number().min(0).max(100_000_000).optional(),
     enabled: z.boolean().optional(),
@@ -228,6 +229,9 @@ export async function updateAdminRechargePlan(
   };
 
   if (patch.name !== undefined) updatePayload.name = patch.name;
+  if (patch.amount_cents !== undefined) {
+    updatePayload.amount_cents = patch.amount_cents;
+  }
   if (patch.credits !== undefined) updatePayload.credits = patch.credits;
   if (patch.bonus_credits !== undefined) {
     updatePayload.bonus_credits = patch.bonus_credits;

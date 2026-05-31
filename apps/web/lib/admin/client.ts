@@ -109,6 +109,7 @@ export type AdminRechargePlanListItem = {
 
 export type AdminRechargePlanUpdateBody = {
   name?: string;
+  amount_cents?: number;
   credits?: number;
   bonus_credits?: number;
   enabled?: boolean;

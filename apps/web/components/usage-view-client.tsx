@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, Gauge, ImageIcon, MessageSquare } from "lucide-react";
+import { AlertTriangle, Gauge, ImageIcon, Info, MessageSquare } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,13 +38,24 @@ export function UsageViewClient({ state }: { state: UsageState }) {
         <p className="mt-1 text-sm text-muted-foreground">
           {t("dashboard.usage.subtitle")}
         </p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("dashboard.usage.subtitleDetail")}
-        </p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("dashboard.usage.billingPolicy")}
-        </p>
       </div>
+
+      <Card className="border-muted bg-muted/30">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Info className="h-4 w-4 shrink-0" />
+            {t("dashboard.usage.howItWorksTitle")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+            <li>{t("dashboard.usage.howItWorksItem1")}</li>
+            <li>{t("dashboard.usage.howItWorksItem2")}</li>
+            <li>{t("dashboard.usage.howItWorksItem3")}</li>
+            <li>{t("dashboard.usage.howItWorksItem4")}</li>
+          </ul>
+        </CardContent>
+      </Card>
 
       {state.status === "error" ? <UsageError state={state} t={t} /> : null}
 
@@ -126,7 +137,10 @@ function UsageTable({
             <th className="py-2 pr-3 text-right font-medium whitespace-nowrap">
               {t("dashboard.usage.colCredits")}
             </th>
-            <th className="hidden py-2 pr-3 font-medium whitespace-nowrap xl:table-cell">
+            <th
+              className="hidden py-2 pr-3 font-medium whitespace-nowrap xl:table-cell"
+              title={t("dashboard.usage.colRequestIdHint")}
+            >
               {t("dashboard.usage.colRequestId")}
             </th>
             <th className="hidden py-2 pr-0 font-medium whitespace-nowrap lg:table-cell">
@@ -186,7 +200,10 @@ function UsageRow({
       <td className="py-2.5 pr-3 text-right text-xs whitespace-nowrap">
         {formatUsageCredits(row, kind)}
       </td>
-      <td className="hidden max-w-[10rem] truncate py-2.5 pr-3 font-mono text-xs text-muted-foreground xl:table-cell">
+      <td
+        className="hidden max-w-[10rem] truncate py-2.5 pr-3 font-mono text-xs text-muted-foreground xl:table-cell"
+        title={row.request_id ?? undefined}
+      >
         {truncateRequestId(row.request_id)}
       </td>
       <td className="hidden max-w-[8rem] truncate py-2.5 pr-0 font-mono text-xs text-muted-foreground lg:table-cell">
