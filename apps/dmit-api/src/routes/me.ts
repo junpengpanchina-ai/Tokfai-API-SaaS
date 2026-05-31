@@ -16,6 +16,8 @@ import type {
   CreditLedgerRow,
   ProfileRow,
   UsageLogRow,
+  UsageSummaryResponse,
+  UsageSummaryStats,
 } from "../types.js";
 
 const DEFAULT_LIMIT = 50;
@@ -33,6 +35,137 @@ function parseLimit(raw: string | undefined): number {
   if (Number.isNaN(parsed) || parsed < 1) return DEFAULT_LIMIT;
   return Math.min(parsed, MAX_LIMIT);
 }
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function formatUtcDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function parseDateParam(raw: string, label: string): Date {
+  if (!DATE_RE.test(raw)) {
+    throw ApiError.badRequest(`${label} must be YYYY-MM-DD.`, "invalid_date");
+  }
+  const parsed = new Date(`${raw}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    throw ApiError.badRequest(`${label} is not a valid date.`, "invalid_date");
+  }
+  return parsed;
+}
+
+function resolveUsageDateRange(
+  startRaw: string | undefined,
+  endRaw: string | undefined
+): { start: Date; end: Date; startDate: string; endDate: string } {
+  const now = new Date();
+  const todayUtc = formatUtcDate(now);
+
+  let startDate = startRaw?.trim() || null;
+  let endDate = endRaw?.trim() || null;
+
+  if (!startDate && !endDate) {
+    endDate = todayUtc;
+    const end = new Date(`${endDate}T23:59:59.999Z`);
+    const start = new Date(end);
+    start.setUTCDate(start.getUTCDate() - 6);
+    start.setUTCHours(0, 0, 0, 0);
+    startDate = formatUtcDate(start);
+    return { start, end, startDate, endDate };
+  }
+
+  if (startDate) parseDateParam(startDate, "start_date");
+  if (endDate) parseDateParam(endDate, "end_date");
+
+  if (!endDate) endDate = todayUtc;
+  if (!startDate) {
+    const end = new Date(`${endDate}T23:59:59.999Z`);
+    const start = new Date(end);
+    start.setUTCDate(start.getUTCDate() - 6);
+    start.setUTCHours(0, 0, 0, 0);
+    startDate = formatUtcDate(start);
+  }
+
+  const start = new Date(`${startDate}T00:00:00.000Z`);
+  const end = new Date(`${endDate}T23:59:59.999Z`);
+
+  if (start > end) {
+    throw ApiError.badRequest(
+      "start_date must be on or before end_date.",
+      "invalid_date_range"
+    );
+  }
+
+  return { start, end, startDate, endDate };
+}
+
+type UsageQueryFilters = {
+  apiKeyId: string | null;
+  model: string | null;
+  status: string | null;
+};
+
+function toNumber(value: string | number | null | undefined): number {
+  if (value == null || value === "") return 0;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isNaN(n) ? 0 : n;
+}
+
+function computeUsageSummary(
+  rows: Pick<
+    UsageLogRow,
+    | "status"
+    | "prompt_tokens"
+    | "completion_tokens"
+    | "total_tokens"
+    | "credits_charged"
+  >[]
+): UsageSummaryStats {
+  let succeededRequests = 0;
+  let totalTokens = 0;
+  let totalPromptTokens = 0;
+  let totalCompletionTokens = 0;
+  let totalCreditsCharged = 0;
+
+  for (const row of rows) {
+    const succeeded = row.status === "succeeded";
+    if (succeeded) {
+      succeededRequests += 1;
+      totalPromptTokens += row.prompt_tokens ?? 0;
+      totalCompletionTokens += row.completion_tokens ?? 0;
+      totalTokens += row.total_tokens ?? 0;
+
+      const credits = toNumber(row.credits_charged);
+      if (credits > 0) {
+        totalCreditsCharged += credits;
+      }
+    }
+  }
+
+  const totalRequests = rows.length;
+
+  return {
+    total_requests: totalRequests,
+    succeeded_requests: succeededRequests,
+    failed_requests: totalRequests - succeededRequests,
+    total_tokens: totalTokens,
+    total_prompt_tokens: totalPromptTokens,
+    total_completion_tokens: totalCompletionTokens,
+    total_credits_charged: totalCreditsCharged,
+  };
+}
+
+function normalizeUsageRow(row: UsageLogRow): UsageLogRow {
+  if (row.status === "succeeded") {
+    return row;
+  }
+  return {
+    ...row,
+    credits_charged: null,
+  };
+}
+
+const USAGE_SUMMARY_SELECT =
+  "id, request_id, api_key_id, model, status, prompt_tokens, completion_tokens, total_tokens, credits_charged, error_code, created_at";
 
 export const meRoutes = new Hono();
 
@@ -272,4 +405,101 @@ meRoutes.get("/usage", async (c) => {
   }
 
   return c.json({ data: (data ?? []) as UsageLogRow[] });
+});
+
+/** GET /v1/me/usage/summary — filtered usage query with aggregates. */
+meRoutes.get("/usage/summary", async (c) => {
+  const user = authedUser(c);
+  const limit = parseLimit(c.req.query("limit"));
+  const { start, end, startDate, endDate } = resolveUsageDateRange(
+    c.req.query("start_date"),
+    c.req.query("end_date")
+  );
+
+  const apiKeyId = c.req.query("api_key_id")?.trim() || null;
+  const model = c.req.query("model")?.trim() || null;
+  const status = c.req.query("status")?.trim() || null;
+
+  if (status && status !== "succeeded" && status !== "failed") {
+    throw ApiError.badRequest(
+      "status must be succeeded or failed.",
+      "invalid_status"
+    );
+  }
+
+  const filters: UsageQueryFilters = { apiKeyId, model, status };
+
+  let summaryQuery = supabase()
+    .from("usage_logs")
+    .select("status, prompt_tokens, completion_tokens, total_tokens, credits_charged")
+    .eq("user_id", user.id)
+    .gte("created_at", start.toISOString())
+    .lte("created_at", end.toISOString());
+  if (filters.apiKeyId) summaryQuery = summaryQuery.eq("api_key_id", filters.apiKeyId);
+  if (filters.model) summaryQuery = summaryQuery.eq("model", filters.model);
+  if (filters.status === "succeeded") {
+    summaryQuery = summaryQuery.eq("status", "succeeded");
+  } else if (filters.status === "failed") {
+    summaryQuery = summaryQuery.neq("status", "succeeded");
+  }
+
+  let dataQuery = supabase()
+    .from("usage_logs")
+    .select(USAGE_SUMMARY_SELECT)
+    .eq("user_id", user.id)
+    .gte("created_at", start.toISOString())
+    .lte("created_at", end.toISOString())
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (filters.apiKeyId) dataQuery = dataQuery.eq("api_key_id", filters.apiKeyId);
+  if (filters.model) dataQuery = dataQuery.eq("model", filters.model);
+  if (filters.status === "succeeded") {
+    dataQuery = dataQuery.eq("status", "succeeded");
+  } else if (filters.status === "failed") {
+    dataQuery = dataQuery.neq("status", "succeeded");
+  }
+
+  const [summaryResult, dataResult] = await Promise.all([
+    summaryQuery,
+    dataQuery,
+  ]);
+
+  if (summaryResult.error) {
+    throw ApiError.internal(
+      `Failed to load usage summary: ${summaryResult.error.message}`,
+      "me_usage_summary_failed"
+    );
+  }
+  if (dataResult.error) {
+    throw ApiError.internal(
+      `Failed to load usage logs: ${dataResult.error.message}`,
+      "me_usage_summary_failed"
+    );
+  }
+
+  const summaryRows = (summaryResult.data ?? []) as Pick<
+    UsageLogRow,
+    | "status"
+    | "prompt_tokens"
+    | "completion_tokens"
+    | "total_tokens"
+    | "credits_charged"
+  >[];
+  const dataRows = ((dataResult.data ?? []) as UsageLogRow[]).map(
+    normalizeUsageRow
+  );
+
+  const response: UsageSummaryResponse = {
+    summary: computeUsageSummary(summaryRows),
+    filters: {
+      start_date: startDate,
+      end_date: endDate,
+      api_key_id: apiKeyId,
+      model,
+      status,
+    },
+    data: dataRows,
+  };
+
+  return c.json(response);
 });

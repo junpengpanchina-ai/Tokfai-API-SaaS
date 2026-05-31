@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { AlertTriangle, Gauge, ImageIcon, Info, MessageSquare } from "lucide-react";
 
+import { UsageQuerySection, type UsageApiKeyOption } from "@/components/usage-query-section";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +28,13 @@ type UsageState =
   | { status: "ready"; logs: MeUsageLogEntry[] }
   | { status: "error"; message: string; code?: string; httpStatus?: number };
 
-export function UsageViewClient({ state }: { state: UsageState }) {
+export function UsageViewClient({
+  state,
+  apiKeys,
+}: {
+  state: UsageState;
+  apiKeys: UsageApiKeyOption[];
+}) {
   const { t } = useI18n();
 
   return (
@@ -39,6 +47,8 @@ export function UsageViewClient({ state }: { state: UsageState }) {
           {t("dashboard.usage.subtitle")}
         </p>
       </div>
+
+      <UsageQuerySection apiKeys={apiKeys} />
 
       <Card className="border-muted bg-muted/30">
         <CardHeader className="pb-3">

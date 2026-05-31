@@ -138,6 +138,7 @@ export async function listBillingRechargePlans(
 export interface MeUsageLogEntry {
   id: string;
   created_at: string;
+  api_key_id?: string | null;
   model: string | null;
   status: string;
   prompt_tokens: number | null;
@@ -146,6 +147,78 @@ export interface MeUsageLogEntry {
   credits_charged: number | string | null;
   request_id: string | null;
   error_code: string | null;
+}
+
+export interface MeUsageSummary {
+  total_requests: number;
+  succeeded_requests: number;
+  failed_requests: number;
+  total_tokens: number;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
+  total_credits_charged: number;
+}
+
+export interface MeUsageSummaryFilters {
+  start_date: string | null;
+  end_date: string | null;
+  api_key_id: string | null;
+  model: string | null;
+  status: string | null;
+}
+
+export interface MeUsageSummaryResponse {
+  summary: MeUsageSummary;
+  filters: MeUsageSummaryFilters;
+  data: MeUsageLogEntry[];
+}
+
+export interface MeUsageSummaryQuery {
+  start_date?: string;
+  end_date?: string;
+  api_key_id?: string;
+  model?: string;
+  status?: string;
+  limit?: number;
+}
+
+function buildUsageSummaryQuery(params: MeUsageSummaryQuery): string {
+  const search = new URLSearchParams();
+  if (params.start_date) search.set("start_date", params.start_date);
+  if (params.end_date) search.set("end_date", params.end_date);
+  if (params.api_key_id) search.set("api_key_id", params.api_key_id);
+  if (params.model) search.set("model", params.model);
+  if (params.status) search.set("status", params.status);
+  if (params.limit != null) search.set("limit", String(params.limit));
+  const qs = search.toString();
+  return qs ? `/v1/me/usage/summary?${qs}` : "/v1/me/usage/summary";
+}
+
+export async function fetchMyUsageSummary(
+  accessToken: string,
+  params: MeUsageSummaryQuery = {}
+): Promise<MeUsageSummaryResponse> {
+  return dmitServerFetch<MeUsageSummaryResponse>(
+    buildUsageSummaryQuery(params),
+    accessToken
+  );
+}
+
+export interface MeApiKeyOption {
+  id: string;
+  name: string;
+  prefix: string;
+  status: string;
+}
+
+export async function listMyApiKeys(
+  accessToken: string
+): Promise<MeApiKeyOption[]> {
+  const res = await dmitServerFetch<DataResponse<MeApiKeyOption[]>>(
+    "/v1/me/api-keys",
+    accessToken
+  );
+  return res.data ?? [];
 }
 
 export async function listMyUsage(

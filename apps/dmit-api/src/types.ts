@@ -51,10 +51,11 @@ export interface UsageLogInsert {
   safety_reason: string | null;
 }
 
-/** Read-only fields returned by GET /v1/me/usage */
+/** Read-only fields returned by GET /v1/me/usage and /v1/me/usage/summary */
 export interface UsageLogRow {
   id: string;
   created_at: string;
+  api_key_id?: string | null;
   model: string | null;
   status: string;
   prompt_tokens: number | null;
@@ -62,6 +63,31 @@ export interface UsageLogRow {
   total_tokens: number | null;
   credits_charged: string | number | null;
   request_id: string | null;
+  error_code?: string | null;
+}
+
+export interface UsageSummaryStats {
+  total_requests: number;
+  succeeded_requests: number;
+  failed_requests: number;
+  total_tokens: number;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
+  total_credits_charged: number;
+}
+
+export interface UsageSummaryFilters {
+  start_date: string | null;
+  end_date: string | null;
+  api_key_id: string | null;
+  model: string | null;
+  status: string | null;
+}
+
+export interface UsageSummaryResponse {
+  summary: UsageSummaryStats;
+  filters: UsageSummaryFilters;
+  data: UsageLogRow[];
 }
 
 export type CreditLedgerType =

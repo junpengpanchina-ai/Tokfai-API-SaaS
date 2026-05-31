@@ -14,6 +14,7 @@ export function registerDebugRoutes(app: Hono): void {
         credits: "GET /v1/me/credits",
         creditsLedger: "GET /v1/me/credits/ledger",
         usage: "GET /v1/me/usage",
+        usageSummary: "GET /v1/me/usage/summary",
       },
       now: new Date().toISOString(),
     })

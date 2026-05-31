@@ -2,6 +2,8 @@ import type { MeUsageLogEntry } from "@/lib/dmit/server";
 import { formatCreditsPrecise, formatInt } from "@/lib/format";
 import { isAvailableImageModel } from "@/lib/model-catalog";
 
+export type { MeUsageLogEntry };
+
 export type UsageKind = "chat" | "image";
 
 export function getUsageKind(
@@ -21,6 +23,8 @@ export function formatUsageCredits(
   row: MeUsageLogEntry,
   kind: UsageKind
 ): string {
+  if (row.status !== "succeeded") return "—";
+
   const value = row.credits_charged;
   if (value == null || value === "") return "—";
 

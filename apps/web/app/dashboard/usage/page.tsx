@@ -5,7 +5,7 @@ import {
   UsageViewClient,
   type UsageState,
 } from "@/components/usage-view-client";
-import { DmitServerError, listMyUsage } from "@/lib/dmit/server";
+import { DmitServerError, listMyApiKeys, listMyUsage } from "@/lib/dmit/server";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
@@ -33,6 +33,7 @@ export default async function UsagePage() {
   if (!session?.access_token) {
     return (
       <UsageViewClient
+        apiKeys={[]}
         state={{
           status: "error",
           message: "请重新登录",
@@ -43,8 +44,19 @@ export default async function UsagePage() {
     );
   }
 
-  const state = await loadUsage(session.access_token);
-  return <UsageViewClient state={state} />;
+  const [state, apiKeys] = await Promise.all([
+    loadUsage(session.access_token),
+    loadApiKeys(session.access_token),
+  ]);
+  return <UsageViewClient state={state} apiKeys={apiKeys} />;
+}
+
+async function loadApiKeys(accessToken: string) {
+  try {
+    return await listMyApiKeys(accessToken);
+  } catch {
+    return [];
+  }
 }
 
 async function loadUsage(accessToken: string): Promise<UsageState> {
