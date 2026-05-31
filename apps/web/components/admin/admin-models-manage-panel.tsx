@@ -369,12 +369,12 @@ export function AdminModelsManagePanel() {
                         <StatusBadge status={model.status} t={t} />
                       </td>
                       <td className="py-3 pr-4 font-mono text-xs">
-                        {model.billing_mode ?? "—"}
+                        {model.billing_type ?? "—"}
                       </td>
                       <td className="py-3 pr-4 font-mono text-xs">
-                        {model.billing_mode === "per_image"
-                          ? `in=${model.input_per_1k ?? "—"}`
-                          : `in=${model.input_per_1k ?? "—"} / out=${model.output_per_1k ?? "—"}`}
+                        {model.billing_type === "image"
+                          ? `${model.image_credits_per_generation ?? "—"} / gen`
+                          : `in=${model.input_credits_per_million_tokens ?? "—"} / out=${model.output_credits_per_million_tokens ?? "—"} / 1M`}
                       </td>
                       <td className="py-3 pr-4 text-muted-foreground">
                         {formatDateTime(model.updated_at)}

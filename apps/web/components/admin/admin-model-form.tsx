@@ -27,6 +27,7 @@ export function AdminModelForm({
 }) {
   const { t } = useI18n();
   const isCreate = mode === "create";
+  const isImageBilling = values.billing_type === "image";
 
   function patch(patchValues: Partial<AdminModelFormValues>) {
     onChange({ ...values, ...patchValues });
@@ -67,7 +68,7 @@ export function AdminModelForm({
             onChange={(value) =>
               patch({
                 model_type: value as AdminModelFormValues["model_type"],
-                billing_mode: value === "image" ? "per_image" : "token",
+                billing_type: value === "image" ? "image" : "chat",
               })
             }
             options={[
@@ -78,21 +79,18 @@ export function AdminModelForm({
             ]}
           />
         </Field>
-        <Field label={t("admin.models.manage.formBillingMode")}>
+        <Field label={t("admin.models.manage.formBillingType")}>
           <NativeSelect
-            value={values.billing_mode}
+            value={values.billing_type}
             disabled={submitting}
             onChange={(value) =>
               patch({
-                billing_mode: value as AdminModelFormValues["billing_mode"],
+                billing_type: value as AdminModelFormValues["billing_type"],
               })
             }
             options={[
-              { value: "token", label: t("admin.models.manage.billingToken") },
-              {
-                value: "per_image",
-                label: t("admin.models.manage.billingPerImage"),
-              },
+              { value: "chat", label: t("admin.models.manage.billingChat") },
+              { value: "image", label: t("admin.models.manage.billingImage") },
             ]}
           />
         </Field>
@@ -111,36 +109,65 @@ export function AdminModelForm({
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label={t("admin.models.manage.formInputPer1k")}>
-          <Input
-            type="number"
-            min="0"
-            step="0.000001"
-            value={values.input_per_1k}
-            disabled={submitting}
-            onChange={(event) => patch({ input_per_1k: event.target.value })}
-          />
-        </Field>
-        <Field label={t("admin.models.manage.formOutputPer1k")}>
-          <Input
-            type="number"
-            min="0"
-            step="0.000001"
-            value={values.output_per_1k}
-            disabled={submitting}
-            onChange={(event) => patch({ output_per_1k: event.target.value })}
-          />
-        </Field>
-        <Field label={t("admin.models.manage.formMarkup")}>
+        {!isImageBilling ? (
+          <>
+            <Field label={t("admin.models.manage.formInputPerMillion")}>
+              <Input
+                type="number"
+                min="0"
+                step="0.000001"
+                value={values.input_credits_per_million_tokens}
+                disabled={submitting}
+                onChange={(event) =>
+                  patch({ input_credits_per_million_tokens: event.target.value })
+                }
+              />
+            </Field>
+            <Field label={t("admin.models.manage.formOutputPerMillion")}>
+              <Input
+                type="number"
+                min="0"
+                step="0.000001"
+                value={values.output_credits_per_million_tokens}
+                disabled={submitting}
+                onChange={(event) =>
+                  patch({ output_credits_per_million_tokens: event.target.value })
+                }
+              />
+            </Field>
+          </>
+        ) : (
+          <Field label={t("admin.models.manage.formImageCredits")}>
+            <Input
+              type="number"
+              min="0"
+              step="1"
+              value={values.image_credits_per_generation}
+              disabled={submitting}
+              onChange={(event) =>
+                patch({ image_credits_per_generation: event.target.value })
+              }
+            />
+          </Field>
+        )}
+        <Field label={t("admin.models.manage.formMarkupRatio")}>
           <Input
             type="number"
             min="0"
             step="0.01"
-            value={values.markup_multiplier}
+            value={values.markup_ratio}
+            disabled={submitting}
+            onChange={(event) => patch({ markup_ratio: event.target.value })}
+          />
+        </Field>
+        <Field label={t("admin.models.manage.formUpstreamNote")}>
+          <Input
+            value={values.upstream_cost_note}
             disabled={submitting}
             onChange={(event) =>
-              patch({ markup_multiplier: event.target.value })
+              patch({ upstream_cost_note: event.target.value })
             }
+            placeholder={t("admin.models.manage.formUpstreamNoteHint")}
           />
         </Field>
       </div>
@@ -159,10 +186,16 @@ export function AdminModelForm({
           onChange={(visible) => patch({ visible })}
         />
         <ToggleField
-          label={t("admin.models.manage.formBillable")}
-          checked={values.billable}
+          label={t("admin.models.manage.formPricingEnabled")}
+          checked={values.pricing_enabled}
           disabled={submitting}
-          onChange={(billable) => patch({ billable })}
+          onChange={(pricing_enabled) => patch({ pricing_enabled })}
+        />
+        <ToggleField
+          label={t("admin.models.manage.formPricingVisible")}
+          checked={values.pricing_visible}
+          disabled={submitting}
+          onChange={(pricing_visible) => patch({ pricing_visible })}
         />
       </div>
 

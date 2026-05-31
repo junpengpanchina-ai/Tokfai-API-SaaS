@@ -125,6 +125,27 @@ export interface BillingRechargePlan {
   badge: string | null;
 }
 
+export interface CatalogModelPricingItem {
+  model_id: string;
+  display_name: string | null;
+  model_type: string | null;
+  billing_type: "chat" | "image";
+  input_credits_per_million_tokens: number | null;
+  output_credits_per_million_tokens: number | null;
+  image_credits_per_generation: number | null;
+  updated_at: string | null;
+}
+
+export async function listCatalogModelPricing(
+  accessToken: string
+): Promise<CatalogModelPricingItem[]> {
+  const res = await dmitServerFetch<DataResponse<CatalogModelPricingItem[]>>(
+    "/v1/catalog/model-pricing",
+    accessToken
+  );
+  return res.data ?? [];
+}
+
 export async function listBillingRechargePlans(
   accessToken: string
 ): Promise<BillingRechargePlan[]> {

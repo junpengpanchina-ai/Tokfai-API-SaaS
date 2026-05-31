@@ -62,11 +62,14 @@ export type AdminModelListItem = {
   visible: boolean | null;
   status: AdminModelStatus;
   sort_order: number | null;
-  billing_mode: string | null;
-  input_per_1k: number | null;
-  output_per_1k: number | null;
-  billable: boolean | null;
-  markup_multiplier: number | null;
+  billing_type: string | null;
+  input_credits_per_million_tokens: number | null;
+  output_credits_per_million_tokens: number | null;
+  image_credits_per_generation: number | null;
+  upstream_cost_note: string | null;
+  markup_ratio: number | null;
+  pricing_enabled: boolean | null;
+  pricing_visible: boolean | null;
   updated_at: string | null;
 };
 
@@ -78,17 +81,17 @@ export type AdminModelCreateBody = {
   enabled?: boolean;
   visible?: boolean;
   sort_order?: number;
-  billing_mode: "token" | "per_image";
-  input_per_1k?: number;
-  output_per_1k?: number;
-  billable?: boolean;
-  markup_multiplier?: number;
+  billing_type?: "chat" | "image";
+  input_credits_per_million_tokens?: number;
+  output_credits_per_million_tokens?: number;
+  image_credits_per_generation?: number;
+  upstream_cost_note?: string | null;
+  markup_ratio?: number;
+  pricing_enabled?: boolean;
+  pricing_visible?: boolean;
 };
 
-export type AdminModelUpdateBody = Partial<
-  Omit<AdminModelCreateBody, "id" | "billing_mode">
-> & {
-  billing_mode?: "token" | "per_image";
+export type AdminModelUpdateBody = Partial<AdminModelCreateBody> & {
   action?: "restore";
 };
 

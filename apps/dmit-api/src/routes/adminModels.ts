@@ -15,6 +15,15 @@ const MODEL_PATCH_FIELDS = [
 ] as const;
 
 const PRICING_PATCH_FIELDS = [
+  "billing_type",
+  "input_credits_per_million_tokens",
+  "output_credits_per_million_tokens",
+  "image_credits_per_generation",
+  "upstream_cost_note",
+  "markup_ratio",
+  "enabled",
+  "visible",
+  // Legacy aliases accepted from older admin clients
   "billing_mode",
   "input_per_1k",
   "output_per_1k",
@@ -22,8 +31,10 @@ const PRICING_PATCH_FIELDS = [
   "markup_multiplier",
 ] as const;
 
-const PER_1K_MAX = 0.1;
-const MARKUP_MULTIPLIER_MAX = 20;
+const CREDITS_PER_MILLION_MAX = 1_000_000;
+const IMAGE_CREDITS_MAX = 1_000_000;
+const MARKUP_RATIO_MAX = 20;
+const UPSTREAM_NOTE_MAX = 500;
 const MODEL_ID_PATTERN = /^[a-z0-9][a-z0-9._-]*$/;
 
 export type AdminModelStatus =
@@ -41,11 +52,14 @@ export type AdminModelListItem = {
   visible: boolean | null;
   status: AdminModelStatus;
   sort_order: number | null;
-  billing_mode: string | null;
-  input_per_1k: number | null;
-  output_per_1k: number | null;
-  billable: boolean | null;
-  markup_multiplier: number | null;
+  billing_type: string | null;
+  input_credits_per_million_tokens: number | null;
+  output_credits_per_million_tokens: number | null;
+  image_credits_per_generation: number | null;
+  upstream_cost_note: string | null;
+  markup_ratio: number | null;
+  pricing_enabled: boolean | null;
+  pricing_visible: boolean | null;
   updated_at: string | null;
 };
 
@@ -66,11 +80,19 @@ type ModelDbRow = {
 };
 
 type ModelPricingDbRow = {
-  billing_mode: string | null;
-  input_per_1k: number | string | null;
-  output_per_1k: number | string | null;
-  billable: boolean | null;
-  markup_multiplier: number | string | null;
+  billing_type: string | null;
+  input_credits_per_million_tokens: number | string | null;
+  output_credits_per_million_tokens: number | string | null;
+  image_credits_per_generation: number | string | null;
+  upstream_cost_note: string | null;
+  markup_ratio: number | string | null;
+  enabled: boolean | null;
+  visible: boolean | null;
+  billing_mode?: string | null;
+  input_per_1k?: number | string | null;
+  output_per_1k?: number | string | null;
+  billable?: boolean | null;
+  markup_multiplier?: number | string | null;
   updated_at: string | null;
 };
 
@@ -82,6 +104,7 @@ type AdminModelWriteContext = {
 };
 
 const ADMIN_MODEL_RESOURCE_TYPE = "models";
+const ADMIN_PRICING_RESOURCE_TYPE = "model_pricing";
 
 function resolveModelResourceId(
   id: string | undefined,
@@ -141,6 +164,7 @@ async function auditAdminModelWrite(
   ctx: AdminModelWriteContext,
   args: {
     action: string;
+    resourceType?: string;
     resourceId: string;
     requestPayload: Record<string, unknown>;
     status: "succeeded" | "failed";
@@ -155,7 +179,7 @@ async function auditAdminModelWrite(
     actorUserId: ctx.adminUser.userId,
     actorEmail: ctx.adminUser.email,
     action: args.action,
-    resourceType: ADMIN_MODEL_RESOURCE_TYPE,
+    resourceType: args.resourceType ?? ADMIN_MODEL_RESOURCE_TYPE,
     resourceId: args.resourceId,
     requestPayload: args.requestPayload,
     status: args.status,
@@ -187,11 +211,31 @@ const ModelPatchSchema = z
 
 const PricingPatchSchema = z
   .object({
+    billing_type: z.enum(["chat", "image"]).optional(),
+    input_credits_per_million_tokens: z
+      .number()
+      .min(0)
+      .max(CREDITS_PER_MILLION_MAX)
+      .optional(),
+    output_credits_per_million_tokens: z
+      .number()
+      .min(0)
+      .max(CREDITS_PER_MILLION_MAX)
+      .optional(),
+    image_credits_per_generation: z
+      .number()
+      .min(0)
+      .max(IMAGE_CREDITS_MAX)
+      .optional(),
+    upstream_cost_note: z.string().trim().max(UPSTREAM_NOTE_MAX).nullable().optional(),
+    markup_ratio: z.number().min(0).max(MARKUP_RATIO_MAX).optional(),
+    enabled: z.boolean().optional(),
+    visible: z.boolean().optional(),
     billing_mode: z.enum(["token", "per_image"]).optional(),
-    input_per_1k: z.number().min(0).max(PER_1K_MAX).optional(),
-    output_per_1k: z.number().min(0).max(PER_1K_MAX).optional(),
+    input_per_1k: z.number().min(0).max(100).optional(),
+    output_per_1k: z.number().min(0).max(100).optional(),
     billable: z.boolean().optional(),
-    markup_multiplier: z.number().min(0).max(MARKUP_MULTIPLIER_MAX).optional(),
+    markup_multiplier: z.number().min(0).max(MARKUP_RATIO_MAX).optional(),
   })
   .strict();
 
@@ -209,11 +253,31 @@ const CreateModelSchema = z
     enabled: z.boolean().optional(),
     visible: z.boolean().optional(),
     sort_order: z.number().int().min(0).max(100_000).optional(),
-    billing_mode: z.enum(["token", "per_image"]),
-    input_per_1k: z.number().min(0).max(PER_1K_MAX).optional(),
-    output_per_1k: z.number().min(0).max(PER_1K_MAX).optional(),
+    billing_type: z.enum(["chat", "image"]).optional(),
+    input_credits_per_million_tokens: z
+      .number()
+      .min(0)
+      .max(CREDITS_PER_MILLION_MAX)
+      .optional(),
+    output_credits_per_million_tokens: z
+      .number()
+      .min(0)
+      .max(CREDITS_PER_MILLION_MAX)
+      .optional(),
+    image_credits_per_generation: z
+      .number()
+      .min(0)
+      .max(IMAGE_CREDITS_MAX)
+      .optional(),
+    upstream_cost_note: z.string().trim().max(UPSTREAM_NOTE_MAX).nullable().optional(),
+    markup_ratio: z.number().min(0).max(MARKUP_RATIO_MAX).optional(),
+    pricing_enabled: z.boolean().optional(),
+    pricing_visible: z.boolean().optional(),
+    billing_mode: z.enum(["token", "per_image"]).optional(),
+    input_per_1k: z.number().min(0).max(100).optional(),
+    output_per_1k: z.number().min(0).max(100).optional(),
     billable: z.boolean().optional(),
-    markup_multiplier: z.number().min(0).max(MARKUP_MULTIPLIER_MAX).optional(),
+    markup_multiplier: z.number().min(0).max(MARKUP_RATIO_MAX).optional(),
   })
   .strict();
 
@@ -227,6 +291,14 @@ const MODEL_LIST_SELECT = `
   sort_order,
   updated_at,
   model_pricing (
+    billing_type,
+    input_credits_per_million_tokens,
+    output_credits_per_million_tokens,
+    image_credits_per_generation,
+    upstream_cost_note,
+    markup_ratio,
+    enabled,
+    visible,
     billing_mode,
     input_per_1k,
     output_per_1k,
@@ -286,6 +358,55 @@ function resolveUpdatedAt(
     : pricingUpdatedAt;
 }
 
+function resolveBillingTypeFromRow(pricing: ModelPricingDbRow | null): string | null {
+  if (!pricing) return null;
+  if (pricing.billing_type === "chat" || pricing.billing_type === "image") {
+    return pricing.billing_type;
+  }
+  if (pricing.billing_mode === "per_image") return "image";
+  if (pricing.billing_mode === "token") return "chat";
+  return null;
+}
+
+function resolveInputCreditsPerMillion(pricing: ModelPricingDbRow | null): number | null {
+  if (!pricing) return null;
+  const direct = toNumberOrNull(pricing.input_credits_per_million_tokens);
+  if (direct !== null && direct > 0) return direct;
+  const legacy = toNumberOrNull(pricing.input_per_1k);
+  return legacy === null ? null : legacy * 1000;
+}
+
+function resolveOutputCreditsPerMillion(pricing: ModelPricingDbRow | null): number | null {
+  if (!pricing) return null;
+  const direct = toNumberOrNull(pricing.output_credits_per_million_tokens);
+  if (direct !== null && direct > 0) return direct;
+  const legacy = toNumberOrNull(pricing.output_per_1k);
+  return legacy === null ? null : legacy * 1000;
+}
+
+function resolveImageCreditsPerGeneration(
+  pricing: ModelPricingDbRow | null
+): number | null {
+  if (!pricing) return null;
+  const direct = toNumberOrNull(pricing.image_credits_per_generation);
+  if (direct !== null && direct > 0) return direct;
+  if (resolveBillingTypeFromRow(pricing) !== "image") return null;
+  const legacy = toNumberOrNull(pricing.input_per_1k);
+  if (legacy === null) return null;
+  const markup =
+    toNumberOrNull(pricing.markup_ratio) ??
+    toNumberOrNull(pricing.markup_multiplier) ??
+    1;
+  return legacy * markup;
+}
+
+function resolveMarkupRatio(pricing: ModelPricingDbRow | null): number | null {
+  if (!pricing) return null;
+  const direct = toNumberOrNull(pricing.markup_ratio);
+  if (direct !== null && direct > 0) return direct;
+  return toNumberOrNull(pricing.markup_multiplier);
+}
+
 export function flattenAdminModelRow(row: ModelDbRow): AdminModelListItem {
   const pricing = pickPricingRow(row.model_pricing);
 
@@ -298,11 +419,14 @@ export function flattenAdminModelRow(row: ModelDbRow): AdminModelListItem {
     visible: row.visible,
     status: deriveAdminModelStatus(row.enabled, row.visible),
     sort_order: toIntOrNull(row.sort_order),
-    billing_mode: pricing?.billing_mode ?? null,
-    input_per_1k: toNumberOrNull(pricing?.input_per_1k),
-    output_per_1k: toNumberOrNull(pricing?.output_per_1k),
-    billable: pricing?.billable ?? null,
-    markup_multiplier: toNumberOrNull(pricing?.markup_multiplier),
+    billing_type: resolveBillingTypeFromRow(pricing),
+    input_credits_per_million_tokens: resolveInputCreditsPerMillion(pricing),
+    output_credits_per_million_tokens: resolveOutputCreditsPerMillion(pricing),
+    image_credits_per_generation: resolveImageCreditsPerGeneration(pricing),
+    upstream_cost_note: pricing?.upstream_cost_note ?? null,
+    markup_ratio: resolveMarkupRatio(pricing),
+    pricing_enabled: pricing?.enabled ?? pricing?.billable ?? null,
+    pricing_visible: pricing?.visible ?? pricing?.billable ?? null,
     updated_at: resolveUpdatedAt(row.updated_at, pricing?.updated_at),
   };
 }
@@ -360,11 +484,126 @@ async function countModelUsageLogs(modelId: string): Promise<number> {
   return count ?? 0;
 }
 
+function normalizeBillingType(input: {
+  billing_type?: "chat" | "image";
+  billing_mode?: "token" | "per_image";
+  model_type?: "chat" | "image" | "video" | "other";
+}): "chat" | "image" {
+  if (input.billing_type === "chat" || input.billing_type === "image") {
+    return input.billing_type;
+  }
+  if (input.billing_mode === "per_image") return "image";
+  if (input.billing_mode === "token") return "chat";
+  if (input.model_type === "image") return "image";
+  return "chat";
+}
+
+type NormalizedPricingWrite = {
+  billing_type: "chat" | "image";
+  input_credits_per_million_tokens: number;
+  output_credits_per_million_tokens: number;
+  image_credits_per_generation: number;
+  upstream_cost_note: string | null;
+  markup_ratio: number;
+  enabled: boolean;
+  visible: boolean;
+};
+
+function normalizePricingWrite(
+  input: Record<string, unknown>,
+  defaults?: Partial<NormalizedPricingWrite>
+): NormalizedPricingWrite {
+  const billingType = normalizeBillingType({
+    billing_type:
+      typeof input.billing_type === "string"
+        ? (input.billing_type as "chat" | "image")
+        : undefined,
+    billing_mode:
+      typeof input.billing_mode === "string"
+        ? (input.billing_mode as "token" | "per_image")
+        : undefined,
+    model_type:
+      typeof input.model_type === "string"
+        ? (input.model_type as "chat" | "image" | "video" | "other")
+        : undefined,
+  });
+
+  const inputPerMillion =
+    typeof input.input_credits_per_million_tokens === "number"
+      ? input.input_credits_per_million_tokens
+      : typeof input.input_per_1k === "number"
+        ? input.input_per_1k * 1000
+        : (defaults?.input_credits_per_million_tokens ?? 0);
+
+  const outputPerMillion =
+    typeof input.output_credits_per_million_tokens === "number"
+      ? input.output_credits_per_million_tokens
+      : typeof input.output_per_1k === "number"
+        ? input.output_per_1k * 1000
+        : (defaults?.output_credits_per_million_tokens ?? 0);
+
+  const imageCredits =
+    typeof input.image_credits_per_generation === "number"
+      ? input.image_credits_per_generation
+      : billingType === "image" && typeof input.input_per_1k === "number"
+        ? input.input_per_1k *
+          (typeof input.markup_ratio === "number"
+            ? input.markup_ratio
+            : typeof input.markup_multiplier === "number"
+              ? input.markup_multiplier
+              : 1)
+        : (defaults?.image_credits_per_generation ?? 0);
+
+  const markupRatio =
+    typeof input.markup_ratio === "number"
+      ? input.markup_ratio
+      : typeof input.markup_multiplier === "number"
+        ? input.markup_multiplier
+        : (defaults?.markup_ratio ?? 1);
+
+  const pricingEnabled =
+    typeof input.pricing_enabled === "boolean"
+      ? input.pricing_enabled
+      : typeof input.enabled === "boolean"
+        ? input.enabled
+        : typeof input.billable === "boolean"
+          ? input.billable
+          : (defaults?.enabled ?? false);
+
+  const pricingVisible =
+    typeof input.pricing_visible === "boolean"
+      ? input.pricing_visible
+      : typeof input.visible === "boolean"
+        ? input.visible
+        : typeof input.billable === "boolean"
+          ? input.billable
+          : (defaults?.visible ?? false);
+
+  const upstreamNote =
+    input.upstream_cost_note === null
+      ? null
+      : typeof input.upstream_cost_note === "string"
+        ? input.upstream_cost_note.trim() || null
+        : (defaults?.upstream_cost_note ?? null);
+
+  return {
+    billing_type: billingType,
+    input_credits_per_million_tokens: inputPerMillion,
+    output_credits_per_million_tokens: outputPerMillion,
+    image_credits_per_generation: imageCredits,
+    upstream_cost_note: upstreamNote,
+    markup_ratio: markupRatio > 0 ? markupRatio : 1,
+    enabled: pricingEnabled,
+    visible: pricingVisible,
+  };
+}
+
 function partitionPatchBody(body: Record<string, unknown>):
   | {
       ok: true;
       model: z.infer<typeof ModelPatchSchema>;
       pricing: z.infer<typeof PricingPatchSchema>;
+      pricingRaw: Record<string, unknown>;
     }
   | { ok: false; error: string; detail?: unknown } {
   const modelBody: Record<string, unknown> = {};
@@ -372,6 +611,14 @@ function partitionPatchBody(body: Record<string, unknown>):
 
   for (const [key, value] of Object.entries(body)) {
     if (key === "action") continue;
+    if (key === "pricing_enabled") {
+      pricingBody.enabled = value;
+      continue;
+    }
+    if (key === "pricing_visible") {
+      pricingBody.visible = value;
+      continue;
+    }
     if ((MODEL_PATCH_FIELDS as readonly string[]).includes(key)) {
       modelBody[key] = value;
       continue;
@@ -412,13 +659,14 @@ function partitionPatchBody(body: Record<string, unknown>):
     ok: true,
     model: modelParsed.data,
     pricing: pricingParsed.data,
+    pricingRaw: pricingBody,
   };
 }
 
 async function applyModelPatch(
   id: string,
   model: z.infer<typeof ModelPatchSchema>,
-  pricing: z.infer<typeof PricingPatchSchema>
+  pricingRaw: Record<string, unknown>
 ): Promise<void> {
   const now = new Date().toISOString();
 
@@ -436,13 +684,14 @@ async function applyModelPatch(
     }
   }
 
-  if (Object.keys(pricing).length > 0) {
+  if (Object.keys(pricingRaw).length > 0) {
+    const normalized = normalizePricingWrite(pricingRaw);
     const { error: pricingError } = await supabase()
       .from("model_pricing")
       .upsert(
         {
           model_id: id,
-          ...pricing,
+          ...normalized,
           updated_at: now,
         },
         { onConflict: "model_id" }
@@ -485,13 +734,45 @@ export async function createAdminModel(
   const input = parsed.data;
   const {
     id,
+    billing_type,
     billing_mode,
+    input_credits_per_million_tokens,
+    output_credits_per_million_tokens,
+    image_credits_per_generation,
+    upstream_cost_note,
+    markup_ratio,
+    pricing_enabled,
+    pricing_visible,
     input_per_1k,
     output_per_1k,
     billable,
     markup_multiplier,
     ...modelFields
   } = input;
+
+  const pricingWrite = normalizePricingWrite(
+    {
+      billing_type,
+      billing_mode,
+      model_type: modelFields.model_type,
+      input_credits_per_million_tokens,
+      output_credits_per_million_tokens,
+      image_credits_per_generation,
+      upstream_cost_note,
+      markup_ratio,
+      pricing_enabled,
+      pricing_visible,
+      input_per_1k,
+      output_per_1k,
+      billable,
+      markup_multiplier,
+    },
+    {
+      markup_ratio: 1,
+      enabled: false,
+      visible: false,
+    }
+  );
 
   const { data: existing, error: existingError } = await supabase()
     .from("models")
@@ -543,11 +824,7 @@ export async function createAdminModel(
 
   const { error: pricingError } = await supabase().from("model_pricing").insert({
     model_id: id,
-    billing_mode,
-    input_per_1k: input_per_1k ?? (billing_mode === "per_image" ? 0.001 : 0),
-    output_per_1k: output_per_1k ?? 0,
-    billable: billable ?? false,
-    markup_multiplier: markup_multiplier ?? 1,
+    ...pricingWrite,
     updated_at: now,
   });
 
@@ -572,6 +849,16 @@ export async function createAdminModel(
     modelId: id,
     modelStatus: model.status,
     changedFields: Object.keys(input),
+  });
+
+  await auditAdminModelWrite(ctx, {
+    action: "model_pricing.update",
+    resourceType: ADMIN_PRICING_RESOURCE_TYPE,
+    resourceId: id,
+    requestPayload: pricingWrite,
+    status: "succeeded",
+    modelId: id,
+    changedFields: Object.keys(pricingWrite),
   });
 
   return { ok: true, model };
@@ -620,8 +907,9 @@ export async function updateAdminModel(
 
   const action = resolveModelAuditAction(body, parsed.model);
   const changedFields = collectChangedFieldNames(parsed.model, parsed.pricing);
+  const pricingChanged = Object.keys(parsed.pricingRaw).length > 0;
 
-  await applyModelPatch(id, parsed.model, parsed.pricing);
+  await applyModelPatch(id, parsed.model, parsed.pricingRaw);
 
   const model = await getAdminModelById(id);
   if (!model) {
@@ -637,15 +925,29 @@ export async function updateAdminModel(
     return { ok: false, status: 404, error: "model_not_found" };
   }
 
-  await auditAdminModelWrite(ctx, {
-    action,
-    resourceId: id,
-    requestPayload: body,
-    status: "succeeded",
-    modelId: id,
-    modelStatus: model.status,
-    changedFields,
-  });
+  if (Object.keys(parsed.model).length > 0) {
+    await auditAdminModelWrite(ctx, {
+      action,
+      resourceId: id,
+      requestPayload: body,
+      status: "succeeded",
+      modelId: id,
+      modelStatus: model.status,
+      changedFields: Object.keys(parsed.model),
+    });
+  }
+
+  if (pricingChanged) {
+    await auditAdminModelWrite(ctx, {
+      action: "model_pricing.update",
+      resourceType: ADMIN_PRICING_RESOURCE_TYPE,
+      resourceId: id,
+      requestPayload: parsed.pricingRaw,
+      status: "succeeded",
+      modelId: id,
+      changedFields: Object.keys(parsed.pricing),
+    });
+  }
 
   return { ok: true, model, action };
 }
@@ -685,7 +987,7 @@ export async function patchAdminModel(
     return { ok: false, status: 404, error: "model_not_found" };
   }
 
-  await applyModelPatch(id, parsed.model, parsed.pricing);
+  await applyModelPatch(id, parsed.model, parsed.pricingRaw);
   return { ok: true };
 }
 

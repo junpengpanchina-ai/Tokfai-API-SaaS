@@ -14,6 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n/i18n-provider";
+import type { CatalogModelPricingItem } from "@/lib/dmit/client";
 import {
   CHAT_MODELS,
   IMAGE_MODELS,
@@ -26,16 +27,25 @@ import {
 import {
   formatChatInputPricePerMillion,
   formatChatOutputPricePerMillion,
+  formatDbChatInputCreditsPerMillion,
+  formatDbChatOutputCreditsPerMillion,
+  formatDbImageCreditsPerGeneration,
   formatImageCreditsPerRequest,
   formatImageReferenceYuanPerRequest,
+  catalogPricingByModelId,
   getChatBillingUnitLabel,
   getImageModelUseCase,
   getImagePerRequestBillingUnitLabel,
 } from "@/lib/model-pricing-display";
 import { TOKFAI_MODELS_ENDPOINT } from "@/lib/tokfai-api";
 
-export function ModelsClient() {
+export function ModelsClient({
+  catalogPricing,
+}: {
+  catalogPricing: CatalogModelPricingItem[];
+}) {
   const { t, locale } = useI18n();
+  const pricingByModelId = catalogPricingByModelId(catalogPricing);
 
   const availableImageModels = IMAGE_MODELS.filter(
     (model) => model.status === "available"
@@ -81,6 +91,7 @@ export function ModelsClient() {
         description={t("dashboard.models.chatSectionDesc")}
         icon={MessageSquare}
         models={CHAT_MODELS}
+        pricingByModelId={pricingByModelId}
         t={t}
         locale={locale}
       />
@@ -90,6 +101,7 @@ export function ModelsClient() {
         description={t("dashboard.models.imageSectionDesc")}
         icon={ImageIcon}
         models={availableImageModels}
+        pricingByModelId={pricingByModelId}
         t={t}
         locale={locale}
       />
@@ -101,6 +113,7 @@ export function ModelsClient() {
           icon={ImageIcon}
           models={comingSoonImageModels}
           comingSoon
+          pricingByModelId={pricingByModelId}
           t={t}
           locale={locale}
         />
@@ -112,6 +125,7 @@ export function ModelsClient() {
         icon={Video}
         models={VIDEO_MODELS}
         comingSoon
+        pricingByModelId={pricingByModelId}
         t={t}
         locale={locale}
       />
@@ -125,6 +139,7 @@ function ModelSection({
   icon: Icon,
   models,
   comingSoon = false,
+  pricingByModelId,
   t,
   locale,
 }: {
@@ -133,6 +148,7 @@ function ModelSection({
   icon: React.ComponentType<{ className?: string }>;
   models: ModelCatalogEntry[];
   comingSoon?: boolean;
+  pricingByModelId: Map<string, CatalogModelPricingItem>;
   t: (key: string) => string;
   locale: "en" | "zh";
 }) {
@@ -155,7 +171,13 @@ function ModelSection({
 
       <div className="grid gap-4 md:grid-cols-2">
         {models.map((model) => (
-          <ModelCard key={model.id} model={model} t={t} locale={locale} />
+          <ModelCard
+            key={model.id}
+            model={model}
+            dbPricing={pricingByModelId.get(model.id) ?? null}
+            t={t}
+            locale={locale}
+          />
         ))}
       </div>
     </section>
@@ -164,10 +186,12 @@ function ModelSection({
 
 function ModelCard({
   model,
+  dbPricing,
   t,
   locale,
 }: {
   model: ModelCatalogEntry;
+  dbPricing: CatalogModelPricingItem | null;
   t: (key: string) => string;
   locale: "en" | "zh";
 }) {
@@ -213,7 +237,7 @@ function ModelCard({
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <PriceBlock model={model} t={t} locale={locale} />
+        <PriceBlock model={model} dbPricing={dbPricing} t={t} locale={locale} />
 
         <dl className="grid gap-2 text-sm">
           {model.type !== "image" ? (
@@ -314,14 +338,48 @@ function ModelCard({
 
 function PriceBlock({
   model,
+  dbPricing,
   t,
   locale,
 }: {
   model: ModelCatalogEntry;
+  dbPricing: CatalogModelPricingItem | null;
   t: (key: string) => string;
   locale: "en" | "zh";
 }) {
   if (isImageModelEntry(model)) {
+    if (
+      dbPricing?.billing_type === "image" &&
+      dbPricing.image_credits_per_generation != null
+    ) {
+      return (
+        <div className="rounded-lg border bg-muted/40 px-4 py-3">
+          <dl className="grid gap-3 text-sm">
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-muted-foreground">
+                {t("dashboard.models.creditsPrice")}
+              </dt>
+              <dd className="mt-1 text-lg font-semibold tracking-tight">
+                {formatDbImageCreditsPerGeneration(
+                  dbPricing.image_credits_per_generation,
+                  locale
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-muted-foreground">
+                {t("dashboard.models.billingUnit")}
+              </dt>
+              <dd>{getImagePerRequestBillingUnitLabel(locale)}</dd>
+            </div>
+          </dl>
+          <p className="mt-3 text-sm text-muted-foreground">
+            {t("dashboard.models.imageBillingNote")}
+          </p>
+        </div>
+      );
+    }
+
     return (
       <div className="rounded-lg border bg-muted/40 px-4 py-3">
         <dl className="grid gap-3 text-sm">
@@ -356,6 +414,44 @@ function PriceBlock({
   }
 
   if (isChatModelEntry(model)) {
+    if (
+      dbPricing?.billing_type === "chat" &&
+      dbPricing.input_credits_per_million_tokens != null &&
+      dbPricing.output_credits_per_million_tokens != null
+    ) {
+      return (
+        <div className="rounded-lg border bg-muted/40 px-4 py-3">
+          <div className="text-xs uppercase tracking-wider text-muted-foreground">
+            {t("dashboard.models.price")}
+          </div>
+          <dl className="mt-2 grid gap-2 text-sm">
+            <div>
+              <dt className="text-xs text-muted-foreground">
+                {t("dashboard.models.inputPrice")}
+              </dt>
+              <dd className="font-mono font-medium">
+                {formatDbChatInputCreditsPerMillion(
+                  dbPricing.input_credits_per_million_tokens,
+                  locale
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">
+                {t("dashboard.models.outputPrice")}
+              </dt>
+              <dd className="font-mono font-medium">
+                {formatDbChatOutputCreditsPerMillion(
+                  dbPricing.output_credits_per_million_tokens,
+                  locale
+                )}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      );
+    }
+
     return (
       <div className="rounded-lg border bg-muted/40 px-4 py-3">
         <div className="text-xs uppercase tracking-wider text-muted-foreground">

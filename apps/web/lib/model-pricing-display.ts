@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/i18n/messages";
+import type { CatalogModelPricingItem } from "@/lib/dmit/client";
 import {
   getImageModelById,
   type ChatModelPricing,
@@ -7,6 +8,45 @@ import {
   type PriceRangeYuan,
   isImageModelEntry,
 } from "@/lib/model-catalog";
+
+function formatCreditsAmount(value: number, locale: Locale): string {
+  return value.toLocaleString(locale === "zh" ? "zh-CN" : "en-US");
+}
+
+export function formatDbChatInputCreditsPerMillion(
+  credits: number,
+  locale: Locale
+): string {
+  const amount = formatCreditsAmount(credits, locale);
+  if (locale === "zh") {
+    return `${amount} 积分 / 100万 tokens`;
+  }
+  return `${amount} credits / 1M tokens`;
+}
+
+export function formatDbChatOutputCreditsPerMillion(
+  credits: number,
+  locale: Locale
+): string {
+  return formatDbChatInputCreditsPerMillion(credits, locale);
+}
+
+export function formatDbImageCreditsPerGeneration(
+  credits: number,
+  locale: Locale
+): string {
+  const amount = formatCreditsAmount(credits, locale);
+  if (locale === "zh") {
+    return `${amount} 积分/次`;
+  }
+  return `${amount} credits / generation`;
+}
+
+export function catalogPricingByModelId(
+  items: CatalogModelPricingItem[]
+): Map<string, CatalogModelPricingItem> {
+  return new Map(items.map((item) => [item.model_id, item]));
+}
 
 function formatYuanAmount(value: number): string {
   return Number.isInteger(value) ? value.toString() : value.toString();

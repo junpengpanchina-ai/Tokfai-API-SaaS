@@ -12,6 +12,7 @@ import {
   legacyStripeWebhookRoutes,
   webhookRoutes,
 } from "./routes/webhooks.js";
+import { catalogRoutes } from "./routes/catalog.js";
 import { modelRoutes } from "./routes/models.js";
 import { chatRoutes } from "./routes/chat.js";
 import { imageRoutes } from "./routes/images.js";
@@ -33,6 +34,7 @@ export function buildApp() {
   app.post("/v1/webhooks/stripe", handleStripeWebhook);
   app.route("/v1/webhooks", webhookRoutes);
   app.route("/", legacyStripeWebhookRoutes);
+  app.route("/", catalogRoutes);
   app.route("/", modelRoutes);
   app.route("/", announcementRoutes);
   app.route("/", chatRoutes);

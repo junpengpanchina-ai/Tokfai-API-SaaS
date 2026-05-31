@@ -532,6 +532,30 @@ export interface CreateCheckoutSessionResponse {
   credits: number;
 }
 
+export interface CatalogModelPricingItem {
+  model_id: string;
+  display_name: string | null;
+  model_type: string | null;
+  billing_type: "chat" | "image";
+  input_credits_per_million_tokens: number | null;
+  output_credits_per_million_tokens: number | null;
+  image_credits_per_generation: number | null;
+  updated_at: string | null;
+}
+
+export async function listCatalogModelPricing(
+  accessToken: string
+): Promise<CatalogModelPricingItem[]> {
+  const res = await dmitFetch<{ data?: CatalogModelPricingItem[] }>(
+    "/v1/catalog/model-pricing",
+    {
+      method: "GET",
+      accessToken,
+    }
+  );
+  return Array.isArray(res.data) ? res.data : [];
+}
+
 /**
  * List visible recharge plans for the credits dashboard.
  */

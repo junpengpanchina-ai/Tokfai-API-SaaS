@@ -62,11 +62,14 @@ export type AdminModelFormValues = {
   enabled: boolean;
   visible: boolean;
   sort_order: number;
-  billing_mode: "token" | "per_image";
-  input_per_1k: string;
-  output_per_1k: string;
-  billable: boolean;
-  markup_multiplier: string;
+  billing_type: "chat" | "image";
+  input_credits_per_million_tokens: string;
+  output_credits_per_million_tokens: string;
+  image_credits_per_generation: string;
+  upstream_cost_note: string;
+  markup_ratio: string;
+  pricing_enabled: boolean;
+  pricing_visible: boolean;
 };
 
 export function emptyAdminModelFormValues(): AdminModelFormValues {
@@ -78,17 +81,29 @@ export function emptyAdminModelFormValues(): AdminModelFormValues {
     enabled: false,
     visible: false,
     sort_order: 1000,
-    billing_mode: "token",
-    input_per_1k: "0",
-    output_per_1k: "0",
-    billable: false,
-    markup_multiplier: "1",
+    billing_type: "chat",
+    input_credits_per_million_tokens: "0",
+    output_credits_per_million_tokens: "0",
+    image_credits_per_generation: "0",
+    upstream_cost_note: "",
+    markup_ratio: "1",
+    pricing_enabled: false,
+    pricing_visible: false,
   };
 }
 
 export function adminModelToFormValues(
   model: AdminModelListItem
 ): AdminModelFormValues {
+  const billingType =
+    model.billing_type === "image"
+      ? "image"
+      : model.billing_type === "chat"
+        ? "chat"
+        : normalizeAdminModelType(model.model_type) === "image"
+          ? "image"
+          : "chat";
+
   return {
     id: model.id,
     display_name: model.display_name ?? "",
@@ -103,11 +118,18 @@ export function adminModelToFormValues(
     enabled: Boolean(model.enabled),
     visible: Boolean(model.visible),
     sort_order: model.sort_order ?? 1000,
-    billing_mode: model.billing_mode === "per_image" ? "per_image" : "token",
-    input_per_1k: String(model.input_per_1k ?? 0),
-    output_per_1k: String(model.output_per_1k ?? 0),
-    billable: Boolean(model.billable),
-    markup_multiplier: String(model.markup_multiplier ?? 1),
+    billing_type: billingType,
+    input_credits_per_million_tokens: String(
+      model.input_credits_per_million_tokens ?? 0
+    ),
+    output_credits_per_million_tokens: String(
+      model.output_credits_per_million_tokens ?? 0
+    ),
+    image_credits_per_generation: String(model.image_credits_per_generation ?? 0),
+    upstream_cost_note: model.upstream_cost_note ?? "",
+    markup_ratio: String(model.markup_ratio ?? 1),
+    pricing_enabled: Boolean(model.pricing_enabled),
+    pricing_visible: Boolean(model.pricing_visible),
   };
 }
 
@@ -120,11 +142,14 @@ export function formValuesToCreateBody(values: AdminModelFormValues) {
     enabled: values.enabled,
     visible: values.visible,
     sort_order: values.sort_order,
-    billing_mode: values.billing_mode,
-    input_per_1k: Number(values.input_per_1k),
-    output_per_1k: Number(values.output_per_1k),
-    billable: values.billable,
-    markup_multiplier: Number(values.markup_multiplier),
+    billing_type: values.billing_type,
+    input_credits_per_million_tokens: Number(values.input_credits_per_million_tokens),
+    output_credits_per_million_tokens: Number(values.output_credits_per_million_tokens),
+    image_credits_per_generation: Number(values.image_credits_per_generation),
+    upstream_cost_note: values.upstream_cost_note.trim() || null,
+    markup_ratio: Number(values.markup_ratio),
+    pricing_enabled: values.pricing_enabled,
+    pricing_visible: values.pricing_visible,
   };
 }
 
@@ -136,10 +161,13 @@ export function formValuesToUpdateBody(values: AdminModelFormValues) {
     enabled: values.enabled,
     visible: values.visible,
     sort_order: values.sort_order,
-    billing_mode: values.billing_mode,
-    input_per_1k: Number(values.input_per_1k),
-    output_per_1k: Number(values.output_per_1k),
-    billable: values.billable,
-    markup_multiplier: Number(values.markup_multiplier),
+    billing_type: values.billing_type,
+    input_credits_per_million_tokens: Number(values.input_credits_per_million_tokens),
+    output_credits_per_million_tokens: Number(values.output_credits_per_million_tokens),
+    image_credits_per_generation: Number(values.image_credits_per_generation),
+    upstream_cost_note: values.upstream_cost_note.trim() || null,
+    markup_ratio: Number(values.markup_ratio),
+    pricing_enabled: values.pricing_enabled,
+    pricing_visible: values.pricing_visible,
   };
 }
