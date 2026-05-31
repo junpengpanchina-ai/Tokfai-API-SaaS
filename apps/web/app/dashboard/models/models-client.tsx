@@ -27,15 +27,19 @@ import {
 import {
   formatChatInputPricePerMillion,
   formatChatOutputPricePerMillion,
+  formatDbChatInputCreditsPer1kExample,
   formatDbChatInputCreditsPerMillion,
+  formatDbChatOutputCreditsPer1kExample,
   formatDbChatOutputCreditsPerMillion,
+  formatDbImageCreditsExample,
   formatDbImageCreditsPerGeneration,
+  formatDbImageYuanExample,
   formatImageCreditsPerRequest,
   formatImageReferenceYuanPerRequest,
   catalogPricingByModelId,
-  getChatBillingUnitLabel,
   getImageModelUseCase,
-  getImagePerRequestBillingUnitLabel,
+  resolveDbChatCredits,
+  resolveDbImageCredits,
 } from "@/lib/model-pricing-display";
 import { TOKFAI_MODELS_ENDPOINT } from "@/lib/tokfai-api";
 
@@ -208,12 +212,6 @@ function ModelCard({
   }
 
   const typeLabel = MODEL_TYPE_LABELS[model.type](t);
-  const billingUnitLabel =
-    model.type === "image"
-      ? getImagePerRequestBillingUnitLabel(locale)
-      : model.type === "chat"
-        ? getChatBillingUnitLabel(locale)
-        : model.billingUnit;
 
   return (
     <Card>
@@ -240,14 +238,6 @@ function ModelCard({
         <PriceBlock model={model} dbPricing={dbPricing} t={t} locale={locale} />
 
         <dl className="grid gap-2 text-sm">
-          {model.type !== "image" ? (
-            <div className="flex flex-col gap-0.5">
-              <dt className="text-xs uppercase tracking-wider text-muted-foreground">
-                {t("dashboard.models.billingUnit")}
-              </dt>
-              <dd>{billingUnitLabel}</dd>
-            </div>
-          ) : null}
           <div className="flex flex-col gap-0.5">
             <dt className="text-xs uppercase tracking-wider text-muted-foreground">
               {t("dashboard.models.description")}
@@ -348,138 +338,133 @@ function PriceBlock({
   locale: "en" | "zh";
 }) {
   if (isImageModelEntry(model)) {
-    if (
-      dbPricing?.billing_type === "image" &&
-      dbPricing.image_credits_per_generation != null
-    ) {
-      return (
-        <div className="rounded-lg border bg-muted/40 px-4 py-3">
-          <dl className="grid gap-3 text-sm">
-            <div>
-              <dt className="text-xs uppercase tracking-wider text-muted-foreground">
-                {t("dashboard.models.creditsPrice")}
-              </dt>
-              <dd className="mt-1 text-lg font-semibold tracking-tight">
-                {formatDbImageCreditsPerGeneration(
-                  dbPricing.image_credits_per_generation,
-                  locale
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wider text-muted-foreground">
-                {t("dashboard.models.billingUnit")}
-              </dt>
-              <dd>{getImagePerRequestBillingUnitLabel(locale)}</dd>
-            </div>
-          </dl>
-          <p className="mt-3 text-sm text-muted-foreground">
-            {t("dashboard.models.imageBillingNote")}
-          </p>
-        </div>
-      );
-    }
+    const dbCredits = resolveDbImageCredits(dbPricing);
+    const credits =
+      dbCredits ?? (isImageModelEntry(model) ? model.pricing.creditsPerRequest : null);
+
+    if (credits == null) return null;
+
+    const yuanExample =
+      dbCredits != null
+        ? formatDbImageYuanExample(dbCredits, locale)
+        : formatImageReferenceYuanPerRequest(model.pricing, locale);
+    const creditsExample =
+      dbCredits != null
+        ? formatDbImageCreditsExample(dbCredits, locale)
+        : formatImageCreditsPerRequest(model.pricing, locale);
 
     return (
-      <div className="rounded-lg border bg-muted/40 px-4 py-3">
-        <dl className="grid gap-3 text-sm">
-          <div>
-            <dt className="text-xs uppercase tracking-wider text-muted-foreground">
-              {t("dashboard.models.creditsPrice")}
-            </dt>
-            <dd className="mt-1 text-lg font-semibold tracking-tight">
-              {formatImageCreditsPerRequest(model.pricing, locale)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs uppercase tracking-wider text-muted-foreground">
-              {t("dashboard.models.referencePrice")}
-            </dt>
-            <dd className="mt-1 font-mono font-medium">
-              {formatImageReferenceYuanPerRequest(model.pricing, locale)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs uppercase tracking-wider text-muted-foreground">
-              {t("dashboard.models.billingUnit")}
-            </dt>
-            <dd>{getImagePerRequestBillingUnitLabel(locale)}</dd>
-          </div>
-        </dl>
-        <p className="mt-3 text-sm text-muted-foreground">
-          {t("dashboard.models.imageBillingNote")}
-        </p>
-      </div>
+      <ModelPricingPanel
+        t={t}
+        variant="image"
+        consumptionLines={[formatDbImageCreditsPerGeneration(credits, locale)]}
+        exampleLines={
+          locale === "zh" && yuanExample
+            ? [yuanExample]
+            : [creditsExample]
+        }
+      />
     );
   }
 
   if (isChatModelEntry(model)) {
-    if (
-      dbPricing?.billing_type === "chat" &&
-      dbPricing.input_credits_per_million_tokens != null &&
-      dbPricing.output_credits_per_million_tokens != null
-    ) {
+    const dbChat = resolveDbChatCredits(dbPricing);
+
+    if (dbChat) {
       return (
-        <div className="rounded-lg border bg-muted/40 px-4 py-3">
-          <div className="text-xs uppercase tracking-wider text-muted-foreground">
-            {t("dashboard.models.price")}
-          </div>
-          <dl className="mt-2 grid gap-2 text-sm">
-            <div>
-              <dt className="text-xs text-muted-foreground">
-                {t("dashboard.models.inputPrice")}
-              </dt>
-              <dd className="font-mono font-medium">
-                {formatDbChatInputCreditsPerMillion(
-                  dbPricing.input_credits_per_million_tokens,
-                  locale
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">
-                {t("dashboard.models.outputPrice")}
-              </dt>
-              <dd className="font-mono font-medium">
-                {formatDbChatOutputCreditsPerMillion(
-                  dbPricing.output_credits_per_million_tokens,
-                  locale
-                )}
-              </dd>
-            </div>
-          </dl>
-        </div>
+        <ModelPricingPanel
+          t={t}
+          variant="chat"
+          consumptionLines={[
+            formatDbChatInputCreditsPerMillion(dbChat.inputPerMillion, locale),
+            formatDbChatOutputCreditsPerMillion(dbChat.outputPerMillion, locale),
+          ]}
+          exampleLines={[
+            formatDbChatInputCreditsPer1kExample(dbChat.inputPerMillion, locale),
+            formatDbChatOutputCreditsPer1kExample(dbChat.outputPerMillion, locale),
+          ]}
+        />
       );
     }
 
     return (
-      <div className="rounded-lg border bg-muted/40 px-4 py-3">
-        <div className="text-xs uppercase tracking-wider text-muted-foreground">
-          {t("dashboard.models.price")}
-        </div>
-        <dl className="mt-2 grid gap-2 text-sm">
-          <div>
-            <dt className="text-xs text-muted-foreground">
-              {t("dashboard.models.inputPrice")}
-            </dt>
-            <dd className="font-mono font-medium">
-              {formatChatInputPricePerMillion(model.pricing)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">
-              {t("dashboard.models.outputPrice")}
-            </dt>
-            <dd className="font-mono font-medium">
-              {formatChatOutputPricePerMillion(model.pricing)}
-            </dd>
-          </div>
-        </dl>
-      </div>
+      <ModelPricingPanel
+        t={t}
+        variant="chat"
+        consumptionLines={[
+          `${t("dashboard.models.inputPrice")}: ${formatChatInputPricePerMillion(model.pricing)}`,
+          `${t("dashboard.models.outputPrice")}: ${formatChatOutputPricePerMillion(model.pricing)}`,
+        ]}
+        exampleLines={[
+          locale === "zh"
+            ? "参考价格区间，实际扣费以 Usage / Credits 为准"
+            : "Reference price ranges; actual charges follow Usage / Credits",
+        ]}
+        fallbackReference
+      />
     );
   }
 
   return null;
+}
+
+function ModelPricingPanel({
+  t,
+  variant,
+  consumptionLines,
+  exampleLines,
+  fallbackReference = false,
+}: {
+  t: (key: string) => string;
+  variant: "chat" | "image";
+  consumptionLines: string[];
+  exampleLines: string[];
+  fallbackReference?: boolean;
+}) {
+  const successLabel =
+    variant === "image"
+      ? t("dashboard.models.billingRuleImageSuccess")
+      : t("dashboard.models.billingRuleSuccess");
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="rounded-lg border border-sky-200 bg-sky-50/80 px-4 py-3 dark:border-sky-900/60 dark:bg-sky-950/30">
+        <div className="text-xs font-semibold uppercase tracking-wider text-sky-700 dark:text-sky-300">
+          {t("dashboard.models.creditsConsumption")}
+        </div>
+        <ul className="mt-2 space-y-1.5 text-sm font-medium text-sky-950 dark:text-sky-50">
+          {consumptionLines.map((line) => (
+            <li key={line} className="font-mono leading-relaxed">
+              {line}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="success">{successLabel}</Badge>
+        <Badge variant="outline">{t("dashboard.models.billingRuleFailure")}</Badge>
+        {variant === "chat" ? (
+          <Badge variant="secondary">{t("dashboard.models.billingRuleChatTokens")}</Badge>
+        ) : null}
+      </div>
+
+      <div className="rounded-lg border bg-muted/50 px-4 py-3">
+        <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          {t("dashboard.models.priceExample")}
+        </div>
+        <ul
+          className={`mt-2 space-y-1 text-sm ${
+            fallbackReference ? "text-muted-foreground" : "font-mono text-foreground/90"
+          }`}
+        >
+          {exampleLines.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
 }
 
 const MODEL_TYPE_LABELS: Record<ModelType, (t: (key: string) => string) => string> = {
