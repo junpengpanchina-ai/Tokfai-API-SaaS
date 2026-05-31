@@ -122,10 +122,10 @@ export const messages = {
       models: {
         title: "Models",
         subtitle:
-          "Browse Tokfai model IDs, credits usage, Starter-plan price examples, and availability. Use these IDs in your API requests or the Chat / Image Playgrounds.",
+          "Browse Tokfai model IDs, credits usage, RMB price examples, and availability. Use these IDs in your API requests or the Chat / Image Playgrounds.",
         billingNoticeTitle: "Billing & playgrounds",
         billingNoticeItem1:
-          "Credits usage shows how each model debits your balance. RMB examples are converted from the Starter plan (¥29 / 10,000 credits). Usage and Credits are the source of truth for actual charges.",
+          "Credits usage shows how each model debits your balance. RMB price examples are estimated ranges for reference only. Usage and Credits are the source of truth for actual charges.",
         billingNoticeItem2: "Failed calls are not charged.",
         billingNoticeItem3: "Chat Playground only supports chat models.",
         billingNoticeItem4: "Image Playground only supports image models.",
@@ -168,30 +168,15 @@ export const messages = {
         outputPrice: "Output",
         creditsConsumption: "Credits usage",
         priceExample: "Price example",
-        priceExampleStarterIntro:
-          "Converted from the Starter plan (¥29 / 10,000 credits):",
-        priceExampleUpstreamIntro:
-          "Upstream reference range (not converted from recharge plans):",
         viewExplanation: "View explanation",
         closeExplanation: "Close",
-        priceExampleExplainChat1:
-          "This model calculates credits separately for input and output tokens.",
-        priceExampleExplainChat2:
-          "RMB amounts shown are reference examples calculated from current credit top-up packages only.",
-        priceExampleExplainChat3:
-          "Actual charges are recorded in Usage / Credits ledger.",
-        priceExampleExplainChat4:
-          "Successful requests are charged; failed requests are not charged.",
-        priceExampleExplainChat5:
-          "Different top-up packages have different credit unit prices, so converted RMB may vary.",
-        priceExampleExplainImage1:
-          "This model charges credits per successful generation.",
-        priceExampleExplainImage2:
-          "RMB amounts shown are reference examples calculated from current credit top-up packages only.",
-        priceExampleExplainImage3:
-          "Successful requests are charged; failed requests are not charged.",
-        priceExampleExplainImage4:
-          "Different top-up packages have different credit unit prices, so converted RMB may vary.",
+        priceExampleExplanationTitle: "Price example explanation",
+        priceExampleExplanationP1:
+          "The price range is estimated from credits usage and common top-up ranges. It is for reference only.",
+        priceExampleExplanationP2:
+          "Actual billing is always based on credits. Chat models are billed by input/output tokens, while image models are billed per successful generation.",
+        priceExampleExplanationP3:
+          "Successful requests are charged; failed requests are not charged. Final availability and pricing follow the dashboard configuration.",
         chatCreditsUsageGeneric:
           "Billed by input/output tokens in credits (see Usage for exact rates)",
         billingRules: "Billing rules",
@@ -1028,10 +1013,10 @@ export const messages = {
       models: {
         title: "模型",
         subtitle:
-          "浏览 Tokfai model ID、积分消耗、按充值套餐折算的人民币示例与可用性。可在 API 请求或 Chat / Image Playground 中使用这些 ID。",
+          "浏览 Tokfai model ID、积分消耗、人民币价格示例与可用性。可在 API 请求或 Chat / Image Playground 中使用这些 ID。",
         billingNoticeTitle: "计费与 Playground",
         billingNoticeItem1:
-          "积分消耗展示各模型如何扣减余额；人民币示例按 Starter 套餐（¥29 / 10,000 credits）折算。实际扣费以 Usage 与 Credits 记录为准。",
+          "积分消耗展示各模型如何扣减余额；人民币价格示例为估算区间，仅供参考。实际扣费以 Usage 与 Credits 记录为准。",
         billingNoticeItem2: "失败请求不扣费。",
         billingNoticeItem3: "Chat Playground 仅支持对话模型。",
         billingNoticeItem4: "Image Playground 仅支持图像模型。",
@@ -1072,24 +1057,15 @@ export const messages = {
         outputPrice: "Output",
         creditsConsumption: "积分消耗",
         priceExample: "价格示例",
-        priceExampleStarterIntro: "按 Starter 套餐 ¥29 / 10,000 credits 折算：",
-        priceExampleUpstreamIntro: "上游参考区间（非充值套餐折算）：",
         viewExplanation: "查看说明",
         closeExplanation: "关闭",
-        priceExampleExplainChat1:
-          "本模型按 input / output tokens 分别计算 credits。",
-        priceExampleExplainChat2:
-          "页面显示的人民币金额仅为按当前充值套餐折算的参考示例。",
-        priceExampleExplainChat3: "实际扣费以 Usage / Credits ledger 记录为准。",
-        priceExampleExplainChat4: "成功后扣费，失败不扣费。",
-        priceExampleExplainChat5:
-          "不同充值套餐的 credits 单价不同，因此折算人民币可能存在区间。",
-        priceExampleExplainImage1: "本模型按每次成功生成扣 credits。",
-        priceExampleExplainImage2:
-          "页面显示的人民币金额仅为按当前充值套餐折算的参考示例。",
-        priceExampleExplainImage3: "成功后扣费，失败不扣费。",
-        priceExampleExplainImage4:
-          "不同充值套餐的 credits 单价不同，因此折算人民币可能存在区间。",
+        priceExampleExplanationTitle: "价格示例说明",
+        priceExampleExplanationP1:
+          "这里展示的是根据积分消耗和常见充值区间估算的人民币价格范围，仅用于帮助理解成本区间。",
+        priceExampleExplanationP2:
+          "实际扣费以 credits 为准，Chat 模型按 input/output tokens 计费，Image 模型按成功生成次数计费。",
+        priceExampleExplanationP3:
+          "成功请求才扣费，失败请求不扣费。最终可用模型和价格以后台配置为准。",
         chatCreditsUsageGeneric:
           "按 input/output tokens 扣 credits（具体费率以 Usage 为准）",
         billingRules: "扣费规则",

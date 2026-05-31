@@ -25,14 +25,14 @@ import {
   isImageModelEntry,
 } from "@/lib/model-catalog";
 import {
-  formatChatInputPricePerMillion,
-  formatChatOutputPricePerMillion,
+  formatChatInputYuanExample,
+  formatChatInputYuanExampleFromRange,
+  formatChatOutputYuanExample,
+  formatChatOutputYuanExampleFromRange,
   formatDbChatInputCreditsPerMillion,
   formatDbChatOutputCreditsPerMillion,
   formatDbImageCreditsPerGeneration,
-  formatStarterChatInputYuanExample,
-  formatStarterChatOutputYuanExample,
-  formatStarterImageYuanExample,
+  formatImageYuanExample,
   catalogPricingByModelId,
   getImageModelUseCase,
   resolveDbChatCredits,
@@ -341,13 +341,16 @@ function PriceBlock({
 
     if (credits == null) return null;
 
+    const exampleLines = [
+      formatImageYuanExample(credits, locale),
+    ].filter((line): line is string => line != null);
+
     return (
       <ModelPricingPanel
         t={t}
         variant="image"
         consumptionLines={[formatDbImageCreditsPerGeneration(credits, locale)]}
-        exampleIntro={t("dashboard.models.priceExampleStarterIntro")}
-        exampleLines={[formatStarterImageYuanExample(credits, locale)]}
+        exampleLines={exampleLines}
       />
     );
   }
@@ -356,6 +359,11 @@ function PriceBlock({
     const dbChat = resolveDbChatCredits(dbPricing);
 
     if (dbChat) {
+      const exampleLines = [
+        formatChatInputYuanExample(dbChat.inputPerMillion, locale),
+        formatChatOutputYuanExample(dbChat.outputPerMillion, locale),
+      ].filter((line): line is string => line != null);
+
       return (
         <ModelPricingPanel
           t={t}
@@ -364,26 +372,22 @@ function PriceBlock({
             formatDbChatInputCreditsPerMillion(dbChat.inputPerMillion, locale),
             formatDbChatOutputCreditsPerMillion(dbChat.outputPerMillion, locale),
           ]}
-          exampleIntro={t("dashboard.models.priceExampleStarterIntro")}
-          exampleLines={[
-            formatStarterChatInputYuanExample(dbChat.inputPerMillion, locale),
-            formatStarterChatOutputYuanExample(dbChat.outputPerMillion, locale),
-          ]}
+          exampleLines={exampleLines}
         />
       );
     }
+
+    const exampleLines = [
+      formatChatInputYuanExampleFromRange(model.pricing.inputPerMillionYuan, locale),
+      formatChatOutputYuanExampleFromRange(model.pricing.outputPerMillionYuan, locale),
+    ].filter((line): line is string => line != null);
 
     return (
       <ModelPricingPanel
         t={t}
         variant="chat"
         consumptionLines={[t("dashboard.models.chatCreditsUsageGeneric")]}
-        exampleIntro={t("dashboard.models.priceExampleUpstreamIntro")}
-        exampleLines={[
-          `${t("dashboard.models.inputPrice")}: ${formatChatInputPricePerMillion(model.pricing)}`,
-          `${t("dashboard.models.outputPrice")}: ${formatChatOutputPricePerMillion(model.pricing)}`,
-        ]}
-        fallbackReference
+        exampleLines={exampleLines}
       />
     );
   }
@@ -395,22 +399,19 @@ function ModelPricingPanel({
   t,
   variant,
   consumptionLines,
-  exampleIntro,
   exampleLines,
-  fallbackReference = false,
 }: {
   t: (key: string) => string;
   variant: "chat" | "image";
   consumptionLines: string[];
-  exampleIntro: string;
   exampleLines: string[];
-  fallbackReference?: boolean;
 }) {
   const [explainOpen, setExplainOpen] = useState(false);
   const successLabel =
     variant === "image"
       ? t("dashboard.models.billingRuleImageSuccess")
       : t("dashboard.models.billingRuleSuccess");
+  const showPriceExample = exampleLines.length > 0;
 
   return (
     <div className="flex flex-col gap-3">
@@ -420,7 +421,7 @@ function ModelPricingPanel({
         </div>
         <ul className="mt-2 space-y-1.5 text-sm font-medium text-sky-950 dark:text-sky-50">
           {consumptionLines.map((line) => (
-            <li key={line} className={fallbackReference ? "" : "font-mono leading-relaxed"}>
+            <li key={line} className="font-mono leading-relaxed">
               {line}
             </li>
           ))}
@@ -432,40 +433,38 @@ function ModelPricingPanel({
         <Badge variant="outline">{t("dashboard.models.billingRuleFailure")}</Badge>
       </div>
 
-      <div className="rounded-lg border bg-muted/50 px-4 py-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            {t("dashboard.models.priceExample")}
+      {showPriceExample ? (
+        <div className="rounded-lg border bg-muted/50 px-4 py-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {t("dashboard.models.priceExample")}
+            </div>
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="h-auto shrink-0 px-0 py-0 text-xs font-normal text-primary"
+              onClick={() => setExplainOpen(true)}
+            >
+              <Info className="h-3.5 w-3.5" aria-hidden />
+              {t("dashboard.models.viewExplanation")}
+            </Button>
           </div>
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            className="h-auto shrink-0 px-0 py-0 text-xs font-normal text-primary"
-            onClick={() => setExplainOpen(true)}
-          >
-            <Info className="h-3.5 w-3.5" aria-hidden />
-            {t("dashboard.models.viewExplanation")}
-          </Button>
+          <ul className="mt-2 space-y-1 font-mono text-sm text-foreground/90">
+            {exampleLines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">{exampleIntro}</p>
-        <ul
-          className={`mt-2 space-y-1 text-sm ${
-            fallbackReference ? "text-muted-foreground" : "font-mono text-foreground/90"
-          }`}
-        >
-          {exampleLines.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
-      </div>
+      ) : null}
 
-      <PriceExampleExplanationDialog
-        open={explainOpen}
-        onOpenChange={setExplainOpen}
-        variant={variant}
-        t={t}
-      />
+      {showPriceExample ? (
+        <PriceExampleExplanationDialog
+          open={explainOpen}
+          onOpenChange={setExplainOpen}
+          t={t}
+        />
+      ) : null}
     </div>
   );
 }
@@ -473,12 +472,10 @@ function ModelPricingPanel({
 function PriceExampleExplanationDialog({
   open,
   onOpenChange,
-  variant,
   t,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  variant: "chat" | "image";
   t: (key: string) => string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -493,21 +490,11 @@ function PriceExampleExplanationDialog({
     }
   }, [open]);
 
-  const explanationItems =
-    variant === "chat"
-      ? [
-          t("dashboard.models.priceExampleExplainChat1"),
-          t("dashboard.models.priceExampleExplainChat2"),
-          t("dashboard.models.priceExampleExplainChat3"),
-          t("dashboard.models.priceExampleExplainChat4"),
-          t("dashboard.models.priceExampleExplainChat5"),
-        ]
-      : [
-          t("dashboard.models.priceExampleExplainImage1"),
-          t("dashboard.models.priceExampleExplainImage2"),
-          t("dashboard.models.priceExampleExplainImage3"),
-          t("dashboard.models.priceExampleExplainImage4"),
-        ];
+  const explanationParagraphs = [
+    t("dashboard.models.priceExampleExplanationP1"),
+    t("dashboard.models.priceExampleExplanationP2"),
+    t("dashboard.models.priceExampleExplanationP3"),
+  ];
 
   return (
     <dialog
@@ -521,7 +508,7 @@ function PriceExampleExplanationDialog({
           id="price-example-explanation-title"
           className="text-sm font-semibold leading-snug"
         >
-          {t("dashboard.models.priceExample")}
+          {t("dashboard.models.priceExampleExplanationTitle")}
         </h3>
         <Button
           type="button"
@@ -535,11 +522,11 @@ function PriceExampleExplanationDialog({
         </Button>
       </div>
       <div className="max-h-[min(60vh,24rem)] overflow-y-auto px-4 py-3">
-        <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
-          {explanationItems.map((item) => (
-            <li key={item}>{item}</li>
+        <div className="space-y-3 text-sm text-muted-foreground">
+          {explanationParagraphs.map((paragraph) => (
+            <p key={paragraph}>{paragraph}</p>
           ))}
-        </ul>
+        </div>
       </div>
       <div className="border-t px-4 py-3">
         <Button

@@ -9,16 +9,24 @@ import {
   isImageModelEntry,
 } from "@/lib/model-catalog";
 
-/** Starter recharge plan — used for dashboard RMB examples only (display). */
-export const STARTER_PLAN_CNY = 29;
-export const STARTER_PLAN_CREDITS = 10_000;
+/**
+ * Display-only ¥/credit anchors from common top-up tiers (best / worst rate).
+ * Used for dashboard RMB example ranges — not billing.
+ */
+const DISPLAY_CNY_PER_CREDIT_MIN = 299 / 200_000;
+const DISPLAY_CNY_PER_CREDIT_MAX = 29 / 10_000;
 
-export function getCreditUnitPriceCny(): number {
-  return STARTER_PLAN_CNY / STARTER_PLAN_CREDITS;
+export function creditsToDisplayYuanRange(credits: number): PriceRangeYuan | null {
+  if (!Number.isFinite(credits) || credits <= 0) return null;
+  return {
+    min: credits * DISPLAY_CNY_PER_CREDIT_MIN,
+    max: credits * DISPLAY_CNY_PER_CREDIT_MAX,
+  };
 }
 
-export function yuanFromCredits(credits: number): number {
-  return credits * getCreditUnitPriceCny();
+export function hasDisplayYuanExample(range: PriceRangeYuan | null | undefined): boolean {
+  if (!range) return false;
+  return range.min > 0 && range.max > 0;
 }
 
 function formatYuanValue(yuan: number): string {
@@ -30,37 +38,64 @@ function formatYuanValue(yuan: number): string {
   return yuan.toFixed(5);
 }
 
-export function formatStarterChatInputYuanExample(
-  millionCredits: number,
-  locale: Locale
-): string {
-  const yuan = formatYuanValue(yuanFromCredits(millionCredits));
-  if (locale === "zh") {
-    return `Input: 约 ¥${yuan} / 100万 tokens`;
+function formatDisplayYuanRange(range: PriceRangeYuan): string {
+  const min = formatYuanValue(range.min);
+  const max = formatYuanValue(range.max);
+  if (min === max) {
+    return `¥${min}`;
   }
-  return `Input: ~¥${yuan} / 1M tokens`;
+  return `¥${min}~¥${max}`;
 }
 
-export function formatStarterChatOutputYuanExample(
-  millionCredits: number,
-  locale: Locale
-): string {
-  const yuan = formatYuanValue(yuanFromCredits(millionCredits));
-  if (locale === "zh") {
-    return `Output: 约 ¥${yuan} / 100万 tokens`;
-  }
-  return `Output: ~¥${yuan} / 1M tokens`;
+function chatYuanExampleUnit(locale: Locale): string {
+  return locale === "zh" ? "/M tokens" : "/M tokens";
 }
 
-export function formatStarterImageYuanExample(
+function imageYuanExampleUnit(locale: Locale): string {
+  return locale === "zh" ? "/次" : "/ generation";
+}
+
+export function formatChatInputYuanExample(
+  millionCredits: number,
+  locale: Locale
+): string | null {
+  const range = creditsToDisplayYuanRange(millionCredits);
+  if (!hasDisplayYuanExample(range)) return null;
+  return `input: ${formatDisplayYuanRange(range!)} ${chatYuanExampleUnit(locale)}`;
+}
+
+export function formatChatOutputYuanExample(
+  millionCredits: number,
+  locale: Locale
+): string | null {
+  const range = creditsToDisplayYuanRange(millionCredits);
+  if (!hasDisplayYuanExample(range)) return null;
+  return `output: ${formatDisplayYuanRange(range!)} ${chatYuanExampleUnit(locale)}`;
+}
+
+export function formatImageYuanExample(
   creditsPerGeneration: number,
   locale: Locale
-): string {
-  const yuan = formatYuanValue(yuanFromCredits(creditsPerGeneration));
-  if (locale === "zh") {
-    return `约 ¥${yuan} / 次`;
-  }
-  return `~¥${yuan} / generation`;
+): string | null {
+  const range = creditsToDisplayYuanRange(creditsPerGeneration);
+  if (!hasDisplayYuanExample(range)) return null;
+  return `${formatDisplayYuanRange(range!)} ${imageYuanExampleUnit(locale)}`;
+}
+
+export function formatChatInputYuanExampleFromRange(
+  range: PriceRangeYuan,
+  locale: Locale
+): string | null {
+  if (!hasDisplayYuanExample(range)) return null;
+  return `input: ${formatDisplayYuanRange(range)} ${chatYuanExampleUnit(locale)}`;
+}
+
+export function formatChatOutputYuanExampleFromRange(
+  range: PriceRangeYuan,
+  locale: Locale
+): string | null {
+  if (!hasDisplayYuanExample(range)) return null;
+  return `output: ${formatDisplayYuanRange(range)} ${chatYuanExampleUnit(locale)}`;
 }
 
 function formatCreditsAmount(value: number, locale: Locale): string {
