@@ -704,6 +704,8 @@ export const messages = {
           "Amount is editable here. Checkout still resolves the final amount server-side from plan_id.",
         rechargePlansAmountInvalid:
           "Enter a valid price in yuan (minimum ¥1).",
+        rechargePlansInvalidFields:
+          "Invalid plan fields. Check amount, credits, or Stripe Price ID.",
         rechargePlansAmountReadOnly: "Amount (read-only)",
         rechargePlansBonusCredits: "Bonus credits",
         rechargePlansStripePriceId: "Stripe price ID",
@@ -1492,6 +1494,8 @@ export const messages = {
         rechargePlansAmountHint:
           "后台可修改套餐售价，前台 Checkout 只传 plan_id，最终金额由服务端读取套餐表决定。",
         rechargePlansAmountInvalid: "请输入有效的人民币售价（最低 ¥1）。",
+        rechargePlansInvalidFields:
+          "套餐字段不合法，请检查金额、积分或 Stripe Price ID。",
         rechargePlansAmountReadOnly: "金额（只读）",
         rechargePlansBonusCredits: "赠送积分",
         rechargePlansStripePriceId: "Stripe Price ID",

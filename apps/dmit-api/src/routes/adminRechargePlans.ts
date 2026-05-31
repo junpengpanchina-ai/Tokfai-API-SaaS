@@ -48,27 +48,55 @@ type AdminRechargePlanWriteContext = {
   idempotencyKey: string;
 };
 
+function emptyToUndefined(value: unknown): unknown {
+  if (value === "" || value === undefined) return undefined;
+  return value;
+}
+
+function normalizeStripePriceIdInput(value: unknown): unknown {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "price_..." || /^price_\.+$/i.test(trimmed)) {
+    return null;
+  }
+  return trimmed;
+}
+
+const optionalIntField = (min: number, max: number) =>
+  z.preprocess(
+    emptyToUndefined,
+    z.coerce.number().int().min(min).max(max).optional()
+  );
+
 const RechargePlanPatchSchema = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),
-    amount_cents: z.number().int().min(100).max(100_000_000).optional(),
-    credits: z.number().positive().max(100_000_000).optional(),
-    bonus_credits: z.number().min(0).max(100_000_000).optional(),
+    amount_cents: optionalIntField(100, 100_000_000),
+    credits: optionalIntField(0, 100_000_000),
+    bonus_credits: optionalIntField(0, 100_000_000),
     enabled: z.boolean().optional(),
     visible: z.boolean().optional(),
-    sort_order: z.number().int().min(0).max(1_000_000).optional(),
+    sort_order: optionalIntField(0, 1_000_000),
     badge: z
       .union([z.string().trim().max(40), z.null()])
       .optional(),
     stripe_price_id: z
-      .union([
+      .preprocess(
+        normalizeStripePriceIdInput,
         z
-          .string()
-          .trim()
-          .regex(/^price_[A-Za-z0-9]+$/, "stripe_price_id must start with price_"),
-        z.null(),
-        z.literal(""),
-      ])
+          .union([
+            z
+              .string()
+              .regex(
+                /^price_[A-Za-z0-9]+$/,
+                "stripe_price_id must start with price_"
+              ),
+            z.null(),
+          ])
+          .optional()
+      )
       .optional(),
   })
   .strict();
@@ -173,10 +201,15 @@ export async function updateAdminRechargePlan(
 
   const parsed = RechargePlanPatchSchema.safeParse(body);
   if (!parsed.success) {
+    const fieldErrors = parsed.error.flatten().fieldErrors;
+    console.warn(
+      "[admin] invalid_recharge_plan_fields",
+      JSON.stringify({ plan_id: planId, field_errors: fieldErrors })
+    );
     await auditRechargePlanWrite(ctx, {
       action: "recharge_plans.update",
       resourceId: planId,
-      requestPayload: body,
+      requestPayload: { fields: Object.keys(body) },
       status: "failed",
       error: "invalid_recharge_plan_fields",
     });

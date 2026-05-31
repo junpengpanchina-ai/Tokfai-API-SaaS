@@ -358,6 +358,9 @@ function toAdminApiError(status: number, body: unknown): AdminApiError {
       if (typeof err.message === "string") message = err.message;
       if (typeof err.code === "string") code = err.code;
     }
+    if (typeof record.code === "string" && !code) {
+      code = record.code;
+    }
   } else if (typeof body === "string" && body.trim()) {
     message = body;
   }

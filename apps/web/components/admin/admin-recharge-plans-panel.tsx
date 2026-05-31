@@ -44,11 +44,29 @@ function centsToYuanInput(amountCents: number): string {
 function yuanInputToCents(raw: string): number | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
-  const yuan = Number(trimmed);
-  if (!Number.isFinite(yuan) || yuan <= 0) return null;
-  const cents = Math.round(yuan * 100);
-  if (!Number.isInteger(cents) || cents < 100) return null;
-  return cents;
+  const amountYuan = Number(trimmed);
+  if (!Number.isFinite(amountYuan) || amountYuan <= 0) return null;
+  const amountCents = Math.round(amountYuan * 100);
+  if (!Number.isInteger(amountCents) || amountCents < 100) return null;
+  return amountCents;
+}
+
+function parseNonNegativeInt(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const value = Number(trimmed);
+  if (!Number.isFinite(value) || value < 0 || !Number.isInteger(value)) {
+    return null;
+  }
+  return value;
+}
+
+function normalizeStripePriceId(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === "price_..." || /^price_\.+$/i.test(trimmed)) {
+    return null;
+  }
+  return trimmed;
 }
 
 function planToDraft(plan: AdminRechargePlanListItem): PlanDraft {
@@ -65,26 +83,58 @@ function planToDraft(plan: AdminRechargePlanListItem): PlanDraft {
   };
 }
 
-function draftToUpdateBody(draft: PlanDraft): AdminRechargePlanUpdateBody {
+function draftToUpdateBody(
+  draft: PlanDraft,
+  original: AdminRechargePlanListItem
+): AdminRechargePlanUpdateBody {
   const amountCents = yuanInputToCents(draft.amount_yuan);
   if (amountCents == null) {
     throw new Error("invalid_amount");
   }
 
+  const credits = parseNonNegativeInt(draft.credits);
+  const bonusCredits = parseNonNegativeInt(draft.bonus_credits);
+  const sortOrder = parseNonNegativeInt(draft.sort_order);
+  if (credits == null || bonusCredits == null || sortOrder == null) {
+    throw new Error("invalid_fields");
+  }
+
   const body: AdminRechargePlanUpdateBody = {
     name: draft.name.trim(),
     amount_cents: amountCents,
-    credits: Number(draft.credits),
-    bonus_credits: Number(draft.bonus_credits),
+    credits,
+    bonus_credits: bonusCredits,
     enabled: draft.enabled,
     visible: draft.visible,
-    sort_order: Number(draft.sort_order),
+    sort_order: sortOrder,
     badge: draft.badge.trim() ? draft.badge.trim() : null,
-    stripe_price_id: draft.stripe_price_id.trim()
-      ? draft.stripe_price_id.trim()
-      : null,
   };
+
+  const stripePriceId = normalizeStripePriceId(draft.stripe_price_id);
+  const originalStripe = original.stripe_price_id?.trim() || null;
+  if (stripePriceId !== originalStripe) {
+    body.stripe_price_id = stripePriceId;
+  }
+
   return body;
+}
+
+function savePlanErrorMessage(
+  error: unknown,
+  t: (key: string) => string
+): string {
+  if (error instanceof AdminApiError) {
+    if (error.isSessionExpired) {
+      return t("admin.common.sessionExpired");
+    }
+    if (error.code === "invalid_recharge_plan_fields") {
+      return t("admin.credits.rechargePlansInvalidFields");
+    }
+    return error.message;
+  }
+  return error instanceof Error
+    ? error.message
+    : t("admin.credits.rechargePlansSaveFailed");
 }
 
 function formatAmountCny(amountCents: number): string {
@@ -140,7 +190,7 @@ export function AdminRechargePlansPanel() {
     setSaveError(null);
   }
 
-  async function savePlan(planId: string) {
+  async function savePlan(planId: string, original: AdminRechargePlanListItem) {
     if (!draft) return;
 
     setSavingPlanId(planId);
@@ -149,9 +199,13 @@ export function AdminRechargePlansPanel() {
     try {
       let body: AdminRechargePlanUpdateBody;
       try {
-        body = draftToUpdateBody(draft);
-      } catch {
-        setSaveError(t("admin.credits.rechargePlansAmountInvalid"));
+        body = draftToUpdateBody(draft, original);
+      } catch (err) {
+        setSaveError(
+          err instanceof Error && err.message === "invalid_fields"
+            ? t("admin.credits.rechargePlansInvalidFields")
+            : t("admin.credits.rechargePlansAmountInvalid")
+        );
         return;
       }
       const updated = await updateAdminRechargePlan(planId, body);
@@ -162,11 +216,7 @@ export function AdminRechargePlansPanel() {
       setDraft(null);
       setSaveMessage(t("admin.credits.rechargePlansSaved"));
     } catch (error) {
-      setSaveError(
-        error instanceof Error
-          ? error.message
-          : t("admin.credits.rechargePlansSaveFailed")
-      );
+      setSaveError(savePlanErrorMessage(error, t));
     } finally {
       setSavingPlanId(null);
     }
@@ -355,7 +405,7 @@ export function AdminRechargePlansPanel() {
                           type="button"
                           size="sm"
                           disabled={isSaving}
-                          onClick={() => void savePlan(plan.id)}
+                          onClick={() => void savePlan(plan.id, plan)}
                         >
                           {isSaving ? (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
