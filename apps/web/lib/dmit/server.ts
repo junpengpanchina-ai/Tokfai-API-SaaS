@@ -160,6 +160,7 @@ export interface MeUsageLogEntry {
   id: string;
   created_at: string;
   api_key_id?: string | null;
+  prefix?: string | null;
   model: string | null;
   status: string;
   prompt_tokens: number | null;

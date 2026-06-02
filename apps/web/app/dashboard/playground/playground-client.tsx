@@ -31,6 +31,7 @@ import {
 } from "@/lib/dmit/client";
 import { userMessageForDmitError } from "@/lib/dmit-messages";
 import { useI18n } from "@/lib/i18n/i18n-provider";
+import { formatMessage } from "@/lib/i18n/messages";
 import {
   AVAILABLE_CHAT_MODEL_IDS,
   isAvailableChatModel,
@@ -40,6 +41,7 @@ import {
   TOKFAI_API_KEY_PLACEHOLDER,
   TOKFAI_CHAT_COMPLETIONS_ENDPOINT,
 } from "@/lib/tokfai-api";
+import { formatCreditsPrecise } from "@/lib/format";
 
 const DEFAULT_MODEL = "gemini-3.1-pro";
 const MODEL_OPTIONS = AVAILABLE_CHAT_MODEL_IDS;
@@ -521,14 +523,41 @@ function ResponsePanel({
   const usage = result.usage;
   const requestId =
     result.tokfai?.request_id ?? result.request_id ?? null;
+  const creditsCharged = resolveCreditsCharged(result);
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
-        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-        <p>
-          {t("dashboard.playground.recordedInUsage")}
-        </p>
+      <div className="flex flex-col gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
+        <div className="flex items-start gap-2">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+          <div className="flex flex-col gap-1">
+            {creditsCharged != null ? (
+              <p>
+                {formatMessage(t("dashboard.playground.creditsChargedApprox"), {
+                  credits: formatCreditsPrecise(creditsCharged),
+                })}
+              </p>
+            ) : (
+              <p>{t("dashboard.playground.successNoCreditsHint")}</p>
+            )}
+            <p className="text-muted-foreground">
+              {t("dashboard.playground.balanceUpdatedHint")}{" "}
+              <Link
+                href="/dashboard/usage"
+                className="underline underline-offset-4"
+              >
+                Usage
+              </Link>{" "}
+              /{" "}
+              <Link
+                href="/dashboard/credits"
+                className="underline underline-offset-4"
+              >
+                Credits
+              </Link>
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="rounded-md border bg-muted/40 p-4">
@@ -543,6 +572,16 @@ function ResponsePanel({
       <UsageRow model={result.model} usage={usage} requestId={requestId} />
     </div>
   );
+}
+
+function resolveCreditsCharged(
+  result: ChatCompletionResponse
+): number | null {
+  const raw = result.credits_charged ?? result.tokfai?.credits_charged;
+  if (raw == null) return null;
+  const value = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return value;
 }
 
 function UsageRow({

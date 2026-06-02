@@ -198,7 +198,15 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       message: "Chat completion succeeded.",
     });
 
-    return c.json(data);
+    return c.json({
+      ...data,
+      credits_charged: creditsCharged,
+      request_id: requestId,
+      tokfai: {
+        credits_charged: creditsCharged,
+        request_id: requestId,
+      },
+    });
   } catch (err) {
     if (err instanceof ApiError) {
       await writeUsageLog(

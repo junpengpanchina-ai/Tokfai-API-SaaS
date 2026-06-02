@@ -240,6 +240,7 @@ export const messages = {
         colStatus: "Status",
         colCreated: "Created",
         colLastUsed: "Last used",
+        colRevokedAt: "Revoked at",
         colActions: "Actions",
         copying: "Copying...",
         copyKey: "Copy key",
@@ -294,6 +295,11 @@ export const messages = {
         responsePlaceholder: "Response will appear here.",
         recordedInUsage:
           "This request has been recorded. View it in Usage and Credits.",
+        creditsChargedApprox: "About {credits} were charged for this request.",
+        balanceUpdatedHint:
+          "Balance updated. View details in Usage and Credits.",
+        successNoCreditsHint:
+          "Request succeeded. Charge details appear in Usage.",
       },
       imagePlayground: {
         title: "Image Playground",
@@ -342,14 +348,14 @@ export const messages = {
           "Your Tokfai prepaid balance. Every successful API call debits credits; top-ups are added after Stripe checkout is confirmed.",
         howItWorksTitle: "How credits work",
         howItWorksItem1:
-          "Credits are Tokfai prepaid balance — buy a package once, then spend credits on API calls.",
+          "Your balance and totals on this page match Usage and Credits records — they are the source of truth.",
         howItWorksItem2:
           "Chat API (POST /v1/chat/completions) is billed by input and output tokens.",
         howItWorksItem3:
           "Image API (POST /v1/images/generations) is billed per successful generation.",
-        howItWorksItem4: "Failed requests are not charged.",
-        howItWorksItem5:
-          "After Stripe Checkout, credits are added automatically when the Stripe webhook confirms payment.",
+        howItWorksItem4:
+          "Playground and API calls charge credits only after a successful response.",
+        howItWorksItem5: "Failed requests are not charged.",
         currentBalance: "Current balance",
         totalPurchased: "Total purchased:",
         totalUsed: "Total used:",
@@ -406,11 +412,11 @@ export const messages = {
           "Review API requests, models, status, token counts, and credits charged for your account.",
         howItWorksTitle: "Reading this page",
         howItWorksItem1:
-          "Each row is one API request — chat or image — with model, status, and credits charged.",
+          "Each row is one API request with model, status, credits charged, and API key prefix.",
         howItWorksItem2:
           "Chat rows show prompt, completion, and total tokens. Image rows show credits per generation.",
         howItWorksItem3:
-          "Copy request_id when contacting support — it helps us trace a specific call in our logs.",
+          "Balance and totals on Credits match this page — Usage and Credits are the source of truth.",
         howItWorksItem4: "Failed requests appear here for debugging but are not charged.",
         recentRequests: "Recent requests",
         recentRequestsDesc:
@@ -419,6 +425,7 @@ export const messages = {
         colWhen: "When",
         colType: "Type",
         colModel: "Model",
+        colApiKeyPrefix: "API Key prefix",
         colStatus: "Status",
         colPrompt: "Prompt",
         colCompletion: "Completion",
@@ -1137,6 +1144,7 @@ export const messages = {
         colStatus: "状态",
         colCreated: "创建时间",
         colLastUsed: "最近使用",
+        colRevokedAt: "撤销时间",
         colActions: "操作",
         copying: "复制中…",
         copyKey: "复制密钥",
@@ -1189,6 +1197,9 @@ export const messages = {
         addCredits: "充值积分",
         responsePlaceholder: "响应将显示在这里。",
         recordedInUsage: "本次请求已记录，可在 Usage 与 Credits 中查看。",
+        creditsChargedApprox: "本次扣除 {credits}。",
+        balanceUpdatedHint: "余额已更新，可到 Usage / Credits 查看。",
+        successNoCreditsHint: "本次请求成功，扣费记录可到 Usage 查看。",
       },
       imagePlayground: {
         title: "Image Playground",
@@ -1233,14 +1244,13 @@ export const messages = {
           "Tokfai 预付余额。每次成功的 API 调用会扣除 credits；Stripe Checkout 确认后自动入账。",
         howItWorksTitle: "Credits 如何工作",
         howItWorksItem1:
-          "Credits 是 Tokfai 预付余额——购买套餐后，用 credits 支付 API 调用。",
+          "本页余额与累计数据以 Usage 和 Credits 记录为准，是核账来源。",
         howItWorksItem2:
           "Chat API（POST /v1/chat/completions）按 input / output tokens 扣费。",
         howItWorksItem3:
           "Image API（POST /v1/images/generations）按每次成功生成扣费。",
-        howItWorksItem4: "失败请求不扣费。",
-        howItWorksItem5:
-          "Stripe Checkout 完成后，Stripe webhook 确认支付后 credits 自动入账。",
+        howItWorksItem4: "Playground 与 API 仅在请求成功后才扣费。",
+        howItWorksItem5: "失败请求不扣费。",
         currentBalance: "当前余额",
         totalPurchased: "累计购买：",
         totalUsed: "累计使用：",
@@ -1293,11 +1303,11 @@ export const messages = {
           "查看 API 请求、model、状态、token 用量与 credits 消耗。",
         howItWorksTitle: "如何阅读本页",
         howItWorksItem1:
-          "每一行对应一次 API 请求（对话或图像），包含 model、状态与扣除积分。",
+          "每一行对应一次 API 请求，包含 model、状态、扣除积分与 API Key 前缀。",
         howItWorksItem2:
           "对话行展示 prompt / completion / total tokens；图像行展示每次生成的 credits。",
         howItWorksItem3:
-          "联系支持时请提供 request_id，便于我们在日志中定位具体请求。",
+          "Credits 页余额与本页记录一致——Usage 与 Credits 是核账来源。",
         howItWorksItem4: "失败请求会显示在此便于排查，但不扣费。",
         recentRequests: "最近请求",
         recentRequestsDesc:
@@ -1306,6 +1316,7 @@ export const messages = {
         colWhen: "时间",
         colType: "类型",
         colModel: "Model",
+        colApiKeyPrefix: "API Key 前缀",
         colStatus: "状态",
         colPrompt: "Prompt",
         colCompletion: "Completion",

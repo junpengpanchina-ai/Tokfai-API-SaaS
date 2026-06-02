@@ -110,6 +110,52 @@ function toNumber(value: string | number | null | undefined): number {
   return Number.isNaN(n) ? 0 : n;
 }
 
+const SUCCESS_STATUSES = new Set(["succeeded", "success", "ok"]);
+
+function isSucceededStatus(status: string): boolean {
+  return SUCCESS_STATUSES.has(status.toLowerCase());
+}
+
+async function attachApiKeyPrefixes(
+  userId: string,
+  rows: UsageLogRow[]
+): Promise<UsageLogRow[]> {
+  const apiKeyIds = [
+    ...new Set(
+      rows
+        .map((row) => row.api_key_id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0)
+    ),
+  ];
+
+  const prefixById = new Map<string, string>();
+  if (apiKeyIds.length > 0) {
+    const { data: keys, error } = await supabase()
+      .from("api_keys")
+      .select("id, prefix")
+      .eq("user_id", userId)
+      .in("id", apiKeyIds);
+
+    if (error) {
+      throw ApiError.internal(
+        `Failed to map usage API keys: ${error.message}`,
+        "me_usage_api_key_map_failed"
+      );
+    }
+
+    for (const key of keys ?? []) {
+      if (typeof key.id === "string" && typeof key.prefix === "string") {
+        prefixById.set(key.id, key.prefix);
+      }
+    }
+  }
+
+  return rows.map((row) => ({
+    ...row,
+    prefix: row.api_key_id ? prefixById.get(row.api_key_id) ?? null : null,
+  }));
+}
+
 function computeUsageSummary(
   rows: Pick<
     UsageLogRow,
@@ -127,7 +173,7 @@ function computeUsageSummary(
   let totalCreditsCharged = 0;
 
   for (const row of rows) {
-    const succeeded = row.status === "succeeded";
+    const succeeded = isSucceededStatus(row.status);
     if (succeeded) {
       succeededRequests += 1;
       totalPromptTokens += row.prompt_tokens ?? 0;
@@ -155,7 +201,7 @@ function computeUsageSummary(
 }
 
 function normalizeUsageRow(row: UsageLogRow): UsageLogRow {
-  if (row.status === "succeeded") {
+  if (isSucceededStatus(row.status)) {
     return row;
   }
   return {
@@ -163,6 +209,9 @@ function normalizeUsageRow(row: UsageLogRow): UsageLogRow {
     credits_charged: null,
   };
 }
+
+const USAGE_LIST_SELECT =
+  "id, created_at, api_key_id, model, status, prompt_tokens, completion_tokens, total_tokens, credits_charged";
 
 const USAGE_SUMMARY_SELECT =
   "id, request_id, api_key_id, model, status, prompt_tokens, completion_tokens, total_tokens, credits_charged, error_code, created_at";
@@ -390,9 +439,7 @@ meRoutes.get("/usage", async (c) => {
   const limit = parseLimit(c.req.query("limit"));
   const { data, error } = await supabase()
     .from("usage_logs")
-    .select(
-      "id, created_at, model, status, prompt_tokens, completion_tokens, total_tokens, credits_charged, request_id, error_code"
-    )
+    .select(USAGE_LIST_SELECT)
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -404,7 +451,9 @@ meRoutes.get("/usage", async (c) => {
     );
   }
 
-  return c.json({ data: (data ?? []) as UsageLogRow[] });
+  const rows = ((data ?? []) as UsageLogRow[]).map(normalizeUsageRow);
+  const enriched = await attachApiKeyPrefixes(user.id, rows);
+  return c.json({ data: enriched });
 });
 
 /** GET /v1/me/usage/summary — filtered usage query with aggregates. */
@@ -488,6 +537,7 @@ meRoutes.get("/usage/summary", async (c) => {
   const dataRows = ((dataResult.data ?? []) as UsageLogRow[]).map(
     normalizeUsageRow
   );
+  const enrichedRows = await attachApiKeyPrefixes(user.id, dataRows);
 
   const response: UsageSummaryResponse = {
     summary: computeUsageSummary(summaryRows),
@@ -498,7 +548,7 @@ meRoutes.get("/usage/summary", async (c) => {
       model,
       status,
     },
-    data: dataRows,
+    data: enrichedRows,
   };
 
   return c.json(response);

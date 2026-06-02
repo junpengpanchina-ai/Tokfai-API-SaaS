@@ -301,6 +301,9 @@ function UsageQueryTable({
               {t("dashboard.usage.colModel")}
             </th>
             <th className="py-2 pr-3 font-medium whitespace-nowrap">
+              {t("dashboard.usage.colApiKeyPrefix")}
+            </th>
+            <th className="py-2 pr-3 font-medium whitespace-nowrap">
               {t("dashboard.usage.colStatus")}
             </th>
             <th className="hidden py-2 pr-3 text-right font-medium whitespace-nowrap md:table-cell">
@@ -366,6 +369,9 @@ function UsageQueryRow({
       </td>
       <td className="max-w-[9rem] py-2.5 pr-3 font-mono text-xs break-all sm:max-w-none">
         {row.model ?? "—"}
+      </td>
+      <td className="py-2.5 pr-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
+        {row.prefix ?? "—"}
       </td>
       <td className="py-2.5 pr-3 whitespace-nowrap">
         {tone === "success" ? (

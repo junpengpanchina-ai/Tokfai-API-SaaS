@@ -477,13 +477,14 @@ function ApiKeysTable({
             <th className="py-2 pr-4 font-medium">{t("dashboard.apiKeys.colStatus")}</th>
             <th className="py-2 pr-4 font-medium">{t("dashboard.apiKeys.colCreated")}</th>
             <th className="py-2 pr-4 font-medium">{t("dashboard.apiKeys.colLastUsed")}</th>
+            <th className="py-2 pr-4 font-medium">{t("dashboard.apiKeys.colRevokedAt")}</th>
             <th className="py-2 pr-0 text-right font-medium">{t("dashboard.apiKeys.colActions")}</th>
           </tr>
         </thead>
         <tbody>
           {copyError ? (
             <tr>
-              <td colSpan={6} className="pb-3">
+              <td colSpan={7} className="pb-3">
                 <ActionErrorAlert error={copyError} />
               </td>
             </tr>
@@ -546,6 +547,11 @@ function ApiKeysTable({
                   {key.last_used_at
                     ? formatDate(key.last_used_at)
                     : t("dashboard.apiKeys.neverUsed")}
+                </td>
+                <td className="py-3 pr-4 text-muted-foreground">
+                  {key.revoked_at
+                    ? formatDate(key.revoked_at)
+                    : "—"}
                 </td>
                 <td className="py-3 pr-0 text-right">
                   {isActive ? (

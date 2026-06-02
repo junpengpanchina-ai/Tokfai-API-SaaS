@@ -56,6 +56,8 @@ export interface UsageLogRow {
   id: string;
   created_at: string;
   api_key_id?: string | null;
+  /** Joined from api_keys.prefix for dashboard display — not a usage_logs column. */
+  prefix?: string | null;
   model: string | null;
   status: string;
   prompt_tokens: number | null;
