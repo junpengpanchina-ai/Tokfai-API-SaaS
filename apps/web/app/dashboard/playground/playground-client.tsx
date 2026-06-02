@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -30,7 +31,10 @@ import {
 } from "@/lib/dmit/client";
 import { userMessageForDmitError } from "@/lib/dmit-messages";
 import { useI18n } from "@/lib/i18n/i18n-provider";
-import { isAvailableChatModel } from "@/lib/model-catalog";
+import {
+  AVAILABLE_CHAT_MODEL_IDS,
+  isAvailableChatModel,
+} from "@/lib/model-catalog";
 import {
   isFullTokfaiApiKey,
   TOKFAI_API_KEY_PLACEHOLDER,
@@ -38,7 +42,7 @@ import {
 } from "@/lib/tokfai-api";
 
 const DEFAULT_MODEL = "gemini-3.1-pro";
-const MODEL_OPTIONS = ["gemini-3.1-pro", "gemini-3-pro"] as const;
+const MODEL_OPTIONS = AVAILABLE_CHAT_MODEL_IDS;
 
 function resolveInitialModel(initialModel?: string): string {
   if (initialModel && isAvailableChatModel(initialModel)) {
@@ -85,6 +89,7 @@ export function PlaygroundClient({
   initialModel?: string;
 }) {
   const { t } = useI18n();
+  const router = useRouter();
   const revealableKeys = useMemo(
     () => filterRevealableKeys(activeKeys),
     [activeKeys]
@@ -104,10 +109,8 @@ export function PlaygroundClient({
 
   async function handleRun(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    console.log("[chat-playground] submit start");
 
     if (loading) {
-      console.log("[chat-playground] submit ignored — already loading");
       return;
     }
 
@@ -120,30 +123,15 @@ export function PlaygroundClient({
       return;
     }
 
-    const selected =
-      apiKeyMode === "select"
-        ? revealableKeys.find((row) => row.id === selectedKeyId)
-        : undefined;
-    console.log(
-      "[chat-playground] selectedKeyPrefix exists:",
-      Boolean(selected?.prefix)
-    );
-
     setLoading(true);
     try {
       const resolvedKey = await resolveApiKey();
-      const fullSecretLoaded = isFullTokfaiApiKey(resolvedKey);
-      console.log("[chat-playground] full secret loaded:", fullSecretLoaded);
-      if (!fullSecretLoaded) {
+      if (!isFullTokfaiApiKey(resolvedKey)) {
         throw new PlaygroundValidationError(
           t("dashboard.playground.selectOrPasteApiKey"),
           "missing_api_key"
         );
       }
-
-      console.log("[chat-playground] model:", model);
-      console.log("[chat-playground] prompt length:", trimmedPrompt.length);
-      console.log("[chat-playground] request start");
 
       const res = await chatCompletions(resolvedKey, {
         model,
@@ -151,10 +139,9 @@ export function PlaygroundClient({
         stream: false,
       });
 
-      console.log("[chat-playground] request success");
       setResult(res);
+      router.refresh();
     } catch (err) {
-      console.error("[chat-playground] request failed", err);
       setError(toPlaygroundError(err));
     } finally {
       setLoading(false);

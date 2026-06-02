@@ -35,23 +35,19 @@ export async function grsaiFetch<T = unknown>(
     res.headers.get("x-request-id") ?? res.headers.get("x-upstream-id");
 
   if (!res.ok) {
-    const text = await res.text();
+    await res.text();
     const mapped = mapUpstreamError(res.status);
     throw new ApiError({
       status: mapped.status,
       message: `GRSAI returned ${res.status}.`,
       code: mapped.code,
       type: mapped.type,
-      publicMessage: mapped.publicMessage ?? truncate(text, 200),
+      publicMessage: mapped.publicMessage,
     });
   }
 
   const data = (await res.json()) as T;
   return { data, upstreamId };
-}
-
-function truncate(s: string, n: number): string {
-  return s.length > n ? `${s.slice(0, n)}…` : s;
 }
 
 function mapUpstreamError(status: number): {

@@ -403,7 +403,7 @@ async function listAdminUsageLogs() {
     return {
       created_at: row.created_at,
       email: emails.get(row.user_id) ?? null,
-      api_key_prefix: apiKey?.prefix ?? null,
+      prefix: apiKey?.prefix ?? null,
       api_key_name: apiKey?.name ?? null,
       model: row.model,
       status: row.status,
