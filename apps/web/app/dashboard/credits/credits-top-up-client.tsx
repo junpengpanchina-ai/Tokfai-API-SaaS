@@ -96,7 +96,7 @@ export function CreditsTopUpClient({
             {plans.map((plan) => {
               const isLoading = loadingPlanId === plan.plan_id;
               const isDisabled = loadingPlanId != null || !plan.enabled;
-              const amountCny = plan.amount_cents / 100;
+              const amountLabel = formatCny(plan.amount_cents);
               return (
                 <div
                   key={plan.plan_id}
@@ -117,7 +117,7 @@ export function CreditsTopUpClient({
                       </div>
                     </div>
                     <p className="mt-2 text-3xl font-semibold tracking-tight">
-                      ¥{amountCny}
+                      {amountLabel}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {formatCredits(plan.total_credits)}{" "}
@@ -192,4 +192,15 @@ function CheckoutError({ message }: { message: string }) {
 
 function formatCredits(value: number): string {
   return new Intl.NumberFormat("en-US").format(value);
+}
+
+function formatCny(amountCents: number): string {
+  const yuan = amountCents / 100;
+  const hasFraction = amountCents % 100 !== 0;
+  return new Intl.NumberFormat("zh-CN", {
+    style: "currency",
+    currency: "CNY",
+    minimumFractionDigits: hasFraction ? 1 : 0,
+    maximumFractionDigits: 2,
+  }).format(yuan);
 }

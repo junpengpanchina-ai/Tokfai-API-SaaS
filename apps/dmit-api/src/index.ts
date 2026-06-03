@@ -3,10 +3,8 @@ import { serve } from "@hono/node-server";
 import { buildApp } from "./app.js";
 import { env } from "./env.js";
 import { log } from "./logger.js";
-import { handleStripeWebhook } from "./routes/webhooks.js";
 
 const app = buildApp();
-app.post("/v1/webhooks/stripe", handleStripeWebhook);
 
 const port = env.PORT;
 const hostname = process.env.HOST?.trim() || "127.0.0.1";

@@ -145,13 +145,34 @@ function assertCheckoutPlanAvailable(
   return plan;
 }
 
+const STRIPE_PRICE_ENV_BY_PLAN: Record<string, string> = {
+  starter: "STRIPE_PRICE_STARTER",
+  pro: "STRIPE_PRICE_PRO",
+  business: "STRIPE_PRICE_BUSINESS",
+};
+
+function resolveStripePriceId(plan: AdminRechargePlanListItem): string | null {
+  const fromDb = plan.stripe_price_id?.trim();
+  if (fromDb) return fromDb;
+
+  const envKey = STRIPE_PRICE_ENV_BY_PLAN[plan.id];
+  if (!envKey) return null;
+
+  const fromEnv = process.env[envKey]?.trim();
+  if (fromEnv && /^price_[A-Za-z0-9]+$/.test(fromEnv)) {
+    return fromEnv;
+  }
+  return null;
+}
+
 function buildCheckoutLineItem(
   plan: AdminRechargePlanListItem
 ): Stripe.Checkout.SessionCreateParams.LineItem {
-  if (plan.stripe_price_id) {
+  const stripePriceId = resolveStripePriceId(plan);
+  if (stripePriceId) {
     return {
       quantity: 1,
-      price: plan.stripe_price_id,
+      price: stripePriceId,
     };
   }
 
