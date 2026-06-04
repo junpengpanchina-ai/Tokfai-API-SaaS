@@ -136,7 +136,7 @@ function assertCheckoutPlanAvailable(
       "plan_not_available"
     );
   }
-  if (plan.amount_cents <= 0 || plan.total_credits <= 0) {
+  if (plan.amount_cents <= 0 || plan.credits <= 0) {
     throw ApiError.badRequest(
       `The ${planId} plan has invalid pricing configuration.`,
       "invalid_plan_pricing"
@@ -183,7 +183,7 @@ function buildCheckoutLineItem(
       unit_amount: plan.amount_cents,
       product_data: {
         name: `Tokfai ${plan.name} Credits`,
-        description: `${plan.total_credits} Tokfai credits`,
+        description: `${plan.credits} Tokfai credits`,
       },
     },
   };
@@ -205,7 +205,7 @@ function buildCreditOrderInsert(args: {
     currency: args.plan.currency,
     amount_cny: amountCny,
     amount_cents: args.plan.amount_cents,
-    credits: args.plan.total_credits,
+    credits: args.plan.credits,
   };
 }
 
@@ -221,8 +221,8 @@ function buildCheckoutMetadata(args: {
     plan_id: args.plan.id,
     package_code: args.plan.id,
     credits: String(args.plan.credits),
+    base_credits: String(args.plan.base_credits),
     bonus_credits: String(args.plan.bonus_credits),
-    total_credits: String(args.plan.total_credits),
   };
 }
 
@@ -378,7 +378,7 @@ async function createCheckoutSession(c: Context) {
     order_id: orderId,
     plan_id: plan.id,
     amount_cents: plan.amount_cents,
-    credits: plan.total_credits,
+    credits: plan.credits,
   });
 }
 

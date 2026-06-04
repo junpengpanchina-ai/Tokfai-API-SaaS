@@ -187,7 +187,7 @@ export function PricingContent({
                     ) : null}
                   </div>
                   <CardDescription>
-                    {descriptionKey ? t(descriptionKey) : null}
+                    {plan.description ?? (descriptionKey ? t(descriptionKey) : null)}
                     {plan.plan_id === "starter" ? (
                       <span className="mt-2 block text-muted-foreground">
                         {t("pricing.starterUse")}
@@ -199,15 +199,22 @@ export function PricingContent({
                       {formatCny(plan.amount_cents)}
                     </div>
                     <div className="mt-1 text-sm text-muted-foreground">
-                      {formatPlanCredits(plan.credits)} {t("pricing.creditsUnit")}
+                      {formatMessage(t("pricing.baseCreditsLine"), {
+                        credits: formatPlanCredits(plan.base_credits),
+                      })}
                     </div>
                     {plan.bonus_credits > 0 ? (
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {formatMessage(t("pricing.includesBonusCredits"), {
+                      <div className="mt-1 text-xs font-medium text-primary">
+                        {formatMessage(t("pricing.bonusCreditsLine"), {
                           bonus: formatPlanCredits(plan.bonus_credits),
                         })}
                       </div>
                     ) : null}
+                    <div className="mt-1 text-sm font-medium text-foreground">
+                      {formatMessage(t("pricing.finalCreditsLine"), {
+                        credits: formatPlanCredits(plan.credits),
+                      })}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>

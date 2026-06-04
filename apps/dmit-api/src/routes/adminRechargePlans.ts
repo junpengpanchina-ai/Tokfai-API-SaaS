@@ -12,25 +12,27 @@ export type RechargePlanRow = {
   name: string;
   amount_cents: number;
   currency: string;
-  credits: number;
+  base_credits: number;
   bonus_credits: number;
+  /** Final credited amount (= base_credits + bonus_credits). */
+  credits: number;
   stripe_price_id: string | null;
   enabled: boolean;
   visible: boolean;
   sort_order: number;
   badge: string | null;
+  description: string | null;
   updated_at: string | null;
 };
 
-export type AdminRechargePlanListItem = RechargePlanRow & {
-  total_credits: number;
-};
+export type AdminRechargePlanListItem = RechargePlanRow;
 
 type RechargePlanDbRow = {
   id: string;
   name: string;
   amount_cents: number | string;
   currency?: string | null;
+  base_credits?: number | string | null;
   credits: number | string;
   bonus_credits: number | string | null;
   stripe_price_id: string | null;
@@ -38,6 +40,7 @@ type RechargePlanDbRow = {
   visible: boolean | null;
   sort_order: number | string | null;
   badge: string | null;
+  description?: string | null;
   updated_at: string | null;
 };
 
@@ -74,13 +77,16 @@ const RechargePlanPatchSchema = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),
     amount_cents: optionalIntField(100, 100_000_000),
-    credits: optionalIntField(0, 100_000_000),
+    base_credits: optionalIntField(0, 100_000_000),
     bonus_credits: optionalIntField(0, 100_000_000),
     enabled: z.boolean().optional(),
     visible: z.boolean().optional(),
     sort_order: optionalIntField(0, 1_000_000),
     badge: z
       .union([z.string().trim().max(40), z.null()])
+      .optional(),
+    description: z
+      .union([z.string().trim().max(500), z.null()])
       .optional(),
     stripe_price_id: z
       .preprocess(
@@ -114,21 +120,23 @@ function normalizeCurrency(value: string | null | undefined): string {
 }
 
 function mapRechargePlanRow(row: RechargePlanDbRow): AdminRechargePlanListItem {
-  const credits = toNumber(row.credits);
+  const baseCredits = toNumber(row.base_credits ?? row.credits);
   const bonusCredits = toNumber(row.bonus_credits);
+  const credits = toNumber(row.credits);
   return {
     id: row.id,
     name: row.name,
     amount_cents: toNumber(row.amount_cents),
     currency: normalizeCurrency(row.currency),
-    credits,
+    base_credits: baseCredits,
     bonus_credits: bonusCredits,
-    total_credits: credits + bonusCredits,
+    credits,
     stripe_price_id: row.stripe_price_id?.trim() || null,
     enabled: row.enabled ?? false,
     visible: row.visible ?? true,
     sort_order: toNumber(row.sort_order),
     badge: row.badge?.trim() || null,
+    description: row.description?.trim() || null,
     updated_at: row.updated_at,
   };
 }
@@ -171,7 +179,7 @@ export async function listAdminRechargePlans(): Promise<AdminRechargePlanListIte
   const { data, error } = await supabase()
     .from("recharge_plans")
     .select(
-      "id, name, amount_cents, currency, credits, bonus_credits, stripe_price_id, enabled, visible, sort_order, badge, updated_at"
+      "id, name, amount_cents, currency, base_credits, credits, bonus_credits, stripe_price_id, enabled, visible, sort_order, badge, description, updated_at"
     )
     .order("sort_order", { ascending: true })
     .order("id", { ascending: true });
@@ -265,9 +273,36 @@ export async function updateAdminRechargePlan(
   if (patch.amount_cents !== undefined) {
     updatePayload.amount_cents = patch.amount_cents;
   }
-  if (patch.credits !== undefined) updatePayload.credits = patch.credits;
-  if (patch.bonus_credits !== undefined) {
-    updatePayload.bonus_credits = patch.bonus_credits;
+  if (patch.description !== undefined) {
+    updatePayload.description =
+      patch.description === null || patch.description === ""
+        ? null
+        : patch.description;
+  }
+
+  if (patch.base_credits !== undefined || patch.bonus_credits !== undefined) {
+    const { data: current, error: currentError } = await supabase()
+      .from("recharge_plans")
+      .select("base_credits, bonus_credits")
+      .eq("id", planId)
+      .maybeSingle();
+
+    if (currentError || !current) {
+      throw ApiError.internal(
+        `Failed to load recharge plan credits: ${currentError?.message ?? "missing plan"}`,
+        "recharge_plan_load_failed"
+      );
+    }
+
+    const baseCredits = toNumber(
+      patch.base_credits ?? (current as { base_credits: number | string }).base_credits
+    );
+    const bonusCredits = toNumber(
+      patch.bonus_credits ?? (current as { bonus_credits: number | string }).bonus_credits
+    );
+    updatePayload.base_credits = baseCredits;
+    updatePayload.bonus_credits = bonusCredits;
+    updatePayload.credits = baseCredits + bonusCredits;
   }
   if (patch.enabled !== undefined) updatePayload.enabled = patch.enabled;
   if (patch.visible !== undefined) updatePayload.visible = patch.visible;
@@ -298,7 +333,7 @@ export async function updateAdminRechargePlan(
   const { data: updated, error: loadError } = await supabase()
     .from("recharge_plans")
     .select(
-      "id, name, amount_cents, currency, credits, bonus_credits, stripe_price_id, enabled, visible, sort_order, badge, updated_at"
+      "id, name, amount_cents, currency, base_credits, credits, bonus_credits, stripe_price_id, enabled, visible, sort_order, badge, description, updated_at"
     )
     .eq("id", planId)
     .maybeSingle();
@@ -330,20 +365,22 @@ export type BillingRechargePlan = {
   name: string;
   amount_cents: number;
   currency: string;
-  credits: number;
+  base_credits: number;
   bonus_credits: number;
-  total_credits: number;
+  /** Final credited amount (= base_credits + bonus_credits). */
+  credits: number;
   enabled: boolean;
   visible: boolean;
   sort_order: number;
   badge: string | null;
+  description: string | null;
 };
 
 export async function listBillingRechargePlans(): Promise<BillingRechargePlan[]> {
   const { data, error } = await supabase()
     .from("recharge_plans")
     .select(
-      "id, name, amount_cents, currency, credits, bonus_credits, enabled, visible, sort_order, badge"
+      "id, name, amount_cents, currency, base_credits, credits, bonus_credits, enabled, visible, sort_order, badge, description"
     )
     .eq("visible", true)
     .order("sort_order", { ascending: true })
@@ -357,20 +394,20 @@ export async function listBillingRechargePlans(): Promise<BillingRechargePlan[]>
   }
 
   return ((data ?? []) as RechargePlanDbRow[]).map((row) => {
-    const credits = toNumber(row.credits);
-    const bonusCredits = toNumber(row.bonus_credits);
+    const mapped = mapRechargePlanRow(row);
     return {
-      plan_id: row.id,
-      name: row.name,
-      amount_cents: toNumber(row.amount_cents),
-      currency: normalizeCurrency(row.currency),
-      credits,
-      bonus_credits: bonusCredits,
-      total_credits: credits + bonusCredits,
-      enabled: row.enabled ?? false,
-      visible: row.visible ?? true,
-      sort_order: toNumber(row.sort_order),
-      badge: row.badge?.trim() || null,
+      plan_id: mapped.id,
+      name: mapped.name,
+      amount_cents: mapped.amount_cents,
+      currency: mapped.currency,
+      base_credits: mapped.base_credits,
+      bonus_credits: mapped.bonus_credits,
+      credits: mapped.credits,
+      enabled: mapped.enabled,
+      visible: mapped.visible,
+      sort_order: mapped.sort_order,
+      badge: mapped.badge,
+      description: mapped.description,
     };
   });
 }
@@ -381,7 +418,7 @@ export async function loadCheckoutRechargePlan(
   const { data, error } = await supabase()
     .from("recharge_plans")
     .select(
-      "id, name, amount_cents, currency, credits, bonus_credits, stripe_price_id, enabled, visible, sort_order, badge, updated_at"
+      "id, name, amount_cents, currency, base_credits, credits, bonus_credits, stripe_price_id, enabled, visible, sort_order, badge, description, updated_at"
     )
     .eq("id", planId)
     .maybeSingle();

@@ -111,18 +111,55 @@ export async function listMyCreditLedger(
   return res.data;
 }
 
+export type MeCreditOrderDisplayStatus =
+  | "pending"
+  | "paid"
+  | "expired"
+  | "cancelled"
+  | "failed";
+
+export interface MeCreditOrder {
+  id: string;
+  plan_id: string | null;
+  status: string;
+  display_status: MeCreditOrderDisplayStatus;
+  currency: string;
+  amount_cents: number | null;
+  credits: number;
+  stripe_checkout_session_id: string | null;
+  created_at: string;
+  updated_at: string;
+  paid_at: string | null;
+}
+
+export async function listMyCreditOrders(
+  accessToken: string,
+  limit = 20
+): Promise<MeCreditOrder[]> {
+  const res = await dmitServerFetch<DataResponse<MeCreditOrder[]>>(
+    `/v1/me/credits/orders?limit=${limit}`,
+    accessToken
+  );
+  return (res.data ?? []).map((order) => ({
+    ...order,
+    credits: Number(order.credits),
+  }));
+}
+
 export interface BillingRechargePlan {
   plan_id: string;
   name: string;
   amount_cents: number;
   currency: string;
-  credits: number;
+  base_credits: number;
   bonus_credits: number;
-  total_credits: number;
+  /** Final credited amount (= base_credits + bonus_credits). */
+  credits: number;
   enabled: boolean;
   visible: boolean;
   sort_order: number;
   badge: string | null;
+  description: string | null;
 }
 
 export interface CatalogModelPricingItem {

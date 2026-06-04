@@ -121,16 +121,22 @@ export function CreditsTopUpClient({
                       {amountLabel}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {formatPlanCredits(plan.total_credits)}{" "}
-                      {t("dashboard.credits.creditsUnit")}
+                      {formatMessage(t("dashboard.credits.baseCreditsLine"), {
+                        credits: formatPlanCredits(plan.base_credits),
+                      })}
                     </p>
                     {plan.bonus_credits > 0 ? (
-                      <p className="text-xs text-muted-foreground">
-                        {formatMessage(t("dashboard.credits.includesBonusCredits"), {
+                      <p className="text-xs font-medium text-primary">
+                        {formatMessage(t("dashboard.credits.bonusCreditsLine"), {
                           bonus: formatPlanCredits(plan.bonus_credits),
                         })}
                       </p>
                     ) : null}
+                    <p className="text-sm font-medium text-foreground">
+                      {formatMessage(t("dashboard.credits.finalCreditsLine"), {
+                        credits: formatPlanCredits(plan.credits),
+                      })}
+                    </p>
                   </div>
 
                   <Button

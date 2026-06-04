@@ -99,22 +99,24 @@ export type AdminRechargePlanListItem = {
   id: string;
   name: string;
   amount_cents: number;
-  credits: number;
+  base_credits: number;
   bonus_credits: number;
-  total_credits: number;
+  credits: number;
   stripe_price_id: string | null;
   enabled: boolean;
   visible: boolean;
   sort_order: number;
   badge: string | null;
+  description: string | null;
   updated_at: string | null;
 };
 
 export type AdminRechargePlanUpdateBody = {
   name?: string;
   amount_cents?: number;
-  credits?: number;
+  base_credits?: number;
   bonus_credits?: number;
+  description?: string | null;
   enabled?: boolean;
   visible?: boolean;
   sort_order?: number;

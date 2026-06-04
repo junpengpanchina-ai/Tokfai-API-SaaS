@@ -363,6 +363,18 @@ export const messages = {
         recentLedger: "Recent ledger entries",
         recentLedgerDesc:
           "Last 50 top-ups, debits, and adjustments. Written exclusively by DMIT.",
+        recentOrders: "Recent recharge orders",
+        recentOrdersDesc:
+          "Stripe Checkout orders for your account. Pending orders older than 24 hours are shown as expired.",
+        emptyOrders: "No recharge orders yet.",
+        colPlan: "Plan",
+        colCredits: "Credits",
+        colStatus: "Status",
+        orderStatusPaid: "Paid",
+        orderStatusPending: "Pending",
+        orderStatusExpired: "Expired",
+        orderStatusCancelled: "Cancelled",
+        orderStatusFailed: "Failed",
         colType: "Type",
         colAmount: "Amount",
         colBalanceAfter: "Balance after",
@@ -384,12 +396,21 @@ export const messages = {
           "Checkout temporarily unavailable. Please try again or contact support.",
         noRechargePlans: "No recharge plans are available right now.",
         includesBonusCredits: "Includes {bonus} bonus credits",
+        baseCreditsLine: "{credits} base credits",
+        bonusCreditsLine: "+{bonus} bonus credits",
+        finalCreditsLine: "{credits} credits total",
         comingSoon: "Coming soon",
         billingNote:
           "The frontend never writes profiles.credits_balance. Checkout success only shows a pending confirmation message until the Stripe webhook credits the account.",
         paymentReceived: "Payment received",
         paymentReceivedDesc:
           "Payment received. Credits are added automatically after Stripe confirms checkout (usually within seconds). Refresh this page if your balance has not updated yet.",
+        orderPaidTitle: "Top-up completed",
+        orderPaidDesc:
+          "This checkout is paid and credits have been added to your balance.",
+        orderExpiredTitle: "Checkout not completed",
+        orderExpiredDesc:
+          "This checkout session was not finished in time. Start a new recharge below if you still want credits.",
         checkoutCancelled: "Checkout was cancelled",
         checkoutCancelledDesc:
           "No credits were added. You can pick another amount below.",
@@ -503,6 +524,9 @@ export const messages = {
       buyPlan: "Buy {name}",
       creditsUnit: "credits",
       includesBonusCredits: "Includes {bonus} bonus credits",
+      baseCreditsLine: "{credits} base credits",
+      bonusCreditsLine: "Bonus +{bonus} credits",
+      finalCreditsLine: "{credits} credits credited",
       plansUnavailable:
         "Recharge plans are temporarily unavailable. Please try again later.",
       getStarter: "Get Starter",
@@ -813,6 +837,7 @@ export const messages = {
         rechargePlansInvalidFields:
           "Invalid plan fields. Check amount, credits, or Stripe Price ID.",
         rechargePlansAmountReadOnly: "Amount (read-only)",
+        rechargePlansBaseCredits: "Base credits",
         rechargePlansBonusCredits: "Bonus credits",
         rechargePlansStripePriceId: "Stripe price ID",
         rechargePlansSortOrder: "Sort order",
@@ -1267,6 +1292,18 @@ export const messages = {
         recentLedger: "最近账本记录",
         recentLedgerDesc:
           "最近 50 条充值、扣费与调账记录，仅由 DMIT 写入。",
+        recentOrders: "最近充值订单",
+        recentOrdersDesc:
+          "账户下的 Stripe Checkout 订单。超过 24 小时仍未支付的 pending 订单会显示为「未完成」。",
+        emptyOrders: "暂无充值订单。",
+        colPlan: "套餐",
+        colCredits: "积分",
+        colStatus: "状态",
+        orderStatusPaid: "已支付",
+        orderStatusPending: "待支付",
+        orderStatusExpired: "未完成",
+        orderStatusCancelled: "已取消",
+        orderStatusFailed: "失败",
         colType: "类型",
         colAmount: "金额",
         colBalanceAfter: "变更后余额",
@@ -1287,12 +1324,20 @@ export const messages = {
         checkoutUnavailable: "充值通道暂时不可用，请稍后重试或联系支持。",
         noRechargePlans: "当前没有可用的充值套餐。",
         includesBonusCredits: "含 {bonus} 赠送积分",
+        baseCreditsLine: "基础 {credits} 积分",
+        bonusCreditsLine: "赠送 +{bonus} 积分",
+        finalCreditsLine: "到账 {credits} 积分",
         comingSoon: "即将开放",
         billingNote:
           "前端不会写入 profiles.credits_balance。Checkout 成功仅表示待确认，需等 Stripe webhook 入账。",
         paymentReceived: "支付成功",
         paymentReceivedDesc:
           "支付成功。Stripe 确认 checkout 后 credits 会自动入账（通常数秒内）。若余额未更新，请刷新本页。",
+        orderPaidTitle: "充值已完成",
+        orderPaidDesc: "该笔 Checkout 已支付，积分已入账。",
+        orderExpiredTitle: "Checkout 未完成",
+        orderExpiredDesc:
+          "该 Checkout 会话已超时未完成。如需充值，请在下方重新选择套餐。",
         checkoutCancelled: "Checkout 已取消",
         checkoutCancelledDesc: "未增加积分。可在下方选择其他套餐。",
         emptyLedger: "暂无积分记录。在上方充值，或前往定价页查看套餐。",
@@ -1400,6 +1445,9 @@ export const messages = {
       buyPlan: "购买 {name}",
       creditsUnit: "积分",
       includesBonusCredits: "含赠送 {bonus} 积分",
+      baseCreditsLine: "基础 {credits} 积分",
+      bonusCreditsLine: "赠送 +{bonus} 积分",
+      finalCreditsLine: "到账 {credits} 积分",
       plansUnavailable: "充值套餐暂时无法加载，请稍后再试。",
       getStarter: "购买 Starter",
       comingSoon: "即将上线",
@@ -1703,6 +1751,7 @@ export const messages = {
         rechargePlansInvalidFields:
           "套餐字段不合法，请检查金额、积分或 Stripe Price ID。",
         rechargePlansAmountReadOnly: "金额（只读）",
+        rechargePlansBaseCredits: "基础积分",
         rechargePlansBonusCredits: "赠送积分",
         rechargePlansStripePriceId: "Stripe Price ID",
         rechargePlansSortOrder: "排序",

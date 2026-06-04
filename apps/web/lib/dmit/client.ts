@@ -508,13 +508,15 @@ export interface BillingRechargePlan {
   name: string;
   amount_cents: number;
   currency: string;
-  credits: number;
+  base_credits: number;
   bonus_credits: number;
-  total_credits: number;
+  /** Final credited amount (= base_credits + bonus_credits). */
+  credits: number;
   enabled: boolean;
   visible: boolean;
   sort_order: number;
   badge: string | null;
+  description: string | null;
 }
 
 export interface CreateCheckoutSessionInput {

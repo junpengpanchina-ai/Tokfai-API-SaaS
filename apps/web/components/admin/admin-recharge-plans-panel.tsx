@@ -27,7 +27,7 @@ import { useI18n } from "@/lib/i18n/i18n-provider";
 type PlanDraft = {
   name: string;
   amount_yuan: string;
-  credits: string;
+  base_credits: string;
   bonus_credits: string;
   enabled: boolean;
   visible: boolean;
@@ -73,7 +73,7 @@ function planToDraft(plan: AdminRechargePlanListItem): PlanDraft {
   return {
     name: plan.name,
     amount_yuan: centsToYuanInput(plan.amount_cents),
-    credits: String(plan.credits),
+    base_credits: String(plan.base_credits),
     bonus_credits: String(plan.bonus_credits),
     enabled: plan.enabled,
     visible: plan.visible,
@@ -92,17 +92,17 @@ function draftToUpdateBody(
     throw new Error("invalid_amount");
   }
 
-  const credits = parseNonNegativeInt(draft.credits);
+  const baseCredits = parseNonNegativeInt(draft.base_credits);
   const bonusCredits = parseNonNegativeInt(draft.bonus_credits);
   const sortOrder = parseNonNegativeInt(draft.sort_order);
-  if (credits == null || bonusCredits == null || sortOrder == null) {
+  if (baseCredits == null || bonusCredits == null || sortOrder == null) {
     throw new Error("invalid_fields");
   }
 
   const body: AdminRechargePlanUpdateBody = {
     name: draft.name.trim(),
     amount_cents: amountCents,
-    credits,
+    base_credits: baseCredits,
     bonus_credits: bonusCredits,
     enabled: draft.enabled,
     visible: draft.visible,
@@ -285,10 +285,8 @@ export function AdminRechargePlansPanel() {
                         {formatAmountCny(plan.amount_cents)}
                       </div>
                       <div className="mt-1 text-sm text-muted-foreground">
-                        {formatInt(plan.total_credits)} {t("admin.credits.creditsUnit")}
-                        {plan.bonus_credits > 0
-                          ? ` (+${formatInt(plan.bonus_credits)} bonus)`
-                          : ""}
+                        {formatInt(plan.base_credits)} + {formatInt(plan.bonus_credits)}{" "}
+                        = {formatInt(plan.credits)} {t("admin.credits.creditsUnit")}
                       </div>
                       {plan.stripe_price_id ? (
                         <div className="mt-1 font-mono text-xs text-muted-foreground">
@@ -332,12 +330,12 @@ export function AdminRechargePlansPanel() {
                           }
                         />
                       </Field>
-                      <Field label={t("admin.credits.editCredits")}>
+                      <Field label={t("admin.credits.rechargePlansBaseCredits")}>
                         <Input
                           inputMode="numeric"
-                          value={draft.credits}
+                          value={draft.base_credits}
                           onChange={(event) =>
-                            setDraft({ ...draft, credits: event.target.value })
+                            setDraft({ ...draft, base_credits: event.target.value })
                           }
                         />
                       </Field>
