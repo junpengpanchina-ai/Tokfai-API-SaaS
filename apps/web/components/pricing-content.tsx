@@ -20,7 +20,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  type BillingRechargePlan,
+  creditsPurchaseHref,
+  formatCny,
+  formatPlanCredits,
+} from "@/lib/billing/recharge-plans";
 import { useI18n } from "@/lib/i18n/i18n-provider";
+import { formatMessage } from "@/lib/i18n/messages";
 import {
   TOKFAI_API_BASE_URL,
   TOKFAI_API_KEY_FORMAT,
@@ -29,33 +36,23 @@ import {
   TOKFAI_STARTER_PLAN,
 } from "@/lib/tokfai-api";
 
-const PLANS = [
-  {
-    name: "Starter",
-    price: "¥29",
-    credits: "10,000 credits",
-    description: "For testing and personal use",
-    cta: { labelKey: "pricing.getStarter", href: "/dashboard/credits", comingSoon: false },
-  },
-  {
-    name: "Pro",
-    price: "¥99",
-    credits: "50,000 credits",
-    description: "For builders and small apps",
-    cta: { labelKey: "pricing.comingSoon", comingSoon: true },
-    highlight: true,
-  },
-  {
-    name: "Business",
-    price: "¥299",
-    credits: "200,000 credits",
-    description: "For teams and higher usage",
-    cta: { labelKey: "pricing.comingSoon", comingSoon: true },
-  },
-] as const;
+const PLAN_DESCRIPTION_KEYS: Record<string, string> = {
+  starter: "pricing.planDescStarter",
+  pro: "pricing.planDescPro",
+  business: "pricing.planDescBusiness",
+};
 
-export function PricingContent() {
+export function PricingContent({
+  plans,
+  purchaseDisabled = false,
+  isLoggedIn = false,
+}: {
+  plans: BillingRechargePlan[];
+  purchaseDisabled?: boolean;
+  isLoggedIn?: boolean;
+}) {
   const { t, locale } = useI18n();
+  const purchaseHref = creditsPurchaseHref(isLoggedIn);
 
   const usagePoints = [
     { id: "starter-plan", icon: Wallet, text: t("pricing.starterPlanLine") },
@@ -159,48 +156,76 @@ export function PricingContent() {
           </p>
         </div>
 
+        {purchaseDisabled ? (
+          <p className="mx-auto mt-8 max-w-2xl text-center text-sm text-destructive">
+            {t("pricing.plansUnavailable")}
+          </p>
+        ) : null}
+
         <div className="mx-auto mt-16 grid max-w-5xl gap-6 md:grid-cols-3">
-          {PLANS.map((plan) => (
-            <Card
-              key={plan.name}
-              className={
-                "highlight" in plan && plan.highlight
-                  ? "border-primary shadow-md ring-1 ring-primary/20"
-                  : ""
-              }
-            >
-              <CardHeader>
-                <CardTitle>{plan.name}</CardTitle>
-                <CardDescription>
-                  {plan.description}
-                  {plan.name === "Starter" ? (
-                    <span className="mt-2 block text-muted-foreground">
-                      {t("pricing.starterUse")}
-                    </span>
-                  ) : null}
-                </CardDescription>
-                <div className="pt-4">
-                  <div className="text-3xl font-semibold tracking-tight">
-                    {plan.price}
+          {plans.map((plan) => {
+            const descriptionKey = PLAN_DESCRIPTION_KEYS[plan.plan_id];
+            const canPurchase = plan.enabled && !purchaseDisabled;
+            const isHighlight = plan.plan_id === "pro";
+
+            return (
+              <Card
+                key={plan.plan_id}
+                className={
+                  isHighlight
+                    ? "border-primary shadow-md ring-1 ring-primary/20"
+                    : ""
+                }
+              >
+                <CardHeader>
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle>{plan.name}</CardTitle>
+                    {plan.badge ? (
+                      <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-medium">
+                        {plan.badge}
+                      </span>
+                    ) : null}
                   </div>
-                  <div className="mt-1 text-sm text-muted-foreground">
-                    {plan.credits}
+                  <CardDescription>
+                    {descriptionKey ? t(descriptionKey) : null}
+                    {plan.plan_id === "starter" ? (
+                      <span className="mt-2 block text-muted-foreground">
+                        {t("pricing.starterUse")}
+                      </span>
+                    ) : null}
+                  </CardDescription>
+                  <div className="pt-4">
+                    <div className="text-3xl font-semibold tracking-tight">
+                      {formatCny(plan.amount_cents)}
+                    </div>
+                    <div className="mt-1 text-sm text-muted-foreground">
+                      {formatPlanCredits(plan.credits)} {t("pricing.creditsUnit")}
+                    </div>
+                    {plan.bonus_credits > 0 ? (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {formatMessage(t("pricing.includesBonusCredits"), {
+                          bonus: formatPlanCredits(plan.bonus_credits),
+                        })}
+                      </div>
+                    ) : null}
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {plan.cta.comingSoon ? (
-                  <Button className="w-full" disabled variant="outline">
-                    {t(plan.cta.labelKey)}
-                  </Button>
-                ) : (
-                  <Button asChild className="w-full">
-                    <Link href={plan.cta.href!}>{t(plan.cta.labelKey)}</Link>
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                </CardHeader>
+                <CardContent>
+                  {canPurchase ? (
+                    <Button asChild className="w-full">
+                      <Link href={purchaseHref}>
+                        {formatMessage(t("pricing.buyPlan"), { name: plan.name })}
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button className="w-full" disabled variant="outline">
+                      {t("pricing.comingSoon")}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </section>
 

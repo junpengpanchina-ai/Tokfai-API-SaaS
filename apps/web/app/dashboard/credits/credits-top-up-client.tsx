@@ -16,6 +16,7 @@ import { createCheckoutSession, DmitApiError, type BillingRechargePlan } from "@
 import { userMessageForDmitError } from "@/lib/dmit-messages";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
+import { formatCny, formatPlanCredits } from "@/lib/billing/recharge-plans";
 import { formatImageModelPriceExample } from "@/lib/model-pricing-display";
 import { createClient } from "@/lib/supabase/client";
 
@@ -120,13 +121,13 @@ export function CreditsTopUpClient({
                       {amountLabel}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {formatCredits(plan.total_credits)}{" "}
+                      {formatPlanCredits(plan.total_credits)}{" "}
                       {t("dashboard.credits.creditsUnit")}
                     </p>
                     {plan.bonus_credits > 0 ? (
                       <p className="text-xs text-muted-foreground">
                         {formatMessage(t("dashboard.credits.includesBonusCredits"), {
-                          bonus: formatCredits(plan.bonus_credits),
+                          bonus: formatPlanCredits(plan.bonus_credits),
                         })}
                       </p>
                     ) : null}
@@ -190,17 +191,3 @@ function CheckoutError({ message }: { message: string }) {
   );
 }
 
-function formatCredits(value: number): string {
-  return new Intl.NumberFormat("en-US").format(value);
-}
-
-function formatCny(amountCents: number): string {
-  const yuan = amountCents / 100;
-  const hasFraction = amountCents % 100 !== 0;
-  return new Intl.NumberFormat("zh-CN", {
-    style: "currency",
-    currency: "CNY",
-    minimumFractionDigits: hasFraction ? 1 : 0,
-    maximumFractionDigits: 2,
-  }).format(yuan);
-}

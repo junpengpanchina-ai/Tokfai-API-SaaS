@@ -1,0 +1,119 @@
+import {
+  listBillingRechargePlans,
+  type BillingRechargePlan,
+} from "@/lib/dmit/server";
+
+export type { BillingRechargePlan };
+
+/** Matches production recharge_plans when DMIT is unreachable or user is logged out. */
+export const FALLBACK_RECHARGE_PLANS: BillingRechargePlan[] = [
+  {
+    plan_id: "starter",
+    name: "Starter",
+    amount_cents: 2990,
+    currency: "cny",
+    credits: 10_000,
+    bonus_credits: 0,
+    total_credits: 10_000,
+    enabled: true,
+    visible: true,
+    sort_order: 100,
+    badge: null,
+  },
+  {
+    plan_id: "pro",
+    name: "Pro",
+    amount_cents: 9990,
+    currency: "cny",
+    credits: 50_000,
+    bonus_credits: 0,
+    total_credits: 50_000,
+    enabled: true,
+    visible: true,
+    sort_order: 200,
+    badge: null,
+  },
+  {
+    plan_id: "business",
+    name: "Business",
+    amount_cents: 29_900,
+    currency: "cny",
+    credits: 200_000,
+    bonus_credits: 0,
+    total_credits: 200_000,
+    enabled: true,
+    visible: true,
+    sort_order: 300,
+    badge: null,
+  },
+];
+
+export type PricingPlansLoadResult = {
+  plans: BillingRechargePlan[];
+  source: "api" | "fallback";
+  /** True when an authenticated DMIT fetch failed — disable purchase CTAs. */
+  purchaseDisabled: boolean;
+};
+
+export function filterVisibleRechargePlans(
+  plans: BillingRechargePlan[]
+): BillingRechargePlan[] {
+  return plans
+    .filter((plan) => plan.visible)
+    .sort(
+      (a, b) =>
+        a.sort_order - b.sort_order || a.plan_id.localeCompare(b.plan_id)
+    );
+}
+
+export function formatCny(amountCents: number): string {
+  const yuan = amountCents / 100;
+  const hasFraction = amountCents % 100 !== 0;
+  return new Intl.NumberFormat("zh-CN", {
+    style: "currency",
+    currency: "CNY",
+    minimumFractionDigits: hasFraction ? 1 : 0,
+    maximumFractionDigits: 2,
+  }).format(yuan);
+}
+
+export function formatPlanCredits(value: number): string {
+  return new Intl.NumberFormat("en-US").format(value);
+}
+
+export function creditsPurchaseHref(isLoggedIn: boolean): string {
+  return isLoggedIn
+    ? "/dashboard/credits"
+    : "/login?redirect=/dashboard/credits";
+}
+
+/**
+ * Load visible recharge plans for the public pricing page.
+ * Uses DMIT GET /v1/billing/plans when a Supabase session token is available.
+ */
+export async function fetchBillingPlansForPricing(
+  accessToken: string | null | undefined
+): Promise<PricingPlansLoadResult> {
+  if (!accessToken?.trim()) {
+    return {
+      plans: filterVisibleRechargePlans(FALLBACK_RECHARGE_PLANS),
+      source: "fallback",
+      purchaseDisabled: false,
+    };
+  }
+
+  try {
+    const plans = await listBillingRechargePlans(accessToken);
+    return {
+      plans: filterVisibleRechargePlans(plans),
+      source: "api",
+      purchaseDisabled: false,
+    };
+  } catch {
+    return {
+      plans: filterVisibleRechargePlans(FALLBACK_RECHARGE_PLANS),
+      source: "fallback",
+      purchaseDisabled: true,
+    };
+  }
+}
