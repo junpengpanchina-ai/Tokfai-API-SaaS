@@ -112,16 +112,13 @@ export type AdminRechargePlanListItem = {
 };
 
 export type AdminRechargePlanUpdateBody = {
-  name?: string;
   amount_cents?: number;
   base_credits?: number;
   bonus_credits?: number;
   description?: string | null;
   enabled?: boolean;
   visible?: boolean;
-  sort_order?: number;
   badge?: string | null;
-  stripe_price_id?: string | null;
 };
 
 export class AdminApiError extends Error {

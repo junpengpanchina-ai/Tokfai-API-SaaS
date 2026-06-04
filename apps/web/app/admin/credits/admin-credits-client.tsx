@@ -5,7 +5,7 @@ import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
 import { AdminCreditsAccountPanel } from "@/components/admin/admin-credits-account-panel";
-import { AdminRechargePlansPanel } from "@/components/admin/admin-recharge-plans-panel";
+import Link from "next/link";
 import { AdminStatCard } from "@/components/admin/admin-stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -177,7 +177,20 @@ export function AdminCreditsClient({
         </p>
       </div>
 
-      <AdminRechargePlansPanel />
+      <Card className="border-muted bg-muted/30">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">{t("admin.credits.rechargePlansTitle")}</CardTitle>
+          <CardDescription>{t("admin.credits.rechargePlansDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link
+            href="/admin/recharge-plans"
+            className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+          >
+            {t("admin.credits.manageRechargePlans")}
+          </Link>
+        </CardContent>
+      </Card>
 
       <Card className="border-muted bg-muted/30">
         <CardHeader className="pb-3">

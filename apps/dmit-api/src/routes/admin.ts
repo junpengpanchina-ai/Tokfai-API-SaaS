@@ -653,9 +653,11 @@ protectedAdminRoutes.patch("/recharge-plans/:id", async (c) => {
         ? "Recharge plan not found."
         : result.error === "empty_patch"
           ? "No fields to update."
-          : result.error === "invalid_recharge_plan_fields"
-            ? "Invalid recharge plan fields."
-            : "Failed to update recharge plan.";
+          : result.error === "invalid_recharge_plan_id"
+            ? "Recharge plan ID is not editable."
+            : result.error === "invalid_recharge_plan_fields"
+              ? "Invalid recharge plan fields."
+              : "Failed to update recharge plan.";
     return adminApiError(
       c,
       result.status,

@@ -7,6 +7,8 @@ import { supabase } from "../supabase.js";
 
 const ADMIN_RECHARGE_PLAN_RESOURCE_TYPE = "recharge_plans";
 
+const ALLOWED_RECHARGE_PLAN_IDS = new Set(["starter", "pro", "business"]);
+
 export type RechargePlanRow = {
   id: string;
   name: string;
@@ -56,17 +58,6 @@ function emptyToUndefined(value: unknown): unknown {
   return value;
 }
 
-function normalizeStripePriceIdInput(value: unknown): unknown {
-  if (value === undefined) return undefined;
-  if (value === null) return null;
-  if (typeof value !== "string") return value;
-  const trimmed = value.trim();
-  if (!trimmed || trimmed === "price_..." || /^price_\.+$/i.test(trimmed)) {
-    return null;
-  }
-  return trimmed;
-}
-
 const optionalIntField = (min: number, max: number) =>
   z.preprocess(
     emptyToUndefined,
@@ -75,34 +66,16 @@ const optionalIntField = (min: number, max: number) =>
 
 const RechargePlanPatchSchema = z
   .object({
-    name: z.string().trim().min(1).max(120).optional(),
-    amount_cents: optionalIntField(100, 100_000_000),
+    amount_cents: optionalIntField(0, 100_000_000),
     base_credits: optionalIntField(0, 100_000_000),
     bonus_credits: optionalIntField(0, 100_000_000),
     enabled: z.boolean().optional(),
     visible: z.boolean().optional(),
-    sort_order: optionalIntField(0, 1_000_000),
     badge: z
       .union([z.string().trim().max(40), z.null()])
       .optional(),
     description: z
       .union([z.string().trim().max(500), z.null()])
-      .optional(),
-    stripe_price_id: z
-      .preprocess(
-        normalizeStripePriceIdInput,
-        z
-          .union([
-            z
-              .string()
-              .regex(
-                /^price_[A-Za-z0-9]+$/,
-                "stripe_price_id must start with price_"
-              ),
-            z.null(),
-          ])
-          .optional()
-      )
       .optional(),
   })
   .strict();
@@ -207,6 +180,33 @@ export async function updateAdminRechargePlan(
     return { ok: false, status: 400, error: "missing_plan_id" };
   }
 
+  if (!ALLOWED_RECHARGE_PLAN_IDS.has(planId)) {
+    await auditRechargePlanWrite(ctx, {
+      action: "recharge_plans.update",
+      resourceId: planId,
+      requestPayload: body,
+      status: "failed",
+      error: "invalid_recharge_plan_id",
+    });
+    return { ok: false, status: 400, error: "invalid_recharge_plan_id" };
+  }
+
+  if ("credits" in body) {
+    await auditRechargePlanWrite(ctx, {
+      action: "recharge_plans.update",
+      resourceId: planId,
+      requestPayload: body,
+      status: "failed",
+      error: "invalid_recharge_plan_fields",
+    });
+    return {
+      ok: false,
+      status: 400,
+      error: "invalid_recharge_plan_fields",
+      detail: { credits: ["credits is computed server-side"] },
+    };
+  }
+
   const parsed = RechargePlanPatchSchema.safeParse(body);
   if (!parsed.success) {
     const fieldErrors = parsed.error.flatten().fieldErrors;
@@ -269,7 +269,6 @@ export async function updateAdminRechargePlan(
     updated_at: new Date().toISOString(),
   };
 
-  if (patch.name !== undefined) updatePayload.name = patch.name;
   if (patch.amount_cents !== undefined) {
     updatePayload.amount_cents = patch.amount_cents;
   }
@@ -304,18 +303,32 @@ export async function updateAdminRechargePlan(
     updatePayload.bonus_credits = bonusCredits;
     updatePayload.credits = baseCredits + bonusCredits;
   }
+
+  const finalCredits =
+    typeof updatePayload.credits === "number"
+      ? updatePayload.credits
+      : undefined;
+  if (finalCredits !== undefined && finalCredits <= 0) {
+    await auditRechargePlanWrite(ctx, {
+      action: "recharge_plans.update",
+      resourceId: planId,
+      requestPayload: body,
+      status: "failed",
+      error: "invalid_recharge_plan_fields",
+    });
+    return {
+      ok: false,
+      status: 400,
+      error: "invalid_recharge_plan_fields",
+      detail: { credits: ["base_credits + bonus_credits must be greater than 0"] },
+    };
+  }
+
   if (patch.enabled !== undefined) updatePayload.enabled = patch.enabled;
   if (patch.visible !== undefined) updatePayload.visible = patch.visible;
-  if (patch.sort_order !== undefined) updatePayload.sort_order = patch.sort_order;
   if (patch.badge !== undefined) {
     updatePayload.badge =
       patch.badge === null || patch.badge === "" ? null : patch.badge;
-  }
-  if (patch.stripe_price_id !== undefined) {
-    updatePayload.stripe_price_id =
-      patch.stripe_price_id === null || patch.stripe_price_id === ""
-        ? null
-        : patch.stripe_price_id;
   }
 
   const { error: updateError } = await supabase()
