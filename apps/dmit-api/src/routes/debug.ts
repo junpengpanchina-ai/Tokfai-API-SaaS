@@ -13,6 +13,7 @@ export function registerDebugRoutes(app: Hono): void {
         apiKeysRevoke: "POST /v1/me/api-keys/revoke",
         credits: "GET /v1/me/credits",
         creditsLedger: "GET /v1/me/credits/ledger",
+        creditOrders: "GET /v1/me/credits/orders",
         usage: "GET /v1/me/usage",
         usageSummary: "GET /v1/me/usage/summary",
       },

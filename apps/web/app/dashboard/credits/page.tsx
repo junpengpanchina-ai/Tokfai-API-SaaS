@@ -11,6 +11,8 @@ import {
   getMyCredits,
   listBillingRechargePlans,
   listMyCreditLedger,
+  listMyCreditOrders,
+  type MeCreditOrder,
 } from "@/lib/dmit/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -57,23 +59,31 @@ export default async function CreditsPage({
         creditsState={creditsState}
         checkoutSucceeded={checkoutSucceeded}
         checkoutStatus={searchParams.status}
+        checkoutSessionId={searchParams.session_id}
       />
     </>
   );
 }
 
 async function loadCreditsState(accessToken: string): Promise<CreditsLoadState> {
-  const [profileResult, ledgerResult, plansResult] = await Promise.all([
+  const [profileResult, ledgerResult, ordersResult, plansResult] = await Promise.all([
     readCredits(accessToken),
     readLedger(accessToken),
+    readOrders(accessToken),
     readBillingPlans(accessToken),
   ]);
-  const debug = [profileResult.debug, ledgerResult.debug, plansResult.debug];
+  const debug = [
+    profileResult.debug,
+    ledgerResult.debug,
+    ordersResult.debug,
+    plansResult.debug,
+  ];
   const failed = [profileResult, ledgerResult].find((result) => !result.ok);
   if (failed) {
     return {
       profile: profileResult.ok ? profileResult.data : null,
       ledger: ledgerResult.ok ? ledgerResult.data : [],
+      orders: ordersResult.ok ? ordersResult.data : [],
       plans: plansResult.ok ? plansResult.data : [],
       plansError: plansResult.ok ? null : plansResult.errorMessage,
       error:
@@ -88,6 +98,7 @@ async function loadCreditsState(accessToken: string): Promise<CreditsLoadState> 
     return {
       profile: null,
       ledger: [],
+      orders: ordersResult.ok ? ordersResult.data : [],
       plans: plansResult.ok ? plansResult.data : [],
       plansError: plansResult.ok ? null : plansResult.errorMessage,
       error: "temporary",
@@ -98,6 +109,7 @@ async function loadCreditsState(accessToken: string): Promise<CreditsLoadState> 
   return {
     profile: profileResult.data,
     ledger: ledgerResult.data,
+    orders: ordersResult.ok ? ordersResult.data : [],
     plans: plansResult.ok ? plansResult.data : [],
     plansError: plansResult.ok ? null : plansResult.errorMessage,
     error: null,
@@ -109,6 +121,7 @@ function missingSessionCreditsState(): CreditsLoadState {
   return {
     profile: null,
     ledger: [],
+    orders: [],
     plans: [],
     plansError: null,
     error: "auth",
@@ -151,6 +164,23 @@ async function readLedger(accessToken: string) {
   } catch (err) {
     return {
       ok: false as const,
+      debug: errorDebug(endpoint, err),
+    };
+  }
+}
+
+async function readOrders(accessToken: string) {
+  const endpoint = "/v1/me/credits/orders?limit=20";
+  try {
+    return {
+      ok: true as const,
+      data: await listMyCreditOrders(accessToken, 20),
+      debug: okDebug(endpoint),
+    };
+  } catch (err) {
+    return {
+      ok: false as const,
+      data: [] as MeCreditOrder[],
       debug: errorDebug(endpoint, err),
     };
   }

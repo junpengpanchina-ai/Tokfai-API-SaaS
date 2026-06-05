@@ -10,10 +10,12 @@ import {
   revealApiKey,
   revokeApiKey,
 } from "./apiKeyActions.js";
+import { resolveCreditOrderDisplayStatus } from "../lib/creditOrders.js";
 import type {
   ApiKeyRow,
   AuthedUser,
   CreditLedgerRow,
+  CreditOrderRow,
   ProfileRow,
   UsageLogRow,
   UsageSummaryResponse,
@@ -271,6 +273,61 @@ meRoutes.get("/credits/ledger", async (c) => {
   }
 
   return c.json({ data: (data ?? []) as CreditLedgerRow[] });
+});
+
+/** GET /v1/me/credits/orders — recent Stripe Checkout top-up orders for the user. */
+meRoutes.get("/credits/orders", async (c) => {
+  const user = authedUser(c);
+  const limit = parseLimit(c.req.query("limit"));
+  const { data, error } = await supabase()
+    .from("credit_orders")
+    .select(
+      "id, plan_id, status, currency, amount_cents, credits, stripe_checkout_session_id, created_at, updated_at, paid_at"
+    )
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw ApiError.internal(
+      `Failed to load credit orders: ${error.message}`,
+      "me_credit_orders_failed"
+    );
+  }
+
+  const rows = (data ?? []).map((row) => {
+    const status = typeof row.status === "string" ? row.status : "pending";
+    const createdAt =
+      typeof row.created_at === "string" ? row.created_at : new Date().toISOString();
+
+    return {
+      id: row.id as string,
+      plan_id: (row.plan_id as string | null) ?? null,
+      status,
+      display_status: resolveCreditOrderDisplayStatus({
+        status,
+        createdAt,
+      }),
+      currency: (row.currency as string | null) ?? "cny",
+      amount_cents:
+        typeof row.amount_cents === "number"
+          ? row.amount_cents
+          : row.amount_cents != null
+            ? Number(row.amount_cents)
+            : null,
+      credits: row.credits as string | number,
+      stripe_checkout_session_id:
+        (row.stripe_checkout_session_id as string | null) ?? null,
+      created_at: createdAt,
+      updated_at:
+        typeof row.updated_at === "string"
+          ? row.updated_at
+          : createdAt,
+      paid_at: (row.paid_at as string | null) ?? null,
+    } satisfies CreditOrderRow;
+  });
+
+  return c.json({ data: rows });
 });
 
 /** POST /v1/me/api-keys/revoke — stable body route for dashboard revoke. */

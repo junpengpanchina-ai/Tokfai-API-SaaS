@@ -20,7 +20,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n/i18n-provider";
-import type { BillingRechargePlan, MeCreditLedgerEntry, MeCredits } from "@/lib/dmit/server";
+import type { BillingRechargePlan, MeCreditLedgerEntry, MeCreditOrder, MeCredits } from "@/lib/dmit/server";
+import { formatCny } from "@/lib/billing/recharge-plans";
+import {
+  formatPlanIdLabel,
+  toneForCreditOrderStatus,
+  type CreditOrderDisplayStatus,
+} from "@/lib/billing/credit-order-status";
 import { formatCredits, formatDateTime } from "@/lib/format";
 
 import { CreditsTopUpClient } from "@/app/dashboard/credits/credits-top-up-client";
@@ -38,6 +44,7 @@ interface CreditsRequestDebug {
 export interface CreditsLoadState {
   profile: MeCredits | null;
   ledger: MeCreditLedgerEntry[];
+  orders: MeCreditOrder[];
   plans: BillingRechargePlan[];
   plansError: string | null;
   error: CreditsLoadErrorKind | null;
@@ -48,10 +55,12 @@ export function CreditsContentClient({
   creditsState,
   checkoutSucceeded,
   checkoutStatus,
+  checkoutSessionId,
 }: {
   creditsState: CreditsLoadState;
   checkoutSucceeded: boolean;
   checkoutStatus?: string;
+  checkoutSessionId?: string;
 }) {
   const { t } = useI18n();
 
@@ -87,6 +96,8 @@ export function CreditsContentClient({
       <CheckoutStatusBanner
         status={checkoutStatus}
         checkoutSucceeded={checkoutSucceeded}
+        checkoutSessionId={checkoutSessionId}
+        orders={creditsState.orders}
         t={t}
       />
 
@@ -135,6 +146,78 @@ export function CreditsContentClient({
         plans={creditsState.plans}
         plansError={creditsState.plansError}
       />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("dashboard.credits.recentOrders")}</CardTitle>
+          <CardDescription>{t("dashboard.credits.recentOrdersDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {creditsState.orders.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {t("dashboard.credits.emptyOrders")}
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                    <th className="py-2 pr-4 font-medium">
+                      {t("dashboard.credits.colPlan")}
+                    </th>
+                    <th className="py-2 pr-4 text-right font-medium">
+                      {t("dashboard.credits.colAmount")}
+                    </th>
+                    <th className="py-2 pr-4 text-right font-medium">
+                      {t("dashboard.credits.colCredits")}
+                    </th>
+                    <th className="py-2 pr-4 font-medium">
+                      {t("dashboard.credits.colStatus")}
+                    </th>
+                    <th className="py-2 pr-4 font-medium">
+                      {t("dashboard.credits.colCreated")}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {creditsState.orders.map((order) => (
+                    <tr
+                      key={order.id}
+                      className={
+                        checkoutSessionId &&
+                        order.stripe_checkout_session_id === checkoutSessionId
+                          ? "border-b bg-emerald-50/60 last:border-0 dark:bg-emerald-950/20"
+                          : "border-b last:border-0"
+                      }
+                    >
+                      <td className="py-2 pr-4 font-medium">
+                        {formatPlanIdLabel(order.plan_id)}
+                      </td>
+                      <td className="py-2 pr-4 text-right font-mono text-xs">
+                        {order.amount_cents != null
+                          ? formatCny(order.amount_cents)
+                          : "—"}
+                      </td>
+                      <td className="py-2 pr-4 text-right font-mono text-xs">
+                        {formatCredits(order.credits)}
+                      </td>
+                      <td className="py-2 pr-4">
+                        <OrderStatusBadge
+                          status={order.display_status}
+                          t={t}
+                        />
+                      </td>
+                      <td className="py-2 pr-4 text-muted-foreground">
+                        {formatDateTime(order.created_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -257,13 +340,53 @@ function CreditsLoadErrorCard({
 function CheckoutStatusBanner({
   status,
   checkoutSucceeded,
+  checkoutSessionId,
+  orders,
   t,
 }: {
   status?: string;
   checkoutSucceeded: boolean;
+  checkoutSessionId?: string;
+  orders: MeCreditOrder[];
   t: (key: string) => string;
 }) {
+  const matchedOrder = checkoutSessionId
+    ? orders.find(
+        (order) => order.stripe_checkout_session_id === checkoutSessionId
+      )
+    : undefined;
+
   if (checkoutSucceeded || status === "success") {
+    if (matchedOrder?.display_status === "paid") {
+      return (
+        <Card className="border-emerald-300 bg-emerald-50 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              {t("dashboard.credits.orderPaidTitle")}
+            </CardTitle>
+            <CardDescription className="text-emerald-900/80 dark:text-emerald-100/80">
+              {t("dashboard.credits.orderPaidDesc")}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      );
+    }
+
+    if (matchedOrder?.display_status === "expired") {
+      return (
+        <Card className="border-muted bg-muted/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertCircle className="h-4 w-4 text-muted-foreground" />
+              {t("dashboard.credits.orderExpiredTitle")}
+            </CardTitle>
+            <CardDescription>{t("dashboard.credits.orderExpiredDesc")}</CardDescription>
+          </CardHeader>
+        </Card>
+      );
+    }
+
     return (
       <Card className="border-emerald-300 bg-emerald-50 dark:border-emerald-900/60 dark:bg-emerald-950/30">
         <CardHeader className="pb-3">
@@ -315,6 +438,34 @@ function AmountCell({ amount }: { amount: number | null }) {
       {formatCredits(Math.abs(amount))}
     </span>
   );
+}
+
+function OrderStatusBadge({
+  status,
+  t,
+}: {
+  status: CreditOrderDisplayStatus;
+  t: (key: string) => string;
+}) {
+  const tone = toneForCreditOrderStatus(status);
+  const variant =
+    tone === "success"
+      ? "success"
+      : tone === "warning"
+        ? "warning"
+        : tone === "destructive"
+          ? "destructive"
+          : "outline";
+
+  const labelKey = {
+    paid: "dashboard.credits.orderStatusPaid",
+    pending: "dashboard.credits.orderStatusPending",
+    expired: "dashboard.credits.orderStatusExpired",
+    cancelled: "dashboard.credits.orderStatusCancelled",
+    failed: "dashboard.credits.orderStatusFailed",
+  }[status];
+
+  return <Badge variant={variant}>{t(labelKey)}</Badge>;
 }
 
 function TypeBadge({ type }: { type: string | null | undefined }) {

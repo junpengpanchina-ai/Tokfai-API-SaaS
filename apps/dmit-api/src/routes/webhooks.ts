@@ -3,6 +3,9 @@ import Stripe from "stripe";
 
 import { env } from "../env.js";
 import { ApiError } from "../errors.js";
+import {
+  stripeCheckoutReferenceId,
+} from "../lib/creditOrders.js";
 import { log } from "../logger.js";
 import { stripe } from "../stripe.js";
 import { supabase } from "../supabase.js";
@@ -45,6 +48,27 @@ function creditOrderIdFromSession(session: Stripe.Checkout.Session): string | nu
   if (typeof raw !== "string") return null;
   const trimmed = raw.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+async function isCheckoutSessionAlreadyCredited(
+  sessionId: string
+): Promise<boolean> {
+  const referenceId = stripeCheckoutReferenceId(sessionId);
+  const { data, error } = await supabase()
+    .from("credit_ledger")
+    .select("id")
+    .eq("type", "topup")
+    .in("reference_id", [referenceId, sessionId])
+    .limit(1);
+
+  if (error) {
+    throw ApiError.internal(
+      `Failed to check credit ledger for checkout session: ${error.message}`,
+      "credit_ledger_lookup_failed"
+    );
+  }
+
+  return (data?.length ?? 0) > 0;
 }
 
 async function loadCreditOrderByCheckoutSession(
@@ -107,6 +131,16 @@ async function handleCheckoutSessionCompleted(
   event: Stripe.Event,
   session: Stripe.Checkout.Session
 ) {
+  if (await isCheckoutSessionAlreadyCredited(session.id)) {
+    log.info("stripe_checkout_session_already_credited", {
+      route: "/v1/webhooks/stripe",
+      status: 200,
+      code: "duplicated",
+      message: `Checkout session ${session.id} already credited (event ${event.id}); skipping credit.`,
+    });
+    return { received: true as const, duplicated: true as const };
+  }
+
   const { order, error: lookupError } = await resolveCreditOrder(session);
 
   if (lookupError) {

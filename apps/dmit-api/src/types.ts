@@ -110,6 +110,27 @@ export interface CreditLedgerRow {
   reference_id: string | null;
 }
 
+export type CreditOrderDisplayStatus =
+  | "pending"
+  | "paid"
+  | "expired"
+  | "cancelled"
+  | "failed";
+
+export interface CreditOrderRow {
+  id: string;
+  plan_id: string | null;
+  status: string;
+  display_status: CreditOrderDisplayStatus;
+  currency: string;
+  amount_cents: number | null;
+  credits: string | number;
+  stripe_checkout_session_id: string | null;
+  created_at: string;
+  updated_at: string;
+  paid_at: string | null;
+}
+
 export interface AuthedUser {
   /** auth.users.id */
   id: string;
