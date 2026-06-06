@@ -311,6 +311,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     traits: { speed: "medium", quality: "high", cost: "medium" },
     tags: ["Pro", "VT"],
     supports: [...IMAGE_MODEL_SUPPORTS],
+    playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
   },
   {
@@ -324,6 +325,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     traits: { speed: "medium", quality: "high", cost: "medium" },
     tags: ["CL"],
     supports: [...IMAGE_MODEL_SUPPORTS],
+    playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
   },
   {
@@ -337,6 +339,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     traits: { speed: "low", quality: "high", cost: "high" },
     tags: ["4K", "CL"],
     supports: [...IMAGE_MODEL_SUPPORTS],
+    playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
   },
   {
@@ -350,6 +353,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     traits: { speed: "low", quality: "high", cost: "high" },
     tags: ["Pro", "CL"],
     supports: [...IMAGE_MODEL_SUPPORTS],
+    playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
   },
   {
@@ -363,6 +367,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     traits: { speed: "low", quality: "high", cost: "high" },
     tags: ["Pro", "VIP"],
     supports: [...IMAGE_MODEL_SUPPORTS],
+    playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
   },
   {
@@ -376,20 +381,17 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     traits: { speed: "low", quality: "high", cost: "high" },
     tags: ["Pro", "4K", "VIP"],
     supports: [...IMAGE_MODEL_SUPPORTS],
+    playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
   },
 ];
 
 /** Image models exposed in the Image Playground dropdown. */
-export const IMAGE_PLAYGROUND_MODEL_IDS = [
-  "nano-banana",
-  "nano-banana-fast",
-  "nano-banana-pro",
-  "nano-banana-2",
-  "gpt-image-2",
-] as const;
+export const IMAGE_PLAYGROUND_MODEL_IDS = IMAGE_MODELS.filter(
+  (model) => model.status === "available"
+).map((model) => model.id);
 
-export type ImagePlaygroundModelId = (typeof IMAGE_PLAYGROUND_MODEL_IDS)[number];
+export type ImagePlaygroundModelId = string;
 
 export const IMAGE_PLAYGROUND_SIZES = [
   "1024x1024",
@@ -449,10 +451,21 @@ export function getAdminCatalogPlaygroundLabel(
   if (model.type === "chat") {
     return "Chat Playground";
   }
-  if (model.type === "image" && isAvailableImageModel(model.id)) {
+  if (model.type === "image") {
     return "Image Playground";
   }
   return "Not available";
+}
+
+/** True when a catalog model can open Chat or Image Playground from the Models page. */
+export function isCatalogModelPlaygroundAvailable(model: ModelCatalogEntry): boolean {
+  if (!isCatalogFrontendVisible(model)) {
+    return false;
+  }
+  if (model.status !== "available") {
+    return false;
+  }
+  return model.type === "chat" || model.type === "image";
 }
 
 export const AVAILABLE_CHAT_MODEL_IDS = CHAT_MODELS.filter(
@@ -463,10 +476,8 @@ export function isAvailableChatModel(modelId: string): boolean {
   return AVAILABLE_CHAT_MODEL_IDS.includes(modelId);
 }
 
-export function isAvailableImageModel(
-  modelId: string
-): modelId is ImagePlaygroundModelId {
-  return (IMAGE_PLAYGROUND_MODEL_IDS as readonly string[]).includes(modelId);
+export function isAvailableImageModel(modelId: string): boolean {
+  return IMAGE_PLAYGROUND_MODEL_IDS.includes(modelId);
 }
 
 export function isChatModelEntry(

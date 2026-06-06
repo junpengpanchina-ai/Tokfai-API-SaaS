@@ -21,6 +21,7 @@ import {
   type ModelCatalogEntry,
   type ModelType,
   VIDEO_MODELS,
+  isCatalogModelPlaygroundAvailable,
   isChatModelEntry,
   isImageModelEntry,
 } from "@/lib/model-catalog";
@@ -307,14 +308,14 @@ function ModelCard({
             )}
           </Button>
 
-          {model.type === "chat" && model.status === "available" ? (
+          {isCatalogModelPlaygroundAvailable(model) && model.type === "chat" ? (
             <Button asChild size="sm">
               <Link href={`/dashboard/playground?model=${encodeURIComponent(model.id)}`}>
                 <Terminal className="h-4 w-4" />
                 {t("dashboard.models.tryChatPlayground")}
               </Link>
             </Button>
-          ) : model.type === "image" && model.status === "available" && model.playground ? (
+          ) : isCatalogModelPlaygroundAvailable(model) && model.type === "image" ? (
             <Button asChild size="sm">
               <Link
                 href={`/dashboard/image-playground?model=${encodeURIComponent(model.id)}`}
