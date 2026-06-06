@@ -453,6 +453,14 @@ export function getImageModelById(modelId: string): ModelCatalogEntry | undefine
   return IMAGE_MODELS.find((model) => model.id === modelId);
 }
 
+export function getChatModelById(modelId: string): ModelCatalogEntry | undefined {
+  return CHAT_MODELS.find((model) => model.id === modelId);
+}
+
+export function getCatalogModelById(modelId: string): ModelCatalogEntry | undefined {
+  return ALL_CATALOG_MODELS.find((model) => model.id === modelId);
+}
+
 export function getImageModelCreditsPerRequest(modelId: string): number | null {
   const entry = getImageModelById(modelId);
   if (!entry || !isImageModelEntry(entry)) {

@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Fragment, useEffect, useState } from "react";
 
 import { AdminDebugCard } from "@/components/admin/admin-debug-card";
 import { AdminFutureControlsCard } from "@/components/admin/admin-future-controls-card";
@@ -16,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { fetchAdminUsers } from "@/lib/admin/client";
+import type { AdminUserSummary } from "@/lib/admin/client";
 import type { AdminDebug } from "@/lib/admin/server";
 import {
   formatCredits,
@@ -26,13 +25,7 @@ import {
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
 
-export type AdminUserRow = {
-  id: string;
-  email: string | null;
-  credits_balance: number;
-  total_credits_used: number;
-  updated_at: string | null;
-};
+export type AdminUserRow = AdminUserSummary;
 
 export function AdminUsersPanel({
   users: initialUsers,
@@ -42,34 +35,12 @@ export function AdminUsersPanel({
   debug: AdminDebug | null;
 }) {
   const { t } = useI18n();
-  const router = useRouter();
   const [users, setUsers] = useState(initialUsers);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
 
   useEffect(() => {
     setUsers(initialUsers);
   }, [initialUsers]);
-
-  const refreshUsers = useCallback(async () => {
-    try {
-      const nextUsers = await fetchAdminUsers();
-      setUsers(nextUsers);
-      router.refresh();
-    } catch {
-      // Keep the current list if refresh fails; adjust form shows its own error.
-    }
-  }, [router]);
-
-  function handleCreditsAdjusted(userId: string, balanceAfter: number) {
-    setUsers((current) =>
-      current.map((row) =>
-        row.id === userId
-          ? { ...row, credits_balance: balanceAfter, updated_at: new Date().toISOString() }
-          : row
-      )
-    );
-    void refreshUsers();
-  }
 
   function toggleUserDetails(userId: string) {
     setExpandedUserId((current) => (current === userId ? null : userId));
@@ -104,7 +75,6 @@ export function AdminUsersPanel({
         descriptionKey="admin.users.futureControlsDesc"
         controlLabelKeys={[
           "admin.users.searchUserByEmail",
-          "admin.users.viewBalance",
           "admin.users.viewApiKeysCount",
           "admin.users.viewUsage",
           "admin.users.adjustCreditsAfterApproval",
@@ -123,7 +93,7 @@ export function AdminUsersPanel({
         <CardContent>
           {users.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[56rem] text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
                     <th className="py-2 pr-4 font-medium">{t("admin.users.email")}</th>
@@ -131,12 +101,13 @@ export function AdminUsersPanel({
                       {t("admin.users.creditsBalance")}
                     </th>
                     <th className="py-2 pr-4 text-right font-medium">
-                      {t("admin.users.apiKeysCount")}
+                      {t("admin.users.totalCreditsPurchased")}
                     </th>
                     <th className="py-2 pr-4 text-right font-medium">
-                      {t("admin.users.totalRequests")}
+                      {t("admin.users.totalCreditsUsed")}
                     </th>
-                    <th className="py-2 pr-4 font-medium">{t("admin.users.lastActivity")}</th>
+                    <th className="py-2 pr-4 font-medium">{t("admin.users.createdAt")}</th>
+                    <th className="py-2 pr-4 font-medium">{t("admin.users.updatedAt")}</th>
                     <th className="py-2 pr-4 font-medium">{t("admin.users.actions")}</th>
                   </tr>
                 </thead>
@@ -151,11 +122,14 @@ export function AdminUsersPanel({
                           <td className="py-2 pr-4 text-right font-mono text-xs">
                             {formatCredits(row.credits_balance)}
                           </td>
-                          <td className="py-2 pr-4 text-right text-muted-foreground">
-                            —
+                          <td className="py-2 pr-4 text-right font-mono text-xs">
+                            {formatCredits(row.total_credits_purchased)}
                           </td>
-                          <td className="py-2 pr-4 text-right text-muted-foreground">
-                            —
+                          <td className="py-2 pr-4 text-right font-mono text-xs">
+                            {formatCredits(row.total_credits_used)}
+                          </td>
+                          <td className="py-2 pr-4 text-muted-foreground">
+                            {formatDateTime(row.created_at)}
                           </td>
                           <td className="py-2 pr-4 text-muted-foreground">
                             {formatDateTime(row.updated_at)}
@@ -185,11 +159,8 @@ export function AdminUsersPanel({
                         </tr>
                         {isExpanded ? (
                           <tr className="border-b last:border-0">
-                            <td colSpan={6} className="py-3 pr-4">
-                              <AdminUserDetailPanel
-                                user={row}
-                                onCreditsAdjusted={handleCreditsAdjusted}
-                              />
+                            <td colSpan={7} className="py-3 pr-4">
+                              <AdminUserDetailPanel user={row} />
                             </td>
                           </tr>
                         ) : null}

@@ -196,13 +196,11 @@ export function AdminRechargePlansPanel() {
         );
         return;
       }
-      const updated = await updateAdminRechargePlan(planId, body);
-      setPlans((current) =>
-        current.map((plan) => (plan.id === updated.id ? updated : plan))
-      );
+      await updateAdminRechargePlan(planId, body);
       setEditingPlanId(null);
       setDraft(null);
       setSaveMessage(t("admin.rechargePlans.saved"));
+      await loadPlans();
     } catch (error) {
       setSaveError(savePlanErrorMessage(error, t));
     } finally {

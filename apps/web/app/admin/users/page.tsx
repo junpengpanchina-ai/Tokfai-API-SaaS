@@ -16,7 +16,9 @@ type AdminUser = {
   id: string;
   email: string | null;
   credits_balance: number;
+  total_credits_purchased: number;
   total_credits_used: number;
+  created_at: string | null;
   updated_at: string | null;
 };
 

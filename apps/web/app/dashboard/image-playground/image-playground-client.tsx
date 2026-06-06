@@ -44,6 +44,7 @@ import {
   formatImageReferenceYuanForModelId,
 } from "@/lib/model-pricing-display";
 import {
+  getImageModelById,
   getImageModelCreditsPerRequest,
   IMAGE_PLAYGROUND_MODEL_IDS,
   IMAGE_PLAYGROUND_SIZES,
@@ -51,6 +52,7 @@ import {
   type ImagePlaygroundModelId,
   type ImagePlaygroundSize,
 } from "@/lib/model-catalog";
+import { formatCreditsPrecise } from "@/lib/format";
 import {
   isFullTokfaiApiKey,
   IMAGE_PLAYGROUND_IMAGE_TO_IMAGE_PLACEHOLDER,
@@ -206,6 +208,8 @@ export function ImagePlaygroundClient({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const readyImageUrls = getReadyImageUrls(imageInputs);
+
+  const selectedModelEntry = getImageModelById(model);
 
   const inputImageCount = readyImageUrls.length;
   const hasInputImages = imageInputs.some((item) => item.status !== "error");
@@ -754,6 +758,11 @@ export function ImagePlaygroundClient({
                   {formatMessage(t("dashboard.imagePlayground.currentReferencePrice"), {
                     price: selectedModelReferencePrice,
                   })}
+                </p>
+              ) : null}
+              {selectedModelEntry?.description ? (
+                <p className="text-xs text-muted-foreground">
+                  {selectedModelEntry.description}
                 </p>
               ) : null}
             </div>
@@ -1339,12 +1348,41 @@ function ResponsePanel({
   }
 
   const imageUrl = result.data?.[0]?.url ?? null;
+  const creditsCharged = resolveImageCreditsCharged(result);
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
-        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-        <p>{t("dashboard.playground.recordedInUsage")}</p>
+      <div className="flex flex-col gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
+        <div className="flex items-start gap-2">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+          <div className="flex flex-col gap-1">
+            {creditsCharged != null ? (
+              <p>
+                {formatMessage(t("dashboard.playground.creditsChargedApprox"), {
+                  credits: formatCreditsPrecise(creditsCharged),
+                })}
+              </p>
+            ) : (
+              <p>{t("dashboard.playground.successNoCreditsHint")}</p>
+            )}
+            <p className="text-muted-foreground">
+              {t("dashboard.playground.balanceUpdatedHint")}{" "}
+              <Link
+                href="/dashboard/usage"
+                className="underline underline-offset-4"
+              >
+                Usage
+              </Link>{" "}
+              /{" "}
+              <Link
+                href="/dashboard/credits"
+                className="underline underline-offset-4"
+              >
+                Credits
+              </Link>
+            </p>
+          </div>
+        </div>
       </div>
 
       {imageUrl ? (
@@ -1369,6 +1407,16 @@ function ResponsePanel({
       />
     </div>
   );
+}
+
+function resolveImageCreditsCharged(
+  result: ImageGenerationResponse
+): number | null {
+  const raw = result.credits_charged;
+  if (raw == null) return null;
+  const value = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return value;
 }
 
 function MetadataPanel({

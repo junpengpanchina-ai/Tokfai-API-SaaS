@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 
-import { AdminCreditsAdjustForm } from "@/components/admin/admin-credits-adjust-form";
 import { AdminDisabledWriteActions } from "@/components/admin/admin-disabled-write-actions";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,13 +11,7 @@ import {
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import type { AdminUserRow } from "@/components/admin/admin-users-panel";
 
-export function AdminUserDetailPanel({
-  user,
-  onCreditsAdjusted,
-}: {
-  user: AdminUserRow;
-  onCreditsAdjusted?: (userId: string, balanceAfter: number) => void;
-}) {
+export function AdminUserDetailPanel({ user }: { user: AdminUserRow }) {
   const { t } = useI18n();
   const email = user.email ?? "";
 
@@ -30,19 +23,11 @@ export function AdminUserDetailPanel({
           <p className="mt-1 text-sm text-muted-foreground">{email || "—"}</p>
         </div>
         <AdminDisabledWriteActions
-          actionKeys={["admin.users.revokeKey"]}
+          actionKeys={["admin.users.revokeKey", "admin.users.adjustCreditsAfterApproval"]}
         />
       </div>
 
-      <AdminCreditsAdjustForm
-        userId={user.id}
-        userEmail={user.email}
-        onSuccess={(result) => {
-          onCreditsAdjusted?.(user.id, result.balance_after);
-        }}
-      />
-
-      <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <DetailItem label={t("admin.users.email")} value={email || "—"} />
         <DetailItem
           label={t("admin.users.creditsBalance")}
@@ -50,15 +35,22 @@ export function AdminUserDetailPanel({
           mono
         />
         <DetailItem
-          label={t("admin.users.lastActivity")}
-          value={formatDateTime(user.updated_at)}
+          label={t("admin.users.totalCreditsPurchased")}
+          value={formatCredits(user.total_credits_purchased)}
+          mono
         />
-        <DetailItem label={t("admin.users.apiKeysCount")} value="—" />
-        <DetailItem label={t("admin.users.totalRequests")} value="—" />
         <DetailItem
           label={t("admin.users.totalCreditsUsed")}
           value={formatCredits(user.total_credits_used)}
           mono
+        />
+        <DetailItem
+          label={t("admin.users.createdAt")}
+          value={formatDateTime(user.created_at)}
+        />
+        <DetailItem
+          label={t("admin.users.updatedAt")}
+          value={formatDateTime(user.updated_at)}
         />
       </dl>
 

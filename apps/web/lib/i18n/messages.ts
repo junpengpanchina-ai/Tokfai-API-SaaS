@@ -161,6 +161,7 @@ export const messages = {
         tryChatPlayground: "Try in Chat Playground",
         tryImagePlayground: "Try in Image Playground",
         videoPlaygroundSoon: "Video Playground coming soon",
+        recommendedTag: "Recommended",
         typeChat: "Chat",
         typeImage: "Image",
         typeVideo: "Video",
@@ -266,6 +267,7 @@ export const messages = {
         settings: "Settings",
         settingsDesc:
           "Chat models only. The selected model is passed in the JSON body to api.tokfai.com.",
+        modelDescription: "Model description",
         running: "Running…",
         run: "Run",
         needKey: "Need a key?",
@@ -914,15 +916,19 @@ export const messages = {
       users: {
         title: "User management",
         subtitle:
-          "Read-only account overview. Request counts and API key totals will connect in the next phase.",
+          "Read-only account overview with balances, purchase totals, and usage totals.",
         userManagement: "User management",
         userManagementDesc:
-          "Browse account balances today. Search, key counts, usage drill-down, and credit adjustments will open after approval workflows ship.",
+          "Browse email, credit balance, lifetime purchases, and usage. Manual credit adjustments are not available in this phase.",
         userProfiles: "User profiles",
         userProfilesDesc: "{count} accounts from the admin users endpoint.",
         noUsers: "No user profiles found.",
         email: "Email",
         creditsBalance: "Credits balance",
+        totalCreditsPurchased: "Total purchased",
+        totalCreditsUsed: "Total used",
+        createdAt: "Created",
+        updatedAt: "Updated",
         apiKeysCount: "API keys count",
         totalRequests: "Total requests",
         lastActivity: "Last activity",
@@ -930,7 +936,7 @@ export const messages = {
         ledger: "Ledger",
         futureControlsTitle: "Future controls",
         futureControlsDesc:
-          "Operational user tools are reserved for the next phase. No account writes in this release.",
+          "Search, API key counts, and approved credit adjustments will open in a later phase.",
         searchUserByEmail: "Search user by email",
         viewBalance: "View balance",
         viewApiKeysCount: "View API keys count",
@@ -945,7 +951,6 @@ export const messages = {
         addCredits: "Add credits",
         deductCredits: "Deduct credits",
         revokeKey: "Revoke key",
-        totalCreditsUsed: "Total credits used",
       },
       usage: {
         forbidden: "Your account is not authorized for admin access.",
@@ -1141,6 +1146,7 @@ export const messages = {
         tryChatPlayground: "在 Chat Playground 试用",
         tryImagePlayground: "在 Image Playground 试用",
         videoPlaygroundSoon: "Video Playground 即将上线",
+        recommendedTag: "推荐",
         typeChat: "对话",
         typeImage: "图像",
         typeVideo: "视频",
@@ -1242,6 +1248,7 @@ export const messages = {
         settings: "设置",
         settingsDesc:
           "仅对话模型。所选 model 通过 JSON body 发送至 api.tokfai.com。",
+        modelDescription: "模型说明",
         running: "运行中…",
         run: "运行",
         needKey: "还没有密钥？",
@@ -1861,16 +1868,19 @@ export const messages = {
       },
       users: {
         title: "用户管理",
-        subtitle:
-          "只读账户概览。请求数与 API 密钥统计将在下一阶段接入。",
+        subtitle: "只读账户概览，含余额、累计充值与累计消耗。",
         userManagement: "用户管理",
         userManagementDesc:
-          "当前可浏览账户余额。搜索、密钥数、用量下钻与积分调账将在审批流程上线后开放。",
+          "浏览邮箱、积分余额、累计充值与累计消耗。本阶段不支持人工加减积分。",
         userProfiles: "用户资料",
         userProfilesDesc: "来自 admin users 接口的 {count} 个账户。",
         noUsers: "未找到用户资料。",
         email: "邮箱",
         creditsBalance: "积分余额",
+        totalCreditsPurchased: "累计充值",
+        totalCreditsUsed: "累计消耗",
+        createdAt: "注册时间",
+        updatedAt: "更新时间",
         apiKeysCount: "API 密钥数",
         totalRequests: "请求总数",
         lastActivity: "最后活动",
@@ -1878,7 +1888,7 @@ export const messages = {
         ledger: "账本",
         futureControlsTitle: "下一阶段控件",
         futureControlsDesc:
-          "运营向用户工具预留给下一阶段。本版本不对账户做写入。",
+          "搜索、密钥数统计与审批后调账将在后续阶段开放。",
         searchUserByEmail: "按邮箱搜索用户",
         viewBalance: "查看余额",
         viewApiKeysCount: "查看 API 密钥数",
@@ -1893,7 +1903,6 @@ export const messages = {
         addCredits: "增加积分",
         deductCredits: "扣减积分",
         revokeKey: "吊销密钥",
-        totalCreditsUsed: "累计使用积分",
       },
       usage: {
         forbidden: "当前账户未授权访问 Admin。",

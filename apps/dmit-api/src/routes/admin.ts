@@ -35,7 +35,9 @@ type ProfileAdminRow = {
   id: string;
   email: string | null;
   credits_balance: number | string | null;
+  total_credits_purchased: number | string | null;
   total_credits_used: number | string | null;
+  created_at: string | null;
   updated_at: string | null;
 };
 
@@ -223,7 +225,9 @@ async function listAllProfiles(): Promise<ProfileAdminRow[]> {
     const to = from + PAGE_SIZE - 1;
     const { data, error } = await supabase()
       .from("profiles")
-      .select("id, email, credits_balance, total_credits_used, updated_at")
+      .select(
+        "id, email, credits_balance, total_credits_purchased, total_credits_used, created_at, updated_at"
+      )
       .order("updated_at", { ascending: false })
       .range(from, to);
 
@@ -547,7 +551,9 @@ protectedAdminRoutes.get("/users", async (c) => {
       id: row.id,
       email: row.email,
       credits_balance: toNumber(row.credits_balance),
+      total_credits_purchased: toNumber(row.total_credits_purchased),
       total_credits_used: toNumber(row.total_credits_used),
+      created_at: row.created_at,
       updated_at: row.updated_at,
     })),
   });

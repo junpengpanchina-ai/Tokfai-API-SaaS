@@ -34,6 +34,7 @@ import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
 import {
   AVAILABLE_CHAT_MODEL_IDS,
+  getChatModelById,
   isAvailableChatModel,
 } from "@/lib/model-catalog";
 import {
@@ -108,6 +109,11 @@ export function PlaygroundClient({
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ChatCompletionResponse | null>(null);
   const [error, setError] = useState<PlaygroundError | null>(null);
+
+  const selectedModelEntry = useMemo(
+    () => getChatModelById(model),
+    [model]
+  );
 
   async function handleRun(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -315,12 +321,20 @@ export function PlaygroundClient({
                 disabled={loading}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {MODEL_OPTIONS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
+                {MODEL_OPTIONS.map((m) => {
+                  const entry = getChatModelById(m);
+                  return (
+                    <option key={m} value={m}>
+                      {entry ? `${entry.displayName} (${m})` : m}
+                    </option>
+                  );
+                })}
               </select>
+              {selectedModelEntry?.description ? (
+                <p className="text-xs text-muted-foreground">
+                  {selectedModelEntry.description}
+                </p>
+              ) : null}
             </div>
             <p className="text-xs text-muted-foreground">
               {t("dashboard.playground.needKey")}{" "}

@@ -38,7 +38,7 @@ import {
   resolveDbChatCredits,
   resolveDbImageCredits,
 } from "@/lib/model-pricing-display";
-import { TOKFAI_MODELS_ENDPOINT } from "@/lib/tokfai-api";
+import { TOKFAI_MODELS_ENDPOINT, TOKFAI_RECOMMENDED_MODEL } from "@/lib/tokfai-api";
 
 export function ModelsClient({
   catalogPricing,
@@ -223,6 +223,9 @@ function ModelCard({
           <div className="flex flex-wrap gap-1.5">
             <Badge variant="outline">{typeLabel}</Badge>
             <StatusBadge status={model.status} t={t} />
+            {model.id === TOKFAI_RECOMMENDED_MODEL ? (
+              <Badge variant="default">{t("dashboard.models.recommendedTag")}</Badge>
+            ) : null}
             {model.tags?.map((tag) => (
               <Badge key={tag} variant="secondary">
                 {tag}
