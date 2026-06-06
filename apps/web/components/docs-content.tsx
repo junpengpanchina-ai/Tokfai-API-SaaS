@@ -95,6 +95,32 @@ completion = client.chat.completions.create(
     messages=[{"role": "user", "content": "Hello from Tokfai"}],
 )`;
 
+const OPENAI_JS_IMAGE_EXAMPLE = `import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: "sk-tokfai_xxx",
+  baseURL: "https://api.tokfai.com/v1",
+});
+
+const image = await client.images.generate({
+  model: "nano-banana",
+  prompt: "A serene mountain landscape at sunset, digital art",
+  size: "1024x1024",
+});`;
+
+const OPENAI_PYTHON_IMAGE_EXAMPLE = `from openai import OpenAI
+
+client = OpenAI(
+    api_key="sk-tokfai_xxx",
+    base_url="https://api.tokfai.com/v1",
+)
+
+image = client.images.generate(
+    model="nano-banana",
+    prompt="A serene mountain landscape at sunset, digital art",
+    size="1024x1024",
+)`;
+
 const COMPAT_CLIENT_CONFIG = `Base URL: https://api.tokfai.com/v1
 API Key: sk-tokfai_xxx
 Model: gemini-3.1-pro`;
@@ -237,98 +263,17 @@ export function DocsContent({
         </CardContent>
       </Card>
 
-      <Card className="border-amber-300 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <AlertCircle className="h-4 w-4 text-amber-600" />
-            Billing
-          </CardTitle>
-          <CardDescription className="text-amber-900/80 dark:text-amber-100/80">
-            {TOKFAI_BILLING_POLICY} {TOKFAI_STARTER_PLAN} is available on{" "}
-            <Link
-              href="/pricing"
-              className="font-medium text-foreground underline-offset-4 hover:underline"
-            >
-              Pricing
-            </Link>
-            . Review per-request usage in{" "}
-            <Link
-              href="/dashboard/usage"
-              className="font-medium text-foreground underline-offset-4 hover:underline"
-            >
-              Usage
-            </Link>{" "}
-            and top-up or ledger history in{" "}
-            <Link
-              href="/dashboard/credits"
-              className="font-medium text-foreground underline-offset-4 hover:underline"
-            >
-              Credits
-            </Link>
-            .
-          </CardDescription>
-        </CardHeader>
-      </Card>
-
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">{t("docs.billingCreditsTitle")}</CardTitle>
-          <CardDescription>{t("docs.billingCreditsDesc")}</CardDescription>
+          <CardTitle className="text-base">{t("docs.sectionNavTitle")}</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-3 text-sm">
-          <Link
-            href="/dashboard/credits"
-            className="font-medium text-foreground underline-offset-4 hover:underline"
-          >
-            Dashboard → Credits
-          </Link>
-          <Link
-            href="/dashboard/usage"
-            className="font-medium text-foreground underline-offset-4 hover:underline"
-          >
-            Dashboard → Usage
-          </Link>
-          <Link
-            href="/pricing"
-            className="font-medium text-foreground underline-offset-4 hover:underline"
-          >
-            Pricing
-          </Link>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">{t("docs.billingRatesTitle")}</CardTitle>
-          <CardDescription>{t("docs.billingRatesDesc")}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4 text-sm text-muted-foreground">
-          <div>
-            <h3 className="font-medium text-foreground">
-              {t("docs.chatBillingTitle")}
-            </h3>
-            <p className="mt-1">{t("docs.chatBillingDesc")}</p>
-          </div>
-          <div>
-            <h3 className="font-medium text-foreground">
-              {t("docs.imageBillingTitle")}
-            </h3>
-            <p className="mt-1">{t("docs.imageBillingDesc")}</p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/pricing"
-              className="font-medium text-foreground underline-offset-4 hover:underline"
-            >
-              {t("docs.viewModelRates")}
-            </Link>
-            <Link
-              href="/dashboard/models"
-              className="font-medium text-foreground underline-offset-4 hover:underline"
-            >
-              {t("docs.viewModelsPage")}
-            </Link>
-          </div>
+        <CardContent>
+          <nav className="flex flex-wrap gap-2 text-sm">
+            <DocsSectionLink href="#authentication" label={t("docs.sectionAuthentication")} />
+            <DocsSectionLink href="#chat-completions" label={t("docs.sectionChatCompletions")} />
+            <DocsSectionLink href="#image-generations" label={t("docs.sectionImageGenerations")} />
+            <DocsSectionLink href="#errors-billing" label={t("docs.sectionErrorsBilling")} />
+          </nav>
         </CardContent>
       </Card>
 
@@ -435,48 +380,43 @@ export function DocsContent({
 
       <Card id="authentication">
         <CardHeader>
-          <CardTitle>Authentication</CardTitle>
+          <CardTitle>{t("docs.sectionAuthentication")}</CardTitle>
           <CardDescription>{t("docs.authSectionDesc")}</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
           <CopyableCard
             id="auth"
             title="Header"
-            description=""
+            description="Include on every request."
             value={AUTH_HEADER}
             copied={copiedId === "auth"}
             onCopy={copyText}
             compact
           />
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">Verify your key — GET /v1/models</h3>
+            <CodeBlock
+              id="models-curl"
+              label="curl"
+              code={MODELS_CURL}
+              copied={copiedId === "models-curl"}
+              onCopy={copyText}
+            />
+          </div>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card id="chat-completions">
         <CardHeader>
-          <CardTitle>GET /v1/models</CardTitle>
+          <CardTitle>{t("docs.sectionChatCompletions")}</CardTitle>
           <CardDescription>
-            List models available to your account.
+            Send chat messages and receive a model response via{" "}
+            <EndpointInlineCode value={TOKFAI_CHAT_COMPLETIONS_ENDPOINT} />.
+            Recommended starting model:{" "}
+            <code className="rounded bg-muted px-1 text-xs">{DEFAULT_MODEL}</code>.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <CodeBlock
-            id="models-curl"
-            label="curl"
-            code={MODELS_CURL}
-            copied={copiedId === "models-curl"}
-            onCopy={copyText}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>POST /v1/chat/completions</CardTitle>
-          <CardDescription>
-            Send chat messages and receive a model response.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-6">
           <CodeBlock
             id="chat-completions-curl"
             label="curl"
@@ -484,15 +424,38 @@ export function DocsContent({
             copied={copiedId === "chat-completions-curl"}
             onCopy={copyText}
           />
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">OpenAI JavaScript SDK</h3>
+            <p className="text-sm text-muted-foreground">{t("docs.chatSdkDesc")}</p>
+            <CodeBlock
+              id="openai-js"
+              label="javascript"
+              code={OPENAI_JS_EXAMPLE}
+              copied={copiedId === "openai-js"}
+              onCopy={copyText}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">OpenAI Python SDK</h3>
+            <p className="text-sm text-muted-foreground">{t("docs.chatSdkDesc")}</p>
+            <CodeBlock
+              id="openai-python"
+              label="python"
+              code={OPENAI_PYTHON_EXAMPLE}
+              copied={copiedId === "openai-python"}
+              onCopy={copyText}
+            />
+          </div>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card id="image-generations">
         <CardHeader>
-          <CardTitle>{TOKFAI_IMAGES_GENERATIONS_FULL_PATH}</CardTitle>
+          <CardTitle>{t("docs.sectionImageGenerations")}</CardTitle>
           <CardDescription>
             Generate images from a text prompt, or pass reference images for
-            image-to-image editing.
+            image-to-image editing via{" "}
+            <EndpointInlineCode value={TOKFAI_IMAGES_GENERATIONS_FULL_PATH} />.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
@@ -595,46 +558,133 @@ export function DocsContent({
               onCopy={copyText}
             />
           </div>
+
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">OpenAI JavaScript SDK</h3>
+            <p className="text-sm text-muted-foreground">{t("docs.imageSdkDesc")}</p>
+            <CodeBlock
+              id="openai-js-image"
+              label="javascript"
+              code={OPENAI_JS_IMAGE_EXAMPLE}
+              copied={copiedId === "openai-js-image"}
+              onCopy={copyText}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">OpenAI Python SDK</h3>
+            <p className="text-sm text-muted-foreground">{t("docs.imageSdkDesc")}</p>
+            <CodeBlock
+              id="openai-python-image"
+              label="python"
+              code={OPENAI_PYTHON_IMAGE_EXAMPLE}
+              copied={copiedId === "openai-python-image"}
+              onCopy={copyText}
+            />
+          </div>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card id="errors-billing">
         <CardHeader>
-          <CardTitle>OpenAI JavaScript SDK</CardTitle>
-          <CardDescription>
-            Set <code className="rounded bg-muted px-1 text-xs">baseURL</code> to
-            Tokfai and pass your API key as{" "}
-            <code className="rounded bg-muted px-1 text-xs">apiKey</code>.
-          </CardDescription>
+          <CardTitle>{t("docs.sectionErrorsBilling")}</CardTitle>
+          <CardDescription>{t("docs.billingRatesDesc")}</CardDescription>
         </CardHeader>
-        <CardContent>
-          <CodeBlock
-            id="openai-js"
-            label="javascript"
-            code={OPENAI_JS_EXAMPLE}
-            copied={copiedId === "openai-js"}
-            onCopy={copyText}
-          />
-        </CardContent>
-      </Card>
+        <CardContent className="flex flex-col gap-6">
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 dark:border-amber-900/60 dark:bg-amber-950/30">
+            <div className="flex items-start gap-2 text-sm">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <p className="text-amber-950 dark:text-amber-50">
+                {TOKFAI_BILLING_POLICY} {TOKFAI_STARTER_PLAN} is available on{" "}
+                <Link
+                  href="/pricing"
+                  className="font-medium underline-offset-4 hover:underline"
+                >
+                  Pricing
+                </Link>
+                .
+              </p>
+            </div>
+          </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>OpenAI Python SDK</CardTitle>
-          <CardDescription>
-            Install with{" "}
-            <code className="rounded bg-muted px-1 text-xs">pip install openai</code>{" "}
-            and point the client at Tokfai.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <CodeBlock
-            id="openai-python"
-            label="python"
-            code={OPENAI_PYTHON_EXAMPLE}
-            copied={copiedId === "openai-python"}
-            onCopy={copyText}
-          />
+          <div className="flex flex-col gap-4 text-sm text-muted-foreground">
+            <div>
+              <h3 className="font-medium text-foreground">
+                {t("docs.billingCreditsTitle")}
+              </h3>
+              <p className="mt-1">{t("docs.billingCreditsDesc")}</p>
+            </div>
+            <div>
+              <h3 className="font-medium text-foreground">
+                {t("docs.chatBillingTitle")}
+              </h3>
+              <p className="mt-1">{t("docs.chatBillingDesc")}</p>
+            </div>
+            <div>
+              <h3 className="font-medium text-foreground">
+                {t("docs.imageBillingTitle")}
+              </h3>
+              <p className="mt-1">{t("docs.imageBillingDesc")}</p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/dashboard/credits"
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                Dashboard → Credits
+              </Link>
+              <Link
+                href="/dashboard/usage"
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                Dashboard → Usage
+              </Link>
+              <Link
+                href="/pricing"
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                {t("docs.viewModelRates")}
+              </Link>
+              <Link
+                href="/dashboard/models"
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                {t("docs.viewModelsPage")}
+              </Link>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="mb-3 text-sm font-medium">Error codes</h3>
+            <p className="mb-4 text-sm text-muted-foreground">
+              {t("docs.errorCodesDesc")}
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                    <th className="py-2 pr-4 font-medium">HTTP</th>
+                    <th className="py-2 pr-4 font-medium">Code</th>
+                    <th className="py-2 pr-4 font-medium">Meaning</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ERROR_CODES.map((error) => (
+                    <tr key={error.code} className="border-b last:border-0">
+                      <td className="py-3 pr-4 font-mono text-xs">
+                        {error.status}
+                      </td>
+                      <td className="py-3 pr-4 font-mono text-xs">
+                        {error.code}
+                      </td>
+                      <td className="py-3 pr-4 text-muted-foreground">
+                        {error.meaning}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -700,42 +750,18 @@ export function DocsContent({
           </div>
         </CardContent>
       </Card>
-
-      <Card id="error-codes">
-        <CardHeader>
-          <CardTitle>Error codes</CardTitle>
-          <CardDescription>{t("docs.errorCodesDesc")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-                  <th className="py-2 pr-4 font-medium">HTTP</th>
-                  <th className="py-2 pr-4 font-medium">Code</th>
-                  <th className="py-2 pr-4 font-medium">Meaning</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ERROR_CODES.map((error) => (
-                  <tr key={error.code} className="border-b last:border-0">
-                    <td className="py-3 pr-4 font-mono text-xs">
-                      {error.status}
-                    </td>
-                    <td className="py-3 pr-4 font-mono text-xs">
-                      {error.code}
-                    </td>
-                    <td className="py-3 pr-4 text-muted-foreground">
-                      {error.meaning}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
     </div>
+  );
+}
+
+function DocsSectionLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="rounded-md border bg-muted/40 px-3 py-1.5 font-medium text-foreground underline-offset-4 hover:bg-muted hover:underline"
+    >
+      {label}
+    </Link>
   );
 }
 

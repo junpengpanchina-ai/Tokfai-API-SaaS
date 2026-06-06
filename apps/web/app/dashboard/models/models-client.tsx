@@ -34,6 +34,8 @@ import {
   formatDbImageCreditsPerGeneration,
   formatImageYuanExample,
   catalogPricingByModelId,
+  formatModelTraitLabels,
+  getChatModelUseCase,
   getImageModelUseCase,
   resolveDbChatCredits,
   resolveDbImageCredits,
@@ -209,6 +211,15 @@ function ModelCard({
   }
 
   const typeLabel = MODEL_TYPE_LABELS[model.type](t);
+  const useCase =
+    model.type === "image"
+      ? getImageModelUseCase(model.id, t)
+      : model.type === "chat"
+        ? getChatModelUseCase(model.id, t)
+        : null;
+  const traitLabels = model.traits
+    ? formatModelTraitLabels(model.traits, t)
+    : [];
 
   return (
     <Card>
@@ -233,11 +244,28 @@ function ModelCard({
             ))}
           </div>
         </div>
+        {traitLabels.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {traitLabels.map((trait) => (
+              <Badge key={trait.axis} variant="outline" className="text-xs font-normal">
+                {trait.label}
+              </Badge>
+            ))}
+          </div>
+        ) : null}
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <PriceBlock model={model} dbPricing={dbPricing} t={t} locale={locale} />
 
         <dl className="grid gap-2 text-sm">
+          {useCase && useCase !== "—" ? (
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-xs uppercase tracking-wider text-muted-foreground">
+                {t("dashboard.models.recommendedUseCase")}
+              </dt>
+              <dd className="text-muted-foreground">{useCase}</dd>
+            </div>
+          ) : null}
           <div className="flex flex-col gap-0.5">
             <dt className="text-xs uppercase tracking-wider text-muted-foreground">
               {t("dashboard.models.description")}
@@ -251,16 +279,6 @@ function ModelCard({
               </dt>
               <dd className="text-muted-foreground">
                 {model.supports.join(", ")}
-              </dd>
-            </div>
-          ) : null}
-          {model.type === "image" ? (
-            <div className="flex flex-col gap-0.5">
-              <dt className="text-xs uppercase tracking-wider text-muted-foreground">
-                {t("dashboard.models.recommendedUseCase")}
-              </dt>
-              <dd className="text-muted-foreground">
-                {getImageModelUseCase(model.id, t)}
               </dd>
             </div>
           ) : null}

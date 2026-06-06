@@ -162,6 +162,12 @@ export const messages = {
         tryImagePlayground: "Try in Image Playground",
         videoPlaygroundSoon: "Video Playground coming soon",
         recommendedTag: "Recommended",
+        traitSpeed: "Speed",
+        traitQuality: "Quality",
+        traitCost: "Cost",
+        traitLevelHigh: "High",
+        traitLevelMedium: "Medium",
+        traitLevelLow: "Low",
         typeChat: "Chat",
         typeImage: "Image",
         typeVideo: "Video",
@@ -538,6 +544,16 @@ export const messages = {
         "Point any OpenAI-compatible client at Tokfai and start calling models with your API key.",
     },
     catalog: {
+      chatUseCase: {
+        "gemini-3.1-pro": "Default premium chat — assistants, agents, and production workloads",
+        "gemini-3-pro": "General-purpose high-quality chat",
+        "gemini-3-flash": "Low-latency chat and quick iterations",
+        "gemini-3.5-flash": "Responsive chat with newer flash tier quality",
+        "gemini-2.5-flash": "Everyday chat with efficient token usage",
+        "gemini-2.5-pro": "Higher-quality chat completions",
+        "gpt-5.4": "OpenAI-compatible chat integrations",
+        "gpt-5.5": "Demanding applications needing top-tier chat quality",
+      },
       imageUseCase: {
         "gpt-image-2": "General-purpose image generation",
         "gpt-image-2-vip": "Premium GPT Image quality",
@@ -586,6 +602,15 @@ export const messages = {
         "Image generation is billed per successful generation in credits. Model-specific credits and reference prices are listed on Models and Pricing.",
       viewModelRates: "View full pricing on Pricing",
       viewModelsPage: "Browse models and tags",
+      sectionNavTitle: "API reference",
+      sectionAuthentication: "Authentication",
+      sectionChatCompletions: "Chat Completions",
+      sectionImageGenerations: "Image Generations",
+      sectionErrorsBilling: "Errors & Billing",
+      chatSdkDesc:
+        "Use the official OpenAI SDK with baseURL set to Tokfai.",
+      imageSdkDesc:
+        "Text-to-image via client.images.generate. For image-to-image, pass image_urls in the request body (see curl example).",
     },
     admin: {
       nav: {
@@ -1147,6 +1172,12 @@ export const messages = {
         tryImagePlayground: "在 Image Playground 试用",
         videoPlaygroundSoon: "Video Playground 即将上线",
         recommendedTag: "推荐",
+        traitSpeed: "速度",
+        traitQuality: "质量",
+        traitCost: "成本",
+        traitLevelHigh: "高",
+        traitLevelMedium: "中",
+        traitLevelLow: "低",
         typeChat: "对话",
         typeImage: "图像",
         typeVideo: "视频",
@@ -1501,6 +1532,16 @@ export const messages = {
         "将任意 OpenAI 兼容客户端指向 Tokfai，使用 API 密钥即可调用模型。",
     },
     catalog: {
+      chatUseCase: {
+        "gemini-3.1-pro": "默认推荐对话模型 — 助手、Agent 与生产场景",
+        "gemini-3-pro": "通用高质量对话",
+        "gemini-3-flash": "低延迟对话与快速迭代",
+        "gemini-3.5-flash": "新版 Flash 档位的响应式对话",
+        "gemini-2.5-flash": "日常对话，token 消耗更省",
+        "gemini-2.5-pro": "更高质量的对话补全",
+        "gpt-5.4": "OpenAI 兼容的对话集成",
+        "gpt-5.5": "对质量要求极高的复杂对话应用",
+      },
       imageUseCase: {
         "gpt-image-2": "通用图像生成",
         "gpt-image-2-vip": "GPT Image 高品质输出",
@@ -1548,6 +1589,14 @@ export const messages = {
         "图片生成按次计费，具体 model 的积分价格与参考价格可在 Models / Pricing 查看。",
       viewModelRates: "在 Pricing 查看完整模型价格",
       viewModelsPage: "浏览模型与 Tags",
+      sectionNavTitle: "API 参考",
+      sectionAuthentication: "Authentication",
+      sectionChatCompletions: "Chat Completions",
+      sectionImageGenerations: "Image Generations",
+      sectionErrorsBilling: "Errors & Billing",
+      chatSdkDesc: "使用官方 OpenAI SDK，将 baseURL 指向 Tokfai。",
+      imageSdkDesc:
+        "文生图可通过 client.images.generate 调用。图生图需在请求体中传入 image_urls（见 curl 示例）。",
     },
     admin: {
       nav: {

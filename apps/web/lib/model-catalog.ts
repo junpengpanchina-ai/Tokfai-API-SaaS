@@ -2,6 +2,15 @@ export type ModelType = "chat" | "image" | "video";
 
 export type ModelStatus = "available" | "coming_soon";
 
+/** Display-only speed / quality / cost positioning for model cards. */
+export type ModelTraitLevel = "high" | "medium" | "low";
+
+export type ModelTraits = {
+  speed: ModelTraitLevel;
+  quality: ModelTraitLevel;
+  cost: ModelTraitLevel;
+};
+
 export type PriceRangeYuan = {
   min: number;
   max: number;
@@ -42,6 +51,8 @@ export interface ModelCatalogEntry {
   billingUnit: string;
   description: string;
   pricing: ModelPricing;
+  /** Speed / quality / cost positioning shown on model cards. */
+  traits?: ModelTraits;
   tags?: string[];
   catalogMeta?: CatalogAdminMeta;
   /** Image models only — capabilities shown on the Models page. */
@@ -114,6 +125,7 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     billingUnit: CHAT_BILLING_UNIT,
     description: "Main premium chat model for high-quality completions.",
     pricing: chatPricing(1.5, 3, 7, 14),
+    traits: { speed: "medium", quality: "high", cost: "medium" },
     catalogMeta: catalogMeta(),
   },
   {
@@ -124,6 +136,7 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     billingUnit: CHAT_BILLING_UNIT,
     description: "Gemini 3 Pro chat model for general-purpose conversations.",
     pricing: chatPricing(1.5, 3, 7, 14),
+    traits: { speed: "medium", quality: "high", cost: "medium" },
     catalogMeta: catalogMeta(),
   },
   {
@@ -134,6 +147,7 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     billingUnit: CHAT_BILLING_UNIT,
     description: "Fast Gemini 3 chat model for low-latency responses.",
     pricing: chatPricing(0.4, 0.8, 3, 6),
+    traits: { speed: "high", quality: "medium", cost: "low" },
     tags: ["Flash"],
     catalogMeta: catalogMeta(),
   },
@@ -145,6 +159,7 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     billingUnit: CHAT_BILLING_UNIT,
     description: "Latest Gemini 3.5 flash tier for responsive chat workloads.",
     pricing: chatPricing(1.2, 2.4, 10, 20),
+    traits: { speed: "high", quality: "medium", cost: "medium" },
     tags: ["Flash"],
     catalogMeta: catalogMeta(),
   },
@@ -156,6 +171,7 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     billingUnit: CHAT_BILLING_UNIT,
     description: "Efficient Gemini 2.5 flash model for everyday chat.",
     pricing: chatPricing(0.3, 0.6, 2, 4),
+    traits: { speed: "high", quality: "medium", cost: "low" },
     tags: ["Flash"],
     catalogMeta: catalogMeta(),
   },
@@ -167,6 +183,7 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     billingUnit: CHAT_BILLING_UNIT,
     description: "Gemini 2.5 Pro for higher-quality chat completions.",
     pricing: chatPricing(1.25, 2.5, 6.25, 12.5),
+    traits: { speed: "medium", quality: "high", cost: "medium" },
     catalogMeta: catalogMeta(),
   },
   {
@@ -177,6 +194,7 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     billingUnit: CHAT_BILLING_UNIT,
     description: "GPT 5.4 chat model for OpenAI-compatible workloads.",
     pricing: chatPricing(0.7, 1.4, 6, 12),
+    traits: { speed: "medium", quality: "high", cost: "medium" },
     catalogMeta: catalogMeta(),
   },
   {
@@ -187,6 +205,7 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     billingUnit: CHAT_BILLING_UNIT,
     description: "Premium GPT 5.5 chat model for demanding applications.",
     pricing: chatPricing(2.2, 4.4, 13.5, 27),
+    traits: { speed: "low", quality: "high", cost: "high" },
     catalogMeta: catalogMeta(),
   },
 ];
@@ -208,6 +227,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     billingUnit: IMAGE_BILLING_UNIT,
     description: "OpenAI-compatible image generation model.",
     pricing: imagePricing(600),
+    traits: { speed: "medium", quality: "high", cost: "low" },
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
@@ -220,6 +240,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     billingUnit: IMAGE_BILLING_UNIT,
     description: "Premium tier of GPT Image 2.",
     pricing: imagePricing(1300),
+    traits: { speed: "medium", quality: "high", cost: "medium" },
     tags: ["VIP"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
@@ -233,6 +254,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     billingUnit: IMAGE_BILLING_UNIT,
     description: "Fast image generation with lower latency.",
     pricing: imagePricing(440),
+    traits: { speed: "high", quality: "medium", cost: "low" },
     tags: ["Fast"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
@@ -246,6 +268,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     billingUnit: IMAGE_BILLING_UNIT,
     description: "Image generation model.",
     pricing: imagePricing(1400),
+    traits: { speed: "medium", quality: "medium", cost: "medium" },
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
@@ -258,6 +281,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     billingUnit: IMAGE_BILLING_UNIT,
     description: "Higher-quality image generation model.",
     pricing: imagePricing(1800),
+    traits: { speed: "medium", quality: "high", cost: "medium" },
     tags: ["Pro"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
@@ -271,6 +295,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     billingUnit: IMAGE_BILLING_UNIT,
     description: "Next-generation Nano Banana image model.",
     pricing: imagePricing(1200),
+    traits: { speed: "medium", quality: "high", cost: "medium" },
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
@@ -283,6 +308,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     billingUnit: IMAGE_BILLING_UNIT,
     description: "Nano Banana Pro variant for specialized image generation.",
     pricing: imagePricing(1800),
+    traits: { speed: "medium", quality: "high", cost: "medium" },
     tags: ["Pro", "VT"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     catalogMeta: catalogMeta(),
@@ -295,6 +321,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     billingUnit: IMAGE_BILLING_UNIT,
     description: "Nano Banana 2 CL variant for advanced image workflows.",
     pricing: imagePricing(1600),
+    traits: { speed: "medium", quality: "high", cost: "medium" },
     tags: ["CL"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     catalogMeta: catalogMeta(),
@@ -307,6 +334,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     billingUnit: IMAGE_BILLING_UNIT,
     description: "4K Nano Banana 2 CL image model.",
     pricing: imagePricing(3000),
+    traits: { speed: "low", quality: "high", cost: "high" },
     tags: ["4K", "CL"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     catalogMeta: catalogMeta(),
@@ -319,6 +347,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     billingUnit: IMAGE_BILLING_UNIT,
     description: "Nano Banana Pro CL variant for premium image output.",
     pricing: imagePricing(6000),
+    traits: { speed: "low", quality: "high", cost: "high" },
     tags: ["Pro", "CL"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     catalogMeta: catalogMeta(),
@@ -331,6 +360,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     billingUnit: IMAGE_BILLING_UNIT,
     description: "VIP tier Nano Banana Pro image model.",
     pricing: imagePricing(10000),
+    traits: { speed: "low", quality: "high", cost: "high" },
     tags: ["Pro", "VIP"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     catalogMeta: catalogMeta(),
@@ -343,6 +373,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     billingUnit: IMAGE_BILLING_UNIT,
     description: "4K VIP tier Nano Banana Pro image model.",
     pricing: imagePricing(16000),
+    traits: { speed: "low", quality: "high", cost: "high" },
     tags: ["Pro", "4K", "VIP"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     catalogMeta: catalogMeta(),
@@ -377,6 +408,7 @@ export const VIDEO_MODELS: ModelCatalogEntry[] = [
     billingUnit: "Per video",
     description: "Video generation model.",
     pricing: imagePricing(0),
+    traits: { speed: "low", quality: "medium", cost: "high" },
   },
 ];
 

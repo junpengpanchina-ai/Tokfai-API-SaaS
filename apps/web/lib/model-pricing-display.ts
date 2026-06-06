@@ -5,6 +5,8 @@ import {
   type ChatModelPricing,
   type ImageModelPricing,
   type ModelCatalogEntry,
+  type ModelTraitLevel,
+  type ModelTraits,
   type PriceRangeYuan,
   isImageModelEntry,
 } from "@/lib/model-catalog";
@@ -305,6 +307,49 @@ export function getImageModelUseCase(
   return value === key ? "—" : value;
 }
 
+export function getChatModelUseCase(
+  modelId: string,
+  t: (key: string) => string
+): string {
+  const key = `catalog.chatUseCase.${modelId}`;
+  const value = t(key);
+  return value === key ? "—" : value;
+}
+
+function formatTraitLevel(
+  level: ModelTraitLevel,
+  t: (key: string) => string
+): string {
+  switch (level) {
+    case "high":
+      return t("dashboard.models.traitLevelHigh");
+    case "medium":
+      return t("dashboard.models.traitLevelMedium");
+    case "low":
+      return t("dashboard.models.traitLevelLow");
+  }
+}
+
+export function formatModelTraitLabels(
+  traits: ModelTraits,
+  t: (key: string) => string
+): Array<{ axis: "speed" | "quality" | "cost"; label: string }> {
+  return [
+    {
+      axis: "speed",
+      label: `${t("dashboard.models.traitSpeed")}: ${formatTraitLevel(traits.speed, t)}`,
+    },
+    {
+      axis: "quality",
+      label: `${t("dashboard.models.traitQuality")}: ${formatTraitLevel(traits.quality, t)}`,
+    },
+    {
+      axis: "cost",
+      label: `${t("dashboard.models.traitCost")}: ${formatTraitLevel(traits.cost, t)}`,
+    },
+  ];
+}
+
 export function formatImageCreditsAmount(
   credits: number,
   locale: Locale
@@ -312,13 +357,14 @@ export function formatImageCreditsAmount(
   return credits.toLocaleString(locale === "zh" ? "zh-CN" : "en-US");
 }
 
-/** Model select label, e.g. `nano-banana · 1,400 credits / generation`. */
+/** Model select label, e.g. `Nano Banana (nano-banana) · 1,400 credits / generation`. */
 export function formatImageModelSelectLabel(modelId: string, locale: Locale): string {
   const entry = getImageModelById(modelId);
   if (!entry || !isImageModelEntry(entry)) {
     return modelId;
   }
-  return `${modelId} · ${formatImageCreditsPerRequest(entry.pricing, locale)}`;
+  const price = formatImageCreditsPerRequest(entry.pricing, locale);
+  return `${entry.displayName} (${modelId}) · ${price}`;
 }
 
 export function formatImageModelPriceForModelId(
