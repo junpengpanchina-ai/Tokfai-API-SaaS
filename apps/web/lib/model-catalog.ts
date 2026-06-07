@@ -2,6 +2,26 @@ export type ModelType = "chat" | "image" | "video";
 
 export type ModelStatus = "available" | "coming_soon";
 
+/** Dashboard Models page filter tabs (display-only navigation). */
+export type ModelCategory =
+  | "recommended"
+  | "chat"
+  | "image"
+  | "fast"
+  | "high_quality"
+  | "low_cost"
+  | "coming_soon";
+
+export const MODEL_CATEGORY_TABS: ModelCategory[] = [
+  "recommended",
+  "chat",
+  "image",
+  "fast",
+  "high_quality",
+  "low_cost",
+  "coming_soon",
+];
+
 /** Display-only speed / quality / cost positioning for model cards. */
 export type ModelTraitLevel = "high" | "medium" | "low";
 
@@ -54,6 +74,8 @@ export interface ModelCatalogEntry {
   /** Speed / quality / cost positioning shown on model cards. */
   traits?: ModelTraits;
   tags?: string[];
+  /** Dashboard filter tabs — type and coming_soon are merged in resolveModelCategories. */
+  categories?: ModelCategory[];
   catalogMeta?: CatalogAdminMeta;
   /** Image models only — capabilities shown on the Models page. */
   supports?: string[];
@@ -126,6 +148,7 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     description: "Main premium chat model for high-quality completions.",
     pricing: chatPricing(1.5, 3, 7, 14),
     traits: { speed: "medium", quality: "high", cost: "medium" },
+    categories: ["recommended", "high_quality"],
     catalogMeta: catalogMeta(),
   },
   {
@@ -137,6 +160,7 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     description: "Gemini 3 Pro chat model for general-purpose conversations.",
     pricing: chatPricing(1.5, 3, 7, 14),
     traits: { speed: "medium", quality: "high", cost: "medium" },
+    categories: ["high_quality"],
     catalogMeta: catalogMeta(),
   },
   {
@@ -149,6 +173,7 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     pricing: chatPricing(0.4, 0.8, 3, 6),
     traits: { speed: "high", quality: "medium", cost: "low" },
     tags: ["Flash"],
+    categories: ["recommended", "fast", "low_cost"],
     catalogMeta: catalogMeta(),
   },
   {
@@ -161,6 +186,7 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     pricing: chatPricing(1.2, 2.4, 10, 20),
     traits: { speed: "high", quality: "medium", cost: "medium" },
     tags: ["Flash"],
+    categories: ["fast"],
     catalogMeta: catalogMeta(),
   },
   {
@@ -173,6 +199,7 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     pricing: chatPricing(0.3, 0.6, 2, 4),
     traits: { speed: "high", quality: "medium", cost: "low" },
     tags: ["Flash"],
+    categories: ["fast", "low_cost"],
     catalogMeta: catalogMeta(),
   },
   {
@@ -184,6 +211,7 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     description: "Gemini 2.5 Pro for higher-quality chat completions.",
     pricing: chatPricing(1.25, 2.5, 6.25, 12.5),
     traits: { speed: "medium", quality: "high", cost: "medium" },
+    categories: ["high_quality"],
     catalogMeta: catalogMeta(),
   },
   {
@@ -195,6 +223,7 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     description: "GPT 5.4 chat model for OpenAI-compatible workloads.",
     pricing: chatPricing(0.7, 1.4, 6, 12),
     traits: { speed: "medium", quality: "high", cost: "medium" },
+    categories: [],
     catalogMeta: catalogMeta(),
   },
   {
@@ -206,6 +235,7 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     description: "Premium GPT 5.5 chat model for demanding applications.",
     pricing: chatPricing(2.2, 4.4, 13.5, 27),
     traits: { speed: "low", quality: "high", cost: "high" },
+    categories: ["high_quality"],
     catalogMeta: catalogMeta(),
   },
 ];
@@ -228,6 +258,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     description: "OpenAI-compatible image generation model.",
     pricing: imagePricing(600),
     traits: { speed: "medium", quality: "high", cost: "low" },
+    categories: ["recommended"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
@@ -242,6 +273,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     pricing: imagePricing(1300),
     traits: { speed: "medium", quality: "high", cost: "medium" },
     tags: ["VIP"],
+    categories: ["high_quality"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
@@ -256,6 +288,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     pricing: imagePricing(440),
     traits: { speed: "high", quality: "medium", cost: "low" },
     tags: ["Fast"],
+    categories: ["recommended", "fast", "low_cost"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
@@ -269,6 +302,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     description: "Image generation model.",
     pricing: imagePricing(1400),
     traits: { speed: "medium", quality: "medium", cost: "medium" },
+    categories: ["recommended", "low_cost"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
@@ -283,6 +317,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     pricing: imagePricing(1800),
     traits: { speed: "medium", quality: "high", cost: "medium" },
     tags: ["Pro"],
+    categories: ["high_quality"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
@@ -296,6 +331,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     description: "Next-generation Nano Banana image model.",
     pricing: imagePricing(1200),
     traits: { speed: "medium", quality: "high", cost: "medium" },
+    categories: ["high_quality"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
@@ -310,6 +346,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     pricing: imagePricing(1800),
     traits: { speed: "medium", quality: "high", cost: "medium" },
     tags: ["Pro", "VT"],
+    categories: ["high_quality"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
@@ -324,6 +361,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     pricing: imagePricing(1600),
     traits: { speed: "medium", quality: "high", cost: "medium" },
     tags: ["CL"],
+    categories: ["high_quality"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
@@ -338,6 +376,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     pricing: imagePricing(3000),
     traits: { speed: "low", quality: "high", cost: "high" },
     tags: ["4K", "CL"],
+    categories: ["high_quality"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
@@ -352,6 +391,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     pricing: imagePricing(6000),
     traits: { speed: "low", quality: "high", cost: "high" },
     tags: ["Pro", "CL"],
+    categories: ["high_quality"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
@@ -366,6 +406,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     pricing: imagePricing(10000),
     traits: { speed: "low", quality: "high", cost: "high" },
     tags: ["Pro", "VIP"],
+    categories: ["high_quality"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
@@ -380,6 +421,7 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     pricing: imagePricing(16000),
     traits: { speed: "low", quality: "high", cost: "high" },
     tags: ["Pro", "4K", "VIP"],
+    categories: ["high_quality"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
@@ -420,6 +462,37 @@ export const ALL_CATALOG_MODELS: ModelCatalogEntry[] = [
   ...IMAGE_MODELS,
   ...VIDEO_MODELS,
 ];
+
+/** Dashboard Models page — same order as the full catalog. */
+export const DASHBOARD_CATALOG_MODELS: ModelCatalogEntry[] = ALL_CATALOG_MODELS;
+
+export function resolveModelCategories(model: ModelCatalogEntry): ModelCategory[] {
+  const set = new Set<ModelCategory>(model.categories ?? []);
+  if (model.type === "chat") {
+    set.add("chat");
+  }
+  if (model.type === "image") {
+    set.add("image");
+  }
+  if (model.status === "coming_soon") {
+    set.add("coming_soon");
+  }
+  return MODEL_CATEGORY_TABS.filter((category) => set.has(category));
+}
+
+export function filterDashboardModelsByCategory(
+  category: ModelCategory,
+  models: ModelCatalogEntry[] = DASHBOARD_CATALOG_MODELS
+): ModelCatalogEntry[] {
+  return models.filter((model) => resolveModelCategories(model).includes(category));
+}
+
+export function modelMatchesDashboardCategory(
+  model: ModelCatalogEntry,
+  category: ModelCategory
+): boolean {
+  return resolveModelCategories(model).includes(category);
+}
 
 export type AdminCatalogDisplayStatus = ModelStatus | "hidden";
 

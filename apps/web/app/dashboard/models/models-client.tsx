@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, Copy, ImageIcon, Info, MessageSquare, Terminal, Video, X } from "lucide-react";
+import { Check, Copy, ImageIcon, Info, Terminal, Video, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,11 +16,11 @@ import {
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import type { CatalogModelPricingItem } from "@/lib/dmit/client";
 import {
-  CHAT_MODELS,
-  IMAGE_MODELS,
+  filterDashboardModelsByCategory,
+  MODEL_CATEGORY_TABS,
   type ModelCatalogEntry,
+  type ModelCategory,
   type ModelType,
-  VIDEO_MODELS,
   isCatalogModelPlaygroundAvailable,
   isChatModelEntry,
   isImageModelEntry,
@@ -50,13 +50,10 @@ export function ModelsClient({
 }) {
   const { t, locale } = useI18n();
   const pricingByModelId = catalogPricingByModelId(catalogPricing);
+  const [activeCategory, setActiveCategory] = useState<ModelCategory>("recommended");
 
-  const availableImageModels = IMAGE_MODELS.filter(
-    (model) => model.status === "available"
-  );
-  const comingSoonImageModels = IMAGE_MODELS.filter(
-    (model) => model.status === "coming_soon"
-  );
+  const filteredModels = filterDashboardModelsByCategory(activeCategory);
+  const categoryDescription = t(`dashboard.models.categoryDesc.${activeCategory}`);
 
   return (
     <div className="flex flex-col gap-6">
@@ -90,101 +87,54 @@ export function ModelsClient({
         </CardContent>
       </Card>
 
-      <ModelSection
-        title={t("dashboard.models.chatSectionTitle")}
-        description={t("dashboard.models.chatSectionDesc")}
-        icon={MessageSquare}
-        models={CHAT_MODELS}
-        pricingByModelId={pricingByModelId}
-        t={t}
-        locale={locale}
-      />
-
-      <ModelSection
-        title={t("dashboard.models.imageSectionTitle")}
-        description={t("dashboard.models.imageSectionDesc")}
-        icon={ImageIcon}
-        models={availableImageModels}
-        pricingByModelId={pricingByModelId}
-        t={t}
-        locale={locale}
-      />
-
-      {comingSoonImageModels.length > 0 ? (
-        <ModelSection
-          title={t("dashboard.models.imageComingSoonTitle")}
-          description={t("dashboard.models.imageComingSoonDesc")}
-          icon={ImageIcon}
-          models={comingSoonImageModels}
-          comingSoon
-          pricingByModelId={pricingByModelId}
-          t={t}
-          locale={locale}
-        />
-      ) : null}
-
-      <ModelSection
-        title={t("dashboard.models.videoSectionTitle")}
-        description={t("dashboard.models.videoSectionDesc")}
-        icon={Video}
-        models={VIDEO_MODELS}
-        comingSoon
-        pricingByModelId={pricingByModelId}
-        t={t}
-        locale={locale}
-      />
-    </div>
-  );
-}
-
-function ModelSection({
-  title,
-  description,
-  icon: Icon,
-  models,
-  comingSoon = false,
-  pricingByModelId,
-  t,
-  locale,
-}: {
-  title: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-  models: ModelCatalogEntry[];
-  comingSoon?: boolean;
-  pricingByModelId: Map<string, CatalogModelPricingItem>;
-  t: (key: string) => string;
-  locale: "en" | "zh";
-}) {
-  return (
-    <section className="flex flex-col gap-4">
-      <div className="flex items-start gap-3">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
-          <Icon className="h-4 w-4" />
-        </div>
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
-            {comingSoon ? (
-              <Badge variant="warning">{t("dashboard.models.comingSoon")}</Badge>
-            ) : null}
+      <section className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
+          <div
+            className="flex flex-wrap gap-2"
+            role="tablist"
+            aria-label={t("dashboard.models.categoryTabsLabel")}
+          >
+            {MODEL_CATEGORY_TABS.map((category) => {
+              const isActive = activeCategory === category;
+              return (
+                <Button
+                  key={category}
+                  type="button"
+                  size="sm"
+                  variant={isActive ? "default" : "outline"}
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setActiveCategory(category)}
+                >
+                  {t(`dashboard.models.category.${category}`)}
+                </Button>
+              );
+            })}
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          <p className="text-sm text-muted-foreground">{categoryDescription}</p>
         </div>
-      </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {models.map((model) => (
-          <ModelCard
-            key={model.id}
-            model={model}
-            dbPricing={pricingByModelId.get(model.id) ?? null}
-            t={t}
-            locale={locale}
-          />
-        ))}
-      </div>
-    </section>
+        {filteredModels.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="py-10 text-center text-sm text-muted-foreground">
+              {t("dashboard.models.categoryEmpty")}
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {filteredModels.map((model) => (
+              <ModelCard
+                key={model.id}
+                model={model}
+                dbPricing={pricingByModelId.get(model.id) ?? null}
+                t={t}
+                locale={locale}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
   );
 }
 
