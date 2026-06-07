@@ -487,6 +487,101 @@ export function filterDashboardModelsByCategory(
   return models.filter((model) => resolveModelCategories(model).includes(category));
 }
 
+/** Image tab sub-groups on the dashboard Models page (display-only). */
+export type ImageDisplayGroup =
+  | "basic"
+  | "fast_low_cost"
+  | "high_quality"
+  | "coming_soon";
+
+export const IMAGE_DISPLAY_GROUP_ORDER: ImageDisplayGroup[] = [
+  "basic",
+  "fast_low_cost",
+  "high_quality",
+  "coming_soon",
+];
+
+export function resolveImageDisplayGroup(
+  model: ModelCatalogEntry
+): ImageDisplayGroup | null {
+  if (model.type !== "image") {
+    return null;
+  }
+  if (model.status === "coming_soon") {
+    return "coming_soon";
+  }
+  if (model.categories?.includes("high_quality")) {
+    return "high_quality";
+  }
+  if (model.categories?.includes("fast")) {
+    return "fast_low_cost";
+  }
+  return "basic";
+}
+
+export function groupImageModelsByDisplayGroup(
+  models: ModelCatalogEntry[]
+): { group: ImageDisplayGroup; models: ModelCatalogEntry[] }[] {
+  const byGroup = new Map<ImageDisplayGroup, ModelCatalogEntry[]>();
+  for (const group of IMAGE_DISPLAY_GROUP_ORDER) {
+    byGroup.set(group, []);
+  }
+  for (const model of models) {
+    const group = resolveImageDisplayGroup(model);
+    if (group) {
+      byGroup.get(group)!.push(model);
+    }
+  }
+  return IMAGE_DISPLAY_GROUP_ORDER.map((group) => ({
+    group,
+    models: byGroup.get(group) ?? [],
+  })).filter((entry) => entry.models.length > 0);
+}
+
+export type DashboardUseCaseId =
+  | "chat_general"
+  | "fast_low_cost_chat"
+  | "text_to_image"
+  | "high_quality_image";
+
+export type DashboardUseCasePlayground = "chat" | "image";
+
+export type DashboardUseCaseEntry = {
+  id: DashboardUseCaseId;
+  recommendedModelIds: string[];
+  playground: DashboardUseCasePlayground;
+  /** Default model id passed as ?model= on the playground link. */
+  defaultModelId: string;
+};
+
+/** Top-of-page use-case shortcuts on /dashboard/models (display-only). */
+export const DASHBOARD_USE_CASES: DashboardUseCaseEntry[] = [
+  {
+    id: "chat_general",
+    recommendedModelIds: ["gemini-3.1-pro"],
+    playground: "chat",
+    defaultModelId: "gemini-3.1-pro",
+  },
+  {
+    id: "fast_low_cost_chat",
+    recommendedModelIds: ["gemini-3-flash", "gemini-3.5-flash"],
+    playground: "chat",
+    defaultModelId: "gemini-3-flash",
+  },
+  {
+    id: "text_to_image",
+    recommendedModelIds: ["gpt-image-2", "nano-banana-fast"],
+    playground: "image",
+    defaultModelId: "gpt-image-2",
+  },
+  {
+    id: "high_quality_image",
+    recommendedModelIds: ["nano-banana-2-cl", "nano-banana-pro-cl"],
+    playground: "image",
+    defaultModelId: "nano-banana-2-cl",
+  },
+];
+
 export function modelMatchesDashboardCategory(
   model: ModelCatalogEntry,
   category: ModelCategory

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, Copy, ImageIcon, Info, Terminal, Video, X } from "lucide-react";
+import { Check, Copy, ImageIcon, Info, MessageSquare, Sparkles, Terminal, Video, Zap, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,11 +16,15 @@ import {
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import type { CatalogModelPricingItem } from "@/lib/dmit/client";
 import {
+  DASHBOARD_USE_CASES,
   filterDashboardModelsByCategory,
+  groupImageModelsByDisplayGroup,
   MODEL_CATEGORY_TABS,
   type ModelCatalogEntry,
   type ModelCategory,
   type ModelType,
+  type DashboardUseCaseEntry,
+  type DashboardUseCaseId,
   isCatalogModelPlaygroundAvailable,
   isChatModelEntry,
   isImageModelEntry,
@@ -87,6 +91,8 @@ export function ModelsClient({
         </CardContent>
       </Card>
 
+      <UseCaseSection t={t} />
+
       <section className="flex flex-col gap-4">
         <div className="flex flex-col gap-3">
           <div
@@ -120,6 +126,13 @@ export function ModelsClient({
               {t("dashboard.models.categoryEmpty")}
             </CardContent>
           </Card>
+        ) : activeCategory === "image" ? (
+          <ImageGroupedModelList
+            models={filteredModels}
+            pricingByModelId={pricingByModelId}
+            t={t}
+            locale={locale}
+          />
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {filteredModels.map((model) => (
@@ -134,6 +147,125 @@ export function ModelsClient({
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function UseCaseSection({ t }: { t: (key: string) => string }) {
+  return (
+    <section className="flex flex-col gap-4">
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight">
+          {t("dashboard.models.chooseByUseCase")}
+        </h2>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {DASHBOARD_USE_CASES.map((useCase) => (
+          <UseCaseCard key={useCase.id} useCase={useCase} t={t} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+const USE_CASE_ICONS: Record<DashboardUseCaseId, typeof MessageSquare> = {
+  chat_general: MessageSquare,
+  fast_low_cost_chat: Zap,
+  text_to_image: ImageIcon,
+  high_quality_image: Sparkles,
+};
+
+function UseCaseCard({
+  useCase,
+  t,
+}: {
+  useCase: DashboardUseCaseEntry;
+  t: (key: string) => string;
+}) {
+  const Icon = USE_CASE_ICONS[useCase.id];
+  const playgroundHref =
+    useCase.playground === "chat"
+      ? `/dashboard/playground?model=${encodeURIComponent(useCase.defaultModelId)}`
+      : `/dashboard/image-playground?model=${encodeURIComponent(useCase.defaultModelId)}`;
+  const playgroundLabel =
+    useCase.playground === "chat"
+      ? t("dashboard.models.useCaseOpenChatPlayground")
+      : t("dashboard.models.useCaseOpenImagePlayground");
+
+  return (
+    <Card className="flex flex-col">
+      <CardHeader className="pb-3">
+        <div className="flex items-start gap-3">
+          <div className="rounded-md border bg-muted/50 p-2">
+            <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
+          </div>
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-base leading-snug">
+              {t(`dashboard.models.useCase.${useCase.id}.title`)}
+            </CardTitle>
+            <CardDescription className="mt-1.5 text-sm">
+              {t(`dashboard.models.useCase.${useCase.id}.description`)}
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="mt-auto flex flex-col gap-3 pt-0">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs uppercase tracking-wider text-muted-foreground">
+            {t("dashboard.models.useCaseRecommended")}
+          </span>
+          <span className="font-mono text-xs text-foreground/90">
+            {useCase.recommendedModelIds.join(" · ")}
+          </span>
+        </div>
+        <Button asChild size="sm" className="w-full">
+          <Link href={playgroundHref}>
+            {useCase.playground === "chat" ? (
+              <Terminal className="h-4 w-4" />
+            ) : (
+              <ImageIcon className="h-4 w-4" />
+            )}
+            {playgroundLabel}
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ImageGroupedModelList({
+  models,
+  pricingByModelId,
+  t,
+  locale,
+}: {
+  models: ModelCatalogEntry[];
+  pricingByModelId: Map<string, CatalogModelPricingItem>;
+  t: (key: string) => string;
+  locale: "en" | "zh";
+}) {
+  const grouped = groupImageModelsByDisplayGroup(models);
+
+  return (
+    <div className="flex flex-col gap-8">
+      {grouped.map(({ group, models: groupModels }) => (
+        <div key={group} className="flex flex-col gap-4">
+          <h3 className="text-sm font-semibold tracking-tight">
+            {t(`dashboard.models.imageGroup.${group}`)}
+          </h3>
+          <div className="grid gap-4 md:grid-cols-2">
+            {groupModels.map((model) => (
+              <ModelCard
+                key={model.id}
+                model={model}
+                dbPricing={pricingByModelId.get(model.id) ?? null}
+                t={t}
+                locale={locale}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -279,12 +411,16 @@ function ModelCard({
               {model.type === "video" ? (
                 <>
                   <Video className="h-4 w-4" />
-                  {t("dashboard.models.videoPlaygroundSoon")}
+                  {t("dashboard.models.videoModelComingSoon")}
                 </>
               ) : (
                 <>
-                  <ImageIcon className="h-4 w-4" />
-                  {t("dashboard.models.comingSoon")}
+                  {model.type === "chat" ? (
+                    <Terminal className="h-4 w-4" />
+                  ) : (
+                    <ImageIcon className="h-4 w-4" />
+                  )}
+                  {t("dashboard.models.modelNotCallable")}
                 </>
               )}
             </Button>

@@ -158,9 +158,43 @@ export const messages = {
         playground: "Playground",
         copyModelId: "Copy model id",
         copied: "Copied",
-        tryChatPlayground: "Try in Chat Playground",
-        tryImagePlayground: "Try in Image Playground",
+        tryChatPlayground: "Test in chat",
+        tryImagePlayground: "Test image generation",
+        modelNotCallable: "Not callable yet",
+        videoModelComingSoon: "Video models coming soon",
         videoPlaygroundSoon: "Video Playground coming soon",
+        chooseByUseCase: "Choose by use case",
+        useCaseRecommended: "Recommended",
+        useCaseOpenChatPlayground: "Open Chat Playground",
+        useCaseOpenImagePlayground: "Open Image Playground",
+        useCase: {
+          chat_general: {
+            title: "Chat / general conversation",
+            description:
+              "Premium chat for assistants, agents, and high-quality text generation.",
+          },
+          fast_low_cost_chat: {
+            title: "Fast low-cost chat",
+            description:
+              "Low-latency chat for drafts, previews, and high-volume workloads.",
+          },
+          text_to_image: {
+            title: "Text to image",
+            description:
+              "Generate images from text prompts via the Image Playground or API.",
+          },
+          high_quality_image: {
+            title: "High quality image",
+            description:
+              "Higher-fidelity image models for production visuals and detailed output.",
+          },
+        },
+        imageGroup: {
+          basic: "Basic image generation",
+          fast_low_cost: "Fast / low-cost image",
+          high_quality: "High quality image",
+          coming_soon: "Coming soon",
+        },
         recommendedTag: "Recommended",
         traitSpeed: "Speed",
         traitQuality: "Quality",
@@ -1195,9 +1229,39 @@ export const messages = {
         playground: "Playground",
         copyModelId: "复制 model id",
         copied: "已复制",
-        tryChatPlayground: "在 Chat Playground 试用",
-        tryImagePlayground: "在 Image Playground 试用",
+        tryChatPlayground: "去聊天测试",
+        tryImagePlayground: "去生图测试",
+        modelNotCallable: "暂不可调用",
+        videoModelComingSoon: "视频模型即将开放",
         videoPlaygroundSoon: "Video Playground 即将上线",
+        chooseByUseCase: "按用途选择",
+        useCaseRecommended: "推荐",
+        useCaseOpenChatPlayground: "打开 Chat Playground",
+        useCaseOpenImagePlayground: "打开 Image Playground",
+        useCase: {
+          chat_general: {
+            title: "对话 / 通用聊天",
+            description: "高质量对话，适合助手、Agent 与通用文本生成。",
+          },
+          fast_low_cost_chat: {
+            title: "快速低成本对话",
+            description: "低延迟对话，适合草稿、预览与高频调用场景。",
+          },
+          text_to_image: {
+            title: "文生图",
+            description: "通过 Image Playground 或 API 根据文本提示生成图像。",
+          },
+          high_quality_image: {
+            title: "高质量图像",
+            description: "更高保真图像模型，适合生产级视觉与精细输出。",
+          },
+        },
+        imageGroup: {
+          basic: "基础图像生成",
+          fast_low_cost: "快速 / 低成本图像",
+          high_quality: "高质量图像",
+          coming_soon: "即将上线",
+        },
         recommendedTag: "推荐",
         traitSpeed: "速度",
         traitQuality: "质量",
