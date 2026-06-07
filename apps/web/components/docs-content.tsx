@@ -125,67 +125,36 @@ const COMPAT_CLIENT_CONFIG = `Base URL: https://api.tokfai.com/v1
 API Key: sk-tokfai_xxx
 Model: gemini-3.1-pro`;
 
-const ERROR_CODES = [
-  {
-    status: "401",
-    code: "invalid_token",
-    meaning: "Invalid or missing API key in Authorization header",
-  },
-  {
-    status: "402",
-    code: "insufficient_credits",
-    meaning: "Not enough credits — top up in Dashboard → Credits",
-  },
-  {
-    status: "404",
-    code: "model_not_found",
-    meaning: "The model ID is not available or not enabled for your account",
-  },
-  {
-    status: "404",
-    code: "route_not_found",
-    meaning: "HTTP path not found on api.tokfai.com",
-  },
-  {
-    status: "400",
-    code: "invalid_prompt",
-    meaning: "Missing or empty prompt for image generation",
-  },
-  {
-    status: "400",
-    code: "invalid_image_url",
-    meaning: "The image URL is malformed or not allowed",
-  },
+type ErrorRow = {
+  status: string;
+  code: string;
+  meaningKey: string;
+};
+
+const COMMON_HTTP_ERRORS: ErrorRow[] = [
+  { status: "401", code: "invalid_token", meaningKey: "docs.error401" },
+  { status: "402", code: "insufficient_credits", meaningKey: "docs.error402" },
+  { status: "404", code: "model_not_found", meaningKey: "docs.error404Model" },
+  { status: "404", code: "route_not_found", meaningKey: "docs.error404Route" },
+  { status: "429", code: "upstream_rate_limited", meaningKey: "docs.error429" },
+  { status: "500", code: "upstream_error", meaningKey: "docs.error500" },
+];
+
+const OTHER_ERROR_CODES: ErrorRow[] = [
+  { status: "400", code: "invalid_prompt", meaningKey: "docs.errorInvalidPrompt" },
+  { status: "400", code: "invalid_image_url", meaningKey: "docs.errorInvalidImageUrl" },
   {
     status: "400",
     code: "image_url_unreachable",
-    meaning: "Tokfai could not fetch the image from the provided URL",
+    meaningKey: "docs.errorImageUrlUnreachable",
   },
   {
     status: "400",
     code: "unsupported_image_content_type",
-    meaning: "The URL does not point to a supported image type (PNG, JPG, WEBP)",
+    meaningKey: "docs.errorUnsupportedContentType",
   },
-  {
-    status: "400",
-    code: "image_too_large",
-    meaning: "The input image exceeds the size limit",
-  },
-  {
-    status: "429",
-    code: "upstream_rate_limited",
-    meaning: "Upstream model rate limit — retry with backoff",
-  },
-  {
-    status: "5xx",
-    code: "upstream_error",
-    meaning: "Model temporarily unavailable",
-  },
-  {
-    status: "504",
-    code: "upstream_timeout",
-    meaning: "The model service timed out",
-  },
+  { status: "400", code: "image_too_large", meaningKey: "docs.errorImageTooLarge" },
+  { status: "504", code: "upstream_timeout", meaningKey: "docs.errorUpstreamTimeout" },
 ];
 
 export function DocsContent({
@@ -215,21 +184,15 @@ export function DocsContent({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">
-            API Documentation
+            {t("docs.pageTitle")}
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            {TOKFAI_PRODUCT_TAGLINE} Point your client at{" "}
-            <code className="rounded bg-muted px-1 text-xs">{BASE_URL}</code>,
-            send a{" "}
-            <code className="rounded bg-muted px-1 text-xs">
-              {TOKFAI_API_KEY_FORMAT}
-            </code>{" "}
-            API key, and use the same request shape as OpenAI.
+            {TOKFAI_PRODUCT_TAGLINE} {t("docs.pageSubtitle")}
           </p>
         </div>
         {showDashboardLinks ? (
           <Button asChild variant="outline" size="sm">
-            <Link href="/dashboard/api-keys">Create API key</Link>
+            <Link href="/dashboard/api-keys">{t("docs.createApiKey")}</Link>
           </Button>
         ) : null}
       </div>
@@ -239,24 +202,35 @@ export function DocsContent({
           <CardTitle>{t("docs.quickstartTitle")}</CardTitle>
           <CardDescription>{t("docs.quickstartDesc")}</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
           <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
             <li>{t("docs.quickstartStep1")}</li>
             <li>{t("docs.quickstartStep2")}</li>
             <li>{t("docs.quickstartStep3")}</li>
             <li>{t("docs.quickstartStep4")}</li>
-            <li>{t("docs.quickstartStep5")}</li>
           </ol>
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">{t("docs.quickstartFirstCallTitle")}</h3>
+            <CodeBlock
+              id="quickstart-first-call"
+              label="curl"
+              code={CHAT_COMPLETIONS_CURL}
+              copied={copiedId === "quickstart-first-call"}
+              onCopy={copyText}
+              copyLabel={t("docs.copy")}
+              copiedLabel={t("docs.copied")}
+            />
+          </div>
           {showDashboardLinks ? (
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button asChild variant="outline" size="sm">
-                <Link href="/dashboard/api-keys">API Keys</Link>
+                <Link href="/dashboard/api-keys">{t("docs.quickstartLinksApiKeys")}</Link>
               </Button>
               <Button asChild variant="outline" size="sm">
-                <Link href="/dashboard/credits">Credits</Link>
+                <Link href="/dashboard/credits">{t("docs.quickstartLinksCredits")}</Link>
               </Button>
               <Button asChild variant="outline" size="sm">
-                <Link href="/dashboard/playground">Chat Playground</Link>
+                <Link href="/dashboard/playground">{t("docs.quickstartLinksPlayground")}</Link>
               </Button>
             </div>
           ) : null}
@@ -272,6 +246,10 @@ export function DocsContent({
             <DocsSectionLink href="#authentication" label={t("docs.sectionAuthentication")} />
             <DocsSectionLink href="#chat-completions" label={t("docs.sectionChatCompletions")} />
             <DocsSectionLink href="#image-generations" label={t("docs.sectionImageGenerations")} />
+            <DocsSectionLink
+              href="#client-integrations"
+              label={t("docs.sectionClientIntegrations")}
+            />
             <DocsSectionLink href="#errors-billing" label={t("docs.sectionErrorsBilling")} />
           </nav>
         </CardContent>
@@ -280,74 +258,84 @@ export function DocsContent({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <CopyableCard
           id="base-url"
-          title="Base URL"
-          description="Use this as your OpenAI client baseURL."
+          title={t("docs.baseUrlTitle")}
+          description={t("docs.baseUrlDesc")}
           value={BASE_URL}
           copied={copiedId === "base-url"}
           onCopy={copyText}
+          copyLabel={t("docs.copy")}
+          copiedLabel={t("docs.copied")}
           monospace
         />
         <CopyableCard
           id="api-key-format"
-          title="API key format"
-          description="Create keys in the dashboard; shown once at creation."
+          title={t("docs.apiKeyFormatTitle")}
+          description={t("docs.apiKeyFormatDesc")}
           value={TOKFAI_API_KEY_FORMAT}
           copied={copiedId === "api-key-format"}
           onCopy={copyText}
+          copyLabel={t("docs.copy")}
+          copiedLabel={t("docs.copied")}
         />
         <CopyableCard
           id="models-endpoint"
-          title="Models"
-          description="List available models."
+          title={t("docs.modelsEndpointTitle")}
+          description={t("docs.modelsEndpointDesc")}
           value={TOKFAI_MODELS_ENDPOINT}
           copied={copiedId === "models-endpoint"}
           onCopy={copyText}
+          copyLabel={t("docs.copy")}
+          copiedLabel={t("docs.copied")}
           labelOnly
         />
         <CopyableCard
           id="chat-endpoint"
-          title="Chat Completions"
-          description="OpenAI-compatible chat endpoint."
+          title={t("docs.chatEndpointTitle")}
+          description={t("docs.chatEndpointDesc")}
           value={TOKFAI_CHAT_COMPLETIONS_ENDPOINT}
           copied={copiedId === "chat-endpoint"}
           onCopy={copyText}
+          copyLabel={t("docs.copy")}
+          copiedLabel={t("docs.copied")}
           labelOnly
         />
         <CopyableCard
           id="images-endpoint"
-          title="Image Generations"
-          description="Text-to-image and image-to-image endpoint."
+          title={t("docs.imagesEndpointTitle")}
+          description={t("docs.imagesEndpointDesc")}
           value={TOKFAI_IMAGES_GENERATIONS_FULL_PATH}
           copied={copiedId === "images-endpoint"}
           onCopy={copyText}
+          copyLabel={t("docs.copy")}
+          copiedLabel={t("docs.copied")}
           labelOnly
         />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Models</CardTitle>
+          <CardTitle>{t("docs.modelsTitle")}</CardTitle>
           <CardDescription>
-            Browse chat, image, and video model IDs in{" "}
+            {t("docs.modelsDescPrefix")}{" "}
             <Link
               href="/dashboard/models"
               className="font-medium text-foreground underline-offset-4 hover:underline"
             >
-              Models
+              {t("docs.modelsLink")}
             </Link>
-            . Image models are available via the API and{" "}
+            . {t("docs.modelsDescMiddle")}{" "}
             <Link
               href="/dashboard/image-playground"
               className="font-medium text-foreground underline-offset-4 hover:underline"
             >
-              Image Playground
+              {t("docs.imagePlaygroundLink")}
             </Link>
-            . Chat models are available via the API and{" "}
+            . {t("docs.modelsDescChatMiddle")}{" "}
             <Link
               href="/dashboard/playground"
               className="font-medium text-foreground underline-offset-4 hover:underline"
             >
-              Chat Playground
+              {t("docs.chatPlaygroundLink")}
             </Link>
             . {TOKFAI_PLAYGROUND_POLICY}
           </CardDescription>
@@ -356,23 +344,19 @@ export function DocsContent({
 
       <Card>
         <CardHeader>
-          <CardTitle>Recommended model</CardTitle>
-          <CardDescription>
-            Start with{" "}
-            <code className="rounded bg-muted px-1 text-xs">{DEFAULT_MODEL}</code>{" "}
-            for general chat. Pass it in the{" "}
-            <code className="rounded bg-muted px-1 text-xs">model</code> field
-            on chat completion requests.
-          </CardDescription>
+          <CardTitle>{t("docs.recommendedModelTitle")}</CardTitle>
+          <CardDescription>{t("docs.recommendedModelDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           <CopyableCard
             id="recommended-model"
-            title="Model ID"
+            title={t("docs.modelIdLabel")}
             description=""
             value={DEFAULT_MODEL}
             copied={copiedId === "recommended-model"}
             onCopy={copyText}
+            copyLabel={t("docs.copy")}
+            copiedLabel={t("docs.copied")}
             compact
           />
         </CardContent>
@@ -386,21 +370,25 @@ export function DocsContent({
         <CardContent className="flex flex-col gap-4">
           <CopyableCard
             id="auth"
-            title="Header"
-            description="Include on every request."
+            title={t("docs.authHeaderTitle")}
+            description={t("docs.authHeaderDesc")}
             value={AUTH_HEADER}
             copied={copiedId === "auth"}
             onCopy={copyText}
+            copyLabel={t("docs.copy")}
+            copiedLabel={t("docs.copied")}
             compact
           />
           <div className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">Verify your key — GET /v1/models</h3>
+            <h3 className="text-sm font-medium">{t("docs.authVerifyTitle")}</h3>
             <CodeBlock
               id="models-curl"
               label="curl"
               code={MODELS_CURL}
               copied={copiedId === "models-curl"}
               onCopy={copyText}
+              copyLabel={t("docs.copy")}
+              copiedLabel={t("docs.copied")}
             />
           </div>
         </CardContent>
@@ -409,12 +397,7 @@ export function DocsContent({
       <Card id="chat-completions">
         <CardHeader>
           <CardTitle>{t("docs.sectionChatCompletions")}</CardTitle>
-          <CardDescription>
-            Send chat messages and receive a model response via{" "}
-            <EndpointInlineCode value={TOKFAI_CHAT_COMPLETIONS_ENDPOINT} />.
-            Recommended starting model:{" "}
-            <code className="rounded bg-muted px-1 text-xs">{DEFAULT_MODEL}</code>.
-          </CardDescription>
+          <CardDescription>{t("docs.chatCompletionsDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
           <CodeBlock
@@ -423,9 +406,11 @@ export function DocsContent({
             code={CHAT_COMPLETIONS_CURL}
             copied={copiedId === "chat-completions-curl"}
             onCopy={copyText}
+            copyLabel={t("docs.copy")}
+            copiedLabel={t("docs.copied")}
           />
           <div className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">OpenAI JavaScript SDK</h3>
+            <h3 className="text-sm font-medium">{t("docs.chatSdkJsTitle")}</h3>
             <p className="text-sm text-muted-foreground">{t("docs.chatSdkDesc")}</p>
             <CodeBlock
               id="openai-js"
@@ -433,10 +418,12 @@ export function DocsContent({
               code={OPENAI_JS_EXAMPLE}
               copied={copiedId === "openai-js"}
               onCopy={copyText}
+              copyLabel={t("docs.copy")}
+              copiedLabel={t("docs.copied")}
             />
           </div>
           <div className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">OpenAI Python SDK</h3>
+            <h3 className="text-sm font-medium">{t("docs.chatSdkPythonTitle")}</h3>
             <p className="text-sm text-muted-foreground">{t("docs.chatSdkDesc")}</p>
             <CodeBlock
               id="openai-python"
@@ -444,6 +431,8 @@ export function DocsContent({
               code={OPENAI_PYTHON_EXAMPLE}
               copied={copiedId === "openai-python"}
               onCopy={copyText}
+              copyLabel={t("docs.copy")}
+              copiedLabel={t("docs.copied")}
             />
           </div>
         </CardContent>
@@ -452,17 +441,13 @@ export function DocsContent({
       <Card id="image-generations">
         <CardHeader>
           <CardTitle>{t("docs.sectionImageGenerations")}</CardTitle>
-          <CardDescription>
-            Generate images from a text prompt, or pass reference images for
-            image-to-image editing via{" "}
-            <EndpointInlineCode value={TOKFAI_IMAGES_GENERATIONS_FULL_PATH} />.
-          </CardDescription>
+          <CardDescription>{t("docs.imageGenerationsDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
           <dl className="grid gap-3 text-sm">
             <div className="flex flex-col gap-1 sm:flex-row sm:gap-3">
               <dt className="shrink-0 font-medium text-foreground sm:w-28">
-                Endpoint
+                {t("docs.imageEndpointLabel")}
               </dt>
               <dd>
                 <EndpointInlineCode value={TOKFAI_IMAGES_GENERATIONS_FULL_PATH} />
@@ -470,70 +455,48 @@ export function DocsContent({
             </div>
             <div className="flex flex-col gap-1 sm:flex-row sm:gap-3">
               <dt className="shrink-0 font-medium text-foreground sm:w-28">
-                Modes
+                {t("docs.imageModesLabel")}
               </dt>
               <dd className="text-muted-foreground">
                 <ul className="list-disc space-y-1 pl-4">
-                  <li>
-                    <span className="font-medium text-foreground">
-                      Text-to-image
-                    </span>{" "}
-                    — send <code className="rounded bg-muted px-1 text-xs">model</code>,{" "}
-                    <code className="rounded bg-muted px-1 text-xs">prompt</code>, and{" "}
-                    <code className="rounded bg-muted px-1 text-xs">size</code>.
-                  </li>
-                  <li>
-                    <span className="font-medium text-foreground">
-                      Image-to-image
-                    </span>{" "}
-                    — add{" "}
-                    <code className="rounded bg-muted px-1 text-xs">image_urls</code>{" "}
-                    alongside your prompt.
-                  </li>
+                  <li>{t("docs.imageTextToImageMode")}</li>
+                  <li>{t("docs.imageImageToImageMode")}</li>
                 </ul>
               </dd>
             </div>
             <div className="flex flex-col gap-1 sm:flex-row sm:gap-3">
               <dt className="shrink-0 font-medium text-foreground sm:w-28">
-                image_urls
+                {t("docs.imageUrlsLabel")}
               </dt>
               <dd className="text-muted-foreground">
-                Pass uploaded image URLs from{" "}
+                {t("docs.imageUrlsDescPrefix")}{" "}
                 <Link
                   href="/dashboard/image-playground"
                   className="font-medium text-foreground underline-offset-4 hover:underline"
                 >
-                  Image Playground
+                  {t("docs.imagePlaygroundLink")}
                 </Link>{" "}
-                or external direct image URLs (PNG, JPG, WEBP).
+                {t("docs.imageUrlsDescSuffix")}
               </dd>
             </div>
             <div className="flex flex-col gap-1 sm:flex-row sm:gap-3">
               <dt className="shrink-0 font-medium text-foreground sm:w-28">
-                Billing
+                {t("docs.imageBillingLabel")}
               </dt>
               <dd className="text-muted-foreground">{t("docs.imageApiBilling")}</dd>
             </div>
             <div className="flex flex-col gap-1 sm:flex-row sm:gap-3">
               <dt className="shrink-0 font-medium text-foreground sm:w-28">
-                Playground
+                {t("docs.imagePlaygroundLabel")}
               </dt>
-              <dd className="text-muted-foreground">
-                Image Playground supports drag-and-drop uploads, pasted image or
-                webpage URLs, and reference-image generation.
-              </dd>
+              <dd className="text-muted-foreground">{t("docs.imagePlaygroundDesc")}</dd>
             </div>
           </dl>
 
           <div className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">Text-to-image</h3>
+            <h3 className="text-sm font-medium">{t("docs.imageTextToImageTitle")}</h3>
             <p className="text-sm text-muted-foreground">
-              Required fields:{" "}
-              <code className="rounded bg-muted px-1 text-xs">model</code>,{" "}
-              <code className="rounded bg-muted px-1 text-xs">prompt</code>,{" "}
-              <code className="rounded bg-muted px-1 text-xs">size</code>,{" "}
-              <code className="rounded bg-muted px-1 text-xs">n</code>,{" "}
-              <code className="rounded bg-muted px-1 text-xs">response_format</code>.
+              {t("docs.imageTextToImageRequired")}
             </p>
             <CodeBlock
               id="image-text-to-image-curl"
@@ -541,14 +504,14 @@ export function DocsContent({
               code={IMAGE_TEXT_TO_IMAGE_CURL}
               copied={copiedId === "image-text-to-image-curl"}
               onCopy={copyText}
+              copyLabel={t("docs.copy")}
+              copiedLabel={t("docs.copied")}
             />
           </div>
           <div className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">Image-to-image</h3>
+            <h3 className="text-sm font-medium">{t("docs.imageImageToImageTitle")}</h3>
             <p className="text-sm text-muted-foreground">
-              Include{" "}
-              <code className="rounded bg-muted px-1 text-xs">image_urls</code>{" "}
-              with one or more reference image URLs.
+              {t("docs.imageImageToImageDesc")}
             </p>
             <CodeBlock
               id="image-to-image-curl"
@@ -556,11 +519,13 @@ export function DocsContent({
               code={IMAGE_TO_IMAGE_CURL}
               copied={copiedId === "image-to-image-curl"}
               onCopy={copyText}
+              copyLabel={t("docs.copy")}
+              copiedLabel={t("docs.copied")}
             />
           </div>
 
           <div className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">OpenAI JavaScript SDK</h3>
+            <h3 className="text-sm font-medium">{t("docs.imageSdkJsTitle")}</h3>
             <p className="text-sm text-muted-foreground">{t("docs.imageSdkDesc")}</p>
             <CodeBlock
               id="openai-js-image"
@@ -568,10 +533,12 @@ export function DocsContent({
               code={OPENAI_JS_IMAGE_EXAMPLE}
               copied={copiedId === "openai-js-image"}
               onCopy={copyText}
+              copyLabel={t("docs.copy")}
+              copiedLabel={t("docs.copied")}
             />
           </div>
           <div className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">OpenAI Python SDK</h3>
+            <h3 className="text-sm font-medium">{t("docs.imageSdkPythonTitle")}</h3>
             <p className="text-sm text-muted-foreground">{t("docs.imageSdkDesc")}</p>
             <CodeBlock
               id="openai-python-image"
@@ -579,7 +546,64 @@ export function DocsContent({
               code={OPENAI_PYTHON_IMAGE_EXAMPLE}
               copied={copiedId === "openai-python-image"}
               onCopy={copyText}
+              copyLabel={t("docs.copy")}
+              copiedLabel={t("docs.copied")}
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card id="client-integrations">
+        <CardHeader>
+          <CardTitle>{t("docs.clientIntegrationsTitle")}</CardTitle>
+          <CardDescription>{t("docs.clientIntegrationsDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <CodeBlock
+            id="compat-config"
+            label="config"
+            code={COMPAT_CLIENT_CONFIG}
+            copied={copiedId === "compat-config"}
+            onCopy={copyText}
+            copyLabel={t("docs.copy")}
+            copiedLabel={t("docs.copied")}
+          />
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              <span className="font-medium text-foreground">
+                {t("docs.cherryStudioLabel")}:
+              </span>{" "}
+              {t("docs.cherryStudioSteps")}
+            </p>
+            <p>
+              <span className="font-medium text-foreground">{t("docs.cursorLabel")}:</span>{" "}
+              {t("docs.cursorSteps")}
+            </p>
+            <p>
+              <span className="font-medium text-foreground">
+                {t("docs.openAiSdkLabel")}:
+              </span>{" "}
+              {t("docs.openAiSdkSteps")}
+            </p>
+            <p>
+              {t("docs.clientApiKeyHintPrefix")}{" "}
+              {showDashboardLinks ? (
+                <Link
+                  href="/dashboard/api-keys"
+                  className="font-medium text-foreground underline-offset-4 hover:underline"
+                >
+                  {t("docs.clientApiKeyHintLink")}
+                </Link>
+              ) : (
+                <Link
+                  href="/dashboard/api-keys"
+                  className="font-medium text-foreground underline-offset-4 hover:underline"
+                >
+                  {t("docs.clientApiKeyHintLink")}
+                </Link>
+              )}
+              {t("docs.clientApiKeyHintSuffix")}
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -599,7 +623,7 @@ export function DocsContent({
                   href="/pricing"
                   className="font-medium underline-offset-4 hover:underline"
                 >
-                  Pricing
+                  {t("docs.pricingLink")}
                 </Link>
                 .
               </p>
@@ -614,15 +638,11 @@ export function DocsContent({
               <p className="mt-1">{t("docs.billingCreditsDesc")}</p>
             </div>
             <div>
-              <h3 className="font-medium text-foreground">
-                {t("docs.chatBillingTitle")}
-              </h3>
+              <h3 className="font-medium text-foreground">{t("docs.chatBillingTitle")}</h3>
               <p className="mt-1">{t("docs.chatBillingDesc")}</p>
             </div>
             <div>
-              <h3 className="font-medium text-foreground">
-                {t("docs.imageBillingTitle")}
-              </h3>
+              <h3 className="font-medium text-foreground">{t("docs.imageBillingTitle")}</h3>
               <p className="mt-1">{t("docs.imageBillingDesc")}</p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -630,13 +650,13 @@ export function DocsContent({
                 href="/dashboard/credits"
                 className="font-medium text-foreground underline-offset-4 hover:underline"
               >
-                Dashboard → Credits
+                {t("docs.dashboardCreditsLink")}
               </Link>
               <Link
                 href="/dashboard/usage"
                 className="font-medium text-foreground underline-offset-4 hover:underline"
               >
-                Dashboard → Usage
+                {t("docs.dashboardUsageLink")}
               </Link>
               <Link
                 href="/pricing"
@@ -654,99 +674,17 @@ export function DocsContent({
           </div>
 
           <div>
-            <h3 className="mb-3 text-sm font-medium">Error codes</h3>
+            <h3 className="mb-2 text-sm font-medium">{t("docs.commonErrorsTitle")}</h3>
             <p className="mb-4 text-sm text-muted-foreground">
-              {t("docs.errorCodesDesc")}
+              {t("docs.commonErrorsDesc")}
             </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-                    <th className="py-2 pr-4 font-medium">HTTP</th>
-                    <th className="py-2 pr-4 font-medium">Code</th>
-                    <th className="py-2 pr-4 font-medium">Meaning</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ERROR_CODES.map((error) => (
-                    <tr key={error.code} className="border-b last:border-0">
-                      <td className="py-3 pr-4 font-mono text-xs">
-                        {error.status}
-                      </td>
-                      <td className="py-3 pr-4 font-mono text-xs">
-                        {error.code}
-                      </td>
-                      <td className="py-3 pr-4 text-muted-foreground">
-                        {error.meaning}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ErrorCodeTable errors={COMMON_HTTP_ERRORS} t={t} />
           </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Cherry Studio / Chatbox</CardTitle>
-          <CardDescription>
-            Use these settings in desktop clients that support a custom OpenAI
-            base URL.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <CodeBlock
-            id="compat-config"
-            label="config"
-            code={COMPAT_CLIENT_CONFIG}
-            copied={copiedId === "compat-config"}
-            onCopy={copyText}
-          />
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <p>
-              <span className="font-medium text-foreground">Cherry Studio:</span>{" "}
-              Settings → Provider → OpenAI-compatible → set API Host to{" "}
-              <code className="rounded bg-muted px-1 text-xs">{BASE_URL}</code>,
-              API Key to your{" "}
-              <code className="rounded bg-muted px-1 text-xs">
-                {TOKFAI_API_KEY_FORMAT}
-              </code>{" "}
-              key, and default model to{" "}
-              <code className="rounded bg-muted px-1 text-xs">{DEFAULT_MODEL}</code>.
-            </p>
-            <p>
-              <span className="font-medium text-foreground">Chatbox:</span>{" "}
-              Settings → AI Provider → Custom → API Mode OpenAI-compatible →
-              API Host{" "}
-              <code className="rounded bg-muted px-1 text-xs">{BASE_URL}</code>,
-              API Key{" "}
-              <code className="rounded bg-muted px-1 text-xs">sk-tokfai_xxx</code>,
-              Model{" "}
-              <code className="rounded bg-muted px-1 text-xs">{DEFAULT_MODEL}</code>.
-            </p>
-            <p>
-              Replace{" "}
-              <code className="rounded bg-muted px-1 text-xs">sk-tokfai_xxx</code>{" "}
-              with a key from{" "}
-              {showDashboardLinks ? (
-                <Link
-                  href="/dashboard/api-keys"
-                  className="font-medium text-foreground underline-offset-4 hover:underline"
-                >
-                  API Keys
-                </Link>
-              ) : (
-                <Link
-                  href="/dashboard/api-keys"
-                  className="font-medium text-foreground underline-offset-4 hover:underline"
-                >
-                  your Tokfai dashboard
-                </Link>
-              )}
-              .
-            </p>
+          <div>
+            <h3 className="mb-2 text-sm font-medium">{t("docs.otherErrorsTitle")}</h3>
+            <p className="mb-4 text-sm text-muted-foreground">{t("docs.errorCodesDesc")}</p>
+            <ErrorCodeTable errors={OTHER_ERROR_CODES} t={t} />
           </div>
         </CardContent>
       </Card>
@@ -765,6 +703,37 @@ function DocsSectionLink({ href, label }: { href: string; label: string }) {
   );
 }
 
+function ErrorCodeTable({
+  errors,
+  t,
+}: {
+  errors: ErrorRow[];
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <th className="py-2 pr-4 font-medium">{t("docs.httpColumn")}</th>
+            <th className="py-2 pr-4 font-medium">{t("docs.codeColumn")}</th>
+            <th className="py-2 pr-4 font-medium">{t("docs.meaningColumn")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {errors.map((error) => (
+            <tr key={`${error.status}-${error.code}`} className="border-b last:border-0">
+              <td className="py-3 pr-4 font-mono text-xs">{error.status}</td>
+              <td className="py-3 pr-4 font-mono text-xs">{error.code}</td>
+              <td className="py-3 pr-4 text-muted-foreground">{t(error.meaningKey)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function CopyableCard({
   id,
   title,
@@ -772,6 +741,8 @@ function CopyableCard({
   value,
   copied,
   onCopy,
+  copyLabel,
+  copiedLabel,
   compact = false,
   monospace = false,
   labelOnly = false,
@@ -782,6 +753,8 @@ function CopyableCard({
   value: string;
   copied: boolean;
   onCopy: (id: string, value: string) => void;
+  copyLabel: string;
+  copiedLabel: string;
   compact?: boolean;
   monospace?: boolean;
   labelOnly?: boolean;
@@ -792,9 +765,7 @@ function CopyableCard({
 
   const valueNode = labelOnly ? null : (
     <div className="min-w-0 flex-1 overflow-x-auto">
-      <code className={`rounded bg-muted px-2 py-1 ${valueClassName}`}>
-        {value}
-      </code>
+      <code className={`rounded bg-muted px-2 py-1 ${valueClassName}`}>{value}</code>
     </div>
   );
 
@@ -802,7 +773,12 @@ function CopyableCard({
     return (
       <div className="flex items-start justify-between gap-3">
         {valueNode}
-        <CopyButton copied={copied} onCopy={() => onCopy(id, value)} />
+        <CopyButton
+          copied={copied}
+          onCopy={() => onCopy(id, value)}
+          copyLabel={copyLabel}
+          copiedLabel={copiedLabel}
+        />
       </div>
     );
   }
@@ -821,7 +797,12 @@ function CopyableCard({
         }
       >
         {valueNode}
-        <CopyButton copied={copied} onCopy={() => onCopy(id, value)} />
+        <CopyButton
+          copied={copied}
+          onCopy={() => onCopy(id, value)}
+          copyLabel={copyLabel}
+          copiedLabel={copiedLabel}
+        />
       </CardContent>
     </Card>
   );
@@ -840,9 +821,13 @@ function EndpointInlineCode({ value }: { value: string }) {
 function CopyButton({
   copied,
   onCopy,
+  copyLabel,
+  copiedLabel,
 }: {
   copied: boolean;
   onCopy: () => void;
+  copyLabel: string;
+  copiedLabel: string;
 }) {
   return (
     <Button
@@ -855,12 +840,12 @@ function CopyButton({
       {copied ? (
         <>
           <Check className="h-4 w-4" />
-          Copied
+          {copiedLabel}
         </>
       ) : (
         <>
           <Copy className="h-4 w-4" />
-          Copy
+          {copyLabel}
         </>
       )}
     </Button>
@@ -873,12 +858,16 @@ function CodeBlock({
   code,
   copied,
   onCopy,
+  copyLabel,
+  copiedLabel,
 }: {
   id: string;
   label: string;
   code: string;
   copied: boolean;
   onCopy: (id: string, value: string) => void;
+  copyLabel: string;
+  copiedLabel: string;
 }) {
   return (
     <div className="overflow-hidden rounded-lg border bg-muted">
@@ -896,12 +885,12 @@ function CodeBlock({
           {copied ? (
             <>
               <Check className="h-4 w-4" />
-              Copied
+              {copiedLabel}
             </>
           ) : (
             <>
               <Copy className="h-4 w-4" />
-              Copy
+              {copyLabel}
             </>
           )}
         </Button>

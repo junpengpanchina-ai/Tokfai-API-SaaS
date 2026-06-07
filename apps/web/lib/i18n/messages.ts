@@ -631,26 +631,129 @@ export const messages = {
       },
     },
     docs: {
+      pageTitle: "API Documentation",
+      pageSubtitle:
+        "Point your client at https://api.tokfai.com/v1, send a sk-tokfai_… API key, and use the same request shape as OpenAI.",
+      createApiKey: "Create API key",
+      copy: "Copy",
+      copied: "Copied",
       quickstartTitle: "Quickstart",
       quickstartDesc: "Get your first Tokfai API response in a few minutes.",
       quickstartStep1:
-        "Sign up at tokfai.com and open Dashboard → API Keys to create a key. Copy the full secret — it is shown once at creation.",
+        "Create an API key in Dashboard → API Keys. Copy the full secret — it is shown once at creation.",
       quickstartStep2:
-        "Top up in Dashboard → Credits (Stripe Checkout). Credits are added after payment is confirmed.",
+        "Top up credits in Dashboard → Credits. Credits are added after payment is confirmed.",
       quickstartStep3:
-        "Point your OpenAI-compatible client at https://api.tokfai.com/v1 and send Authorization: Bearer sk-tokfai_… on every request.",
+        "Set your client base URL to https://api.tokfai.com/v1 and send Authorization: Bearer sk-tokfai_… on every request.",
       quickstartStep4:
-        "Call POST /v1/chat/completions for chat or POST /v1/images/generations for images. Start with model gemini-3.1-pro for chat.",
-      quickstartStep5:
-        "Review per-request charges in Dashboard → Usage and balance changes in Dashboard → Credits.",
+        "Make your first call — POST /v1/chat/completions for chat (start with gemini-3.1-pro) or POST /v1/images/generations for images.",
+      quickstartFirstCallTitle: "First call example",
+      quickstartLinksApiKeys: "API Keys",
+      quickstartLinksCredits: "Credits",
+      quickstartLinksPlayground: "Chat Playground",
+      sectionNavTitle: "API reference",
+      sectionAuthentication: "Authentication",
+      sectionChatCompletions: "Chat Completions",
+      sectionImageGenerations: "Image Generations",
+      sectionClientIntegrations: "Client integrations",
+      sectionErrorsBilling: "Errors & Billing",
+      baseUrlTitle: "Base URL",
+      baseUrlDesc: "Use this as your OpenAI client baseURL.",
+      apiKeyFormatTitle: "API key format",
+      apiKeyFormatDesc: "Create keys in the dashboard; shown once at creation.",
+      modelsEndpointTitle: "Models",
+      modelsEndpointDesc: "List available models.",
+      chatEndpointTitle: "Chat Completions",
+      chatEndpointDesc: "OpenAI-compatible chat endpoint.",
+      imagesEndpointTitle: "Image Generations",
+      imagesEndpointDesc: "Text-to-image and image-to-image endpoint.",
+      modelsTitle: "Models",
+      modelsDescPrefix: "Browse chat, image, and video model IDs in",
+      modelsLink: "Models",
+      modelsDescMiddle: "Image models are available via the API and",
+      imagePlaygroundLink: "Image Playground",
+      modelsDescChatMiddle: "Chat models are available via the API and",
+      chatPlaygroundLink: "Chat Playground",
+      recommendedModelTitle: "Recommended model",
+      recommendedModelDesc:
+        "Start with gemini-3.1-pro for general chat. Pass it in the model field on chat completion requests.",
+      modelIdLabel: "Model ID",
       authSectionDesc:
         "Every API request must include your API key in the Authorization header. Dashboard session tokens are not accepted on /v1/chat/completions or /v1/images/generations.",
+      authHeaderTitle: "Header",
+      authHeaderDesc: "Include on every request.",
+      authVerifyTitle: "Verify your key — GET /v1/models",
+      chatCompletionsDesc:
+        "Send chat messages and receive a model response via POST /chat/completions. Recommended starting model: gemini-3.1-pro.",
+      chatSdkJsTitle: "OpenAI JavaScript SDK",
+      chatSdkPythonTitle: "OpenAI Python SDK",
+      chatSdkDesc: "Use the official OpenAI SDK with baseURL set to Tokfai.",
+      imageGenerationsDesc:
+        "Generate images from a text prompt, or pass reference images for image-to-image editing via POST /v1/images/generations.",
+      imageEndpointLabel: "Endpoint",
+      imageModesLabel: "Modes",
+      imageTextToImageMode:
+        "Text-to-image — send model, prompt, and size.",
+      imageImageToImageMode:
+        "Image-to-image — add image_urls alongside your prompt.",
+      imageUrlsLabel: "image_urls",
+      imageUrlsDescPrefix: "Pass uploaded image URLs from",
+      imageUrlsDescSuffix: "or external direct image URLs (PNG, JPG, WEBP).",
+      imageBillingLabel: "Billing",
+      imageApiBilling:
+        "Credits are charged only after a successful generation. Failed requests are not charged. Model-specific credits and reference prices are listed on Models and Pricing.",
+      imagePlaygroundLabel: "Playground",
+      imagePlaygroundDesc:
+        "Image Playground supports drag-and-drop uploads, pasted image or webpage URLs, and reference-image generation.",
+      imageTextToImageTitle: "Text-to-image",
+      imageTextToImageRequired:
+        "Required fields: model, prompt, size, n, response_format.",
+      imageImageToImageTitle: "Image-to-image",
+      imageImageToImageDesc: "Include image_urls with one or more reference image URLs.",
+      imageSdkJsTitle: "OpenAI JavaScript SDK",
+      imageSdkPythonTitle: "OpenAI Python SDK",
+      imageSdkDesc:
+        "Text-to-image via client.images.generate. For image-to-image, pass image_urls in the request body (see curl example).",
+      clientIntegrationsTitle: "Cherry Studio / Cursor / OpenAI SDK",
+      clientIntegrationsDesc:
+        "Tokfai is OpenAI-compatible. Use the same base URL and API key in desktop clients and official SDKs.",
+      cherryStudioLabel: "Cherry Studio",
+      cherryStudioSteps:
+        "Settings → Provider → OpenAI-compatible → API Host https://api.tokfai.com/v1, API Key sk-tokfai_xxx, default model gemini-3.1-pro.",
+      cursorLabel: "Cursor",
+      cursorSteps:
+        "Settings → Models → Override OpenAI Base URL → https://api.tokfai.com/v1. Add your sk-tokfai_xxx key under OpenAI API Key. Pick gemini-3.1-pro or another Tokfai model ID.",
+      openAiSdkLabel: "OpenAI SDK",
+      openAiSdkSteps:
+        "Set baseURL to https://api.tokfai.com/v1 and apiKey to your sk-tokfai_xxx key. See Chat Completions and Image Generations sections for JavaScript and Python examples.",
+      clientApiKeyHintPrefix: "Replace sk-tokfai_xxx with a key from",
+      clientApiKeyHintLink: "API Keys",
+      clientApiKeyHintSuffix: ".",
       billingCreditsTitle: "Billing & credits",
       billingCreditsDesc:
-        "Tokfai uses prepaid credits. Chat models debit by token usage; image models debit per successful generation. Failed requests are not charged. Purchase packages in Dashboard → Credits; ledger entries appear after Stripe webhook confirmation.",
+        "Tokfai uses prepaid credits. Chat models debit by token usage; image models debit per successful generation. Failed requests are not charged. Purchase packages in Dashboard → Credits; ledger entries appear after payment confirmation.",
+      commonErrorsTitle: "Common HTTP errors",
+      commonErrorsDesc:
+        "These status codes cover most integration issues. Check the error.code field in the JSON body for details.",
+      otherErrorsTitle: "Other error codes",
       errorCodesDesc:
-        "Common HTTP status codes and error.code values returned by the Tokfai API.",
-      billingRatesTitle: "Billing & pricing",
+        "Additional error.code values for image validation and upstream failures.",
+      httpColumn: "HTTP",
+      codeColumn: "Code",
+      meaningColumn: "Meaning",
+      error401: "Invalid or missing API key in Authorization header",
+      error402: "Not enough credits — top up in Dashboard → Credits",
+      error404Model: "The model ID is not available or not enabled for your account",
+      error404Route: "HTTP path not found on api.tokfai.com",
+      error429: "Upstream model rate limit — retry with exponential backoff",
+      error500: "Model or upstream service temporarily unavailable — retry later",
+      errorInvalidPrompt: "Missing or empty prompt for image generation",
+      errorInvalidImageUrl: "The image URL is malformed or not allowed",
+      errorImageUrlUnreachable: "Tokfai could not fetch the image from the provided URL",
+      errorUnsupportedContentType:
+        "The URL does not point to a supported image type (PNG, JPG, WEBP)",
+      errorImageTooLarge: "The input image exceeds the size limit",
+      errorUpstreamTimeout: "The model service timed out",
       billingRatesDesc:
         "Successful calls debit credits. Failed calls are not charged. Current reference prices are shown for planning — review per-request charges in Usage and ledger entries in Credits.",
       chatBillingTitle: "Chat models",
@@ -659,19 +762,11 @@ export const messages = {
       imageBillingTitle: "Image models",
       imageBillingDesc:
         "Image models are billed per successful generation in credits, with current reference prices in ¥. Actual credits charged per request appear in Usage.",
-      imageApiBilling:
-        "Image generation is billed per successful generation in credits. Model-specific credits and reference prices are listed on Models and Pricing.",
       viewModelRates: "View full pricing on Pricing",
       viewModelsPage: "Browse models and tags",
-      sectionNavTitle: "API reference",
-      sectionAuthentication: "Authentication",
-      sectionChatCompletions: "Chat Completions",
-      sectionImageGenerations: "Image Generations",
-      sectionErrorsBilling: "Errors & Billing",
-      chatSdkDesc:
-        "Use the official OpenAI SDK with baseURL set to Tokfai.",
-      imageSdkDesc:
-        "Text-to-image via client.images.generate. For image-to-image, pass image_urls in the request body (see curl example).",
+      dashboardCreditsLink: "Dashboard → Credits",
+      dashboardUsageLink: "Dashboard → Usage",
+      pricingLink: "Pricing",
     },
     admin: {
       nav: {
@@ -1672,25 +1767,126 @@ export const messages = {
       },
     },
     docs: {
+      pageTitle: "API 文档",
+      pageSubtitle:
+        "将客户端指向 https://api.tokfai.com/v1，使用 sk-tokfai_… API Key，请求格式与 OpenAI 兼容。",
+      createApiKey: "创建 API Key",
+      copy: "复制",
+      copied: "已复制",
       quickstartTitle: "Quickstart",
       quickstartDesc: "几分钟内完成第一次 Tokfai API 调用。",
       quickstartStep1:
-        "在 tokfai.com 注册，打开 Dashboard → API Keys 创建密钥并复制完整 secret（创建时仅展示一次）。",
+        "在 Dashboard → API Keys 创建 API Key，并复制完整 secret（创建时仅展示一次）。",
       quickstartStep2:
-        "在 Dashboard → Credits 充值（Stripe Checkout）。支付确认后 credits 自动入账。",
+        "在 Dashboard → Credits 充值 credits，支付确认后自动入账。",
       quickstartStep3:
-        "将 OpenAI 兼容客户端的 base URL 设为 https://api.tokfai.com/v1，每次请求携带 Authorization: Bearer sk-tokfai_…。",
+        "将客户端 base URL 设为 https://api.tokfai.com/v1，每次请求携带 Authorization: Bearer sk-tokfai_…。",
       quickstartStep4:
-        "调用 POST /v1/chat/completions（对话）或 POST /v1/images/generations（图像）。对话可从 model gemini-3.1-pro 开始。",
-      quickstartStep5:
-        "在 Dashboard → Usage 查看每次请求扣费，在 Dashboard → Credits 查看余额与账本。",
+        "发起第一次调用 — POST /v1/chat/completions（对话，可从 gemini-3.1-pro 开始）或 POST /v1/images/generations（图像）。",
+      quickstartFirstCallTitle: "第一次调用示例",
+      quickstartLinksApiKeys: "API Keys",
+      quickstartLinksCredits: "Credits",
+      quickstartLinksPlayground: "Chat Playground",
+      sectionNavTitle: "API 参考",
+      sectionAuthentication: "Authentication",
+      sectionChatCompletions: "Chat Completions",
+      sectionImageGenerations: "Image Generations",
+      sectionClientIntegrations: "客户端接入",
+      sectionErrorsBilling: "Errors & Billing",
+      baseUrlTitle: "Base URL",
+      baseUrlDesc: "作为 OpenAI 客户端的 baseURL 使用。",
+      apiKeyFormatTitle: "API Key 格式",
+      apiKeyFormatDesc: "在控制台创建密钥；完整 secret 创建时仅展示一次。",
+      modelsEndpointTitle: "Models",
+      modelsEndpointDesc: "列出可用模型。",
+      chatEndpointTitle: "Chat Completions",
+      chatEndpointDesc: "OpenAI 兼容对话接口。",
+      imagesEndpointTitle: "Image Generations",
+      imagesEndpointDesc: "文生图与图生图接口。",
+      modelsTitle: "Models",
+      modelsDescPrefix: "在",
+      modelsLink: "Models",
+      modelsDescMiddle: "浏览对话、图像与视频 model ID。图像模型可通过 API 与",
+      imagePlaygroundLink: "Image Playground",
+      modelsDescChatMiddle: "使用。对话模型可通过 API 与",
+      chatPlaygroundLink: "Chat Playground",
+      recommendedModelTitle: "推荐模型",
+      recommendedModelDesc:
+        "通用对话建议从 gemini-3.1-pro 开始，在 chat completions 请求的 model 字段传入。",
+      modelIdLabel: "Model ID",
       authSectionDesc:
         "每次 API 请求必须在 Authorization header 中携带 API Key。/v1/chat/completions 与 /v1/images/generations 不接受 Dashboard 会话 token。",
+      authHeaderTitle: "Header",
+      authHeaderDesc: "每次请求都需要携带。",
+      authVerifyTitle: "验证密钥 — GET /v1/models",
+      chatCompletionsDesc:
+        "通过 POST /chat/completions 发送对话消息并获取模型回复。推荐起始模型：gemini-3.1-pro。",
+      chatSdkJsTitle: "OpenAI JavaScript SDK",
+      chatSdkPythonTitle: "OpenAI Python SDK",
+      chatSdkDesc: "使用官方 OpenAI SDK，将 baseURL 指向 Tokfai。",
+      imageGenerationsDesc:
+        "通过 POST /v1/images/generations 根据文本 prompt 生成图像，或传入参考图进行图生图。",
+      imageEndpointLabel: "Endpoint",
+      imageModesLabel: "Modes",
+      imageTextToImageMode: "文生图 — 传入 model、prompt、size。",
+      imageImageToImageMode: "图生图 — 在 prompt 之外额外传入 image_urls。",
+      imageUrlsLabel: "image_urls",
+      imageUrlsDescPrefix: "可传入",
+      imageUrlsDescSuffix: "上传后的图片 URL，或外部可直接访问的图片 URL（PNG、JPG、WEBP）。",
+      imageBillingLabel: "Billing",
+      imageApiBilling:
+        "仅在成功生成后扣除 credits，失败请求不扣费。各 model 的积分价格与参考价格见 Models 与 Pricing。",
+      imagePlaygroundLabel: "Playground",
+      imagePlaygroundDesc:
+        "Image Playground 支持拖拽上传、粘贴图片或网页 URL，以及参考图生成。",
+      imageTextToImageTitle: "文生图",
+      imageTextToImageRequired:
+        "必填字段：model、prompt、size、n、response_format。",
+      imageImageToImageTitle: "图生图",
+      imageImageToImageDesc: "传入一个或多个参考图的 image_urls。",
+      imageSdkJsTitle: "OpenAI JavaScript SDK",
+      imageSdkPythonTitle: "OpenAI Python SDK",
+      imageSdkDesc:
+        "文生图可通过 client.images.generate 调用。图生图需在请求体中传入 image_urls（见 curl 示例）。",
+      clientIntegrationsTitle: "Cherry Studio / Cursor / OpenAI SDK",
+      clientIntegrationsDesc:
+        "Tokfai 兼容 OpenAI 接口。在桌面客户端与官方 SDK 中使用相同的 base URL 与 API Key。",
+      cherryStudioLabel: "Cherry Studio",
+      cherryStudioSteps:
+        "Settings → Provider → OpenAI-compatible → API Host 设为 https://api.tokfai.com/v1，API Key 填 sk-tokfai_xxx，默认 model 设为 gemini-3.1-pro。",
+      cursorLabel: "Cursor",
+      cursorSteps:
+        "Settings → Models → Override OpenAI Base URL → https://api.tokfai.com/v1。在 OpenAI API Key 填入 sk-tokfai_xxx。选择 gemini-3.1-pro 或其他 Tokfai model ID。",
+      openAiSdkLabel: "OpenAI SDK",
+      openAiSdkSteps:
+        "将 baseURL 设为 https://api.tokfai.com/v1，apiKey 设为 sk-tokfai_xxx。JavaScript 与 Python 示例见 Chat Completions 与 Image Generations 章节。",
+      clientApiKeyHintPrefix: "将 sk-tokfai_xxx 替换为",
+      clientApiKeyHintLink: "API Keys",
+      clientApiKeyHintSuffix: "中创建的密钥。",
       billingCreditsTitle: "Billing & Credits",
       billingCreditsDesc:
-        "Tokfai 使用预付 credits。对话模型按 token 扣费，图像模型按每次成功生成扣费，失败请求不扣费。在 Dashboard → Credits 购买套餐；Stripe webhook 确认后写入账本。",
-      errorCodesDesc: "Tokfai API 常见的 HTTP 状态码与 error.code。",
-      billingRatesTitle: "计费与价格",
+        "Tokfai 使用预付 credits。对话模型按 token 扣费，图像模型按每次成功生成扣费，失败请求不扣费。在 Dashboard → Credits 购买套餐；支付确认后写入账本。",
+      commonErrorsTitle: "常见 HTTP 错误",
+      commonErrorsDesc:
+        "以下状态码覆盖大多数接入问题。详情可查看 JSON 响应中的 error.code 字段。",
+      otherErrorsTitle: "其他 error code",
+      errorCodesDesc: "图像校验与上游失败相关的其他 error.code。",
+      httpColumn: "HTTP",
+      codeColumn: "Code",
+      meaningColumn: "含义",
+      error401: "Authorization header 中 API Key 无效或缺失",
+      error402: "credits 不足 — 请在 Dashboard → Credits 充值",
+      error404Model: "model ID 不可用或未对你的账户启用",
+      error404Route: "api.tokfai.com 上不存在该 HTTP 路径",
+      error429: "上游模型限流 — 请指数退避后重试",
+      error500: "模型或上游服务暂时不可用 — 请稍后重试",
+      errorInvalidPrompt: "图像生成缺少或为空 prompt",
+      errorInvalidImageUrl: "图片 URL 格式无效或不被允许",
+      errorImageUrlUnreachable: "Tokfai 无法从提供的 URL 拉取图片",
+      errorUnsupportedContentType:
+        "URL 未指向支持的图片类型（PNG、JPG、WEBP）",
+      errorImageTooLarge: "输入图片超过大小限制",
+      errorUpstreamTimeout: "模型服务请求超时",
       billingRatesDesc:
         "成功调用扣费，失败调用不扣费。展示当前参考价格供规划使用——请在 Usage 查看每次请求扣费，在 Credits 查看账本记录。",
       chatBillingTitle: "对话模型",
@@ -1699,18 +1895,11 @@ export const messages = {
       imageBillingTitle: "图像模型",
       imageBillingDesc:
         "图像模型按每次成功生成扣除积分，并展示当前参考价格（¥）。每次请求实际扣除积分见 Usage。",
-      imageApiBilling:
-        "图片生成按次计费，具体 model 的积分价格与参考价格可在 Models / Pricing 查看。",
       viewModelRates: "在 Pricing 查看完整模型价格",
       viewModelsPage: "浏览模型与 Tags",
-      sectionNavTitle: "API 参考",
-      sectionAuthentication: "Authentication",
-      sectionChatCompletions: "Chat Completions",
-      sectionImageGenerations: "Image Generations",
-      sectionErrorsBilling: "Errors & Billing",
-      chatSdkDesc: "使用官方 OpenAI SDK，将 baseURL 指向 Tokfai。",
-      imageSdkDesc:
-        "文生图可通过 client.images.generate 调用。图生图需在请求体中传入 image_urls（见 curl 示例）。",
+      dashboardCreditsLink: "Dashboard → Credits",
+      dashboardUsageLink: "Dashboard → Usage",
+      pricingLink: "Pricing",
     },
     admin: {
       nav: {
