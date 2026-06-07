@@ -30,7 +30,29 @@ export const messages = {
     home: {
       headline: "OpenAI-compatible image & chat API",
       description:
-        "One API for chat, image, and AI apps. Works with OpenAI SDK, Cursor, Cherry Studio, and your own products. Try image generation in the Image Playground.",
+        "One API for chat and image generation. Drop in Cursor, Cherry Studio, the OpenAI SDK, or your own app — same endpoints and request shapes as OpenAI.",
+      compatLabel: "Works with",
+      compatCursor: "Cursor",
+      compatCherryStudio: "Cherry Studio",
+      compatOpenAiSdk: "OpenAI SDK",
+      compatCustomApp: "Custom App",
+      scenariosTitle: "Core use cases",
+      scenariosDesc:
+        "Three API surfaces — chat, image, and desktop client integration — all on the same OpenAI-compatible base URL.",
+      scenarioChatTitle: "Chat API",
+      scenarioChatBody:
+        "Send messages via POST /chat/completions. Stream or batch responses with models like gemini-3.1-pro.",
+      scenarioChatCta: "Chat API docs",
+      scenarioImageTitle: "Image API",
+      scenarioImageBody:
+        "Generate images with text-to-image or image-to-image via POST /v1/images/generations.",
+      scenarioImageCta: "Image API docs",
+      scenarioDevToolsTitle: "Developer tools integration",
+      scenarioDevToolsBody:
+        "Point Cursor or Cherry Studio at api.tokfai.com/v1 with your sk-tokfai_… key — no code changes required.",
+      scenarioDevToolsCta: "Integration guide",
+      scenarioEndpointLabel: "Endpoint",
+      scenarioModelLabel: "Starter model",
       startWithCredits: "Start with credits",
       tryImagePlayground: "Try Image Playground",
       viewPricing: "View pricing",
@@ -717,12 +739,27 @@ export const messages = {
       clientIntegrationsTitle: "Cherry Studio / Cursor / OpenAI SDK",
       clientIntegrationsDesc:
         "Tokfai is OpenAI-compatible. Use the same base URL and API key in desktop clients and official SDKs.",
+      clientIntegrationConfigTitle: "Required settings",
+      clientIntegrationErrorsTitle: "Common errors",
+      clientIntegrationFixColumn: "What to check",
       cherryStudioLabel: "Cherry Studio",
       cherryStudioSteps:
-        "Settings → Provider → OpenAI-compatible → API Host https://api.tokfai.com/v1, API Key sk-tokfai_xxx, default model gemini-3.1-pro.",
+        "Settings → Provider → OpenAI-compatible. Set API Host, API Key, and default model as below.",
+      cherryStudioError401:
+        "Paste the full sk-tokfai_… secret from Dashboard → API Keys — not your dashboard login token.",
+      cherryStudioError402:
+        "Top up credits in Dashboard → Credits before sending requests from Cherry Studio.",
+      cherryStudioError404:
+        "Pick a Tokfai model ID such as gemini-3.1-pro. Browse available IDs on the Models page.",
       cursorLabel: "Cursor",
       cursorSteps:
-        "Settings → Models → Override OpenAI Base URL → https://api.tokfai.com/v1. Add your sk-tokfai_xxx key under OpenAI API Key. Pick gemini-3.1-pro or another Tokfai model ID.",
+        "Settings → Models → Override OpenAI Base URL. Add your API key and select a Tokfai model ID.",
+      cursorError401:
+        "Paste the full sk-tokfai_… key under OpenAI API Key — not your Cursor or Tokfai login password.",
+      cursorError402:
+        "Top up credits in Dashboard → Credits before using Cursor chat with Tokfai.",
+      cursorError404:
+        "Choose a Tokfai model ID (e.g. gemini-3.1-pro) in the model picker. See Models for the full list.",
       openAiSdkLabel: "OpenAI SDK",
       openAiSdkSteps:
         "Set baseURL to https://api.tokfai.com/v1 and apiKey to your sk-tokfai_xxx key. See Chat Completions and Image Generations sections for JavaScript and Python examples.",
@@ -1199,7 +1236,29 @@ export const messages = {
     home: {
       headline: "OpenAI 兼容的图像与对话 API",
       description:
-        "一个 API 覆盖对话、图像与 AI 应用。兼容 OpenAI SDK、Cursor、Cherry Studio 及自研产品。可在 Image Playground 中体验图像生成。",
+        "一个 API 覆盖对话与图像生成。接入 Cursor、Cherry Studio、OpenAI SDK 或自研 App — 与 OpenAI 相同的 endpoint 与请求格式。",
+      compatLabel: "兼容",
+      compatCursor: "Cursor",
+      compatCherryStudio: "Cherry Studio",
+      compatOpenAiSdk: "OpenAI SDK",
+      compatCustomApp: "自研 App",
+      scenariosTitle: "核心场景",
+      scenariosDesc:
+        "对话、图像与桌面客户端接入 — 共用同一 OpenAI 兼容 Base URL。",
+      scenarioChatTitle: "Chat API",
+      scenarioChatBody:
+        "通过 POST /chat/completions 发送消息，使用 gemini-3.1-pro 等模型流式或批量获取回复。",
+      scenarioChatCta: "Chat API 文档",
+      scenarioImageTitle: "Image API",
+      scenarioImageBody:
+        "通过 POST /v1/images/generations 进行文生图或图生图。",
+      scenarioImageCta: "Image API 文档",
+      scenarioDevToolsTitle: "Developer tools integration",
+      scenarioDevToolsBody:
+        "将 Cursor 或 Cherry Studio 指向 api.tokfai.com/v1，填入 sk-tokfai_… 密钥，无需改代码。",
+      scenarioDevToolsCta: "接入指南",
+      scenarioEndpointLabel: "Endpoint",
+      scenarioModelLabel: "起始 model",
       startWithCredits: "从积分开始",
       tryImagePlayground: "体验 Image Playground",
       viewPricing: "查看定价",
@@ -1851,12 +1910,27 @@ export const messages = {
       clientIntegrationsTitle: "Cherry Studio / Cursor / OpenAI SDK",
       clientIntegrationsDesc:
         "Tokfai 兼容 OpenAI 接口。在桌面客户端与官方 SDK 中使用相同的 base URL 与 API Key。",
+      clientIntegrationConfigTitle: "必填配置",
+      clientIntegrationErrorsTitle: "常见错误",
+      clientIntegrationFixColumn: "排查建议",
       cherryStudioLabel: "Cherry Studio",
       cherryStudioSteps:
-        "Settings → Provider → OpenAI-compatible → API Host 设为 https://api.tokfai.com/v1，API Key 填 sk-tokfai_xxx，默认 model 设为 gemini-3.1-pro。",
+        "Settings → Provider → OpenAI-compatible。按下方表格填写 API Host、API Key 与默认 model。",
+      cherryStudioError401:
+        "在 Dashboard → API Keys 复制完整 sk-tokfai_… secret — 不要使用 Dashboard 登录 token。",
+      cherryStudioError402:
+        "在 Cherry Studio 发请求前，先在 Dashboard → Credits 充值 credits。",
+      cherryStudioError404:
+        "选择 Tokfai model ID，例如 gemini-3.1-pro。完整列表见 Models 页面。",
       cursorLabel: "Cursor",
       cursorSteps:
-        "Settings → Models → Override OpenAI Base URL → https://api.tokfai.com/v1。在 OpenAI API Key 填入 sk-tokfai_xxx。选择 gemini-3.1-pro 或其他 Tokfai model ID。",
+        "Settings → Models → Override OpenAI Base URL。填入 API Key 并选择 Tokfai model ID。",
+      cursorError401:
+        "在 OpenAI API Key 中粘贴完整 sk-tokfai_… 密钥 — 不是 Cursor 或 Tokfai 登录密码。",
+      cursorError402:
+        "在 Cursor 中使用 Tokfai 对话前，先在 Dashboard → Credits 充值 credits。",
+      cursorError404:
+        "在 model 选择器中选择 Tokfai model ID（如 gemini-3.1-pro）。完整列表见 Models。",
       openAiSdkLabel: "OpenAI SDK",
       openAiSdkSteps:
         "将 baseURL 设为 https://api.tokfai.com/v1，apiKey 设为 sk-tokfai_xxx。JavaScript 与 Python 示例见 Chat Completions 与 Image Generations 章节。",

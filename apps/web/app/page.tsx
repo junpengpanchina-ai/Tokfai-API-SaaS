@@ -1,17 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  ArrowRight,
-  BarChart3,
-  BookOpen,
-  FlaskConical,
-  ImageIcon,
-  KeyRound,
-  Sparkles,
-  Wallet,
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import { HomeHero } from "@/components/home-hero";
+import { HomeScenarios } from "@/components/home-scenarios";
 import { PublicFooter } from "@/components/public-footer";
 import { PublicHeader } from "@/components/public-header";
 import {
@@ -27,53 +19,12 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 
 export const metadata: Metadata = {
   title: "Tokfai — OpenAI-compatible image & chat API",
   description: TOKFAI_PRODUCT_TAGLINE,
 };
-
-const FEATURES = [
-  {
-    icon: Sparkles,
-    title: "OpenAI-compatible API",
-    body: `Drop in your existing OpenAI client — same endpoints and request shapes at ${TOKFAI_API_BASE_URL}.`,
-  },
-  {
-    icon: Wallet,
-    title: "Prepaid credits billing",
-    body: TOKFAI_BILLING_POLICY,
-  },
-  {
-    icon: KeyRound,
-    title: "API key management",
-    body: `Create, label, and revoke ${TOKFAI_API_KEY_FORMAT} keys from your dashboard whenever you need to rotate secrets.`,
-  },
-  {
-    icon: BarChart3,
-    title: "Usage logs and ledger",
-    body: "Every call is recorded. Track API usage and your credit balance in one place.",
-  },
-  {
-    icon: FlaskConical,
-    title: "Playground testing",
-    body: "Try chat models in the Chat Playground and image generation in the Image Playground before wiring them into production code.",
-  },
-  {
-    icon: ImageIcon,
-    title: "Image API",
-    body: "Generate images with text-to-image and image-to-image via POST /v1/images/generations. Video models are coming soon.",
-  },
-  {
-    icon: BookOpen,
-    title: "Developer docs",
-    body: "Quick-start guides, endpoint reference, and examples for chat and image APIs.",
-  },
-];
 
 const STEPS = [
   {
@@ -123,24 +74,7 @@ export default function HomePage() {
       <main className="flex-1">
         <HomeHero />
 
-        <section className="container pb-20 md:pb-28">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((feature) => {
-              const Icon = feature.icon;
-              return (
-                <Card key={feature.title}>
-                  <CardHeader>
-                    <div className="mb-3 grid h-9 w-9 place-items-center rounded-md bg-primary/10 text-primary">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <CardTitle className="text-base">{feature.title}</CardTitle>
-                    <CardDescription>{feature.body}</CardDescription>
-                  </CardHeader>
-                </Card>
-              );
-            })}
-          </div>
-        </section>
+        <HomeScenarios />
 
         <section className="border-t bg-muted/30">
           <div className="container py-16 md:py-20">

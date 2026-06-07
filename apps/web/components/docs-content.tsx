@@ -125,6 +125,44 @@ const COMPAT_CLIENT_CONFIG = `Base URL: https://api.tokfai.com/v1
 API Key: sk-tokfai_xxx
 Model: gemini-3.1-pro`;
 
+type ClientIntegrationErrorRow = {
+  status: string;
+  code: string;
+  meaningKey: string;
+  fixKey: string;
+};
+
+function clientIntegrationErrors(
+  prefix: "cherryStudio" | "cursor",
+): ClientIntegrationErrorRow[] {
+  return [
+    {
+      status: "401",
+      code: "invalid_token",
+      meaningKey: "docs.error401",
+      fixKey: `docs.${prefix}Error401`,
+    },
+    {
+      status: "402",
+      code: "insufficient_credits",
+      meaningKey: "docs.error402",
+      fixKey: `docs.${prefix}Error402`,
+    },
+    {
+      status: "404",
+      code: "model_not_found",
+      meaningKey: "docs.error404Model",
+      fixKey: `docs.${prefix}Error404`,
+    },
+  ];
+}
+
+const CLIENT_CONFIG_ROWS = [
+  { id: "base-url", labelKey: "docs.baseUrlTitle", value: BASE_URL },
+  { id: "api-key", labelKey: "docs.apiKeyFormatTitle", value: API_KEY_PLACEHOLDER },
+  { id: "model-id", labelKey: "docs.modelIdLabel", value: DEFAULT_MODEL },
+] as const;
+
 type ErrorRow = {
   status: string;
   code: string;
@@ -558,7 +596,7 @@ export function DocsContent({
           <CardTitle>{t("docs.clientIntegrationsTitle")}</CardTitle>
           <CardDescription>{t("docs.clientIntegrationsDesc")}</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4">
+        <CardContent className="flex flex-col gap-6">
           <CodeBlock
             id="compat-config"
             label="config"
@@ -568,17 +606,28 @@ export function DocsContent({
             copyLabel={t("docs.copy")}
             copiedLabel={t("docs.copied")}
           />
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <p>
-              <span className="font-medium text-foreground">
-                {t("docs.cherryStudioLabel")}:
-              </span>{" "}
-              {t("docs.cherryStudioSteps")}
-            </p>
-            <p>
-              <span className="font-medium text-foreground">{t("docs.cursorLabel")}:</span>{" "}
-              {t("docs.cursorSteps")}
-            </p>
+
+          <ClientIntegrationPanel
+            id="cherry-studio"
+            title={t("docs.cherryStudioLabel")}
+            steps={t("docs.cherryStudioSteps")}
+            errors={clientIntegrationErrors("cherryStudio")}
+            copiedId={copiedId}
+            onCopy={copyText}
+            t={t}
+          />
+
+          <ClientIntegrationPanel
+            id="cursor"
+            title={t("docs.cursorLabel")}
+            steps={t("docs.cursorSteps")}
+            errors={clientIntegrationErrors("cursor")}
+            copiedId={copiedId}
+            onCopy={copyText}
+            t={t}
+          />
+
+          <div className="space-y-2 text-sm text-muted-foreground">
             <p>
               <span className="font-medium text-foreground">
                 {t("docs.openAiSdkLabel")}:
@@ -587,21 +636,12 @@ export function DocsContent({
             </p>
             <p>
               {t("docs.clientApiKeyHintPrefix")}{" "}
-              {showDashboardLinks ? (
-                <Link
-                  href="/dashboard/api-keys"
-                  className="font-medium text-foreground underline-offset-4 hover:underline"
-                >
-                  {t("docs.clientApiKeyHintLink")}
-                </Link>
-              ) : (
-                <Link
-                  href="/dashboard/api-keys"
-                  className="font-medium text-foreground underline-offset-4 hover:underline"
-                >
-                  {t("docs.clientApiKeyHintLink")}
-                </Link>
-              )}
+              <Link
+                href="/dashboard/api-keys"
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                {t("docs.clientApiKeyHintLink")}
+              </Link>
               {t("docs.clientApiKeyHintSuffix")}
             </p>
           </div>
@@ -700,6 +740,110 @@ function DocsSectionLink({ href, label }: { href: string; label: string }) {
     >
       {label}
     </Link>
+  );
+}
+
+function ClientIntegrationPanel({
+  id,
+  title,
+  steps,
+  errors,
+  copiedId,
+  onCopy,
+  t,
+}: {
+  id: string;
+  title: string;
+  steps: string;
+  errors: ClientIntegrationErrorRow[];
+  copiedId: string | null;
+  onCopy: (id: string, value: string) => void;
+  t: (key: string) => string;
+}) {
+  return (
+    <div id={id} className="rounded-lg border bg-muted/20 p-4 sm:p-5">
+      <h3 className="text-base font-semibold text-foreground">{title}</h3>
+      <p className="mt-2 text-sm text-muted-foreground">{steps}</p>
+
+      <div className="mt-4">
+        <h4 className="text-sm font-medium text-foreground">
+          {t("docs.clientIntegrationConfigTitle")}
+        </h4>
+        <div className="mt-2 overflow-x-auto rounded-lg border bg-background">
+          <table className="w-full text-sm">
+            <tbody>
+              {CLIENT_CONFIG_ROWS.map((row) => {
+                const copyId = `${id}-${row.id}`;
+                return (
+                  <tr key={row.id} className="border-b last:border-0">
+                    <td className="whitespace-nowrap px-4 py-3 font-medium text-foreground">
+                      {t(row.labelKey)}
+                    </td>
+                    <td className="min-w-0 px-4 py-3">
+                      <code className="break-all font-mono text-xs text-muted-foreground">
+                        {row.value}
+                      </code>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <CopyButton
+                        copied={copiedId === copyId}
+                        onCopy={() => onCopy(copyId, row.value)}
+                        copyLabel={t("docs.copy")}
+                        copiedLabel={t("docs.copied")}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <h4 className="text-sm font-medium text-foreground">
+          {t("docs.clientIntegrationErrorsTitle")}
+        </h4>
+        <div className="mt-2">
+          <ClientIntegrationErrorsTable errors={errors} t={t} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ClientIntegrationErrorsTable({
+  errors,
+  t,
+}: {
+  errors: ClientIntegrationErrorRow[];
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-lg border bg-background">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <th className="py-2 pl-4 pr-4 font-medium">{t("docs.httpColumn")}</th>
+            <th className="py-2 pr-4 font-medium">{t("docs.codeColumn")}</th>
+            <th className="py-2 pr-4 font-medium">{t("docs.meaningColumn")}</th>
+            <th className="py-2 pr-4 font-medium">
+              {t("docs.clientIntegrationFixColumn")}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {errors.map((error) => (
+            <tr key={`${error.status}-${error.code}`} className="border-b last:border-0">
+              <td className="py-3 pl-4 pr-4 font-mono text-xs">{error.status}</td>
+              <td className="py-3 pr-4 font-mono text-xs">{error.code}</td>
+              <td className="py-3 pr-4 text-muted-foreground">{t(error.meaningKey)}</td>
+              <td className="py-3 pr-4 text-muted-foreground">{t(error.fixKey)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
