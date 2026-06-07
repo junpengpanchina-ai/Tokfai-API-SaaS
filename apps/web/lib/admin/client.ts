@@ -108,17 +108,39 @@ export type AdminRechargePlanListItem = {
   sort_order: number;
   badge: string | null;
   description: string | null;
+  archived_at: string | null;
   updated_at: string | null;
 };
 
+export type AdminRechargePlanCreateBody = {
+  id: string;
+  name: string;
+  amount_cents: number;
+  base_credits: number;
+  bonus_credits?: number;
+  description?: string | null;
+  enabled?: boolean;
+  visible?: boolean;
+  sort_order?: number;
+  stripe_price_id?: string | null;
+  badge?: string | null;
+};
+
 export type AdminRechargePlanUpdateBody = {
+  name?: string;
   amount_cents?: number;
   base_credits?: number;
   bonus_credits?: number;
   description?: string | null;
   enabled?: boolean;
   visible?: boolean;
+  sort_order?: number;
+  stripe_price_id?: string | null;
   badge?: string | null;
+};
+
+export type AdminRechargePlanDuplicateBody = {
+  new_id?: string;
 };
 
 export class AdminApiError extends Error {
@@ -331,11 +353,31 @@ export function createAdminRechargePlanIdempotencyKey(): string {
   return `admin-recharge-plan-${Date.now()}-${random}`;
 }
 
-export async function fetchAdminRechargePlans(): Promise<AdminRechargePlanListItem[]> {
+export async function fetchAdminRechargePlans(args?: {
+  includeArchived?: boolean;
+}): Promise<AdminRechargePlanListItem[]> {
+  const query =
+    args?.includeArchived === true ? "?include_archived=true" : "";
   const res = await fetchAdminApi<{ data?: AdminRechargePlanListItem[] }>(
-    "/admin/recharge-plans"
+    `/admin/recharge-plans${query}`
   );
   return Array.isArray(res.data) ? res.data : [];
+}
+
+export async function createAdminRechargePlan(
+  body: AdminRechargePlanCreateBody,
+  idempotencyKey?: string
+): Promise<AdminRechargePlanListItem> {
+  const res = await fetchAdminApi<{ data: AdminRechargePlanListItem }>(
+    "/admin/recharge-plans",
+    {
+      method: "POST",
+      json: body,
+      idempotencyKey:
+        idempotencyKey ?? createAdminRechargePlanIdempotencyKey(),
+    }
+  );
+  return res.data;
 }
 
 export async function updateAdminRechargePlan(
@@ -350,6 +392,55 @@ export async function updateAdminRechargePlan(
       json: body,
       idempotencyKey:
         idempotencyKey ?? createAdminRechargePlanIdempotencyKey(),
+    }
+  );
+  return res.data;
+}
+
+export async function duplicateAdminRechargePlan(
+  id: string,
+  body: AdminRechargePlanDuplicateBody = {},
+  idempotencyKey?: string
+): Promise<{
+  plan: AdminRechargePlanListItem;
+  source_plan_id: string;
+}> {
+  const res = await fetchAdminApi<{
+    data: {
+      plan: AdminRechargePlanListItem;
+      source_plan_id: string;
+    };
+  }>(`/admin/recharge-plans/${encodeURIComponent(id)}/duplicate`, {
+    method: "POST",
+    json: body,
+    idempotencyKey: idempotencyKey ?? createAdminRechargePlanIdempotencyKey(),
+  });
+  return res.data;
+}
+
+export async function archiveAdminRechargePlan(id: string): Promise<{
+  plan: AdminRechargePlanListItem;
+  archived: boolean;
+}> {
+  const res = await fetchAdminApi<{
+    data: {
+      plan: AdminRechargePlanListItem;
+      archived: boolean;
+    };
+  }>(`/admin/recharge-plans/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  return res.data;
+}
+
+export async function restoreAdminRechargePlan(
+  id: string
+): Promise<AdminRechargePlanListItem> {
+  const res = await fetchAdminApi<{ data: AdminRechargePlanListItem }>(
+    `/admin/recharge-plans/${encodeURIComponent(id)}/restore`,
+    {
+      method: "POST",
+      json: {},
     }
   );
   return res.data;

@@ -7,7 +7,10 @@ import { supabase } from "../supabase.js";
 
 const ADMIN_RECHARGE_PLAN_RESOURCE_TYPE = "recharge_plans";
 
-const ALLOWED_RECHARGE_PLAN_IDS = new Set(["starter", "pro", "business"]);
+const RECHARGE_PLAN_ID_PATTERN = /^[a-z0-9][a-z0-9._-]*$/;
+
+const RECHARGE_PLAN_SELECT =
+  "id, name, amount_cents, currency, base_credits, credits, bonus_credits, stripe_price_id, enabled, visible, sort_order, badge, description, archived_at, updated_at";
 
 export type RechargePlanRow = {
   id: string;
@@ -24,6 +27,7 @@ export type RechargePlanRow = {
   sort_order: number;
   badge: string | null;
   description: string | null;
+  archived_at: string | null;
   updated_at: string | null;
 };
 
@@ -43,6 +47,7 @@ type RechargePlanDbRow = {
   sort_order: number | string | null;
   badge: string | null;
   description?: string | null;
+  archived_at?: string | null;
   updated_at: string | null;
 };
 
@@ -64,18 +69,64 @@ const optionalIntField = (min: number, max: number) =>
     z.coerce.number().int().min(min).max(max).optional()
   );
 
+const optionalNullableString = (max: number) =>
+  z
+    .union([z.string().trim().max(max), z.null()])
+    .optional();
+
 const RechargePlanPatchSchema = z
   .object({
-    amount_cents: optionalIntField(0, 100_000_000),
+    name: z.string().trim().min(1).max(120).optional(),
+    amount_cents: optionalIntField(1, 100_000_000),
     base_credits: optionalIntField(0, 100_000_000),
     bonus_credits: optionalIntField(0, 100_000_000),
     enabled: z.boolean().optional(),
     visible: z.boolean().optional(),
-    badge: z
-      .union([z.string().trim().max(40), z.null()])
-      .optional(),
-    description: z
-      .union([z.string().trim().max(500), z.null()])
+    sort_order: optionalIntField(0, 100_000),
+    stripe_price_id: optionalNullableString(120),
+    badge: optionalNullableString(40),
+    description: optionalNullableString(500),
+  })
+  .strict();
+
+const RechargePlanCreateSchema = z
+  .object({
+    id: z
+      .string()
+      .trim()
+      .min(2)
+      .max(64)
+      .regex(RECHARGE_PLAN_ID_PATTERN, "invalid_recharge_plan_id"),
+    name: z.string().trim().min(1).max(120),
+    amount_cents: z.coerce.number().int().min(1).max(100_000_000),
+    base_credits: z.coerce.number().int().min(0).max(100_000_000),
+    bonus_credits: z.coerce.number().int().min(0).max(100_000_000).default(0),
+    enabled: z.boolean().optional(),
+    visible: z.boolean().optional(),
+    sort_order: z.coerce.number().int().min(0).max(100_000).optional(),
+    stripe_price_id: optionalNullableString(120),
+    badge: optionalNullableString(40),
+    description: optionalNullableString(500),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    if (data.base_credits + data.bonus_credits <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "base_credits + bonus_credits must be greater than 0",
+        path: ["base_credits"],
+      });
+    }
+  });
+
+const RechargePlanDuplicateSchema = z
+  .object({
+    new_id: z
+      .string()
+      .trim()
+      .min(2)
+      .max(64)
+      .regex(RECHARGE_PLAN_ID_PATTERN, "invalid_recharge_plan_id")
       .optional(),
   })
   .strict();
@@ -90,6 +141,15 @@ function toNumber(value: number | string | null | undefined): number {
 function normalizeCurrency(value: string | null | undefined): string {
   const normalized = value?.trim().toLowerCase();
   return normalized && normalized.length > 0 ? normalized : "cny";
+}
+
+function normalizeNullableString(
+  value: string | null | undefined,
+  max: number
+): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, max);
 }
 
 function mapRechargePlanRow(row: RechargePlanDbRow): AdminRechargePlanListItem {
@@ -110,8 +170,29 @@ function mapRechargePlanRow(row: RechargePlanDbRow): AdminRechargePlanListItem {
     sort_order: toNumber(row.sort_order),
     badge: row.badge?.trim() || null,
     description: row.description?.trim() || null,
+    archived_at: row.archived_at ?? null,
     updated_at: row.updated_at,
   };
+}
+
+async function loadRechargePlanById(
+  planId: string
+): Promise<AdminRechargePlanListItem | null> {
+  const { data, error } = await supabase()
+    .from("recharge_plans")
+    .select(RECHARGE_PLAN_SELECT)
+    .eq("id", planId)
+    .maybeSingle();
+
+  if (error) {
+    throw ApiError.internal(
+      `Failed to load recharge plan: ${error.message}`,
+      "recharge_plan_load_failed"
+    );
+  }
+
+  if (!data) return null;
+  return mapRechargePlanRow(data as RechargePlanDbRow);
 }
 
 async function auditRechargePlanWrite(
@@ -148,14 +229,20 @@ async function auditRechargePlanWrite(
   });
 }
 
-export async function listAdminRechargePlans(): Promise<AdminRechargePlanListItem[]> {
-  const { data, error } = await supabase()
+export async function listAdminRechargePlans(args?: {
+  includeArchived?: boolean;
+}): Promise<AdminRechargePlanListItem[]> {
+  let query = supabase()
     .from("recharge_plans")
-    .select(
-      "id, name, amount_cents, currency, base_credits, credits, bonus_credits, stripe_price_id, enabled, visible, sort_order, badge, description, updated_at"
-    )
+    .select(RECHARGE_PLAN_SELECT)
     .order("sort_order", { ascending: true })
     .order("id", { ascending: true });
+
+  if (!args?.includeArchived) {
+    query = query.is("archived_at", null);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw ApiError.internal(
@@ -165,6 +252,367 @@ export async function listAdminRechargePlans(): Promise<AdminRechargePlanListIte
   }
 
   return ((data ?? []) as RechargePlanDbRow[]).map(mapRechargePlanRow);
+}
+
+export async function createAdminRechargePlan(
+  body: Record<string, unknown>,
+  ctx: AdminRechargePlanWriteContext
+): Promise<
+  | { ok: true; plan: AdminRechargePlanListItem }
+  | { ok: false; status: 400 | 409; error: string; detail?: unknown }
+> {
+  if ("credits" in body) {
+    await auditRechargePlanWrite(ctx, {
+      action: "recharge_plans.create",
+      resourceId: typeof body.id === "string" ? body.id : "unknown",
+      requestPayload: body,
+      status: "failed",
+      error: "invalid_recharge_plan_fields",
+    });
+    return {
+      ok: false,
+      status: 400,
+      error: "invalid_recharge_plan_fields",
+      detail: { credits: ["credits is computed server-side"] },
+    };
+  }
+
+  const parsed = RechargePlanCreateSchema.safeParse(body);
+  if (!parsed.success) {
+    await auditRechargePlanWrite(ctx, {
+      action: "recharge_plans.create",
+      resourceId: typeof body.id === "string" ? body.id : "unknown",
+      requestPayload: body,
+      status: "failed",
+      error: "invalid_recharge_plan_fields",
+    });
+    return {
+      ok: false,
+      status: 400,
+      error: "invalid_recharge_plan_fields",
+      detail: parsed.error.flatten(),
+    };
+  }
+
+  const input = parsed.data;
+  const { data: existing, error: existingError } = await supabase()
+    .from("recharge_plans")
+    .select("id")
+    .eq("id", input.id)
+    .maybeSingle();
+
+  if (existingError) {
+    throw ApiError.internal(
+      `Failed to verify recharge plan id: ${existingError.message}`,
+      "recharge_plan_verify_failed"
+    );
+  }
+
+  if (existing) {
+    await auditRechargePlanWrite(ctx, {
+      action: "recharge_plans.create",
+      resourceId: input.id,
+      requestPayload: input,
+      status: "failed",
+      error: "recharge_plan_already_exists",
+    });
+    return { ok: false, status: 409, error: "recharge_plan_already_exists" };
+  }
+
+  const now = new Date().toISOString();
+  const credits = input.base_credits + input.bonus_credits;
+
+  const { error: insertError } = await supabase().from("recharge_plans").insert({
+    id: input.id,
+    name: input.name,
+    amount_cents: input.amount_cents,
+    currency: "cny",
+    base_credits: input.base_credits,
+    bonus_credits: input.bonus_credits,
+    credits,
+    stripe_price_id: normalizeNullableString(input.stripe_price_id ?? null, 120),
+    enabled: input.enabled ?? false,
+    visible: input.visible ?? true,
+    sort_order: input.sort_order ?? 1000,
+    badge: normalizeNullableString(input.badge ?? null, 40),
+    description: normalizeNullableString(input.description ?? null, 500),
+    archived_at: null,
+    updated_at: now,
+  });
+
+  if (insertError) {
+    throw ApiError.internal(
+      `Failed to create recharge plan: ${insertError.message}`,
+      "recharge_plan_create_failed"
+    );
+  }
+
+  const plan = await loadRechargePlanById(input.id);
+  if (!plan) {
+    throw ApiError.internal(
+      "Created recharge plan could not be loaded.",
+      "recharge_plan_load_failed"
+    );
+  }
+
+  await auditRechargePlanWrite(ctx, {
+    action: "recharge_plans.create",
+    resourceId: input.id,
+    requestPayload: input,
+    status: "succeeded",
+    plan,
+  });
+
+  return { ok: true, plan };
+}
+
+async function resolveDuplicatePlanId(
+  sourceId: string,
+  requestedId?: string
+): Promise<string> {
+  if (requestedId) return requestedId;
+
+  const base = `${sourceId}-copy`;
+  let candidate = base;
+  let suffix = 1;
+
+  while (true) {
+    const { data, error } = await supabase()
+      .from("recharge_plans")
+      .select("id")
+      .eq("id", candidate)
+      .maybeSingle();
+
+    if (error) {
+      throw ApiError.internal(
+        `Failed to verify duplicate plan id: ${error.message}`,
+        "recharge_plan_verify_failed"
+      );
+    }
+
+    if (!data) return candidate;
+
+    suffix += 1;
+    candidate = `${base}-${suffix}`;
+    if (suffix > 999) {
+      throw ApiError.internal(
+        "Could not generate a unique duplicate plan id.",
+        "recharge_plan_duplicate_id_failed"
+      );
+    }
+  }
+}
+
+export async function duplicateAdminRechargePlan(
+  sourceId: string,
+  body: Record<string, unknown>,
+  ctx: AdminRechargePlanWriteContext
+): Promise<
+  | { ok: true; plan: AdminRechargePlanListItem; source_plan_id: string }
+  | { ok: false; status: 400 | 404 | 409; error: string; detail?: unknown }
+> {
+  const trimmedSourceId = sourceId.trim();
+  if (!trimmedSourceId) {
+    return { ok: false, status: 400, error: "missing_plan_id" };
+  }
+
+  const parsed = RechargePlanDuplicateSchema.safeParse(body);
+  if (!parsed.success) {
+    await auditRechargePlanWrite(ctx, {
+      action: "recharge_plans.duplicate",
+      resourceId: trimmedSourceId,
+      requestPayload: body,
+      status: "failed",
+      error: "invalid_recharge_plan_fields",
+    });
+    return {
+      ok: false,
+      status: 400,
+      error: "invalid_recharge_plan_fields",
+      detail: parsed.error.flatten(),
+    };
+  }
+
+  const source = await loadRechargePlanById(trimmedSourceId);
+  if (!source) {
+    await auditRechargePlanWrite(ctx, {
+      action: "recharge_plans.duplicate",
+      resourceId: trimmedSourceId,
+      requestPayload: body,
+      status: "failed",
+      error: "recharge_plan_not_found",
+    });
+    return { ok: false, status: 404, error: "recharge_plan_not_found" };
+  }
+
+  const newId = await resolveDuplicatePlanId(
+    trimmedSourceId,
+    parsed.data.new_id
+  );
+
+  const createResult = await createAdminRechargePlan(
+    {
+      id: newId,
+      name: `${source.name} (copy)`,
+      amount_cents: source.amount_cents,
+      base_credits: source.base_credits,
+      bonus_credits: source.bonus_credits,
+      stripe_price_id: null,
+      enabled: false,
+      visible: source.visible,
+      sort_order: source.sort_order + 1,
+      badge: source.badge,
+      description: source.description,
+    },
+    ctx
+  );
+
+  if (!createResult.ok) {
+    await auditRechargePlanWrite(ctx, {
+      action: "recharge_plans.duplicate",
+      resourceId: trimmedSourceId,
+      requestPayload: { ...body, new_id: newId },
+      status: "failed",
+      error: createResult.error,
+    });
+    return createResult;
+  }
+
+  await auditRechargePlanWrite(ctx, {
+    action: "recharge_plans.duplicate",
+    resourceId: newId,
+    requestPayload: { source_plan_id: trimmedSourceId, new_id: newId },
+    status: "succeeded",
+    plan: createResult.plan,
+  });
+
+  return {
+    ok: true,
+    plan: createResult.plan,
+    source_plan_id: trimmedSourceId,
+  };
+}
+
+export async function archiveAdminRechargePlan(
+  id: string,
+  ctx: AdminRechargePlanWriteContext
+): Promise<
+  | { ok: true; plan: AdminRechargePlanListItem; archived: boolean }
+  | { ok: false; status: 400 | 404; error: string }
+> {
+  const planId = id.trim();
+  if (!planId) {
+    return { ok: false, status: 400, error: "missing_plan_id" };
+  }
+
+  const existing = await loadRechargePlanById(planId);
+  if (!existing) {
+    await auditRechargePlanWrite(ctx, {
+      action: "recharge_plans.archive",
+      resourceId: planId,
+      requestPayload: {},
+      status: "failed",
+      error: "recharge_plan_not_found",
+    });
+    return { ok: false, status: 404, error: "recharge_plan_not_found" };
+  }
+
+  if (existing.archived_at) {
+    return { ok: true, plan: existing, archived: true };
+  }
+
+  const now = new Date().toISOString();
+  const { error: updateError } = await supabase()
+    .from("recharge_plans")
+    .update({ archived_at: now, updated_at: now })
+    .eq("id", planId);
+
+  if (updateError) {
+    throw ApiError.internal(
+      `Failed to archive recharge plan: ${updateError.message}`,
+      "recharge_plan_archive_failed"
+    );
+  }
+
+  const plan = await loadRechargePlanById(planId);
+  if (!plan) {
+    throw ApiError.internal(
+      "Archived recharge plan could not be loaded.",
+      "recharge_plan_load_failed"
+    );
+  }
+
+  await auditRechargePlanWrite(ctx, {
+    action: "recharge_plans.archive",
+    resourceId: planId,
+    requestPayload: {},
+    status: "succeeded",
+    changedFields: ["archived_at"],
+    plan,
+  });
+
+  return { ok: true, plan, archived: true };
+}
+
+export async function restoreAdminRechargePlan(
+  id: string,
+  ctx: AdminRechargePlanWriteContext
+): Promise<
+  | { ok: true; plan: AdminRechargePlanListItem }
+  | { ok: false; status: 400 | 404; error: string }
+> {
+  const planId = id.trim();
+  if (!planId) {
+    return { ok: false, status: 400, error: "missing_plan_id" };
+  }
+
+  const existing = await loadRechargePlanById(planId);
+  if (!existing) {
+    await auditRechargePlanWrite(ctx, {
+      action: "recharge_plans.restore",
+      resourceId: planId,
+      requestPayload: {},
+      status: "failed",
+      error: "recharge_plan_not_found",
+    });
+    return { ok: false, status: 404, error: "recharge_plan_not_found" };
+  }
+
+  if (!existing.archived_at) {
+    return { ok: true, plan: existing };
+  }
+
+  const now = new Date().toISOString();
+  const { error: updateError } = await supabase()
+    .from("recharge_plans")
+    .update({ archived_at: null, updated_at: now })
+    .eq("id", planId);
+
+  if (updateError) {
+    throw ApiError.internal(
+      `Failed to restore recharge plan: ${updateError.message}`,
+      "recharge_plan_restore_failed"
+    );
+  }
+
+  const plan = await loadRechargePlanById(planId);
+  if (!plan) {
+    throw ApiError.internal(
+      "Restored recharge plan could not be loaded.",
+      "recharge_plan_load_failed"
+    );
+  }
+
+  await auditRechargePlanWrite(ctx, {
+    action: "recharge_plans.restore",
+    resourceId: planId,
+    requestPayload: {},
+    status: "succeeded",
+    changedFields: ["archived_at"],
+    plan,
+  });
+
+  return { ok: true, plan };
 }
 
 export async function updateAdminRechargePlan(
@@ -178,17 +626,6 @@ export async function updateAdminRechargePlan(
   const planId = id.trim();
   if (!planId) {
     return { ok: false, status: 400, error: "missing_plan_id" };
-  }
-
-  if (!ALLOWED_RECHARGE_PLAN_IDS.has(planId)) {
-    await auditRechargePlanWrite(ctx, {
-      action: "recharge_plans.update",
-      resourceId: planId,
-      requestPayload: body,
-      status: "failed",
-      error: "invalid_recharge_plan_id",
-    });
-    return { ok: false, status: 400, error: "invalid_recharge_plan_id" };
   }
 
   if ("credits" in body) {
@@ -269,14 +706,22 @@ export async function updateAdminRechargePlan(
     updated_at: new Date().toISOString(),
   };
 
+  if (patch.name !== undefined) updatePayload.name = patch.name;
   if (patch.amount_cents !== undefined) {
     updatePayload.amount_cents = patch.amount_cents;
   }
+  if (patch.sort_order !== undefined) updatePayload.sort_order = patch.sort_order;
   if (patch.description !== undefined) {
     updatePayload.description =
       patch.description === null || patch.description === ""
         ? null
         : patch.description;
+  }
+  if (patch.stripe_price_id !== undefined) {
+    updatePayload.stripe_price_id =
+      patch.stripe_price_id === null || patch.stripe_price_id === ""
+        ? null
+        : patch.stripe_price_id;
   }
 
   if (patch.base_credits !== undefined || patch.bonus_credits !== undefined) {
@@ -343,22 +788,14 @@ export async function updateAdminRechargePlan(
     );
   }
 
-  const { data: updated, error: loadError } = await supabase()
-    .from("recharge_plans")
-    .select(
-      "id, name, amount_cents, currency, base_credits, credits, bonus_credits, stripe_price_id, enabled, visible, sort_order, badge, description, updated_at"
-    )
-    .eq("id", planId)
-    .maybeSingle();
-
-  if (loadError || !updated) {
+  const plan = await loadRechargePlanById(planId);
+  if (!plan) {
     throw ApiError.internal(
       "Updated recharge plan could not be loaded.",
       "recharge_plan_load_failed"
     );
   }
 
-  const plan = mapRechargePlanRow(updated as RechargePlanDbRow);
   const changedFields = Object.keys(patch);
 
   await auditRechargePlanWrite(ctx, {
@@ -371,6 +808,23 @@ export async function updateAdminRechargePlan(
   });
 
   return { ok: true, plan };
+}
+
+export function rechargePlanAdminErrorMessage(error: string): string {
+  switch (error) {
+    case "recharge_plan_not_found":
+      return "Recharge plan not found.";
+    case "recharge_plan_already_exists":
+      return "A recharge plan with this ID already exists.";
+    case "empty_patch":
+      return "No fields to update.";
+    case "invalid_recharge_plan_fields":
+      return "Invalid recharge plan fields.";
+    case "missing_plan_id":
+      return "Plan ID is required.";
+    default:
+      return "Recharge plan operation failed.";
+  }
 }
 
 export type BillingRechargePlan = {
@@ -396,6 +850,7 @@ export async function listBillingRechargePlans(): Promise<BillingRechargePlan[]>
       "id, name, amount_cents, currency, base_credits, credits, bonus_credits, enabled, visible, sort_order, badge, description"
     )
     .eq("visible", true)
+    .is("archived_at", null)
     .order("sort_order", { ascending: true })
     .order("id", { ascending: true });
 
@@ -428,21 +883,5 @@ export async function listBillingRechargePlans(): Promise<BillingRechargePlan[]>
 export async function loadCheckoutRechargePlan(
   planId: string
 ): Promise<AdminRechargePlanListItem | null> {
-  const { data, error } = await supabase()
-    .from("recharge_plans")
-    .select(
-      "id, name, amount_cents, currency, base_credits, credits, bonus_credits, stripe_price_id, enabled, visible, sort_order, badge, description, updated_at"
-    )
-    .eq("id", planId)
-    .maybeSingle();
-
-  if (error) {
-    throw ApiError.internal(
-      `Failed to load recharge plan: ${error.message}`,
-      "recharge_plan_load_failed"
-    );
-  }
-
-  if (!data) return null;
-  return mapRechargePlanRow(data as RechargePlanDbRow);
+  return loadRechargePlanById(planId);
 }

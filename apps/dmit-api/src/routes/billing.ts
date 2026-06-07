@@ -124,6 +124,9 @@ function assertCheckoutPlanAvailable(
   if (!plan) {
     throw ApiError.notFound("Recharge plan not found.", "recharge_plan_not_found");
   }
+  if (plan.archived_at) {
+    throw ApiError.notFound("Recharge plan not found.", "recharge_plan_not_found");
+  }
   if (!plan.visible) {
     throw ApiError.badRequest(
       `The ${planId} plan is not visible for checkout.`,

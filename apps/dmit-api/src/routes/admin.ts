@@ -23,7 +23,12 @@ import {
   updateAdminAnnouncement,
 } from "./adminAnnouncements.js";
 import {
+  archiveAdminRechargePlan,
+  createAdminRechargePlan,
+  duplicateAdminRechargePlan,
   listAdminRechargePlans,
+  rechargePlanAdminErrorMessage,
+  restoreAdminRechargePlan,
   updateAdminRechargePlan,
 } from "./adminRechargePlans.js";
 import type { AdminUserContext } from "../middleware/requireAdminV1.js";
@@ -640,8 +645,28 @@ protectedAdminRoutes.patch("/announcements/:id", async (c) => {
 });
 
 protectedAdminRoutes.get("/recharge-plans", async (c) => {
-  const plans = await listAdminRechargePlans();
+  const includeArchived =
+    c.req.query("include_archived") === "true" ||
+    c.req.query("include_archived") === "1";
+  const plans = await listAdminRechargePlans({ includeArchived });
   return c.json({ data: plans });
+});
+
+protectedAdminRoutes.post("/recharge-plans", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const result = await createAdminRechargePlan(body, adminModelWriteContext(c));
+
+  if (!result.ok) {
+    return adminApiError(
+      c,
+      result.status,
+      rechargePlanAdminErrorMessage(result.error),
+      result.error,
+      result.status === 409 ? "validation_error" : "validation_error"
+    );
+  }
+
+  return c.json({ data: result.plan }, 201);
 });
 
 protectedAdminRoutes.patch("/recharge-plans/:id", async (c) => {
@@ -654,20 +679,91 @@ protectedAdminRoutes.patch("/recharge-plans/:id", async (c) => {
   const result = await updateAdminRechargePlan(id, body, adminModelWriteContext(c));
 
   if (!result.ok) {
-    const message =
-      result.error === "recharge_plan_not_found"
-        ? "Recharge plan not found."
-        : result.error === "empty_patch"
-          ? "No fields to update."
-          : result.error === "invalid_recharge_plan_id"
-            ? "Recharge plan ID is not editable."
-            : result.error === "invalid_recharge_plan_fields"
-              ? "Invalid recharge plan fields."
-              : "Failed to update recharge plan.";
     return adminApiError(
       c,
       result.status,
-      message,
+      rechargePlanAdminErrorMessage(result.error),
+      result.error,
+      result.status === 404 ? "not_found" : "validation_error"
+    );
+  }
+
+  return c.json({ data: result.plan });
+});
+
+protectedAdminRoutes.post("/recharge-plans/:id/duplicate", async (c) => {
+  const id = c.req.param("id").trim();
+  if (!id) {
+    return adminApiError(c, 400, "Plan ID is required.", "missing_plan_id");
+  }
+
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const result = await duplicateAdminRechargePlan(
+    id,
+    body,
+    adminModelWriteContext(c)
+  );
+
+  if (!result.ok) {
+    return adminApiError(
+      c,
+      result.status,
+      rechargePlanAdminErrorMessage(result.error),
+      result.error,
+      result.status === 404 ? "not_found" : "validation_error"
+    );
+  }
+
+  return c.json(
+    {
+      data: {
+        plan: result.plan,
+        source_plan_id: result.source_plan_id,
+      },
+    },
+    201
+  );
+});
+
+protectedAdminRoutes.delete("/recharge-plans/:id", async (c) => {
+  const id = c.req.param("id").trim();
+  if (!id) {
+    return adminApiError(c, 400, "Plan ID is required.", "missing_plan_id");
+  }
+
+  const result = await archiveAdminRechargePlan(id, adminModelWriteContext(c));
+
+  if (!result.ok) {
+    return adminApiError(
+      c,
+      result.status,
+      rechargePlanAdminErrorMessage(result.error),
+      result.error,
+      result.status === 404 ? "not_found" : "validation_error"
+    );
+  }
+
+  return c.json({
+    data: {
+      plan: result.plan,
+      archived: result.archived,
+    },
+  });
+});
+
+protectedAdminRoutes.post("/recharge-plans/:id/restore", async (c) => {
+  const id = c.req.param("id").trim();
+  if (!id) {
+    return adminApiError(c, 400, "Plan ID is required.", "missing_plan_id");
+  }
+
+  const result = await restoreAdminRechargePlan(id, adminModelWriteContext(c));
+
+  if (!result.ok) {
+    return adminApiError(
+      c,
+      result.status,
+      rechargePlanAdminErrorMessage(result.error),
       result.error,
       result.status === 404 ? "not_found" : "validation_error"
     );

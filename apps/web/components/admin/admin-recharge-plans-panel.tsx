@@ -1,6 +1,14 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { Loader2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -16,8 +24,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   AdminApiError,
+  archiveAdminRechargePlan,
+  createAdminRechargePlan,
+  duplicateAdminRechargePlan,
   fetchAdminRechargePlans,
+  restoreAdminRechargePlan,
   updateAdminRechargePlan,
+  type AdminRechargePlanCreateBody,
   type AdminRechargePlanListItem,
   type AdminRechargePlanUpdateBody,
 } from "@/lib/admin/client";
@@ -25,15 +38,39 @@ import { formatCny } from "@/lib/billing/recharge-plans";
 import { formatDateTime, formatInt } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 
+const PLAN_ID_PATTERN = /^[a-z0-9][a-z0-9._-]*$/;
+
+type PanelMode = "list" | "create" | "edit";
+
 type PlanDraft = {
+  id: string;
+  name: string;
   amount_yuan: string;
   base_credits: string;
   bonus_credits: string;
   badge: string;
   description: string;
+  sort_order: string;
+  stripe_price_id: string;
   enabled: boolean;
   visible: boolean;
 };
+
+function emptyDraft(): PlanDraft {
+  return {
+    id: "",
+    name: "",
+    amount_yuan: "",
+    base_credits: "",
+    bonus_credits: "0",
+    badge: "",
+    description: "",
+    sort_order: "1000",
+    stripe_price_id: "",
+    enabled: false,
+    visible: true,
+  };
+}
 
 function centsToYuanInput(amountCents: number): string {
   const yuan = amountCents / 100;
@@ -44,9 +81,9 @@ function yuanInputToCents(raw: string): number | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
   const amountYuan = Number(trimmed);
-  if (!Number.isFinite(amountYuan) || amountYuan < 0) return null;
+  if (!Number.isFinite(amountYuan) || amountYuan <= 0) return null;
   const amountCents = Math.round(amountYuan * 100);
-  if (!Number.isInteger(amountCents) || amountCents < 0) return null;
+  if (!Number.isInteger(amountCents) || amountCents <= 0) return null;
   return amountCents;
 }
 
@@ -69,13 +106,58 @@ function draftTotalCredits(draft: PlanDraft): number | null {
 
 function planToDraft(plan: AdminRechargePlanListItem): PlanDraft {
   return {
+    id: plan.id,
+    name: plan.name,
     amount_yuan: centsToYuanInput(plan.amount_cents),
     base_credits: String(plan.base_credits),
     bonus_credits: String(plan.bonus_credits),
     badge: plan.badge ?? "",
     description: plan.description ?? "",
+    sort_order: String(plan.sort_order),
+    stripe_price_id: plan.stripe_price_id ?? "",
     enabled: plan.enabled,
     visible: plan.visible,
+  };
+}
+
+function draftToCreateBody(draft: PlanDraft): AdminRechargePlanCreateBody {
+  const planId = draft.id.trim();
+  if (!planId || !PLAN_ID_PATTERN.test(planId) || planId.length < 2) {
+    throw new Error("invalid_plan_id");
+  }
+  if (!draft.name.trim()) {
+    throw new Error("invalid_name");
+  }
+
+  const amountCents = yuanInputToCents(draft.amount_yuan);
+  if (amountCents == null) {
+    throw new Error("invalid_amount");
+  }
+
+  const baseCredits = parseNonNegativeInt(draft.base_credits);
+  const bonusCredits = parseNonNegativeInt(draft.bonus_credits);
+  const sortOrder = parseNonNegativeInt(draft.sort_order);
+  if (baseCredits == null || bonusCredits == null || sortOrder == null) {
+    throw new Error("invalid_fields");
+  }
+  if (baseCredits + bonusCredits <= 0) {
+    throw new Error("invalid_fields");
+  }
+
+  return {
+    id: planId,
+    name: draft.name.trim(),
+    amount_cents: amountCents,
+    base_credits: baseCredits,
+    bonus_credits: bonusCredits,
+    enabled: draft.enabled,
+    visible: draft.visible,
+    sort_order: sortOrder,
+    badge: draft.badge.trim() ? draft.badge.trim() : null,
+    description: draft.description.trim() ? draft.description.trim() : null,
+    stripe_price_id: draft.stripe_price_id.trim()
+      ? draft.stripe_price_id.trim()
+      : null,
   };
 }
 
@@ -87,28 +169,37 @@ function draftToUpdateBody(draft: PlanDraft): AdminRechargePlanUpdateBody {
 
   const baseCredits = parseNonNegativeInt(draft.base_credits);
   const bonusCredits = parseNonNegativeInt(draft.bonus_credits);
-  if (baseCredits == null || bonusCredits == null) {
+  const sortOrder = parseNonNegativeInt(draft.sort_order);
+  if (baseCredits == null || bonusCredits == null || sortOrder == null) {
     throw new Error("invalid_fields");
   }
-
   if (baseCredits + bonusCredits <= 0) {
     throw new Error("invalid_fields");
   }
+  if (!draft.name.trim()) {
+    throw new Error("invalid_name");
+  }
 
   return {
+    name: draft.name.trim(),
     amount_cents: amountCents,
     base_credits: baseCredits,
     bonus_credits: bonusCredits,
     enabled: draft.enabled,
     visible: draft.visible,
+    sort_order: sortOrder,
     badge: draft.badge.trim() ? draft.badge.trim() : null,
     description: draft.description.trim() ? draft.description.trim() : null,
+    stripe_price_id: draft.stripe_price_id.trim()
+      ? draft.stripe_price_id.trim()
+      : null,
   };
 }
 
-function savePlanErrorMessage(
+function planErrorMessage(
   error: unknown,
-  t: (key: string) => string
+  t: (key: string) => string,
+  fallback: string
 ): string {
   if (error instanceof AdminApiError) {
     if (error.isSessionExpired) {
@@ -117,11 +208,25 @@ function savePlanErrorMessage(
     if (error.code === "invalid_recharge_plan_fields") {
       return t("admin.rechargePlans.invalidFields");
     }
+    if (error.code === "recharge_plan_already_exists") {
+      return t("admin.rechargePlans.planIdInvalid");
+    }
     return error.message;
   }
-  return error instanceof Error
-    ? error.message
-    : t("admin.rechargePlans.saveFailed");
+  return error instanceof Error ? error.message : fallback;
+}
+
+function draftValidationMessage(error: Error, t: (key: string) => string): string {
+  switch (error.message) {
+    case "invalid_plan_id":
+      return t("admin.rechargePlans.planIdInvalid");
+    case "invalid_name":
+      return t("admin.rechargePlans.nameRequired");
+    case "invalid_fields":
+      return t("admin.rechargePlans.invalidFields");
+    default:
+      return t("admin.rechargePlans.amountInvalid");
+  }
 }
 
 export function AdminRechargePlansPanel() {
@@ -129,32 +234,27 @@ export function AdminRechargePlansPanel() {
   const [plans, setPlans] = useState<AdminRechargePlanListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [panelMode, setPanelMode] = useState<PanelMode>("list");
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
   const [draft, setDraft] = useState<PlanDraft | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [savingPlanId, setSavingPlanId] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [actionPlanId, setActionPlanId] = useState<string | null>(null);
 
   const loadPlans = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const rows = await fetchAdminRechargePlans();
+      const rows = await fetchAdminRechargePlans({ includeArchived: showArchived });
       setPlans(rows);
     } catch (error) {
-      if (error instanceof AdminApiError && error.isSessionExpired) {
-        setLoadError(t("admin.common.sessionExpired"));
-      } else {
-        setLoadError(
-          error instanceof Error
-            ? error.message
-            : t("admin.rechargePlans.loadFailed")
-        );
-      }
+      setLoadError(planErrorMessage(error, t, t("admin.rechargePlans.loadFailed")));
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [showArchived, t]);
 
   useEffect(() => {
     void loadPlans();
@@ -165,275 +265,640 @@ export function AdminRechargePlansPanel() {
     [draft]
   );
 
+  function openCreateForm() {
+    setPanelMode("create");
+    setEditingPlanId(null);
+    setDraft(emptyDraft());
+    setFormError(null);
+    setStatusMessage(null);
+  }
+
   function startEdit(plan: AdminRechargePlanListItem) {
+    setPanelMode("edit");
     setEditingPlanId(plan.id);
     setDraft(planToDraft(plan));
-    setSaveError(null);
-    setSaveMessage(null);
+    setFormError(null);
+    setStatusMessage(null);
   }
 
-  function cancelEdit() {
+  function closeForm() {
+    setPanelMode("list");
     setEditingPlanId(null);
     setDraft(null);
-    setSaveError(null);
+    setFormError(null);
   }
 
-  async function savePlan(planId: string) {
+  async function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     if (!draft) return;
 
-    setSavingPlanId(planId);
-    setSaveError(null);
-    setSaveMessage(null);
+    setSubmitting(true);
+    setFormError(null);
+    setStatusMessage(null);
+    try {
+      let body: AdminRechargePlanCreateBody;
+      try {
+        body = draftToCreateBody(draft);
+      } catch (err) {
+        setFormError(
+          draftValidationMessage(
+            err instanceof Error ? err : new Error("invalid_fields"),
+            t
+          )
+        );
+        return;
+      }
+      await createAdminRechargePlan(body);
+      closeForm();
+      setStatusMessage(t("admin.rechargePlans.created"));
+      await loadPlans();
+    } catch (error) {
+      setFormError(
+        planErrorMessage(error, t, t("admin.rechargePlans.createFailed"))
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!draft || !editingPlanId) return;
+
+    setSubmitting(true);
+    setFormError(null);
+    setStatusMessage(null);
     try {
       let body: AdminRechargePlanUpdateBody;
       try {
         body = draftToUpdateBody(draft);
       } catch (err) {
-        setSaveError(
-          err instanceof Error && err.message === "invalid_fields"
-            ? t("admin.rechargePlans.invalidFields")
-            : t("admin.rechargePlans.amountInvalid")
+        setFormError(
+          draftValidationMessage(
+            err instanceof Error ? err : new Error("invalid_fields"),
+            t
+          )
         );
         return;
       }
-      await updateAdminRechargePlan(planId, body);
-      setEditingPlanId(null);
-      setDraft(null);
-      setSaveMessage(t("admin.rechargePlans.saved"));
+      await updateAdminRechargePlan(editingPlanId, body);
+      closeForm();
+      setStatusMessage(t("admin.rechargePlans.saved"));
       await loadPlans();
     } catch (error) {
-      setSaveError(savePlanErrorMessage(error, t));
+      setFormError(
+        planErrorMessage(error, t, t("admin.rechargePlans.saveFailed"))
+      );
     } finally {
-      setSavingPlanId(null);
+      setSubmitting(false);
+    }
+  }
+
+  async function handleQuickPatch(
+    planId: string,
+    body: AdminRechargePlanUpdateBody,
+    successMessage: string
+  ) {
+    setActionPlanId(planId);
+    setFormError(null);
+    try {
+      await updateAdminRechargePlan(planId, body);
+      setStatusMessage(successMessage);
+      await loadPlans();
+    } catch (error) {
+      setLoadError(
+        planErrorMessage(error, t, t("admin.rechargePlans.saveFailed"))
+      );
+    } finally {
+      setActionPlanId(null);
+    }
+  }
+
+  async function handleDuplicate(plan: AdminRechargePlanListItem) {
+    setActionPlanId(plan.id);
+    setFormError(null);
+    try {
+      const result = await duplicateAdminRechargePlan(plan.id);
+      setStatusMessage(
+        t("admin.rechargePlans.duplicated").replace("{id}", result.plan.id)
+      );
+      await loadPlans();
+    } catch (error) {
+      setLoadError(
+        planErrorMessage(error, t, t("admin.rechargePlans.createFailed"))
+      );
+    } finally {
+      setActionPlanId(null);
+    }
+  }
+
+  async function handleArchive(planId: string) {
+    setActionPlanId(planId);
+    try {
+      await archiveAdminRechargePlan(planId);
+      if (editingPlanId === planId) closeForm();
+      setStatusMessage(t("admin.rechargePlans.archived"));
+      await loadPlans();
+    } catch (error) {
+      setLoadError(
+        planErrorMessage(error, t, t("admin.rechargePlans.saveFailed"))
+      );
+    } finally {
+      setActionPlanId(null);
+    }
+  }
+
+  async function handleRestore(planId: string) {
+    setActionPlanId(planId);
+    try {
+      await restoreAdminRechargePlan(planId);
+      setStatusMessage(t("admin.rechargePlans.restored"));
+      await loadPlans();
+    } catch (error) {
+      setLoadError(
+        planErrorMessage(error, t, t("admin.rechargePlans.saveFailed"))
+      );
+    } finally {
+      setActionPlanId(null);
     }
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-wrap items-center gap-2">
-          <CardTitle className="text-base">{t("admin.rechargePlans.tableTitle")}</CardTitle>
-          <Badge variant="secondary">{plans.length}</Badge>
-        </div>
-        <CardDescription>{t("admin.rechargePlans.tableDesc")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <ul className="space-y-1 text-sm text-muted-foreground">
-          <li>{t("admin.rechargePlans.creditsComputedHint")}</li>
-          <li>{t("admin.rechargePlans.checkoutHint")}</li>
-        </ul>
+    <div className="flex flex-col gap-4">
+      {panelMode === "create" && draft ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              {t("admin.rechargePlans.createTitle")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PlanForm
+              mode="create"
+              draft={draft}
+              draftTotal={draftTotal}
+              submitting={submitting}
+              error={formError}
+              onChange={setDraft}
+              onSubmit={handleCreateSubmit}
+              onCancel={closeForm}
+              t={t}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
 
-        {loadError ? (
-          <p className="text-sm text-destructive">{loadError}</p>
-        ) : null}
-        {saveMessage ? (
-          <p className="text-sm text-emerald-600 dark:text-emerald-400">{saveMessage}</p>
-        ) : null}
-        {saveError ? <p className="text-sm text-destructive">{saveError}</p> : null}
+      {panelMode === "edit" && draft && editingPlanId ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t("admin.rechargePlans.edit")}</CardTitle>
+            <CardDescription className="font-mono text-xs">
+              {editingPlanId}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PlanForm
+              mode="edit"
+              draft={draft}
+              draftTotal={draftTotal}
+              submitting={submitting}
+              error={formError}
+              onChange={setDraft}
+              onSubmit={handleEditSubmit}
+              onCancel={closeForm}
+              t={t}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
 
-        {loading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            {t("admin.common.refreshing")}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="text-base">
+                  {t("admin.rechargePlans.tableTitle")}
+                </CardTitle>
+                <Badge variant="secondary">{plans.length}</Badge>
+              </div>
+              <CardDescription className="mt-1">
+                {t("admin.rechargePlans.tableDesc")}
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={showArchived}
+                  onChange={(event) => setShowArchived(event.target.checked)}
+                />
+                {t("admin.rechargePlans.showArchived")}
+              </label>
+              <Button type="button" size="sm" onClick={openCreateForm}>
+                {t("admin.rechargePlans.createPlan")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={loading}
+                onClick={() => void loadPlans()}
+              >
+                {loading ? t("admin.common.refreshing") : t("admin.common.refresh")}
+              </Button>
+            </div>
           </div>
-        ) : plans.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("admin.rechargePlans.empty")}</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[72rem] text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-                  <th className="py-2 pr-3 font-medium">{t("admin.rechargePlans.colId")}</th>
-                  <th className="py-2 pr-3 font-medium">{t("admin.rechargePlans.colName")}</th>
-                  <th className="py-2 pr-3 font-medium">{t("admin.rechargePlans.colAmount")}</th>
-                  <th className="py-2 pr-3 text-right font-medium">
-                    {t("admin.rechargePlans.colBaseCredits")}
-                  </th>
-                  <th className="py-2 pr-3 text-right font-medium">
-                    {t("admin.rechargePlans.colBonusCredits")}
-                  </th>
-                  <th className="py-2 pr-3 text-right font-medium">
-                    {t("admin.rechargePlans.colCredits")}
-                  </th>
-                  <th className="py-2 pr-3 font-medium">{t("admin.rechargePlans.colBadge")}</th>
-                  <th className="py-2 pr-3 font-medium">
-                    {t("admin.rechargePlans.colDescription")}
-                  </th>
-                  <th className="py-2 pr-3 font-medium">{t("admin.rechargePlans.colEnabled")}</th>
-                  <th className="py-2 pr-3 font-medium">{t("admin.rechargePlans.colVisible")}</th>
-                  <th className="py-2 pr-3 font-medium">{t("admin.rechargePlans.colUpdated")}</th>
-                  <th className="py-2 pr-3 font-medium">{t("admin.rechargePlans.colActions")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {plans.map((plan) => {
-                  const isEditing = editingPlanId === plan.id;
-                  const isSaving = savingPlanId === plan.id;
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <ul className="space-y-1 text-sm text-muted-foreground">
+            <li>{t("admin.rechargePlans.creditsComputedHint")}</li>
+            <li>{t("admin.rechargePlans.checkoutHint")}</li>
+          </ul>
 
-                  return (
-                    <Fragment key={plan.id}>
-                      <tr className="border-b align-top">
-                        <td className="py-2 pr-3 font-mono text-xs">{plan.id}</td>
-                        <td className="py-2 pr-3 font-medium">{plan.name}</td>
-                        <td className="py-2 pr-3 whitespace-nowrap">
-                          {formatCny(plan.amount_cents)}
-                        </td>
-                        <td className="py-2 pr-3 text-right font-mono text-xs">
-                          {formatInt(plan.base_credits)}
-                        </td>
-                        <td className="py-2 pr-3 text-right font-mono text-xs">
-                          {formatInt(plan.bonus_credits)}
-                        </td>
-                        <td className="py-2 pr-3 text-right font-mono text-xs font-medium">
-                          {formatInt(plan.credits)}
-                        </td>
-                        <td className="py-2 pr-3">{plan.badge ?? "—"}</td>
-                        <td className="max-w-[12rem] py-2 pr-3 text-muted-foreground">
-                          {plan.description ?? "—"}
-                        </td>
-                        <td className="py-2 pr-3">
-                          {plan.enabled ? (
-                            <Badge variant="success">{t("admin.rechargePlans.yes")}</Badge>
-                          ) : (
-                            <Badge variant="secondary">{t("admin.rechargePlans.no")}</Badge>
-                          )}
-                        </td>
-                        <td className="py-2 pr-3">
-                          {plan.visible ? (
-                            <Badge variant="outline">{t("admin.rechargePlans.yes")}</Badge>
-                          ) : (
-                            <Badge variant="warning">{t("admin.rechargePlans.no")}</Badge>
-                          )}
-                        </td>
-                        <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">
-                          {formatDateTime(plan.updated_at)}
-                        </td>
-                        <td className="py-2 pr-3">
-                          {!isEditing ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => startEdit(plan)}
-                            >
-                              {t("admin.rechargePlans.edit")}
-                            </Button>
-                          ) : null}
-                        </td>
-                      </tr>
+          {loadError ? (
+            <p className="text-sm text-destructive">{loadError}</p>
+          ) : null}
+          {statusMessage ? (
+            <p className="text-sm text-emerald-600 dark:text-emerald-400">
+              {statusMessage}
+            </p>
+          ) : null}
 
-                      {isEditing && draft ? (
-                        <tr className="border-b bg-muted/20">
-                          <td colSpan={12} className="p-4">
-                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                              <Field label={t("admin.rechargePlans.colAmount")}>
-                                <Input
-                                  inputMode="decimal"
-                                  value={draft.amount_yuan}
-                                  onChange={(event) =>
-                                    setDraft({ ...draft, amount_yuan: event.target.value })
-                                  }
-                                />
-                              </Field>
-                              <Field label={t("admin.rechargePlans.colBaseCredits")}>
-                                <Input
-                                  inputMode="numeric"
-                                  value={draft.base_credits}
-                                  onChange={(event) =>
-                                    setDraft({ ...draft, base_credits: event.target.value })
-                                  }
-                                />
-                              </Field>
-                              <Field label={t("admin.rechargePlans.colBonusCredits")}>
-                                <Input
-                                  inputMode="numeric"
-                                  value={draft.bonus_credits}
-                                  onChange={(event) =>
-                                    setDraft({ ...draft, bonus_credits: event.target.value })
-                                  }
-                                />
-                              </Field>
-                              <Field label={t("admin.rechargePlans.colCredits")}>
-                                <Input
-                                  value={
-                                    draftTotal != null ? formatInt(draftTotal) : "—"
-                                  }
-                                  disabled
-                                />
-                              </Field>
-                              <Field label={t("admin.rechargePlans.colBadge")}>
-                                <Input
-                                  value={draft.badge}
-                                  onChange={(event) =>
-                                    setDraft({ ...draft, badge: event.target.value })
-                                  }
-                                />
-                              </Field>
-                              <Field label={t("admin.rechargePlans.colDescription")}>
-                                <Input
-                                  value={draft.description}
-                                  onChange={(event) =>
-                                    setDraft({ ...draft, description: event.target.value })
-                                  }
-                                />
-                              </Field>
-                              <label className="flex items-center gap-2 text-sm">
-                                <input
-                                  type="checkbox"
-                                  checked={draft.enabled}
-                                  onChange={(event) =>
-                                    setDraft({ ...draft, enabled: event.target.checked })
-                                  }
-                                />
-                                {t("admin.rechargePlans.colEnabled")}
-                              </label>
-                              <label className="flex items-center gap-2 text-sm">
-                                <input
-                                  type="checkbox"
-                                  checked={draft.visible}
-                                  onChange={(event) =>
-                                    setDraft({ ...draft, visible: event.target.checked })
-                                  }
-                                />
-                                {t("admin.rechargePlans.colVisible")}
-                              </label>
-                            </div>
-                            <div className="mt-4 flex flex-wrap gap-2">
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {t("admin.common.refreshing")}
+            </div>
+          ) : plans.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {t("admin.rechargePlans.empty")}
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[80rem] text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                    <th className="py-2 pr-3 font-medium">
+                      {t("admin.rechargePlans.colId")}
+                    </th>
+                    <th className="py-2 pr-3 font-medium">
+                      {t("admin.rechargePlans.colName")}
+                    </th>
+                    <th className="py-2 pr-3 font-medium">
+                      {t("admin.rechargePlans.colAmount")}
+                    </th>
+                    <th className="py-2 pr-3 text-right font-medium">
+                      {t("admin.rechargePlans.colBaseCredits")}
+                    </th>
+                    <th className="py-2 pr-3 text-right font-medium">
+                      {t("admin.rechargePlans.colBonusCredits")}
+                    </th>
+                    <th className="py-2 pr-3 text-right font-medium">
+                      {t("admin.rechargePlans.colCredits")}
+                    </th>
+                    <th className="py-2 pr-3 font-medium">
+                      {t("admin.rechargePlans.colSortOrder")}
+                    </th>
+                    <th className="py-2 pr-3 font-medium">
+                      {t("admin.rechargePlans.colBadge")}
+                    </th>
+                    <th className="py-2 pr-3 font-medium">
+                      {t("admin.rechargePlans.colDescription")}
+                    </th>
+                    <th className="py-2 pr-3 font-medium">
+                      {t("admin.rechargePlans.colEnabled")}
+                    </th>
+                    <th className="py-2 pr-3 font-medium">
+                      {t("admin.rechargePlans.colVisible")}
+                    </th>
+                    <th className="py-2 pr-3 font-medium">
+                      {t("admin.rechargePlans.colArchived")}
+                    </th>
+                    <th className="py-2 pr-3 font-medium">
+                      {t("admin.rechargePlans.colUpdated")}
+                    </th>
+                    <th className="py-2 pr-3 font-medium">
+                      {t("admin.rechargePlans.colActions")}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {plans.map((plan) => {
+                    const isArchived = Boolean(plan.archived_at);
+                    const isBusy = actionPlanId === plan.id;
+
+                    return (
+                      <Fragment key={plan.id}>
+                        <tr
+                          className={`border-b align-top ${isArchived ? "opacity-70" : ""}`}
+                        >
+                          <td className="py-2 pr-3 font-mono text-xs">{plan.id}</td>
+                          <td className="py-2 pr-3 font-medium">{plan.name}</td>
+                          <td className="py-2 pr-3 whitespace-nowrap">
+                            {formatCny(plan.amount_cents)}
+                          </td>
+                          <td className="py-2 pr-3 text-right font-mono text-xs">
+                            {formatInt(plan.base_credits)}
+                          </td>
+                          <td className="py-2 pr-3 text-right font-mono text-xs">
+                            {formatInt(plan.bonus_credits)}
+                          </td>
+                          <td className="py-2 pr-3 text-right font-mono text-xs font-medium">
+                            {formatInt(plan.credits)}
+                          </td>
+                          <td className="py-2 pr-3 font-mono text-xs">
+                            {plan.sort_order}
+                          </td>
+                          <td className="py-2 pr-3">{plan.badge ?? "—"}</td>
+                          <td className="max-w-[12rem] py-2 pr-3 text-muted-foreground">
+                            {plan.description ?? "—"}
+                          </td>
+                          <td className="py-2 pr-3">
+                            {plan.enabled ? (
+                              <Badge variant="success">{t("admin.rechargePlans.yes")}</Badge>
+                            ) : (
+                              <Badge variant="secondary">{t("admin.rechargePlans.no")}</Badge>
+                            )}
+                          </td>
+                          <td className="py-2 pr-3">
+                            {plan.visible ? (
+                              <Badge variant="outline">{t("admin.rechargePlans.yes")}</Badge>
+                            ) : (
+                              <Badge variant="warning">{t("admin.rechargePlans.no")}</Badge>
+                            )}
+                          </td>
+                          <td className="py-2 pr-3">
+                            {isArchived ? (
+                              <Badge variant="secondary">
+                                {t("admin.rechargePlans.archivedBadge")}
+                              </Badge>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">
+                            {formatDateTime(plan.updated_at)}
+                          </td>
+                          <td className="py-2 pr-3">
+                            <div className="flex flex-wrap gap-1">
                               <Button
                                 type="button"
-                                size="sm"
-                                disabled={isSaving}
-                                onClick={() => void savePlan(plan.id)}
-                              >
-                                {isSaving ? (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : null}
-                                {isSaving
-                                  ? t("admin.rechargePlans.saving")
-                                  : t("admin.rechargePlans.save")}
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
                                 variant="outline"
-                                disabled={isSaving}
-                                onClick={cancelEdit}
+                                size="sm"
+                                disabled={isBusy}
+                                onClick={() => startEdit(plan)}
                               >
-                                {t("admin.rechargePlans.cancel")}
+                                {t("admin.rechargePlans.edit")}
                               </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={isBusy}
+                                onClick={() => void handleDuplicate(plan)}
+                              >
+                                {t("admin.rechargePlans.duplicate")}
+                              </Button>
+                              {!isArchived ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={isBusy}
+                                  onClick={() =>
+                                    void handleQuickPatch(
+                                      plan.id,
+                                      { enabled: !plan.enabled },
+                                      plan.enabled
+                                        ? t("admin.rechargePlans.disableCheckout")
+                                        : t("admin.rechargePlans.enableCheckout")
+                                    )
+                                  }
+                                >
+                                  {plan.enabled
+                                    ? t("admin.rechargePlans.disableCheckout")
+                                    : t("admin.rechargePlans.enableCheckout")}
+                                </Button>
+                              ) : null}
+                              {!isArchived ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={isBusy}
+                                  onClick={() =>
+                                    void handleQuickPatch(
+                                      plan.id,
+                                      { visible: !plan.visible },
+                                      plan.visible
+                                        ? t("admin.rechargePlans.hideFromPricing")
+                                        : t("admin.rechargePlans.showOnPricing")
+                                    )
+                                  }
+                                >
+                                  {plan.visible
+                                    ? t("admin.rechargePlans.hideFromPricing")
+                                    : t("admin.rechargePlans.showOnPricing")}
+                                </Button>
+                              ) : null}
+                              {isArchived ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={isBusy}
+                                  onClick={() => void handleRestore(plan.id)}
+                                >
+                                  {t("admin.rechargePlans.unarchive")}
+                                </Button>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={isBusy}
+                                  onClick={() => void handleArchive(plan.id)}
+                                >
+                                  {t("admin.rechargePlans.archive")}
+                                </Button>
+                              )}
                             </div>
                           </td>
                         </tr>
-                      ) : null}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function PlanForm({
+  mode,
+  draft,
+  draftTotal,
+  submitting,
+  error,
+  onChange,
+  onSubmit,
+  onCancel,
+  t,
+}: {
+  mode: "create" | "edit";
+  draft: PlanDraft;
+  draftTotal: number | null;
+  submitting: boolean;
+  error: string | null;
+  onChange: (draft: PlanDraft) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onCancel: () => void;
+  t: (key: string) => string;
+}) {
+  return (
+    <form className="flex flex-col gap-4" onSubmit={onSubmit}>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {mode === "create" ? (
+          <Field label={t("admin.rechargePlans.colId")}>
+            <Input
+              value={draft.id}
+              onChange={(event) =>
+                onChange({ ...draft, id: event.target.value.toLowerCase() })
+              }
+              className="font-mono text-xs"
+              placeholder="starter-plus"
+            />
+          </Field>
+        ) : (
+          <Field label={t("admin.rechargePlans.colId")}>
+            <Input value={draft.id} disabled className="font-mono text-xs" />
+          </Field>
         )}
-      </CardContent>
-    </Card>
+        <Field label={t("admin.rechargePlans.colName")}>
+          <Input
+            value={draft.name}
+            onChange={(event) => onChange({ ...draft, name: event.target.value })}
+          />
+        </Field>
+        <Field label={t("admin.rechargePlans.colAmount")}>
+          <Input
+            inputMode="decimal"
+            value={draft.amount_yuan}
+            onChange={(event) =>
+              onChange({ ...draft, amount_yuan: event.target.value })
+            }
+          />
+        </Field>
+        <Field label={t("admin.rechargePlans.colBaseCredits")}>
+          <Input
+            inputMode="numeric"
+            value={draft.base_credits}
+            onChange={(event) =>
+              onChange({ ...draft, base_credits: event.target.value })
+            }
+          />
+        </Field>
+        <Field label={t("admin.rechargePlans.colBonusCredits")}>
+          <Input
+            inputMode="numeric"
+            value={draft.bonus_credits}
+            onChange={(event) =>
+              onChange({ ...draft, bonus_credits: event.target.value })
+            }
+          />
+        </Field>
+        <Field label={t("admin.rechargePlans.colCredits")}>
+          <Input
+            value={draftTotal != null ? formatInt(draftTotal) : "—"}
+            disabled
+          />
+        </Field>
+        <Field label={t("admin.rechargePlans.colSortOrder")}>
+          <Input
+            inputMode="numeric"
+            value={draft.sort_order}
+            onChange={(event) =>
+              onChange({ ...draft, sort_order: event.target.value })
+            }
+          />
+        </Field>
+        <Field label={t("admin.rechargePlans.colStripePriceId")}>
+          <Input
+            value={draft.stripe_price_id}
+            onChange={(event) =>
+              onChange({ ...draft, stripe_price_id: event.target.value })
+            }
+            className="font-mono text-xs"
+            placeholder="price_..."
+          />
+        </Field>
+        <Field label={t("admin.rechargePlans.colBadge")}>
+          <Input
+            value={draft.badge}
+            onChange={(event) => onChange({ ...draft, badge: event.target.value })}
+          />
+        </Field>
+        <Field label={t("admin.rechargePlans.colDescription")}>
+          <Input
+            value={draft.description}
+            onChange={(event) =>
+              onChange({ ...draft, description: event.target.value })
+            }
+          />
+        </Field>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={draft.enabled}
+            onChange={(event) =>
+              onChange({ ...draft, enabled: event.target.checked })
+            }
+          />
+          {t("admin.rechargePlans.colEnabled")}
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={draft.visible}
+            onChange={(event) =>
+              onChange({ ...draft, visible: event.target.checked })
+            }
+          />
+          {t("admin.rechargePlans.colVisible")}
+        </label>
+      </div>
+
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" size="sm" disabled={submitting}>
+          {submitting ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : null}
+          {submitting
+            ? mode === "create"
+              ? t("admin.rechargePlans.creating")
+              : t("admin.rechargePlans.saving")
+            : mode === "create"
+              ? t("admin.rechargePlans.create")
+              : t("admin.rechargePlans.save")}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={submitting}
+          onClick={onCancel}
+        >
+          {t("admin.rechargePlans.cancel")}
+        </Button>
+      </div>
+    </form>
   );
 }
 
