@@ -5,7 +5,6 @@ import {
   ArrowUpRight,
   CreditCard,
   Gauge,
-  ImageIcon,
   KeyRound,
   MessageSquare,
   type LucideIcon,
@@ -57,13 +56,15 @@ type OnboardingStepConfig = {
   bodyKey: string;
   buttonKey: string;
   href: string;
+  secondaryButtonKey?: string;
+  secondaryHref?: string;
   icon: LucideIcon;
 };
 
 const ONBOARDING_STEPS: OnboardingStepConfig[] = [
   {
     step: 1,
-    titleKey: "dashboard.overview.createApiKey",
+    titleKey: "dashboard.overview.onboardingStep1Title",
     bodyKey: "dashboard.overview.createApiKeyBody",
     buttonKey: "dashboard.overview.createApiKey",
     href: "/dashboard/api-keys",
@@ -71,35 +72,29 @@ const ONBOARDING_STEPS: OnboardingStepConfig[] = [
   },
   {
     step: 2,
-    titleKey: "dashboard.overview.tryChatPlayground",
+    titleKey: "dashboard.overview.onboardingStep2Title",
+    bodyKey: "dashboard.overview.topUpCreditsBody",
+    buttonKey: "dashboard.overview.topUpCredits",
+    href: "/dashboard/credits",
+    icon: CreditCard,
+  },
+  {
+    step: 3,
+    titleKey: "dashboard.overview.onboardingStep3Title",
     bodyKey: "dashboard.overview.tryChatPlaygroundBody",
     buttonKey: "dashboard.overview.openChatPlayground",
     href: "/dashboard/playground",
     icon: MessageSquare,
   },
   {
-    step: 3,
-    titleKey: "dashboard.overview.tryImagePlayground",
-    bodyKey: "dashboard.overview.tryImagePlaygroundBody",
-    buttonKey: "dashboard.overview.openImagePlayground",
-    href: "/dashboard/image-playground",
-    icon: ImageIcon,
-  },
-  {
     step: 4,
-    titleKey: "dashboard.overview.reviewUsage",
-    bodyKey: "dashboard.overview.reviewUsageBody",
+    titleKey: "dashboard.overview.onboardingStep4Title",
+    bodyKey: "dashboard.overview.onboardingStep4Body",
     buttonKey: "dashboard.overview.viewUsage",
     href: "/dashboard/usage",
+    secondaryButtonKey: "dashboard.overview.viewCredits",
+    secondaryHref: "/dashboard/credits",
     icon: Gauge,
-  },
-  {
-    step: 5,
-    titleKey: "dashboard.overview.topUpCredits",
-    bodyKey: "dashboard.overview.topUpCreditsBody",
-    buttonKey: "dashboard.overview.topUpCredits",
-    href: "/dashboard/credits",
-    icon: CreditCard,
   },
 ];
 
@@ -137,8 +132,8 @@ export function DashboardOverviewContent({
 
       <Card>
         <CardHeader>
-          <CardTitle>{t("dashboard.overview.getStarted")}</CardTitle>
-          <CardDescription>{t("dashboard.overview.getStartedDesc")}</CardDescription>
+          <CardTitle>{t("dashboard.overview.onboardingTitle")}</CardTitle>
+          <CardDescription>{t("dashboard.overview.onboardingDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {ONBOARDING_STEPS.map((item) => (
@@ -280,9 +275,16 @@ function OnboardingStep({
           <p className="mt-1 text-sm text-muted-foreground">{body}</p>
         </div>
       </div>
-      <Button asChild size="sm" className="shrink-0 sm:mt-0.5">
-        <Link href={item.href}>{t(item.buttonKey)}</Link>
-      </Button>
+      <div className="flex shrink-0 flex-wrap gap-2 sm:mt-0.5">
+        <Button asChild size="sm">
+          <Link href={item.href}>{t(item.buttonKey)}</Link>
+        </Button>
+        {item.secondaryHref && item.secondaryButtonKey ? (
+          <Button asChild size="sm" variant="outline">
+            <Link href={item.secondaryHref}>{t(item.secondaryButtonKey)}</Link>
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }

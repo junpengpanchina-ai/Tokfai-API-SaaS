@@ -154,13 +154,36 @@ function clientIntegrationErrors(
       meaningKey: "docs.error404Model",
       fixKey: `docs.${prefix}Error404`,
     },
+    {
+      status: "500",
+      code: "upstream_error",
+      meaningKey: "docs.error500",
+      fixKey: `docs.${prefix}Error500`,
+    },
   ];
 }
 
+const THREE_MINUTE_SETUP_ROWS = [
+  { id: "base-url", labelKey: "docs.baseUrlTitle", value: BASE_URL },
+  { id: "api-key", labelKey: "docs.apiKeyFormatTitle", value: TOKFAI_API_KEY_FORMAT },
+  {
+    id: "model",
+    labelKey: "docs.recommendedModelTitle",
+    value: DEFAULT_MODEL,
+  },
+] as const;
+
+const WORKS_WITH_CLIENTS = [
+  "docs.compatCursor",
+  "docs.compatCherryStudio",
+  "docs.compatOpenAiSdk",
+  "docs.compatCustomApp",
+] as const;
+
 const CLIENT_CONFIG_ROWS = [
   { id: "base-url", labelKey: "docs.baseUrlTitle", value: BASE_URL },
-  { id: "api-key", labelKey: "docs.apiKeyFormatTitle", value: API_KEY_PLACEHOLDER },
-  { id: "model-id", labelKey: "docs.modelIdLabel", value: DEFAULT_MODEL },
+  { id: "api-key", labelKey: "docs.clientIntegrationApiKeyLabel", value: API_KEY_PLACEHOLDER },
+  { id: "model-id", labelKey: "docs.clientIntegrationModelLabel", value: DEFAULT_MODEL },
 ] as const;
 
 type ErrorRow = {
@@ -235,6 +258,75 @@ export function DocsContent({
         ) : null}
       </div>
 
+      <Card id="three-minute-setup">
+        <CardHeader>
+          <CardTitle>{t("docs.threeMinuteSetupTitle")}</CardTitle>
+          <CardDescription>{t("docs.threeMinuteSetupDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="overflow-x-auto rounded-lg border">
+            <table className="w-full text-sm">
+              <tbody>
+                {THREE_MINUTE_SETUP_ROWS.map((row) => {
+                  const copyId = `three-minute-${row.id}`;
+                  return (
+                    <tr key={row.id} className="border-b last:border-0">
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-foreground">
+                        {t(row.labelKey)}
+                      </td>
+                      <td className="min-w-0 px-4 py-3">
+                        <code className="break-all font-mono text-xs text-muted-foreground">
+                          {row.value}
+                        </code>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <CopyButton
+                          copied={copiedId === copyId}
+                          onCopy={() => copyText(copyId, row.value)}
+                          copyLabel={t("docs.copy")}
+                          copiedLabel={t("docs.copied")}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              {t("docs.worksWithLabel")}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {WORKS_WITH_CLIENTS.map((key) => (
+                <span
+                  key={key}
+                  className="rounded-full border bg-muted/40 px-3 py-1 text-xs font-medium text-foreground"
+                >
+                  {t(key)}
+                </span>
+              ))}
+            </div>
+          </div>
+          {showDashboardLinks ? (
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/dashboard/api-keys">{t("docs.createApiKey")}</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="#client-integrations">{t("docs.sectionClientIntegrations")}</Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link href="#client-integrations">{t("docs.sectionClientIntegrations")}</Link>
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card id="quickstart">
         <CardHeader>
           <CardTitle>{t("docs.quickstartTitle")}</CardTitle>
@@ -281,6 +373,10 @@ export function DocsContent({
         </CardHeader>
         <CardContent>
           <nav className="flex flex-wrap gap-2 text-sm">
+            <DocsSectionLink
+              href="#three-minute-setup"
+              label={t("docs.threeMinuteSetupTitle")}
+            />
             <DocsSectionLink href="#authentication" label={t("docs.sectionAuthentication")} />
             <DocsSectionLink href="#chat-completions" label={t("docs.sectionChatCompletions")} />
             <DocsSectionLink href="#image-generations" label={t("docs.sectionImageGenerations")} />

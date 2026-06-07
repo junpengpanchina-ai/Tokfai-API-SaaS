@@ -74,8 +74,17 @@ export const messages = {
       overview: {
         title: "Overview",
         subtitle:
-          "Welcome to Tokfai. Follow the steps below to create a key, test chat and image generation, review usage, and top up credits.",
+          "Welcome to Tokfai. Complete onboarding below — create a key, top up credits, test in Chat Playground, then review Usage and Credits.",
         v1Preview: "V1 preview",
+        onboardingTitle: "Onboarding",
+        onboardingDesc:
+          "Four steps to go from sign-up to a verified API request.",
+        onboardingStep1Title: "Create API Key",
+        onboardingStep2Title: "Top up Credits",
+        onboardingStep3Title: "Test in Chat Playground",
+        onboardingStep4Title: "View Usage / Credits",
+        onboardingStep4Body:
+          "Confirm requests appear in Usage with model, credits charged, and request ID. Verify your balance in Credits.",
         getStarted: "Get started",
         getStartedDesc:
           "Complete this checklist to validate your account end-to-end.",
@@ -94,6 +103,7 @@ export const messages = {
         reviewUsageBody:
           "Confirm chat and image requests appear with model, credits charged, and request ID.",
         viewUsage: "View Usage",
+        viewCredits: "View Credits",
         topUpCredits: "Top up Credits",
         topUpCreditsBody: "{plan}. {policy}",
         creditsRemaining: "Credits remaining",
@@ -659,6 +669,14 @@ export const messages = {
       createApiKey: "Create API key",
       copy: "Copy",
       copied: "Copied",
+      threeMinuteSetupTitle: "3-minute setup",
+      threeMinuteSetupDesc:
+        "Everything you need to point Cursor, Cherry Studio, OpenAI SDK, or your app at Tokfai.",
+      worksWithLabel: "Works with",
+      compatCursor: "Cursor",
+      compatCherryStudio: "Cherry Studio",
+      compatOpenAiSdk: "OpenAI SDK",
+      compatCustomApp: "Custom App",
       quickstartTitle: "Quickstart",
       quickstartDesc: "Get your first Tokfai API response in a few minutes.",
       quickstartStep1:
@@ -742,6 +760,8 @@ export const messages = {
       clientIntegrationConfigTitle: "Required settings",
       clientIntegrationErrorsTitle: "Common errors",
       clientIntegrationFixColumn: "What to check",
+      clientIntegrationApiKeyLabel: "API Key",
+      clientIntegrationModelLabel: "Model",
       cherryStudioLabel: "Cherry Studio",
       cherryStudioSteps:
         "Settings → Provider → OpenAI-compatible. Set API Host, API Key, and default model as below.",
@@ -751,6 +771,8 @@ export const messages = {
         "Top up credits in Dashboard → Credits before sending requests from Cherry Studio.",
       cherryStudioError404:
         "Pick a Tokfai model ID such as gemini-3.1-pro. Browse available IDs on the Models page.",
+      cherryStudioError500:
+        "The model service is temporarily unavailable — retry in a few minutes or switch models.",
       cursorLabel: "Cursor",
       cursorSteps:
         "Settings → Models → Override OpenAI Base URL. Add your API key and select a Tokfai model ID.",
@@ -760,6 +782,8 @@ export const messages = {
         "Top up credits in Dashboard → Credits before using Cursor chat with Tokfai.",
       cursorError404:
         "Choose a Tokfai model ID (e.g. gemini-3.1-pro) in the model picker. See Models for the full list.",
+      cursorError500:
+        "Retry the request or pick another model — upstream services may be briefly unavailable.",
       openAiSdkLabel: "OpenAI SDK",
       openAiSdkSteps:
         "Set baseURL to https://api.tokfai.com/v1 and apiKey to your sk-tokfai_xxx key. See Chat Completions and Image Generations sections for JavaScript and Python examples.",
@@ -1280,8 +1304,16 @@ export const messages = {
       overview: {
         title: "概览",
         subtitle:
-          "欢迎使用 Tokfai。按以下步骤创建密钥、测试对话与图像生成、查看用量并充值积分。",
+          "欢迎使用 Tokfai。完成下方 Onboarding — 创建密钥、充值 credits、在 Chat Playground 测试，然后查看 Usage 与 Credits。",
         v1Preview: "V1 预览",
+        onboardingTitle: "Onboarding",
+        onboardingDesc: "四步完成从注册到验证 API 请求。",
+        onboardingStep1Title: "Create API Key",
+        onboardingStep2Title: "Top up Credits",
+        onboardingStep3Title: "Test in Chat Playground",
+        onboardingStep4Title: "View Usage / Credits",
+        onboardingStep4Body:
+          "在 Usage 确认请求已记录，包含 model、credits_charged 与 request ID；在 Credits 核对余额。",
         getStarted: "快速开始",
         getStartedDesc: "完成以下清单，端到端验证你的账户。",
         createApiKey: "创建 API 密钥",
@@ -1299,6 +1331,7 @@ export const messages = {
         reviewUsageBody:
           "确认对话与图像请求已记录，包含 model、credits_charged 与 request ID。",
         viewUsage: "查看用量",
+        viewCredits: "查看 Credits",
         topUpCredits: "充值积分",
         topUpCreditsBody: "{plan}。{policy}",
         creditsRemaining: "剩余积分",
@@ -1832,6 +1865,14 @@ export const messages = {
       createApiKey: "创建 API Key",
       copy: "复制",
       copied: "已复制",
+      threeMinuteSetupTitle: "3-minute setup",
+      threeMinuteSetupDesc:
+        "接入 Cursor、Cherry Studio、OpenAI SDK 或自研 App 所需的全部配置。",
+      worksWithLabel: "Works with",
+      compatCursor: "Cursor",
+      compatCherryStudio: "Cherry Studio",
+      compatOpenAiSdk: "OpenAI SDK",
+      compatCustomApp: "Custom App",
       quickstartTitle: "Quickstart",
       quickstartDesc: "几分钟内完成第一次 Tokfai API 调用。",
       quickstartStep1:
@@ -1913,6 +1954,8 @@ export const messages = {
       clientIntegrationConfigTitle: "必填配置",
       clientIntegrationErrorsTitle: "常见错误",
       clientIntegrationFixColumn: "排查建议",
+      clientIntegrationApiKeyLabel: "API Key",
+      clientIntegrationModelLabel: "Model",
       cherryStudioLabel: "Cherry Studio",
       cherryStudioSteps:
         "Settings → Provider → OpenAI-compatible。按下方表格填写 API Host、API Key 与默认 model。",
@@ -1922,6 +1965,8 @@ export const messages = {
         "在 Cherry Studio 发请求前，先在 Dashboard → Credits 充值 credits。",
       cherryStudioError404:
         "选择 Tokfai model ID，例如 gemini-3.1-pro。完整列表见 Models 页面。",
+      cherryStudioError500:
+        "模型服务暂时不可用 — 稍后重试或切换 model。",
       cursorLabel: "Cursor",
       cursorSteps:
         "Settings → Models → Override OpenAI Base URL。填入 API Key 并选择 Tokfai model ID。",
@@ -1931,6 +1976,8 @@ export const messages = {
         "在 Cursor 中使用 Tokfai 对话前，先在 Dashboard → Credits 充值 credits。",
       cursorError404:
         "在 model 选择器中选择 Tokfai model ID（如 gemini-3.1-pro）。完整列表见 Models。",
+      cursorError500:
+        "重试请求或切换 model — 上游服务可能短暂不可用。",
       openAiSdkLabel: "OpenAI SDK",
       openAiSdkSteps:
         "将 baseURL 设为 https://api.tokfai.com/v1，apiKey 设为 sk-tokfai_xxx。JavaScript 与 Python 示例见 Chat Completions 与 Image Generations 章节。",

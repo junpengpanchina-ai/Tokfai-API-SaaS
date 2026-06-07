@@ -16,12 +16,12 @@ export async function DashboardShell({
   const email = user?.email ?? "";
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
+    <div className="min-h-svh md:flex">
       <DashboardSidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-svh min-w-0 flex-1 flex-col">
         <DashboardMobileNav />
         <DashboardHeader email={email} />
-        <main className="flex-1 p-4 sm:p-6 md:p-10">
+        <main className="min-w-0 flex-1 p-4 sm:p-6 md:p-10">
           <div className="mx-auto w-full max-w-6xl">{children}</div>
         </main>
         <footer className="border-t px-4 py-4 text-xs text-muted-foreground sm:px-6">
