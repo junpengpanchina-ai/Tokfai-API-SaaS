@@ -2,6 +2,10 @@ import { z } from "zod";
 
 import { ApiError } from "../errors.js";
 import { recordAdminAuditLog } from "../lib/adminAuditLog.js";
+import {
+  createRechargePlanStripePrice,
+  createRechargePlanStripeResources,
+} from "../lib/rechargePlanStripe.js";
 import type { AdminUserContext } from "../middleware/requireAdminV1.js";
 import { supabase } from "../supabase.js";
 
@@ -10,7 +14,13 @@ const ADMIN_RECHARGE_PLAN_RESOURCE_TYPE = "recharge_plans";
 const RECHARGE_PLAN_ID_PATTERN = /^[a-z0-9][a-z0-9._-]*$/;
 
 const RECHARGE_PLAN_SELECT =
-  "id, name, amount_cents, currency, base_credits, credits, bonus_credits, stripe_price_id, enabled, visible, sort_order, badge, description, archived_at, updated_at";
+  "id, name, amount_cents, currency, base_credits, credits, bonus_credits, stripe_product_id, stripe_price_id, enabled, visible, sort_order, badge, description, archived_at, updated_at";
+
+const CLIENT_FORBIDDEN_RECHARGE_PLAN_FIELDS = [
+  "credits",
+  "stripe_price_id",
+  "stripe_product_id",
+] as const;
 
 export type RechargePlanRow = {
   id: string;
@@ -21,6 +31,7 @@ export type RechargePlanRow = {
   bonus_credits: number;
   /** Final credited amount (= base_credits + bonus_credits). */
   credits: number;
+  stripe_product_id: string | null;
   stripe_price_id: string | null;
   enabled: boolean;
   visible: boolean;
@@ -41,6 +52,7 @@ type RechargePlanDbRow = {
   base_credits?: number | string | null;
   credits: number | string;
   bonus_credits: number | string | null;
+  stripe_product_id?: string | null;
   stripe_price_id: string | null;
   enabled: boolean | null;
   visible: boolean | null;
@@ -77,17 +89,29 @@ const optionalNullableString = (max: number) =>
 const RechargePlanPatchSchema = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),
+    amount_yuan: z.coerce.number().positive().max(1_000_000).optional(),
     amount_cents: optionalIntField(1, 100_000_000),
     base_credits: optionalIntField(0, 100_000_000),
     bonus_credits: optionalIntField(0, 100_000_000),
     enabled: z.boolean().optional(),
     visible: z.boolean().optional(),
     sort_order: optionalIntField(0, 100_000),
-    stripe_price_id: optionalNullableString(120),
     badge: optionalNullableString(40),
     description: optionalNullableString(500),
   })
-  .strict();
+  .strict()
+  .superRefine((data, ctx) => {
+    if (
+      data.amount_yuan !== undefined &&
+      data.amount_cents !== undefined
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Send amount_yuan or amount_cents, not both.",
+        path: ["amount_yuan"],
+      });
+    }
+  });
 
 const RechargePlanCreateSchema = z
   .object({
@@ -98,18 +122,35 @@ const RechargePlanCreateSchema = z
       .max(64)
       .regex(RECHARGE_PLAN_ID_PATTERN, "invalid_recharge_plan_id"),
     name: z.string().trim().min(1).max(120),
-    amount_cents: z.coerce.number().int().min(1).max(100_000_000),
+    amount_yuan: z.coerce.number().positive().max(1_000_000).optional(),
+    amount_cents: z.coerce.number().int().min(1).max(100_000_000).optional(),
     base_credits: z.coerce.number().int().min(0).max(100_000_000),
     bonus_credits: z.coerce.number().int().min(0).max(100_000_000).default(0),
     enabled: z.boolean().optional(),
     visible: z.boolean().optional(),
     sort_order: z.coerce.number().int().min(0).max(100_000).optional(),
-    stripe_price_id: optionalNullableString(120),
     badge: optionalNullableString(40),
     description: optionalNullableString(500),
   })
   .strict()
   .superRefine((data, ctx) => {
+    if (data.amount_yuan === undefined && data.amount_cents === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "amount_yuan or amount_cents is required",
+        path: ["amount_yuan"],
+      });
+    }
+    if (
+      data.amount_yuan !== undefined &&
+      data.amount_cents !== undefined
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Send amount_yuan or amount_cents, not both.",
+        path: ["amount_yuan"],
+      });
+    }
     if (data.base_credits + data.bonus_credits <= 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -152,6 +193,36 @@ function normalizeNullableString(
   return trimmed.slice(0, max);
 }
 
+function findForbiddenRechargePlanField(
+  body: Record<string, unknown>
+): (typeof CLIENT_FORBIDDEN_RECHARGE_PLAN_FIELDS)[number] | null {
+  for (const field of CLIENT_FORBIDDEN_RECHARGE_PLAN_FIELDS) {
+    if (field in body) return field;
+  }
+  return null;
+}
+
+function resolveAmountCents(args: {
+  amount_yuan?: number;
+  amount_cents?: number;
+}): number {
+  if (args.amount_cents !== undefined) return args.amount_cents;
+  if (args.amount_yuan !== undefined) {
+    const amountCents = Math.round(args.amount_yuan * 100);
+    if (!Number.isInteger(amountCents) || amountCents <= 0) {
+      throw ApiError.badRequest(
+        "Invalid amount_yuan value.",
+        "invalid_recharge_plan_fields"
+      );
+    }
+    return amountCents;
+  }
+  throw ApiError.badRequest(
+    "amount_yuan or amount_cents is required.",
+    "invalid_recharge_plan_fields"
+  );
+}
+
 function mapRechargePlanRow(row: RechargePlanDbRow): AdminRechargePlanListItem {
   const baseCredits = toNumber(row.base_credits ?? row.credits);
   const bonusCredits = toNumber(row.bonus_credits);
@@ -164,6 +235,7 @@ function mapRechargePlanRow(row: RechargePlanDbRow): AdminRechargePlanListItem {
     base_credits: baseCredits,
     bonus_credits: bonusCredits,
     credits,
+    stripe_product_id: row.stripe_product_id?.trim() || null,
     stripe_price_id: row.stripe_price_id?.trim() || null,
     enabled: row.enabled ?? false,
     visible: row.visible ?? true,
@@ -261,7 +333,8 @@ export async function createAdminRechargePlan(
   | { ok: true; plan: AdminRechargePlanListItem }
   | { ok: false; status: 400 | 409; error: string; detail?: unknown }
 > {
-  if ("credits" in body) {
+  const forbiddenField = findForbiddenRechargePlanField(body);
+  if (forbiddenField) {
     await auditRechargePlanWrite(ctx, {
       action: "recharge_plans.create",
       resourceId: typeof body.id === "string" ? body.id : "unknown",
@@ -273,7 +346,7 @@ export async function createAdminRechargePlan(
       ok: false,
       status: 400,
       error: "invalid_recharge_plan_fields",
-      detail: { credits: ["credits is computed server-side"] },
+      detail: { [forbiddenField]: [`${forbiddenField} is computed server-side`] },
     };
   }
 
@@ -295,6 +368,7 @@ export async function createAdminRechargePlan(
   }
 
   const input = parsed.data;
+  const amountCents = resolveAmountCents(input);
   const { data: existing, error: existingError } = await supabase()
     .from("recharge_plans")
     .select("id")
@@ -322,15 +396,23 @@ export async function createAdminRechargePlan(
   const now = new Date().toISOString();
   const credits = input.base_credits + input.bonus_credits;
 
+  const stripeIds = await createRechargePlanStripeResources({
+    planId: input.id,
+    name: input.name,
+    amountCents,
+    credits,
+  });
+
   const { error: insertError } = await supabase().from("recharge_plans").insert({
     id: input.id,
     name: input.name,
-    amount_cents: input.amount_cents,
+    amount_cents: amountCents,
     currency: "cny",
     base_credits: input.base_credits,
     bonus_credits: input.bonus_credits,
     credits,
-    stripe_price_id: normalizeNullableString(input.stripe_price_id ?? null, 120),
+    stripe_product_id: stripeIds.stripe_product_id,
+    stripe_price_id: stripeIds.stripe_price_id,
     enabled: input.enabled ?? false,
     visible: input.visible ?? true,
     sort_order: input.sort_order ?? 1000,
@@ -450,32 +532,65 @@ export async function duplicateAdminRechargePlan(
     parsed.data.new_id
   );
 
-  const createResult = await createAdminRechargePlan(
-    {
-      id: newId,
-      name: `${source.name} (copy)`,
-      amount_cents: source.amount_cents,
-      base_credits: source.base_credits,
-      bonus_credits: source.bonus_credits,
-      stripe_price_id: null,
-      enabled: false,
-      visible: source.visible,
-      sort_order: source.sort_order + 1,
-      badge: source.badge,
-      description: source.description,
-    },
-    ctx
-  );
+  const { data: idConflict, error: idConflictError } = await supabase()
+    .from("recharge_plans")
+    .select("id")
+    .eq("id", newId)
+    .maybeSingle();
 
-  if (!createResult.ok) {
+  if (idConflictError) {
+    throw ApiError.internal(
+      `Failed to verify duplicate plan id: ${idConflictError.message}`,
+      "recharge_plan_verify_failed"
+    );
+  }
+
+  if (idConflict) {
     await auditRechargePlanWrite(ctx, {
       action: "recharge_plans.duplicate",
       resourceId: trimmedSourceId,
       requestPayload: { ...body, new_id: newId },
       status: "failed",
-      error: createResult.error,
+      error: "recharge_plan_already_exists",
     });
-    return createResult;
+    return { ok: false, status: 409, error: "recharge_plan_already_exists" };
+  }
+
+  const now = new Date().toISOString();
+  const credits = source.base_credits + source.bonus_credits;
+
+  const { error: insertError } = await supabase().from("recharge_plans").insert({
+    id: newId,
+    name: `${source.name} (copy)`,
+    amount_cents: source.amount_cents,
+    currency: source.currency,
+    base_credits: source.base_credits,
+    bonus_credits: source.bonus_credits,
+    credits,
+    stripe_product_id: null,
+    stripe_price_id: null,
+    enabled: false,
+    visible: false,
+    sort_order: source.sort_order + 1,
+    badge: source.badge,
+    description: source.description,
+    archived_at: null,
+    updated_at: now,
+  });
+
+  if (insertError) {
+    throw ApiError.internal(
+      `Failed to duplicate recharge plan: ${insertError.message}`,
+      "recharge_plan_duplicate_failed"
+    );
+  }
+
+  const plan = await loadRechargePlanById(newId);
+  if (!plan) {
+    throw ApiError.internal(
+      "Duplicated recharge plan could not be loaded.",
+      "recharge_plan_load_failed"
+    );
   }
 
   await auditRechargePlanWrite(ctx, {
@@ -483,12 +598,12 @@ export async function duplicateAdminRechargePlan(
     resourceId: newId,
     requestPayload: { source_plan_id: trimmedSourceId, new_id: newId },
     status: "succeeded",
-    plan: createResult.plan,
+    plan,
   });
 
   return {
     ok: true,
-    plan: createResult.plan,
+    plan,
     source_plan_id: trimmedSourceId,
   };
 }
@@ -628,7 +743,8 @@ export async function updateAdminRechargePlan(
     return { ok: false, status: 400, error: "missing_plan_id" };
   }
 
-  if ("credits" in body) {
+  const forbiddenField = findForbiddenRechargePlanField(body);
+  if (forbiddenField) {
     await auditRechargePlanWrite(ctx, {
       action: "recharge_plans.update",
       resourceId: planId,
@@ -640,7 +756,7 @@ export async function updateAdminRechargePlan(
       ok: false,
       status: 400,
       error: "invalid_recharge_plan_fields",
-      detail: { credits: ["credits is computed server-side"] },
+      detail: { [forbiddenField]: [`${forbiddenField} is computed server-side`] },
     };
   }
 
@@ -678,18 +794,7 @@ export async function updateAdminRechargePlan(
     return { ok: false, status: 400, error: "empty_patch" };
   }
 
-  const { data: existing, error: existingError } = await supabase()
-    .from("recharge_plans")
-    .select("id")
-    .eq("id", planId)
-    .maybeSingle();
-
-  if (existingError) {
-    throw ApiError.internal(
-      `Failed to verify recharge plan: ${existingError.message}`,
-      "recharge_plan_verify_failed"
-    );
-  }
+  const existing = await loadRechargePlanById(planId);
 
   if (!existing) {
     await auditRechargePlanWrite(ctx, {
@@ -707,8 +812,32 @@ export async function updateAdminRechargePlan(
   };
 
   if (patch.name !== undefined) updatePayload.name = patch.name;
-  if (patch.amount_cents !== undefined) {
-    updatePayload.amount_cents = patch.amount_cents;
+
+  const requestedAmountCents =
+    patch.amount_yuan !== undefined || patch.amount_cents !== undefined
+      ? resolveAmountCents(patch)
+      : undefined;
+  if (
+    requestedAmountCents !== undefined &&
+    requestedAmountCents !== existing.amount_cents
+  ) {
+    const nextCredits =
+      patch.base_credits !== undefined || patch.bonus_credits !== undefined
+        ? (patch.base_credits ?? existing.base_credits) +
+          (patch.bonus_credits ?? existing.bonus_credits)
+        : existing.credits;
+
+    const stripeIds = await createRechargePlanStripePrice({
+      planId,
+      name: patch.name ?? existing.name,
+      amountCents: requestedAmountCents,
+      credits: nextCredits,
+      stripeProductId: existing.stripe_product_id,
+    });
+
+    updatePayload.amount_cents = requestedAmountCents;
+    updatePayload.stripe_product_id = stripeIds.stripe_product_id;
+    updatePayload.stripe_price_id = stripeIds.stripe_price_id;
   }
   if (patch.sort_order !== undefined) updatePayload.sort_order = patch.sort_order;
   if (patch.description !== undefined) {
@@ -717,13 +846,6 @@ export async function updateAdminRechargePlan(
         ? null
         : patch.description;
   }
-  if (patch.stripe_price_id !== undefined) {
-    updatePayload.stripe_price_id =
-      patch.stripe_price_id === null || patch.stripe_price_id === ""
-        ? null
-        : patch.stripe_price_id;
-  }
-
   if (patch.base_credits !== undefined || patch.bonus_credits !== undefined) {
     const { data: current, error: currentError } = await supabase()
       .from("recharge_plans")
@@ -774,6 +896,28 @@ export async function updateAdminRechargePlan(
   if (patch.badge !== undefined) {
     updatePayload.badge =
       patch.badge === null || patch.badge === "" ? null : patch.badge;
+  }
+
+  if (!existing.stripe_price_id) {
+    const nextName =
+      typeof updatePayload.name === "string" ? updatePayload.name : existing.name;
+    const nextAmountCents =
+      typeof updatePayload.amount_cents === "number"
+        ? updatePayload.amount_cents
+        : existing.amount_cents;
+    const nextCredits =
+      typeof updatePayload.credits === "number"
+        ? updatePayload.credits
+        : existing.credits;
+
+    const stripeIds = await createRechargePlanStripeResources({
+      planId,
+      name: nextName,
+      amountCents: nextAmountCents,
+      credits: nextCredits,
+    });
+    updatePayload.stripe_product_id = stripeIds.stripe_product_id;
+    updatePayload.stripe_price_id = stripeIds.stripe_price_id;
   }
 
   const { error: updateError } = await supabase()
@@ -849,6 +993,7 @@ export async function listBillingRechargePlans(): Promise<BillingRechargePlan[]>
     .select(
       "id, name, amount_cents, currency, base_credits, credits, bonus_credits, enabled, visible, sort_order, badge, description"
     )
+    .eq("enabled", true)
     .eq("visible", true)
     .is("archived_at", null)
     .order("sort_order", { ascending: true })

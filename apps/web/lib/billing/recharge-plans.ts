@@ -62,7 +62,7 @@ export function filterVisibleRechargePlans(
   plans: BillingRechargePlan[]
 ): BillingRechargePlan[] {
   return plans
-    .filter((plan) => plan.visible)
+    .filter((plan) => plan.enabled && plan.visible)
     .sort(
       (a, b) =>
         a.sort_order - b.sort_order || a.plan_id.localeCompare(b.plan_id)

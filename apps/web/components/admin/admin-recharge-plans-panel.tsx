@@ -51,7 +51,6 @@ type PlanDraft = {
   badge: string;
   description: string;
   sort_order: string;
-  stripe_price_id: string;
   enabled: boolean;
   visible: boolean;
 };
@@ -66,7 +65,6 @@ function emptyDraft(): PlanDraft {
     badge: "",
     description: "",
     sort_order: "1000",
-    stripe_price_id: "",
     enabled: false,
     visible: true,
   };
@@ -77,14 +75,12 @@ function centsToYuanInput(amountCents: number): string {
   return Number.isInteger(yuan) ? String(yuan) : yuan.toFixed(2);
 }
 
-function yuanInputToCents(raw: string): number | null {
+function yuanInputToNumber(raw: string): number | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
   const amountYuan = Number(trimmed);
   if (!Number.isFinite(amountYuan) || amountYuan <= 0) return null;
-  const amountCents = Math.round(amountYuan * 100);
-  if (!Number.isInteger(amountCents) || amountCents <= 0) return null;
-  return amountCents;
+  return amountYuan;
 }
 
 function parseNonNegativeInt(raw: string): number | null {
@@ -114,7 +110,6 @@ function planToDraft(plan: AdminRechargePlanListItem): PlanDraft {
     badge: plan.badge ?? "",
     description: plan.description ?? "",
     sort_order: String(plan.sort_order),
-    stripe_price_id: plan.stripe_price_id ?? "",
     enabled: plan.enabled,
     visible: plan.visible,
   };
@@ -129,8 +124,8 @@ function draftToCreateBody(draft: PlanDraft): AdminRechargePlanCreateBody {
     throw new Error("invalid_name");
   }
 
-  const amountCents = yuanInputToCents(draft.amount_yuan);
-  if (amountCents == null) {
+  const amountYuan = yuanInputToNumber(draft.amount_yuan);
+  if (amountYuan == null) {
     throw new Error("invalid_amount");
   }
 
@@ -147,7 +142,7 @@ function draftToCreateBody(draft: PlanDraft): AdminRechargePlanCreateBody {
   return {
     id: planId,
     name: draft.name.trim(),
-    amount_cents: amountCents,
+    amount_yuan: amountYuan,
     base_credits: baseCredits,
     bonus_credits: bonusCredits,
     enabled: draft.enabled,
@@ -155,15 +150,12 @@ function draftToCreateBody(draft: PlanDraft): AdminRechargePlanCreateBody {
     sort_order: sortOrder,
     badge: draft.badge.trim() ? draft.badge.trim() : null,
     description: draft.description.trim() ? draft.description.trim() : null,
-    stripe_price_id: draft.stripe_price_id.trim()
-      ? draft.stripe_price_id.trim()
-      : null,
   };
 }
 
 function draftToUpdateBody(draft: PlanDraft): AdminRechargePlanUpdateBody {
-  const amountCents = yuanInputToCents(draft.amount_yuan);
-  if (amountCents == null) {
+  const amountYuan = yuanInputToNumber(draft.amount_yuan);
+  if (amountYuan == null) {
     throw new Error("invalid_amount");
   }
 
@@ -182,7 +174,7 @@ function draftToUpdateBody(draft: PlanDraft): AdminRechargePlanUpdateBody {
 
   return {
     name: draft.name.trim(),
-    amount_cents: amountCents,
+    amount_yuan: amountYuan,
     base_credits: baseCredits,
     bonus_credits: bonusCredits,
     enabled: draft.enabled,
@@ -190,9 +182,6 @@ function draftToUpdateBody(draft: PlanDraft): AdminRechargePlanUpdateBody {
     sort_order: sortOrder,
     badge: draft.badge.trim() ? draft.badge.trim() : null,
     description: draft.description.trim() ? draft.description.trim() : null,
-    stripe_price_id: draft.stripe_price_id.trim()
-      ? draft.stripe_price_id.trim()
-      : null,
   };
 }
 
@@ -561,6 +550,9 @@ export function AdminRechargePlansPanel() {
                       {t("admin.rechargePlans.colSortOrder")}
                     </th>
                     <th className="py-2 pr-3 font-medium">
+                      {t("admin.rechargePlans.colStripePriceId")}
+                    </th>
+                    <th className="py-2 pr-3 font-medium">
                       {t("admin.rechargePlans.colBadge")}
                     </th>
                     <th className="py-2 pr-3 font-medium">
@@ -609,6 +601,9 @@ export function AdminRechargePlansPanel() {
                           </td>
                           <td className="py-2 pr-3 font-mono text-xs">
                             {plan.sort_order}
+                          </td>
+                          <td className="max-w-[10rem] py-2 pr-3 font-mono text-xs text-muted-foreground">
+                            {plan.stripe_price_id ?? "—"}
                           </td>
                           <td className="py-2 pr-3">{plan.badge ?? "—"}</td>
                           <td className="max-w-[12rem] py-2 pr-3 text-muted-foreground">
@@ -825,16 +820,6 @@ function PlanForm({
             onChange={(event) =>
               onChange({ ...draft, sort_order: event.target.value })
             }
-          />
-        </Field>
-        <Field label={t("admin.rechargePlans.colStripePriceId")}>
-          <Input
-            value={draft.stripe_price_id}
-            onChange={(event) =>
-              onChange({ ...draft, stripe_price_id: event.target.value })
-            }
-            className="font-mono text-xs"
-            placeholder="price_..."
           />
         </Field>
         <Field label={t("admin.rechargePlans.colBadge")}>

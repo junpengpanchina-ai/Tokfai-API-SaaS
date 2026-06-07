@@ -102,6 +102,7 @@ export type AdminRechargePlanListItem = {
   base_credits: number;
   bonus_credits: number;
   credits: number;
+  stripe_product_id?: string | null;
   stripe_price_id: string | null;
   enabled: boolean;
   visible: boolean;
@@ -115,27 +116,25 @@ export type AdminRechargePlanListItem = {
 export type AdminRechargePlanCreateBody = {
   id: string;
   name: string;
-  amount_cents: number;
+  amount_yuan: number;
   base_credits: number;
   bonus_credits?: number;
   description?: string | null;
   enabled?: boolean;
   visible?: boolean;
   sort_order?: number;
-  stripe_price_id?: string | null;
   badge?: string | null;
 };
 
 export type AdminRechargePlanUpdateBody = {
   name?: string;
-  amount_cents?: number;
+  amount_yuan?: number;
   base_credits?: number;
   bonus_credits?: number;
   description?: string | null;
   enabled?: boolean;
   visible?: boolean;
   sort_order?: number;
-  stripe_price_id?: string | null;
   badge?: string | null;
 };
 
