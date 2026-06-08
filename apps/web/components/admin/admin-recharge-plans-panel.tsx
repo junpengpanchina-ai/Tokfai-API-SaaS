@@ -23,7 +23,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  AdminApiError,
   archiveAdminRechargePlan,
   createAdminRechargePlan,
   duplicateAdminRechargePlan,
@@ -34,6 +33,10 @@ import {
   type AdminRechargePlanListItem,
   type AdminRechargePlanUpdateBody,
 } from "@/lib/admin/client";
+import {
+  draftRechargePlanValidationMessage,
+  formatAdminRechargePlanError,
+} from "@/lib/admin/recharge-plan-errors";
 import { formatCny } from "@/lib/billing/recharge-plans";
 import { formatDateTime, formatInt } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/i18n-provider";
@@ -132,11 +135,17 @@ function draftToCreateBody(draft: PlanDraft): AdminRechargePlanCreateBody {
   const baseCredits = parseNonNegativeInt(draft.base_credits);
   const bonusCredits = parseNonNegativeInt(draft.bonus_credits);
   const sortOrder = parseNonNegativeInt(draft.sort_order);
-  if (baseCredits == null || bonusCredits == null || sortOrder == null) {
-    throw new Error("invalid_fields");
+  if (baseCredits == null) {
+    throw new Error("invalid_base_credits");
+  }
+  if (bonusCredits == null) {
+    throw new Error("invalid_bonus_credits");
+  }
+  if (sortOrder == null) {
+    throw new Error("invalid_sort_order");
   }
   if (baseCredits + bonusCredits <= 0) {
-    throw new Error("invalid_fields");
+    throw new Error("invalid_total_credits");
   }
 
   return {
@@ -162,11 +171,17 @@ function draftToUpdateBody(draft: PlanDraft): AdminRechargePlanUpdateBody {
   const baseCredits = parseNonNegativeInt(draft.base_credits);
   const bonusCredits = parseNonNegativeInt(draft.bonus_credits);
   const sortOrder = parseNonNegativeInt(draft.sort_order);
-  if (baseCredits == null || bonusCredits == null || sortOrder == null) {
-    throw new Error("invalid_fields");
+  if (baseCredits == null) {
+    throw new Error("invalid_base_credits");
+  }
+  if (bonusCredits == null) {
+    throw new Error("invalid_bonus_credits");
+  }
+  if (sortOrder == null) {
+    throw new Error("invalid_sort_order");
   }
   if (baseCredits + bonusCredits <= 0) {
-    throw new Error("invalid_fields");
+    throw new Error("invalid_total_credits");
   }
   if (!draft.name.trim()) {
     throw new Error("invalid_name");
@@ -190,32 +205,7 @@ function planErrorMessage(
   t: (key: string) => string,
   fallback: string
 ): string {
-  if (error instanceof AdminApiError) {
-    if (error.isSessionExpired) {
-      return t("admin.common.sessionExpired");
-    }
-    if (error.code === "invalid_recharge_plan_fields") {
-      return t("admin.rechargePlans.invalidFields");
-    }
-    if (error.code === "recharge_plan_already_exists") {
-      return t("admin.rechargePlans.planIdInvalid");
-    }
-    return error.message;
-  }
-  return error instanceof Error ? error.message : fallback;
-}
-
-function draftValidationMessage(error: Error, t: (key: string) => string): string {
-  switch (error.message) {
-    case "invalid_plan_id":
-      return t("admin.rechargePlans.planIdInvalid");
-    case "invalid_name":
-      return t("admin.rechargePlans.nameRequired");
-    case "invalid_fields":
-      return t("admin.rechargePlans.invalidFields");
-    default:
-      return t("admin.rechargePlans.amountInvalid");
-  }
+  return formatAdminRechargePlanError(error, t, fallback);
 }
 
 export function AdminRechargePlansPanel() {
@@ -290,7 +280,7 @@ export function AdminRechargePlansPanel() {
         body = draftToCreateBody(draft);
       } catch (err) {
         setFormError(
-          draftValidationMessage(
+          draftRechargePlanValidationMessage(
             err instanceof Error ? err : new Error("invalid_fields"),
             t
           )
@@ -323,7 +313,7 @@ export function AdminRechargePlansPanel() {
         body = draftToUpdateBody(draft);
       } catch (err) {
         setFormError(
-          draftValidationMessage(
+          draftRechargePlanValidationMessage(
             err instanceof Error ? err : new Error("invalid_fields"),
             t
           )
@@ -783,6 +773,8 @@ function PlanForm({
         <Field label={t("admin.rechargePlans.colAmount")}>
           <Input
             inputMode="decimal"
+            step="0.01"
+            min="0.01"
             value={draft.amount_yuan}
             onChange={(event) =>
               onChange({ ...draft, amount_yuan: event.target.value })

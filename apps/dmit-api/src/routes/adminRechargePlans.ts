@@ -81,6 +81,9 @@ const optionalIntField = (min: number, max: number) =>
     z.coerce.number().int().min(min).max(max).optional()
   );
 
+const requiredIntField = (min: number, max: number) =>
+  z.preprocess(emptyToUndefined, z.coerce.number().int().min(min).max(max));
+
 const optionalNullableString = (max: number) =>
   z
     .union([z.string().trim().max(max), z.null()])
@@ -123,12 +126,12 @@ const RechargePlanCreateSchema = z
       .regex(RECHARGE_PLAN_ID_PATTERN, "invalid_recharge_plan_id"),
     name: z.string().trim().min(1).max(120),
     amount_yuan: z.coerce.number().positive().max(1_000_000).optional(),
-    amount_cents: z.coerce.number().int().min(1).max(100_000_000).optional(),
-    base_credits: z.coerce.number().int().min(0).max(100_000_000),
-    bonus_credits: z.coerce.number().int().min(0).max(100_000_000).default(0),
+    amount_cents: requiredIntField(1, 100_000_000).optional(),
+    base_credits: requiredIntField(0, 100_000_000),
+    bonus_credits: requiredIntField(0, 100_000_000).default(0),
     enabled: z.boolean().optional(),
     visible: z.boolean().optional(),
-    sort_order: z.coerce.number().int().min(0).max(100_000).optional(),
+    sort_order: optionalIntField(0, 100_000),
     badge: optionalNullableString(40),
     description: optionalNullableString(500),
   })
@@ -352,6 +355,14 @@ export async function createAdminRechargePlan(
 
   const parsed = RechargePlanCreateSchema.safeParse(body);
   if (!parsed.success) {
+    const fieldErrors = parsed.error.flatten().fieldErrors;
+    console.warn(
+      "[admin] invalid_recharge_plan_fields",
+      JSON.stringify({
+        action: "recharge_plans.create",
+        field_errors: fieldErrors,
+      })
+    );
     await auditRechargePlanWrite(ctx, {
       action: "recharge_plans.create",
       resourceId: typeof body.id === "string" ? body.id : "unknown",

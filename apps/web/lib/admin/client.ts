@@ -146,18 +146,21 @@ export class AdminApiError extends Error {
   readonly status: number;
   readonly code?: string;
   readonly body: unknown;
+  readonly detail?: unknown;
 
   constructor(args: {
     status: number;
     message: string;
     code?: string;
     body?: unknown;
+    detail?: unknown;
   }) {
     super(args.message);
     this.name = "AdminApiError";
     this.status = args.status;
     this.code = args.code;
     this.body = args.body;
+    this.detail = args.detail;
   }
 
   get isSessionExpired(): boolean {
@@ -543,6 +546,7 @@ function parseJson(text: string): unknown {
 function toAdminApiError(status: number, body: unknown): AdminApiError {
   let message = `Admin request failed (HTTP ${status}).`;
   let code: string | undefined;
+  let detail: unknown;
 
   if (body && typeof body === "object") {
     const record = body as Record<string, unknown>;
@@ -551,9 +555,14 @@ function toAdminApiError(status: number, body: unknown): AdminApiError {
       code = maybeError;
       message = maybeError;
     } else if (maybeError && typeof maybeError === "object") {
-      const err = maybeError as { message?: unknown; code?: unknown };
+      const err = maybeError as {
+        message?: unknown;
+        code?: unknown;
+        detail?: unknown;
+      };
       if (typeof err.message === "string") message = err.message;
       if (typeof err.code === "string") code = err.code;
+      if (err.detail !== undefined) detail = err.detail;
     }
     if (typeof record.code === "string" && !code) {
       code = record.code;
@@ -562,5 +571,5 @@ function toAdminApiError(status: number, body: unknown): AdminApiError {
     message = body;
   }
 
-  return new AdminApiError({ status, message, code, body });
+  return new AdminApiError({ status, message, code, body, detail });
 }

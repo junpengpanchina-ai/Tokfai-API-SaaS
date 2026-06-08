@@ -128,7 +128,8 @@ function adminApiError(
     | "auth_error"
     | "validation_error"
     | "not_found"
-    | "server_error" = "validation_error"
+    | "server_error" = "validation_error",
+  detail?: unknown
 ) {
   return c.json(
     {
@@ -136,6 +137,7 @@ function adminApiError(
         message,
         code,
         type,
+        ...(detail !== undefined ? { detail } : {}),
       },
     },
     status as never
@@ -662,7 +664,8 @@ protectedAdminRoutes.post("/recharge-plans", async (c) => {
       result.status,
       rechargePlanAdminErrorMessage(result.error),
       result.error,
-      result.status === 409 ? "validation_error" : "validation_error"
+      result.status === 409 ? "validation_error" : "validation_error",
+      result.detail
     );
   }
 
@@ -684,7 +687,8 @@ protectedAdminRoutes.patch("/recharge-plans/:id", async (c) => {
       result.status,
       rechargePlanAdminErrorMessage(result.error),
       result.error,
-      result.status === 404 ? "not_found" : "validation_error"
+      result.status === 404 ? "not_found" : "validation_error",
+      result.detail
     );
   }
 
@@ -710,7 +714,8 @@ protectedAdminRoutes.post("/recharge-plans/:id/duplicate", async (c) => {
       result.status,
       rechargePlanAdminErrorMessage(result.error),
       result.error,
-      result.status === 404 ? "not_found" : "validation_error"
+      result.status === 404 ? "not_found" : "validation_error",
+      result.detail
     );
   }
 
