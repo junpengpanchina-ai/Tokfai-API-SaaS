@@ -5,6 +5,23 @@ type ZodFlattenDetail = {
   fieldErrors?: Record<string, string[] | undefined>;
 };
 
+const ERROR_CODE_LABEL_KEYS: Record<string, string> = {
+  invalid_id: "admin.rechargePlans.colId",
+  invalid_name: "admin.rechargePlans.colName",
+  invalid_amount_yuan: "admin.rechargePlans.colAmount",
+  invalid_amount_cents: "admin.rechargePlans.colAmount",
+  invalid_base_credits: "admin.rechargePlans.colBaseCredits",
+  invalid_bonus_credits: "admin.rechargePlans.colBonusCredits",
+  invalid_total_credits: "admin.rechargePlans.colCredits",
+  invalid_sort_order: "admin.rechargePlans.colSortOrder",
+  invalid_badge: "admin.rechargePlans.colBadge",
+  invalid_description: "admin.rechargePlans.colDescription",
+  invalid_credits: "admin.rechargePlans.colCredits",
+  invalid_stripe_price_id: "admin.rechargePlans.colStripePriceId",
+  invalid_stripe_product_id: "admin.rechargePlans.colStripePriceId",
+  invalid_body: "admin.rechargePlans.invalidBody",
+};
+
 const FIELD_LABEL_KEYS: Record<string, string> = {
   id: "admin.rechargePlans.colId",
   name: "admin.rechargePlans.colName",
@@ -23,30 +40,59 @@ function fieldLabel(field: string, t: (key: string) => string): string {
   return key ? t(key) : field;
 }
 
+function errorCodeLabel(code: string, t: (key: string) => string): string {
+  const key = ERROR_CODE_LABEL_KEYS[code];
+  return key ? t(key) : code;
+}
+
+function translateValidationMessage(
+  codeOrField: string,
+  message: string,
+  t: (key: string) => string
+): string {
+  if (message === "invalid_recharge_plan_id") {
+    return t("admin.rechargePlans.planIdInvalid");
+  }
+  if (message === "Expected integer, received float") {
+    return t("admin.rechargePlans.integerRequired");
+  }
+  if (message.includes("amount_yuan or amount_cents is required")) {
+    return t("admin.rechargePlans.amountRequired");
+  }
+  if (message.includes("must be greater than 0")) {
+    return t("admin.rechargePlans.creditsMustBePositive");
+  }
+  if (message.includes("computed server-side")) {
+    return t("admin.rechargePlans.serverComputedField");
+  }
+  if (message.includes("Unrecognized key")) {
+    return message;
+  }
+  if (codeOrField === "invalid_amount_yuan" || codeOrField === "amount_yuan") {
+    if (message.includes("positive")) return t("admin.rechargePlans.amountInvalid");
+  }
+  return message;
+}
+
+function formatCodeDetailLine(
+  code: string,
+  message: string,
+  t: (key: string) => string
+): string {
+  const label = errorCodeLabel(code, t);
+  const text = translateValidationMessage(code, message, t);
+  return `${label}: ${text}`;
+}
+
 function formatFieldMessages(
   field: string,
   messages: string[],
   t: (key: string) => string
 ): string[] {
   const label = fieldLabel(field, t);
-  return messages.map((message) => {
-    if (message === "invalid_recharge_plan_id") {
-      return `${label}: ${t("admin.rechargePlans.planIdInvalid")}`;
-    }
-    if (message === "Expected integer, received float") {
-      return `${label}: ${t("admin.rechargePlans.integerRequired")}`;
-    }
-    if (message.includes("amount_yuan or amount_cents is required")) {
-      return `${label}: ${t("admin.rechargePlans.amountRequired")}`;
-    }
-    if (message.includes("must be greater than 0")) {
-      return `${label}: ${t("admin.rechargePlans.creditsMustBePositive")}`;
-    }
-    if (message.includes("computed server-side")) {
-      return `${label}: ${t("admin.rechargePlans.serverComputedField")}`;
-    }
-    return `${label}: ${message}`;
-  });
+  return messages.map(
+    (message) => `${label}: ${translateValidationMessage(field, message, t)}`
+  );
 }
 
 export function formatRechargePlanValidationDetail(
@@ -57,6 +103,18 @@ export function formatRechargePlanValidationDetail(
 
   const record = detail as Record<string, unknown>;
   const lines: string[] = [];
+
+  const isStableCodeDetail = Object.keys(record).every(
+    (key) => key === "invalid_body" || key.startsWith("invalid_")
+  );
+
+  if (isStableCodeDetail && !("fieldErrors" in record) && !("formErrors" in record)) {
+    for (const [code, value] of Object.entries(record)) {
+      if (typeof value !== "string" || !value.trim()) continue;
+      lines.push(formatCodeDetailLine(code, value, t));
+    }
+    return lines.length > 0 ? lines.join("；") : null;
+  }
 
   if ("formErrors" in record || "fieldErrors" in record) {
     const flat = detail as ZodFlattenDetail;
@@ -94,6 +152,13 @@ export function formatAdminRechargePlanError(
     if (error.code === "invalid_recharge_plan_fields") {
       const detailMessage = formatRechargePlanValidationDetail(error.detail, t);
       if (detailMessage) return detailMessage;
+      if (
+        error.message &&
+        error.message !== "invalid_recharge_plan_fields" &&
+        error.message !== "Invalid recharge plan fields."
+      ) {
+        return error.message;
+      }
       return t("admin.rechargePlans.invalidFields");
     }
     return error.message;

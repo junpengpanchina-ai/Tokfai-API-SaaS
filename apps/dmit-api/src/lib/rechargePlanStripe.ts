@@ -4,8 +4,8 @@ import { ApiError } from "../errors.js";
 import { stripe } from "../stripe.js";
 
 export type RechargePlanStripeIds = {
-  stripe_product_id: string;
-  stripe_price_id: string;
+  stripe_product_id: string | null;
+  stripe_price_id: string | null;
 };
 
 function stripeRechargePlanError(err: unknown, code: string): ApiError {

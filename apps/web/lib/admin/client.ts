@@ -113,13 +113,16 @@ export type AdminRechargePlanListItem = {
   updated_at: string | null;
 };
 
+/** POST /admin/recharge-plans — must match DMIT RechargePlanCreateSchema. */
 export type AdminRechargePlanCreateBody = {
   id: string;
   name: string;
+  /** Price in yuan (e.g. 49.9). DMIT converts to amount_cents server-side. */
   amount_yuan: number;
   base_credits: number;
   bonus_credits?: number;
   description?: string | null;
+  /** When false, Stripe product/price are not provisioned on create. */
   enabled?: boolean;
   visible?: boolean;
   sort_order?: number;

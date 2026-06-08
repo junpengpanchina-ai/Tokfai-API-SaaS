@@ -5,6 +5,7 @@ import { recordAdminAuditLog } from "../lib/adminAuditLog.js";
 import {
   createRechargePlanStripePrice,
   createRechargePlanStripeResources,
+  type RechargePlanStripeIds,
 } from "../lib/rechargePlanStripe.js";
 import type { AdminUserContext } from "../middleware/requireAdminV1.js";
 import { supabase } from "../supabase.js";
@@ -116,7 +117,7 @@ const RechargePlanPatchSchema = z
     }
   });
 
-const RechargePlanCreateSchema = z
+export const RechargePlanCreateSchema = z
   .object({
     id: z
       .string()
@@ -175,6 +176,60 @@ const RechargePlanDuplicateSchema = z
   })
   .strict();
 
+const RECHARGE_PLAN_FIELD_ERROR_CODES: Record<string, string> = {
+  id: "invalid_id",
+  name: "invalid_name",
+  amount_yuan: "invalid_amount_yuan",
+  amount_cents: "invalid_amount_cents",
+  base_credits: "invalid_base_credits",
+  bonus_credits: "invalid_bonus_credits",
+  sort_order: "invalid_sort_order",
+  badge: "invalid_badge",
+  description: "invalid_description",
+  credits: "invalid_credits",
+  stripe_price_id: "invalid_stripe_price_id",
+  stripe_product_id: "invalid_stripe_product_id",
+};
+
+function rechargePlanValidationDetail(
+  flattened: z.typeToFlattenedError<unknown, string>
+): Record<string, string> {
+  const detail: Record<string, string> = {};
+
+  for (const message of flattened.formErrors) {
+    detail.invalid_body = detail.invalid_body
+      ? `${detail.invalid_body}; ${message}`
+      : message;
+  }
+
+  for (const [field, messages] of Object.entries(flattened.fieldErrors)) {
+    if (!Array.isArray(messages) || messages.length === 0) continue;
+    const code = RECHARGE_PLAN_FIELD_ERROR_CODES[field] ?? `invalid_${field}`;
+    if (field === "base_credits" && messages.some((m) => m.includes("greater than 0"))) {
+      detail.invalid_total_credits = messages.join("; ");
+      continue;
+    }
+    detail[code] = messages.join("; ");
+  }
+
+  return detail;
+}
+
+function forbiddenRechargePlanFieldDetail(
+  field: (typeof CLIENT_FORBIDDEN_RECHARGE_PLAN_FIELDS)[number]
+): Record<string, string> {
+  const code =
+    RECHARGE_PLAN_FIELD_ERROR_CODES[field] ?? `invalid_${field}`;
+  return {
+    [code]: `${field} is computed server-side`,
+  };
+}
+
+const EMPTY_STRIPE_IDS: RechargePlanStripeIds = {
+  stripe_product_id: null,
+  stripe_price_id: null,
+};
+
 function toNumber(value: number | string | null | undefined): number {
   if (value == null) return 0;
   if (typeof value === "number") return value;
@@ -208,22 +263,46 @@ function findForbiddenRechargePlanField(
 function resolveAmountCents(args: {
   amount_yuan?: number;
   amount_cents?: number;
-}): number {
-  if (args.amount_cents !== undefined) return args.amount_cents;
+}):
+  | { ok: true; amountCents: number }
+  | { ok: false; detail: Record<string, string> } {
+  if (args.amount_cents !== undefined) {
+    if (!Number.isInteger(args.amount_cents) || args.amount_cents <= 0) {
+      return {
+        ok: false,
+        detail: {
+          invalid_amount_cents: "amount_cents must be a positive integer.",
+        },
+      };
+    }
+    return { ok: true, amountCents: args.amount_cents };
+  }
   if (args.amount_yuan !== undefined) {
     const amountCents = Math.round(args.amount_yuan * 100);
-    if (!Number.isInteger(amountCents) || amountCents <= 0) {
-      throw ApiError.badRequest(
-        "Invalid amount_yuan value.",
-        "invalid_recharge_plan_fields"
-      );
+    if (!Number.isFinite(args.amount_yuan) || args.amount_yuan <= 0) {
+      return {
+        ok: false,
+        detail: {
+          invalid_amount_yuan: "amount_yuan must be a positive number.",
+        },
+      };
     }
-    return amountCents;
+    if (!Number.isInteger(amountCents) || amountCents <= 0) {
+      return {
+        ok: false,
+        detail: {
+          invalid_amount_yuan: "amount_yuan is too small after conversion to cents.",
+        },
+      };
+    }
+    return { ok: true, amountCents };
   }
-  throw ApiError.badRequest(
-    "amount_yuan or amount_cents is required.",
-    "invalid_recharge_plan_fields"
-  );
+  return {
+    ok: false,
+    detail: {
+      invalid_amount_yuan: "amount_yuan or amount_cents is required.",
+    },
+  };
 }
 
 function mapRechargePlanRow(row: RechargePlanDbRow): AdminRechargePlanListItem {
@@ -349,18 +428,18 @@ export async function createAdminRechargePlan(
       ok: false,
       status: 400,
       error: "invalid_recharge_plan_fields",
-      detail: { [forbiddenField]: [`${forbiddenField} is computed server-side`] },
+      detail: forbiddenRechargePlanFieldDetail(forbiddenField),
     };
   }
 
   const parsed = RechargePlanCreateSchema.safeParse(body);
   if (!parsed.success) {
-    const fieldErrors = parsed.error.flatten().fieldErrors;
+    const validationDetail = rechargePlanValidationDetail(parsed.error.flatten());
     console.warn(
       "[admin] invalid_recharge_plan_fields",
       JSON.stringify({
         action: "recharge_plans.create",
-        field_errors: fieldErrors,
+        detail: validationDetail,
       })
     );
     await auditRechargePlanWrite(ctx, {
@@ -374,12 +453,28 @@ export async function createAdminRechargePlan(
       ok: false,
       status: 400,
       error: "invalid_recharge_plan_fields",
-      detail: parsed.error.flatten(),
+      detail: validationDetail,
     };
   }
 
   const input = parsed.data;
-  const amountCents = resolveAmountCents(input);
+  const amountResult = resolveAmountCents(input);
+  if (!amountResult.ok) {
+    await auditRechargePlanWrite(ctx, {
+      action: "recharge_plans.create",
+      resourceId: input.id,
+      requestPayload: input,
+      status: "failed",
+      error: "invalid_recharge_plan_fields",
+    });
+    return {
+      ok: false,
+      status: 400,
+      error: "invalid_recharge_plan_fields",
+      detail: amountResult.detail,
+    };
+  }
+  const amountCents = amountResult.amountCents;
   const { data: existing, error: existingError } = await supabase()
     .from("recharge_plans")
     .select("id")
@@ -406,13 +501,16 @@ export async function createAdminRechargePlan(
 
   const now = new Date().toISOString();
   const credits = input.base_credits + input.bonus_credits;
+  const checkoutEnabled = input.enabled ?? false;
 
-  const stripeIds = await createRechargePlanStripeResources({
-    planId: input.id,
-    name: input.name,
-    amountCents,
-    credits,
-  });
+  const stripeIds = checkoutEnabled
+    ? await createRechargePlanStripeResources({
+        planId: input.id,
+        name: input.name,
+        amountCents,
+        credits,
+      })
+    : EMPTY_STRIPE_IDS;
 
   const { error: insertError } = await supabase().from("recharge_plans").insert({
     id: input.id,
@@ -522,7 +620,7 @@ export async function duplicateAdminRechargePlan(
       ok: false,
       status: 400,
       error: "invalid_recharge_plan_fields",
-      detail: parsed.error.flatten(),
+      detail: rechargePlanValidationDetail(parsed.error.flatten()),
     };
   }
 
@@ -767,16 +865,16 @@ export async function updateAdminRechargePlan(
       ok: false,
       status: 400,
       error: "invalid_recharge_plan_fields",
-      detail: { [forbiddenField]: [`${forbiddenField} is computed server-side`] },
+      detail: forbiddenRechargePlanFieldDetail(forbiddenField),
     };
   }
 
   const parsed = RechargePlanPatchSchema.safeParse(body);
   if (!parsed.success) {
-    const fieldErrors = parsed.error.flatten().fieldErrors;
+    const validationDetail = rechargePlanValidationDetail(parsed.error.flatten());
     console.warn(
       "[admin] invalid_recharge_plan_fields",
-      JSON.stringify({ plan_id: planId, field_errors: fieldErrors })
+      JSON.stringify({ plan_id: planId, detail: validationDetail })
     );
     await auditRechargePlanWrite(ctx, {
       action: "recharge_plans.update",
@@ -789,7 +887,7 @@ export async function updateAdminRechargePlan(
       ok: false,
       status: 400,
       error: "invalid_recharge_plan_fields",
-      detail: parsed.error.flatten(),
+      detail: validationDetail,
     };
   }
 
@@ -824,10 +922,29 @@ export async function updateAdminRechargePlan(
 
   if (patch.name !== undefined) updatePayload.name = patch.name;
 
-  const requestedAmountCents =
-    patch.amount_yuan !== undefined || patch.amount_cents !== undefined
-      ? resolveAmountCents(patch)
-      : undefined;
+  let requestedAmountCents: number | undefined;
+  if (patch.amount_yuan !== undefined || patch.amount_cents !== undefined) {
+    const amountResult = resolveAmountCents(patch);
+    if (!amountResult.ok) {
+      await auditRechargePlanWrite(ctx, {
+        action: "recharge_plans.update",
+        resourceId: planId,
+        requestPayload: body,
+        status: "failed",
+        error: "invalid_recharge_plan_fields",
+      });
+      return {
+        ok: false,
+        status: 400,
+        error: "invalid_recharge_plan_fields",
+        detail: amountResult.detail,
+      };
+    }
+    requestedAmountCents = amountResult.amountCents;
+  }
+
+  const willBeEnabled = patch.enabled ?? existing.enabled;
+
   if (
     requestedAmountCents !== undefined &&
     requestedAmountCents !== existing.amount_cents
@@ -838,17 +955,20 @@ export async function updateAdminRechargePlan(
           (patch.bonus_credits ?? existing.bonus_credits)
         : existing.credits;
 
-    const stripeIds = await createRechargePlanStripePrice({
-      planId,
-      name: patch.name ?? existing.name,
-      amountCents: requestedAmountCents,
-      credits: nextCredits,
-      stripeProductId: existing.stripe_product_id,
-    });
-
     updatePayload.amount_cents = requestedAmountCents;
-    updatePayload.stripe_product_id = stripeIds.stripe_product_id;
-    updatePayload.stripe_price_id = stripeIds.stripe_price_id;
+
+    if (willBeEnabled) {
+      const stripeIds = await createRechargePlanStripePrice({
+        planId,
+        name: patch.name ?? existing.name,
+        amountCents: requestedAmountCents,
+        credits: nextCredits,
+        stripeProductId: existing.stripe_product_id,
+      });
+
+      updatePayload.stripe_product_id = stripeIds.stripe_product_id;
+      updatePayload.stripe_price_id = stripeIds.stripe_price_id;
+    }
   }
   if (patch.sort_order !== undefined) updatePayload.sort_order = patch.sort_order;
   if (patch.description !== undefined) {
@@ -898,7 +1018,10 @@ export async function updateAdminRechargePlan(
       ok: false,
       status: 400,
       error: "invalid_recharge_plan_fields",
-      detail: { credits: ["base_credits + bonus_credits must be greater than 0"] },
+      detail: {
+        invalid_total_credits:
+          "base_credits + bonus_credits must be greater than 0",
+      },
     };
   }
 
@@ -909,7 +1032,7 @@ export async function updateAdminRechargePlan(
       patch.badge === null || patch.badge === "" ? null : patch.badge;
   }
 
-  if (!existing.stripe_price_id) {
+  if (willBeEnabled && !existing.stripe_price_id && !updatePayload.stripe_price_id) {
     const nextName =
       typeof updatePayload.name === "string" ? updatePayload.name : existing.name;
     const nextAmountCents =
