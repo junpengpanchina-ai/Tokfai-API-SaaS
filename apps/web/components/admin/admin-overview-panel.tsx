@@ -97,6 +97,24 @@ function formatTokenMetric(
   return formatInt(value);
 }
 
+function formatOrderStatusLabel(status: string): string {
+  const normalized = status.trim().toLowerCase();
+  switch (normalized) {
+    case "pending":
+      return "待支付";
+    case "paid":
+    case "succeeded":
+    case "completed":
+      return "已支付";
+    case "cancelled":
+      return "已取消";
+    case "failed":
+      return "失败";
+    default:
+      return status;
+  }
+}
+
 function OrderStatusBadge({ status }: { status: string }) {
   const normalized = status.trim().toLowerCase();
   const variant =
@@ -110,7 +128,7 @@ function OrderStatusBadge({ status }: { status: string }) {
           ? "destructive"
           : "outline";
 
-  return <Badge variant={variant}>{status}</Badge>;
+  return <Badge variant={variant}>{formatOrderStatusLabel(status)}</Badge>;
 }
 
 export function AdminOverviewPanel({
@@ -128,7 +146,7 @@ export function AdminOverviewPanel({
   const healthTimestamp = resolveHealthTimestamp(health);
   const summaryUpdatedAt = summary?.updated_at ?? null;
   const recentUsersLabel =
-    summary?.user_source === "admin_users" ? "最近后台用户" : "最近注册用户";
+    summary?.user_source === "admin_users" ? "后台用户" : "终端注册用户";
 
   return (
     <>
@@ -226,7 +244,7 @@ export function AdminOverviewPanel({
               value={formatTokenMetric(summary, "total_tokens")}
               hint={
                 summary.has_token_data
-                  ? `输入 ${formatTokenMetric(summary, "total_input_tokens")} · 输出 ${formatTokenMetric(summary, "total_output_tokens")}`
+                  ? `输入 / 输出：${formatTokenMetric(summary, "total_input_tokens")} / ${formatTokenMetric(summary, "total_output_tokens")}`
                   : undefined
               }
             />

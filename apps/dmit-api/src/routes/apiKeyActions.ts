@@ -3,7 +3,9 @@ import type { Context } from "hono";
 import { decryptSecret } from "../auth/keyEncryption.js";
 import { ApiError } from "../errors.js";
 import { supabase } from "../supabase.js";
-import type { AuthedUser } from "../types.js";
+import type { ApiKeyRow, AuthedUser } from "../types.js";
+
+type RevokedApiKeyRow = Pick<ApiKeyRow, "id" | "revoked_at">;
 
 function authedUser(c: { get: (key: never) => unknown }): AuthedUser {
   return c.get("user" as never) as AuthedUser;
@@ -25,13 +27,14 @@ export async function revokeApiKey(c: Context, id: string) {
     throw ApiError.badRequest("Missing API key id.", "missing_api_key_id");
   }
 
+  const revokedAt = new Date().toISOString();
   const { data, error } = await supabase()
     .from("api_keys")
-    .update({ revoked_at: new Date().toISOString() })
+    .update({ revoked_at: revokedAt })
     .eq("id", id)
     .eq("user_id", user.id)
-    .select("id")
-    .maybeSingle();
+    .select("id, revoked_at")
+    .maybeSingle<RevokedApiKeyRow>();
 
   if (error) {
     throw ApiError.internal(
@@ -47,7 +50,13 @@ export async function revokeApiKey(c: Context, id: string) {
     ok: true,
     api_key: {
       id: data.id,
-      status: "revoked",
+      status: "revoked" as const,
+      revoked_at: data.revoked_at ?? revokedAt,
+    },
+    data: {
+      id: data.id,
+      status: "revoked" as const,
+      revoked_at: data.revoked_at ?? revokedAt,
     },
   });
 }

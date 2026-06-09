@@ -531,12 +531,16 @@ protectedAdminRoutes.use("*", requireAdminV1);
 
 protectedAdminRoutes.post("/credits/adjust", handleAdminCreditsAdjust);
 
+/**
+ * Read-only admin dashboard metrics. Response is a single JSON object via
+ * `c.json` (Content-Type: application/json) — no HTML or log lines in the body.
+ * When piping to jq, run this curl in its own shell; do not chain with git,
+ * pm2, or other commands whose stdout would be read by jq.
+ * See apps/dmit-api/README.md § Admin dashboard smoke test.
+ */
 protectedAdminRoutes.get("/dashboard-summary", async (c) => {
   const { summary, warnings } = await buildAdminDashboardSummary();
-  return c.json({
-    data: summary,
-    ...(warnings.length > 0 ? { warnings } : {}),
-  });
+  return c.json({ data: summary, warnings });
 });
 
 protectedAdminRoutes.get("/summary", async (c) => {

@@ -8,9 +8,16 @@
 | Route | Auth | Status |
 |---|---|---|
 | `GET /v1/health` | none | ✅ implemented |
-| `GET /v1/keys` | Supabase JWT | ⏳ 501 stub (D3) |
-| `POST /v1/keys` | Supabase JWT | ⏳ 501 stub (D3) |
-| `DELETE /v1/keys/:id` | Supabase JWT | ⏳ 501 stub (D3) |
+| `GET /v1/keys` | Supabase JWT | ✅ implemented (legacy alias) |
+| `POST /v1/keys` | Supabase JWT | ✅ implemented (legacy alias) |
+| `POST /v1/keys/:id/reveal` | Supabase JWT | ✅ implemented |
+| `POST /v1/keys/:id/revoke` | Supabase JWT | ✅ implemented |
+| `DELETE /v1/keys/:id` | Supabase JWT | ✅ implemented |
+| `GET /v1/me/api-keys` | Supabase JWT | ✅ implemented (dashboard) |
+| `POST /v1/me/api-keys` | Supabase JWT | ✅ implemented (dashboard) |
+| `POST /v1/me/api-keys/reveal` | Supabase JWT | ✅ implemented |
+| `POST /v1/me/api-keys/revoke` | Supabase JWT | ✅ implemented |
+| `DELETE /v1/me/api-keys/:id` | Supabase JWT | ✅ implemented |
 | `POST /v1/billing/checkout` | Supabase JWT | ⏳ 501 stub (D4) |
 | `POST /v1/webhooks/stripe` | `Stripe-Signature` | ⏳ 501 stub (D4) |
 | `GET /v1/models` | `sk-tokfai_...` | ⏳ 501 stub (D5) |
@@ -32,6 +39,75 @@ Smoke test:
 curl -i http://localhost:8787/v1/health
 # 200 { "ok": true, "service": "dmit", "version": "..." }
 ```
+
+## Admin dashboard smoke test
+
+Run **each command in its own shell** (or on its own line without chaining).
+If you pipe `curl` to `jq` in the same line as `git status`, `pm2 logs`, or
+other tools, jq will try to parse their stdout and fail — that is a shell
+usage issue, not mixed content in the API response. DMIT endpoints return a
+single JSON body (`Content-Type: application/json`) via Hono `c.json`.
+
+Replace `BASE` and `TOKEN` (Supabase access token for an active admin account).
+
+```bash
+# 1) Public health (no auth)
+curl -sS "http://localhost:8787/v1/health" | jq .
+
+# 2) Public billing plans (no auth)
+curl -sS "http://localhost:8787/v1/billing/plans" | jq .
+
+# 3) Admin dashboard summary (Bearer JWT required)
+curl -sS "http://localhost:8787/admin/dashboard-summary" \
+  -H "Authorization: Bearer TOKEN" | jq .
+```
+
+Expected shape for (3): `{ "data": { ...metrics }, "warnings": [] }`.
+
+## User API Keys smoke test
+
+Dashboard uses `/v1/me/api-keys`. Replace `BASE` and `TOKEN` (Supabase access
+token for a signed-in user — not an admin-only token, not `sk-tokfai_...`).
+
+Run **each command on its own line** (same jq piping note as above).
+
+```bash
+export BASE="http://localhost:8787"
+export TOKEN="<supabase_access_token>"
+
+# 1) List keys (metadata only — no secret)
+curl -sS "$BASE/v1/me/api-keys" \
+  -H "Authorization: Bearer $TOKEN" | jq .
+
+# 2) Create key (secret returned once)
+CREATE=$(curl -sS -X POST "$BASE/v1/me/api-keys" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"smoke-test"}')
+echo "$CREATE" | jq .
+export SK=$(echo "$CREATE" | jq -r '.secret')
+export KEY_ID=$(echo "$CREATE" | jq -r '.api_key.id')
+
+# 3) Reveal (owner copy)
+curl -sS -X POST "$BASE/v1/me/api-keys/reveal" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"id\":\"$KEY_ID\"}" | jq .
+
+# 4) Revoke (soft delete; response includes revoked_at)
+curl -sS -X POST "$BASE/v1/me/api-keys/revoke" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"id\":\"$KEY_ID\"}" | jq .
+
+# 5) Revoked key rejected on chat (401 key_revoked)
+curl -sS -o /dev/null -w "HTTP %{http_code}\n" -X POST "$BASE/v1/chat/completions" \
+  -H "Authorization: Bearer $SK" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gemini-3.1-pro","messages":[{"role":"user","content":"ping"}]}'
+```
+
+Supabase read-only acceptance SQL: `supabase/scripts/p735_api_keys_verify.sql`.
 
 ## Build
 
