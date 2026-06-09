@@ -9,9 +9,10 @@ import {
 } from "@/lib/admin/server";
 import { getDmitBaseUrl } from "@/lib/dmit/server";
 import { createClient } from "@/lib/supabase/server";
+import type { AdminDashboardSummary } from "@/lib/admin/client";
 
 export const metadata = {
-  title: "Admin — Overview",
+  title: "Admin — 总览",
 };
 
 type AdminMeResponse = {
@@ -20,33 +21,31 @@ type AdminMeResponse = {
   };
 };
 
-type AdminSummary = {
-  total_users: number;
-  total_requests: number;
-  success_requests: number;
-  failed_requests: number;
-  total_credits_charged: number;
+type DashboardSummaryResponse = {
+  data: AdminDashboardSummary;
+  warnings?: string[];
 };
 
-type AdminUsageLog = {
-  id: string;
-  email: string | null;
-  model: string | null;
-  status: string | null;
-  prompt_tokens: number | null;
-  completion_tokens: number | null;
-  total_tokens: number | null;
-  credits_charged: number | null;
-  request_id: string | null;
-  created_at: string | null;
+type ApiHealth = {
+  ok: boolean;
+  service?: string;
+  now?: string;
+  timestamp?: string;
 };
 
-type SummaryResponse = {
-  data: {
-    summary: AdminSummary;
-    usage_logs: AdminUsageLog[];
-  };
-};
+async function fetchApiHealth(dmitBaseUrl: string): Promise<ApiHealth | null> {
+  try {
+    const res = await fetch(`${dmitBaseUrl}/v1/health`, {
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      return { ok: false };
+    }
+    return (await res.json()) as ApiHealth;
+  } catch {
+    return { ok: false };
+  }
+}
 
 export default async function AdminPage() {
   const supabase = createClient();
@@ -67,9 +66,12 @@ export default async function AdminPage() {
   const userEmail = user.email ?? null;
   const hasAccessToken = Boolean(accessToken);
 
-  let summary: AdminSummary | null = null;
-  let usageLogs: AdminUsageLog[] = [];
+  let summary: AdminDashboardSummary | null = null;
+  let warnings: string[] = [];
   let debug: AdminDebug | null = null;
+  let health: ApiHealth | null = null;
+
+  health = await fetchApiHealth(dmitBaseUrl);
 
   if (!accessToken) {
     debug = {
@@ -97,13 +99,13 @@ export default async function AdminPage() {
           isForbidden: true,
         };
       } else {
-        const summaryRes = await fetchDmitAdmin<SummaryResponse>(
-          `${dmitBaseUrl}/admin/summary`,
+        const summaryRes = await fetchDmitAdmin<DashboardSummaryResponse>(
+          `${dmitBaseUrl}/admin/dashboard-summary`,
           accessToken
         );
 
-        summary = summaryRes.data.summary;
-        usageLogs = summaryRes.data.usage_logs;
+        summary = summaryRes.data;
+        warnings = Array.isArray(summaryRes.warnings) ? summaryRes.warnings : [];
       }
     } catch (error) {
       debug = toAdminDebug(error, {
@@ -117,7 +119,8 @@ export default async function AdminPage() {
   return (
     <AdminOverviewPanel
       summary={summary}
-      recentActivity={usageLogs.slice(0, 5)}
+      warnings={warnings}
+      health={health}
       debug={debug}
     />
   );

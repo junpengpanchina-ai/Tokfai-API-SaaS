@@ -145,6 +145,57 @@ export type AdminRechargePlanDuplicateBody = {
   new_id?: string;
 };
 
+export type AdminDashboardSummary = {
+  total_users: number | null;
+  total_api_keys: number | null;
+  total_recharge_plans: number | null;
+  visible_recharge_plans: number | null;
+  total_credit_orders: number | null;
+  credit_orders_last_24h: number | null;
+  credit_orders_last_7d: number | null;
+  paid_credit_orders: number | null;
+  total_recharge_amount_cents: number;
+  credit_ledger_credits_in: number | null;
+  total_usage_logs: number | null;
+  usage_logs_last_24h: number | null;
+  usage_logs_last_7d: number | null;
+  updated_at: string;
+};
+
+export async function fetchAdminDashboardSummary(): Promise<{
+  summary: AdminDashboardSummary;
+  warnings: string[];
+}> {
+  const res = await fetchAdminApi<{
+    data: AdminDashboardSummary;
+    warnings?: string[];
+  }>("/admin/dashboard-summary");
+  return {
+    summary: res.data,
+    warnings: Array.isArray(res.warnings) ? res.warnings : [],
+  };
+}
+
+export type AdminCreditOrderListItem = {
+  id: string;
+  created_at: string;
+  email: string | null;
+  package_code: string | null;
+  plan_id: string;
+  amount_cents: number | null;
+  currency: string;
+  status: string;
+  stripe_checkout_session_id: string | null;
+  stripe_payment_intent_id: string | null;
+  updated_at: string;
+};
+
+export type AdminCreditOrdersQuery = {
+  email?: string;
+  status?: string;
+  package_code?: string;
+};
+
 export class AdminApiError extends Error {
   readonly status: number;
   readonly code?: string;
@@ -449,6 +500,31 @@ export async function restoreAdminRechargePlan(
     }
   );
   return res.data;
+}
+
+function buildAdminCreditOrdersQuery(
+  filters: AdminCreditOrdersQuery = {}
+): string {
+  const params = new URLSearchParams();
+  const email = filters.email?.trim();
+  const status = filters.status?.trim();
+  const packageCode = filters.package_code?.trim();
+
+  if (email) params.set("email", email);
+  if (status && status !== "all") params.set("status", status);
+  if (packageCode) params.set("package_code", packageCode);
+
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export async function fetchAdminCreditOrders(
+  filters: AdminCreditOrdersQuery = {}
+): Promise<AdminCreditOrderListItem[]> {
+  const res = await fetchAdminApi<{ data?: AdminCreditOrderListItem[] }>(
+    `/admin/credit-orders${buildAdminCreditOrdersQuery(filters)}`
+  );
+  return Array.isArray(res.data) ? res.data : [];
 }
 
 export type AdminAnnouncementType =

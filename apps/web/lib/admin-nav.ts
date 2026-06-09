@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Megaphone,
   Package,
+  Receipt,
   Users,
 } from "lucide-react";
 
@@ -50,6 +51,12 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     href: "/admin/recharge-plans",
     labelKey: "admin.nav.rechargePlans",
     icon: Package,
+    prefetch: true,
+  },
+  {
+    href: "/admin/credit-orders",
+    labelKey: "admin.nav.creditOrders",
+    icon: Receipt,
     prefetch: true,
   },
   {

@@ -33,6 +33,8 @@ healthRoutes.get("/debug/routes", (c) =>
     routes: [
       "GET /admin/credits",
       "POST /admin/credits/adjust",
+      "GET /admin/dashboard-summary",
+      "GET /admin/credit-orders",
       "GET /admin/recharge-plans",
       "POST /admin/recharge-plans",
       "PATCH /admin/recharge-plans/:id",
@@ -64,6 +66,7 @@ healthRoutes.get("/__version", (c) =>
       "POST /stripe/webhook",
       "GET /admin/credits",
       "POST /admin/credits/adjust",
+      "GET /admin/credit-orders",
       "GET /admin/recharge-plans",
       "POST /admin/recharge-plans",
       "PATCH /admin/recharge-plans/:id",

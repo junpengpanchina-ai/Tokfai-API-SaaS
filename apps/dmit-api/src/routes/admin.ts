@@ -22,6 +22,11 @@ import {
   listAdminAnnouncements,
   updateAdminAnnouncement,
 } from "./adminAnnouncements.js";
+import { buildAdminDashboardSummary } from "./adminDashboardSummary.js";
+import {
+  listAdminCreditOrders,
+  parseAdminCreditOrdersQuery,
+} from "./adminCreditOrders.js";
 import {
   archiveAdminRechargePlan,
   createAdminRechargePlan,
@@ -526,6 +531,14 @@ protectedAdminRoutes.use("*", requireAdminV1);
 
 protectedAdminRoutes.post("/credits/adjust", handleAdminCreditsAdjust);
 
+protectedAdminRoutes.get("/dashboard-summary", async (c) => {
+  const { summary, warnings } = await buildAdminDashboardSummary();
+  return c.json({
+    data: summary,
+    ...(warnings.length > 0 ? { warnings } : {}),
+  });
+});
+
 protectedAdminRoutes.get("/summary", async (c) => {
   const [totalUsers, totalRequests, successRequests, totalCreditsCharged, logs] =
     await Promise.all([
@@ -644,6 +657,11 @@ protectedAdminRoutes.patch("/announcements/:id", async (c) => {
   }
 
   return c.json({ data: result.announcement });
+});
+
+protectedAdminRoutes.get("/credit-orders", async (c) => {
+  const orders = await listAdminCreditOrders(parseAdminCreditOrdersQuery(c));
+  return c.json({ data: orders });
 });
 
 protectedAdminRoutes.get("/recharge-plans", async (c) => {
