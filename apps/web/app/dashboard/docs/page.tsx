@@ -1,9 +1,9 @@
-import { DocsContent } from "@/components/docs-content";
+import { QuickstartContent } from "@/components/quickstart-content";
 
 export const metadata = {
-  title: "Docs",
+  title: "快速接入",
 };
 
 export default function DashboardDocsPage() {
-  return <DocsContent />;
+  return <QuickstartContent />;
 }
