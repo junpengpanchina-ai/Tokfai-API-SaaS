@@ -1,22 +1,58 @@
 import { supabase } from "../supabase.js";
+import { listAdminCreditOrders } from "./adminCreditOrders.js";
 
 const PAGE_SIZE = 1000;
+/** Paid order statuses in public.credit_orders (schema default: paid; also accept legacy values). */
 const PAID_ORDER_STATUSES = ["paid", "succeeded", "completed"];
+const USAGE_SUCCESS_STATUSES = ["succeeded", "success", "ok"];
+
+export type AdminDashboardRecentOrder = {
+  id: string;
+  email: string | null;
+  plan_label: string | null;
+  amount_cents: number | null;
+  status: string;
+  created_at: string;
+};
+
+export type AdminDashboardRecentUser = {
+  id: string;
+  email: string | null;
+  created_at: string;
+};
 
 export type AdminDashboardSummary = {
+  /** Terminal users from public.profiles (one row per auth.users). */
   total_users: number | null;
-  total_api_keys: number | null;
-  total_recharge_plans: number | null;
-  visible_recharge_plans: number | null;
+  /**
+   * Staff admin registry count from public.admin_users — not end-user signups.
+   * See migration 0012_admin_security_base.sql.
+   */
+  admin_user_count: number | null;
+  today_new_users: number | null;
+  last_7d_new_users: number | null;
+  last_30d_new_users: number | null;
+  /** Which table backs user counts / recent users. */
+  user_source: "profiles" | "admin_users";
+
   total_credit_orders: number | null;
-  credit_orders_last_24h: number | null;
-  credit_orders_last_7d: number | null;
-  paid_credit_orders: number | null;
+  paid_orders: number | null;
+  pending_orders: number | null;
+  /** Sum of paid order amounts only; pending/cancelled/failed excluded. */
   total_recharge_amount_cents: number;
-  credit_ledger_credits_in: number | null;
-  total_usage_logs: number | null;
-  usage_logs_last_24h: number | null;
-  usage_logs_last_7d: number | null;
+
+  total_requests: number | null;
+  successful_requests: number | null;
+  failed_requests: number | null;
+  has_token_data: boolean;
+  total_input_tokens: number | null;
+  total_output_tokens: number | null;
+  total_tokens: number | null;
+  total_usage_credits: number | null;
+
+  recent_orders: AdminDashboardRecentOrder[];
+  recent_users: AdminDashboardRecentUser[];
+
   updated_at: string;
 };
 
@@ -30,8 +66,20 @@ type SafeSumResult = {
   warning?: string;
 };
 
-function isoSinceHours(hours: number): string {
-  return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+type UsageAggregateResult = {
+  total_input_tokens: number | null;
+  total_output_tokens: number | null;
+  total_tokens: number | null;
+  total_usage_credits: number | null;
+  has_token_data: boolean;
+  warning?: string;
+};
+
+function isoStartOfTodayUtc(): string {
+  const now = new Date();
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  ).toISOString();
 }
 
 function isoSinceDays(days: number): string {
@@ -54,8 +102,8 @@ function isMissingColumnError(message: string): boolean {
 function isMissingTableError(message: string): boolean {
   const lower = message.toLowerCase();
   return (
-    lower.includes("relation") && lower.includes("does not exist") ||
-    lower.includes("schema cache") && lower.includes("could not find")
+    (lower.includes("relation") && lower.includes("does not exist")) ||
+    (lower.includes("schema cache") && lower.includes("could not find"))
   );
 }
 
@@ -66,8 +114,9 @@ type CountResponse = {
 
 type SupabaseCountQuery = {
   is: (column: string, value: null) => SupabaseCountQuery;
-  eq: (column: string, value: boolean) => SupabaseCountQuery;
+  eq: (column: string, value: boolean | string) => SupabaseCountQuery;
   gte: (column: string, value: string) => SupabaseCountQuery;
+  in: (column: string, values: string[]) => SupabaseCountQuery;
 } & PromiseLike<CountResponse>;
 
 async function safeCount(
@@ -96,59 +145,28 @@ async function safeCount(
   }
 }
 
-async function sumCreditLedgerCreditsIn(): Promise<SafeSumResult> {
-  try {
-    let total = 0;
-
-    for (let from = 0; ; from += PAGE_SIZE) {
-      const to = from + PAGE_SIZE - 1;
-      const { data, error } = await supabase()
-        .from("credit_ledger")
-        .select("amount")
-        .gt("amount", 0)
-        .range(from, to);
-
-      if (error) {
-        return {
-          value: null,
-          warning: `credit_ledger credits_in sum: ${error.message}`,
-        };
-      }
-
-      const page = (data ?? []) as Array<{ amount: number | string | null }>;
-      total += page.reduce((sum, row) => sum + toNumber(row.amount), 0);
-
-      if (page.length < PAGE_SIZE) break;
-    }
-
-    return { value: total };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { value: null, warning: `credit_ledger credits_in sum: ${message}` };
-  }
-}
-
-async function sumCreditOrdersAmountCents(): Promise<{
+async function sumPaidCreditOrdersAmountCents(): Promise<{
   value: number;
   warning?: string;
 }> {
   try {
-    const { data, error } = await supabase()
+    const probe = await supabase()
       .from("credit_orders")
       .select("amount_cents")
+      .in("status", PAID_ORDER_STATUSES)
       .limit(1);
 
-    if (error) {
-      if (isMissingColumnError(error.message)) {
-        return sumCreditOrdersAmountFromCny();
+    if (probe.error) {
+      if (isMissingColumnError(probe.error.message)) {
+        return sumPaidCreditOrdersAmountFromCny();
       }
-      if (isMissingTableError(error.message)) {
-        return { value: 0, warning: `credit_orders amount sum: ${error.message}` };
+      if (isMissingTableError(probe.error.message)) {
+        return { value: 0, warning: `credit_orders paid amount sum: ${probe.error.message}` };
       }
-      return { value: 0, warning: `credit_orders amount sum: ${error.message}` };
+      return { value: 0, warning: `credit_orders paid amount sum: ${probe.error.message}` };
     }
 
-    if (!data || data.length === 0) {
+    if (!probe.data || probe.data.length === 0) {
       return { value: 0 };
     }
 
@@ -159,12 +177,13 @@ async function sumCreditOrdersAmountCents(): Promise<{
       const { data: rows, error: pageError } = await supabase()
         .from("credit_orders")
         .select("amount_cents")
+        .in("status", PAID_ORDER_STATUSES)
         .range(from, to);
 
       if (pageError) {
         return {
           value: 0,
-          warning: `credit_orders amount_cents sum: ${pageError.message}`,
+          warning: `credit_orders paid amount_cents sum: ${pageError.message}`,
         };
       }
 
@@ -177,28 +196,29 @@ async function sumCreditOrdersAmountCents(): Promise<{
     return { value: total };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return { value: 0, warning: `credit_orders amount sum: ${message}` };
+    return { value: 0, warning: `credit_orders paid amount sum: ${message}` };
   }
 }
 
-async function sumCreditOrdersAmountFromCny(): Promise<{
+async function sumPaidCreditOrdersAmountFromCny(): Promise<{
   value: number;
   warning?: string;
 }> {
   try {
-    const { data, error } = await supabase()
+    const probe = await supabase()
       .from("credit_orders")
       .select("amount_cny")
+      .in("status", PAID_ORDER_STATUSES)
       .limit(1);
 
-    if (error) {
-      if (isMissingColumnError(error.message)) {
+    if (probe.error) {
+      if (isMissingColumnError(probe.error.message)) {
         return { value: 0 };
       }
-      return { value: 0, warning: `credit_orders amount_cny sum: ${error.message}` };
+      return { value: 0, warning: `credit_orders paid amount_cny sum: ${probe.error.message}` };
     }
 
-    if (!data || data.length === 0) {
+    if (!probe.data || probe.data.length === 0) {
       return { value: 0 };
     }
 
@@ -209,12 +229,13 @@ async function sumCreditOrdersAmountFromCny(): Promise<{
       const { data: rows, error: pageError } = await supabase()
         .from("credit_orders")
         .select("amount_cny")
+        .in("status", PAID_ORDER_STATUSES)
         .range(from, to);
 
       if (pageError) {
         return {
           value: 0,
-          warning: `credit_orders amount_cny sum: ${pageError.message}`,
+          warning: `credit_orders paid amount_cny sum: ${pageError.message}`,
         };
       }
 
@@ -230,31 +251,201 @@ async function sumCreditOrdersAmountFromCny(): Promise<{
     return { value: total };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return { value: 0, warning: `credit_orders amount_cny sum: ${message}` };
+    return { value: 0, warning: `credit_orders paid amount_cny sum: ${message}` };
   }
 }
 
-async function countPaidCreditOrders(): Promise<SafeCountResult> {
-  try {
-    const { count, error } = await supabase()
-      .from("credit_orders")
-      .select("id", { count: "exact", head: true })
-      .in("status", PAID_ORDER_STATUSES);
+async function countOrdersByStatus(statuses: string[]): Promise<SafeCountResult> {
+  return safeCount("credit_orders", (q) => q.in("status", statuses));
+}
 
-    if (error) {
-      if (isMissingColumnError(error.message)) {
-        return { value: null };
+async function countSuccessfulRequests(): Promise<SafeCountResult> {
+  return safeCount("usage_logs", (q) => q.in("status", USAGE_SUCCESS_STATUSES));
+}
+
+async function aggregateUsageMetrics(): Promise<UsageAggregateResult> {
+  try {
+    let totalInput = 0;
+    let totalOutput = 0;
+    let totalTokens = 0;
+    let totalCredits = 0;
+    let hasTokenData = false;
+
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const to = from + PAGE_SIZE - 1;
+      const { data, error } = await supabase()
+        .from("usage_logs")
+        .select("prompt_tokens, completion_tokens, total_tokens, credits_charged")
+        .range(from, to);
+
+      if (error) {
+        if (isMissingColumnError(error.message)) {
+          return {
+            total_input_tokens: null,
+            total_output_tokens: null,
+            total_tokens: null,
+            total_usage_credits: null,
+            has_token_data: false,
+          };
+        }
+        return {
+          total_input_tokens: null,
+          total_output_tokens: null,
+          total_tokens: null,
+          total_usage_credits: null,
+          has_token_data: false,
+          warning: `usage_logs aggregate: ${error.message}`,
+        };
       }
+
+      const page = (data ?? []) as Array<{
+        prompt_tokens: number | null;
+        completion_tokens: number | null;
+        total_tokens: number | null;
+        credits_charged: number | string | null;
+      }>;
+
+      for (const row of page) {
+        if (row.prompt_tokens != null) {
+          hasTokenData = true;
+          totalInput += toNumber(row.prompt_tokens);
+        }
+        if (row.completion_tokens != null) {
+          hasTokenData = true;
+          totalOutput += toNumber(row.completion_tokens);
+        }
+        if (row.total_tokens != null) {
+          hasTokenData = true;
+          totalTokens += toNumber(row.total_tokens);
+        }
+        totalCredits += toNumber(row.credits_charged);
+      }
+
+      if (page.length < PAGE_SIZE) break;
+    }
+
+    return {
+      total_input_tokens: hasTokenData ? totalInput : null,
+      total_output_tokens: hasTokenData ? totalOutput : null,
+      total_tokens: hasTokenData ? totalTokens : null,
+      total_usage_credits: totalCredits,
+      has_token_data: hasTokenData,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      total_input_tokens: null,
+      total_output_tokens: null,
+      total_tokens: null,
+      total_usage_credits: null,
+      has_token_data: false,
+      warning: `usage_logs aggregate: ${message}`,
+    };
+  }
+}
+
+function resolvePlanLabel(
+  packageCode: string | null | undefined,
+  planId: string | null | undefined
+): string | null {
+  const pkg = packageCode?.trim();
+  const plan = planId?.trim();
+  if (pkg && plan && pkg !== plan) return `${pkg} / ${plan}`;
+  return pkg || plan || null;
+}
+
+async function fetchRecentOrders(): Promise<{
+  orders: AdminDashboardRecentOrder[];
+  warning?: string;
+}> {
+  try {
+    const rows = await listAdminCreditOrders({ limit: 5 });
+    return {
+      orders: rows.map((row) => ({
+        id: row.id,
+        email: row.email,
+        plan_label: resolvePlanLabel(row.package_code, row.plan_id),
+        amount_cents: row.amount_cents,
+        status: row.status,
+        created_at: row.created_at,
+      })),
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { orders: [], warning: `recent credit_orders: ${message}` };
+  }
+}
+
+async function fetchRecentUsers(): Promise<{
+  users: AdminDashboardRecentUser[];
+  user_source: "profiles" | "admin_users";
+  warning?: string;
+}> {
+  try {
+    const { data, error } = await supabase()
+      .from("profiles")
+      .select("id, email, created_at")
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    if (!error) {
       return {
-        value: null,
-        warning: `credit_orders paid count: ${error.message}`,
+        users: ((data ?? []) as AdminDashboardRecentUser[]).map((row) => ({
+          id: row.id,
+          email: row.email,
+          created_at: row.created_at,
+        })),
+        user_source: "profiles",
       };
     }
 
-    return { value: count ?? 0 };
+    if (!isMissingTableError(error.message)) {
+      return {
+        users: [],
+        user_source: "profiles",
+        warning: `recent profiles: ${error.message}`,
+      };
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return { value: null, warning: `credit_orders paid count: ${message}` };
+    return {
+      users: [],
+      user_source: "profiles",
+      warning: `recent profiles: ${message}`,
+    };
+  }
+
+  // Fallback: admin_users holds staff identities only, not terminal signups.
+  try {
+    const { data, error } = await supabase()
+      .from("admin_users")
+      .select("id, email, created_at")
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    if (error) {
+      return {
+        users: [],
+        user_source: "admin_users",
+        warning: `recent admin_users fallback: ${error.message}`,
+      };
+    }
+
+    return {
+      users: ((data ?? []) as AdminDashboardRecentUser[]).map((row) => ({
+        id: row.id,
+        email: row.email,
+        created_at: row.created_at,
+      })),
+      user_source: "admin_users",
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      users: [],
+      user_source: "admin_users",
+      warning: `recent admin_users fallback: ${message}`,
+    };
   }
 }
 
@@ -272,70 +463,90 @@ export async function buildAdminDashboardSummary(): Promise<{
   warnings: string[];
 }> {
   const warnings: string[] = [];
-  const since24h = isoSinceHours(24);
+  const sinceToday = isoStartOfTodayUtc();
   const since7d = isoSinceDays(7);
+  const since30d = isoSinceDays(30);
 
   const [
     totalUsers,
-    totalApiKeys,
-    totalRechargePlans,
-    visibleRechargePlans,
+    adminUserCount,
+    todayNewUsers,
+    last7dNewUsers,
+    last30dNewUsers,
     totalCreditOrders,
-    creditOrders24h,
-    creditOrders7d,
-    paidCreditOrders,
+    paidOrders,
+    pendingOrders,
     rechargeAmount,
-    ledgerCreditsIn,
-    totalUsageLogs,
-    usageLogs24h,
-    usageLogs7d,
+    totalRequests,
+    successfulRequests,
+    usageAggregate,
+    recentOrdersResult,
+    recentUsersResult,
   ] = await Promise.all([
     safeCount("profiles"),
-    safeCount("api_keys"),
-    safeCount("recharge_plans", (q) => q.is("archived_at", null)),
-    safeCount("recharge_plans", (q) =>
-      q.is("archived_at", null).eq("enabled", true).eq("visible", true)
-    ),
+    safeCount("admin_users"),
+    safeCount("profiles", (q) => q.gte("created_at", sinceToday)),
+    safeCount("profiles", (q) => q.gte("created_at", since7d)),
+    safeCount("profiles", (q) => q.gte("created_at", since30d)),
     safeCount("credit_orders"),
-    safeCount("credit_orders", (q) => q.gte("created_at", since24h)),
-    safeCount("credit_orders", (q) => q.gte("created_at", since7d)),
-    countPaidCreditOrders(),
-    sumCreditOrdersAmountCents(),
-    sumCreditLedgerCreditsIn(),
+    countOrdersByStatus(PAID_ORDER_STATUSES),
+    countOrdersByStatus(["pending"]),
+    sumPaidCreditOrdersAmountCents(),
     safeCount("usage_logs"),
-    safeCount("usage_logs", (q) => q.gte("created_at", since24h)),
-    safeCount("usage_logs", (q) => q.gte("created_at", since7d)),
+    countSuccessfulRequests(),
+    aggregateUsageMetrics(),
+    fetchRecentOrders(),
+    fetchRecentUsers(),
   ]);
 
+  const failedRequests: SafeCountResult = {
+    value:
+      totalRequests.value != null && successfulRequests.value != null
+        ? Math.max(0, totalRequests.value - successfulRequests.value)
+        : null,
+  };
+
   collectWarning(warnings, totalUsers);
-  collectWarning(warnings, totalApiKeys);
-  collectWarning(warnings, totalRechargePlans);
-  collectWarning(warnings, visibleRechargePlans);
+  collectWarning(warnings, adminUserCount);
+  collectWarning(warnings, todayNewUsers);
+  collectWarning(warnings, last7dNewUsers);
+  collectWarning(warnings, last30dNewUsers);
   collectWarning(warnings, totalCreditOrders);
-  collectWarning(warnings, creditOrders24h);
-  collectWarning(warnings, creditOrders7d);
-  collectWarning(warnings, paidCreditOrders);
+  collectWarning(warnings, paidOrders);
+  collectWarning(warnings, pendingOrders);
   collectWarning(warnings, rechargeAmount);
-  collectWarning(warnings, ledgerCreditsIn);
-  collectWarning(warnings, totalUsageLogs);
-  collectWarning(warnings, usageLogs24h);
-  collectWarning(warnings, usageLogs7d);
+  collectWarning(warnings, totalRequests);
+  collectWarning(warnings, successfulRequests);
+  collectWarning(warnings, usageAggregate);
+  collectWarning(warnings, recentOrdersResult);
+  collectWarning(warnings, recentUsersResult);
 
   return {
     summary: {
       total_users: totalUsers.value,
-      total_api_keys: totalApiKeys.value,
-      total_recharge_plans: totalRechargePlans.value,
-      visible_recharge_plans: visibleRechargePlans.value,
+      admin_user_count: adminUserCount.value,
+      today_new_users: todayNewUsers.value,
+      last_7d_new_users: last7dNewUsers.value,
+      last_30d_new_users: last30dNewUsers.value,
+      user_source: recentUsersResult.user_source,
+
       total_credit_orders: totalCreditOrders.value,
-      credit_orders_last_24h: creditOrders24h.value,
-      credit_orders_last_7d: creditOrders7d.value,
-      paid_credit_orders: paidCreditOrders.value,
+      paid_orders: paidOrders.value,
+      pending_orders: pendingOrders.value,
       total_recharge_amount_cents: rechargeAmount.value,
-      credit_ledger_credits_in: ledgerCreditsIn.value,
-      total_usage_logs: totalUsageLogs.value,
-      usage_logs_last_24h: usageLogs24h.value,
-      usage_logs_last_7d: usageLogs7d.value,
+
+      total_requests: totalRequests.value,
+      successful_requests: successfulRequests.value,
+      failed_requests: failedRequests.value,
+      has_token_data: usageAggregate.has_token_data,
+      total_input_tokens: usageAggregate.total_input_tokens,
+      total_output_tokens: usageAggregate.total_output_tokens,
+      total_tokens: usageAggregate.total_tokens,
+      total_usage_credits: usageAggregate.total_usage_credits,
+
+      recent_orders: recentOrdersResult.orders,
+      recent_users: recentUsersResult.users,
+
       updated_at: new Date().toISOString(),
     },
     warnings,

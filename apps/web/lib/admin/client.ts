@@ -145,20 +145,42 @@ export type AdminRechargePlanDuplicateBody = {
   new_id?: string;
 };
 
+export type AdminDashboardRecentOrder = {
+  id: string;
+  email: string | null;
+  plan_label: string | null;
+  amount_cents: number | null;
+  status: string;
+  created_at: string;
+};
+
+export type AdminDashboardRecentUser = {
+  id: string;
+  email: string | null;
+  created_at: string;
+};
+
 export type AdminDashboardSummary = {
   total_users: number | null;
-  total_api_keys: number | null;
-  total_recharge_plans: number | null;
-  visible_recharge_plans: number | null;
+  admin_user_count: number | null;
+  today_new_users: number | null;
+  last_7d_new_users: number | null;
+  last_30d_new_users: number | null;
+  user_source: "profiles" | "admin_users";
   total_credit_orders: number | null;
-  credit_orders_last_24h: number | null;
-  credit_orders_last_7d: number | null;
-  paid_credit_orders: number | null;
+  paid_orders: number | null;
+  pending_orders: number | null;
   total_recharge_amount_cents: number;
-  credit_ledger_credits_in: number | null;
-  total_usage_logs: number | null;
-  usage_logs_last_24h: number | null;
-  usage_logs_last_7d: number | null;
+  total_requests: number | null;
+  successful_requests: number | null;
+  failed_requests: number | null;
+  has_token_data: boolean;
+  total_input_tokens: number | null;
+  total_output_tokens: number | null;
+  total_tokens: number | null;
+  total_usage_credits: number | null;
+  recent_orders: AdminDashboardRecentOrder[];
+  recent_users: AdminDashboardRecentUser[];
   updated_at: string;
 };
 

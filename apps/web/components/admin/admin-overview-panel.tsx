@@ -25,7 +25,7 @@ import {
 import type { AdminDashboardSummary } from "@/lib/admin/client";
 import type { AdminDebug } from "@/lib/admin/server";
 import { formatCny } from "@/lib/billing/recharge-plans";
-import { formatDateTime, formatInt } from "@/lib/format";
+import { formatCreditsPrecise, formatDateTime, formatInt } from "@/lib/format";
 
 type ApiHealth = {
   ok: boolean;
@@ -87,6 +87,32 @@ function resolveHealthTimestamp(health: ApiHealth | null): string | null {
   return health.now ?? health.timestamp ?? null;
 }
 
+function formatTokenMetric(
+  summary: AdminDashboardSummary,
+  field: "total_tokens" | "total_input_tokens" | "total_output_tokens"
+): string {
+  if (!summary.has_token_data) return "暂无 token 数据";
+  const value = summary[field];
+  if (value == null) return "—";
+  return formatInt(value);
+}
+
+function OrderStatusBadge({ status }: { status: string }) {
+  const normalized = status.trim().toLowerCase();
+  const variant =
+    normalized === "paid" ||
+    normalized === "succeeded" ||
+    normalized === "completed"
+      ? "default"
+      : normalized === "pending"
+        ? "secondary"
+        : normalized === "failed" || normalized === "cancelled"
+          ? "destructive"
+          : "outline";
+
+  return <Badge variant={variant}>{status}</Badge>;
+}
+
 export function AdminOverviewPanel({
   summary,
   warnings,
@@ -101,6 +127,8 @@ export function AdminOverviewPanel({
   const healthOk = health?.ok === true;
   const healthTimestamp = resolveHealthTimestamp(health);
   const summaryUpdatedAt = summary?.updated_at ?? null;
+  const recentUsersLabel =
+    summary?.user_source === "admin_users" ? "最近后台用户" : "最近注册用户";
 
   return (
     <>
@@ -140,41 +168,163 @@ export function AdminOverviewPanel({
             <AdminStatCard
               label="用户数"
               value={formatCount(summary.total_users)}
+              hint={
+                summary.admin_user_count != null
+                  ? `管理员 ${formatCount(summary.admin_user_count)}`
+                  : undefined
+              }
             />
             <AdminStatCard
-              label="订单数"
-              value={formatCount(summary.total_credit_orders)}
+              label="今日新用户"
+              value={formatCount(summary.today_new_users)}
             />
             <AdminStatCard
-              label="累计充值金额"
-              value={formatRechargeTotal(summary.total_recharge_amount_cents)}
+              label="近 7 天新用户"
+              value={formatCount(summary.last_7d_new_users)}
             />
             <AdminStatCard
-              label="总调用量"
-              value={formatCount(summary.total_usage_logs)}
+              label="近 30 天新用户"
+              value={formatCount(summary.last_30d_new_users)}
             />
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <AdminStatCard
-              label="套餐数"
-              value={formatCount(summary.total_recharge_plans)}
-              hint="未归档"
+              label="订单总数"
+              value={formatCount(summary.total_credit_orders)}
             />
             <AdminStatCard
-              label="可见套餐数"
-              value={formatCount(summary.visible_recharge_plans)}
-              hint="已启用且前台可见"
+              label="已支付订单"
+              value={formatCount(summary.paid_orders)}
             />
             <AdminStatCard
-              label="近 24 小时订单"
-              value={formatCount(summary.credit_orders_last_24h)}
+              label="待支付订单"
+              value={formatCount(summary.pending_orders)}
             />
             <AdminStatCard
-              label="近 7 天订单"
-              value={formatCount(summary.credit_orders_last_7d)}
+              label="累计实付金额"
+              value={formatRechargeTotal(summary.total_recharge_amount_cents)}
+              hint="仅已支付订单"
             />
           </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <AdminStatCard
+              label="总请求数"
+              value={formatCount(summary.total_requests)}
+            />
+            <AdminStatCard
+              label="成功请求数"
+              value={formatCount(summary.successful_requests)}
+            />
+            <AdminStatCard
+              label="失败请求数"
+              value={formatCount(summary.failed_requests)}
+            />
+            <AdminStatCard
+              label="总 Token"
+              value={formatTokenMetric(summary, "total_tokens")}
+              hint={
+                summary.has_token_data
+                  ? `输入 ${formatTokenMetric(summary, "total_input_tokens")} · 输出 ${formatTokenMetric(summary, "total_output_tokens")}`
+                  : undefined
+              }
+            />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">最近 5 条订单</CardTitle>
+                <CardDescription>
+                  来自 public.credit_orders，按创建时间倒序
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {summary.recent_orders.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">暂无订单</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-muted-foreground">
+                          <th className="pb-2 pr-3 font-medium">邮箱</th>
+                          <th className="pb-2 pr-3 font-medium">套餐</th>
+                          <th className="pb-2 pr-3 font-medium">金额</th>
+                          <th className="pb-2 pr-3 font-medium">状态</th>
+                          <th className="pb-2 font-medium">创建时间</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {summary.recent_orders.map((order) => (
+                          <tr key={order.id} className="border-b last:border-0">
+                            <td className="py-2 pr-3">{order.email ?? "—"}</td>
+                            <td className="py-2 pr-3">
+                              {order.plan_label ?? "—"}
+                            </td>
+                            <td className="py-2 pr-3">
+                              {order.amount_cents != null
+                                ? formatCny(order.amount_cents)
+                                : "—"}
+                            </td>
+                            <td className="py-2 pr-3">
+                              <OrderStatusBadge status={order.status} />
+                            </td>
+                            <td className="py-2">
+                              {formatDateTime(order.created_at)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">{recentUsersLabel}</CardTitle>
+                <CardDescription>
+                  {summary.user_source === "admin_users"
+                    ? "public.admin_users（后台管理员，非终端用户）"
+                    : "public.profiles（终端注册用户）"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {summary.recent_users.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">暂无用户</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-muted-foreground">
+                          <th className="pb-2 pr-3 font-medium">邮箱</th>
+                          <th className="pb-2 font-medium">创建时间</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {summary.recent_users.map((user) => (
+                          <tr key={user.id} className="border-b last:border-0">
+                            <td className="py-2 pr-3">{user.email ?? "—"}</td>
+                            <td className="py-2">
+                              {formatDateTime(user.created_at)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {summary.has_token_data && summary.total_usage_credits != null ? (
+            <p className="text-xs text-muted-foreground">
+              累计消耗积分：{formatCreditsPrecise(summary.total_usage_credits)}
+            </p>
+          ) : null}
         </>
       ) : null}
 
