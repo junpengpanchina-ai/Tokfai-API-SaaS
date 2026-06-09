@@ -403,13 +403,16 @@ function stripeCheckoutError(err: unknown, code: string): ApiError {
 }
 
 /**
- * Dashboard-initiated billing actions. Auth is the user's Supabase JWT.
+ * Billing routes.
+ * GET /v1/billing/plans is public (pricing / credits UI).
+ * Checkout requires the user's Supabase JWT.
  */
 export const billingRoutes = new Hono();
 
-billingRoutes.use("/billing/*", requireSupabaseJwt);
-billingRoutes.use("/v1/billing/*", requireSupabaseJwt);
-
 billingRoutes.get("/v1/billing/plans", listBillingPlans);
-billingRoutes.post("/v1/billing/checkout", createCheckoutSession);
-billingRoutes.post("/billing/create-checkout-session", createCheckoutSession);
+billingRoutes.post("/v1/billing/checkout", requireSupabaseJwt, createCheckoutSession);
+billingRoutes.post(
+  "/billing/create-checkout-session",
+  requireSupabaseJwt,
+  createCheckoutSession
+);

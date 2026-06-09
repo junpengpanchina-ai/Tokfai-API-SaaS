@@ -559,16 +559,14 @@ export async function listCatalogModelPricing(
 }
 
 /**
- * List visible recharge plans for the credits dashboard.
+ * List visible recharge plans (public DMIT endpoint — no JWT required).
  */
-export async function listBillingRechargePlans(
-  accessToken: string
-): Promise<BillingRechargePlan[]> {
+export async function listBillingRechargePlans(): Promise<BillingRechargePlan[]> {
   const res = await dmitFetch<{ data?: BillingRechargePlan[] }>(
     "/v1/billing/plans",
     {
       method: "GET",
-      accessToken,
+      accessToken: null,
     }
   );
   return Array.isArray(res.data) ? res.data : [];

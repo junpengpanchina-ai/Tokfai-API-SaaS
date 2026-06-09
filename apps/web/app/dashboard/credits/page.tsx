@@ -70,7 +70,7 @@ async function loadCreditsState(accessToken: string): Promise<CreditsLoadState> 
     readCredits(accessToken),
     readLedger(accessToken),
     readOrders(accessToken),
-    readBillingPlans(accessToken),
+    readBillingPlans(),
   ]);
   const debug = [
     profileResult.debug,
@@ -186,12 +186,12 @@ async function readOrders(accessToken: string) {
   }
 }
 
-async function readBillingPlans(accessToken: string) {
+async function readBillingPlans() {
   const endpoint = "/v1/billing/plans";
   try {
     return {
       ok: true as const,
-      data: await listBillingRechargePlans(accessToken),
+      data: await listBillingRechargePlans(),
       errorMessage: null,
       debug: okDebug(endpoint),
     };

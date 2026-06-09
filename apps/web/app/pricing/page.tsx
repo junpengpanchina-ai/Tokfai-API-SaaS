@@ -23,9 +23,7 @@ export default async function PricingPage() {
     data: { session },
   } = await supabase.auth.getSession();
 
-  const { plans, purchaseDisabled } = await fetchBillingPlansForPricing(
-    session?.access_token
-  );
+  const { plans, purchaseDisabled } = await fetchBillingPlansForPricing();
 
   return (
     <div className="flex min-h-screen flex-col">

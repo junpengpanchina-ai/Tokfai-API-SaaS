@@ -92,21 +92,11 @@ export function creditsPurchaseHref(isLoggedIn: boolean): string {
 
 /**
  * Load visible recharge plans for the public pricing page.
- * Uses DMIT GET /v1/billing/plans when a Supabase session token is available.
+ * Uses public DMIT GET /v1/billing/plans (no auth).
  */
-export async function fetchBillingPlansForPricing(
-  accessToken: string | null | undefined
-): Promise<PricingPlansLoadResult> {
-  if (!accessToken?.trim()) {
-    return {
-      plans: filterVisibleRechargePlans(FALLBACK_RECHARGE_PLANS),
-      source: "fallback",
-      purchaseDisabled: false,
-    };
-  }
-
+export async function fetchBillingPlansForPricing(): Promise<PricingPlansLoadResult> {
   try {
-    const plans = await listBillingRechargePlans(accessToken);
+    const plans = await listBillingRechargePlans();
     return {
       plans: filterVisibleRechargePlans(plans),
       source: "api",
@@ -116,7 +106,7 @@ export async function fetchBillingPlansForPricing(
     return {
       plans: filterVisibleRechargePlans(FALLBACK_RECHARGE_PLANS),
       source: "fallback",
-      purchaseDisabled: true,
+      purchaseDisabled: false,
     };
   }
 }

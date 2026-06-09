@@ -22,13 +22,16 @@ export function getDmitBaseUrl(): string {
 
 export async function dmitServerFetch<T>(
   path: string,
-  accessToken: string
+  accessToken: string | null
 ): Promise<T> {
+  const headers: HeadersInit = {};
+  if (accessToken !== null) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
   const res = await fetch(`${getDmitBaseUrl()}${path}`, {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+    headers,
     cache: "no-store",
   });
 
@@ -183,12 +186,11 @@ export async function listCatalogModelPricing(
   return res.data ?? [];
 }
 
-export async function listBillingRechargePlans(
-  accessToken: string
-): Promise<BillingRechargePlan[]> {
+/** Public DMIT endpoint — no Supabase JWT required. */
+export async function listBillingRechargePlans(): Promise<BillingRechargePlan[]> {
   const res = await dmitServerFetch<DataResponse<BillingRechargePlan[]>>(
     "/v1/billing/plans",
-    accessToken
+    null
   );
   return res.data ?? [];
 }
