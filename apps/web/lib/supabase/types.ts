@@ -25,6 +25,7 @@ export interface UsageLogRow {
   total_tokens: number | null;
   credits_charged: number | null;
   request_id: string | null;
+  error_code?: string | null;
 }
 
 export interface ProfileRow {

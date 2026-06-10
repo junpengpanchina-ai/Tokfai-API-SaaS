@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, Gauge, ImageIcon, Info, MessageSquare } from "lucide-react";
+import { AlertTriangle, Gauge, Info } from "lucide-react";
 
-import { UsageQuerySection, type UsageApiKeyOption } from "@/components/usage-query-section";
-
+import { AdminStatCard } from "@/components/admin/admin-stat-card";
+import { CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,28 +14,25 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  formatCreditsPrecise,
+  formatDateTime,
+  formatInt,
+} from "@/lib/format";
 import { useI18n } from "@/lib/i18n/i18n-provider";
-import { formatDateTime, toneForStatus } from "@/lib/format";
-import type { MeUsageLogEntry } from "@/lib/dmit/server";
+import type { UsagePageLog, UsagePageState } from "@/lib/usage-page";
 import {
   formatUsageCredits,
   formatUsageTokenCell,
   getUsageKind,
+  resolveUsageRoute,
+  usageStatusTone,
   type UsageKind,
 } from "@/lib/usage-display";
 
-type UsageState =
-  | { status: "ready"; logs: MeUsageLogEntry[] }
-  | { status: "error"; message: string; code?: string; httpStatus?: number };
-
-export function UsageViewClient({
-  state,
-  apiKeys,
-}: {
-  state: UsageState;
-  apiKeys: UsageApiKeyOption[];
-}) {
+export function UsageViewClient({ state }: { state: UsagePageState }) {
   const { t } = useI18n();
+  const { copiedId, copyText } = useCopyToClipboard();
 
   return (
     <div className="flex flex-col gap-6">
@@ -48,7 +45,26 @@ export function UsageViewClient({
         </p>
       </div>
 
-      <UsageQuerySection apiKeys={apiKeys} />
+      {state.status === "ready" ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <AdminStatCard
+            label={t("dashboard.usage.statRequests24h")}
+            value={formatInt(state.stats.requestsLast24Hours)}
+          />
+          <AdminStatCard
+            label={t("dashboard.usage.statRequests7d")}
+            value={formatInt(state.stats.requestsLast7Days)}
+          />
+          <AdminStatCard
+            label={t("dashboard.usage.statTokens7d")}
+            value={formatInt(state.stats.tokensLast7Days)}
+          />
+          <AdminStatCard
+            label={t("dashboard.usage.statCredits7d")}
+            value={formatCreditsPrecise(state.stats.creditsLast7Days)}
+          />
+        </div>
+      ) : null}
 
       <Card className="border-muted bg-muted/30">
         <CardHeader className="pb-3">
@@ -67,7 +83,7 @@ export function UsageViewClient({
         </CardContent>
       </Card>
 
-      {state.status === "error" ? <UsageError state={state} t={t} /> : null}
+      {state.status === "error" ? <UsageError t={t} /> : null}
 
       <Card>
         <CardHeader>
@@ -78,7 +94,12 @@ export function UsageViewClient({
         </CardHeader>
         <CardContent>
           {state.status === "ready" && state.logs.length > 0 ? (
-            <UsageTable logs={state.logs} t={t} />
+            <UsageTable
+              logs={state.logs}
+              copiedId={copiedId}
+              onCopy={copyText}
+              t={t}
+            />
           ) : state.status === "ready" ? (
             <EmptyState t={t} />
           ) : null}
@@ -88,13 +109,7 @@ export function UsageViewClient({
   );
 }
 
-function UsageError({
-  state,
-  t,
-}: {
-  state: Extract<UsageState, { status: "error" }>;
-  t: (key: string) => string;
-}) {
+function UsageError({ t }: { t: (key: string) => string }) {
   return (
     <Card className="border-destructive/30 bg-destructive/5">
       <CardHeader className="pb-3">
@@ -102,38 +117,36 @@ function UsageError({
           <AlertTriangle className="h-4 w-4 text-destructive" />
           {t("dashboard.usage.loadError")}
         </CardTitle>
-        <CardDescription>{state.message}</CardDescription>
+        <CardDescription>{t("dashboard.usage.loadErrorDesc")}</CardDescription>
       </CardHeader>
-      <CardContent className="font-mono text-xs text-muted-foreground">
-        status={state.httpStatus ?? "n/a"} code={state.code ?? "n/a"}
-      </CardContent>
     </Card>
   );
 }
 
 function UsageTable({
   logs,
+  copiedId,
+  onCopy,
   t,
 }: {
-  logs: MeUsageLogEntry[];
+  logs: UsagePageLog[];
+  copiedId: string | null;
+  onCopy: (id: string, value: string) => void;
   t: (key: string) => string;
 }) {
   return (
     <div className="overflow-x-auto -mx-1 px-1">
-      <table className="w-full min-w-[640px] text-sm">
+      <table className="w-full min-w-[720px] text-sm">
         <thead>
           <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
             <th className="py-2 pr-3 font-medium whitespace-nowrap">
               {t("dashboard.usage.colWhen")}
             </th>
             <th className="py-2 pr-3 font-medium whitespace-nowrap">
-              {t("dashboard.usage.colType")}
-            </th>
-            <th className="py-2 pr-3 font-medium whitespace-nowrap">
               {t("dashboard.usage.colModel")}
             </th>
             <th className="py-2 pr-3 font-medium whitespace-nowrap">
-              {t("dashboard.usage.colApiKeyPrefix")}
+              {t("dashboard.usage.colRoute")}
             </th>
             <th className="py-2 pr-3 font-medium whitespace-nowrap">
               {t("dashboard.usage.colStatus")}
@@ -151,20 +164,26 @@ function UsageTable({
               {t("dashboard.usage.colCredits")}
             </th>
             <th
-              className="hidden py-2 pr-3 font-medium whitespace-nowrap xl:table-cell"
+              className="py-2 pr-0 font-medium whitespace-nowrap"
               title={t("dashboard.usage.colRequestIdHint")}
             >
               {t("dashboard.usage.colRequestId")}
-            </th>
-            <th className="hidden py-2 pr-0 font-medium whitespace-nowrap lg:table-cell">
-              {t("dashboard.usage.colError")}
             </th>
           </tr>
         </thead>
         <tbody>
           {logs.map((row) => {
             const kind = getUsageKind(row.model);
-            return <UsageRow key={row.id} row={row} kind={kind} t={t} />;
+            return (
+              <UsageRow
+                key={row.id}
+                row={row}
+                kind={kind}
+                copiedId={copiedId}
+                onCopy={onCopy}
+                t={t}
+              />
+            );
           })}
         </tbody>
       </table>
@@ -175,25 +194,28 @@ function UsageTable({
 function UsageRow({
   row,
   kind,
+  copiedId,
+  onCopy,
   t,
 }: {
-  row: MeUsageLogEntry;
+  row: UsagePageLog;
   kind: UsageKind;
+  copiedId: string | null;
+  onCopy: (id: string, value: string) => void;
   t: (key: string) => string;
 }) {
+  const copyId = `usage-request-id-${row.id}`;
+
   return (
     <tr className="border-b last:border-0 align-top">
       <td className="py-2.5 pr-3 text-muted-foreground whitespace-nowrap">
         {formatDateTime(row.created_at)}
       </td>
-      <td className="py-2.5 pr-3">
-        <KindBadge kind={kind} t={t} />
-      </td>
       <td className="max-w-[9rem] py-2.5 pr-3 font-mono text-xs break-all sm:max-w-none">
         {row.model ?? "—"}
       </td>
       <td className="py-2.5 pr-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
-        {row.prefix ?? "—"}
+        {resolveUsageRoute(row.model)}
       </td>
       <td className="py-2.5 pr-3 whitespace-nowrap">
         <StatusBadge status={row.status} t={t} />
@@ -216,45 +238,28 @@ function UsageRow({
       <td className="py-2.5 pr-3 text-right text-xs whitespace-nowrap">
         {formatUsageCredits(row, kind)}
       </td>
-      <td
-        className="hidden max-w-[10rem] truncate py-2.5 pr-3 font-mono text-xs text-muted-foreground xl:table-cell"
-        title={row.request_id ?? undefined}
-      >
-        {truncateRequestId(row.request_id)}
-      </td>
-      <td className="hidden max-w-[8rem] truncate py-2.5 pr-0 font-mono text-xs text-muted-foreground lg:table-cell">
-        {row.error_code ?? "—"}
+      <td className="py-2.5 pr-0">
+        {row.request_id ? (
+          <div className="flex items-center gap-1">
+            <code
+              className="max-w-[10rem] truncate font-mono text-xs text-muted-foreground"
+              title={row.request_id}
+            >
+              {truncateRequestId(row.request_id)}
+            </code>
+            <CopyButton
+              copied={copiedId === copyId}
+              onCopy={() => onCopy(copyId, row.request_id!)}
+              copyLabel={t("dashboard.usage.copyRequestId")}
+              copiedLabel={t("dashboard.usage.copiedRequestId")}
+              size="icon"
+            />
+          </div>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
       </td>
     </tr>
-  );
-}
-
-function KindBadge({
-  kind,
-  t,
-}: {
-  kind: UsageKind;
-  t: (key: string) => string;
-}) {
-  const label =
-    kind === "image"
-      ? t("dashboard.usage.kindImage")
-      : t("dashboard.usage.kindChat");
-
-  if (kind === "image") {
-    return (
-      <Badge variant="outline" className="gap-1 whitespace-nowrap">
-        <ImageIcon className="h-3 w-3" />
-        {label}
-      </Badge>
-    );
-  }
-
-  return (
-    <Badge variant="outline" className="gap-1 whitespace-nowrap">
-      <MessageSquare className="h-3 w-3" />
-      {label}
-    </Badge>
   );
 }
 
@@ -265,15 +270,30 @@ function StatusBadge({
   status: string;
   t: (key: string) => string;
 }) {
-  const tone = toneForStatus(status);
-  const label =
-    tone === "success"
-      ? t("dashboard.usage.statusSucceeded")
-      : t("dashboard.usage.statusFailed");
+  const tone = usageStatusTone(status);
+  const label = statusLabel(status, tone, t);
+
   if (tone === "success") {
     return <Badge variant="success">{label}</Badge>;
   }
+  if (tone === "muted") {
+    return <Badge variant="secondary">{label}</Badge>;
+  }
   return <Badge variant="destructive">{label}</Badge>;
+}
+
+function statusLabel(
+  status: string,
+  tone: ReturnType<typeof usageStatusTone>,
+  t: (key: string) => string
+): string {
+  if (tone === "success") {
+    return t("dashboard.usage.statusSucceeded");
+  }
+  if (tone === "muted") {
+    return t("dashboard.usage.statusPending");
+  }
+  return status || t("dashboard.usage.statusFailed");
 }
 
 function EmptyState({ t }: { t: (key: string) => string }) {
@@ -282,27 +302,20 @@ function EmptyState({ t }: { t: (key: string) => string }) {
       <div className="grid h-10 w-10 place-items-center rounded-full bg-muted text-muted-foreground">
         <Gauge className="h-5 w-5" />
       </div>
-      <p className="max-w-sm text-sm text-muted-foreground">
+      <p className="max-w-sm text-sm font-medium text-foreground">
         {t("dashboard.usage.emptyTitle")}
       </p>
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        <Button asChild size="sm" variant="outline">
-          <Link href="/dashboard/playground">{t("common.chatPlayground")}</Link>
-        </Button>
-        <Button asChild size="sm" variant="outline">
-          <Link href="/dashboard/image-playground">
-            {t("common.imagePlayground")}
-          </Link>
-        </Button>
-      </div>
+      <p className="max-w-sm text-sm text-muted-foreground">
+        {t("dashboard.usage.emptyHint")}
+      </p>
+      <Button asChild size="sm">
+        <Link href="/dashboard/playground">{t("common.chatPlayground")}</Link>
+      </Button>
     </div>
   );
 }
 
-function truncateRequestId(requestId: string | null | undefined) {
-  if (!requestId) return "—";
+function truncateRequestId(requestId: string) {
   if (requestId.length <= 16) return requestId;
   return `${requestId.slice(0, 8)}...${requestId.slice(-6)}`;
 }
-
-export type { UsageState };

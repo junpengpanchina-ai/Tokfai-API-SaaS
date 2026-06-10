@@ -719,9 +719,13 @@ export const messages = {
         title: "Usage",
         subtitle:
           "Review API requests, models, status, token counts, and credits charged for your account.",
+        statRequests24h: "Requests (24h)",
+        statRequests7d: "Requests (7d)",
+        statTokens7d: "Tokens (7d)",
+        statCredits7d: "Credits used (7d)",
         howItWorksTitle: "Reading this page",
         howItWorksItem1:
-          "Each row is one API request with model, status, credits charged, and API key prefix.",
+          "Each row is one API request with model, route, status, tokens, credits charged, and request_id.",
         howItWorksItem2:
           "Chat rows show prompt, completion, and total tokens. Image rows show credits per generation.",
         howItWorksItem3:
@@ -731,9 +735,11 @@ export const messages = {
         recentRequestsDesc:
           "Last 50 entries, newest first. Run a request in the Chat Playground or Image Playground to generate more.",
         loadError: "Could not load usage",
+        loadErrorDesc: "Usage logs could not be loaded right now. Please try again later.",
         colWhen: "When",
         colType: "Type",
         colModel: "Model",
+        colRoute: "Route",
         colApiKeyPrefix: "API Key prefix",
         colStatus: "Status",
         colPrompt: "Prompt",
@@ -742,14 +748,18 @@ export const messages = {
         colCredits: "Credits charged",
         colRequestId: "Request ID",
         colRequestIdHint: "Use when contacting support to trace a request",
+        copyRequestId: "Copy request ID",
+        copiedRequestId: "Copied",
         colError: "Error code",
         kindChat: "Chat",
         kindImage: "Image",
         statusSucceeded: "succeeded",
         statusFailed: "failed",
+        statusPending: "pending",
         imageGeneration: "image generation",
-        emptyTitle:
-          "No API usage yet. Send your first chat completion or image generation from the Playgrounds to see requests here.",
+        emptyTitle: "No usage records yet.",
+        emptyHint:
+          "Send a test request from Chat Playground to generate your first usage log.",
         usageQueryTitle: "Usage query",
         usageQueryDesc:
           "Query API credit usage by date range, model, status, or API key.",
@@ -2217,9 +2227,13 @@ export const messages = {
         title: "用量",
         subtitle:
           "查看 API 请求、model、状态、token 用量与 credits 消耗。",
+        statRequests24h: "最近 24 小时请求数",
+        statRequests7d: "最近 7 天请求数",
+        statTokens7d: "最近 7 天 tokens",
+        statCredits7d: "最近 7 天 credits 消耗",
         howItWorksTitle: "如何阅读本页",
         howItWorksItem1:
-          "每一行对应一次 API 请求，包含 model、状态、扣除积分与 API Key 前缀。",
+          "每一行对应一次 API 请求，包含 model、route、状态、tokens、credits_charged 与 request_id。",
         howItWorksItem2:
           "对话行展示 prompt / completion / total tokens；图像行展示每次生成的 credits。",
         howItWorksItem3:
@@ -2229,9 +2243,11 @@ export const messages = {
         recentRequestsDesc:
           "最近 50 条，按时间倒序。在 Chat Playground 或 Image Playground 发起请求以产生更多记录。",
         loadError: "无法加载用量",
+        loadErrorDesc: "暂时无法读取 usage_logs，请稍后重试。",
         colWhen: "时间",
         colType: "类型",
         colModel: "Model",
+        colRoute: "Route",
         colApiKeyPrefix: "API Key 前缀",
         colStatus: "状态",
         colPrompt: "Prompt",
@@ -2240,14 +2256,17 @@ export const messages = {
         colCredits: "扣除积分",
         colRequestId: "请求 ID",
         colRequestIdHint: "联系支持排查问题时提供",
+        copyRequestId: "复制 request_id",
+        copiedRequestId: "已复制",
         colError: "错误码",
         kindChat: "对话",
         kindImage: "图像",
         statusSucceeded: "成功",
         statusFailed: "失败",
+        statusPending: "待处理",
         imageGeneration: "image generation",
-        emptyTitle:
-          "暂无 API 用量。在 Playground 发送第一次对话或图像生成后，记录会显示在这里。",
+        emptyTitle: "暂无用量记录。",
+        emptyHint: "建议先去 Playground 测试一次，成功调用后会出现在这里。",
         usageQueryTitle: "消耗查询",
         usageQueryDesc: "按日期、模型、状态或 API Key 查询积分消耗。",
         startDate: "开始日期",

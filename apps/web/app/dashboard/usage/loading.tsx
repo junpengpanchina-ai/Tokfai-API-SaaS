@@ -6,14 +6,27 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+function StatSkeleton() {
+  return (
+    <div className="rounded-lg border px-4 py-5">
+      <div className="h-3 w-24 animate-pulse rounded bg-muted" />
+      <div className="mt-3 h-8 w-16 animate-pulse rounded bg-muted" />
+    </div>
+  );
+}
+
 export default function UsageLoading() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Usage</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Loading your recent API calls...
-        </p>
+        <div className="h-9 w-32 animate-pulse rounded bg-muted" />
+        <div className="mt-2 h-4 w-80 max-w-full animate-pulse rounded bg-muted" />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <StatSkeleton key={index} />
+        ))}
       </div>
 
       <Card>
@@ -23,49 +36,21 @@ export default function UsageLoading() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto -mx-1 px-1">
-            <table className="w-full min-w-[640px] text-sm">
+            <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-                  <th className="py-2 pr-3 font-medium">When</th>
-                  <th className="py-2 pr-3 font-medium">Type</th>
-                  <th className="py-2 pr-3 font-medium">Model</th>
-                  <th className="py-2 pr-3 font-medium">Status</th>
-                  <th className="hidden py-2 pr-3 text-right font-medium md:table-cell">
-                    Prompt
-                  </th>
-                  <th className="hidden py-2 pr-3 text-right font-medium lg:table-cell">
-                    Completion
-                  </th>
-                  <th className="hidden py-2 pr-3 text-right font-medium sm:table-cell">
-                    Total
-                  </th>
-                  <th className="py-2 pr-3 text-right font-medium">Credits</th>
-                  <th className="hidden py-2 pr-3 font-medium xl:table-cell">
-                    Request ID
-                  </th>
-                  <th className="hidden py-2 pr-0 font-medium lg:table-cell">
-                    Error
-                  </th>
+                  {Array.from({ length: 9 }).map((_, index) => (
+                    <th key={index} className="py-2 pr-3 font-medium">
+                      <div className="h-3 w-16 animate-pulse rounded bg-muted" />
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {Array.from({ length: 5 }).map((_, index) => (
                   <tr key={index} className="border-b last:border-0">
-                    {Array.from({ length: 10 }).map((__, cellIndex) => (
-                      <td
-                        key={cellIndex}
-                        className={`py-3 pr-3 ${
-                          cellIndex === 4
-                            ? "hidden md:table-cell"
-                            : cellIndex === 5 || cellIndex === 9
-                              ? "hidden lg:table-cell"
-                              : cellIndex === 6
-                                ? "hidden sm:table-cell"
-                                : cellIndex === 8
-                                  ? "hidden xl:table-cell"
-                                  : ""
-                        }`}
-                      >
+                    {Array.from({ length: 9 }).map((__, cellIndex) => (
+                      <td key={cellIndex} className="py-3 pr-3">
                         <div className="h-4 w-20 animate-pulse rounded bg-muted" />
                       </td>
                     ))}
