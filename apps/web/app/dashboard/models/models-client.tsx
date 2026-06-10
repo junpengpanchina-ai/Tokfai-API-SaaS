@@ -26,9 +26,7 @@ import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
 import {
   buildPackageUsageEstimates,
-  formatCreditsEstimate,
   getDefaultAvailableImageModel,
-  resolveImageCreditsPerGeneration,
 } from "@/lib/model-cost-estimate";
 import { DASHBOARD_CATALOG_MODELS } from "@/lib/model-catalog";
 import {
@@ -36,7 +34,6 @@ import {
   summarizeModelsCatalog,
   type ModelsTableRow,
 } from "@/lib/models-page";
-import { catalogPricingByModelId } from "@/lib/model-pricing-display";
 
 const CHAT_COMPLETIONS_CURL = `curl https://api.tokfai.com/v1/chat/completions \\
   -H "Authorization: Bearer sk-tokfai_xxx" \\
@@ -87,19 +84,6 @@ export function ModelsClient({
   const packageRows = buildPackageUsageEstimates(catalogPricing, t);
 
   const defaultImage = getDefaultAvailableImageModel();
-  const pricingByModelId = catalogPricingByModelId(catalogPricing);
-  const defaultImageCredits = defaultImage
-    ? resolveImageCreditsPerGeneration(
-        defaultImage,
-        pricingByModelId.get(defaultImage.id) ?? null
-      )
-    : null;
-  const packageImageColLabel =
-    defaultImageCredits != null
-      ? formatMessage(t("dashboard.models.colPackageImages"), {
-          credits: formatCreditsEstimate(defaultImageCredits),
-        })
-      : t("dashboard.models.colPackageImagesFallback");
 
   return (
     <div className="flex flex-col gap-6">
@@ -119,8 +103,12 @@ export function ModelsClient({
             {t("dashboard.models.priceDisclaimerTitle")}
           </CardTitle>
         </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          {t("dashboard.models.priceDisclaimer")}
+        <CardContent className="flex flex-col gap-2 text-sm text-muted-foreground">
+          <p>{t("dashboard.models.priceDisclaimer")}</p>
+          <p>{t("dashboard.models.priceDisclaimerBudget")}</p>
+          <p className="font-medium text-foreground/90">
+            {t("dashboard.models.salesTip")}
+          </p>
         </CardContent>
       </Card>
 
@@ -233,7 +221,7 @@ export function ModelsClient({
             })}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -245,16 +233,13 @@ export function ModelsClient({
                     {t("dashboard.models.colPackageCredits")}
                   </th>
                   <th className="py-2 pr-4 font-medium">
-                    {t("dashboard.models.colPackageShortChats")}
-                  </th>
-                  <th className="py-2 pr-4 font-medium">
-                    {packageImageColLabel}
+                    {t("dashboard.models.colPackageUsageFit")}
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {packageRows.map((plan) => (
-                  <tr key={plan.planLabel} className="border-b last:border-0">
+                  <tr key={plan.planId} className="border-b last:border-0">
                     <td className="py-2 pr-4 font-medium">
                       {plan.planLabel}
                       <span className="ml-1 text-xs text-muted-foreground">
@@ -262,19 +247,21 @@ export function ModelsClient({
                       </span>
                     </td>
                     <td className="py-2 pr-4 font-mono text-xs">
-                      {plan.credits.toLocaleString(locale === "zh" ? "zh-CN" : "en-US")}
+                      {plan.credits.toLocaleString(
+                        locale === "zh" ? "zh-CN" : "en-US"
+                      )}
                     </td>
                     <td className="py-2 pr-4 text-muted-foreground">
-                      {plan.shortChatCountLabel}
-                    </td>
-                    <td className="py-2 pr-4 text-muted-foreground">
-                      {plan.imageGenerationCountLabel}
+                      {plan.usageFitLabel}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          <p className="text-sm text-muted-foreground">
+            {t("dashboard.models.packageEstimateRoughNote")}
+          </p>
         </CardContent>
       </Card>
 

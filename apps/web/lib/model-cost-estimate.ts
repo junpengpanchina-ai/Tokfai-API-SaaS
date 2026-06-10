@@ -41,11 +41,11 @@ export const ESTIMATE_RECHARGE_PLANS: EstimateRechargePlan[] = [
 ];
 
 export interface PackageUsageEstimateRow {
+  planId: string;
   planLabel: string;
   amountLabel: string;
   credits: number;
-  shortChatCountLabel: string;
-  imageGenerationCountLabel: string;
+  usageFitLabel: string;
 }
 
 export function getDefaultAvailableImageModel(): ModelCatalogEntry | null {
@@ -129,13 +129,36 @@ export function formatCreditsEstimate(value: number): string {
   return fixed.replace(/\.?0+$/, "");
 }
 
-export function formatYuanEstimate(credits: number): string {
-  if (!Number.isFinite(credits) || credits <= 0) return "≈¥0";
+/** Soft RMB for image models — 1–2 decimal places, never micro-yuan. */
+export function formatImageYuanSoft(credits: number): string {
+  if (!Number.isFinite(credits) || credits <= 0) return "—";
   const yuan = credits * YUAN_PER_CREDIT;
-  if (yuan >= 0.01) return `≈¥${yuan.toFixed(2)}`;
-  const fixed = yuan.toFixed(6);
-  const trimmed = fixed.replace(/0+$/, "").replace(/\.$/, "");
-  return `≈¥${trimmed}`;
+  if (yuan >= 10) return `约 ¥${yuan.toFixed(1)}`;
+  if (yuan >= 1) return `约 ¥${yuan.toFixed(2)}`;
+  const fixed = yuan.toFixed(2);
+  const trimmed = fixed.replace(/\.?0+$/, "");
+  return `约 ¥${trimmed}`;
+}
+
+export type ChatBudgetLevel = "veryLow" | "low" | "medium" | "high";
+
+export function resolveChatBudgetLevel(credits: number): ChatBudgetLevel {
+  if (!Number.isFinite(credits) || credits <= 0) return "veryLow";
+  if (credits < 0.01) return "veryLow";
+  if (credits < 0.1) return "low";
+  if (credits < 1) return "medium";
+  return "high";
+}
+
+/** Bucket per-call credits into readable ranges (budget reference, not exact billing). */
+export function formatChatCreditsSoftRange(credits: number): string {
+  if (!Number.isFinite(credits) || credits <= 0) return "0.001～0.02";
+  if (credits < 0.01) return "0.001～0.02";
+  if (credits < 0.1) return "0.01～0.1";
+  if (credits < 1) return "0.1～1";
+  const low = formatCreditsEstimate(Math.max(0.1, credits * 0.5));
+  const high = formatCreditsEstimate(credits * 1.5);
+  return `${low}～${high}`;
 }
 
 export function formatGenerationCount(planCredits: number, perGeneration: number): number {
@@ -144,65 +167,23 @@ export function formatGenerationCount(planCredits: number, perGeneration: number
 }
 
 export function buildPackageUsageEstimates(
-  catalogPricing: CatalogModelPricingItem[],
+  _catalogPricing: CatalogModelPricingItem[],
   t: (key: string) => string
 ): PackageUsageEstimateRow[] {
-  const pricingByModelId = new Map(
-    catalogPricing.map((item) => [item.model_id, item])
-  );
-
-  const defaultChat = getDefaultChatModel();
-  const defaultImage = getDefaultAvailableImageModel();
-
-  const chatPricing = defaultChat
-    ? resolveChatCreditsPerMillion(
-        defaultChat,
-        pricingByModelId.get(defaultChat.id) ?? null
-      )
-    : null;
-
-  const shortChatCredits = chatPricing
-    ? chatCreditsForTokens(
-        chatPricing.inputPerMillion,
-        chatPricing.outputPerMillion,
-        SHORT_CHAT_INPUT_TOKENS,
-        SHORT_CHAT_OUTPUT_TOKENS
-      )
-    : null;
-
-  const imageCredits = defaultImage
-    ? resolveImageCreditsPerGeneration(
-        defaultImage,
-        pricingByModelId.get(defaultImage.id) ?? null
-      )
-    : null;
-
   return ESTIMATE_RECHARGE_PLANS.map((plan) => {
-    const shortChatCountLabel =
-      shortChatCredits != null && shortChatCredits > 0
-        ? t("dashboard.models.packageShortChatCount").replace(
-            "{count}",
-            String(Math.floor(plan.credits / shortChatCredits))
-          )
-        : t("dashboard.models.packageEstimateUnavailable");
-
-    const imageCount =
-      imageCredits != null ? formatGenerationCount(plan.credits, imageCredits) : 0;
-
-    const imageGenerationCountLabel =
-      imageCredits != null && imageCredits > 0
-        ? t("dashboard.models.packageImageCount").replace(
-            "{count}",
-            String(imageCount)
-          )
-        : t("dashboard.models.packageEstimateUnavailable");
+    const fitKey = `dashboard.models.packageUsageFit.${plan.planId}`;
+    const fitLabel = t(fitKey);
+    const usageFitLabel =
+      fitLabel === fitKey
+        ? t("dashboard.models.packageEstimateUnavailable")
+        : fitLabel;
 
     return {
+      planId: plan.planId,
       planLabel: plan.label,
       amountLabel: plan.amountLabel,
       credits: plan.credits,
-      shortChatCountLabel,
-      imageGenerationCountLabel,
+      usageFitLabel,
     };
   });
 }

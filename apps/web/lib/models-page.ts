@@ -20,10 +20,12 @@ import {
 import {
   chatCreditsForTokens,
   ESTIMATE_RECHARGE_PLANS,
+  formatChatCreditsSoftRange,
   formatCreditsEstimate,
   formatGenerationCount,
-  formatYuanEstimate,
+  formatImageYuanSoft,
   LONG_CHAT_INPUT_TOKENS,
+  resolveChatBudgetLevel,
   LONG_CHAT_OUTPUT_TOKENS,
   resolveChatCreditsPerMillion,
   resolveImageCreditsPerGeneration,
@@ -146,16 +148,15 @@ function resolveCostEstimates(
       LONG_CHAT_OUTPUT_TOKENS
     );
 
+    const budgetLevel = resolveChatBudgetLevel(shortCredits);
+    const budgetKey = `dashboard.models.chatBudgetLevel.${budgetLevel}`;
+
     return {
       shortEstimate: t("dashboard.models.chatEstimateShort")
-        .replace("{credits}", formatCreditsEstimate(shortCredits))
-        .replace("{yuan}", formatYuanEstimate(shortCredits)),
+        .replace("{range}", formatChatCreditsSoftRange(shortCredits)),
       longEstimate: t("dashboard.models.chatEstimateLong")
-        .replace("{credits}", formatCreditsEstimate(longCredits))
-        .replace("{yuan}", formatYuanEstimate(longCredits)),
-      approxRmb: t("dashboard.models.chatApproxRmb")
-        .replace("{shortYuan}", formatYuanEstimate(shortCredits))
-        .replace("{longYuan}", formatYuanEstimate(longCredits)),
+        .replace("{range}", formatChatCreditsSoftRange(longCredits)),
+      approxRmb: t(budgetKey),
     };
   }
 
@@ -171,11 +172,11 @@ function resolveCostEstimates(
 
     const perImageLabel = t("dashboard.models.imagePerGeneration")
       .replace("{credits}", formatCreditsEstimate(perImage))
-      .replace("{yuan}", formatYuanEstimate(perImage));
+      .replace("{yuan}", formatImageYuanSoft(perImage));
 
     const packageLines = ESTIMATE_RECHARGE_PLANS.map((plan) => {
       const count = formatGenerationCount(plan.credits, perImage);
-      return t("dashboard.models.imagePlanGenerations")
+      return t("dashboard.models.imagePlanGenerationsSoft")
         .replace("{plan}", plan.label)
         .replace("{amount}", plan.amountLabel)
         .replace("{count}", String(count));
@@ -184,7 +185,7 @@ function resolveCostEstimates(
     return {
       shortEstimate: perImageLabel,
       longEstimate: packageLines.join("\n"),
-      approxRmb: formatYuanEstimate(perImage),
+      approxRmb: formatImageYuanSoft(perImage),
     };
   }
 
@@ -194,11 +195,11 @@ function resolveCostEstimates(
     if (videoCredits != null && videoCredits > 0) {
       const unitLabel = t("dashboard.models.videoPerUnit")
         .replace("{credits}", formatCreditsEstimate(videoCredits))
-        .replace("{yuan}", formatYuanEstimate(videoCredits));
+        .replace("{yuan}", formatImageYuanSoft(videoCredits));
       return {
         shortEstimate: unitLabel,
         longEstimate: unitLabel,
-        approxRmb: formatYuanEstimate(videoCredits),
+        approxRmb: formatImageYuanSoft(videoCredits),
       };
     }
 
