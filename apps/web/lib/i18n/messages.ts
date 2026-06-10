@@ -454,21 +454,40 @@ export const messages = {
         viewDocs: "View docs",
       },
       playground: {
-        title: "Chat Playground",
+        title: "Playground",
         subtitle:
-          "Chat Playground only supports chat models. Send a single-turn completion through the Tokfai API using your own sk-tokfai_ key — the same path external clients use, so normal billing applies.",
+          "Choose a model, send a test request, and verify the Tokfai API works.",
         forImageModels: "For image models, use",
-        request: "Request",
+        request: "Test request",
         requestDesc:
-          "One user message, non-streaming. Successful calls are recorded in Usage and debited from Credits.",
-        settings: "Settings",
-        settingsDesc:
-          "Chat models only. The selected model is passed in the JSON body to api.tokfai.com.",
-        modelDescription: "Model description",
-        running: "Running…",
-        run: "Run",
+          "Paste your API key, pick a chat model, and send one non-streaming message.",
+        model: "Model",
+        prompt: "Prompt",
+        promptPlaceholder:
+          "Enter test content, e.g. introduce Tokfai API in one sentence.",
+        presetShort: "Quick test",
+        presetCode: "Explain code",
+        presetBusiness: "Marketing copy",
+        presetSummary: "Chinese summary",
+        presetShortPrompt:
+          "Introduce Tokfai API in one sentence.",
+        presetCodePrompt:
+          "Explain what a REST API is in simple terms and give a curl example.",
+        presetBusinessPrompt:
+          "Write SaaS marketing copy under 100 words highlighting ease of use and pay-as-you-go billing.",
+        presetSummaryPrompt:
+          "Summarize in Chinese: what value does an OpenAI-compatible API bring to developers?",
+        running: "Sending…",
+        run: "Send test",
+        costHint:
+          "Playground calls consume credits. Check your balance first. Actual charges are recorded in the credits ledger.",
+        viewCreditsLedger: "View credits ledger",
+        productionKeyHint:
+          "For production, create and copy your sk-tokfai key on the API Keys page.",
+        noActiveKeyHint:
+          "You don't have an active API key yet. Create one first.",
+        createApiKey: "Create API key",
         needKey: "Need a key?",
-        createApiKey: "Create an API key",
         needCredits: "Need more credits?",
         topUp: "Top up",
         apiKey: "API key",
@@ -481,24 +500,52 @@ export const messages = {
         pasteYourKey: "Paste your key",
         orCreateOne: "create one",
         fullApiKey: "Full API key",
+        showKey: "Show",
+        hideKey: "Hide",
+        pasteKeySecurityHint:
+          "The key is kept in this page only and is not saved. Do not use on shared devices.",
         selectOrPasteApiKey: "Select or paste an API key.",
         apiKeyLoadTimedOut:
           "Timed out loading the selected API key. Paste the full secret or try again.",
         sentAsBearer:
           "Sent as Authorization: Bearer sk-tokfai_…. Never logged or persisted by this page.",
         waitingForModel: "Waiting for the model…",
+        resultTitle: "Result",
+        requestStatus: "Status",
+        statusSuccess: "Success",
+        statusFailed: "Failed",
+        modelId: "Model ID",
+        responseContent: "Response",
+        requestId: "request_id",
+        createdAt: "created_at",
+        inputTokens: "input tokens",
+        outputTokens: "output tokens",
+        totalTokens: "total tokens",
+        creditsCharged: "credits charged",
+        usageFallback:
+          "Usage for this call is recorded in the credits ledger at /dashboard/credits.",
         requestFailed: "Request failed",
-        errorCode: "Error code:",
-        errorMessage: "Error message:",
-        addCredits: "Add credits",
-        responsePlaceholder: "Response will appear here.",
-        recordedInUsage:
-          "This request has been recorded. View it in Usage and Credits.",
-        creditsChargedApprox: "About {credits} were charged for this request.",
-        balanceUpdatedHint:
-          "Balance updated. View details in Usage and Credits.",
-        successNoCreditsHint:
-          "Request succeeded. Charge details appear in Usage.",
+        errorCode: "Error code",
+        errorMessage: "Message",
+        addCredits: "Top up credits",
+        responsePlaceholder: "The model response will appear here after you send.",
+        viewModels: "View models",
+        viewDocs: "View docs",
+        errors: {
+          missingToken:
+            "Missing API key. Create and paste an active key first.",
+          invalidToken:
+            "API key is invalid or revoked. Create a new key.",
+          insufficientCredits:
+            "Insufficient credits. Top up and try again.",
+          modelNotFound:
+            "Model not found or not available. Try another model.",
+          upstreamError:
+            "Upstream model is temporarily unavailable. Retry later or switch models.",
+          rateLimited: "Too many requests. Please try again later.",
+          unknown: "Request failed. Please try again later.",
+          missingPrompt: "Please enter a prompt.",
+        },
       },
       imagePlayground: {
         title: "Image Playground",
@@ -1889,24 +1936,41 @@ export const messages = {
         viewDocs: "查看文档",
       },
       playground: {
-        title: "Chat Playground",
+        title: "Playground",
         subtitle:
-          "Chat Playground 仅支持对话模型。使用你的 sk-tokfai_ 密钥发送单轮对话——与外部客户端相同路径，按正常计费规则扣费。",
+          "选择模型，发送一次测试请求，验证 Tokfai API 是否正常工作。",
         forImageModels: "图像模型请使用",
-        request: "请求",
+        request: "测试请求",
         requestDesc:
-          "单条 user 消息，非流式。成功调用会记入 Usage 并从 Credits 扣费。",
-        settings: "设置",
-        settingsDesc:
-          "仅对话模型。所选 model 通过 JSON body 发送至 api.tokfai.com。",
-        modelDescription: "模型说明",
-        running: "运行中…",
-        run: "运行",
+          "粘贴 API Key，选择对话模型，发送一条非流式消息进行测试。",
+        model: "模型",
+        prompt: "Prompt",
+        promptPlaceholder:
+          "请输入测试内容，例如：用一句话介绍 Tokfai API。",
+        presetShort: "简短测试",
+        presetCode: "代码解释",
+        presetBusiness: "商业文案",
+        presetSummary: "中文总结",
+        presetShortPrompt: "用一句话介绍 Tokfai API。",
+        presetCodePrompt:
+          "用简单的语言解释什么是 REST API，并给一个 curl 示例。",
+        presetBusinessPrompt:
+          "写一段 100 字以内的 SaaS 产品推广文案，强调易用与按量计费。",
+        presetSummaryPrompt:
+          "请用中文总结：OpenAI 兼容 API 对开发者有什么价值。",
+        running: "发送中…",
+        run: "发送测试",
+        costHint:
+          "Playground 会消耗 credits，请先确认余额。实际扣费以积分账本为准。",
+        viewCreditsLedger: "查看积分账本",
+        productionKeyHint:
+          "用于生产接入时，请在 API Keys 页面创建并复制 sk-tokfai 密钥。",
+        noActiveKeyHint: "你还没有可用 API Key，请先创建 API Key。",
+        createApiKey: "创建 API Key",
         needKey: "还没有密钥？",
-        createApiKey: "创建 API 密钥",
         needCredits: "积分不足？",
         topUp: "去充值",
-        apiKey: "API 密钥",
+        apiKey: "API Key",
         selectKey: "选择密钥",
         pasteKey: "粘贴密钥",
         yourActiveKeys: "你的活跃密钥",
@@ -1914,22 +1978,48 @@ export const messages = {
         noRevealableKeys: "没有可自动加载的密钥。",
         pasteYourKey: "粘贴密钥",
         orCreateOne: "创建一个",
-        fullApiKey: "完整 API 密钥",
-        selectOrPasteApiKey: "请选择或粘贴 API 密钥",
+        fullApiKey: "完整 API Key",
+        showKey: "显示",
+        hideKey: "隐藏",
+        pasteKeySecurityHint:
+          "密钥仅保存在当前页面 state，不会写入数据库。请勿在公共设备保存密钥。",
+        selectOrPasteApiKey: "请选择或粘贴 API Key。",
         apiKeyLoadTimedOut:
-          "加载所选 API 密钥超时。请粘贴完整 secret 或稍后重试。",
+          "加载所选 API Key 超时。请粘贴完整 secret 或稍后重试。",
         sentAsBearer:
           "以 Authorization: Bearer sk-tokfai_… 发送。本页不会记录或持久化。",
         waitingForModel: "等待模型响应…",
+        resultTitle: "结果",
+        requestStatus: "请求状态",
+        statusSuccess: "成功",
+        statusFailed: "失败",
+        modelId: "模型 ID",
+        responseContent: "回复内容",
+        requestId: "request_id",
+        createdAt: "created_at",
+        inputTokens: "input tokens",
+        outputTokens: "output tokens",
+        totalTokens: "total tokens",
+        creditsCharged: "credits charged",
+        usageFallback:
+          "本次消耗请以 /dashboard/credits 积分账本为准。",
         requestFailed: "请求失败",
-        errorCode: "错误码：",
-        errorMessage: "错误信息：",
-        addCredits: "充值积分",
-        responsePlaceholder: "响应将显示在这里。",
-        recordedInUsage: "本次请求已记录，可在 Usage 与 Credits 中查看。",
-        creditsChargedApprox: "本次扣除 {credits}。",
-        balanceUpdatedHint: "余额已更新，可到 Usage / Credits 查看。",
-        successNoCreditsHint: "本次请求成功，扣费记录可到 Usage 查看。",
+        errorCode: "错误码",
+        errorMessage: "提示",
+        addCredits: "去充值",
+        responsePlaceholder: "发送测试后，模型回复将显示在这里。",
+        viewModels: "查看模型",
+        viewDocs: "查看文档",
+        errors: {
+          missingToken: "缺少 API Key，请先创建并选择可用密钥。",
+          invalidToken: "API Key 无效或已吊销，请重新创建。",
+          insufficientCredits: "余额不足，请充值后再试。",
+          modelNotFound: "模型不存在或暂未开放，请换一个模型。",
+          upstreamError: "上游模型暂时异常，请稍后重试或切换模型。",
+          rateLimited: "请求过快，请稍后再试。",
+          unknown: "请求失败，请稍后重试。",
+          missingPrompt: "请输入测试内容。",
+        },
       },
       imagePlayground: {
         title: "Image Playground",
