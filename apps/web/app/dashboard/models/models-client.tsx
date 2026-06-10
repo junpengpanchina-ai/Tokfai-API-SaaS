@@ -8,6 +8,7 @@ import {
   MessageSquare,
   Terminal,
   BookOpen,
+  Info,
 } from "lucide-react";
 
 import { CodeBlock, CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
@@ -22,12 +23,20 @@ import {
 } from "@/components/ui/card";
 import type { CatalogModelPricingItem } from "@/lib/dmit/client";
 import { useI18n } from "@/lib/i18n/i18n-provider";
+import { formatMessage } from "@/lib/i18n/messages";
+import {
+  buildPackageUsageEstimates,
+  formatCreditsEstimate,
+  getDefaultAvailableImageModel,
+  resolveImageCreditsPerGeneration,
+} from "@/lib/model-cost-estimate";
 import { DASHBOARD_CATALOG_MODELS } from "@/lib/model-catalog";
 import {
   buildModelsTableRows,
   summarizeModelsCatalog,
   type ModelsTableRow,
 } from "@/lib/models-page";
+import { catalogPricingByModelId } from "@/lib/model-pricing-display";
 
 const CHAT_COMPLETIONS_CURL = `curl https://api.tokfai.com/v1/chat/completions \\
   -H "Authorization: Bearer sk-tokfai_xxx" \\
@@ -53,6 +62,13 @@ const USAGE_TIP_ICONS = {
   costSensitive: CreditCard,
 } as const;
 
+const HOW_TO_ESTIMATE_KEYS = [
+  "howToEstimateItem1",
+  "howToEstimateItem2",
+  "howToEstimateItem3",
+  "howToEstimateItem4",
+] as const;
+
 export function ModelsClient({
   catalogPricing,
 }: {
@@ -68,6 +84,22 @@ export function ModelsClient({
     t,
     locale
   );
+  const packageRows = buildPackageUsageEstimates(catalogPricing, t);
+
+  const defaultImage = getDefaultAvailableImageModel();
+  const pricingByModelId = catalogPricingByModelId(catalogPricing);
+  const defaultImageCredits = defaultImage
+    ? resolveImageCreditsPerGeneration(
+        defaultImage,
+        pricingByModelId.get(defaultImage.id) ?? null
+      )
+    : null;
+  const packageImageColLabel =
+    defaultImageCredits != null
+      ? formatMessage(t("dashboard.models.colPackageImages"), {
+          credits: formatCreditsEstimate(defaultImageCredits),
+        })
+      : t("dashboard.models.colPackageImagesFallback");
 
   return (
     <div className="flex flex-col gap-6">
@@ -79,6 +111,18 @@ export function ModelsClient({
           {t("dashboard.models.subtitle")}
         </p>
       </div>
+
+      <Card className="border-muted bg-muted/30">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Info className="h-4 w-4 shrink-0" />
+            {t("dashboard.models.priceDisclaimerTitle")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          {t("dashboard.models.priceDisclaimer")}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <OverviewStat
@@ -99,6 +143,25 @@ export function ModelsClient({
           mono
         />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("dashboard.models.howToEstimateTitle")}</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+            {HOW_TO_ESTIMATE_KEYS.map((key) => (
+              <li key={key}>{t(`dashboard.models.${key}`)}</li>
+            ))}
+          </ul>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/credits">
+              <CreditCard className="mr-1.5 h-4 w-4" />
+              {t("dashboard.models.viewCreditsLedger")}
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -134,10 +197,13 @@ export function ModelsClient({
                     {t("dashboard.models.outputPrice")}
                   </th>
                   <th className="py-2 pr-4 font-medium">
-                    {t("dashboard.models.colUnit")}
+                    {t("dashboard.models.colShortEstimate")}
                   </th>
                   <th className="py-2 pr-4 font-medium">
-                    {t("dashboard.models.colNote")}
+                    {t("dashboard.models.colLongEstimate")}
+                  </th>
+                  <th className="py-2 pr-4 font-medium">
+                    {t("dashboard.models.colApproxRmb")}
                   </th>
                 </tr>
               </thead>
@@ -150,6 +216,61 @@ export function ModelsClient({
                     onCopy={copyText}
                     t={t}
                   />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("dashboard.models.packageEstimateTitle")}</CardTitle>
+          <CardDescription>
+            {formatMessage(t("dashboard.models.packageEstimateDesc"), {
+              model: stats.defaultModelId,
+              imageModel: defaultImage?.id ?? "—",
+            })}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                  <th className="py-2 pr-4 font-medium">
+                    {t("dashboard.models.colPackagePlan")}
+                  </th>
+                  <th className="py-2 pr-4 font-medium">
+                    {t("dashboard.models.colPackageCredits")}
+                  </th>
+                  <th className="py-2 pr-4 font-medium">
+                    {t("dashboard.models.colPackageShortChats")}
+                  </th>
+                  <th className="py-2 pr-4 font-medium">
+                    {packageImageColLabel}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {packageRows.map((plan) => (
+                  <tr key={plan.planLabel} className="border-b last:border-0">
+                    <td className="py-2 pr-4 font-medium">
+                      {plan.planLabel}
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        {plan.amountLabel}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-4 font-mono text-xs">
+                      {plan.credits.toLocaleString(locale === "zh" ? "zh-CN" : "en-US")}
+                    </td>
+                    <td className="py-2 pr-4 text-muted-foreground">
+                      {plan.shortChatCountLabel}
+                    </td>
+                    <td className="py-2 pr-4 text-muted-foreground">
+                      {plan.imageGenerationCountLabel}
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -298,7 +419,7 @@ function ModelTableRow({
       <td className="py-2 pr-4">
         <StatusBadge status={row.status} t={t} />
       </td>
-      <td className="max-w-[14rem] py-2 pr-4 text-muted-foreground">
+      <td className="max-w-[12rem] py-2 pr-4 text-muted-foreground">
         {row.useCase}
       </td>
       <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">
@@ -307,11 +428,26 @@ function ModelTableRow({
       <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">
         {row.outputPrice}
       </td>
-      <td className="py-2 pr-4 text-muted-foreground">{row.unit}</td>
-      <td className="max-w-[12rem] py-2 pr-4 text-xs text-muted-foreground">
-        {row.note}
+      <td className="max-w-[14rem] py-2 pr-4 text-xs text-muted-foreground">
+        {row.shortEstimate}
       </td>
+      <td className="max-w-[14rem] py-2 pr-4 text-xs text-muted-foreground">
+        <MultilineCell text={row.longEstimate} />
+      </td>
+      <td className="py-2 pr-4 text-xs text-muted-foreground">{row.approxRmb}</td>
     </tr>
+  );
+}
+
+function MultilineCell({ text }: { text: string }) {
+  const lines = text.split("\n");
+  if (lines.length === 1) return <>{text}</>;
+  return (
+    <div className="flex flex-col gap-1">
+      {lines.map((line) => (
+        <div key={line}>{line}</div>
+      ))}
+    </div>
   );
 }
 
