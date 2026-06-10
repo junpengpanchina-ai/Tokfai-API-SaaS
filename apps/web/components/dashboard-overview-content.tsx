@@ -5,12 +5,12 @@ import {
   Activity,
   ArrowUpRight,
   BookOpen,
+  Boxes,
   CheckCircle2,
   Coins,
   CreditCard,
   ImageIcon,
   KeyRound,
-  LayoutDashboard,
   Shield,
   Terminal,
   type LucideIcon,
@@ -53,6 +53,10 @@ type OnboardingStepConfig = {
   icon: LucideIcon;
   completeWhen?: OnboardingCompleteWhen;
 };
+
+type UserPhase = "needsCredits" | "needsApiKey" | "needsFirstCall" | "returning";
+
+type OnboardingStepStatus = "completed" | "current" | "upcoming";
 
 const ONBOARDING_STEPS: OnboardingStepConfig[] = [
   {
@@ -101,42 +105,20 @@ const ONBOARDING_STEPS: OnboardingStepConfig[] = [
   },
 ];
 
-const QUICK_LINKS = [
-  {
-    href: "/dashboard/api-keys",
-    labelKey: "nav.apiKeys",
-    icon: KeyRound,
-  },
-  {
-    href: "/dashboard/docs",
-    labelKey: "nav.docs",
-    icon: BookOpen,
-  },
+const CONTINUE_LINKS = [
   {
     href: "/dashboard/playground",
-    labelKey: "nav.playground",
+    labelKey: "common.chatPlayground",
     icon: Terminal,
   },
   {
     href: "/dashboard/image-playground",
-    labelKey: "nav.imagePlayground",
+    labelKey: "common.imagePlayground",
     icon: ImageIcon,
   },
-  {
-    href: "/dashboard/usage",
-    labelKey: "nav.usage",
-    icon: Activity,
-  },
-  {
-    href: "/dashboard/credits",
-    labelKey: "nav.credits",
-    icon: CreditCard,
-  },
-  {
-    href: "/pricing",
-    labelKey: "nav.pricing",
-    icon: LayoutDashboard,
-  },
+  { href: "/dashboard/usage", labelKey: "nav.usage", icon: Activity },
+  { href: "/dashboard/credits", labelKey: "nav.credits", icon: CreditCard },
+  { href: "/dashboard/models", labelKey: "nav.models", icon: Boxes },
 ] as const;
 
 const SECURITY_ITEM_KEYS = [
@@ -154,13 +136,20 @@ export function DashboardOverviewContent({
   announcements?: PublicAnnouncement[];
 }) {
   const { t } = useI18n();
+  const phase = getUserPhase(overview);
+  const isReturning = phase === "returning";
+  const allOnboardingComplete = ONBOARDING_STEPS.every((step) =>
+    isOnboardingStepComplete(step, overview)
+  );
 
   const statCards = [
     {
       labelKey: "dashboard.overview.creditsBalance",
       subKey: overview.profileMissing
         ? "dashboard.overview.profileMissing"
-        : "dashboard.overview.creditsBalanceHint",
+        : overview.creditsBalance <= 0
+          ? "dashboard.overview.topUpToStart"
+          : "dashboard.overview.creditsBalanceHint",
       value: formatCredits(overview.creditsBalance),
       href: "/dashboard/credits",
       icon: CreditCard,
@@ -204,115 +193,43 @@ export function DashboardOverviewContent({
           {t("dashboard.overview.title")}
         </h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          {t("dashboard.overview.subtitle")}
+          {t(
+            isReturning
+              ? "dashboard.overview.subtitleReturning"
+              : "dashboard.overview.subtitle"
+          )}
         </p>
       </div>
 
       <DashboardAnnouncementsOverview announcements={announcements} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("dashboard.overview.onboardingTitle")}</CardTitle>
-          <CardDescription>{t("dashboard.overview.onboardingDesc")}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {ONBOARDING_STEPS.map((item) => (
-            <OnboardingStep
-              key={item.step}
-              item={item}
-              overview={overview}
-              t={t}
-            />
-          ))}
-        </CardContent>
-      </Card>
+      {!isReturning ? <StatePriorityBanner phase={phase} t={t} /> : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {statCards.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <Card key={stat.labelKey}>
-              <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-                <CardDescription>{t(stat.labelKey)}</CardDescription>
-                <Icon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-semibold tracking-tight">
-                  {stat.value}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {t(stat.subKey)}
-                </p>
-                <Button
-                  asChild
-                  variant="ghost"
-                  size="sm"
-                  className="mt-3 -ml-2 h-7 px-2 text-xs"
-                >
-                  <Link href={stat.href}>
-                    {t("common.open")}
-                    <ArrowUpRight className="h-3 w-3" />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+      <ContinueCard t={t} emphasize={isReturning} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("dashboard.overview.quickLinksTitle")}</CardTitle>
-          <CardDescription>{t("dashboard.overview.quickLinksDesc")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {QUICK_LINKS.map((link) => {
-              const Icon = link.icon;
-              return (
-                <Button
-                  key={link.href}
-                  asChild
-                  variant="outline"
-                  className="h-auto justify-start gap-2 px-4 py-3"
-                >
-                  <Link href={link.href}>
-                    <Icon className="h-4 w-4 shrink-0" />
-                    {t(link.labelKey)}
-                  </Link>
-                </Button>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("dashboard.overview.recentActivityTitle")}</CardTitle>
-          <CardDescription>
-            {t("dashboard.overview.recentActivityDesc")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {overview.recentActivity.length > 0 ? (
-            <div className="flex flex-col gap-4">
-              <RecentActivityTable rows={overview.recentActivity} t={t} />
-              <div className="flex justify-end">
-                <Button asChild size="sm" variant="outline">
-                  <Link href="/dashboard/usage">
-                    {t("dashboard.overview.viewAllUsage")}
-                  </Link>
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <p className="rounded-md border border-dashed bg-muted/30 px-4 py-6 text-sm text-muted-foreground">
-              {t("dashboard.overview.recentActivityEmpty")}
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      {isReturning ? (
+        <>
+          <StatCards statCards={statCards} t={t} />
+          <RecentActivityCard overview={overview} t={t} />
+          <OnboardingSection
+            overview={overview}
+            isReturning
+            allComplete={allOnboardingComplete}
+            t={t}
+          />
+        </>
+      ) : (
+        <>
+          <OnboardingSection
+            overview={overview}
+            isReturning={false}
+            allComplete={allOnboardingComplete}
+            t={t}
+          />
+          <StatCards statCards={statCards} t={t} />
+          <RecentActivityCard overview={overview} t={t} />
+        </>
+      )}
 
       <Card className="border-muted bg-muted/30">
         <CardHeader className="pb-3">
@@ -338,8 +255,35 @@ export function DashboardOverviewContent({
   );
 }
 
+function getUserPhase(overview: DashboardOverviewData): UserPhase {
+  if (overview.creditsBalance <= 0) return "needsCredits";
+  if (!overview.hasActiveApiKey) return "needsApiKey";
+  if (
+    !overview.hasChatPlaygroundSuccess &&
+    !overview.hasImagePlaygroundSuccess
+  ) {
+    return "needsFirstCall";
+  }
+  return "returning";
+}
+
 function isOnboardingStepComplete(
-  completeWhen: OnboardingCompleteWhen | undefined,
+  item: OnboardingStepConfig,
+  overview: DashboardOverviewData
+): boolean {
+  if (item.completeWhen) {
+    return isCompleteByFlag(item.completeWhen, overview);
+  }
+  if (item.step === 3) {
+    return (
+      overview.hasChatPlaygroundSuccess || overview.hasImagePlaygroundSuccess
+    );
+  }
+  return false;
+}
+
+function isCompleteByFlag(
+  completeWhen: OnboardingCompleteWhen,
   overview: DashboardOverviewData
 ): boolean {
   switch (completeWhen) {
@@ -356,6 +300,292 @@ function isOnboardingStepComplete(
   }
 }
 
+function getOnboardingStepStatus(
+  item: OnboardingStepConfig,
+  overview: DashboardOverviewData
+): OnboardingStepStatus {
+  if (isOnboardingStepComplete(item, overview)) return "completed";
+  const firstIncomplete = ONBOARDING_STEPS.find(
+    (step) => !isOnboardingStepComplete(step, overview)
+  );
+  if (firstIncomplete?.step === item.step) return "current";
+  return "upcoming";
+}
+
+function StatePriorityBanner({
+  phase,
+  t,
+}: {
+  phase: Exclude<UserPhase, "returning">;
+  t: (key: string) => string;
+}) {
+  const config = {
+    needsCredits: {
+      titleKey: "dashboard.overview.stateNeedsCreditsTitle",
+      bodyKey: "dashboard.overview.stateNeedsCreditsBody",
+      actionKey: "dashboard.overview.stateNeedsCreditsAction",
+      href: "/pricing",
+    },
+    needsApiKey: {
+      titleKey: "dashboard.overview.stateNeedsApiKeyTitle",
+      bodyKey: "dashboard.overview.stateNeedsApiKeyBody",
+      actionKey: "dashboard.overview.stateNeedsApiKeyAction",
+      href: "/dashboard/api-keys",
+    },
+    needsFirstCall: {
+      titleKey: "dashboard.overview.stateNeedsFirstCallTitle",
+      bodyKey: "dashboard.overview.stateNeedsFirstCallBody",
+      actionKey: null,
+      href: null,
+    },
+  }[phase];
+
+  return (
+    <Card className="border-primary/30 bg-primary/5">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">{t(config.titleKey)}</CardTitle>
+        <CardDescription>{t(config.bodyKey)}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-wrap gap-2">
+        {phase === "needsFirstCall" ? (
+          <>
+            <Button asChild size="sm">
+              <Link href="/dashboard/docs">
+                {t("dashboard.overview.stateNeedsFirstCallQuickstart")}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/playground">
+                {t("dashboard.overview.stateNeedsFirstCallPlayground")}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/image-playground">
+                {t("common.imagePlayground")}
+              </Link>
+            </Button>
+          </>
+        ) : config.href && config.actionKey ? (
+          <Button asChild size="sm">
+            <Link href={config.href}>{t(config.actionKey)}</Link>
+          </Button>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ContinueCard({
+  t,
+  emphasize,
+}: {
+  t: (key: string) => string;
+  emphasize?: boolean;
+}) {
+  return (
+    <Card className={emphasize ? "border-primary/20 shadow-sm" : undefined}>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">
+          {t("dashboard.overview.continueTitle")}
+        </CardTitle>
+        <CardDescription>{t("dashboard.overview.continueDesc")}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {CONTINUE_LINKS.map((link) => {
+            const Icon = link.icon;
+            return (
+              <Button
+                key={link.href}
+                asChild
+                variant="outline"
+                className="h-auto justify-start gap-2 px-4 py-3"
+              >
+                <Link href={link.href}>
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {t(link.labelKey)}
+                </Link>
+              </Button>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function OnboardingSection({
+  overview,
+  isReturning,
+  allComplete,
+  t,
+}: {
+  overview: DashboardOverviewData;
+  isReturning: boolean;
+  allComplete: boolean;
+  t: (key: string) => string;
+}) {
+  if (isReturning && allComplete) {
+    return (
+      <Card className="border-muted bg-muted/20">
+        <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            {t("dashboard.overview.onboardingAllComplete")}
+          </p>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/usage">
+              {t("dashboard.overview.recentActivityViewUsage")}
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const incompleteSteps = ONBOARDING_STEPS.filter(
+    (step) => !isOnboardingStepComplete(step, overview)
+  );
+  const stepsToShow =
+    isReturning && incompleteSteps.length > 0
+      ? incompleteSteps
+      : ONBOARDING_STEPS;
+
+  return (
+    <Card className={isReturning ? "border-muted bg-muted/20" : undefined}>
+      <CardHeader>
+        <CardTitle className={isReturning ? "text-base" : undefined}>
+          {t(
+            isReturning
+              ? "dashboard.overview.onboardingTitleReturning"
+              : "dashboard.overview.onboardingTitle"
+          )}
+        </CardTitle>
+        <CardDescription>
+          {t(
+            isReturning
+              ? "dashboard.overview.onboardingDescReturning"
+              : "dashboard.overview.onboardingDesc"
+          )}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {stepsToShow.map((item) => (
+          <OnboardingStep
+            key={item.step}
+            item={item}
+            overview={overview}
+            t={t}
+          />
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function StatCards({
+  statCards,
+  t,
+}: {
+  statCards: ReadonlyArray<{
+    labelKey: string;
+    subKey: string;
+    value: string;
+    href: string;
+    icon: LucideIcon;
+  }>;
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {statCards.map((stat) => {
+        const Icon = stat.icon;
+        return (
+          <Card key={stat.labelKey}>
+            <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+              <CardDescription>{t(stat.labelKey)}</CardDescription>
+              <Icon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-semibold tracking-tight">
+                {stat.value}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t(stat.subKey)}
+              </p>
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="mt-3 -ml-2 h-7 px-2 text-xs"
+              >
+                <Link href={stat.href}>
+                  {t("common.open")}
+                  <ArrowUpRight className="h-3 w-3" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+function RecentActivityCard({
+  overview,
+  t,
+}: {
+  overview: DashboardOverviewData;
+  t: (key: string) => string;
+}) {
+  const hasSuccessfulActivity = overview.recentActivity.some(
+    (row) => toneForStatus(row.status) === "success"
+  );
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("dashboard.overview.recentActivityTitle")}</CardTitle>
+        <CardDescription>
+          {t("dashboard.overview.recentActivityDesc")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {overview.recentActivity.length > 0 ? (
+          <div className="flex flex-col gap-4">
+            <RecentActivityTable rows={overview.recentActivity} t={t} />
+            <div className="flex flex-wrap justify-end gap-2">
+              {hasSuccessfulActivity ? (
+                <>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/dashboard/usage">
+                      {t("dashboard.overview.recentActivityViewUsage")}
+                    </Link>
+                  </Button>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/dashboard/credits">
+                      {t("dashboard.overview.recentActivityViewCredits")}
+                    </Link>
+                  </Button>
+                </>
+              ) : null}
+              <Button asChild size="sm" variant="ghost">
+                <Link href="/dashboard/usage">
+                  {t("dashboard.overview.viewAllUsage")}
+                </Link>
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="rounded-md border border-dashed bg-muted/30 px-4 py-6 text-sm text-muted-foreground">
+            {t("dashboard.overview.recentActivityEmpty")}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function OnboardingStep({
   item,
   overview,
@@ -366,16 +596,27 @@ function OnboardingStep({
   t: (key: string) => string;
 }) {
   const Icon = item.icon;
-  const completed = isOnboardingStepComplete(item.completeWhen, overview);
+  const status = getOnboardingStepStatus(item, overview);
+  const completed = status === "completed";
 
   return (
-    <div className="flex flex-col gap-4 rounded-md border bg-card p-4 sm:flex-row sm:items-start">
+    <div
+      className={`flex flex-col gap-4 rounded-md border bg-card p-4 sm:flex-row sm:items-start ${
+        status === "current"
+          ? "border-primary/40 ring-1 ring-primary/10"
+          : status === "completed"
+            ? "opacity-80"
+            : ""
+      }`}
+    >
       <div className="flex items-start gap-4 sm:flex-1">
         <div
           className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-semibold ${
             completed
               ? "bg-emerald-500/10 text-emerald-700"
-              : "bg-primary/10 text-primary"
+              : status === "current"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground"
           }`}
         >
           {completed ? (
@@ -388,17 +629,29 @@ function OnboardingStep({
           <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
             <Icon className="h-4 w-4 text-muted-foreground" />
             {t(item.titleKey)}
-            {completed ? (
+            {status === "completed" ? (
               <Badge variant="success" className="font-normal">
                 {t("dashboard.overview.stepCompleted")}
               </Badge>
-            ) : null}
+            ) : status === "current" ? (
+              <Badge variant="default" className="font-normal">
+                {t("dashboard.overview.stepCurrent")}
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="font-normal">
+                {t("dashboard.overview.stepNext")}
+              </Badge>
+            )}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">{t(item.bodyKey)}</p>
         </div>
       </div>
       <div className="flex shrink-0 sm:mt-0.5">
-        <Button asChild size="sm" variant={completed ? "outline" : "default"}>
+        <Button
+          asChild
+          size="sm"
+          variant={status === "current" ? "default" : "outline"}
+        >
           <Link href={item.href}>{t(item.buttonKey)}</Link>
         </Button>
       </div>
