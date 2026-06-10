@@ -5,9 +5,10 @@ import {
   AlertCircle,
   ArrowDownRight,
   ArrowUpRight,
+  BookOpen,
   CheckCircle2,
   CreditCard,
-  Info,
+  KeyRound,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -19,37 +20,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useI18n } from "@/lib/i18n/i18n-provider";
-import type { BillingRechargePlan, MeCreditLedgerEntry, MeCreditOrder, MeCredits } from "@/lib/dmit/server";
-import { formatCny } from "@/lib/billing/recharge-plans";
 import {
   formatPlanIdLabel,
   toneForCreditOrderStatus,
+  truncateCheckoutSessionId,
   type CreditOrderDisplayStatus,
 } from "@/lib/billing/credit-order-status";
+import { formatCny } from "@/lib/billing/recharge-plans";
+import type { CreditsPageData } from "@/lib/credits";
 import { formatCredits, formatDateTime } from "@/lib/format";
+import { useI18n } from "@/lib/i18n/i18n-provider";
+import type { CreditLedgerRow } from "@/lib/supabase/types";
 
-import { CreditsTopUpClient } from "@/app/dashboard/credits/credits-top-up-client";
-
-type CreditsLoadErrorKind = "auth" | "temporary";
-
-interface CreditsRequestDebug {
-  endpoint: string;
-  url: string;
-  status: number | null;
-  code: string | null;
-  message: string | null;
-}
-
-export interface CreditsLoadState {
-  profile: MeCredits | null;
-  ledger: MeCreditLedgerEntry[];
-  orders: MeCreditOrder[];
-  plans: BillingRechargePlan[];
-  plansError: string | null;
-  error: CreditsLoadErrorKind | null;
-  debug: CreditsRequestDebug[];
-}
+export type CreditsLoadState = CreditsPageData;
 
 export function CreditsContentClient({
   creditsState,
@@ -63,6 +46,7 @@ export function CreditsContentClient({
   checkoutSessionId?: string;
 }) {
   const { t } = useI18n();
+  const { balance, ledger, orders, error } = creditsState;
 
   return (
     <div className="flex flex-col gap-6">
@@ -75,147 +59,70 @@ export function CreditsContentClient({
         </p>
       </div>
 
-      <Card className="border-muted bg-muted/30">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Info className="h-4 w-4 shrink-0" />
-            {t("dashboard.credits.howItWorksTitle")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
-            <li>{t("dashboard.credits.howItWorksItem1")}</li>
-            <li>{t("dashboard.credits.howItWorksItem2")}</li>
-            <li>{t("dashboard.credits.howItWorksItem3")}</li>
-            <li>{t("dashboard.credits.howItWorksItem4")}</li>
-            <li>{t("dashboard.credits.howItWorksItem5")}</li>
-          </ul>
-        </CardContent>
-      </Card>
-
       <CheckoutStatusBanner
         status={checkoutStatus}
         checkoutSucceeded={checkoutSucceeded}
         checkoutSessionId={checkoutSessionId}
-        orders={creditsState.orders}
+        orders={orders}
         t={t}
       />
 
-      {creditsState.error ? (
-        <CreditsLoadErrorCard state={creditsState} t={t} />
-      ) : null}
+      {error ? <CreditsLoadErrorCard error={error} t={t} /> : null}
 
       <Card>
         <CardHeader>
           <CardDescription>{t("dashboard.credits.currentBalance")}</CardDescription>
           <CardTitle className="text-4xl">
-            {creditsState.profile
-              ? formatCredits(creditsState.profile.credits_balance)
-              : t("common.unavailable")}
+            {error ? t("common.unavailable") : formatCredits(balance.balance)}
           </CardTitle>
+          {balance.showNoLedgerHint && !error ? (
+            <p className="text-sm text-muted-foreground">
+              {t("dashboard.credits.noLedgerHint")}
+            </p>
+          ) : null}
         </CardHeader>
-        <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-2 text-sm text-muted-foreground">
-          <div>
-            {t("dashboard.credits.totalPurchased")}{" "}
-            <span className="font-medium text-foreground">
-              {creditsState.profile
-                ? formatCredits(creditsState.profile.total_credits_purchased)
-                : t("common.unavailable")}
-            </span>
-          </div>
-          <div>
-            {t("dashboard.credits.totalUsed")}{" "}
-            <span className="font-medium text-foreground">
-              {creditsState.profile
-                ? formatCredits(creditsState.profile.total_credits_used)
-                : t("common.unavailable")}
-            </span>
-          </div>
-          <div>
-            {t("dashboard.credits.lastUpdated")}{" "}
-            <span className="font-medium text-foreground">
-              {creditsState.profile
-                ? formatDateTime(creditsState.profile.updated_at)
-                : t("common.unavailable")}
-            </span>
-          </div>
+        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <BalanceStat
+            label={t("dashboard.credits.lastChange")}
+            value={
+              balance.lastChangeAt
+                ? formatDateTime(balance.lastChangeAt)
+                : "—"
+            }
+          />
+          <BalanceStat
+            label={t("dashboard.credits.todayConsumed")}
+            value={formatCredits(balance.todayConsumed)}
+          />
+          <BalanceStat
+            label={t("dashboard.credits.last7DaysConsumed")}
+            value={formatCredits(balance.last7DaysConsumed)}
+          />
         </CardContent>
       </Card>
 
-      <CreditsTopUpClient
-        plans={creditsState.plans}
-        plansError={creditsState.plansError}
-      />
-
       <Card>
-        <CardHeader>
-          <CardTitle>{t("dashboard.credits.recentOrders")}</CardTitle>
-          <CardDescription>{t("dashboard.credits.recentOrdersDesc")}</CardDescription>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">
+            {t("dashboard.credits.quickActions")}
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          {creditsState.orders.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {t("dashboard.credits.emptyOrders")}
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-                    <th className="py-2 pr-4 font-medium">
-                      {t("dashboard.credits.colPlan")}
-                    </th>
-                    <th className="py-2 pr-4 text-right font-medium">
-                      {t("dashboard.credits.colAmount")}
-                    </th>
-                    <th className="py-2 pr-4 text-right font-medium">
-                      {t("dashboard.credits.colCredits")}
-                    </th>
-                    <th className="py-2 pr-4 font-medium">
-                      {t("dashboard.credits.colStatus")}
-                    </th>
-                    <th className="py-2 pr-4 font-medium">
-                      {t("dashboard.credits.colCreated")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {creditsState.orders.map((order) => (
-                    <tr
-                      key={order.id}
-                      className={
-                        checkoutSessionId &&
-                        order.stripe_checkout_session_id === checkoutSessionId
-                          ? "border-b bg-emerald-50/60 last:border-0 dark:bg-emerald-950/20"
-                          : "border-b last:border-0"
-                      }
-                    >
-                      <td className="py-2 pr-4 font-medium">
-                        {formatPlanIdLabel(order.plan_id)}
-                      </td>
-                      <td className="py-2 pr-4 text-right font-mono text-xs">
-                        {order.amount_cents != null
-                          ? formatCny(order.amount_cents)
-                          : "—"}
-                      </td>
-                      <td className="py-2 pr-4 text-right font-mono text-xs">
-                        {formatCredits(order.credits)}
-                      </td>
-                      <td className="py-2 pr-4">
-                        <OrderStatusBadge
-                          status={order.display_status}
-                          t={t}
-                        />
-                      </td>
-                      <td className="py-2 pr-4 text-muted-foreground">
-                        {formatDateTime(order.created_at)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+        <CardContent className="flex flex-wrap gap-2">
+          <Button asChild size="sm">
+            <Link href="/pricing">{t("dashboard.credits.actionRecharge")}</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/api-keys">
+              <KeyRound className="mr-1.5 h-4 w-4" />
+              {t("dashboard.credits.actionApiKeys")}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/docs">
+              <BookOpen className="mr-1.5 h-4 w-4" />
+              {t("dashboard.credits.actionDocs")}
+            </Link>
+          </Button>
         </CardContent>
       </Card>
 
@@ -225,13 +132,16 @@ export function CreditsContentClient({
           <CardDescription>{t("dashboard.credits.recentLedgerDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
-          {creditsState.ledger.length === 0 ? (
-            <EmptyState t={t} />
+          {ledger.length === 0 ? (
+            <EmptyLedgerState t={t} />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                    <th className="py-2 pr-4 font-medium">
+                      {t("dashboard.credits.colCreated")}
+                    </th>
                     <th className="py-2 pr-4 font-medium">
                       {t("dashboard.credits.colType")}
                     </th>
@@ -247,36 +157,86 @@ export function CreditsContentClient({
                     <th className="py-2 pr-4 font-medium">
                       {t("dashboard.credits.colReference")}
                     </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ledger.map((entry) => (
+                    <LedgerRow key={entry.id} entry={entry} t={t} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("dashboard.credits.recentOrders")}</CardTitle>
+          <CardDescription>{t("dashboard.credits.recentOrdersDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {orders.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {t("dashboard.credits.emptyOrders")}
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
                     <th className="py-2 pr-4 font-medium">
                       {t("dashboard.credits.colCreated")}
+                    </th>
+                    <th className="py-2 pr-4 text-right font-medium">
+                      {t("dashboard.credits.colAmount")}
+                    </th>
+                    <th className="py-2 pr-4 font-medium">
+                      {t("dashboard.credits.colStatus")}
+                    </th>
+                    <th className="py-2 pr-4 font-medium">
+                      {t("dashboard.credits.colPlan")}
+                    </th>
+                    <th className="py-2 pr-4 font-medium">
+                      {t("dashboard.credits.colSession")}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {creditsState.ledger.map((entry) => (
-                    <tr key={entry.id} className="border-b last:border-0">
-                      <td className="py-2 pr-4">
-                        <TypeBadge type={entry.type} />
-                      </td>
-                      <td className="py-2 pr-4 text-right font-mono text-xs">
-                        <AmountCell amount={entry.amount} />
-                      </td>
-                      <td className="py-2 pr-4 text-right font-mono text-xs">
-                        {entry.balance_after != null
-                          ? formatCredits(entry.balance_after)
-                          : "—"}
-                      </td>
+                  {orders.map((order) => (
+                    <tr
+                      key={order.id}
+                      className={
+                        checkoutSessionId &&
+                        order.stripe_checkout_session_id === checkoutSessionId
+                          ? "border-b bg-emerald-50/60 last:border-0 dark:bg-emerald-950/20"
+                          : "border-b last:border-0"
+                      }
+                    >
                       <td className="py-2 pr-4 text-muted-foreground">
-                        {displayReason(entry.reason, t)}
+                        {formatDateTime(order.created_at)}
+                      </td>
+                      <td className="py-2 pr-4 text-right font-mono text-xs">
+                        {formatOrderAmount(order)}
+                      </td>
+                      <td className="py-2 pr-4">
+                        <OrderStatusBadge
+                          status={order.display_status}
+                          t={t}
+                        />
+                      </td>
+                      <td className="py-2 pr-4 font-medium">
+                        {formatPlanIdLabel(
+                          order.plan_id ?? order.package_code ?? null
+                        )}
                       </td>
                       <td
-                        className="max-w-[10rem] truncate py-2 pr-4 font-mono text-xs text-muted-foreground"
-                        title={entry.reference_id ?? undefined}
+                        className="py-2 pr-4 font-mono text-xs text-muted-foreground"
+                        title={order.stripe_checkout_session_id ?? undefined}
                       >
-                        {entry.reference_id ?? "—"}
-                      </td>
-                      <td className="py-2 pr-4 text-muted-foreground">
-                        {formatDateTime(entry.created_at)}
+                        {truncateCheckoutSessionId(
+                          order.stripe_checkout_session_id
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -290,14 +250,59 @@ export function CreditsContentClient({
   );
 }
 
-function CreditsLoadErrorCard({
-  state,
+function BalanceStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border bg-muted/30 px-3 py-2">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-sm font-medium text-foreground">{value}</p>
+    </div>
+  );
+}
+
+function LedgerRow({
+  entry,
   t,
 }: {
-  state: CreditsLoadState;
+  entry: CreditLedgerRow;
   t: (key: string) => string;
 }) {
-  const isAuth = state.error === "auth";
+  return (
+    <tr className="border-b last:border-0">
+      <td className="py-2 pr-4 text-muted-foreground">
+        {formatDateTime(entry.created_at)}
+      </td>
+      <td className="py-2 pr-4">
+        <LedgerTypeBadge type={entry.type} t={t} />
+      </td>
+      <td className="py-2 pr-4 text-right font-mono text-xs">
+        <AmountCell amount={entry.amount} />
+      </td>
+      <td className="py-2 pr-4 text-right font-mono text-xs">
+        {entry.balance_after != null
+          ? formatCredits(entry.balance_after)
+          : "—"}
+      </td>
+      <td className="py-2 pr-4 text-muted-foreground">
+        {displayReason(entry.reason, t)}
+      </td>
+      <td
+        className="max-w-[10rem] truncate py-2 pr-4 font-mono text-xs text-muted-foreground"
+        title={entry.reference_id ?? undefined}
+      >
+        {entry.reference_id ?? "—"}
+      </td>
+    </tr>
+  );
+}
+
+function CreditsLoadErrorCard({
+  error,
+  t,
+}: {
+  error: "auth" | "temporary";
+  t: (key: string) => string;
+}) {
+  const isAuth = error === "auth";
   return (
     <Card className="border-destructive/30 bg-destructive/5">
       <CardHeader className="pb-3">
@@ -313,26 +318,6 @@ function CreditsLoadErrorCard({
             : t("dashboard.credits.loadErrorTempDesc")}
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="rounded-md border bg-background p-3 text-xs">
-          <div className="mb-2 font-medium text-foreground">DMIT debug</div>
-          <div className="flex flex-col gap-2">
-            {state.debug.map((item) => (
-              <div key={`${item.endpoint}-${item.status}`} className="font-mono">
-                <div className="break-all text-muted-foreground">{item.url}</div>
-                <div>
-                  status={item.status ?? "n/a"} code={item.code ?? "n/a"}
-                </div>
-                {item.message ? (
-                  <div className="break-words text-muted-foreground">
-                    {item.message}
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </div>
-      </CardContent>
     </Card>
   );
 }
@@ -347,7 +332,7 @@ function CheckoutStatusBanner({
   status?: string;
   checkoutSucceeded: boolean;
   checkoutSessionId?: string;
-  orders: MeCreditOrder[];
+  orders: CreditsLoadState["orders"];
   t: (key: string) => string;
 }) {
   const matchedOrder = checkoutSessionId
@@ -422,21 +407,23 @@ function CheckoutStatusBanner({
 function AmountCell({ amount }: { amount: number | null }) {
   if (amount == null) return <span>—</span>;
   const isPositive = amount >= 0;
+  const label = isPositive
+    ? `+${formatCredits(amount)}`
+    : formatCredits(amount);
   return (
-    <span
-      className={
-        isPositive
-          ? "inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400"
-          : "inline-flex items-center gap-1 text-destructive"
-      }
+    <Badge
+      variant={isPositive ? "success" : "destructive"}
+      className="font-mono text-xs"
     >
-      {isPositive ? (
-        <ArrowUpRight className="h-3 w-3" />
-      ) : (
-        <ArrowDownRight className="h-3 w-3" />
-      )}
-      {formatCredits(Math.abs(amount))}
-    </span>
+      <span className="inline-flex items-center gap-1">
+        {isPositive ? (
+          <ArrowUpRight className="h-3 w-3" />
+        ) : (
+          <ArrowDownRight className="h-3 w-3" />
+        )}
+        {label}
+      </span>
+    </Badge>
   );
 }
 
@@ -468,45 +455,83 @@ function OrderStatusBadge({
   return <Badge variant={variant}>{t(labelKey)}</Badge>;
 }
 
-function TypeBadge({ type }: { type: string | null | undefined }) {
-  if (!type) return <Badge variant="outline">unknown</Badge>;
-  const normalized = type.toLowerCase();
+function LedgerTypeBadge({
+  type,
+  t,
+}: {
+  type: string | null | undefined;
+  t: (key: string) => string;
+}) {
+  const label = ledgerTypeLabel(type, t);
+  const normalized = (type ?? "").toLowerCase();
   if (
     normalized === "purchase" ||
     normalized === "topup" ||
     normalized === "grant" ||
+    normalized === "bonus" ||
     normalized === "refund"
   ) {
-    return <Badge variant="success">{type}</Badge>;
+    return <Badge variant="success">{label}</Badge>;
   }
-  if (normalized === "debit") {
-    return <Badge variant="destructive">{type}</Badge>;
+  if (normalized === "debit" || normalized === "usage") {
+    return <Badge variant="destructive">{label}</Badge>;
   }
   if (normalized === "adjustment") {
-    return <Badge variant="warning">{type}</Badge>;
+    return <Badge variant="warning">{label}</Badge>;
   }
-  return <Badge variant="outline">{type}</Badge>;
+  return <Badge variant="outline">{label}</Badge>;
 }
 
-function EmptyState({ t }: { t: (key: string) => string }) {
+function ledgerTypeLabel(
+  type: string | null | undefined,
+  t: (key: string) => string
+): string {
+  const normalized = (type ?? "").toLowerCase();
+  const keyMap: Record<string, string> = {
+    topup: "dashboard.credits.typeTopup",
+    purchase: "dashboard.credits.typeTopup",
+    bonus: "dashboard.credits.typeBonus",
+    grant: "dashboard.credits.typeBonus",
+    usage: "dashboard.credits.typeUsage",
+    debit: "dashboard.credits.typeUsage",
+    refund: "dashboard.credits.typeRefund",
+    adjustment: "dashboard.credits.typeAdjustment",
+  };
+  const key = keyMap[normalized] ?? "dashboard.credits.typeUnknown";
+  return t(key);
+}
+
+function EmptyLedgerState({ t }: { t: (key: string) => string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed py-16 text-center">
       <div className="grid h-10 w-10 place-items-center rounded-full bg-muted text-muted-foreground">
         <CreditCard className="h-5 w-5" />
       </div>
-      <p className="max-w-sm text-sm text-muted-foreground">
+      <p className="max-w-md text-sm text-muted-foreground">
         {t("dashboard.credits.emptyLedger")}
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2">
         <Button asChild size="sm" variant="default">
-          <a href="#recharge-credits">{t("dashboard.credits.rechargeCredits")}</a>
+          <Link href="/dashboard/api-keys">
+            {t("dashboard.credits.createApiKey")}
+          </Link>
         </Button>
         <Button asChild size="sm" variant="outline">
-          <Link href="/pricing">{t("dashboard.credits.viewPricing")}</Link>
+          <Link href="/dashboard/docs">{t("dashboard.credits.viewQuickstart")}</Link>
         </Button>
       </div>
     </div>
   );
+}
+
+function formatOrderAmount(order: CreditsLoadState["orders"][number]): string {
+  if (order.amount_cents != null) {
+    return formatCny(order.amount_cents);
+  }
+  if (order.amount_cny != null) {
+    return formatCny(order.amount_cny * 100);
+  }
+  return "—";
 }
 
 function displayReason(
