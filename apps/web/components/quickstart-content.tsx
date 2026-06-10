@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Check, Copy } from "lucide-react";
-import { useRef, useState } from "react";
 
+import {
+  CodeBlock,
+  CopyButton,
+  useCopyToClipboard,
+} from "@/components/copy-code-block";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -91,21 +94,7 @@ const ERROR_CODES = [
 
 export function QuickstartContent() {
   const { t } = useI18n();
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const timeoutRef = useRef<number | null>(null);
-
-  async function copyText(id: string, value: string) {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopiedId(id);
-      if (timeoutRef.current) {
-        window.clearTimeout(timeoutRef.current);
-      }
-      timeoutRef.current = window.setTimeout(() => setCopiedId(null), 2000);
-    } catch {
-      setCopiedId(null);
-    }
-  }
+  const { copiedId, copyText } = useCopyToClipboard();
 
   return (
     <div className="flex flex-col gap-6">
@@ -369,80 +358,3 @@ function ErrorCodeTable({
   );
 }
 
-function CopyButton({
-  copied,
-  onCopy,
-  copyLabel,
-  copiedLabel,
-}: {
-  copied: boolean;
-  onCopy: () => void;
-  copyLabel: string;
-  copiedLabel: string;
-}) {
-  return (
-    <Button type="button" variant="ghost" size="sm" className="h-8 shrink-0" onClick={onCopy}>
-      {copied ? (
-        <>
-          <Check className="h-4 w-4" />
-          {copiedLabel}
-        </>
-      ) : (
-        <>
-          <Copy className="h-4 w-4" />
-          {copyLabel}
-        </>
-      )}
-    </Button>
-  );
-}
-
-function CodeBlock({
-  id,
-  label,
-  code,
-  copied,
-  onCopy,
-  copyLabel,
-  copiedLabel,
-}: {
-  id: string;
-  label: string;
-  code: string;
-  copied: boolean;
-  onCopy: (id: string, value: string) => void;
-  copyLabel: string;
-  copiedLabel: string;
-}) {
-  return (
-    <div className="overflow-hidden rounded-lg border bg-muted">
-      <div className="flex items-center justify-between border-b bg-background/70 px-4 py-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {label}
-        </span>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8"
-          onClick={() => onCopy(id, code)}
-        >
-          {copied ? (
-            <>
-              <Check className="h-4 w-4" />
-              {copiedLabel}
-            </>
-          ) : (
-            <>
-              <Copy className="h-4 w-4" />
-              {copyLabel}
-            </>
-          )}
-        </Button>
-      </div>
-      <pre className="overflow-x-auto p-4 text-sm leading-relaxed">
-        <code>{code}</code>
-      </pre>
-    </div>
-  );
-}

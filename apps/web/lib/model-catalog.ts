@@ -445,6 +445,30 @@ export type ImagePlaygroundSize = (typeof IMAGE_PLAYGROUND_SIZES)[number];
 
 export const VIDEO_MODELS: ModelCatalogEntry[] = [
   {
+    id: "veo3.1-fast",
+    displayName: "Veo 3.1 Fast",
+    type: "video",
+    status: "coming_soon",
+    billingUnit: "Per video",
+    description: "Fast video / image-related generation capabilities (planned).",
+    pricing: imagePricing(0),
+    traits: { speed: "high", quality: "medium", cost: "medium" },
+    categories: ["coming_soon"],
+    catalogMeta: catalogMeta(),
+  },
+  {
+    id: "sora-2",
+    displayName: "Sora 2",
+    type: "video",
+    status: "coming_soon",
+    billingUnit: "Per video",
+    description: "Planned video generation model.",
+    pricing: imagePricing(0),
+    traits: { speed: "low", quality: "high", cost: "high" },
+    categories: ["coming_soon"],
+    catalogMeta: catalogMeta(),
+  },
+  {
     id: "veo",
     displayName: "Veo",
     type: "video",
@@ -453,6 +477,7 @@ export const VIDEO_MODELS: ModelCatalogEntry[] = [
     description: "Video generation model.",
     pricing: imagePricing(0),
     traits: { speed: "low", quality: "medium", cost: "high" },
+    categories: ["coming_soon"],
   },
 ];
 
