@@ -466,7 +466,7 @@ export const messages = {
         forImageModels: "For image models, use",
         request: "Test request",
         requestDesc:
-          "Paste your API key, pick a chat model, and send one non-streaming message.",
+          "Select or create an API key, pick a chat model, and send one non-streaming message.",
         model: "Model",
         prompt: "Prompt",
         promptPlaceholder:
@@ -497,6 +497,24 @@ export const messages = {
         needCredits: "Need more credits?",
         topUp: "Top up",
         apiKey: "API key",
+        currentKeySelection: "Current selection: {name} ({prefix}…)",
+        pasteOtherKey: "Paste another key",
+        manageApiKeys: "Manage API Keys",
+        manageApiKeysHint:
+          "To revoke or delete keys, go to the API Keys page.",
+        noKeyTitle: "No active API Key yet",
+        noKeyBody:
+          "Create a test key to run your first real Playground call.",
+        createTestKey: "Create test key",
+        creatingTestKey: "Creating…",
+        goToApiKeys: "Go to API Keys",
+        testKeyCreated:
+          "Test key created. Copy the full secret — it won't be shown again after refresh.",
+        copySecret: "Copy secret",
+        copied: "Copied",
+        testNow: "Test now",
+        secretOnceHint:
+          "Full secret is shown only once at creation. After refresh it cannot be viewed again — create a new key if lost.",
         selectKey: "Select key",
         pasteKey: "Paste key",
         yourActiveKeys: "Your active keys",
@@ -551,6 +569,8 @@ export const messages = {
           rateLimited: "Too many requests. Please try again later.",
           unknown: "Request failed. Please try again later.",
           missingPrompt: "Please enter a prompt.",
+          keyNotRetrievable:
+            "For security, full keys aren't stored long-term. Paste your key or create a new test key.",
         },
       },
       imagePlayground: {
@@ -1952,7 +1972,7 @@ export const messages = {
         forImageModels: "图像模型请使用",
         request: "测试请求",
         requestDesc:
-          "粘贴 API Key，选择对话模型，发送一条非流式消息进行测试。",
+          "选择或创建 API Key，选择对话模型，发送一条非流式消息进行测试。",
         model: "模型",
         prompt: "Prompt",
         promptPlaceholder:
@@ -1981,6 +2001,22 @@ export const messages = {
         needCredits: "积分不足？",
         topUp: "去充值",
         apiKey: "API Key",
+        currentKeySelection: "当前选择：{name}（{prefix}…）",
+        pasteOtherKey: "粘贴其他 Key",
+        manageApiKeys: "管理 API Keys",
+        manageApiKeysHint: "如需吊销或删除密钥，请前往 API Keys 页面管理。",
+        noKeyTitle: "还没有可用 API Key",
+        noKeyBody: "创建一个测试 Key 后，即可在 Playground 里完成第一次真实调用。",
+        createTestKey: "创建测试 Key",
+        creatingTestKey: "创建中…",
+        goToApiKeys: "前往 API Keys",
+        testKeyCreated:
+          "测试 Key 已创建。请复制完整 secret；刷新页面后不会再次显示。",
+        copySecret: "复制 secret",
+        copied: "已复制",
+        testNow: "立即测试",
+        secretOnceHint:
+          "完整 secret 只在创建时展示一次。刷新页面后将无法再次查看，如遗失请重新创建。",
         selectKey: "选择密钥",
         pasteKey: "粘贴密钥",
         yourActiveKeys: "你的活跃密钥",
@@ -2029,6 +2065,8 @@ export const messages = {
           rateLimited: "请求过快，请稍后再试。",
           unknown: "请求失败，请稍后重试。",
           missingPrompt: "请输入测试内容。",
+          keyNotRetrievable:
+            "出于安全考虑，完整 key 不会长期保存。请粘贴 key，或重新创建一个测试 Key。",
         },
       },
       imagePlayground: {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -15,6 +15,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
+import { CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,12 +29,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   chatCompletions,
+  createApiKey,
   DmitApiError,
   revealMeApiKey,
   type ChatCompletionResponse,
 } from "@/lib/dmit/client";
 import { formatDateTime, formatCreditsPrecise, formatInt } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/i18n-provider";
+import { formatMessage } from "@/lib/i18n/messages";
 import {
   AVAILABLE_CHAT_MODEL_IDS,
   getChatModelById,
@@ -48,6 +51,7 @@ import {
 const DEFAULT_MODEL = "gemini-3.1-pro";
 const MODEL_OPTIONS = AVAILABLE_CHAT_MODEL_IDS;
 const REVEAL_KEY_TIMEOUT_MS = 30_000;
+const PLAYGROUND_TEST_KEY_NAME = "playground-test";
 
 function resolveInitialModel(initialModel?: string): string {
   if (initialModel && isAvailableChatModel(initialModel)) {
@@ -56,14 +60,34 @@ function resolveInitialModel(initialModel?: string): string {
   return DEFAULT_MODEL;
 }
 
-function filterRevealableKeys(
-  keys: PlaygroundApiKeyOption[]
-): PlaygroundApiKeyOption[] {
-  return keys.filter((row) => row.can_reveal !== false);
+function firstActiveKeyId(keys: PlaygroundApiKeyOption[]): string {
+  return keys[0]?.id ?? "";
 }
 
-function firstRevealableKeyId(keys: PlaygroundApiKeyOption[]): string {
-  return filterRevealableKeys(keys)[0]?.id ?? "";
+function playgroundTestKeyNameWithDate(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${PLAYGROUND_TEST_KEY_NAME}-${y}${m}${day}`;
+}
+
+function meKeyToPlaygroundOption(
+  apiKey: {
+    id: string;
+    name: string;
+    prefix: string;
+    status: string;
+    can_reveal?: boolean;
+  }
+): PlaygroundApiKeyOption {
+  return {
+    id: apiKey.id,
+    name: apiKey.name,
+    prefix: apiKey.prefix,
+    status: apiKey.status,
+    can_reveal: apiKey.can_reveal,
+  };
 }
 
 export interface PlaygroundApiKeyOption {
@@ -80,7 +104,7 @@ interface PlaygroundError {
   message: string;
 }
 
-type ApiKeyMode = "paste" | "select";
+type KeyPanelView = "select" | "paste" | "empty";
 
 type PromptPresetId = "short" | "code" | "business" | "summary";
 
@@ -110,29 +134,115 @@ export function PlaygroundClient({
 }) {
   const { t } = useI18n();
   const router = useRouter();
-  const revealableKeys = useMemo(
-    () => filterRevealableKeys(activeKeys),
-    [activeKeys]
+  const promptRef = useRef<HTMLTextAreaElement>(null);
+
+  const [localKeys, setLocalKeys] = useState<PlaygroundApiKeyOption[]>(activeKeys);
+  const [sessionSecrets, setSessionSecrets] = useState<Record<string, string>>({});
+  const [keyPanelView, setKeyPanelView] = useState<KeyPanelView>(() =>
+    activeKeys.length > 0 ? "select" : "empty"
   );
-  const hasActiveKeys = activeKeys.length > 0;
+  const [createdBannerKeyId, setCreatedBannerKeyId] = useState<string | null>(
+    null
+  );
 
   const [model, setModel] = useState(() => resolveInitialModel(initialModel));
   const [prompt, setPrompt] = useState("");
-  const [apiKeyMode, setApiKeyMode] = useState<ApiKeyMode>("paste");
   const [apiKey, setApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [selectedKeyId, setSelectedKeyId] = useState(() =>
-    firstRevealableKeyId(activeKeys)
+    firstActiveKeyId(activeKeys)
   );
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [createKeyError, setCreateKeyError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ChatCompletionResponse | null>(null);
   const [completedAt, setCompletedAt] = useState<string | null>(null);
   const [error, setError] = useState<PlaygroundError | null>(null);
 
+  useEffect(() => {
+    setLocalKeys(activeKeys);
+    if (activeKeys.length > 0 && keyPanelView === "empty") {
+      setKeyPanelView("select");
+    }
+  }, [activeKeys, keyPanelView]);
+
+  useEffect(() => {
+    if (
+      localKeys.length > 0 &&
+      !localKeys.some((row) => row.id === selectedKeyId)
+    ) {
+      setSelectedKeyId(localKeys[0].id);
+    }
+  }, [localKeys, selectedKeyId]);
+
+  const selectedKey = useMemo(
+    () => localKeys.find((row) => row.id === selectedKeyId) ?? null,
+    [localKeys, selectedKeyId]
+  );
+
   const selectedModelEntry = useMemo(
     () => getChatModelById(model),
     [model]
   );
+
+  const createdSecret =
+    createdBannerKeyId != null
+      ? (sessionSecrets[createdBannerKeyId] ?? null)
+      : null;
+
+  async function handleCreateTestKey() {
+    if (creatingKey) {
+      return;
+    }
+    if (!accessToken) {
+      setCreateKeyError(t("dashboard.playground.errors.unknown"));
+      return;
+    }
+
+    setCreatingKey(true);
+    setCreateKeyError(null);
+
+    try {
+      let result;
+      try {
+        result = await createApiKey(
+          { name: PLAYGROUND_TEST_KEY_NAME },
+          { accessToken }
+        );
+      } catch (err) {
+        if (err instanceof DmitApiError && err.status === 409) {
+          result = await createApiKey(
+            { name: playgroundTestKeyNameWithDate() },
+            { accessToken }
+          );
+        } else {
+          throw err;
+        }
+      }
+
+      const listItem = meKeyToPlaygroundOption(result.api_key);
+      setSessionSecrets((prev) => ({
+        ...prev,
+        [listItem.id]: result.secret,
+      }));
+      setLocalKeys((prev) => {
+        const without = prev.filter((row) => row.id !== listItem.id);
+        return [listItem, ...without];
+      });
+      setSelectedKeyId(listItem.id);
+      setCreatedBannerKeyId(listItem.id);
+      setKeyPanelView("select");
+      router.refresh();
+    } catch (err) {
+      setCreateKeyError(
+        err instanceof DmitApiError
+          ? playgroundErrorMessage(err.status, err.code, t)
+          : t("dashboard.playground.errors.unknown")
+      );
+    } finally {
+      setCreatingKey(false);
+    }
+  }
 
   async function handleRun(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -183,7 +293,7 @@ export function PlaygroundClient({
   }
 
   async function resolveApiKey(): Promise<string> {
-    if (apiKeyMode === "paste") {
+    if (keyPanelView === "paste") {
       const trimmed = apiKey.trim();
       if (!trimmed) {
         throw new PlaygroundValidationError(
@@ -200,19 +310,25 @@ export function PlaygroundClient({
       return trimmed;
     }
 
-    const selected = revealableKeys.find((row) => row.id === selectedKeyId);
-    if (!selected) {
+    if (keyPanelView === "empty" || !selectedKey) {
       throw new PlaygroundValidationError(
         t("dashboard.playground.errors.missingToken"),
         "missing_api_key"
       );
     }
-    if (selected.can_reveal === false) {
+
+    const sessionSecret = sessionSecrets[selectedKey.id];
+    if (sessionSecret && isFullTokfaiApiKey(sessionSecret)) {
+      return sessionSecret;
+    }
+
+    if (selectedKey.can_reveal === false) {
       throw new PlaygroundValidationError(
-        t("dashboard.playground.errors.missingToken"),
+        t("dashboard.playground.errors.keyNotRetrievable"),
         "key_not_revealable"
       );
     }
+
     if (!accessToken) {
       throw new PlaygroundValidationError(
         t("dashboard.playground.errors.unknown"),
@@ -220,11 +336,11 @@ export function PlaygroundClient({
       );
     }
 
-    const secret = await revealApiKeyWithTimeout(selected.id, accessToken);
+    const secret = await revealApiKeyWithTimeout(selectedKey.id, accessToken);
     if (!isFullTokfaiApiKey(secret)) {
       throw new PlaygroundValidationError(
-        t("dashboard.playground.errors.missingToken"),
-        "missing_api_key"
+        t("dashboard.playground.errors.keyNotRetrievable"),
+        "key_not_revealable"
       );
     }
     return secret;
@@ -260,6 +376,11 @@ export function PlaygroundClient({
     setPrompt(t(presetPromptKey(id)));
   }
 
+  function focusPrompt() {
+    promptRef.current?.focus();
+    promptRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
   return (
     <form onSubmit={handleRun} className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -289,37 +410,30 @@ export function PlaygroundClient({
         <span>{t("dashboard.playground.productionKeyHint")}</span>
       </div>
 
-      {!hasActiveKeys ? (
-        <div className="flex flex-col gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-2 text-sm">
-            <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-            <span>{t("dashboard.playground.noActiveKeyHint")}</span>
-          </div>
-          <Button asChild size="sm" variant="outline" className="shrink-0">
-            <Link href="/dashboard/api-keys">
-              {t("dashboard.playground.createApiKey")}
-            </Link>
-          </Button>
-        </div>
-      ) : null}
-
       <Card>
         <CardHeader>
           <CardTitle>{t("dashboard.playground.request")}</CardTitle>
           <CardDescription>{t("dashboard.playground.requestDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-5">
-          <ApiKeyField
-            mode={apiKeyMode}
-            revealableKeys={revealableKeys}
+          <ApiKeySection
+            keyPanelView={keyPanelView}
+            localKeys={localKeys}
+            selectedKey={selectedKey}
+            selectedKeyId={selectedKeyId}
             apiKey={apiKey}
             showApiKey={showApiKey}
-            selectedKeyId={selectedKeyId}
+            creatingKey={creatingKey}
+            createKeyError={createKeyError}
+            createdSecret={createdSecret}
+            createdBannerKeyId={createdBannerKeyId}
             loading={loading}
-            onModeChange={setApiKeyMode}
+            onCreateTestKey={handleCreateTestKey}
+            onKeyPanelViewChange={setKeyPanelView}
+            onSelectedKeyChange={setSelectedKeyId}
             onApiKeyChange={setApiKey}
             onShowApiKeyChange={setShowApiKey}
-            onSelectedKeyChange={setSelectedKeyId}
+            onFocusPrompt={focusPrompt}
             t={t}
           />
 
@@ -351,6 +465,7 @@ export function PlaygroundClient({
           <div className="flex flex-col gap-2">
             <Label htmlFor="prompt">{t("dashboard.playground.prompt")}</Label>
             <textarea
+              ref={promptRef}
               id="prompt"
               rows={8}
               value={prompt}
@@ -424,103 +539,55 @@ export function PlaygroundClient({
   );
 }
 
-function ApiKeyField({
-  mode,
-  revealableKeys,
+function ApiKeySection({
+  keyPanelView,
+  localKeys,
+  selectedKey,
+  selectedKeyId,
   apiKey,
   showApiKey,
-  selectedKeyId,
+  creatingKey,
+  createKeyError,
+  createdSecret,
+  createdBannerKeyId,
   loading,
-  onModeChange,
+  onCreateTestKey,
+  onKeyPanelViewChange,
+  onSelectedKeyChange,
   onApiKeyChange,
   onShowApiKeyChange,
-  onSelectedKeyChange,
+  onFocusPrompt,
   t,
 }: {
-  mode: ApiKeyMode;
-  revealableKeys: PlaygroundApiKeyOption[];
+  keyPanelView: KeyPanelView;
+  localKeys: PlaygroundApiKeyOption[];
+  selectedKey: PlaygroundApiKeyOption | null;
+  selectedKeyId: string;
   apiKey: string;
   showApiKey: boolean;
-  selectedKeyId: string;
+  creatingKey: boolean;
+  createKeyError: string | null;
+  createdSecret: string | null;
+  createdBannerKeyId: string | null;
   loading: boolean;
-  onModeChange: (mode: ApiKeyMode) => void;
+  onCreateTestKey: () => void;
+  onKeyPanelViewChange: (view: KeyPanelView) => void;
+  onSelectedKeyChange: (id: string) => void;
   onApiKeyChange: (value: string) => void;
   onShowApiKeyChange: (show: boolean) => void;
-  onSelectedKeyChange: (id: string) => void;
+  onFocusPrompt: () => void;
   t: (key: string) => string;
 }) {
-  return (
-    <div className="flex flex-col gap-3 rounded-md border bg-muted/20 p-4">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <KeyRound className="h-4 w-4 text-muted-foreground" />
-        {t("dashboard.playground.apiKey")}
-      </div>
+  const { copiedId, copyText } = useCopyToClipboard();
+  const secretCopied = copiedId === "playground-created-secret";
 
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant={mode === "paste" ? "default" : "outline"}
-          disabled={loading}
-          onClick={() => onModeChange("paste")}
-        >
+  if (keyPanelView === "paste") {
+    return (
+      <div className="flex flex-col gap-3 rounded-md border bg-muted/20 p-4">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <KeyRound className="h-4 w-4 text-muted-foreground" />
           {t("dashboard.playground.pasteKey")}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant={mode === "select" ? "default" : "outline"}
-          disabled={loading || revealableKeys.length === 0}
-          onClick={() => onModeChange("select")}
-        >
-          {t("dashboard.playground.selectKey")}
-        </Button>
-      </div>
-
-      {mode === "select" ? (
-        revealableKeys.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="api-key-select">
-              {t("dashboard.playground.yourActiveKeys")}
-            </Label>
-            <select
-              id="api-key-select"
-              value={selectedKeyId}
-              onChange={(e) => onSelectedKeyChange(e.target.value)}
-              disabled={loading}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {revealableKeys.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.name} ({row.prefix || "no prefix"})
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-muted-foreground">
-              {t("dashboard.playground.secretNotStored")}
-            </p>
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            {t("dashboard.playground.noRevealableKeys")}{" "}
-            <button
-              type="button"
-              className="underline underline-offset-4"
-              onClick={() => onModeChange("paste")}
-            >
-              {t("dashboard.playground.pasteYourKey")}
-            </button>{" "}
-            or{" "}
-            <Link
-              href="/dashboard/api-keys"
-              className="underline underline-offset-4"
-            >
-              {t("dashboard.playground.orCreateOne")}
-            </Link>
-            .
-          </p>
-        )
-      ) : (
+        </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="api-key">{t("dashboard.playground.fullApiKey")}</Label>
           <div className="flex gap-2">
@@ -558,7 +625,181 @@ function ApiKeyField({
             {t("dashboard.playground.pasteKeySecurityHint")}
           </p>
         </div>
-      )}
+        {localKeys.length > 0 ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={loading}
+            className="w-fit"
+            onClick={() => onKeyPanelViewChange("select")}
+          >
+            {t("dashboard.playground.selectKey")}
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (keyPanelView === "empty" || localKeys.length === 0) {
+    return (
+      <div className="flex flex-col gap-4 rounded-md border border-dashed bg-muted/20 p-4">
+        <div className="flex items-start gap-2">
+          <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium">
+              {t("dashboard.playground.noKeyTitle")}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {t("dashboard.playground.noKeyBody")}
+            </p>
+          </div>
+        </div>
+        {createKeyError ? (
+          <p className="text-sm text-destructive">{createKeyError}</p>
+        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            disabled={loading || creatingKey}
+            onClick={onCreateTestKey}
+          >
+            {creatingKey ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {t("dashboard.playground.creatingTestKey")}
+              </>
+            ) : (
+              t("dashboard.playground.createTestKey")
+            )}
+          </Button>
+          <Button asChild type="button" size="sm" variant="outline">
+            <Link href="/dashboard/api-keys">
+              {t("dashboard.playground.goToApiKeys")}
+            </Link>
+          </Button>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-auto w-fit px-0 text-xs text-muted-foreground"
+          disabled={loading}
+          onClick={() => onKeyPanelViewChange("paste")}
+        >
+          {t("dashboard.playground.pasteOtherKey")}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4 rounded-md border bg-muted/20 p-4">
+      <div className="flex items-center gap-2 text-sm font-medium">
+        <KeyRound className="h-4 w-4 text-muted-foreground" />
+        {t("dashboard.playground.apiKey")}
+      </div>
+
+      {createdSecret && createdBannerKeyId === selectedKeyId ? (
+        <CreatedKeyBanner
+          secret={createdSecret}
+          secretCopied={secretCopied}
+          onCopy={() => copyText("playground-created-secret", createdSecret)}
+          onTestNow={onFocusPrompt}
+          t={t}
+        />
+      ) : null}
+
+      {selectedKey ? (
+        <p className="text-sm text-muted-foreground">
+          {formatMessage(t("dashboard.playground.currentKeySelection"), {
+            name: selectedKey.name,
+            prefix: selectedKey.prefix || "sk-tokfai",
+          })}
+        </p>
+      ) : null}
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="api-key-select">{t("dashboard.playground.selectKey")}</Label>
+        <select
+          id="api-key-select"
+          value={selectedKeyId}
+          onChange={(e) => onSelectedKeyChange(e.target.value)}
+          disabled={loading}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {localKeys.map((row) => (
+            <option key={row.id} value={row.id}>
+              {row.name} ({row.prefix || "no prefix"})
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-muted-foreground">
+          {t("dashboard.playground.secretNotStored")}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={loading}
+          onClick={() => onKeyPanelViewChange("paste")}
+        >
+          {t("dashboard.playground.pasteOtherKey")}
+        </Button>
+        <Button asChild type="button" size="sm" variant="outline">
+          <Link href="/dashboard/api-keys">
+            {t("dashboard.playground.manageApiKeys")}
+          </Link>
+        </Button>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        {t("dashboard.playground.manageApiKeysHint")}
+      </p>
+    </div>
+  );
+}
+
+function CreatedKeyBanner({
+  secret,
+  secretCopied,
+  onCopy,
+  onTestNow,
+  t,
+}: {
+  secret: string;
+  secretCopied: boolean;
+  onCopy: () => void;
+  onTestNow: () => void;
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4">
+      <div className="flex items-start gap-2 text-sm text-emerald-800 dark:text-emerald-200">
+        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>{t("dashboard.playground.testKeyCreated")}</span>
+      </div>
+      <code className="break-all rounded-md border bg-background px-3 py-2 font-mono text-sm">
+        {secret}
+      </code>
+      <p className="text-xs text-muted-foreground">
+        {t("dashboard.playground.secretOnceHint")}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <CopyButton
+          copied={secretCopied}
+          onCopy={onCopy}
+          copyLabel={t("dashboard.playground.copySecret")}
+          copiedLabel={t("dashboard.playground.copied")}
+        />
+        <Button type="button" size="sm" variant="outline" onClick={onTestNow}>
+          {t("dashboard.playground.testNow")}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -626,6 +867,14 @@ function ResponsePanel({
             <Button asChild size="sm" variant="outline" className="w-fit">
               <Link href="/dashboard/credits">
                 {t("dashboard.playground.addCredits")}
+              </Link>
+            </Button>
+          ) : null}
+          {error.code === "key_not_revealable" ||
+          error.code === "missing_api_key" ? (
+            <Button asChild size="sm" variant="outline" className="w-fit">
+              <Link href="/dashboard/api-keys">
+                {t("dashboard.playground.manageApiKeys")}
               </Link>
             </Button>
           ) : null}
@@ -798,7 +1047,7 @@ function PlaygroundFooter({ t }: { t: (key: string) => string }) {
     },
     {
       href: "/dashboard/api-keys",
-      label: t("dashboard.playground.createApiKey"),
+      label: t("dashboard.playground.manageApiKeys"),
     },
   ] as const;
 
@@ -848,7 +1097,7 @@ function playgroundErrorMessage(
     missing_token: "dashboard.playground.errors.missingToken",
     missing_api_key: "dashboard.playground.errors.missingToken",
     no_api_key: "dashboard.playground.errors.missingToken",
-    key_not_revealable: "dashboard.playground.errors.missingToken",
+    key_not_revealable: "dashboard.playground.errors.keyNotRetrievable",
     invalid_token: "dashboard.playground.errors.invalidToken",
     invalid_api_key: "dashboard.playground.errors.invalidToken",
     insufficient_credits: "dashboard.playground.errors.insufficientCredits",
