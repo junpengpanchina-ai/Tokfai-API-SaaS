@@ -1,14 +1,18 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Check,
   CheckCircle2,
   Copy,
+  Eye,
+  EyeOff,
   ImageIcon,
+  Info,
   KeyRound,
   Loader2,
   Plus,
@@ -17,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 
+import { CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,12 +34,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  createApiKey,
   DmitApiError,
   imageGenerations,
   revealMeApiKey,
   type ImageGenerationResponse,
 } from "@/lib/dmit/client";
-import { userMessageForDmitError } from "@/lib/dmit-messages";
+import {
+  hasGeneratedImageBase64,
+  imagePlaygroundErrorMessage,
+  resolveGeneratedImageUrl,
+  resolveImageCreatedAt,
+} from "@/lib/image-playground-display";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
 import {
@@ -46,13 +57,14 @@ import {
 import {
   getImageModelById,
   getImageModelCreditsPerRequest,
+  IMAGE_PLAYGROUND_DEFAULT_MODEL,
   IMAGE_PLAYGROUND_MODEL_IDS,
   IMAGE_PLAYGROUND_SIZES,
   isAvailableImageModel,
   type ImagePlaygroundModelId,
   type ImagePlaygroundSize,
 } from "@/lib/model-catalog";
-import { formatCreditsPrecise } from "@/lib/format";
+import { formatCreditsPrecise, formatDateTime } from "@/lib/format";
 import {
   isFullTokfaiApiKey,
   IMAGE_PLAYGROUND_IMAGE_TO_IMAGE_PLACEHOLDER,
@@ -70,17 +82,54 @@ import {
   validatePlaygroundImageFile,
 } from "@/lib/storage/upload-image";
 
-import { IMAGE_PLAYGROUND_PRESETS } from "./image-playground-presets";
+import {
+  IMAGE_PLAYGROUND_DEFAULT_PROMPT,
+  IMAGE_PLAYGROUND_PRESET_IDS,
+  imagePlaygroundPresetLabelKey,
+  imagePlaygroundPresetPromptKey,
+  type ImagePlaygroundPresetId,
+} from "./image-playground-presets";
 
-const DEFAULT_MODEL: ImagePlaygroundModelId = "nano-banana";
+const DEFAULT_MODEL: ImagePlaygroundModelId = IMAGE_PLAYGROUND_DEFAULT_MODEL;
 const DEFAULT_SIZE: ImagePlaygroundSize = "1024x1024";
-const DEFAULT_PROMPT = "A serene mountain landscape at sunset, digital art.";
+const REVEAL_KEY_TIMEOUT_MS = 30_000;
+const PLAYGROUND_TEST_KEY_NAME = "playground-test";
 
 function resolveInitialModel(initialModel?: string): ImagePlaygroundModelId {
   if (initialModel && isAvailableImageModel(initialModel)) {
     return initialModel;
   }
   return DEFAULT_MODEL;
+}
+
+function firstActiveKeyId(keys: ImagePlaygroundApiKeyOption[]): string {
+  return keys[0]?.id ?? "";
+}
+
+function playgroundTestKeyNameWithDate(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${PLAYGROUND_TEST_KEY_NAME}-${y}${m}${day}`;
+}
+
+function meKeyToPlaygroundOption(
+  apiKey: {
+    id: string;
+    name: string;
+    prefix: string;
+    status: string;
+    can_reveal?: boolean;
+  }
+): ImagePlaygroundApiKeyOption {
+  return {
+    id: apiKey.id,
+    name: apiKey.name,
+    prefix: apiKey.prefix,
+    status: apiKey.status,
+    can_reveal: apiKey.can_reveal,
+  };
 }
 
 export interface ImagePlaygroundApiKeyOption {
@@ -97,7 +146,7 @@ interface PlaygroundError {
   message: string;
 }
 
-type ApiKeyMode = "paste" | "select";
+type KeyPanelView = "select" | "paste" | "empty";
 
 type ImageInputSource = "upload" | "url";
 
@@ -184,16 +233,34 @@ export function ImagePlaygroundClient({
   initialModel?: string;
 }) {
   const { t, locale } = useI18n();
+  const router = useRouter();
+  const promptRef = useRef<HTMLTextAreaElement>(null);
+
+  const [localKeys, setLocalKeys] =
+    useState<ImagePlaygroundApiKeyOption[]>(activeKeys);
+  const [sessionSecrets, setSessionSecrets] = useState<Record<string, string>>(
+    {}
+  );
+  const [keyPanelView, setKeyPanelView] = useState<KeyPanelView>(() =>
+    activeKeys.length > 0 ? "select" : "empty"
+  );
+  const [createdBannerKeyId, setCreatedBannerKeyId] = useState<string | null>(
+    null
+  );
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [createKeyError, setCreateKeyError] = useState<string | null>(null);
+
   const [model, setModel] = useState(() => resolveInitialModel(initialModel));
   const [size, setSize] = useState<ImagePlaygroundSize>(DEFAULT_SIZE);
-  const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
-  const [apiKeyMode, setApiKeyMode] = useState<ApiKeyMode>(
-    activeKeys.length > 0 ? "select" : "paste"
-  );
+  const [prompt, setPrompt] = useState(IMAGE_PLAYGROUND_DEFAULT_PROMPT);
   const [apiKey, setApiKey] = useState("");
-  const [selectedKeyId, setSelectedKeyId] = useState(activeKeys[0]?.id ?? "");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [selectedKeyId, setSelectedKeyId] = useState(() =>
+    firstActiveKeyId(activeKeys)
+  );
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImageGenerationResponse | null>(null);
+  const [completedAt, setCompletedAt] = useState<string | null>(null);
   const [error, setError] = useState<PlaygroundError | null>(null);
   const [imageInputs, setImageInputs] = useState<ImageInputItem[]>([]);
   const imageInputsRef = useRef(imageInputs);
@@ -209,7 +276,34 @@ export function ImagePlaygroundClient({
 
   const readyImageUrls = getReadyImageUrls(imageInputs);
 
+  useEffect(() => {
+    setLocalKeys(activeKeys);
+    if (activeKeys.length > 0 && keyPanelView === "empty") {
+      setKeyPanelView("select");
+    }
+  }, [activeKeys, keyPanelView]);
+
+  useEffect(() => {
+    if (
+      localKeys.length > 0 &&
+      !localKeys.some((row) => row.id === selectedKeyId)
+    ) {
+      setSelectedKeyId(localKeys[0].id);
+    }
+  }, [localKeys, selectedKeyId]);
+
+  const selectedKey = useMemo(
+    () => localKeys.find((row) => row.id === selectedKeyId) ?? null,
+    [localKeys, selectedKeyId]
+  );
+
   const selectedModelEntry = getImageModelById(model);
+  const isModelComingSoon = selectedModelEntry?.status === "coming_soon";
+
+  const createdSecret =
+    createdBannerKeyId != null
+      ? (sessionSecrets[createdBannerKeyId] ?? null)
+      : null;
 
   const inputImageCount = readyImageUrls.length;
   const hasInputImages = imageInputs.some((item) => item.status !== "error");
@@ -397,8 +491,65 @@ export function ImagePlaygroundClient({
     });
   }, []);
 
+  async function handleCreateTestKey() {
+    if (creatingKey) return;
+    if (!accessToken) {
+      setCreateKeyError(t("dashboard.imagePlayground.errors.unknown"));
+      return;
+    }
+
+    setCreatingKey(true);
+    setCreateKeyError(null);
+
+    try {
+      let keyResult;
+      try {
+        keyResult = await createApiKey(
+          { name: PLAYGROUND_TEST_KEY_NAME },
+          { accessToken }
+        );
+      } catch (err) {
+        if (err instanceof DmitApiError && err.status === 409) {
+          keyResult = await createApiKey(
+            { name: playgroundTestKeyNameWithDate() },
+            { accessToken }
+          );
+        } else {
+          throw err;
+        }
+      }
+
+      const listItem = meKeyToPlaygroundOption(keyResult.api_key);
+      setSessionSecrets((prev) => ({
+        ...prev,
+        [listItem.id]: keyResult.secret,
+      }));
+      setLocalKeys((prev) => {
+        const without = prev.filter((row) => row.id !== listItem.id);
+        return [listItem, ...without];
+      });
+      setSelectedKeyId(listItem.id);
+      setCreatedBannerKeyId(listItem.id);
+      setKeyPanelView("select");
+      router.refresh();
+    } catch (err) {
+      setCreateKeyError(
+        err instanceof DmitApiError
+          ? imagePlaygroundErrorMessage(err.status, err.code, t)
+          : t("dashboard.imagePlayground.errors.unknown")
+      );
+    } finally {
+      setCreatingKey(false);
+    }
+  }
+
+  function focusPrompt() {
+    promptRef.current?.focus();
+    promptRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
   async function handleCopyApiRequest() {
-    const trimmedPrompt = prompt.trim() || DEFAULT_PROMPT;
+    const trimmedPrompt = prompt.trim() || IMAGE_PLAYGROUND_DEFAULT_PROMPT;
     const curl = buildImageGenerationCurl({
       model,
       prompt: trimmedPrompt,
@@ -423,13 +574,23 @@ export function ImagePlaygroundClient({
 
     setError(null);
     setResult(null);
+    setCompletedAt(null);
+
+    if (isModelComingSoon) {
+      setError({
+        status: 0,
+        code: "model_coming_soon",
+        message: t("dashboard.imagePlayground.modelComingSoon"),
+      });
+      return;
+    }
 
     const trimmedPrompt = prompt.trim();
     if (!trimmedPrompt) {
       setError({
         status: 0,
         code: "missing_prompt",
-        message: "Prompt is required.",
+        message: t("dashboard.imagePlayground.errors.missingPrompt"),
       });
       return;
     }
@@ -453,7 +614,7 @@ export function ImagePlaygroundClient({
     try {
       resolvedKey = await resolveApiKey();
     } catch (err) {
-      setError(toPlaygroundError(err));
+      setError(toPlaygroundError(err, t));
       return;
     }
 
@@ -471,55 +632,93 @@ export function ImagePlaygroundClient({
       setLastRequestInputCount(imageUrlsForRequest.length);
       const res = await imageGenerations(resolvedKey, payload);
       setResult(res);
+      setCompletedAt(
+        resolveImageCreatedAt(res) ?? new Date().toISOString()
+      );
+      router.refresh();
     } catch (err) {
-      setError(toPlaygroundError(err));
+      setCompletedAt(new Date().toISOString());
+      setError(toPlaygroundError(err, t));
     } finally {
       setLoading(false);
     }
   }
 
+  async function revealApiKeyWithTimeout(
+    keyId: string,
+    token: string
+  ): Promise<string> {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        revealMeApiKey(keyId, { accessToken: token }),
+        new Promise<string>((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(
+              new PlaygroundValidationError(
+                t("dashboard.playground.apiKeyLoadTimedOut"),
+                "key_reveal_timeout"
+              )
+            );
+          }, REVEAL_KEY_TIMEOUT_MS);
+        }),
+      ]);
+    } finally {
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+    }
+  }
+
   async function resolveApiKey(): Promise<string> {
-    if (apiKeyMode === "paste") {
+    if (keyPanelView === "paste") {
       const trimmed = apiKey.trim();
       if (!trimmed) {
         throw new PlaygroundValidationError(
-          "API key is required.",
+          t("dashboard.imagePlayground.errors.missingToken"),
           "missing_api_key"
         );
       }
       if (!isFullTokfaiApiKey(trimmed)) {
         throw new PlaygroundValidationError(
-          `Enter a full key like ${TOKFAI_API_KEY_PLACEHOLDER}.`,
+          t("dashboard.imagePlayground.errors.invalidToken"),
           "invalid_api_key"
         );
       }
       return trimmed;
     }
 
-    const selected = activeKeys.find((row) => row.id === selectedKeyId);
-    if (!selected) {
+    if (keyPanelView === "empty" || !selectedKey) {
       throw new PlaygroundValidationError(
-        "Select an active API key or paste one manually.",
+        t("dashboard.imagePlayground.errors.missingToken"),
         "missing_api_key"
       );
     }
-    if (!selected.can_reveal) {
+
+    const sessionSecret = sessionSecrets[selectedKey.id];
+    if (sessionSecret && isFullTokfaiApiKey(sessionSecret)) {
+      return sessionSecret;
+    }
+
+    if (selectedKey.can_reveal === false) {
       throw new PlaygroundValidationError(
-        "This key cannot be loaded automatically. Switch to “Paste key” and enter the full secret.",
+        t("dashboard.imagePlayground.errors.keyNotRetrievable"),
         "key_not_revealable"
       );
     }
+
     if (!accessToken) {
       throw new PlaygroundValidationError(
-        "Please sign in again.",
+        t("dashboard.imagePlayground.errors.unknown"),
         "missing_access_token"
       );
     }
-    const secret = await revealMeApiKey(selected.id, { accessToken });
+
+    const secret = await revealApiKeyWithTimeout(selectedKey.id, accessToken);
     if (!isFullTokfaiApiKey(secret)) {
       throw new PlaygroundValidationError(
-        "Could not load a valid API key. Paste the full secret instead.",
-        "invalid_api_key"
+        t("dashboard.imagePlayground.errors.keyNotRetrievable"),
+        "key_not_revealable"
       );
     }
     return secret;
@@ -555,6 +754,11 @@ export function ImagePlaygroundClient({
         </Badge>
       </div>
 
+      <div className="flex items-start gap-2 rounded-md border border-blue-500/30 bg-blue-500/5 px-4 py-3 text-sm text-muted-foreground">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+        <span>{t("dashboard.imagePlayground.billingHint")}</span>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-[1fr,280px]">
         <Card>
           <CardHeader>
@@ -574,15 +778,25 @@ export function ImagePlaygroundClient({
             </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <ApiKeyField
-              mode={apiKeyMode}
-              activeKeys={activeKeys}
-              apiKey={apiKey}
+            <ApiKeySection
+              keyPanelView={keyPanelView}
+              localKeys={localKeys}
+              selectedKey={selectedKey}
               selectedKeyId={selectedKeyId}
+              apiKey={apiKey}
+              showApiKey={showApiKey}
+              creatingKey={creatingKey}
+              createKeyError={createKeyError}
+              createdSecret={createdSecret}
+              createdBannerKeyId={createdBannerKeyId}
               loading={loading}
-              onModeChange={setApiKeyMode}
-              onApiKeyChange={setApiKey}
+              onCreateTestKey={handleCreateTestKey}
+              onKeyPanelViewChange={setKeyPanelView}
               onSelectedKeyChange={setSelectedKeyId}
+              onApiKeyChange={setApiKey}
+              onShowApiKeyChange={setShowApiKey}
+              onFocusPrompt={focusPrompt}
+              t={t}
             />
 
             <ImageInputsPanel
@@ -614,11 +828,14 @@ export function ImagePlaygroundClient({
                 </p>
               ) : null}
               <PromptPresets
-                inputImageCount={inputImageCount}
                 loading={loading}
-                onSelect={(presetPrompt) => setPrompt(presetPrompt)}
+                onSelect={(presetId) =>
+                  setPrompt(t(imagePlaygroundPresetPromptKey(presetId)))
+                }
+                t={t}
               />
               <textarea
+                ref={promptRef}
                 id="prompt"
                 rows={6}
                 required
@@ -657,7 +874,7 @@ export function ImagePlaygroundClient({
                 </Button>
                 <Button
                   type="submit"
-                  disabled={loading || hasUploadingImages}
+                  disabled={loading || hasUploadingImages || isModelComingSoon}
                 >
                   {loading ? (
                     <>
@@ -713,6 +930,7 @@ export function ImagePlaygroundClient({
               loading={loading}
               error={error}
               result={result}
+              completedAt={completedAt}
               inputImagesCount={
                 result?.input_images_count ?? lastRequestInputCount
               }
@@ -765,6 +983,11 @@ export function ImagePlaygroundClient({
                   {selectedModelEntry.description}
                 </p>
               ) : null}
+              {isModelComingSoon ? (
+                <p className="text-xs font-medium text-destructive">
+                  {t("dashboard.imagePlayground.modelComingSoon")}
+                </p>
+              ) : null}
             </div>
 
             <div className="flex flex-col gap-2">
@@ -804,47 +1027,35 @@ export function ImagePlaygroundClient({
           </CardContent>
         </Card>
       </div>
+
+      <ImagePlaygroundFooter t={t} />
     </form>
   );
 }
 
 function PromptPresets({
-  inputImageCount,
   loading,
   onSelect,
+  t,
 }: {
-  inputImageCount: number;
   loading: boolean;
-  onSelect: (prompt: string) => void;
+  onSelect: (presetId: ImagePlaygroundPresetId) => void;
+  t: (key: string) => string;
 }) {
   return (
-    <div className="flex flex-col gap-2">
-      <p className="text-xs text-muted-foreground">Quick templates</p>
-      <div className="flex flex-wrap gap-2">
-        {IMAGE_PLAYGROUND_PRESETS.map((preset) => {
-          const showInputHint =
-            preset.worksBestWithInputImage === true && inputImageCount === 0;
-
-          return (
-            <div key={preset.id} className="flex items-center gap-1.5">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={loading}
-                onClick={() => onSelect(preset.prompt)}
-              >
-                {preset.label}
-              </Button>
-              {showInputHint ? (
-                <span className="text-[10px] text-muted-foreground">
-                  Works best with an input image.
-                </span>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
+    <div className="flex flex-wrap gap-2">
+      {IMAGE_PLAYGROUND_PRESET_IDS.map((presetId) => (
+        <Button
+          key={presetId}
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={loading}
+          onClick={() => onSelect(presetId)}
+        >
+          {t(imagePlaygroundPresetLabelKey(presetId))}
+        </Button>
+      ))}
     </div>
   );
 }
@@ -1168,119 +1379,269 @@ function formatUrlLabel(url: string): string {
   }
 }
 
-function ApiKeyField({
-  mode,
-  activeKeys,
-  apiKey,
+function ApiKeySection({
+  keyPanelView,
+  localKeys,
+  selectedKey,
   selectedKeyId,
+  apiKey,
+  showApiKey,
+  creatingKey,
+  createKeyError,
+  createdSecret,
+  createdBannerKeyId,
   loading,
-  onModeChange,
-  onApiKeyChange,
+  onCreateTestKey,
+  onKeyPanelViewChange,
   onSelectedKeyChange,
+  onApiKeyChange,
+  onShowApiKeyChange,
+  onFocusPrompt,
+  t,
 }: {
-  mode: ApiKeyMode;
-  activeKeys: ImagePlaygroundApiKeyOption[];
-  apiKey: string;
+  keyPanelView: KeyPanelView;
+  localKeys: ImagePlaygroundApiKeyOption[];
+  selectedKey: ImagePlaygroundApiKeyOption | null;
   selectedKeyId: string;
+  apiKey: string;
+  showApiKey: boolean;
+  creatingKey: boolean;
+  createKeyError: string | null;
+  createdSecret: string | null;
+  createdBannerKeyId: string | null;
   loading: boolean;
-  onModeChange: (mode: ApiKeyMode) => void;
-  onApiKeyChange: (value: string) => void;
+  onCreateTestKey: () => void;
+  onKeyPanelViewChange: (view: KeyPanelView) => void;
   onSelectedKeyChange: (id: string) => void;
+  onApiKeyChange: (value: string) => void;
+  onShowApiKeyChange: (show: boolean) => void;
+  onFocusPrompt: () => void;
+  t: (key: string) => string;
 }) {
-  const revealableKeys = activeKeys.filter((row) => row.can_reveal !== false);
+  const { copiedId, copyText } = useCopyToClipboard();
+  const secretCopied = copiedId === "image-playground-created-secret";
+
+  if (keyPanelView === "paste") {
+    return (
+      <div className="flex flex-col gap-3 rounded-md border bg-muted/20 p-4">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <KeyRound className="h-4 w-4 text-muted-foreground" />
+          {t("dashboard.playground.pasteKey")}
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="api-key">{t("dashboard.playground.fullApiKey")}</Label>
+          <div className="flex gap-2">
+            <Input
+              id="api-key"
+              type={showApiKey ? "text" : "password"}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={TOKFAI_API_KEY_PLACEHOLDER}
+              value={apiKey}
+              onChange={(e) => onApiKeyChange(e.target.value)}
+              disabled={loading}
+              className="font-mono"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              disabled={loading}
+              aria-label={
+                showApiKey
+                  ? t("dashboard.playground.hideKey")
+                  : t("dashboard.playground.showKey")
+              }
+              onClick={() => onShowApiKeyChange(!showApiKey)}
+            >
+              {showApiKey ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {t("dashboard.playground.pasteKeySecurityHint")}
+          </p>
+        </div>
+        {localKeys.length > 0 ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={loading}
+            className="w-fit"
+            onClick={() => onKeyPanelViewChange("select")}
+          >
+            {t("dashboard.playground.selectKey")}
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (keyPanelView === "empty" || localKeys.length === 0) {
+    return (
+      <div className="flex flex-col gap-4 rounded-md border border-dashed bg-muted/20 p-4">
+        <div className="flex items-start gap-2">
+          <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium">
+              {t("dashboard.playground.noKeyTitle")}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {t("dashboard.playground.noKeyBody")}
+            </p>
+          </div>
+        </div>
+        {createKeyError ? (
+          <p className="text-sm text-destructive">{createKeyError}</p>
+        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            disabled={loading || creatingKey}
+            onClick={onCreateTestKey}
+          >
+            {creatingKey ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {t("dashboard.playground.creatingTestKey")}
+              </>
+            ) : (
+              t("dashboard.playground.createTestKey")
+            )}
+          </Button>
+          <Button asChild type="button" size="sm" variant="outline">
+            <Link href="/dashboard/api-keys">
+              {t("dashboard.playground.goToApiKeys")}
+            </Link>
+          </Button>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-auto w-fit px-0 text-xs text-muted-foreground"
+          disabled={loading}
+          onClick={() => onKeyPanelViewChange("paste")}
+        >
+          {t("dashboard.playground.pasteOtherKey")}
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-3 rounded-md border bg-muted/20 p-4">
+    <div className="flex flex-col gap-4 rounded-md border bg-muted/20 p-4">
       <div className="flex items-center gap-2 text-sm font-medium">
         <KeyRound className="h-4 w-4 text-muted-foreground" />
-        API key
+        {t("dashboard.playground.apiKey")}
+      </div>
+
+      {createdSecret && createdBannerKeyId === selectedKeyId ? (
+        <CreatedKeyBanner
+          secret={createdSecret}
+          secretCopied={secretCopied}
+          onCopy={() =>
+            copyText("image-playground-created-secret", createdSecret)
+          }
+          onTestNow={onFocusPrompt}
+          t={t}
+        />
+      ) : null}
+
+      {selectedKey ? (
+        <p className="text-sm text-muted-foreground">
+          {formatMessage(t("dashboard.playground.currentKeySelection"), {
+            name: selectedKey.name,
+            prefix: selectedKey.prefix || "sk-tokfai",
+          })}
+        </p>
+      ) : null}
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="api-key-select">{t("dashboard.playground.selectKey")}</Label>
+        <select
+          id="api-key-select"
+          value={selectedKeyId}
+          onChange={(e) => onSelectedKeyChange(e.target.value)}
+          disabled={loading}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {localKeys.map((row) => (
+            <option key={row.id} value={row.id}>
+              {row.name} ({row.prefix || "no prefix"})
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-muted-foreground">
+          {t("dashboard.playground.secretNotStored")}
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"
           size="sm"
-          variant={mode === "select" ? "default" : "outline"}
-          disabled={loading || revealableKeys.length === 0}
-          onClick={() => onModeChange("select")}
-        >
-          Select key
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant={mode === "paste" ? "default" : "outline"}
+          variant="outline"
           disabled={loading}
-          onClick={() => onModeChange("paste")}
+          onClick={() => onKeyPanelViewChange("paste")}
         >
-          Paste key
+          {t("dashboard.playground.pasteOtherKey")}
+        </Button>
+        <Button asChild type="button" size="sm" variant="outline">
+          <Link href="/dashboard/api-keys">
+            {t("dashboard.playground.manageApiKeys")}
+          </Link>
         </Button>
       </div>
 
-      {mode === "select" ? (
-        revealableKeys.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="api-key-select">Your active keys</Label>
-            <select
-              id="api-key-select"
-              value={selectedKeyId}
-              onChange={(e) => onSelectedKeyChange(e.target.value)}
-              disabled={loading}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {revealableKeys.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.name} ({row.prefix || "no prefix"})
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-muted-foreground">
-              The full secret is loaded only for this request and is not stored
-              in the browser.
-            </p>
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            No revealable keys found.{" "}
-            <button
-              type="button"
-              className="underline underline-offset-4"
-              onClick={() => onModeChange("paste")}
-            >
-              Paste your key
-            </button>{" "}
-            or{" "}
-            <Link
-              href="/dashboard/api-keys"
-              className="underline underline-offset-4"
-            >
-              create one
-            </Link>
-            .
-          </p>
-        )
-      ) : (
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="api-key">Full API key</Label>
-          <Input
-            id="api-key"
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder={TOKFAI_API_KEY_PLACEHOLDER}
-            value={apiKey}
-            onChange={(e) => onApiKeyChange(e.target.value)}
-            disabled={loading}
-          />
-          <p className="text-xs text-muted-foreground">
-            Sent as{" "}
-            <code className="rounded bg-background px-1 text-[11px]">
-              Authorization: Bearer sk-tokfai_…
-            </code>
-            . Never logged or persisted by this page.
-          </p>
-        </div>
-      )}
+      <p className="text-xs text-muted-foreground">
+        {t("dashboard.playground.manageApiKeysHint")}
+      </p>
+    </div>
+  );
+}
+
+function CreatedKeyBanner({
+  secret,
+  secretCopied,
+  onCopy,
+  onTestNow,
+  t,
+}: {
+  secret: string;
+  secretCopied: boolean;
+  onCopy: () => void;
+  onTestNow: () => void;
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4">
+      <div className="flex items-start gap-2 text-sm text-emerald-800 dark:text-emerald-200">
+        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>{t("dashboard.playground.testKeyCreated")}</span>
+      </div>
+      <code className="break-all rounded-md border bg-background px-3 py-2 font-mono text-sm">
+        {secret}
+      </code>
+      <p className="text-xs text-muted-foreground">
+        {t("dashboard.playground.secretOnceHint")}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <CopyButton
+          copied={secretCopied}
+          onCopy={onCopy}
+          copyLabel={t("dashboard.playground.copySecret")}
+          copiedLabel={t("dashboard.playground.copied")}
+        />
+        <Button type="button" size="sm" variant="outline" onClick={onTestNow}>
+          {t("dashboard.playground.testNow")}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -1289,12 +1650,14 @@ function ResponsePanel({
   loading,
   error,
   result,
+  completedAt,
   inputImagesCount,
   t,
 }: {
   loading: boolean;
   error: PlaygroundError | null;
   result: ImageGenerationResponse | null;
+  completedAt: string | null;
   inputImagesCount: number | null | undefined;
   t: (key: string) => string;
 }) {
@@ -1347,8 +1710,11 @@ function ResponsePanel({
     );
   }
 
-  const imageUrl = result.data?.[0]?.url ?? null;
+  const imageUrl = resolveGeneratedImageUrl(result);
+  const base64Only = !imageUrl && hasGeneratedImageBase64(result);
   const creditsCharged = resolveImageCreditsCharged(result);
+  const createdAt =
+    completedAt ?? resolveImageCreatedAt(result) ?? null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -1371,14 +1737,14 @@ function ResponsePanel({
                 href="/dashboard/usage"
                 className="underline underline-offset-4"
               >
-                Usage
+                {t("dashboard.imagePlayground.viewUsage")}
               </Link>{" "}
               /{" "}
               <Link
                 href="/dashboard/credits"
                 className="underline underline-offset-4"
               >
-                Credits
+                {t("dashboard.imagePlayground.viewCredits")}
               </Link>
             </p>
           </div>
@@ -1394,16 +1760,22 @@ function ResponsePanel({
             className="mx-auto max-h-[480px] w-full object-contain"
           />
         </div>
+      ) : base64Only ? (
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-muted-foreground">
+          {t("dashboard.imagePlayground.base64OnlyHint")}
+        </div>
       ) : (
         <div className="rounded-md border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
-          No image URL returned.
+          {t("dashboard.imagePlayground.generatedImagePlaceholder")}
         </div>
       )}
 
       <MetadataPanel
         result={result}
         imageUrl={imageUrl}
+        createdAt={createdAt}
         inputImagesCount={inputImagesCount ?? result.input_images_count ?? 0}
+        t={t}
       />
     </div>
   );
@@ -1422,39 +1794,21 @@ function resolveImageCreditsCharged(
 function MetadataPanel({
   result,
   imageUrl,
+  createdAt,
   inputImagesCount,
+  t,
 }: {
   result: ImageGenerationResponse;
   imageUrl: string | null;
+  createdAt: string | null;
   inputImagesCount: number;
+  t: (key: string) => string;
 }) {
-  const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
+  const { copiedId, copyText } = useCopyToClipboard();
+  const urlCopyId = "image-playground-url";
+  const requestCopyId = "image-playground-request-id";
 
-  async function handleCopyUrl() {
-    if (!imageUrl) return;
-    try {
-      await navigator.clipboard.writeText(imageUrl);
-      setCopyStatus("copied");
-      window.setTimeout(() => setCopyStatus("idle"), 2000);
-    } catch {
-      setCopyStatus("idle");
-    }
-  }
-
-  const items: Array<{ label: string; value: string | number | null | undefined }> =
-    [
-      { label: "Input images", value: String(inputImagesCount) },
-      { label: "model", value: result.model },
-      { label: "request_id", value: result.request_id },
-      { label: "upstream_id", value: result.upstream_id },
-      {
-        label: "credits_charged",
-        value:
-          result.credits_charged != null
-            ? String(result.credits_charged)
-            : null,
-      },
-    ];
+  const creditsCharged = resolveImageCreditsCharged(result);
 
   return (
     <div className="flex flex-col gap-3 rounded-md border bg-card p-4">
@@ -1466,38 +1820,85 @@ function MetadataPanel({
           <code className="block overflow-x-auto rounded-md border bg-muted/40 p-3 font-mono text-xs break-all">
             {imageUrl}
           </code>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="w-fit"
-            onClick={handleCopyUrl}
-          >
-            {copyStatus === "copied" ? (
-              <>
-                <Check className="h-4 w-4" />
-                Copied
-              </>
-            ) : (
-              <>
-                <Copy className="h-4 w-4" />
-                Copy image URL
-              </>
-            )}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild type="button" size="sm" variant="outline" className="w-fit">
+              <a href={imageUrl} download target="_blank" rel="noopener noreferrer">
+                {t("dashboard.imagePlayground.downloadImage")}
+              </a>
+            </Button>
+            <CopyButton
+              copied={copiedId === urlCopyId}
+              onCopy={() => copyText(urlCopyId, imageUrl)}
+              copyLabel={t("dashboard.imagePlayground.copyImageUrl")}
+              copiedLabel={t("dashboard.imagePlayground.copiedImageUrl")}
+            />
+          </div>
         </div>
       ) : null}
 
       <dl className="grid gap-2 text-sm">
-        {items.map((item) =>
-          item.value != null && item.value !== "" ? (
-            <div key={item.label} className="flex flex-wrap gap-x-2">
-              <dt className="text-muted-foreground">{item.label}:</dt>
-              <dd className="font-mono">{item.value}</dd>
-            </div>
-          ) : null
-        )}
+        <div className="flex flex-wrap gap-x-2">
+          <dt className="text-muted-foreground">model:</dt>
+          <dd className="font-mono">{result.model}</dd>
+        </div>
+        {createdAt ? (
+          <div className="flex flex-wrap gap-x-2">
+            <dt className="text-muted-foreground">created_at:</dt>
+            <dd className="font-mono">{formatDateTime(createdAt)}</dd>
+          </div>
+        ) : null}
+        {creditsCharged != null ? (
+          <div className="flex flex-wrap gap-x-2">
+            <dt className="text-muted-foreground">credits_charged:</dt>
+            <dd className="font-mono">{formatCreditsPrecise(creditsCharged)}</dd>
+          </div>
+        ) : null}
+        <div className="flex flex-wrap gap-x-2">
+          <dt className="text-muted-foreground">input images:</dt>
+          <dd className="font-mono">{inputImagesCount}</dd>
+        </div>
+        {result.request_id ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <dt className="text-muted-foreground">request_id:</dt>
+            <dd className="font-mono break-all">{result.request_id}</dd>
+            <CopyButton
+              copied={copiedId === requestCopyId}
+              onCopy={() => copyText(requestCopyId, result.request_id!)}
+              copyLabel={t("dashboard.imagePlayground.copyRequestId")}
+              copiedLabel={t("dashboard.imagePlayground.copiedRequestId")}
+              size="icon"
+            />
+          </div>
+        ) : null}
       </dl>
+    </div>
+  );
+}
+
+function ImagePlaygroundFooter({ t }: { t: (key: string) => string }) {
+  const links = [
+    { href: "/dashboard/usage", label: t("dashboard.imagePlayground.viewUsage") },
+    {
+      href: "/dashboard/credits",
+      label: t("dashboard.imagePlayground.viewCredits"),
+    },
+    {
+      href: "/dashboard/models",
+      label: t("dashboard.imagePlayground.viewModels"),
+    },
+    {
+      href: "/dashboard/api-keys",
+      label: t("dashboard.playground.manageApiKeys"),
+    },
+  ] as const;
+
+  return (
+    <div className="flex flex-wrap gap-2 border-t pt-4">
+      {links.map((link) => (
+        <Button key={link.href} asChild variant="outline" size="sm">
+          <Link href={link.href}>{link.label}</Link>
+        </Button>
+      ))}
     </div>
   );
 }
@@ -1520,12 +1921,15 @@ const IMAGE_PAGE_RESOLVE_ERROR_CODES = new Set([
 const IMAGE_PAGE_RESOLVE_ERROR_MESSAGE =
   "Tokfai could not find a usable image on this page. Try another URL or upload the image directly.";
 
-function toPlaygroundError(err: unknown): PlaygroundError {
+function toPlaygroundError(
+  err: unknown,
+  t: (key: string) => string
+): PlaygroundError {
   if (err instanceof PlaygroundValidationError) {
     return {
       status: 0,
       code: err.code,
-      message: err.message,
+      message: playgroundErrorMessage(0, err.code, t),
     };
   }
   if (err instanceof DmitApiError) {
@@ -1540,26 +1944,39 @@ function toPlaygroundError(err: unknown): PlaygroundError {
     return {
       status: err.status,
       code: err.code,
-      message: userMessageForDmitError(err.status, err.code, err.message),
+      message: imagePlaygroundErrorMessage(
+        err.status,
+        err.code,
+        t,
+        err.message
+      ),
     };
   }
   if (err instanceof TypeError) {
     return {
       status: 0,
       code: "network_error",
-      message: userMessageForDmitError(503),
+      message: imagePlaygroundErrorMessage(503, "upstream_error", t),
     };
   }
   if (err instanceof Error) {
     return {
       status: 0,
       code: "unknown_error",
-      message: userMessageForDmitError(0, undefined, err.message),
+      message: imagePlaygroundErrorMessage(0, undefined, t, err.message),
     };
   }
   return {
     status: 0,
     code: "unknown_error",
-    message: userMessageForDmitError(503),
+    message: imagePlaygroundErrorMessage(503, undefined, t),
   };
+}
+
+function playgroundErrorMessage(
+  status: number,
+  code: string | undefined,
+  t: (key: string) => string
+): string {
+  return imagePlaygroundErrorMessage(status, code, t);
 }

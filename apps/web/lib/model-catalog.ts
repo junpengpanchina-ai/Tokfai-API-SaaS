@@ -428,10 +428,22 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
   },
 ];
 
+/** Curated Image Playground model order (display-only). */
+export const IMAGE_PLAYGROUND_PRIMARY_MODEL_IDS = [
+  "gpt-image-2",
+  "nano-banana-fast",
+  "nano-banana",
+  "nano-banana-pro",
+] as const;
+
+export const IMAGE_PLAYGROUND_DEFAULT_MODEL = "gpt-image-2";
+
 /** Image models exposed in the Image Playground dropdown. */
-export const IMAGE_PLAYGROUND_MODEL_IDS = IMAGE_MODELS.filter(
-  (model) => model.status === "available"
-).map((model) => model.id);
+export const IMAGE_PLAYGROUND_MODEL_IDS: string[] =
+  IMAGE_PLAYGROUND_PRIMARY_MODEL_IDS.filter((modelId) => {
+    const model = IMAGE_MODELS.find((entry) => entry.id === modelId);
+    return model?.status === "available";
+  });
 
 export type ImagePlaygroundModelId = string;
 

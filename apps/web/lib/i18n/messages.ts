@@ -604,6 +604,8 @@ export const messages = {
         size: "Size",
         generatingImage: "Generating image…",
         generatedImagePlaceholder: "Generated image will appear here.",
+        base64OnlyHint:
+          "The API returned base64 image data (data[0].b64_json). Image Playground only previews URL responses — use the API directly or set response_format=url.",
         needKey: "Need a key?",
         createApiKey: "Create an API key",
         needCredits: "Need more credits?",
@@ -613,6 +615,50 @@ export const messages = {
         currentReferencePrice: "Current reference price: {price}.",
         estimatedCost: "Estimated cost: {credits} credits",
         priceFallback: "Price is shown in Usage after the request.",
+        billingHint:
+          "Image generation consumes credits. Actual charges are recorded in Usage and Credits.",
+        modelComingSoon:
+          "This model is coming soon and cannot be used in Playground yet.",
+        presetProduct: "Product shot",
+        presetAvatar: "Avatar",
+        presetEcommerce: "E-commerce hero",
+        presetPoster: "Poster",
+        presetProductPrompt:
+          "Create a clean product-style image of a futuristic API dashboard, soft lighting, minimal background.",
+        presetAvatarPrompt:
+          "Create a friendly professional avatar portrait, soft lighting, neutral background, high detail.",
+        presetEcommercePrompt:
+          "Create a polished e-commerce hero image with a product on a minimal studio background, commercial lighting.",
+        presetPosterPrompt:
+          "Create a modern promotional poster with bold composition, clean typography space, premium commercial style.",
+        resultTitle: "Result",
+        downloadImage: "Download image",
+        copyImageUrl: "Copy image URL",
+        copiedImageUrl: "Copied",
+        copyRequestId: "Copy request ID",
+        copiedRequestId: "Copied",
+        viewUsage: "View Usage",
+        viewCredits: "View Credits",
+        viewModels: "View Models",
+        footerActions: "Next steps",
+        errors: {
+          missingToken:
+            "Missing API key. Create and paste an active key first.",
+          invalidToken:
+            "API key is invalid or revoked. Create a new key.",
+          insufficientCredits:
+            "Insufficient credits. Top up and try again.",
+          upstreamTimeout:
+            "Image generation timed out. Please try again later.",
+          upstreamError:
+            "Image service is temporarily unavailable. Try again or switch models.",
+          imageGenerationFailed:
+            "Image generation failed. Check your prompt and try again.",
+          missingPrompt: "Please enter a prompt.",
+          keyNotRetrievable:
+            "For security, full keys aren't stored long-term. Paste your key or create a new test key.",
+          unknown: "Request failed. Please try again later.",
+        },
       },
       credits: {
         title: "Credits ledger",
@@ -2118,6 +2164,8 @@ export const messages = {
         size: "尺寸",
         generatingImage: "生成图像中…",
         generatedImagePlaceholder: "生成的图像将显示在这里。",
+        base64OnlyHint:
+          "API 返回了 base64 图像数据（data[0].b64_json）。Image Playground 仅预览 URL 响应 — 请直接调用 API 或设置 response_format=url。",
         needKey: "还没有密钥？",
         createApiKey: "创建 API 密钥",
         needCredits: "积分不足？",
@@ -2126,6 +2174,43 @@ export const messages = {
         currentReferencePrice: "当前参考价格：{price}。",
         estimatedCost: "预计消耗：{credits} credits",
         priceFallback: "价格以实际用量记录为准。",
+        billingHint:
+          "图像生成会消耗 credits，实际扣费以 Credits / Usage 账本为准。",
+        modelComingSoon: "该模型即将上线，暂不能在 Playground 中使用。",
+        presetProduct: "产品图",
+        presetAvatar: "头像图",
+        presetEcommerce: "电商主图",
+        presetPoster: "海报图",
+        presetProductPrompt:
+          "Create a clean product-style image of a futuristic API dashboard, soft lighting, minimal background.",
+        presetAvatarPrompt:
+          "生成一张干净专业的头像肖像，柔和光线，中性背景，高细节。",
+        presetEcommercePrompt:
+          "生成一张精致的电商主图，产品在极简棚拍背景上，商业级布光。",
+        presetPosterPrompt:
+          "生成一张现代宣传海报，构图醒目，预留清晰排版空间，高级商业风格。",
+        resultTitle: "生成结果",
+        downloadImage: "下载图片",
+        copyImageUrl: "复制图片 URL",
+        copiedImageUrl: "已复制",
+        copyRequestId: "复制 request_id",
+        copiedRequestId: "已复制",
+        viewUsage: "查看 Usage",
+        viewCredits: "查看 Credits",
+        viewModels: "查看 Models",
+        footerActions: "下一步",
+        errors: {
+          missingToken: "缺少 API Key，请先创建并选择可用密钥。",
+          invalidToken: "API Key 无效或已吊销，请重新创建。",
+          insufficientCredits: "余额不足，请充值后再试。",
+          upstreamTimeout: "图像生成超时，请稍后重试。",
+          upstreamError: "图像服务暂时不可用，请稍后重试或切换模型。",
+          imageGenerationFailed: "图像生成失败，请检查 prompt 后重试。",
+          missingPrompt: "请输入 prompt。",
+          keyNotRetrievable:
+            "出于安全考虑，完整 key 不会长期保存。请粘贴 key，或重新创建一个测试 Key。",
+          unknown: "请求失败，请稍后重试。",
+        },
       },
       credits: {
         title: "积分账本",
