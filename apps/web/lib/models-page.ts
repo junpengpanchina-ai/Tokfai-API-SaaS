@@ -14,6 +14,7 @@ import {
   formatDbImageCreditsPerGeneration,
   formatChatInputPricePerMillion,
   formatChatOutputPricePerMillion,
+  getChatModelNote,
   getChatModelUseCase,
   getImageModelUseCase,
 } from "@/lib/model-pricing-display";
@@ -80,12 +81,18 @@ export function buildModelsTableRows(
 
   return models.map((model) => {
     const dbPricing = pricingByModelId.get(model.id) ?? null;
-    const useCase =
+    const useCaseBase =
       model.type === "image"
         ? getImageModelUseCase(model.id, t)
         : model.type === "chat"
           ? getChatModelUseCase(model.id, t)
           : model.description;
+    const chatNote =
+      model.type === "chat" ? getChatModelNote(model.id, t) : null;
+    const useCase =
+      chatNote && useCaseBase !== "—"
+        ? `${useCaseBase}\n${chatNote}`
+        : chatNote ?? (useCaseBase === "—" ? model.description : useCaseBase);
 
     const prices = resolveModelPrices(model, dbPricing, t, locale, billingFallback);
     const estimates = resolveCostEstimates(

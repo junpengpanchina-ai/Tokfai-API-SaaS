@@ -46,9 +46,10 @@ import {
   isFullTokfaiApiKey,
   TOKFAI_API_KEY_PLACEHOLDER,
   TOKFAI_CHAT_COMPLETIONS_ENDPOINT,
+  TOKFAI_RECOMMENDED_MODEL,
 } from "@/lib/tokfai-api";
 
-const DEFAULT_MODEL = "gemini-3.1-pro";
+const DEFAULT_MODEL = TOKFAI_RECOMMENDED_MODEL;
 const MODEL_OPTIONS = AVAILABLE_CHAT_MODEL_IDS;
 const REVEAL_KEY_TIMEOUT_MS = 30_000;
 const PLAYGROUND_TEST_KEY_NAME = "playground-test";
@@ -1082,15 +1083,40 @@ class PlaygroundValidationError extends Error {
   }
 }
 
+function isUpstreamModelLoadError(
+  status: number,
+  code: string | undefined,
+  message?: string
+): boolean {
+  const normalized = (code ?? "").toLowerCase();
+  const detail = (message ?? "").toLowerCase();
+
+  if (
+    normalized === "upstream_error" ||
+    status === 502 ||
+    detail.includes("model load") ||
+    detail.includes("load is too high")
+  ) {
+    return true;
+  }
+
+  return status >= 500 || status === 503 || status === 504;
+}
+
 function playgroundErrorMessage(
   status: number,
   code: string | undefined,
-  t: (key: string) => string
+  t: (key: string) => string,
+  message?: string
 ): string {
   const normalized = (code ?? "").toLowerCase();
 
   if (status === 402 || normalized === "insufficient_credits") {
     return t("dashboard.playground.errors.insufficientCredits");
+  }
+
+  if (isUpstreamModelLoadError(status, code, message)) {
+    return t("dashboard.playground.errors.upstreamError");
   }
 
   const codeMap: Record<string, string> = {
@@ -1102,7 +1128,6 @@ function playgroundErrorMessage(
     invalid_api_key: "dashboard.playground.errors.invalidToken",
     insufficient_credits: "dashboard.playground.errors.insufficientCredits",
     model_not_found: "dashboard.playground.errors.modelNotFound",
-    upstream_error: "dashboard.playground.errors.upstreamError",
     upstream_auth_error: "dashboard.playground.errors.upstreamError",
     upstream_rate_limited: "dashboard.playground.errors.upstreamError",
     rate_limited: "dashboard.playground.errors.rateLimited",
@@ -1115,15 +1140,6 @@ function playgroundErrorMessage(
 
   if (status === 404 && !codeMap[normalized]) {
     return t("dashboard.playground.errors.modelNotFound");
-  }
-
-  if (
-    status >= 500 ||
-    status === 502 ||
-    status === 503 ||
-    status === 504
-  ) {
-    return t("dashboard.playground.errors.upstreamError");
   }
 
   const key = codeMap[normalized];
@@ -1153,7 +1169,12 @@ function toPlaygroundError(
     return {
       status: err.status,
       code: err.code,
-      message: playgroundErrorMessage(err.status, err.code, t),
+      message: playgroundErrorMessage(
+        err.status,
+        err.code,
+        t,
+        err.message
+      ),
     };
   }
   if (err instanceof TypeError) {

@@ -565,7 +565,7 @@ export const messages = {
           modelNotFound:
             "Model not found or not available. Try another model.",
           upstreamError:
-            "Upstream model is temporarily unavailable. Retry later or switch models.",
+            "The selected model is busy or the upstream provider is temporarily unavailable. Try gpt-5.4 or gpt-5.5.",
           rateLimited: "Too many requests. Please try again later.",
           unknown: "Request failed. Please try again later.",
           missingPrompt: "Please enter a prompt.",
@@ -833,6 +833,16 @@ export const messages = {
         "gemini-2.5-pro": "Chat, code, and general tasks",
         "gpt-5.4": "Chat, code, and general tasks",
         "gpt-5.5": "Chat, code, and general tasks",
+      },
+      chatModelNote: {
+        "gpt-5.4":
+          "Recommended test model for Playground and OpenAI-compatible chat calls.",
+        "gemini-3.1-pro":
+          "May be unavailable during high load. For testing, try gpt-5.4 first.",
+        "gemini-3-pro":
+          "May be unavailable during high load. For testing, try gpt-5.4 first.",
+        "gemini-2.5-pro":
+          "May be unavailable during high load. For testing, try gpt-5.4 first.",
       },
       imageUseCase: {
         "gpt-image-2": "Text-to-image, image-to-image, high-quality images",
@@ -2061,7 +2071,8 @@ export const messages = {
           invalidToken: "API Key 无效或已吊销，请重新创建。",
           insufficientCredits: "余额不足，请充值后再试。",
           modelNotFound: "模型不存在或暂未开放，请换一个模型。",
-          upstreamError: "上游模型暂时异常，请稍后重试或切换模型。",
+          upstreamError:
+            "当前模型负载较高或上游暂时异常。建议切换 gpt-5.4 / gpt-5.5 后重试。",
           rateLimited: "请求过快，请稍后再试。",
           unknown: "请求失败，请稍后重试。",
           missingPrompt: "请输入测试内容。",
@@ -2316,6 +2327,14 @@ export const messages = {
         "gemini-2.5-pro": "适合对话 / 代码 / 通用任务",
         "gpt-5.4": "适合对话 / 代码 / 通用任务",
         "gpt-5.5": "适合对话 / 代码 / 通用任务",
+      },
+      chatModelNote: {
+        "gpt-5.4": "推荐测试模型，当前可用于 Playground 与 OpenAI-compatible chat 调用。",
+        "gemini-3.1-pro":
+          "高负载时可能暂时不可用，测试阶段建议优先使用 gpt-5.4。",
+        "gemini-3-pro": "高负载时可能暂时不可用，测试阶段建议优先使用 gpt-5.4。",
+        "gemini-2.5-pro":
+          "高负载时可能暂时不可用，测试阶段建议优先使用 gpt-5.4。",
       },
       imageUseCase: {
         "gpt-image-2": "适合文生图 / 图生图 / 高质量图片",

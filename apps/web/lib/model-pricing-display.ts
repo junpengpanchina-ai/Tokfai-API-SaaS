@@ -316,6 +316,15 @@ export function getChatModelUseCase(
   return value === key ? "—" : value;
 }
 
+export function getChatModelNote(
+  modelId: string,
+  t: (key: string) => string
+): string | null {
+  const key = `catalog.chatModelNote.${modelId}`;
+  const value = t(key);
+  return value === key ? null : value;
+}
+
 function formatTraitLevel(
   level: ModelTraitLevel,
   t: (key: string) => string

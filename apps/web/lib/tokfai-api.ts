@@ -13,7 +13,7 @@ export const IMAGE_REFERENCE_SYSTEM_HINT =
   "Use the input image(s) as visual reference. Preserve the main subject unless the user asks otherwise.";
 export const TOKFAI_API_KEY_FORMAT = "sk-tokfai_...";
 export const TOKFAI_API_KEY_PLACEHOLDER = "sk-tokfai_xxx";
-export const TOKFAI_RECOMMENDED_MODEL = "gemini-3.1-pro";
+export const TOKFAI_RECOMMENDED_MODEL = "gpt-5.4";
 
 export const TOKFAI_PRODUCT_TAGLINE =
   "OpenAI-compatible image & chat API — one API for chat, image, and AI apps.";

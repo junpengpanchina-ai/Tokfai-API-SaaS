@@ -39,7 +39,7 @@ const CHAT_COMPLETIONS_CURL = `curl https://api.tokfai.com/v1/chat/completions \
   -H "Authorization: Bearer sk-tokfai_xxx" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "gemini-3.1-pro",
+    "model": "gpt-5.4",
     "messages": [
       {"role": "user", "content": "Hello Tokfai"}
     ]
@@ -407,7 +407,7 @@ function ModelTableRow({
         <StatusBadge status={row.status} t={t} />
       </td>
       <td className="max-w-[12rem] py-2 pr-4 text-muted-foreground">
-        {row.useCase}
+        <MultilineCell text={row.useCase} />
       </td>
       <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">
         {row.inputPrice}
