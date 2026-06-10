@@ -64,12 +64,12 @@ export function PricingContent({
     {
       id: "billing-success",
       icon: MessageSquare,
-      text: "Successful calls debit credits.",
+      text: t("pricing.billingSuccessCalls"),
     },
     {
       id: "billing-failed",
       icon: ImageIcon,
-      text: "Failed calls are not charged.",
+      text: t("pricing.billingFailedCalls"),
     },
     {
       id: "chat-billing",
@@ -86,14 +86,14 @@ export function PricingContent({
       icon: ArrowRight,
       text: (
         <>
-          Monitor usage in{" "}
+          {t("pricing.monitorUsagePrefix")}{" "}
           <Link
             href="/dashboard/usage"
             className="font-medium text-foreground underline-offset-4 hover:underline"
           >
-            /dashboard/usage
+            {t("nav.usage")}
           </Link>
-          .
+          {t("pricing.monitorUsageSuffix")}
         </>
       ),
     },
@@ -102,46 +102,50 @@ export function PricingContent({
       icon: Code2,
       text: (
         <>
-          Ledger in{" "}
+          {t("pricing.ledgerInPrefix")}{" "}
           <Link
             href="/dashboard/credits"
             className="font-medium text-foreground underline-offset-4 hover:underline"
           >
-            /dashboard/credits
+            {t("nav.credits")}
           </Link>
-          .
+          {t("pricing.ledgerInSuffix")}
         </>
       ),
     },
   ];
 
   const devItems = [
-    { label: "Base URL", value: TOKFAI_API_BASE_URL },
-    { label: "API key format", value: TOKFAI_API_KEY_FORMAT },
-    { label: "Starter", value: TOKFAI_STARTER_PLAN },
-    { label: "Billing", value: TOKFAI_BILLING_POLICY },
-    { label: "Playground", value: TOKFAI_PLAYGROUND_POLICY },
+    { label: t("pricing.devLabelBaseUrl"), value: TOKFAI_API_BASE_URL },
+    { label: t("pricing.devLabelApiKeyFormat"), value: TOKFAI_API_KEY_FORMAT },
+    { label: t("pricing.devLabelStarter"), value: TOKFAI_STARTER_PLAN },
+    { label: t("pricing.devLabelBilling"), value: TOKFAI_BILLING_POLICY },
+    { label: t("pricing.devLabelPlayground"), value: TOKFAI_PLAYGROUND_POLICY },
     {
-      label: "Models",
+      label: t("pricing.devLabelModels"),
       value: "/dashboard/models",
       href: "/dashboard/models",
     },
     {
-      label: "Chat Playground",
+      label: t("pricing.devLabelChatPlayground"),
       value: "/dashboard/playground",
       href: "/dashboard/playground",
     },
     {
-      label: "Image Playground",
+      label: t("pricing.devLabelImagePlayground"),
       value: "/dashboard/image-playground",
       href: "/dashboard/image-playground",
     },
     {
-      label: "API Keys",
+      label: t("pricing.devLabelApiKeys"),
       value: "/dashboard/api-keys",
       href: "/dashboard/api-keys",
     },
-    { label: "Docs", value: "/dashboard/docs", href: "/dashboard/docs" },
+    {
+      label: t("pricing.devLabelDocs"),
+      value: "/dashboard/docs",
+      href: "/dashboard/docs",
+    },
   ] as const;
 
   return (

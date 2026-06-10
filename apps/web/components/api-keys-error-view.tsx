@@ -13,18 +13,26 @@ import { useI18n } from "@/lib/i18n/i18n-provider";
 
 export function ApiKeysErrorView({
   message,
+  messageKey,
   method,
   url,
   httpStatus,
   code,
 }: {
-  message: string;
+  message?: string;
+  messageKey?: "auth" | "temp";
   method: string;
   url: string;
   httpStatus?: number;
   code?: string;
 }) {
   const { t } = useI18n();
+  const displayMessage =
+    messageKey === "auth"
+      ? t("dashboard.apiKeys.loadErrorAuthDesc")
+      : messageKey === "temp"
+        ? t("dashboard.apiKeys.loadErrorTempDesc")
+        : (message ?? t("dashboard.apiKeys.loadErrorTempDesc"));
 
   return (
     <div className="flex flex-col gap-6">
@@ -43,14 +51,14 @@ export function ApiKeysErrorView({
             <AlertTriangle className="h-4 w-4 text-destructive" />
             {t("dashboard.apiKeys.loadError")}
           </CardTitle>
-          <CardDescription>{message}</CardDescription>
+          <CardDescription>{displayMessage}</CardDescription>
         </CardHeader>
         <CardContent className="font-mono text-xs text-muted-foreground">
           method={method} url={url}
           <br />
           status={httpStatus ?? "n/a"} code={code ?? "n/a"}
           <br />
-          message={message}
+          message={displayMessage}
         </CardContent>
       </Card>
     </div>

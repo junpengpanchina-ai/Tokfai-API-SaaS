@@ -57,6 +57,35 @@ export const messages = {
       tryImagePlayground: "Try Image Playground",
       viewPricing: "View pricing",
       readDocs: "Read docs",
+      howItWorksTitle: "How it works",
+      howItWorksDesc: "From sign-up to your first API call in five steps.",
+      step1Title: "Sign in",
+      step1Body:
+        "Create a Tokfai account or log in with your existing credentials.",
+      step2Title: "Buy credits",
+      step2Body:
+        "Starter ¥29.9 — prepaid balance powers every API call.",
+      step3Title: "Create API key",
+      step3Body:
+        "Issue a sk-tokfai_… key from the dashboard and store it securely.",
+      step4Title: "Call the API",
+      step4Body:
+        "Point OpenAI SDK, Cursor, Cherry Studio, or your app at api.tokfai.com/v1. Test chat in Chat Playground and images in Image Playground.",
+      step5Title: "Monitor usage",
+      step5Body:
+        "Watch requests, credits charged, and ledger entries update in real time.",
+      devQuickRefTitle: "Developer quick reference",
+      devQuickRefDesc:
+        "Swap your base URL and Authorization header — keep the rest of your OpenAI-compatible code unchanged.",
+      devLabelBaseUrl: "Base URL",
+      devLabelApiKeyFormat: "API key format",
+      devLabelStarter: "Starter",
+      devLabelBilling: "Billing",
+      devLabelPlayground: "Playground",
+      devLabelAuthExample: "Authorization example",
+      devLabelModels: "Models",
+      devLabelImageApiDocs: "Image API docs",
+      fullApiReference: "Full API reference",
     },
     common: {
       signOut: "Sign out",
@@ -69,6 +98,9 @@ export const messages = {
       unavailable: "Unavailable",
       chatPlayground: "Chat Playground",
       imagePlayground: "Image Playground",
+      footerTagline: "Tokfai · OpenAI-compatible image & chat API",
+      apiReference: "API reference →",
+      copyright: "© {year} Tokfai",
     },
     dashboard: {
       overview: {
@@ -116,6 +148,7 @@ export const messages = {
         recentActivityDesc: "Last 5 API requests from usage_logs.",
         recentActivityEmpty:
           "No usage yet. Run a Playground test and recent calls will appear here.",
+        viewAllUsage: "View all usage",
         securityTitle: "Security reminders",
         securityItem1:
           "The full API key is shown only once when created — copy it immediately.",
@@ -398,6 +431,10 @@ export const messages = {
         subtitleCreate:
           "Create keys to authenticate requests to {baseUrl}. The full secret is shown once when created. Active keys can be revealed and copied again with Copy key.",
         loadError: "Could not load API keys",
+        loadErrorAuthDesc: "Your session has expired. Please sign in again.",
+        loadErrorTempDesc:
+          "API keys could not be loaded right now. Please try again later.",
+        authHeaderHint: "Use this key in",
         quickStart: "Quick start",
         quickStartDesc: "Send your key on every request to the Tokfai API.",
         quickStartItem1: "Full secret is shown once when created.",
@@ -805,7 +842,9 @@ export const messages = {
         imageGeneration: "image generation",
         emptyTitle: "No usage records yet.",
         emptyHint:
-          "Send a test request from Chat Playground to generate your first usage log.",
+          "Send a test from Chat Playground or Image Playground to generate your first usage log.",
+        loadingRecentRequests: "Recent requests",
+        loadingRecentRequestsDesc: "Loading the latest usage logs.",
         usageQueryTitle: "Usage query",
         usageQueryDesc:
           "Query API credit usage by date range, model, status, or API key.",
@@ -878,6 +917,22 @@ export const messages = {
       forDevelopersTitle: "For developers",
       forDevelopersDesc:
         "Point any OpenAI-compatible client at Tokfai and start calling models with your API key.",
+      billingSuccessCalls: "Successful calls debit credits.",
+      billingFailedCalls: "Failed calls are not charged.",
+      monitorUsagePrefix: "Monitor usage in",
+      monitorUsageSuffix: ".",
+      ledgerInPrefix: "Ledger in",
+      ledgerInSuffix: ".",
+      devLabelBaseUrl: "Base URL",
+      devLabelApiKeyFormat: "API key format",
+      devLabelStarter: "Starter",
+      devLabelBilling: "Billing",
+      devLabelPlayground: "Playground",
+      devLabelModels: "Models",
+      devLabelChatPlayground: "Chat Playground",
+      devLabelImagePlayground: "Image Playground",
+      devLabelApiKeys: "API Keys",
+      devLabelDocs: "Docs",
     },
     catalog: {
       chatUseCase: {
@@ -1650,6 +1705,31 @@ export const messages = {
       tryImagePlayground: "体验 Image Playground",
       viewPricing: "查看定价",
       readDocs: "阅读文档",
+      howItWorksTitle: "如何开始",
+      howItWorksDesc: "从注册到第一次 API 调用，共五个步骤。",
+      step1Title: "登录",
+      step1Body: "注册 Tokfai 账户或使用已有账号登录。",
+      step2Title: "购买积分",
+      step2Body: "Starter ¥29.9 — 预付费余额驱动每次 API 调用。",
+      step3Title: "创建 API Key",
+      step3Body: "在控制台签发 sk-tokfai_… 密钥并妥善保存。",
+      step4Title: "调用 API",
+      step4Body:
+        "将 OpenAI SDK、Cursor、Cherry Studio 或自研应用指向 api.tokfai.com/v1。可在 Chat Playground 与 Image Playground 测试。",
+      step5Title: "查看用量",
+      step5Body: "实时查看请求、扣费积分与账本流水。",
+      devQuickRefTitle: "开发者速查",
+      devQuickRefDesc:
+        "替换 Base URL 与 Authorization 头即可 — 其余 OpenAI 兼容代码无需改动。",
+      devLabelBaseUrl: "Base URL",
+      devLabelApiKeyFormat: "API key format",
+      devLabelStarter: "Starter",
+      devLabelBilling: "Billing",
+      devLabelPlayground: "Playground",
+      devLabelAuthExample: "Authorization example",
+      devLabelModels: "Models",
+      devLabelImageApiDocs: "Image API docs",
+      fullApiReference: "完整 API 参考",
     },
     common: {
       signOut: "退出登录",
@@ -1662,6 +1742,9 @@ export const messages = {
       unavailable: "不可用",
       chatPlayground: "Chat Playground",
       imagePlayground: "Image Playground",
+      footerTagline: "Tokfai · OpenAI 兼容的图像与对话 API",
+      apiReference: "API 参考 →",
+      copyright: "© {year} Tokfai",
     },
     dashboard: {
       overview: {
@@ -1709,6 +1792,7 @@ export const messages = {
         recentActivityDesc: "最近 5 条 usage_logs 记录。",
         recentActivityEmpty:
           "暂无调用记录。完成一次 Playground 测试后，这里会显示最近调用。",
+        viewAllUsage: "查看全部用量",
         securityTitle: "安全提醒",
         securityItem1: "API Key 只在创建时完整展示一次，请立即复制保存。",
         securityItem2: "不要把 sk-tokfai 密钥写进前端公开代码或客户端应用。",
@@ -1973,6 +2057,9 @@ export const messages = {
         subtitleCreate:
           "创建密钥以向 {baseUrl} 发起认证请求。完整密钥仅在创建时展示一次；活跃密钥可通过「复制密钥」再次获取。",
         loadError: "无法加载 API 密钥",
+        loadErrorAuthDesc: "登录状态异常，请重新登录。",
+        loadErrorTempDesc: "API 密钥暂时无法加载，请稍后重试。",
+        authHeaderHint: "在请求中使用",
         quickStart: "快速上手",
         quickStartDesc: "每次请求 Tokfai API 时都需要携带密钥。",
         quickStartItem1: "完整密钥仅在创建时展示一次。",
@@ -2351,7 +2438,10 @@ export const messages = {
         statusPending: "待处理",
         imageGeneration: "image generation",
         emptyTitle: "暂无用量记录。",
-        emptyHint: "建议先去 Playground 测试一次，成功调用后会出现在这里。",
+        emptyHint:
+          "在 Chat Playground 或 Image Playground 发送测试请求，成功调用后会出现在这里。",
+        loadingRecentRequests: "最近请求",
+        loadingRecentRequestsDesc: "正在加载最新 usage_logs…",
         usageQueryTitle: "消耗查询",
         usageQueryDesc: "按日期、模型、状态或 API Key 查询积分消耗。",
         startDate: "开始日期",
@@ -2420,6 +2510,22 @@ export const messages = {
       forDevelopersTitle: "开发者",
       forDevelopersDesc:
         "将任意 OpenAI 兼容客户端指向 Tokfai，使用 API 密钥即可调用模型。",
+      billingSuccessCalls: "成功调用会扣除积分。",
+      billingFailedCalls: "失败调用不扣费。",
+      monitorUsagePrefix: "在",
+      monitorUsageSuffix: "查看用量。",
+      ledgerInPrefix: "账本见",
+      ledgerInSuffix: "。",
+      devLabelBaseUrl: "Base URL",
+      devLabelApiKeyFormat: "API key format",
+      devLabelStarter: "Starter",
+      devLabelBilling: "Billing",
+      devLabelPlayground: "Playground",
+      devLabelModels: "Models",
+      devLabelChatPlayground: "Chat Playground",
+      devLabelImagePlayground: "Image Playground",
+      devLabelApiKeys: "API Keys",
+      devLabelDocs: "Docs",
     },
     catalog: {
       chatUseCase: {

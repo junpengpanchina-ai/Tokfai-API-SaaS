@@ -303,7 +303,7 @@ function IntegrationGuide({ t }: { t: (key: string) => string }) {
           <li>{t("dashboard.apiKeys.quickStartItem4")}</li>
         </ul>
         <p className="text-sm text-muted-foreground">
-          Use this key in{" "}
+          {t("dashboard.apiKeys.authHeaderHint")}{" "}
           <code className="rounded bg-background px-1.5 py-0.5 font-mono text-xs">
             Authorization: Bearer {TOKFAI_API_KEY_PLACEHOLDER}
           </code>

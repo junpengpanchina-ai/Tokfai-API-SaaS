@@ -1,7 +1,7 @@
 import { QuickstartContent } from "@/components/quickstart-content";
 
 export const metadata = {
-  title: "快速接入",
+  title: "Quickstart",
 };
 
 export default function DashboardDocsPage() {

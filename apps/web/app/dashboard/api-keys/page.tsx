@@ -24,7 +24,7 @@ type ApiKeysState =
   | { status: "ready"; keys: ApiKeyListItem[] }
   | {
       status: "error";
-      message: string;
+      messageKey: "auth" | "temp";
       code?: string;
       httpStatus?: number;
       method: string;
@@ -51,7 +51,7 @@ export default async function ApiKeysPage() {
   if (!session?.access_token) {
     return (
       <ApiKeysErrorView
-        message="登录状态异常，请重新登录。"
+        messageKey="auth"
         code="missing_session"
         httpStatus={401}
         method="GET"
@@ -73,7 +73,7 @@ export default async function ApiKeysPage() {
 
   return (
     <ApiKeysErrorView
-      message={state.message}
+      messageKey={state.messageKey}
       code={state.code}
       httpStatus={state.httpStatus}
       method={state.method}
@@ -97,10 +97,8 @@ async function loadApiKeys(accessToken: string): Promise<ApiKeysState> {
     if (err instanceof DmitServerError) {
       return {
         status: "error",
-        message:
-          err.status === 401 || err.status === 403
-            ? "登录状态异常，请重新登录。"
-            : "API Keys 暂时无法加载，请稍后重试。",
+        messageKey:
+          err.status === 401 || err.status === 403 ? "auth" : "temp",
         code: err.code,
         httpStatus: err.status,
         method: "GET",
@@ -109,7 +107,7 @@ async function loadApiKeys(accessToken: string): Promise<ApiKeysState> {
     }
     return {
       status: "error",
-      message: "API Keys 暂时无法加载，请稍后重试。",
+      messageKey: "temp",
       method: "GET",
       url,
     };

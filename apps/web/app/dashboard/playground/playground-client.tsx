@@ -136,6 +136,7 @@ export function PlaygroundClient({
   const { t } = useI18n();
   const router = useRouter();
   const promptRef = useRef<HTMLTextAreaElement>(null);
+  const { copiedId, copyText } = useCopyToClipboard();
 
   const [localKeys, setLocalKeys] = useState<PlaygroundApiKeyOption[]>(activeKeys);
   const [sessionSecrets, setSessionSecrets] = useState<Record<string, string>>({});
@@ -530,6 +531,8 @@ export function PlaygroundClient({
             error={error}
             result={result}
             completedAt={completedAt}
+            copiedId={copiedId}
+            onCopyRequestId={copyText}
             t={t}
           />
         </CardContent>
@@ -810,12 +813,16 @@ function ResponsePanel({
   error,
   result,
   completedAt,
+  copiedId,
+  onCopyRequestId,
   t,
 }: {
   loading: boolean;
   error: PlaygroundError | null;
   result: ChatCompletionResponse | null;
   completedAt: string | null;
+  copiedId: string | null;
+  onCopyRequestId: (id: string, value: string) => void;
   t: (key: string) => string;
 }) {
   if (loading) {
@@ -836,6 +843,8 @@ function ResponsePanel({
           requestId={null}
           completedAt={completedAt}
           t={t}
+          copiedId={null}
+          onCopyRequestId={undefined}
         />
         <div className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-4">
           <div className="flex items-center gap-2 text-sm font-medium text-destructive">
@@ -907,6 +916,8 @@ function ResponsePanel({
         modelId={result.model}
         requestId={requestId}
         completedAt={completedAt}
+        copiedId={copiedId}
+        onCopyRequestId={onCopyRequestId}
         t={t}
       />
 
@@ -935,15 +946,20 @@ function ResultMeta({
   modelId,
   requestId,
   completedAt,
+  copiedId,
+  onCopyRequestId,
   t,
 }: {
   status: "success" | "failed";
   modelId: string | null;
   requestId: string | null;
   completedAt: string | null;
+  copiedId: string | null;
+  onCopyRequestId?: (id: string, value: string) => void;
   t: (key: string) => string;
 }) {
   const isSuccess = status === "success";
+  const requestCopyId = "playground-request-id";
 
   return (
     <div className="flex flex-col gap-2 rounded-md border p-4 text-sm">
@@ -959,7 +975,7 @@ function ResultMeta({
             ? t("dashboard.playground.statusSuccess")
             : t("dashboard.playground.statusFailed")}
         </span>
-        <Badge variant={isSuccess ? "secondary" : "destructive"}>
+        <Badge variant={isSuccess ? "success" : "destructive"}>
           {isSuccess
             ? t("dashboard.playground.statusSuccess")
             : t("dashboard.playground.statusFailed")}
@@ -975,11 +991,20 @@ function ResultMeta({
           </div>
         ) : null}
         {requestId ? (
-          <div className="flex flex-wrap gap-x-2">
+          <div className="flex flex-wrap items-center gap-2">
             <dt className="text-muted-foreground">
               {t("dashboard.playground.requestId")}
             </dt>
-            <dd className="font-mono">{requestId}</dd>
+            <dd className="font-mono break-all">{requestId}</dd>
+            {onCopyRequestId ? (
+              <CopyButton
+                copied={copiedId === requestCopyId}
+                onCopy={() => onCopyRequestId(requestCopyId, requestId)}
+                copyLabel={t("dashboard.usage.copyRequestId")}
+                copiedLabel={t("dashboard.usage.copiedRequestId")}
+                size="icon"
+              />
+            ) : null}
           </div>
         ) : null}
         {completedAt ? (

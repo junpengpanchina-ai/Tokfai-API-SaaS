@@ -282,7 +282,16 @@ export function DashboardOverviewContent({
         </CardHeader>
         <CardContent>
           {overview.recentActivity.length > 0 ? (
-            <RecentActivityTable rows={overview.recentActivity} t={t} />
+            <div className="flex flex-col gap-4">
+              <RecentActivityTable rows={overview.recentActivity} t={t} />
+              <div className="flex justify-end">
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/dashboard/usage">
+                    {t("dashboard.overview.viewAllUsage")}
+                  </Link>
+                </Button>
+              </div>
+            </div>
           ) : (
             <p className="rounded-md border border-dashed bg-muted/30 px-4 py-6 text-sm text-muted-foreground">
               {t("dashboard.overview.recentActivityEmpty")}
@@ -440,7 +449,7 @@ function StatusBadge({
     <Badge
       variant={
         tone === "success"
-          ? "secondary"
+          ? "success"
           : tone === "destructive"
             ? "destructive"
             : "outline"

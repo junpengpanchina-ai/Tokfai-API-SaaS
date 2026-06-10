@@ -308,9 +308,16 @@ function EmptyState({ t }: { t: (key: string) => string }) {
       <p className="max-w-sm text-sm text-muted-foreground">
         {t("dashboard.usage.emptyHint")}
       </p>
-      <Button asChild size="sm">
-        <Link href="/dashboard/playground">{t("common.chatPlayground")}</Link>
-      </Button>
+      <div className="flex flex-wrap justify-center gap-2">
+        <Button asChild size="sm">
+          <Link href="/dashboard/playground">{t("common.chatPlayground")}</Link>
+        </Button>
+        <Button asChild size="sm" variant="outline">
+          <Link href="/dashboard/image-playground">
+            {t("common.imagePlayground")}
+          </Link>
+        </Button>
+      </div>
     </div>
   );
 }
