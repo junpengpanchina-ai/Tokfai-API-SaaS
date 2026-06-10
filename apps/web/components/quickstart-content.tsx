@@ -107,6 +107,28 @@ export function QuickstartContent() {
         </p>
       </div>
 
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">{t("quickstart.nextStepsTitle")}</CardTitle>
+          <CardDescription>{t("quickstart.nextStepsDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button asChild size="sm">
+            <Link href="/dashboard/api-keys">{t("quickstart.nextCreateApiKey")}</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/playground">
+              {t("quickstart.nextChatPlayground")}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/image-playground">
+              {t("quickstart.nextImagePlayground")}
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+
       <Card id="base-url">
         <CardHeader>
           <CardTitle>{t("quickstart.baseUrlTitle")}</CardTitle>

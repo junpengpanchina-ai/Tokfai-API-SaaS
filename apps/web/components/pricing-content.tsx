@@ -238,6 +238,10 @@ export function PricingContent({
             );
           })}
         </div>
+
+        <p className="mx-auto mt-10 max-w-2xl text-center text-sm text-muted-foreground">
+          {t("pricing.afterPurchaseTip")}
+        </p>
       </section>
 
       <section className="border-t bg-muted/30">

@@ -5,10 +5,10 @@ import {
   Activity,
   ArrowUpRight,
   BookOpen,
-  Boxes,
   CheckCircle2,
   Coins,
   CreditCard,
+  ImageIcon,
   KeyRound,
   LayoutDashboard,
   Shield,
@@ -38,6 +38,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+type OnboardingCompleteWhen =
+  | "creditsBalance"
+  | "activeApiKey"
+  | "chatPlayground"
+  | "imagePlayground";
+
 type OnboardingStepConfig = {
   step: number;
   titleKey: string;
@@ -45,7 +51,7 @@ type OnboardingStepConfig = {
   buttonKey: string;
   href: string;
   icon: LucideIcon;
-  completeWhen?: "activeApiKey";
+  completeWhen?: OnboardingCompleteWhen;
 };
 
 const ONBOARDING_STEPS: OnboardingStepConfig[] = [
@@ -53,26 +59,27 @@ const ONBOARDING_STEPS: OnboardingStepConfig[] = [
     step: 1,
     titleKey: "dashboard.overview.onboardingStep1Title",
     bodyKey: "dashboard.overview.onboardingStep1Body",
+    buttonKey: "dashboard.overview.goRecharge",
+    href: "/pricing",
+    icon: CreditCard,
+    completeWhen: "creditsBalance",
+  },
+  {
+    step: 2,
+    titleKey: "dashboard.overview.onboardingStep2Title",
+    bodyKey: "dashboard.overview.onboardingStep2Body",
     buttonKey: "dashboard.overview.goCreate",
     href: "/dashboard/api-keys",
     icon: KeyRound,
     completeWhen: "activeApiKey",
   },
   {
-    step: 2,
-    titleKey: "dashboard.overview.onboardingStep2Title",
-    bodyKey: "dashboard.overview.onboardingStep2Body",
-    buttonKey: "dashboard.overview.goView",
-    href: "/dashboard/docs",
-    icon: BookOpen,
-  },
-  {
     step: 3,
     titleKey: "dashboard.overview.onboardingStep3Title",
     bodyKey: "dashboard.overview.onboardingStep3Body",
     buttonKey: "dashboard.overview.goView",
-    href: "/dashboard/models",
-    icon: Boxes,
+    href: "/dashboard/docs",
+    icon: BookOpen,
   },
   {
     step: 4,
@@ -81,14 +88,16 @@ const ONBOARDING_STEPS: OnboardingStepConfig[] = [
     buttonKey: "dashboard.overview.goTest",
     href: "/dashboard/playground",
     icon: Terminal,
+    completeWhen: "chatPlayground",
   },
   {
     step: 5,
     titleKey: "dashboard.overview.onboardingStep5Title",
     bodyKey: "dashboard.overview.onboardingStep5Body",
-    buttonKey: "dashboard.overview.goView",
-    href: "/dashboard/credits",
-    icon: CreditCard,
+    buttonKey: "dashboard.overview.goTest",
+    href: "/dashboard/image-playground",
+    icon: ImageIcon,
+    completeWhen: "imagePlayground",
   },
 ];
 
@@ -104,14 +113,19 @@ const QUICK_LINKS = [
     icon: BookOpen,
   },
   {
-    href: "/dashboard/models",
-    labelKey: "nav.models",
-    icon: Boxes,
-  },
-  {
     href: "/dashboard/playground",
     labelKey: "nav.playground",
     icon: Terminal,
+  },
+  {
+    href: "/dashboard/image-playground",
+    labelKey: "nav.imagePlayground",
+    icon: ImageIcon,
+  },
+  {
+    href: "/dashboard/usage",
+    labelKey: "nav.usage",
+    icon: Activity,
   },
   {
     href: "/dashboard/credits",
@@ -206,7 +220,7 @@ export function DashboardOverviewContent({
             <OnboardingStep
               key={item.step}
               item={item}
-              hasActiveApiKey={overview.hasActiveApiKey}
+              overview={overview}
               t={t}
             />
           ))}
@@ -324,18 +338,35 @@ export function DashboardOverviewContent({
   );
 }
 
+function isOnboardingStepComplete(
+  completeWhen: OnboardingCompleteWhen | undefined,
+  overview: DashboardOverviewData
+): boolean {
+  switch (completeWhen) {
+    case "creditsBalance":
+      return overview.creditsBalance > 0;
+    case "activeApiKey":
+      return overview.hasActiveApiKey;
+    case "chatPlayground":
+      return overview.hasChatPlaygroundSuccess;
+    case "imagePlayground":
+      return overview.hasImagePlaygroundSuccess;
+    default:
+      return false;
+  }
+}
+
 function OnboardingStep({
   item,
-  hasActiveApiKey,
+  overview,
   t,
 }: {
   item: OnboardingStepConfig;
-  hasActiveApiKey: boolean;
+  overview: DashboardOverviewData;
   t: (key: string) => string;
 }) {
   const Icon = item.icon;
-  const completed =
-    item.completeWhen === "activeApiKey" && hasActiveApiKey;
+  const completed = isOnboardingStepComplete(item.completeWhen, overview);
 
   return (
     <div className="flex flex-col gap-4 rounded-md border bg-card p-4 sm:flex-row sm:items-start">
@@ -358,7 +389,7 @@ function OnboardingStep({
             <Icon className="h-4 w-4 text-muted-foreground" />
             {t(item.titleKey)}
             {completed ? (
-              <Badge variant="secondary" className="font-normal">
+              <Badge variant="success" className="font-normal">
                 {t("dashboard.overview.stepCompleted")}
               </Badge>
             ) : null}

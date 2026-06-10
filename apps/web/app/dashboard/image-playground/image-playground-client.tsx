@@ -1488,10 +1488,10 @@ function ApiKeySection({
           <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium">
-              {t("dashboard.playground.noKeyTitle")}
+              {t("dashboard.imagePlayground.noKeyTitle")}
             </p>
             <p className="text-sm text-muted-foreground">
-              {t("dashboard.playground.noKeyBody")}
+              {t("dashboard.imagePlayground.noKeyBody")}
             </p>
           </div>
         </div>
@@ -1508,15 +1508,15 @@ function ApiKeySection({
             {creatingKey ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {t("dashboard.playground.creatingTestKey")}
+                {t("dashboard.imagePlayground.creatingTestKey")}
               </>
             ) : (
-              t("dashboard.playground.createTestKey")
+              t("dashboard.imagePlayground.createTestKey")
             )}
           </Button>
           <Button asChild type="button" size="sm" variant="outline">
             <Link href="/dashboard/api-keys">
-              {t("dashboard.playground.goToApiKeys")}
+              {t("dashboard.imagePlayground.goToApiKeys")}
             </Link>
           </Button>
         </div>

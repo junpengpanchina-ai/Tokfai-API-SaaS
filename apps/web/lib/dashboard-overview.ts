@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type { ProfileRow, UsageLogRow } from "@/lib/supabase/types";
+import { getUsageKind, usageStatusTone } from "@/lib/usage-display";
 
 const RECENT_ACTIVITY_LIMIT = 5;
 
@@ -18,6 +19,8 @@ export interface DashboardOverviewData {
   requestsLast7Days: number;
   creditsConsumedLast7Days: number;
   hasActiveApiKey: boolean;
+  hasChatPlaygroundSuccess: boolean;
+  hasImagePlaygroundSuccess: boolean;
   recentActivity: DashboardOverviewActivity[];
   profileMissing: boolean;
 }
@@ -32,8 +35,14 @@ export async function loadDashboardOverviewData(
     Date.now() - 7 * 24 * 60 * 60 * 1000
   ).toISOString();
 
-  const [profileRes, apiKeysRes, usageCountRes, ledgerDebitsRes, recentRes] =
-    await Promise.all([
+  const [
+    profileRes,
+    apiKeysRes,
+    usageCountRes,
+    ledgerDebitsRes,
+    recentRes,
+    successUsageRes,
+  ] = await Promise.all([
       supabase
         .from("profiles")
         .select("id, credits_balance")
@@ -63,6 +72,12 @@ export async function loadDashboardOverviewData(
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(RECENT_ACTIVITY_LIMIT),
+      supabase
+        .from("usage_logs")
+        .select("model, status")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(50),
     ]);
 
   const profile = profileRes.error
@@ -70,22 +85,46 @@ export async function loadDashboardOverviewData(
     : (profileRes.data as Pick<ProfileRow, "credits_balance"> | null);
   const activeApiKeyCount = apiKeysRes.error ? 0 : (apiKeysRes.count ?? 0);
 
+  const creditsBalance =
+    profile?.credits_balance != null ? toNumber(profile.credits_balance) : 0;
+  const playgroundFlags = derivePlaygroundSuccessFlags(
+    successUsageRes.error ? [] : (successUsageRes.data ?? [])
+  );
+
   return {
-    creditsBalance:
-      profile?.credits_balance != null
-        ? toNumber(profile.credits_balance)
-        : 0,
+    creditsBalance,
     activeApiKeyCount,
     requestsLast7Days: usageCountRes.error ? 0 : (usageCountRes.count ?? 0),
     creditsConsumedLast7Days: ledgerDebitsRes.error
       ? 0
       : sumDebitAmounts(ledgerDebitsRes.data ?? []),
     hasActiveApiKey: activeApiKeyCount > 0,
+    hasChatPlaygroundSuccess: playgroundFlags.hasChatPlaygroundSuccess,
+    hasImagePlaygroundSuccess: playgroundFlags.hasImagePlaygroundSuccess,
     recentActivity: recentRes.error
       ? []
       : mapRecentActivity((recentRes.data ?? []) as UsageLogRow[]),
     profileMissing: !profileRes.error && !profileRes.data,
   };
+}
+
+function derivePlaygroundSuccessFlags(
+  rows: Array<{ model: string | null; status: string | null }>
+): {
+  hasChatPlaygroundSuccess: boolean;
+  hasImagePlaygroundSuccess: boolean;
+} {
+  let hasChatPlaygroundSuccess = false;
+  let hasImagePlaygroundSuccess = false;
+
+  for (const row of rows) {
+    if (usageStatusTone(row.status) !== "success") continue;
+    const kind = getUsageKind(row.model);
+    if (kind === "chat") hasChatPlaygroundSuccess = true;
+    if (kind === "image") hasImagePlaygroundSuccess = true;
+  }
+
+  return { hasChatPlaygroundSuccess, hasImagePlaygroundSuccess };
 }
 
 function mapRecentActivity(rows: UsageLogRow[]): DashboardOverviewActivity[] {

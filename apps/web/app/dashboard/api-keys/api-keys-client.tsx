@@ -645,11 +645,14 @@ function EmptyState({ t }: { t: (key: string) => string }) {
         {t("dashboard.apiKeys.emptyTitle")}
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2">
+        <Button type="button" size="sm" asChild>
+          <a href="#create-api-key">{t("dashboard.apiKeys.emptyCreateFirst")}</a>
+        </Button>
         <Button type="button" size="sm" variant="outline" asChild>
-          <a href="#create-api-key">{t("dashboard.apiKeys.createApiKey")}</a>
+          <Link href="/pricing">{t("dashboard.apiKeys.emptyRecharge")}</Link>
         </Button>
         <Button type="button" size="sm" variant="ghost" asChild>
-          <Link href="/docs">{t("dashboard.apiKeys.viewDocs")}</Link>
+          <Link href="/dashboard/docs">{t("dashboard.apiKeys.viewDocs")}</Link>
         </Button>
       </div>
     </div>

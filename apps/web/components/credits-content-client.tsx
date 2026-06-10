@@ -512,12 +512,15 @@ function EmptyLedgerState({ t }: { t: (key: string) => string }) {
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2">
         <Button asChild size="sm" variant="default">
+          <Link href="/pricing">{t("dashboard.credits.emptyLedgerTopUp")}</Link>
+        </Button>
+        <Button asChild size="sm" variant="outline">
           <Link href="/dashboard/api-keys">
             {t("dashboard.credits.createApiKey")}
           </Link>
         </Button>
-        <Button asChild size="sm" variant="outline">
-          <Link href="/dashboard/docs">{t("dashboard.credits.viewQuickstart")}</Link>
+        <Button asChild size="sm" variant="ghost">
+          <Link href="/dashboard/playground">{t("common.chatPlayground")}</Link>
         </Button>
       </div>
     </div>

@@ -106,27 +106,29 @@ export const messages = {
       overview: {
         title: "Overview",
         subtitle:
-          "Complete API Key setup, model selection, Playground testing, and credits ledger review to onboard Tokfai API quickly.",
-        onboardingTitle: "Getting started",
-        onboardingDesc: "Five steps from sign-up to a verified API request.",
-        onboardingStep1Title: "Create API Key",
+          "Top up credits, create an API key, read Quickstart, and run Chat and Image Playground tests — then review Usage and Credits.",
+        onboardingTitle: "New user checklist",
+        onboardingDesc:
+          "Five steps from sign-up to your first chat and image API calls.",
+        onboardingStep1Title: "Top up credits",
         onboardingStep1Body:
-          "Generate an sk-tokfai_ key. The full secret is shown once at creation.",
-        onboardingStep2Title: "View Quickstart",
+          "Buy prepaid credits on Pricing. You need balance before API calls.",
+        onboardingStep2Title: "Create API Key",
         onboardingStep2Body:
-          "Read integration examples for curl, OpenAI SDK, Cursor, and Cherry Studio.",
-        onboardingStep3Title: "Choose a model",
+          "Generate an sk-tokfai_ key. The full secret is shown once at creation.",
+        onboardingStep3Title: "View Quickstart",
         onboardingStep3Body:
-          "Browse chat and image models, pricing notes, and recommended use cases.",
-        onboardingStep4Title: "Playground test",
+          "You only need three things: base URL, API Key, and a model ID.",
+        onboardingStep4Title: "Chat Playground test",
         onboardingStep4Body:
-          "Send a test chat completion with your API key before production integration.",
-        onboardingStep5Title: "View credits ledger",
+          "Send one test chat request to verify your key and balance.",
+        onboardingStep5Title: "Image Playground test",
         onboardingStep5Body:
-          "Confirm balance, top-ups, and usage debits in the credits ledger.",
+          "Generate one test image to verify the image API.",
         goCreate: "Create",
         goView: "View",
         goTest: "Test",
+        goRecharge: "Top up",
         stepCompleted: "Completed",
         creditsBalance: "Credits balance",
         creditsBalanceHint: "Current balance from your profile.",
@@ -493,7 +495,9 @@ export const messages = {
         legacyKeyMessage:
           "Create a new key to copy the full secret. Legacy keys that cannot be revealed must be replaced.",
         emptyTitle:
-          "No API keys yet. Create your first key above — the full secret is shown once, so copy it immediately.",
+          "No API keys yet. Create your first key to start testing — the full secret is shown once, so copy it immediately.",
+        emptyCreateFirst: "Create your first API key",
+        emptyRecharge: "Top up credits",
         viewDocs: "View docs",
       },
       playground: {
@@ -645,6 +649,12 @@ export const messages = {
           "The API returned base64 image data (data[0].b64_json). Image Playground only previews URL responses — use the API directly or set response_format=url.",
         needKey: "Need a key?",
         createApiKey: "Create an API key",
+        noKeyTitle: "No active API Key yet",
+        noKeyBody:
+          "Create a test key to run your first image generation.",
+        createTestKey: "Create test key",
+        creatingTestKey: "Creating…",
+        goToApiKeys: "Go to API Keys",
         needCredits: "Need more credits?",
         topUp: "Top up",
         currentModelPrice:
@@ -786,7 +796,8 @@ export const messages = {
         checkoutCancelledDesc:
           "No credits were added. You can pick another package on Pricing.",
         emptyLedger:
-          "No credit ledger entries yet. After you create an API key and complete a call, usage debits appear here; after a successful recharge, top-up entries appear here.",
+          "No ledger entries yet. Top up on Pricing, create an API key, then run a Playground test — top-ups and usage debits will appear here.",
+        emptyLedgerTopUp: "Top up credits",
         viewPricing: "View pricing",
         loadErrorAuth: "Session expired — please sign in again",
         loadErrorAuthDesc: "Your session has expired. Please sign in again.",
@@ -843,6 +854,7 @@ export const messages = {
         emptyTitle: "No usage records yet.",
         emptyHint:
           "Send a test from Chat Playground or Image Playground to generate your first usage log.",
+        emptyViewCredits: "View credits ledger",
         loadingRecentRequests: "Recent requests",
         loadingRecentRequestsDesc: "Loading the latest usage logs.",
         usageQueryTitle: "Usage query",
@@ -933,6 +945,8 @@ export const messages = {
       devLabelImagePlayground: "Image Playground",
       devLabelApiKeys: "API Keys",
       devLabelDocs: "Docs",
+      afterPurchaseTip:
+        "After purchase, check Credits for balance and ledger entries. Test consumption in Chat or Image Playground.",
     },
     catalog: {
       chatUseCase: {
@@ -1141,6 +1155,12 @@ export const messages = {
       pageTitle: "Quickstart with Tokfai API",
       pageSubtitle:
         "Get your first OpenAI-compatible API call working in about 5 minutes after you have an API key.",
+      nextStepsTitle: "Next steps",
+      nextStepsDesc:
+        "You only need three things: base URL, API Key, and a model ID. Then test in Playground.",
+      nextCreateApiKey: "Create API Key",
+      nextChatPlayground: "Chat Playground",
+      nextImagePlayground: "Image Playground",
       baseUrlTitle: "Base URL",
       baseUrlDesc:
         "OpenAI SDK compatible — when migrating, you usually only need to replace baseURL and apiKey.",
@@ -1750,27 +1770,26 @@ export const messages = {
       overview: {
         title: "Overview",
         subtitle:
-          "完成 API Key、模型选择、Playground 测试和积分账本查看，快速接入 Tokfai API。",
-        onboardingTitle: "新用户接入步骤",
-        onboardingDesc: "五步完成从注册到验证 API 请求。",
-        onboardingStep1Title: "创建 API Key",
-        onboardingStep1Body:
-          "生成 sk-tokfai_ 密钥。完整 secret 仅在创建时展示一次。",
-        onboardingStep2Title: "查看 Quickstart",
+          "充值积分、创建 API Key、阅读 Quickstart、完成 Chat 与 Image Playground 测试，再查看 Usage 与 Credits。",
+        onboardingTitle: "新手五步",
+        onboardingDesc: "从注册到完成第一次对话与图像 API 调用。",
+        onboardingStep1Title: "充值积分",
+        onboardingStep1Body: "在定价页购买预付费积分，调用 API 前需有余额。",
+        onboardingStep2Title: "创建 API Key",
         onboardingStep2Body:
-          "阅读 curl、OpenAI SDK、Cursor、Cherry Studio 等接入示例。",
-        onboardingStep3Title: "选择模型",
+          "生成 sk-tokfai_ 密钥。完整 secret 仅在创建时展示一次。",
+        onboardingStep3Title: "查看 Quickstart",
         onboardingStep3Body:
-          "浏览对话与图像模型、价格说明和推荐场景。",
-        onboardingStep4Title: "Playground 测试",
+          "只需三件事：Base URL、API Key 和 model ID。",
+        onboardingStep4Title: "Chat Playground 测试",
         onboardingStep4Body:
-          "用 API Key 发送一次测试请求，确认生产接入前响应正常。",
-        onboardingStep5Title: "查看积分账本",
-        onboardingStep5Body:
-          "在积分账本确认余额、充值与 usage 扣费记录。",
+          "发送一次对话测试，验证密钥与余额是否正常。",
+        onboardingStep5Title: "Image Playground 测试",
+        onboardingStep5Body: "生成一张测试图片，验证图像 API。",
         goCreate: "去创建",
         goView: "去查看",
         goTest: "去测试",
+        goRecharge: "去充值",
         stepCompleted: "已完成",
         creditsBalance: "当前 credits 余额",
         creditsBalanceHint: "来自 profiles.credits_balance。",
@@ -2115,7 +2134,9 @@ export const messages = {
         legacyKeyMessage:
           "请创建新密钥以复制完整 secret。无法揭示的旧密钥需替换。",
         emptyTitle:
-          "还没有 API 密钥。在上方创建第一把密钥——完整 secret 仅展示一次，请立即复制。",
+          "还没有 API 密钥。创建第一把密钥即可开始测试——完整 secret 仅展示一次，请立即复制。",
+        emptyCreateFirst: "创建第一个 API Key",
+        emptyRecharge: "去充值积分",
         viewDocs: "查看文档",
       },
       playground: {
@@ -2255,6 +2276,11 @@ export const messages = {
           "API 返回了 base64 图像数据（data[0].b64_json）。Image Playground 仅预览 URL 响应 — 请直接调用 API 或设置 response_format=url。",
         needKey: "还没有密钥？",
         createApiKey: "创建 API 密钥",
+        noKeyTitle: "还没有可用 API Key",
+        noKeyBody: "创建测试 Key 后即可发起第一次图像生成。",
+        createTestKey: "创建测试 Key",
+        creatingTestKey: "创建中…",
+        goToApiKeys: "前往 API Keys",
         needCredits: "积分不足？",
         topUp: "去充值",
         currentModelPrice: "当前模型：{price}。成功生成后扣费，失败不扣费。",
@@ -2384,7 +2410,8 @@ export const messages = {
         checkoutCancelled: "Checkout 已取消",
         checkoutCancelledDesc: "未增加积分。请前往定价页选择其他套餐。",
         emptyLedger:
-          "你还没有积分流水。创建 API Key 并完成一次调用后，这里会显示消耗记录；充值成功后，这里会显示充值记录。",
+          "暂无积分流水。先在定价页充值、创建 API Key，再发起 Playground 测试——充值与扣费记录会显示在此。",
+        emptyLedgerTopUp: "去充值积分",
         viewPricing: "查看定价",
         loadErrorAuth: "登录状态异常",
         loadErrorAuthDesc: "登录状态异常，请重新登录。",
@@ -2440,6 +2467,7 @@ export const messages = {
         emptyTitle: "暂无用量记录。",
         emptyHint:
           "在 Chat Playground 或 Image Playground 发送测试请求，成功调用后会出现在这里。",
+        emptyViewCredits: "查看积分账本",
         loadingRecentRequests: "最近请求",
         loadingRecentRequestsDesc: "正在加载最新 usage_logs…",
         usageQueryTitle: "消耗查询",
@@ -2526,6 +2554,8 @@ export const messages = {
       devLabelImagePlayground: "Image Playground",
       devLabelApiKeys: "API Keys",
       devLabelDocs: "Docs",
+      afterPurchaseTip:
+        "充值后可在 Credits 查看到账与流水，在 Chat 或 Image Playground 测试消耗。",
     },
     catalog: {
       chatUseCase: {
@@ -2728,6 +2758,12 @@ export const messages = {
     quickstart: {
       pageTitle: "快速接入 Tokfai API",
       pageSubtitle: "拿到 API Key 后，约 5 分钟内即可完成 OpenAI 兼容 API 的第一次调用。",
+      nextStepsTitle: "下一步",
+      nextStepsDesc:
+        "只需三件事：Base URL、API Key 和 model ID。然后在 Playground 测试。",
+      nextCreateApiKey: "创建 API Key",
+      nextChatPlayground: "Chat Playground",
+      nextImagePlayground: "Image Playground",
       baseUrlTitle: "Base URL",
       baseUrlDesc: "兼容 OpenAI SDK，迁移时通常只需要替换 baseURL 和 apiKey。",
       apiKeyTitle: "API Key",

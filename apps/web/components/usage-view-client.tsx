@@ -317,6 +317,9 @@ function EmptyState({ t }: { t: (key: string) => string }) {
             {t("common.imagePlayground")}
           </Link>
         </Button>
+        <Button asChild size="sm" variant="ghost">
+          <Link href="/dashboard/credits">{t("dashboard.usage.emptyViewCredits")}</Link>
+        </Button>
       </div>
     </div>
   );
