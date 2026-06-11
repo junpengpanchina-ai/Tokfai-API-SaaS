@@ -13,28 +13,14 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  resolveAuthErrorMessage,
+  resolveUrlAuthErrorMessage,
+} from "@/lib/auth/auth-errors";
 import { resolvePostLoginPath } from "@/lib/auth/login-redirect";
 import { getOAuthRedirectOrigin } from "@/lib/auth/site-url";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { createClient } from "@/lib/supabase/client";
-
-const LOGIN_ERROR_KEYS: Record<string, string> = {
-  missing_code: "auth.login.errorMissingCode",
-  auth_callback_failed: "auth.login.errorOAuthFailed",
-  oauth_callback_failed: "auth.login.errorOAuthFailed",
-};
-
-function getLoginErrorMessage(
-  error: string | undefined,
-  t: (key: string) => string
-) {
-  if (!error) {
-    return null;
-  }
-
-  const key = LOGIN_ERROR_KEYS[error];
-  return key ? t(key) : error;
-}
 
 export function LoginForm({
   nextPath,
@@ -52,10 +38,11 @@ export function LoginForm({
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(
-    getLoginErrorMessage(initialError, t)
+    resolveUrlAuthErrorMessage(initialError, t)
   );
 
   const postLoginPath = resolvePostLoginPath(nextPath, legacyRedirect);
+  const isBusy = loading || googleLoading;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -64,14 +51,14 @@ export function LoginForm({
 
     const supabase = createClient();
     const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
+      email: email.trim(),
       password,
     });
 
     setLoading(false);
 
     if (authError) {
-      setError(authError.message);
+      setError(resolveAuthErrorMessage(authError, t));
       return;
     }
 
@@ -95,7 +82,7 @@ export function LoginForm({
     });
 
     if (oauthError) {
-      setError(oauthError.message);
+      setError(resolveAuthErrorMessage(oauthError, t));
       setGoogleLoading(false);
     }
   }
@@ -109,7 +96,7 @@ export function LoginForm({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit} className="flex min-w-0 flex-col gap-4">
           <div className="flex min-w-0 flex-col gap-2">
             <Label htmlFor="email">{t("auth.login.email")}</Label>
             <Input
@@ -120,6 +107,7 @@ export function LoginForm({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder={t("auth.login.emailPlaceholder")}
+              disabled={isBusy}
             />
           </div>
           <div className="flex min-w-0 flex-col gap-2">
@@ -131,11 +119,12 @@ export function LoginForm({
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              disabled={isBusy}
             />
           </div>
 
           {error ? (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="text-sm text-destructive break-words" role="alert">
               {error}
             </p>
           ) : null}
@@ -143,7 +132,7 @@ export function LoginForm({
           <Button
             type="submit"
             className="w-full whitespace-normal text-center"
-            disabled={loading || googleLoading}
+            disabled={isBusy}
           >
             {loading ? t("auth.login.signingIn") : t("auth.login.signIn")}
           </Button>
@@ -158,7 +147,7 @@ export function LoginForm({
             variant="outline"
             className="w-full whitespace-normal text-center"
             onClick={handleGoogleLogin}
-            disabled={loading || googleLoading}
+            disabled={isBusy}
           >
             {googleLoading
               ? t("auth.login.googleRedirecting")

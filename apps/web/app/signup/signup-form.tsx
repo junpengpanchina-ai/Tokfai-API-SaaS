@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,15 +13,30 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { resolveAuthErrorMessage } from "@/lib/auth/auth-errors";
+import { resolvePostLoginPath } from "@/lib/auth/login-redirect";
 import { getOAuthRedirectOrigin } from "@/lib/auth/site-url";
+import { useI18n } from "@/lib/i18n/i18n-provider";
 import { createClient } from "@/lib/supabase/client";
 
-export function SignupForm() {
+export function SignupForm({
+  nextPath,
+  legacyRedirect,
+}: {
+  nextPath?: string;
+  legacyRedirect?: string;
+}) {
+  const { t } = useI18n();
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+
+  const postLoginPath = resolvePostLoginPath(nextPath, legacyRedirect);
+  const isBusy = loading || googleLoading;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -30,58 +46,69 @@ export function SignupForm() {
 
     const supabase = createClient();
     const origin = getOAuthRedirectOrigin();
+    const callbackUrl = new URL(`${origin}/auth/callback`);
+    callbackUrl.searchParams.set("next", postLoginPath);
+
     const { data, error: authError } = await supabase.auth.signUp({
-      email,
+      email: email.trim(),
       password,
       options: {
-        emailRedirectTo: `${origin}/auth/callback`,
+        emailRedirectTo: callbackUrl.toString(),
       },
     });
 
     setLoading(false);
 
     if (authError) {
-      setError(authError.message);
+      setError(resolveAuthErrorMessage(authError, t));
       return;
     }
 
     if (data.user && !data.session) {
-      setInfo(
-        "Check your email — we sent a confirmation link to finish signup."
-      );
+      setInfo(t("auth.signup.confirmEmail"));
       return;
     }
 
     if (data.session) {
-      window.location.assign("/dashboard");
+      router.replace(postLoginPath);
+      router.refresh();
     }
   }
 
   async function handleGoogle() {
     setError(null);
+    setInfo(null);
+    setGoogleLoading(true);
+
+    const callbackUrl = new URL(`${getOAuthRedirectOrigin()}/auth/callback`);
+    callbackUrl.searchParams.set("next", postLoginPath);
+
     const supabase = createClient();
-    const origin = getOAuthRedirectOrigin();
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${origin}/auth/callback`,
+        redirectTo: callbackUrl.toString(),
       },
     });
+
     if (oauthError) {
-      setError(oauthError.message);
+      setError(resolveAuthErrorMessage(oauthError, t));
+      setGoogleLoading(false);
     }
   }
 
   return (
-    <Card>
+    <Card className="w-full min-w-0 overflow-hidden">
       <CardHeader>
-        <CardTitle>Create your account</CardTitle>
-        <CardDescription>Start building in under a minute.</CardDescription>
+        <CardTitle>{t("auth.signup.title")}</CardTitle>
+        <CardDescription className="break-words">
+          {t("auth.signup.description")}
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="email">Email</Label>
+        <form onSubmit={handleSubmit} className="flex min-w-0 flex-col gap-4">
+          <div className="flex min-w-0 flex-col gap-2">
+            <Label htmlFor="email">{t("auth.signup.email")}</Label>
             <Input
               id="email"
               type="email"
@@ -89,11 +116,12 @@ export function SignupForm() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder={t("auth.signup.emailPlaceholder")}
+              disabled={isBusy}
             />
           </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="password">Password</Label>
+          <div className="flex min-w-0 flex-col gap-2">
+            <Label htmlFor="password">{t("auth.signup.password")}</Label>
             <Input
               id="password"
               type="password"
@@ -102,32 +130,45 @@ export function SignupForm() {
               minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 characters"
+              placeholder={t("auth.signup.passwordPlaceholder")}
+              disabled={isBusy}
             />
           </div>
 
           {error ? (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="text-sm text-destructive break-words" role="alert">
               {error}
             </p>
           ) : null}
           {info ? (
-            <p className="text-sm text-muted-foreground" role="status">
+            <p className="text-sm text-muted-foreground break-words" role="status">
               {info}
             </p>
           ) : null}
 
-          <Button type="submit" disabled={loading}>
-            {loading ? "Creating account…" : "Create account"}
+          <Button
+            type="submit"
+            className="w-full whitespace-normal text-center"
+            disabled={isBusy}
+          >
+            {loading ? t("auth.signup.creating") : t("auth.signup.createAccount")}
           </Button>
 
           <div className="relative my-2 text-center text-xs uppercase tracking-wider text-muted-foreground">
-            <span className="bg-card px-2">or</span>
+            <span className="bg-card px-2">{t("auth.signup.or")}</span>
             <span className="absolute inset-x-0 top-1/2 -z-10 h-px bg-border" />
           </div>
 
-          <Button type="button" variant="outline" onClick={handleGoogle}>
-            Continue with Google
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full whitespace-normal text-center"
+            onClick={handleGoogle}
+            disabled={isBusy}
+          >
+            {googleLoading
+              ? t("auth.signup.googleRedirecting")
+              : t("auth.signup.continueWithGoogle")}
           </Button>
         </form>
       </CardContent>

@@ -69,11 +69,9 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (!user && isProtectedDashboardPath(pathname)) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.search = "";
-    url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(
+      new URL(loginPathWithNext(pathname), request.url)
+    );
   }
 
   if (user && (pathname === "/login" || pathname === "/signup")) {

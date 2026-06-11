@@ -2,22 +2,20 @@
 
 import Link from "next/link";
 
-import { signupPathWithNext } from "@/lib/auth/login-redirect";
+import { loginPathWithNext } from "@/lib/auth/login-redirect";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 
-import { LoginForm } from "./login-form";
+import { SignupForm } from "./signup-form";
 
-export function LoginPageContent({
+export function SignupPageContent({
   nextPath,
   legacyRedirect,
-  initialError,
 }: {
   nextPath?: string;
   legacyRedirect?: string;
-  initialError?: string;
 }) {
   const { t } = useI18n();
-  const signupHref = signupPathWithNext(nextPath ?? legacyRedirect);
+  const loginHref = loginPathWithNext(nextPath ?? legacyRedirect);
 
   return (
     <div className="flex min-h-screen min-w-0 items-center justify-center bg-muted/30 px-4 py-12">
@@ -30,18 +28,14 @@ export function LoginPageContent({
             <span className="text-lg font-semibold tracking-tight">Tokfai</span>
           </Link>
         </div>
-        <LoginForm
-          nextPath={nextPath}
-          legacyRedirect={legacyRedirect}
-          initialError={initialError}
-        />
+        <SignupForm nextPath={nextPath} legacyRedirect={legacyRedirect} />
         <p className="mt-6 text-center text-sm text-muted-foreground">
-          {t("auth.login.noAccount")}{" "}
+          {t("auth.signup.hasAccount")}{" "}
           <Link
-            href={signupHref}
+            href={loginHref}
             className="font-medium text-foreground underline-offset-4 hover:underline"
           >
-            {t("auth.login.createOne")}
+            {t("auth.signup.logIn")}
           </Link>
         </p>
       </div>

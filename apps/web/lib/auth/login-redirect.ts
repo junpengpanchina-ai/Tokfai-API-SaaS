@@ -4,10 +4,24 @@ export const DEFAULT_POST_LOGIN_PATH = "/dashboard";
 export function sanitizeNextPath(
   next: string | null | undefined
 ): string {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) {
+  if (!next) {
     return DEFAULT_POST_LOGIN_PATH;
   }
-  return next;
+
+  const trimmed = next.trim();
+
+  if (
+    !trimmed.startsWith("/") ||
+    trimmed.startsWith("//") ||
+    trimmed.includes("\\") ||
+    trimmed.includes("\0") ||
+    trimmed.includes("://") ||
+    trimmed.startsWith("/\\")
+  ) {
+    return DEFAULT_POST_LOGIN_PATH;
+  }
+
+  return trimmed;
 }
 
 export function resolvePostLoginPath(
@@ -17,8 +31,22 @@ export function resolvePostLoginPath(
   return sanitizeNextPath(next ?? legacyRedirect);
 }
 
-export function loginPathWithNext(next: string): string {
-  return `/login?next=${encodeURIComponent(sanitizeNextPath(next))}`;
+export function loginPathWithNext(next?: string | null): string {
+  const path = sanitizeNextPath(next);
+  return `/login?next=${encodeURIComponent(path)}`;
+}
+
+export function signupPathWithNext(next?: string | null): string {
+  const path = sanitizeNextPath(next);
+  return `/signup?next=${encodeURIComponent(path)}`;
+}
+
+export function loginPathWithError(
+  error: string,
+  next?: string | null
+): string {
+  const path = sanitizeNextPath(next);
+  return `/login?error=${encodeURIComponent(error)}&next=${encodeURIComponent(path)}`;
 }
 
 export function isProtectedDashboardPath(pathname: string): boolean {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { resolvePostLoginPath } from "@/lib/auth/login-redirect";
+import { loginPathWithError, resolvePostLoginPath } from "@/lib/auth/login-redirect";
 import { authDebug } from "@/lib/auth/debug";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 
@@ -14,6 +14,18 @@ export async function GET(request: Request) {
   const origin = requestUrl.origin;
   const nextPath = resolvePostLoginPath(requestUrl.searchParams.get("next"));
 
+  const oauthError = requestUrl.searchParams.get("error");
+  if (oauthError) {
+    authDebug("callback_oauth_error", {
+      error: oauthError,
+      nextPath,
+    });
+
+    return NextResponse.redirect(
+      new URL(loginPathWithError("oauth_callback_failed", nextPath), origin)
+    );
+  }
+
   authDebug("callback_has_code", {
     hasCode: Boolean(code),
     origin,
@@ -22,7 +34,7 @@ export async function GET(request: Request) {
 
   if (!code) {
     return NextResponse.redirect(
-      new URL("/login?error=missing_code", origin)
+      new URL(loginPathWithError("missing_code", nextPath), origin)
     );
   }
 
@@ -35,7 +47,7 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.redirect(
-      new URL("/login?error=auth_callback_failed", origin)
+      new URL(loginPathWithError("auth_callback_failed", nextPath), origin)
     );
   }
 
