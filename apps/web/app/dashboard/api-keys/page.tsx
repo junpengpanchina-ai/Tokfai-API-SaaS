@@ -1,6 +1,7 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { loginPathWithNext } from "@/lib/auth/login-redirect";
 import { ApiKeysErrorView } from "@/components/api-keys-error-view";
 import {
   DmitServerError,
@@ -41,7 +42,7 @@ export default async function ApiKeysPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login?redirect=/dashboard/api-keys");
+    redirect(loginPathWithNext("/dashboard/api-keys"));
   }
 
   const {

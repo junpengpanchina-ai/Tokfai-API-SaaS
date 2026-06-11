@@ -1,6 +1,7 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { loginPathWithNext } from "@/lib/auth/login-redirect";
 import { dmitServerFetch } from "@/lib/dmit/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -28,7 +29,7 @@ export default async function ImagePlaygroundPage({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login?redirect=/dashboard/image-playground");
+    redirect(loginPathWithNext("/dashboard/image-playground"));
   }
 
   const {

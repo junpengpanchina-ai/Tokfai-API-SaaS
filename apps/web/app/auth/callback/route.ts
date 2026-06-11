@@ -1,20 +1,23 @@
 import { NextResponse } from "next/server";
 
+import { resolvePostLoginPath } from "@/lib/auth/login-redirect";
 import { authDebug } from "@/lib/auth/debug";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 
 /**
  * Supabase OAuth + email-confirmation callback.
- * Exchanges the `code` for a session and redirects into the dashboard.
+ * Exchanges the `code` for a session and redirects to `next` or /dashboard.
  */
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
   const origin = requestUrl.origin;
+  const nextPath = resolvePostLoginPath(requestUrl.searchParams.get("next"));
 
   authDebug("callback_has_code", {
     hasCode: Boolean(code),
     origin,
+    nextPath,
   });
 
   if (!code) {
@@ -37,9 +40,9 @@ export async function GET(request: Request) {
   }
 
   authDebug("callback_exchange_success", {
-    redirectTo: "/dashboard",
+    redirectTo: nextPath,
     origin,
   });
 
-  return NextResponse.redirect(new URL("/dashboard", origin));
+  return NextResponse.redirect(new URL(nextPath, origin));
 }

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { loginPathWithNext } from "@/lib/auth/login-redirect";
 import { listCatalogModelPricing } from "@/lib/dmit/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -18,7 +19,7 @@ export default async function ModelsPage() {
   } = await supabase.auth.getSession();
 
   if (!session?.user) {
-    redirect("/login?redirect=/dashboard/models");
+    redirect(loginPathWithNext("/dashboard/models"));
   }
 
   let catalogPricing = [] as Awaited<ReturnType<typeof listCatalogModelPricing>>;

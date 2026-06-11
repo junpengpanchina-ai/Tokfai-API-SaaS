@@ -1,3 +1,4 @@
+import { loginPathWithNext } from "@/lib/auth/login-redirect";
 import {
   listBillingRechargePlans,
   type BillingRechargePlan,
@@ -87,7 +88,7 @@ export function formatPlanCredits(value: number): string {
 export function creditsPurchaseHref(isLoggedIn: boolean): string {
   return isLoggedIn
     ? "/dashboard/credits"
-    : "/login?redirect=/dashboard/credits";
+    : loginPathWithNext("/dashboard/credits");
 }
 
 /**

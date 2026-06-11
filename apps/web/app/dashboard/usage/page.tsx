@@ -1,6 +1,7 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { loginPathWithNext } from "@/lib/auth/login-redirect";
 import { UsageViewClient } from "@/components/usage-view-client";
 import { loadUsagePageData } from "@/lib/usage-page";
 import { createClient } from "@/lib/supabase/server";
@@ -20,7 +21,7 @@ export default async function UsagePage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login?redirect=/dashboard/usage");
+    redirect(loginPathWithNext("/dashboard/usage"));
   }
 
   const state = await loadUsagePageData(user.id);

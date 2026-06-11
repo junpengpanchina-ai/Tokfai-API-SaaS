@@ -13,38 +13,49 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { resolvePostLoginPath } from "@/lib/auth/login-redirect";
 import { getOAuthRedirectOrigin } from "@/lib/auth/site-url";
+import { useI18n } from "@/lib/i18n/i18n-provider";
 import { createClient } from "@/lib/supabase/client";
 
-const LOGIN_ERRORS: Record<string, string> = {
-  missing_code: "Missing OAuth code.",
-  auth_callback_failed: "Google login failed. Please try again.",
-  oauth_callback_failed: "Google login failed. Please try again.",
+const LOGIN_ERROR_KEYS: Record<string, string> = {
+  missing_code: "auth.login.errorMissingCode",
+  auth_callback_failed: "auth.login.errorOAuthFailed",
+  oauth_callback_failed: "auth.login.errorOAuthFailed",
 };
 
-function getLoginErrorMessage(error?: string) {
+function getLoginErrorMessage(
+  error: string | undefined,
+  t: (key: string) => string
+) {
   if (!error) {
     return null;
   }
 
-  return LOGIN_ERRORS[error] ?? error;
+  const key = LOGIN_ERROR_KEYS[error];
+  return key ? t(key) : error;
 }
 
 export function LoginForm({
-  redirectTo,
+  nextPath,
+  legacyRedirect,
   initialError,
 }: {
-  redirectTo?: string;
+  nextPath?: string;
+  legacyRedirect?: string;
   initialError?: string;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(
-    getLoginErrorMessage(initialError)
+    getLoginErrorMessage(initialError, t)
   );
+
+  const postLoginPath = resolvePostLoginPath(nextPath, legacyRedirect);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -64,10 +75,7 @@ export function LoginForm({
       return;
     }
 
-    const target = redirectTo && redirectTo.startsWith("/")
-      ? redirectTo
-      : "/dashboard";
-    router.replace(target);
+    router.replace(postLoginPath);
     router.refresh();
   }
 
@@ -75,11 +83,14 @@ export function LoginForm({
     setError(null);
     setGoogleLoading(true);
 
+    const callbackUrl = new URL(`${getOAuthRedirectOrigin()}/auth/callback`);
+    callbackUrl.searchParams.set("next", postLoginPath);
+
     const supabase = createClient();
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${getOAuthRedirectOrigin()}/auth/callback`,
+        redirectTo: callbackUrl.toString(),
       },
     });
 
@@ -92,13 +103,13 @@ export function LoginForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Welcome back</CardTitle>
-        <CardDescription>Log in to your Tokfai account.</CardDescription>
+        <CardTitle>{t("auth.login.title")}</CardTitle>
+        <CardDescription>{t("auth.login.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t("auth.login.email")}</Label>
             <Input
               id="email"
               type="email"
@@ -106,11 +117,11 @@ export function LoginForm({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder={t("auth.login.emailPlaceholder")}
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t("auth.login.password")}</Label>
             <Input
               id="password"
               type="password"
@@ -128,11 +139,11 @@ export function LoginForm({
           ) : null}
 
           <Button type="submit" disabled={loading || googleLoading}>
-            {loading ? "Signing in…" : "Sign in"}
+            {loading ? t("auth.login.signingIn") : t("auth.login.signIn")}
           </Button>
 
           <div className="relative my-2 text-center text-xs uppercase tracking-wider text-muted-foreground">
-            <span className="bg-card px-2">or</span>
+            <span className="bg-card px-2">{t("auth.login.or")}</span>
             <span className="absolute inset-x-0 top-1/2 -z-10 h-px bg-border" />
           </div>
 
@@ -142,7 +153,9 @@ export function LoginForm({
             onClick={handleGoogleLogin}
             disabled={loading || googleLoading}
           >
-            {googleLoading ? "Redirecting…" : "Continue with Google"}
+            {googleLoading
+              ? t("auth.login.googleRedirecting")
+              : t("auth.login.continueWithGoogle")}
           </Button>
         </form>
       </CardContent>

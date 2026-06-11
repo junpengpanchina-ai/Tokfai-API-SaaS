@@ -102,6 +102,25 @@ export const messages = {
       apiReference: "API reference →",
       copyright: "© {year} Tokfai",
     },
+    auth: {
+      login: {
+        title: "Log in to Tokfai",
+        description:
+          "Log in to Tokfai to manage API keys, credits, and Playgrounds.",
+        email: "Email",
+        emailPlaceholder: "you@example.com",
+        password: "Password",
+        signIn: "Sign in",
+        signingIn: "Signing in…",
+        or: "or",
+        continueWithGoogle: "Continue with Google",
+        googleRedirecting: "Redirecting…",
+        noAccount: "No account?",
+        createOne: "Create one",
+        errorMissingCode: "Missing OAuth code.",
+        errorOAuthFailed: "Google login failed. Please try again.",
+      },
+    },
     dashboard: {
       overview: {
         title: "Overview",
@@ -1790,6 +1809,24 @@ export const messages = {
       footerTagline: "Tokfai · OpenAI 兼容的图像与对话 API",
       apiReference: "API 参考 →",
       copyright: "© {year} Tokfai",
+    },
+    auth: {
+      login: {
+        title: "登录 Tokfai",
+        description: "登录 Tokfai，继续管理 API Key、积分与 Playground。",
+        email: "邮箱",
+        emailPlaceholder: "you@example.com",
+        password: "密码",
+        signIn: "登录",
+        signingIn: "登录中…",
+        or: "或",
+        continueWithGoogle: "使用 Google 登录",
+        googleRedirecting: "跳转中…",
+        noAccount: "还没有账号？",
+        createOne: "立即注册",
+        errorMissingCode: "缺少 OAuth 授权码。",
+        errorOAuthFailed: "Google 登录失败，请重试。",
+      },
     },
     dashboard: {
       overview: {

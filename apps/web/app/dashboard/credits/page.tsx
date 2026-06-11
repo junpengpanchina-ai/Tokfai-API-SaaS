@@ -1,6 +1,7 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { loginPathWithNext } from "@/lib/auth/login-redirect";
 import { CreditsContentClient } from "@/components/credits-content-client";
 import { loadCreditsPageData } from "@/lib/credits";
 import { createClient } from "@/lib/supabase/server";
@@ -25,7 +26,7 @@ export default async function CreditsPage({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login?redirect=/dashboard/credits");
+    redirect(loginPathWithNext("/dashboard/credits"));
   }
 
   const creditsState = await loadCreditsPageData(user.id);
