@@ -27,6 +27,7 @@ import {
   toneForStatus,
 } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/i18n-provider";
+import { usageStatusLabel, usageStatusTone } from "@/lib/usage-display";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -555,19 +556,17 @@ function RecentActivityCard({
           <div className="flex flex-col gap-4">
             <RecentActivityTable rows={overview.recentActivity} t={t} />
             <div className="flex flex-wrap justify-end gap-2">
+              <Button asChild size="sm" variant="outline">
+                <Link href="/dashboard/usage">
+                  {t("dashboard.overview.recentActivityViewUsage")}
+                </Link>
+              </Button>
               {hasSuccessfulActivity ? (
-                <>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/dashboard/usage">
-                      {t("dashboard.overview.recentActivityViewUsage")}
-                    </Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/dashboard/credits">
-                      {t("dashboard.overview.recentActivityViewCredits")}
-                    </Link>
-                  </Button>
-                </>
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/dashboard/credits">
+                    {t("dashboard.overview.recentActivityViewCredits")}
+                  </Link>
+                </Button>
               ) : null}
               <Button asChild size="sm" variant="ghost">
                 <Link href="/dashboard/usage">
@@ -577,9 +576,21 @@ function RecentActivityCard({
             </div>
           </div>
         ) : (
-          <p className="rounded-md border border-dashed bg-muted/30 px-4 py-6 text-sm text-muted-foreground">
-            {t("dashboard.overview.recentActivityEmpty")}
-          </p>
+          <div className="flex flex-col items-center gap-3 rounded-md border border-dashed bg-muted/30 px-4 py-8 text-center">
+            <p className="max-w-md text-sm text-muted-foreground">
+              {t("dashboard.overview.recentActivityEmpty")}
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button asChild size="sm">
+                <Link href="/dashboard/playground">{t("common.chatPlayground")}</Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/dashboard/image-playground">
+                  {t("common.imagePlayground")}
+                </Link>
+              </Button>
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
@@ -722,13 +733,8 @@ function StatusBadge({
   status: string | null;
   t: (key: string) => string;
 }) {
-  const tone = toneForStatus(status);
-  const label =
-    tone === "success"
-      ? t("dashboard.usage.statusSucceeded")
-      : tone === "destructive"
-        ? t("dashboard.usage.statusFailed")
-        : (status ?? "—");
+  const tone = usageStatusTone(status);
+  const label = usageStatusLabel(status, t);
 
   return (
     <Badge
@@ -737,7 +743,7 @@ function StatusBadge({
           ? "success"
           : tone === "destructive"
             ? "destructive"
-            : "outline"
+            : "secondary"
       }
     >
       {label}

@@ -224,7 +224,7 @@ export function ApiKeysClient({
                 maxLength={64}
               />
             </div>
-            <Button type="submit" disabled={creating}>
+            <Button type="submit" className="w-full sm:w-auto" disabled={creating}>
               {creating ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
@@ -311,7 +311,7 @@ function IntegrationGuide({ t }: { t: (key: string) => string }) {
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/docs">
+            <Link href="/dashboard/docs">
               {t("dashboard.apiKeys.viewApiDocs")}
               <ExternalLink className="h-3.5 w-3.5" />
             </Link>
@@ -363,7 +363,7 @@ function OneTimeSecretCard({
               })
             : t("dashboard.apiKeys.apiKeyCreated")}
         </CardTitle>
-        <CardDescription className="text-base text-emerald-900/90 dark:text-emerald-100/90">
+        <CardDescription className="text-sm text-emerald-900/90 dark:text-emerald-100/90">
           {t("dashboard.apiKeys.oneTimeSecretDesc")}
         </CardDescription>
       </CardHeader>
@@ -387,8 +387,8 @@ function OneTimeSecretCard({
             Authorization: Bearer {secret}
           </code>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" size="lg" onClick={onCopy}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <Button type="button" className="w-full sm:w-auto" onClick={onCopy}>
             {copyStatus === "copied" ? (
               <>
                 <Check className="h-4 w-4" />
@@ -401,11 +401,16 @@ function OneTimeSecretCard({
               </>
             )}
           </Button>
-          <Button type="button" size="lg" variant="outline" onClick={onDismiss}>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full sm:w-auto"
+            onClick={onDismiss}
+          >
             {t("dashboard.apiKeys.savedMyKey")}
           </Button>
-          <Button type="button" size="lg" variant="ghost" asChild>
-            <Link href="/docs">
+          <Button type="button" variant="ghost" className="w-full sm:w-auto" asChild>
+            <Link href="/dashboard/docs">
               {t("dashboard.apiKeys.readDocs")}
               <ExternalLink className="h-4 w-4" />
             </Link>
@@ -502,7 +507,10 @@ function ApiKeysTable({
                 <td className="py-3 pr-4 font-medium">{key.name}</td>
                 <td className="py-3 pr-4">
                   <div className="flex flex-col gap-2">
-                    <code className="font-mono text-xs text-muted-foreground">
+                    <code
+                      className="font-mono text-xs text-muted-foreground"
+                      title={key.prefix || undefined}
+                    >
                       {key.prefix || "—"}
                     </code>
                     {isActive && canReveal ? (
@@ -598,23 +606,9 @@ function ActionErrorAlert({
     <Card className={`border-destructive/30 bg-destructive/5 ${className ?? ""}`}>
       <CardContent className="flex items-start gap-2 pt-4">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-        <div>
-          <p className="text-sm text-destructive" role="alert">
-            {error.message}
-          </p>
-          <p className="mt-1 font-mono text-xs text-muted-foreground">
-            {error.method ? <>method={error.method} </> : null}
-            {error.url ? (
-              <>
-                url={error.url}
-                <br />
-              </>
-            ) : null}
-            status={error.status} code={error.code ?? "n/a"}
-            <br />
-            message={error.message}
-          </p>
-        </div>
+        <p className="text-sm text-destructive" role="alert">
+          {error.message}
+        </p>
       </CardContent>
     </Card>
   );

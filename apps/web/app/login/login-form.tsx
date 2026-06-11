@@ -101,14 +101,16 @@ export function LoginForm({
   }
 
   return (
-    <Card>
+    <Card className="w-full min-w-0 overflow-hidden">
       <CardHeader>
         <CardTitle>{t("auth.login.title")}</CardTitle>
-        <CardDescription>{t("auth.login.description")}</CardDescription>
+        <CardDescription className="break-words">
+          {t("auth.login.description")}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
+          <div className="flex min-w-0 flex-col gap-2">
             <Label htmlFor="email">{t("auth.login.email")}</Label>
             <Input
               id="email"
@@ -120,7 +122,7 @@ export function LoginForm({
               placeholder={t("auth.login.emailPlaceholder")}
             />
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex min-w-0 flex-col gap-2">
             <Label htmlFor="password">{t("auth.login.password")}</Label>
             <Input
               id="password"
@@ -138,7 +140,11 @@ export function LoginForm({
             </p>
           ) : null}
 
-          <Button type="submit" disabled={loading || googleLoading}>
+          <Button
+            type="submit"
+            className="w-full whitespace-normal text-center"
+            disabled={loading || googleLoading}
+          >
             {loading ? t("auth.login.signingIn") : t("auth.login.signIn")}
           </Button>
 
@@ -150,6 +156,7 @@ export function LoginForm({
           <Button
             type="button"
             variant="outline"
+            className="w-full whitespace-normal text-center"
             onClick={handleGoogleLogin}
             disabled={loading || googleLoading}
           >

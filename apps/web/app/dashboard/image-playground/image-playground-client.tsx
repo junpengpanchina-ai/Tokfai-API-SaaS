@@ -733,7 +733,7 @@ export function ImagePlaygroundClient({
       onDrop={(event) => {
         event.preventDefault();
       }}
-      className="flex flex-col gap-6"
+      className="flex min-w-0 flex-col gap-6"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0 flex-1">
@@ -1324,12 +1324,6 @@ function ImageInputThumbnail({
         )}
       </div>
       <div className="flex flex-col gap-1 border-t px-2 py-1.5">
-        <span className="truncate text-[11px] text-muted-foreground">
-          source: {item.source}
-        </span>
-        <span className="truncate text-[11px] text-muted-foreground">
-          status: {item.status}
-        </span>
         {referenceMessage ? (
           <p className="text-[11px] leading-snug text-muted-foreground">
             {referenceMessage}
@@ -1729,15 +1723,15 @@ function ResponsePanel({
           <div className="flex flex-col gap-1">
             {creditsCharged != null ? (
               <p>
-                {formatMessage(t("dashboard.playground.creditsChargedApprox"), {
+                {formatMessage(t("dashboard.imagePlayground.successCreditsCharged"), {
                   credits: formatCreditsPrecise(creditsCharged),
                 })}
               </p>
             ) : (
-              <p>{t("dashboard.playground.successNoCreditsHint")}</p>
+              <p>{t("dashboard.imagePlayground.successNoCreditsHint")}</p>
             )}
             <p className="text-muted-foreground">
-              {t("dashboard.playground.balanceUpdatedHint")}{" "}
+              {t("dashboard.imagePlayground.successBalanceHint")}{" "}
               <Link
                 href="/dashboard/usage"
                 className="underline underline-offset-4"
@@ -1820,7 +1814,7 @@ function MetadataPanel({
       {imageUrl ? (
         <div className="flex flex-col gap-2">
           <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-            Image URL
+            {t("dashboard.imagePlayground.metaImageUrl")}
           </Label>
           <code className="block overflow-x-auto rounded-md border bg-muted/40 p-3 font-mono text-xs break-all">
             {imageUrl}
@@ -1843,28 +1837,38 @@ function MetadataPanel({
 
       <dl className="grid gap-2 text-sm">
         <div className="flex flex-wrap gap-x-2">
-          <dt className="text-muted-foreground">model:</dt>
+          <dt className="text-muted-foreground">
+            {t("dashboard.imagePlayground.metaModel")}
+          </dt>
           <dd className="font-mono">{result.model}</dd>
         </div>
         {createdAt ? (
           <div className="flex flex-wrap gap-x-2">
-            <dt className="text-muted-foreground">created_at:</dt>
+            <dt className="text-muted-foreground">
+              {t("dashboard.imagePlayground.metaCreatedAt")}
+            </dt>
             <dd className="font-mono">{formatDateTime(createdAt)}</dd>
           </div>
         ) : null}
         {creditsCharged != null ? (
           <div className="flex flex-wrap gap-x-2">
-            <dt className="text-muted-foreground">credits_charged:</dt>
+            <dt className="text-muted-foreground">
+              {t("dashboard.imagePlayground.metaCreditsCharged")}
+            </dt>
             <dd className="font-mono">{formatCreditsPrecise(creditsCharged)}</dd>
           </div>
         ) : null}
         <div className="flex flex-wrap gap-x-2">
-          <dt className="text-muted-foreground">input images:</dt>
+          <dt className="text-muted-foreground">
+            {t("dashboard.imagePlayground.metaInputImages")}
+          </dt>
           <dd className="font-mono">{inputImagesCount}</dd>
         </div>
         {result.request_id ? (
           <div className="flex flex-wrap items-center gap-2">
-            <dt className="text-muted-foreground">request_id:</dt>
+            <dt className="text-muted-foreground">
+              {t("dashboard.imagePlayground.metaRequestId")}
+            </dt>
             <dd className="font-mono break-all">{result.request_id}</dd>
             <CopyButton
               copied={copiedId === requestCopyId}
@@ -1923,9 +1927,6 @@ const IMAGE_PAGE_RESOLVE_ERROR_CODES = new Set([
   "unsupported_image_content_type",
 ]);
 
-const IMAGE_PAGE_RESOLVE_ERROR_MESSAGE =
-  "Tokfai could not find a usable image on this page. Try another URL or upload the image directly.";
-
 function toPlaygroundError(
   err: unknown,
   t: (key: string) => string
@@ -1939,22 +1940,24 @@ function toPlaygroundError(
   }
   if (err instanceof DmitApiError) {
     const code = err.code?.toLowerCase();
+    if (code === "key_reveal_timeout") {
+      return {
+        status: err.status,
+        code: err.code,
+        message: err.message,
+      };
+    }
     if (code && IMAGE_PAGE_RESOLVE_ERROR_CODES.has(code)) {
       return {
         status: err.status,
         code: err.code,
-        message: IMAGE_PAGE_RESOLVE_ERROR_MESSAGE,
+        message: t("dashboard.imagePlayground.errors.pageImageNotFound"),
       };
     }
     return {
       status: err.status,
       code: err.code,
-      message: imagePlaygroundErrorMessage(
-        err.status,
-        err.code,
-        t,
-        err.message
-      ),
+      message: imagePlaygroundErrorMessage(err.status, err.code, t),
     };
   }
   if (err instanceof TypeError) {
@@ -1968,7 +1971,7 @@ function toPlaygroundError(
     return {
       status: 0,
       code: "unknown_error",
-      message: imagePlaygroundErrorMessage(0, undefined, t, err.message),
+      message: imagePlaygroundErrorMessage(0, undefined, t),
     };
   }
   return {

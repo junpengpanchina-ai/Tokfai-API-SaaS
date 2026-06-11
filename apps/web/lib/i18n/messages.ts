@@ -513,7 +513,7 @@ export const messages = {
         apiKeyCreated: "API key created",
         apiKeyCreatedNamed: "API key created: {name}",
         oneTimeSecretDesc:
-          "Copy and store this key now. The full secret is shown once at creation. You can also copy it later from the list with Copy key.",
+          "Copy and store this key now — it is shown only once at creation.",
         yourApiKey: "Your API key",
         authorizationHeader: "Authorization header",
         copyFullKey: "Copy full key",
@@ -521,7 +521,7 @@ export const messages = {
         savedMyKey: "I've saved my key",
         readDocs: "Read the docs",
         revokeConfirm:
-          "Revoke this API key? Existing apps using this key will stop working.",
+          "Revoke this API key? Existing apps using this key will stop working. This cannot be undone.",
         colName: "Name",
         colPrefix: "Prefix",
         colStatus: "Status",
@@ -723,6 +723,16 @@ export const messages = {
         presetPosterPrompt:
           "Create a modern promotional poster with bold composition, clean typography space, premium commercial style.",
         resultTitle: "Result",
+        successCreditsCharged: "Charged {credits} credits.",
+        successNoCreditsHint:
+          "Generation succeeded. Check Usage or Credits for billing details.",
+        successBalanceHint: "Recorded in",
+        metaImageUrl: "Image URL",
+        metaModel: "Model",
+        metaCreatedAt: "Created at",
+        metaCreditsCharged: "Credits charged",
+        metaInputImages: "Input images",
+        metaRequestId: "request_id",
         downloadImage: "Download image",
         copyImageUrl: "Copy image URL",
         copiedImageUrl: "Copied",
@@ -749,6 +759,8 @@ export const messages = {
           keyNotRetrievable:
             "For security, full keys aren't stored long-term. Paste your key or create a new test key.",
           unknown: "Request failed. Please try again later.",
+          pageImageNotFound:
+            "Could not find a usable image on this page. Try another URL or upload the image directly.",
         },
       },
       credits: {
@@ -849,9 +861,12 @@ export const messages = {
         loadErrorTempDesc:
           "Credits could not be loaded right now. Please try again later.",
         reasonStripeCheckout: "Stripe top-up",
-        reasonChatUsage: "API usage charge",
+        reasonChatUsage: "Chat API usage",
+        reasonImageUsage: "Image generation",
         reasonAdminAdjustment: "Admin adjustment",
         reasonSystemFix: "System correction",
+        copyReference: "Copy reference",
+        copiedReference: "Copied",
       },
       usage: {
         title: "Usage",
@@ -2194,15 +2209,15 @@ export const messages = {
           "列表展示 prefix 便于识别。活跃密钥可通过「复制密钥」获取完整 secret。",
         apiKeyCreated: "API 密钥已创建",
         apiKeyCreatedNamed: "API 密钥已创建：{name}",
-        oneTimeSecretDesc:
-          "请立即复制并妥善保存。完整密钥仅在创建时展示一次，之后仍可通过列表中的「复制密钥」获取。",
+        oneTimeSecretDesc: "请立即复制并妥善保存——完整密钥仅在创建时展示一次。",
         yourApiKey: "你的 API 密钥",
         authorizationHeader: "Authorization header",
         copyFullKey: "复制完整密钥",
         copied: "已复制",
         savedMyKey: "我已保存密钥",
         readDocs: "阅读文档",
-        revokeConfirm: "确定吊销此 API 密钥？使用该密钥的应用将无法继续工作。",
+        revokeConfirm:
+          "确定吊销此 API 密钥？使用该密钥的应用将无法继续工作，且无法恢复。",
         colName: "名称",
         colPrefix: "Prefix",
         colStatus: "状态",
@@ -2389,6 +2404,16 @@ export const messages = {
         presetPosterPrompt:
           "生成一张现代宣传海报，构图醒目，预留清晰排版空间，高级商业风格。",
         resultTitle: "生成结果",
+        successCreditsCharged: "本次扣费 {credits} credits。",
+        successNoCreditsHint:
+          "生成成功。扣费详情请查看 Usage 或 Credits。",
+        successBalanceHint: "已记录至",
+        metaImageUrl: "图片 URL",
+        metaModel: "模型",
+        metaCreatedAt: "创建时间",
+        metaCreditsCharged: "扣费 credits",
+        metaInputImages: "输入图片数",
+        metaRequestId: "request_id",
         downloadImage: "下载图片",
         copyImageUrl: "复制图片 URL",
         copiedImageUrl: "已复制",
@@ -2409,6 +2434,8 @@ export const messages = {
           keyNotRetrievable:
             "出于安全考虑，完整 key 不会长期保存。请粘贴 key，或重新创建一个测试 Key。",
           unknown: "请求失败，请稍后重试。",
+          pageImageNotFound:
+            "无法从该页面解析可用图片。请换用其他 URL 或直接上传图片。",
         },
       },
       credits: {
@@ -2504,9 +2531,12 @@ export const messages = {
         loadErrorTemp: "积分暂时无法加载",
         loadErrorTempDesc: "积分暂时无法加载，请稍后重试。",
         reasonStripeCheckout: "Stripe 充值到账",
-        reasonChatUsage: "API 调用扣费",
+        reasonChatUsage: "对话 API 扣费",
+        reasonImageUsage: "图像生成扣费",
         reasonAdminAdjustment: "管理员调账",
         reasonSystemFix: "系统修正",
+        copyReference: "复制 reference",
+        copiedReference: "已复制",
       },
       usage: {
         title: "用量",

@@ -160,9 +160,9 @@ function resolveCostEstimates(
 
     return {
       shortEstimate: t("dashboard.models.chatEstimateShort")
-        .replace("{range}", formatChatCreditsSoftRange(shortCredits)),
+        .replace("{range}", formatChatCreditsSoftRange(shortCredits, locale)),
       longEstimate: t("dashboard.models.chatEstimateLong")
-        .replace("{range}", formatChatCreditsSoftRange(longCredits)),
+        .replace("{range}", formatChatCreditsSoftRange(longCredits, locale)),
       approxRmb: t(budgetKey),
     };
   }
@@ -179,7 +179,7 @@ function resolveCostEstimates(
 
     const perImageLabel = t("dashboard.models.imagePerGeneration")
       .replace("{credits}", formatCreditsEstimate(perImage))
-      .replace("{yuan}", formatImageYuanSoft(perImage));
+      .replace("{yuan}", formatImageYuanSoft(perImage, locale));
 
     const packageLines = ESTIMATE_RECHARGE_PLANS.map((plan) => {
       const count = formatGenerationCount(plan.credits, perImage);
@@ -192,7 +192,7 @@ function resolveCostEstimates(
     return {
       shortEstimate: perImageLabel,
       longEstimate: packageLines.join("\n"),
-      approxRmb: formatImageYuanSoft(perImage),
+      approxRmb: formatImageYuanSoft(perImage, locale),
     };
   }
 
@@ -202,11 +202,11 @@ function resolveCostEstimates(
     if (videoCredits != null && videoCredits > 0) {
       const unitLabel = t("dashboard.models.videoPerUnit")
         .replace("{credits}", formatCreditsEstimate(videoCredits))
-        .replace("{yuan}", formatImageYuanSoft(videoCredits));
+        .replace("{yuan}", formatImageYuanSoft(videoCredits, locale));
       return {
         shortEstimate: unitLabel,
         longEstimate: unitLabel,
-        approxRmb: formatImageYuanSoft(videoCredits),
+        approxRmb: formatImageYuanSoft(videoCredits, locale),
       };
     }
 

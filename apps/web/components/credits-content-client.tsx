@@ -8,8 +8,11 @@ import {
   BookOpen,
   CheckCircle2,
   CreditCard,
+  Info,
   KeyRound,
 } from "lucide-react";
+
+import { CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
 
 import { ResponsiveTableScroll } from "@/components/responsive-table-scroll";
 import { Badge } from "@/components/ui/badge";
@@ -82,7 +85,7 @@ export function CreditsContentClient({
             </p>
           ) : null}
         </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <BalanceStat
             label={t("dashboard.credits.lastChange")}
             value={
@@ -99,6 +102,24 @@ export function CreditsContentClient({
             label={t("dashboard.credits.last7DaysConsumed")}
             value={formatCredits(balance.last7DaysConsumed)}
           />
+        </CardContent>
+      </Card>
+
+      <Card className="border-muted bg-muted/30">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Info className="h-4 w-4 shrink-0" />
+            {t("dashboard.credits.howItWorksTitle")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+            <li>{t("dashboard.credits.howItWorksItem1")}</li>
+            <li>{t("dashboard.credits.howItWorksItem2")}</li>
+            <li>{t("dashboard.credits.howItWorksItem3")}</li>
+            <li>{t("dashboard.credits.howItWorksItem4")}</li>
+            <li>{t("dashboard.credits.howItWorksItem5")}</li>
+          </ul>
         </CardContent>
       </Card>
 
@@ -178,9 +199,14 @@ export function CreditsContentClient({
         </CardHeader>
         <CardContent>
           {orders.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {t("dashboard.credits.emptyOrders")}
-            </p>
+            <div className="flex flex-col items-center gap-3 py-8 text-center">
+              <p className="max-w-md text-sm text-muted-foreground">
+                {t("dashboard.credits.emptyOrders")}
+              </p>
+              <Button asChild size="sm">
+                <Link href="/pricing">{t("dashboard.credits.actionRecharge")}</Link>
+              </Button>
+            </div>
           ) : (
             <ResponsiveTableScroll>
               <table className="w-full min-w-[640px] text-sm">
@@ -267,6 +293,9 @@ function LedgerRow({
   entry: CreditLedgerRow;
   t: (key: string) => string;
 }) {
+  const { copiedId, copyText } = useCopyToClipboard();
+  const referenceCopyId = `ledger-ref-${entry.id}`;
+
   return (
     <tr className="border-b last:border-0">
       <td className="py-2 pr-4 text-muted-foreground">
@@ -283,14 +312,32 @@ function LedgerRow({
           ? formatCredits(entry.balance_after)
           : "—"}
       </td>
-      <td className="py-2 pr-4 text-muted-foreground">
+      <td
+        className="max-w-[12rem] truncate py-2 pr-4 text-muted-foreground"
+        title={entry.reason ?? undefined}
+      >
         {displayReason(entry.reason, t)}
       </td>
-      <td
-        className="max-w-[10rem] truncate py-2 pr-4 font-mono text-xs text-muted-foreground"
-        title={entry.reference_id ?? undefined}
-      >
-        {entry.reference_id ?? "—"}
+      <td className="py-2 pr-4">
+        {entry.reference_id ? (
+          <div className="flex items-center gap-1">
+            <code
+              className="max-w-[10rem] truncate font-mono text-xs text-muted-foreground"
+              title={entry.reference_id}
+            >
+              {truncateReferenceId(entry.reference_id)}
+            </code>
+            <CopyButton
+              copied={copiedId === referenceCopyId}
+              onCopy={() => copyText(referenceCopyId, entry.reference_id!)}
+              copyLabel={t("dashboard.credits.copyReference")}
+              copiedLabel={t("dashboard.credits.copiedReference")}
+              size="icon"
+            />
+          </div>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
       </td>
     </tr>
   );
@@ -523,9 +570,19 @@ function EmptyLedgerState({ t }: { t: (key: string) => string }) {
         <Button asChild size="sm" variant="ghost">
           <Link href="/dashboard/playground">{t("common.chatPlayground")}</Link>
         </Button>
+        <Button asChild size="sm" variant="ghost">
+          <Link href="/dashboard/image-playground">
+            {t("common.imagePlayground")}
+          </Link>
+        </Button>
       </div>
     </div>
   );
+}
+
+function truncateReferenceId(referenceId: string) {
+  if (referenceId.length <= 16) return referenceId;
+  return `${referenceId.slice(0, 8)}...${referenceId.slice(-6)}`;
 }
 
 function formatOrderAmount(order: CreditsLoadState["orders"][number]): string {
@@ -548,6 +605,9 @@ function displayReason(
   }
   if (reason === "Chat completion usage") {
     return t("dashboard.credits.reasonChatUsage");
+  }
+  if (reason === "Image generation usage") {
+    return t("dashboard.credits.reasonImageUsage");
   }
   if (reason === "admin_adjustment") {
     return t("dashboard.credits.reasonAdminAdjustment");

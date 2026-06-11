@@ -30,6 +30,20 @@ const USAGE_ERROR_STATUSES = new Set([
   "rate_limited",
 ]);
 
+export function usageStatusLabel(
+  status: string | null | undefined,
+  t: (key: string) => string
+): string {
+  const tone = usageStatusTone(status);
+  if (tone === "success") {
+    return t("dashboard.usage.statusSucceeded");
+  }
+  if (tone === "muted") {
+    return t("dashboard.usage.statusPending");
+  }
+  return t("dashboard.usage.statusFailed");
+}
+
 export function usageStatusTone(
   status: string | null | undefined
 ): SemanticTone {
@@ -80,10 +94,6 @@ export function formatUsageCredits(
 
   const n = typeof value === "number" ? value : Number(value);
   if (Number.isNaN(n)) return "—";
-
-  if (kind === "image") {
-    return n === 1 ? "1 credit" : `${formatInt(n)} credits`;
-  }
 
   return formatCreditsPrecise(n);
 }

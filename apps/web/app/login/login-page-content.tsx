@@ -18,8 +18,8 @@ export function LoginPageContent({
   const { t } = useI18n();
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-12">
-      <div className="w-full max-w-sm">
+    <div className="flex min-h-screen min-w-0 items-center justify-center bg-muted/30 px-4 py-12">
+      <div className="w-full min-w-0 max-w-sm">
         <div className="mb-8 text-center">
           <Link href="/" className="inline-flex items-center gap-2">
             <div className="grid h-9 w-9 place-items-center rounded-md bg-primary font-bold text-primary-foreground">

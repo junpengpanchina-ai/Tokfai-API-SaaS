@@ -27,6 +27,7 @@ import {
   formatUsageTokenCell,
   getUsageKind,
   resolveUsageRoute,
+  usageStatusLabel,
   usageStatusTone,
   type UsageKind,
 } from "@/lib/usage-display";
@@ -103,6 +104,10 @@ export function UsageViewClient({ state }: { state: UsagePageState }) {
             />
           ) : state.status === "ready" ? (
             <EmptyState t={t} />
+          ) : state.status === "error" ? (
+            <p className="text-sm text-muted-foreground">
+              {t("dashboard.usage.loadErrorDesc")}
+            </p>
           ) : null}
         </CardContent>
       </Card>
@@ -272,7 +277,7 @@ function StatusBadge({
   t: (key: string) => string;
 }) {
   const tone = usageStatusTone(status);
-  const label = statusLabel(status, tone, t);
+  const label = usageStatusLabel(status, t);
 
   if (tone === "success") {
     return <Badge variant="success">{label}</Badge>;
@@ -281,20 +286,6 @@ function StatusBadge({
     return <Badge variant="secondary">{label}</Badge>;
   }
   return <Badge variant="destructive">{label}</Badge>;
-}
-
-function statusLabel(
-  status: string,
-  tone: ReturnType<typeof usageStatusTone>,
-  t: (key: string) => string
-): string {
-  if (tone === "success") {
-    return t("dashboard.usage.statusSucceeded");
-  }
-  if (tone === "muted") {
-    return t("dashboard.usage.statusPending");
-  }
-  return status || t("dashboard.usage.statusFailed");
 }
 
 function EmptyState({ t }: { t: (key: string) => string }) {

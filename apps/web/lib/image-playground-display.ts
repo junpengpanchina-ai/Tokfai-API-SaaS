@@ -68,8 +68,7 @@ export function resolveImageCreatedAt(
 export function imagePlaygroundErrorMessage(
   status: number,
   code: string | undefined,
-  t: (key: string) => string,
-  fallback?: string
+  t: (key: string) => string
 ): string {
   const normalized = (code ?? "").toLowerCase();
 
@@ -110,10 +109,6 @@ export function imagePlaygroundErrorMessage(
   const key = codeMap[normalized];
   if (key) {
     return t(key);
-  }
-
-  if (fallback?.trim()) {
-    return fallback.trim();
   }
 
   return t("dashboard.imagePlayground.errors.unknown");
