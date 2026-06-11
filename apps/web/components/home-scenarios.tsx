@@ -48,7 +48,7 @@ export function HomeScenarios() {
 
   return (
     <section className="border-t bg-muted/30">
-      <div className="container py-16 md:py-20">
+      <div className="container min-w-0 overflow-x-hidden py-16 md:py-20">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-2xl font-semibold tracking-tight">
             {t("home.scenariosTitle")}
@@ -61,7 +61,7 @@ export function HomeScenarios() {
           {SCENARIOS.map((scenario) => {
             const Icon = scenario.icon;
             return (
-              <Card key={scenario.key} className="flex flex-col">
+              <Card key={scenario.key} className="flex min-w-0 flex-col overflow-hidden">
                 <CardHeader>
                   <div className="mb-3 grid h-10 w-10 place-items-center rounded-md bg-primary/10 text-primary">
                     <Icon className="h-5 w-5" />

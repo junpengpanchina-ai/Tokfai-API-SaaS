@@ -15,6 +15,7 @@ import {
 import { dashboardCtaHref } from "@/lib/auth/public-cta";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useI18n } from "@/lib/i18n/i18n-provider";
+import { formatMessage } from "@/lib/i18n/messages";
 
 import {
   TOKFAI_API_BASE_URL,
@@ -782,7 +783,10 @@ export function DocsContent({
             <div className="flex items-start gap-2 text-sm">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
               <p className="text-amber-950 dark:text-amber-50">
-                {TOKFAI_BILLING_POLICY} {TOKFAI_STARTER_PLAN} is available on{" "}
+                {formatMessage(t("docs.billingPolicyNotice"), {
+                  policy: TOKFAI_BILLING_POLICY,
+                  starter: TOKFAI_STARTER_PLAN,
+                })}{" "}
                 <Link
                   href="/pricing"
                   className="font-medium underline-offset-4 hover:underline"

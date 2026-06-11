@@ -29,7 +29,7 @@ export function HomeHero() {
   const docsHref = isLoggedIn ? "/dashboard/docs" : "/docs";
 
   return (
-    <section className="container py-20 md:py-28">
+    <section className="container min-w-0 overflow-x-hidden py-20 md:py-28">
       <div className="mx-auto max-w-3xl text-center">
         <p className="text-sm font-semibold uppercase tracking-widest text-primary">
           Tokfai

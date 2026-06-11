@@ -19,17 +19,19 @@ import { useI18n } from "@/lib/i18n/i18n-provider";
 import {
   TOKFAI_API_BASE_URL,
   TOKFAI_API_KEY_PLACEHOLDER,
+  TOKFAI_RECOMMENDED_MODEL,
 } from "@/lib/tokfai-api";
 
 const BASE_URL = TOKFAI_API_BASE_URL;
 const API_KEY_PLACEHOLDER = TOKFAI_API_KEY_PLACEHOLDER;
+const DEFAULT_MODEL = TOKFAI_RECOMMENDED_MODEL;
 const AUTH_HEADER = `Authorization: Bearer ${API_KEY_PLACEHOLDER}`;
 
 const CHAT_COMPLETIONS_CURL = `curl https://api.tokfai.com/v1/chat/completions \\
   -H "Authorization: Bearer sk-tokfai_xxx" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "gemini-3.1-pro",
+    "model": "${DEFAULT_MODEL}",
     "messages": [
       {"role": "user", "content": "Hello Tokfai"}
     ]
@@ -43,7 +45,7 @@ const client = new OpenAI({
 });
 
 const completion = await client.chat.completions.create({
-  model: "gemini-3.1-pro",
+  model: "${DEFAULT_MODEL}",
   messages: [{ role: "user", content: "Hello Tokfai" }],
 });`;
 
@@ -55,7 +57,7 @@ client = OpenAI(
 )
 
 completion = client.chat.completions.create(
-    model="gemini-3.1-pro",
+    model="${DEFAULT_MODEL}",
     messages=[{"role": "user", "content": "Hello Tokfai"}],
 )`;
 

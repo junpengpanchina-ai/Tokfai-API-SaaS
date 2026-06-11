@@ -919,7 +919,7 @@ export const messages = {
           "Chat rows show prompt, completion, and total tokens. Image rows show credits per generation.",
         howItWorksItem3:
           "Balance and totals on Credits match this page — Usage and Credits are the source of truth.",
-        howItWorksItem4: "Failed requests appear here for debugging but are not charged.",
+        howItWorksItem4: "Failed requests are listed here but are not charged.",
         recentRequests: "Recent requests",
         recentRequestsDesc:
           "Last 50 entries, newest first. Run a request in the Chat Playground or Image Playground to generate more.",
@@ -1262,6 +1262,7 @@ export const messages = {
       viewModelsPage: "Browse models and tags",
       dashboardCreditsLink: "Dashboard → Credits",
       dashboardUsageLink: "Dashboard → Usage",
+      billingPolicyNotice: "{policy} {starter} — packages on",
       pricingLink: "Pricing",
     },
     quickstart: {
@@ -1293,7 +1294,7 @@ export const messages = {
       cherryApiHost: "API Host",
       cherryApiKey: "API Key",
       cherryModel: "Model",
-      cherryModelValue: "Fetch from GET /v1/models",
+      cherryModelValue: "gpt-5.4",
       cursorTitle: "Cursor",
       cursorDesc: "Add Tokfai as a custom OpenAI-compatible provider.",
       cursorStep1: "Choose OpenAI Compatible / Custom Provider.",
@@ -2641,12 +2642,12 @@ export const messages = {
           "对话行展示 prompt / completion / total tokens；图像行展示每次生成的 credits。",
         howItWorksItem3:
           "Credits 页余额与本页记录一致——Usage 与 Credits 是核账来源。",
-        howItWorksItem4: "失败请求会显示在此便于排查，但不扣费。",
+        howItWorksItem4: "失败请求会显示在此，但不扣费。",
         recentRequests: "最近请求",
         recentRequestsDesc:
           "最近 50 条，按时间倒序。在 Chat Playground 或 Image Playground 发起请求以产生更多记录。",
         loadError: "无法加载用量",
-        loadErrorDesc: "暂时无法读取 usage_logs，请稍后重试。",
+        loadErrorDesc: "暂时无法加载用量记录，请稍后重试。",
         colWhen: "时间",
         colType: "类型",
         colModel: "Model",
@@ -2673,7 +2674,7 @@ export const messages = {
           "在 Chat Playground 或 Image Playground 发送测试请求，成功调用后会出现在这里。",
         emptyViewCredits: "查看积分账本",
         loadingRecentRequests: "最近请求",
-        loadingRecentRequestsDesc: "正在加载最新 usage_logs…",
+        loadingRecentRequestsDesc: "正在加载最新用量记录…",
         usageQueryTitle: "消耗查询",
         usageQueryDesc: "按日期、模型、状态或 API Key 查询积分消耗。",
         startDate: "开始日期",
@@ -2975,7 +2976,8 @@ export const messages = {
       viewModelsPage: "浏览模型与 Tags",
       dashboardCreditsLink: "Dashboard → Credits",
       dashboardUsageLink: "Dashboard → Usage",
-      pricingLink: "Pricing",
+      billingPolicyNotice: "{policy} {starter} — 套餐见",
+      pricingLink: "定价",
     },
     quickstart: {
       pageTitle: "快速接入 Tokfai API",
@@ -3004,7 +3006,7 @@ export const messages = {
       cherryApiHost: "API Host",
       cherryApiKey: "API Key",
       cherryModel: "Model",
-      cherryModelValue: "从 GET /v1/models 获取",
+      cherryModelValue: "gpt-5.4",
       cursorTitle: "Cursor 配置",
       cursorDesc: "将 Tokfai 添加为 OpenAI 兼容的自定义 Provider。",
       cursorStep1: "选择 OpenAI Compatible / Custom Provider。",

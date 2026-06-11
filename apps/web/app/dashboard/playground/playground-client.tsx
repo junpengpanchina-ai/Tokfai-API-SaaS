@@ -384,7 +384,7 @@ export function PlaygroundClient({
   }
 
   return (
-    <form onSubmit={handleRun} className="flex flex-col gap-6">
+    <form onSubmit={handleRun} className="flex min-w-0 flex-col gap-6 overflow-x-hidden">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -399,7 +399,7 @@ export function PlaygroundClient({
               href="/dashboard/image-playground"
               className="underline underline-offset-4"
             >
-              Image Playground
+              {t("common.imagePlayground")}
             </Link>
             .
           </p>

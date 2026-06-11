@@ -26,6 +26,7 @@ import {
   formatCny,
   formatPlanCredits,
 } from "@/lib/billing/recharge-plans";
+import { dashboardCtaHref } from "@/lib/auth/public-cta";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
 import {
@@ -59,6 +60,7 @@ export function PricingContent({
 }) {
   const { t, locale } = useI18n();
   const purchaseHref = creditsPurchaseHref(isLoggedIn);
+  const dashHref = (path: string) => dashboardCtaHref(path, isLoggedIn);
 
   const usagePoints = [
     { id: "starter-plan", icon: Wallet, text: t("pricing.starterPlanLine") },
@@ -94,7 +96,7 @@ export function PricingContent({
         <>
           {t("pricing.monitorUsagePrefix")}{" "}
           <Link
-            href="/dashboard/usage"
+            href={dashHref("/dashboard/usage")}
             className="font-medium text-foreground underline-offset-4 hover:underline"
           >
             {t("nav.usage")}
@@ -110,7 +112,7 @@ export function PricingContent({
         <>
           {t("pricing.ledgerInPrefix")}{" "}
           <Link
-            href="/dashboard/credits"
+            href={dashHref("/dashboard/credits")}
             className="font-medium text-foreground underline-offset-4 hover:underline"
           >
             {t("nav.credits")}
@@ -130,33 +132,33 @@ export function PricingContent({
     {
       label: t("pricing.devLabelModels"),
       value: "/dashboard/models",
-      href: "/dashboard/models",
+      href: dashHref("/dashboard/models"),
     },
     {
       label: t("pricing.devLabelChatPlayground"),
       value: "/dashboard/playground",
-      href: "/dashboard/playground",
+      href: dashHref("/dashboard/playground"),
     },
     {
       label: t("pricing.devLabelImagePlayground"),
       value: "/dashboard/image-playground",
-      href: "/dashboard/image-playground",
+      href: dashHref("/dashboard/image-playground"),
     },
     {
       label: t("pricing.devLabelApiKeys"),
       value: "/dashboard/api-keys",
-      href: "/dashboard/api-keys",
+      href: dashHref("/dashboard/api-keys"),
     },
     {
       label: t("pricing.devLabelDocs"),
-      value: "/dashboard/docs",
-      href: "/dashboard/docs",
+      value: isLoggedIn ? "/dashboard/docs" : "/docs",
+      href: isLoggedIn ? "/dashboard/docs" : "/docs",
     },
   ] as const;
 
   return (
     <>
-      <section className="container py-12 sm:py-20 md:py-28">
+      <section className="container min-w-0 overflow-x-hidden py-12 sm:py-20 md:py-28">
         <div className="mx-auto max-w-3xl text-center">
           <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl">
             {t("pricing.heroTitle")}
@@ -175,7 +177,7 @@ export function PricingContent({
           </p>
         ) : null}
 
-        <div className="mx-auto mt-10 grid max-w-5xl grid-cols-1 gap-6 sm:mt-16 md:grid-cols-3">
+        <div className="mx-auto mt-10 grid max-w-5xl min-w-0 grid-cols-1 gap-6 overflow-x-hidden sm:mt-16 md:grid-cols-3">
           {plans.map((plan) => {
             const descriptionKey = PLAN_DESCRIPTION_KEYS[plan.plan_id];
             const audienceKey = PLAN_AUDIENCE_KEYS[plan.plan_id];
