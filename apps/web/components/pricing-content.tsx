@@ -150,12 +150,12 @@ export function PricingContent({
 
   return (
     <>
-      <section className="container py-20 md:py-28">
+      <section className="container py-12 sm:py-20 md:py-28">
         <div className="mx-auto max-w-3xl text-center">
-          <h1 className="text-balance text-4xl font-semibold tracking-tight md:text-5xl">
+          <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl">
             {t("pricing.heroTitle")}
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-balance text-lg text-muted-foreground">
+          <p className="mx-auto mt-4 max-w-2xl text-balance text-base text-muted-foreground sm:text-lg">
             {t("pricing.heroDesc")}
           </p>
         </div>
@@ -166,7 +166,7 @@ export function PricingContent({
           </p>
         ) : null}
 
-        <div className="mx-auto mt-16 grid max-w-5xl gap-6 md:grid-cols-3">
+        <div className="mx-auto mt-10 grid max-w-5xl grid-cols-1 gap-6 sm:mt-16 md:grid-cols-3">
           {plans.map((plan) => {
             const descriptionKey = PLAN_DESCRIPTION_KEYS[plan.plan_id];
             const canPurchase = plan.enabled && !purchaseDisabled;

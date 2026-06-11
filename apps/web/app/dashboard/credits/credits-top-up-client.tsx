@@ -93,7 +93,7 @@ export function CreditsTopUpClient({
             {t("dashboard.credits.noRechargePlans")}
           </p>
         ) : (
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             {plans.map((plan) => {
               const isLoading = loadingPlanId === plan.plan_id;
               const isDisabled = loadingPlanId != null || !plan.enabled;

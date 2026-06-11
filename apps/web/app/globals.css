@@ -64,7 +64,16 @@
   * {
     @apply border-border;
   }
+  html {
+    @apply overflow-x-hidden;
+  }
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply min-w-0 overflow-x-hidden bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin-x {
+    scrollbar-width: thin;
   }
 }

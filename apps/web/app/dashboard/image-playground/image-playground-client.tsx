@@ -735,9 +735,9 @@ export function ImagePlaygroundClient({
       }}
       className="flex flex-col gap-6"
     >
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             {t("dashboard.imagePlayground.title")}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -749,7 +749,10 @@ export function ImagePlaygroundClient({
             {t("dashboard.imagePlayground.usesOwnKey")}
           </p>
         </div>
-        <Badge variant="secondary" className="shrink-0 whitespace-nowrap font-mono text-xs">
+        <Badge
+          variant="secondary"
+          className="max-w-full shrink-0 self-start break-all font-mono text-xs sm:max-w-none"
+        >
           {TOKFAI_IMAGES_GENERATIONS_ENDPOINT}
         </Badge>
       </div>
@@ -759,8 +762,8 @@ export function ImagePlaygroundClient({
         <span>{t("dashboard.imagePlayground.billingHint")}</span>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr,280px]">
-        <Card>
+      <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle>{t("dashboard.imagePlayground.request")}</CardTitle>
             <CardDescription>{t("dashboard.imagePlayground.requestDesc")}</CardDescription>
@@ -847,18 +850,19 @@ export function ImagePlaygroundClient({
               />
             </div>
 
-            <div className="flex flex-col items-end gap-2">
+            <div className="flex w-full min-w-0 flex-col items-stretch gap-2 sm:items-end">
               {hasUploadingImages ? (
                 <p className="text-xs text-muted-foreground">
                   {t("dashboard.imagePlayground.waitingForImages")}
                 </p>
               ) : null}
-              <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                 <Button
                   type="button"
                   variant="outline"
                   disabled={loading || hasUploadingImages}
                   onClick={() => void handleCopyApiRequest()}
+                  className="w-full sm:w-auto"
                 >
                   {copyRequestStatus === "copied" ? (
                     <>
@@ -875,6 +879,7 @@ export function ImagePlaygroundClient({
                 <Button
                   type="submit"
                   disabled={loading || hasUploadingImages || isModelComingSoon}
+                  className="w-full sm:w-auto"
                 >
                   {loading ? (
                     <>
@@ -939,7 +944,7 @@ export function ImagePlaygroundClient({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="min-w-0 lg:row-span-1">
           <CardHeader>
             <CardTitle>{t("dashboard.imagePlayground.settings")}</CardTitle>
             <CardDescription>{t("dashboard.imagePlayground.settingsDesc")}</CardDescription>
@@ -1757,7 +1762,7 @@ function ResponsePanel({
           <img
             src={imageUrl}
             alt="Generated image"
-            className="mx-auto max-h-[480px] w-full object-contain"
+            className="mx-auto max-h-[min(480px,70vh)] w-full max-w-full object-contain"
           />
         </div>
       ) : base64Only ? (

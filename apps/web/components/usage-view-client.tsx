@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AlertTriangle, Gauge, Info } from "lucide-react";
 
 import { AdminStatCard } from "@/components/admin/admin-stat-card";
+import { ResponsiveTableScroll } from "@/components/responsive-table-scroll";
 import { CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,7 @@ export function UsageViewClient({ state }: { state: UsagePageState }) {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
           {t("dashboard.usage.title")}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -135,7 +136,7 @@ function UsageTable({
   t: (key: string) => string;
 }) {
   return (
-    <div className="overflow-x-auto -mx-1 px-1">
+    <ResponsiveTableScroll>
       <table className="w-full min-w-[720px] text-sm">
         <thead>
           <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
@@ -187,7 +188,7 @@ function UsageTable({
           })}
         </tbody>
       </table>
-    </div>
+    </ResponsiveTableScroll>
   );
 }
 

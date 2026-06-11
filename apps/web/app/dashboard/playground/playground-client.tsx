@@ -385,9 +385,9 @@ export function PlaygroundClient({
 
   return (
     <form onSubmit={handleRun} className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             {t("dashboard.playground.title")}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -404,7 +404,12 @@ export function PlaygroundClient({
             .
           </p>
         </div>
-        <Badge variant="secondary">{TOKFAI_CHAT_COMPLETIONS_ENDPOINT}</Badge>
+        <Badge
+          variant="secondary"
+          className="max-w-full shrink-0 self-start break-all font-mono text-xs sm:max-w-none"
+        >
+          {TOKFAI_CHAT_COMPLETIONS_ENDPOINT}
+        </Badge>
       </div>
 
       <div className="flex items-start gap-2 rounded-md border border-blue-500/30 bg-blue-500/5 px-4 py-3 text-sm text-muted-foreground">
@@ -503,8 +508,13 @@ export function PlaygroundClient({
             </Button>
           </div>
 
-          <div className="flex justify-end">
-            <Button type="submit" disabled={loading} aria-busy={loading}>
+          <div className="flex justify-stretch sm:justify-end">
+            <Button
+              type="submit"
+              disabled={loading}
+              aria-busy={loading}
+              className="w-full sm:w-auto"
+            >
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />

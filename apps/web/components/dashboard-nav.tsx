@@ -54,27 +54,31 @@ export function DashboardMobileNav() {
   return (
     <nav
       aria-label={t(ariaLabelKey)}
-      className="flex gap-1 overflow-x-auto border-b bg-muted/30 p-2 md:hidden"
+      className="sticky top-[4.75rem] z-20 shrink-0 border-b bg-muted/40 backdrop-blur scrollbar-thin-x md:hidden sm:top-16"
     >
-      {items.map((item) => {
-        const active = isNavItemActive(pathname, item, isAdminRoute);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            prefetch={item.prefetch}
-            className={cn(
-              "shrink-0 rounded-md px-3 py-2 text-xs font-medium transition-colors",
-              active
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
-            )}
-            aria-current={active ? "page" : undefined}
-          >
-            {t(item.labelKey)}
-          </Link>
-        );
-      })}
+      <div className="flex gap-1 overflow-x-auto p-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {items.map((item) => {
+          const active = isNavItemActive(pathname, item, isAdminRoute);
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              prefetch={item.prefetch}
+              className={cn(
+                "flex shrink-0 items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors",
+                active
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
+              )}
+              aria-current={active ? "page" : undefined}
+            >
+              <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span className="whitespace-nowrap">{t(item.labelKey)}</span>
+            </Link>
+          );
+        })}
+      </div>
     </nav>
   );
 }
@@ -124,7 +128,7 @@ export function DashboardSidebar() {
                   )}
                   aria-current={active ? "page" : undefined}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-4 w-4 shrink-0" />
                   {t(item.labelKey)}
                 </Link>
               </div>

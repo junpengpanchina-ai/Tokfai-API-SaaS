@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { CodeBlock, CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
+import { ResponsiveTableScroll } from "@/components/responsive-table-scroll";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -88,7 +89,7 @@ export function ModelsClient({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
           {t("dashboard.models.title")}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -162,8 +163,8 @@ export function ModelsClient({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <ResponsiveTableScroll>
+            <table className="w-full min-w-[800px] text-sm">
               <thead>
                 <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <th className="py-2 pr-4 font-medium">
@@ -207,7 +208,7 @@ export function ModelsClient({
                 ))}
               </tbody>
             </table>
-          </div>
+          </ResponsiveTableScroll>
         </CardContent>
       </Card>
 
@@ -222,8 +223,8 @@ export function ModelsClient({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <ResponsiveTableScroll>
+            <table className="w-full min-w-[480px] text-sm">
               <thead>
                 <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <th className="py-2 pr-4 font-medium">
@@ -258,7 +259,7 @@ export function ModelsClient({
                 ))}
               </tbody>
             </table>
-          </div>
+          </ResponsiveTableScroll>
           <p className="text-sm text-muted-foreground">
             {t("dashboard.models.packageEstimateRoughNote")}
           </p>

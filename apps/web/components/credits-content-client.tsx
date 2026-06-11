@@ -11,6 +11,7 @@ import {
   KeyRound,
 } from "lucide-react";
 
+import { ResponsiveTableScroll } from "@/components/responsive-table-scroll";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,7 +52,7 @@ export function CreditsContentClient({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
           {t("dashboard.credits.title")}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -135,8 +136,8 @@ export function CreditsContentClient({
           {ledger.length === 0 ? (
             <EmptyLedgerState t={t} />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <ResponsiveTableScroll>
+              <table className="w-full min-w-[720px] text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
                     <th className="py-2 pr-4 font-medium">
@@ -165,7 +166,7 @@ export function CreditsContentClient({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ResponsiveTableScroll>
           )}
         </CardContent>
       </Card>
@@ -181,8 +182,8 @@ export function CreditsContentClient({
               {t("dashboard.credits.emptyOrders")}
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <ResponsiveTableScroll>
+              <table className="w-full min-w-[640px] text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
                     <th className="py-2 pr-4 font-medium">
@@ -242,7 +243,7 @@ export function CreditsContentClient({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ResponsiveTableScroll>
           )}
         </CardContent>
       </Card>

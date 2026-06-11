@@ -15,6 +15,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 
+import { ResponsiveTableScroll } from "@/components/responsive-table-scroll";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -177,7 +178,7 @@ export function ApiKeysClient({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
           {t("dashboard.apiKeys.title")}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -468,8 +469,8 @@ function ApiKeysTable({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+    <ResponsiveTableScroll>
+      <table className="w-full min-w-[720px] text-sm">
         <thead>
           <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
             <th className="py-2 pr-4 font-medium">{t("dashboard.apiKeys.colName")}</th>
@@ -582,7 +583,7 @@ function ApiKeysTable({
           })}
         </tbody>
       </table>
-    </div>
+    </ResponsiveTableScroll>
   );
 }
 

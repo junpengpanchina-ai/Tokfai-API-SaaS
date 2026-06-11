@@ -189,7 +189,7 @@ export function DashboardOverviewContent({
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
           {t("dashboard.overview.title")}
         </h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
@@ -391,7 +391,7 @@ function ContinueCard({
         <CardDescription>{t("dashboard.overview.continueDesc")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {CONTINUE_LINKS.map((link) => {
             const Icon = link.icon;
             return (
@@ -496,7 +496,7 @@ function StatCards({
   t: (key: string) => string;
 }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {statCards.map((stat) => {
         const Icon = stat.icon;
         return (
@@ -601,7 +601,7 @@ function OnboardingStep({
 
   return (
     <div
-      className={`flex flex-col gap-4 rounded-md border bg-card p-4 sm:flex-row sm:items-start ${
+      className={`flex min-w-0 flex-col gap-4 rounded-md border bg-card p-4 sm:flex-row sm:items-start ${
         status === "current"
           ? "border-primary/40 ring-1 ring-primary/10"
           : status === "completed"
@@ -651,6 +651,7 @@ function OnboardingStep({
           asChild
           size="sm"
           variant={status === "current" ? "default" : "outline"}
+          className="w-full sm:w-auto"
         >
           <Link href={item.href}>{t(item.buttonKey)}</Link>
         </Button>
@@ -667,7 +668,7 @@ function RecentActivityTable({
   t: (key: string) => string;
 }) {
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <div className="-mx-1 overflow-x-auto rounded-md border px-1">
       <table className="w-full min-w-[640px] text-sm">
         <thead>
           <tr className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
