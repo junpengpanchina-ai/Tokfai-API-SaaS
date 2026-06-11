@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -27,7 +27,7 @@ export function SignupForm({
   legacyRedirect?: string;
 }) {
   const { t } = useI18n();
-  const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -35,7 +35,10 @@ export function SignupForm({
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  const postLoginPath = resolvePostLoginPath(nextPath, legacyRedirect);
+  const postLoginPath = resolvePostLoginPath(
+    nextPath ?? searchParams.get("next"),
+    legacyRedirect ?? searchParams.get("redirect")
+  );
   const isBusy = loading || googleLoading;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -70,8 +73,7 @@ export function SignupForm({
     }
 
     if (data.session) {
-      router.replace(postLoginPath);
-      router.refresh();
+      window.location.assign(postLoginPath);
     }
   }
 

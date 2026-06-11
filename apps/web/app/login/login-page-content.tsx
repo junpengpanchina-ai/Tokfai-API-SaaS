@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 
 import { signupPathWithNext } from "@/lib/auth/login-redirect";
@@ -30,11 +31,17 @@ export function LoginPageContent({
             <span className="text-lg font-semibold tracking-tight">Tokfai</span>
           </Link>
         </div>
-        <LoginForm
-          nextPath={nextPath}
-          legacyRedirect={legacyRedirect}
-          initialError={initialError}
-        />
+        <Suspense
+          fallback={
+            <div className="h-[420px] w-full animate-pulse rounded-lg bg-muted" />
+          }
+        >
+          <LoginForm
+            nextPath={nextPath}
+            legacyRedirect={legacyRedirect}
+            initialError={initialError}
+          />
+        </Suspense>
         <p className="mt-6 text-center text-sm text-muted-foreground">
           {t("auth.login.noAccount")}{" "}
           <Link

@@ -2,9 +2,9 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import {
-  DEFAULT_POST_LOGIN_PATH,
   isProtectedDashboardPath,
   loginPathWithNext,
+  resolvePostLoginPath,
 } from "@/lib/auth/login-redirect";
 
 type CookieToSet = {
@@ -76,7 +76,10 @@ export async function updateSession(request: NextRequest) {
 
   if (user && (pathname === "/login" || pathname === "/signup")) {
     const url = request.nextUrl.clone();
-    url.pathname = DEFAULT_POST_LOGIN_PATH;
+    url.pathname = resolvePostLoginPath(
+      url.searchParams.get("next"),
+      url.searchParams.get("redirect")
+    );
     url.search = "";
     return NextResponse.redirect(url);
   }
