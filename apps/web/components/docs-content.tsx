@@ -12,6 +12,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { dashboardCtaHref } from "@/lib/auth/public-cta";
+import { useAuth } from "@/lib/auth/auth-provider";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 
 import {
@@ -41,7 +43,7 @@ const CHAT_COMPLETIONS_CURL = `curl https://api.tokfai.com/v1/chat/completions \
   -H "Authorization: Bearer sk-tokfai_xxx" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "gemini-3.1-pro",
+    "model": "${DEFAULT_MODEL}",
     "messages": [
       { "role": "user", "content": "Hello from Tokfai" }
     ],
@@ -79,7 +81,7 @@ const client = new OpenAI({
 });
 
 const completion = await client.chat.completions.create({
-  model: "gemini-3.1-pro",
+  model: "${DEFAULT_MODEL}",
   messages: [{ role: "user", content: "Hello from Tokfai" }],
 });`;
 
@@ -91,7 +93,7 @@ client = OpenAI(
 )
 
 completion = client.chat.completions.create(
-    model="gemini-3.1-pro",
+    model="${DEFAULT_MODEL}",
     messages=[{"role": "user", "content": "Hello from Tokfai"}],
 )`;
 
@@ -123,7 +125,14 @@ image = client.images.generate(
 
 const COMPAT_CLIENT_CONFIG = `Base URL: https://api.tokfai.com/v1
 API Key: sk-tokfai_xxx
-Model: gemini-3.1-pro`;
+Model: ${DEFAULT_MODEL}`;
+
+const SETUP_FLOW_STEP_KEYS = [
+  "docs.setupStep1",
+  "docs.setupStep2",
+  "docs.setupStep3",
+  "docs.setupStep4",
+] as const;
 
 type ClientIntegrationErrorRow = {
   status: string;
@@ -224,8 +233,17 @@ export function DocsContent({
   showDashboardLinks?: boolean;
 }) {
   const { t } = useI18n();
+  const { user } = useAuth();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const timeoutRef = useRef<number | null>(null);
+  const isLoggedIn = Boolean(user);
+
+  function dashHref(path: string): string {
+    if (showDashboardLinks || isLoggedIn) {
+      return path;
+    }
+    return dashboardCtaHref(path, false);
+  }
 
   async function copyText(id: string, value: string) {
     try {
@@ -251,11 +269,9 @@ export function DocsContent({
             {TOKFAI_PRODUCT_TAGLINE} {t("docs.pageSubtitle")}
           </p>
         </div>
-        {showDashboardLinks ? (
-          <Button asChild variant="outline" size="sm">
-            <Link href="/dashboard/api-keys">{t("docs.createApiKey")}</Link>
-          </Button>
-        ) : null}
+        <Button asChild variant="outline" size="sm">
+          <Link href={dashHref("/dashboard/api-keys")}>{t("docs.createApiKey")}</Link>
+        </Button>
       </div>
 
       <Card id="three-minute-setup">
@@ -264,6 +280,14 @@ export function DocsContent({
           <CardDescription>{t("docs.threeMinuteSetupDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
+          <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+            {SETUP_FLOW_STEP_KEYS.map((key) => (
+              <li key={key}>{t(key)}</li>
+            ))}
+          </ol>
+          <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+            {t("docs.setupPlaygroundHint")}
+          </p>
           <div className="overflow-x-auto rounded-lg border">
             <table className="w-full text-sm">
               <tbody>
@@ -308,22 +332,19 @@ export function DocsContent({
               ))}
             </div>
           </div>
-          {showDashboardLinks ? (
-            <div className="flex flex-wrap gap-2">
-              <Button asChild variant="outline" size="sm">
-                <Link href="/dashboard/api-keys">{t("docs.createApiKey")}</Link>
-              </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link href="#client-integrations">{t("docs.sectionClientIntegrations")}</Link>
-              </Button>
-            </div>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              <Button asChild variant="outline" size="sm">
-                <Link href="#client-integrations">{t("docs.sectionClientIntegrations")}</Link>
-              </Button>
-            </div>
-          )}
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href={dashHref("/dashboard/api-keys")}>{t("docs.createApiKey")}</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href={dashHref("/dashboard/playground")}>
+                {t("docs.quickstartLinksPlayground")}
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="#client-integrations">{t("docs.sectionClientIntegrations")}</Link>
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -351,19 +372,28 @@ export function DocsContent({
               copiedLabel={t("docs.copied")}
             />
           </div>
-          {showDashboardLinks ? (
-            <div className="flex flex-wrap gap-2">
-              <Button asChild variant="outline" size="sm">
-                <Link href="/dashboard/api-keys">{t("docs.quickstartLinksApiKeys")}</Link>
-              </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/dashboard/credits">{t("docs.quickstartLinksCredits")}</Link>
-              </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/dashboard/playground">{t("docs.quickstartLinksPlayground")}</Link>
-              </Button>
-            </div>
-          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href={dashHref("/dashboard/api-keys")}>
+                {t("docs.quickstartLinksApiKeys")}
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href={dashHref("/dashboard/credits")}>
+                {t("docs.quickstartLinksCredits")}
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href={dashHref("/dashboard/playground")}>
+                {t("docs.quickstartLinksPlayground")}
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href={dashHref("/dashboard/image-playground")}>
+                {t("docs.quickstartLinksImagePlayground")}
+              </Link>
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -452,21 +482,21 @@ export function DocsContent({
           <CardDescription>
             {t("docs.modelsDescPrefix")}{" "}
             <Link
-              href="/dashboard/models"
+              href={dashHref("/dashboard/models")}
               className="font-medium text-foreground underline-offset-4 hover:underline"
             >
               {t("docs.modelsLink")}
             </Link>
             . {t("docs.modelsDescMiddle")}{" "}
             <Link
-              href="/dashboard/image-playground"
+              href={dashHref("/dashboard/image-playground")}
               className="font-medium text-foreground underline-offset-4 hover:underline"
             >
               {t("docs.imagePlaygroundLink")}
             </Link>
             . {t("docs.modelsDescChatMiddle")}{" "}
             <Link
-              href="/dashboard/playground"
+              href={dashHref("/dashboard/playground")}
               className="font-medium text-foreground underline-offset-4 hover:underline"
             >
               {t("docs.chatPlaygroundLink")}
@@ -605,7 +635,7 @@ export function DocsContent({
               <dd className="text-muted-foreground">
                 {t("docs.imageUrlsDescPrefix")}{" "}
                 <Link
-                  href="/dashboard/image-playground"
+                  href={dashHref("/dashboard/image-playground")}
                   className="font-medium text-foreground underline-offset-4 hover:underline"
                 >
                   {t("docs.imagePlaygroundLink")}
@@ -723,24 +753,22 @@ export function DocsContent({
             t={t}
           />
 
-          <div className="space-y-2 text-sm text-muted-foreground">
-            <p>
-              <span className="font-medium text-foreground">
-                {t("docs.openAiSdkLabel")}:
-              </span>{" "}
-              {t("docs.openAiSdkSteps")}
-            </p>
-            <p>
-              {t("docs.clientApiKeyHintPrefix")}{" "}
-              <Link
-                href="/dashboard/api-keys"
-                className="font-medium text-foreground underline-offset-4 hover:underline"
-              >
-                {t("docs.clientApiKeyHintLink")}
-              </Link>
-              {t("docs.clientApiKeyHintSuffix")}
-            </p>
-          </div>
+          <OpenAiSdkIntegrationPanel
+            copiedId={copiedId}
+            onCopy={copyText}
+            t={t}
+          />
+
+          <p className="text-sm text-muted-foreground">
+            {t("docs.clientApiKeyHintPrefix")}{" "}
+            <Link
+              href={dashHref("/dashboard/api-keys")}
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              {t("docs.clientApiKeyHintLink")}
+            </Link>
+            {t("docs.clientApiKeyHintSuffix")}
+          </p>
         </CardContent>
       </Card>
 
@@ -783,13 +811,13 @@ export function DocsContent({
             </div>
             <div className="flex flex-wrap gap-3">
               <Link
-                href="/dashboard/credits"
+                href={dashHref("/dashboard/credits")}
                 className="font-medium text-foreground underline-offset-4 hover:underline"
               >
                 {t("docs.dashboardCreditsLink")}
               </Link>
               <Link
-                href="/dashboard/usage"
+                href={dashHref("/dashboard/usage")}
                 className="font-medium text-foreground underline-offset-4 hover:underline"
               >
                 {t("docs.dashboardUsageLink")}
@@ -801,7 +829,7 @@ export function DocsContent({
                 {t("docs.viewModelRates")}
               </Link>
               <Link
-                href="/dashboard/models"
+                href={dashHref("/dashboard/models")}
                 className="font-medium text-foreground underline-offset-4 hover:underline"
               >
                 {t("docs.viewModelsPage")}
@@ -836,6 +864,77 @@ function DocsSectionLink({ href, label }: { href: string; label: string }) {
     >
       {label}
     </Link>
+  );
+}
+
+function OpenAiSdkIntegrationPanel({
+  copiedId,
+  onCopy,
+  t,
+}: {
+  copiedId: string | null;
+  onCopy: (id: string, value: string) => void;
+  t: (key: string) => string;
+}) {
+  return (
+    <div id="openai-sdk" className="rounded-lg border bg-muted/20 p-4 sm:p-5">
+      <h3 className="text-base font-semibold text-foreground">
+        {t("docs.openAiSdkLabel")}
+      </h3>
+      <p className="mt-2 text-sm text-muted-foreground">{t("docs.openAiSdkSteps")}</p>
+
+      <div className="mt-4">
+        <h4 className="text-sm font-medium text-foreground">
+          {t("docs.clientIntegrationConfigTitle")}
+        </h4>
+        <div className="mt-2 overflow-x-auto rounded-lg border bg-background">
+          <table className="w-full text-sm">
+            <tbody>
+              {CLIENT_CONFIG_ROWS.map((row) => {
+                const copyId = `openai-sdk-${row.id}`;
+                return (
+                  <tr key={row.id} className="border-b last:border-0">
+                    <td className="whitespace-nowrap px-4 py-3 font-medium text-foreground">
+                      {t(row.labelKey)}
+                    </td>
+                    <td className="min-w-0 px-4 py-3">
+                      <code className="break-all font-mono text-xs text-muted-foreground">
+                        {row.value}
+                      </code>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <CopyButton
+                        copied={copiedId === copyId}
+                        onCopy={() => onCopy(copyId, row.value)}
+                        copyLabel={t("docs.copy")}
+                        copiedLabel={t("docs.copied")}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <p className="mt-4 text-sm text-muted-foreground">
+        {t("docs.openAiSdkExamplesHint")}{" "}
+        <Link
+          href="#chat-completions"
+          className="font-medium text-foreground underline-offset-4 hover:underline"
+        >
+          {t("docs.sectionChatCompletions")}
+        </Link>
+        {" · "}
+        <Link
+          href="#image-generations"
+          className="font-medium text-foreground underline-offset-4 hover:underline"
+        >
+          {t("docs.sectionImageGenerations")}
+        </Link>
+      </p>
+    </div>
   );
 }
 

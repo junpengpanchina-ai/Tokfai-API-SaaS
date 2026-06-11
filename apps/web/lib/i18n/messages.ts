@@ -29,8 +29,10 @@ export const messages = {
     },
     home: {
       headline: "OpenAI-compatible image & chat API",
+      tagline:
+        "One API for chat and image — plug into Cursor, Cherry Studio, the OpenAI SDK, or your own app.",
       description:
-        "One API for chat and image generation. Drop in Cursor, Cherry Studio, the OpenAI SDK, or your own app — same endpoints and request shapes as OpenAI.",
+        "Same endpoints and request shapes as OpenAI. Buy prepaid credits, create an sk-tokfai_… key, and start calling models in minutes.",
       compatLabel: "Works with",
       compatCursor: "Cursor",
       compatCherryStudio: "Cherry Studio",
@@ -41,7 +43,7 @@ export const messages = {
         "Three API surfaces — chat, image, and desktop client integration — all on the same OpenAI-compatible base URL.",
       scenarioChatTitle: "Chat API",
       scenarioChatBody:
-        "Send messages via POST /chat/completions. Stream or batch responses with models like gemini-3.1-pro.",
+        "Send messages via POST /chat/completions. Stream or batch responses with models like gpt-5.4.",
       scenarioChatCta: "Chat API docs",
       scenarioImageTitle: "Image API",
       scenarioImageBody:
@@ -978,7 +980,9 @@ export const messages = {
     pricing: {
       heroTitle: "OpenAI-compatible image & chat API",
       heroDesc:
-        "One API for chat, image, and AI apps. Use Tokfai with Cursor, Cherry Studio, OpenAI SDK, or your own app. Video models are coming soon.",
+        "Prepaid credits power Chat API and Image API calls. Pick a package, create an API key, and integrate with Cursor, Cherry Studio, OpenAI SDK, or your own app.",
+      budgetNote:
+        "Reference prices help you plan spend — actual charges follow Usage and Credits (not exact ¥ billing).",
       usageTitle: "Usage-based billing",
       usageDesc:
         "Prepaid credits power every API call. You only pay for what you use.",
@@ -1006,9 +1010,13 @@ export const messages = {
       starterPlanLine:
         "Starter ¥29.9 / Pro ¥99.9 / Business ¥299 — prepaid credits for Chat and Image API.",
       starterUse: "Credits work for Chat API and Image API testing.",
-      planDescStarter: "For testing and personal use",
-      planDescPro: "For builders and small apps",
-      planDescBusiness: "For teams and higher usage",
+      planDescStarter: "For testing and personal projects",
+      planDescPro: "For builders and growing side projects",
+      planDescBusiness: "For teams and high-volume production",
+      planAudienceStarter: "Best for testing",
+      planAudiencePro: "Best for small teams",
+      planAudienceBusiness: "Best for high-volume use",
+      planCreditsUse: "Credits work for Chat API and Image API.",
       buyPlan: "Buy {name}",
       creditsUnit: "credits",
       includesBonusCredits: "Includes {bonus} bonus credits",
@@ -1086,7 +1094,17 @@ export const messages = {
       copied: "Copied",
       threeMinuteSetupTitle: "3-minute setup",
       threeMinuteSetupDesc:
-        "Everything you need to point Cursor, Cherry Studio, OpenAI SDK, or your app at Tokfai.",
+        "Four steps to go from sign-up to your first API call — works with Cursor, Cherry Studio, OpenAI SDK, or a custom app.",
+      setupStep1:
+        "Sign in and create an API key under API Keys. Copy the full sk-tokfai_… secret — it is shown once.",
+      setupStep2:
+        "Top up prepaid credits under Credits. Balance updates after payment is confirmed.",
+      setupStep3:
+        "Set base URL to https://api.tokfai.com/v1 and send Authorization: Bearer sk-tokfai_… on every request.",
+      setupStep4:
+        "Send a test request with model gpt-5.4, or try Chat Playground and Image Playground first.",
+      setupPlaygroundHint:
+        "Recommended flow: create your key in API Keys, then validate chat and image calls in Playground before wiring your app.",
       worksWithLabel: "Works with",
       compatCursor: "Cursor",
       compatCherryStudio: "Cherry Studio",
@@ -1101,11 +1119,12 @@ export const messages = {
       quickstartStep3:
         "Set your client base URL to https://api.tokfai.com/v1 and send Authorization: Bearer sk-tokfai_… on every request.",
       quickstartStep4:
-        "Make your first call — POST /v1/chat/completions for chat (start with gemini-3.1-pro) or POST /v1/images/generations for images.",
+        "Make your first call — POST /v1/chat/completions for chat (start with gpt-5.4) or POST /v1/images/generations for images.",
       quickstartFirstCallTitle: "First call example",
       quickstartLinksApiKeys: "API Keys",
       quickstartLinksCredits: "Credits",
       quickstartLinksPlayground: "Chat Playground",
+      quickstartLinksImagePlayground: "Image Playground",
       sectionNavTitle: "API reference",
       sectionAuthentication: "Authentication",
       sectionChatCompletions: "Chat Completions",
@@ -1131,7 +1150,7 @@ export const messages = {
       chatPlaygroundLink: "Chat Playground",
       recommendedModelTitle: "Recommended model",
       recommendedModelDesc:
-        "Start with gemini-3.1-pro for general chat. Pass it in the model field on chat completion requests.",
+        "Start with gpt-5.4 for general chat and Playground tests. Pass it in the model field on chat completion requests.",
       modelIdLabel: "Model ID",
       authSectionDesc:
         "Every API request must include your API key in the Authorization header. Dashboard session tokens are not accepted on /v1/chat/completions or /v1/images/generations.",
@@ -1139,7 +1158,7 @@ export const messages = {
       authHeaderDesc: "Include on every request.",
       authVerifyTitle: "Verify your key — GET /v1/models",
       chatCompletionsDesc:
-        "Send chat messages and receive a model response via POST /chat/completions. Recommended starting model: gemini-3.1-pro.",
+        "Send chat messages and receive a model response via POST /chat/completions. Recommended starting model: gpt-5.4.",
       chatSdkJsTitle: "OpenAI JavaScript SDK",
       chatSdkPythonTitle: "OpenAI Python SDK",
       chatSdkDesc: "Use the official OpenAI SDK with baseURL set to Tokfai.",
@@ -1185,7 +1204,7 @@ export const messages = {
       cherryStudioError402:
         "Top up credits in Dashboard → Credits before sending requests from Cherry Studio.",
       cherryStudioError404:
-        "Pick a Tokfai model ID such as gemini-3.1-pro. Browse available IDs on the Models page.",
+        "Pick a Tokfai model ID such as gpt-5.4. Browse available IDs on the Models page.",
       cherryStudioError500:
         "The model service is temporarily unavailable — retry in a few minutes or switch models.",
       cursorLabel: "Cursor",
@@ -1196,12 +1215,13 @@ export const messages = {
       cursorError402:
         "Top up credits in Dashboard → Credits before using Cursor chat with Tokfai.",
       cursorError404:
-        "Choose a Tokfai model ID (e.g. gemini-3.1-pro) in the model picker. See Models for the full list.",
+        "Choose a Tokfai model ID (e.g. gpt-5.4) in the model picker. See Models for the full list.",
       cursorError500:
         "Retry the request or pick another model — upstream services may be briefly unavailable.",
       openAiSdkLabel: "OpenAI SDK",
       openAiSdkSteps:
-        "Set baseURL to https://api.tokfai.com/v1 and apiKey to your sk-tokfai_xxx key. See Chat Completions and Image Generations sections for JavaScript and Python examples.",
+        "Set baseURL to https://api.tokfai.com/v1 and apiKey to your sk-tokfai_… key. Use gpt-5.4 as the default chat model.",
+      openAiSdkExamplesHint: "Full JavaScript and Python examples are in",
       clientApiKeyHintPrefix: "Replace sk-tokfai_xxx with a key from",
       clientApiKeyHintLink: "API Keys",
       clientApiKeyHintSuffix: ".",
@@ -1790,8 +1810,10 @@ export const messages = {
     },
     home: {
       headline: "OpenAI 兼容的图像与对话 API",
+      tagline:
+        "一个 API 覆盖对话与图像 — 可接入 Cursor、Cherry Studio、OpenAI SDK 或自研 App。",
       description:
-        "一个 API 覆盖对话与图像生成。接入 Cursor、Cherry Studio、OpenAI SDK 或自研 App — 与 OpenAI 相同的 endpoint 与请求格式。",
+        "与 OpenAI 相同的 endpoint 与请求格式。购买预付费积分、创建 sk-tokfai_… 密钥，数分钟内即可调用。",
       compatLabel: "兼容",
       compatCursor: "Cursor",
       compatCherryStudio: "Cherry Studio",
@@ -1802,18 +1824,18 @@ export const messages = {
         "对话、图像与桌面客户端接入 — 共用同一 OpenAI 兼容 Base URL。",
       scenarioChatTitle: "Chat API",
       scenarioChatBody:
-        "通过 POST /chat/completions 发送消息，使用 gemini-3.1-pro 等模型流式或批量获取回复。",
+        "通过 POST /chat/completions 发送消息，使用 gpt-5.4 等模型流式或批量获取回复。",
       scenarioChatCta: "Chat API 文档",
       scenarioImageTitle: "Image API",
       scenarioImageBody:
         "通过 POST /v1/images/generations 进行文生图或图生图。",
       scenarioImageCta: "Image API 文档",
-      scenarioDevToolsTitle: "Developer tools integration",
+      scenarioDevToolsTitle: "桌面客户端接入",
       scenarioDevToolsBody:
         "将 Cursor 或 Cherry Studio 指向 api.tokfai.com/v1，填入 sk-tokfai_… 密钥，无需改代码。",
       scenarioDevToolsCta: "接入指南",
-      scenarioEndpointLabel: "Endpoint",
-      scenarioModelLabel: "起始 model",
+      scenarioEndpointLabel: "接口",
+      scenarioModelLabel: "推荐 model",
       startWithCredits: "从积分开始",
       tryImagePlayground: "体验 Image Playground",
       viewPricing: "查看定价",
@@ -2678,7 +2700,9 @@ export const messages = {
     pricing: {
       heroTitle: "OpenAI 兼容的图像与对话 API",
       heroDesc:
-        "一个 API 覆盖对话、图像与 AI 应用。可用于 Cursor、Cherry Studio、OpenAI SDK 或自研产品。视频模型即将上线。",
+        "预付费积分可用于 Chat API 与 Image API。选择套餐、创建 API Key，即可接入 Cursor、Cherry Studio、OpenAI SDK 或自研产品。",
+      budgetNote:
+        "参考价格便于预算规划，实际扣费以 Usage 与 Credits 为准（非精确人民币计费）。",
       usageTitle: "按量计费",
       usageDesc: "预付费积分驱动每次 API 调用，按实际使用扣费。",
       modelRatesTitle: "模型价格",
@@ -2705,9 +2729,13 @@ export const messages = {
       starterPlanLine:
         "Starter ¥29.9 / Pro ¥99.9 / Business ¥299 — 预付费积分用于 Chat 与 Image API。",
       starterUse: "Credits 可用于 Chat API 与 Image API 测试。",
-      planDescStarter: "适合测试与个人使用",
-      planDescPro: "适合开发者与小应用",
-      planDescBusiness: "适合团队与更高用量",
+      planDescStarter: "适合测试与个人项目",
+      planDescPro: "适合开发者与成长型小项目",
+      planDescBusiness: "适合团队与高频生产环境",
+      planAudienceStarter: "适合测试",
+      planAudiencePro: "适合小团队",
+      planAudienceBusiness: "适合高频使用",
+      planCreditsUse: "积分可用于 Chat API 与 Image API。",
       buyPlan: "购买 {name}",
       creditsUnit: "积分",
       includesBonusCredits: "含赠送 {bonus} 积分",
@@ -2780,15 +2808,25 @@ export const messages = {
       createApiKey: "创建 API Key",
       copy: "复制",
       copied: "已复制",
-      threeMinuteSetupTitle: "3-minute setup",
+      threeMinuteSetupTitle: "3 分钟接入",
       threeMinuteSetupDesc:
-        "接入 Cursor、Cherry Studio、OpenAI SDK 或自研 App 所需的全部配置。",
-      worksWithLabel: "Works with",
+        "四步完成从注册到第一次 API 调用 — 适用于 Cursor、Cherry Studio、OpenAI SDK 或自研 App。",
+      setupStep1:
+        "登录后在 API Keys 创建密钥，复制完整 sk-tokfai_… secret（创建时仅展示一次）。",
+      setupStep2:
+        "在 Credits 充值预付费积分，支付确认后余额自动入账。",
+      setupStep3:
+        "将 base URL 设为 https://api.tokfai.com/v1，每次请求携带 Authorization: Bearer sk-tokfai_…。",
+      setupStep4:
+        "使用 model gpt-5.4 发送测试请求，或先在 Chat Playground 与 Image Playground 验证。",
+      setupPlaygroundHint:
+        "推荐流程：先在 API Keys 创建密钥，再在 Playground 验证对话与图像调用，最后接入你的应用。",
+      worksWithLabel: "兼容",
       compatCursor: "Cursor",
       compatCherryStudio: "Cherry Studio",
       compatOpenAiSdk: "OpenAI SDK",
       compatCustomApp: "Custom App",
-      quickstartTitle: "Quickstart",
+      quickstartTitle: "快速开始",
       quickstartDesc: "几分钟内完成第一次 Tokfai API 调用。",
       quickstartStep1:
         "在 Dashboard → API Keys 创建 API Key，并复制完整 secret（创建时仅展示一次）。",
@@ -2797,11 +2835,12 @@ export const messages = {
       quickstartStep3:
         "将客户端 base URL 设为 https://api.tokfai.com/v1，每次请求携带 Authorization: Bearer sk-tokfai_…。",
       quickstartStep4:
-        "发起第一次调用 — POST /v1/chat/completions（对话，可从 gemini-3.1-pro 开始）或 POST /v1/images/generations（图像）。",
+        "发起第一次调用 — POST /v1/chat/completions（对话，建议从 gpt-5.4 开始）或 POST /v1/images/generations（图像）。",
       quickstartFirstCallTitle: "第一次调用示例",
       quickstartLinksApiKeys: "API Keys",
       quickstartLinksCredits: "Credits",
       quickstartLinksPlayground: "Chat Playground",
+      quickstartLinksImagePlayground: "Image Playground",
       sectionNavTitle: "API 参考",
       sectionAuthentication: "Authentication",
       sectionChatCompletions: "Chat Completions",
@@ -2827,7 +2866,7 @@ export const messages = {
       chatPlaygroundLink: "Chat Playground",
       recommendedModelTitle: "推荐模型",
       recommendedModelDesc:
-        "通用对话建议从 gemini-3.1-pro 开始，在 chat completions 请求的 model 字段传入。",
+        "通用对话与 Playground 测试建议从 gpt-5.4 开始，在 chat completions 请求的 model 字段传入。",
       modelIdLabel: "Model ID",
       authSectionDesc:
         "每次 API 请求必须在 Authorization header 中携带 API Key。/v1/chat/completions 与 /v1/images/generations 不接受 Dashboard 会话 token。",
@@ -2835,7 +2874,7 @@ export const messages = {
       authHeaderDesc: "每次请求都需要携带。",
       authVerifyTitle: "验证密钥 — GET /v1/models",
       chatCompletionsDesc:
-        "通过 POST /chat/completions 发送对话消息并获取模型回复。推荐起始模型：gemini-3.1-pro。",
+        "通过 POST /chat/completions 发送对话消息并获取模型回复。推荐起始模型：gpt-5.4。",
       chatSdkJsTitle: "OpenAI JavaScript SDK",
       chatSdkPythonTitle: "OpenAI Python SDK",
       chatSdkDesc: "使用官方 OpenAI SDK，将 baseURL 指向 Tokfai。",
@@ -2879,7 +2918,7 @@ export const messages = {
       cherryStudioError402:
         "在 Cherry Studio 发请求前，先在 Dashboard → Credits 充值 credits。",
       cherryStudioError404:
-        "选择 Tokfai model ID，例如 gemini-3.1-pro。完整列表见 Models 页面。",
+        "选择 Tokfai model ID，例如 gpt-5.4。完整列表见 Models 页面。",
       cherryStudioError500:
         "模型服务暂时不可用 — 稍后重试或切换 model。",
       cursorLabel: "Cursor",
@@ -2890,12 +2929,13 @@ export const messages = {
       cursorError402:
         "在 Cursor 中使用 Tokfai 对话前，先在 Dashboard → Credits 充值 credits。",
       cursorError404:
-        "在 model 选择器中选择 Tokfai model ID（如 gemini-3.1-pro）。完整列表见 Models。",
+        "在 model 选择器中选择 Tokfai model ID（如 gpt-5.4）。完整列表见 Models。",
       cursorError500:
         "重试请求或切换 model — 上游服务可能短暂不可用。",
       openAiSdkLabel: "OpenAI SDK",
       openAiSdkSteps:
-        "将 baseURL 设为 https://api.tokfai.com/v1，apiKey 设为 sk-tokfai_xxx。JavaScript 与 Python 示例见 Chat Completions 与 Image Generations 章节。",
+        "将 baseURL 设为 https://api.tokfai.com/v1，apiKey 设为 sk-tokfai_… 密钥。默认对话 model 建议使用 gpt-5.4。",
+      openAiSdkExamplesHint: "完整 JavaScript 与 Python 示例见",
       clientApiKeyHintPrefix: "将 sk-tokfai_xxx 替换为",
       clientApiKeyHintLink: "API Keys",
       clientApiKeyHintSuffix: "中创建的密钥。",

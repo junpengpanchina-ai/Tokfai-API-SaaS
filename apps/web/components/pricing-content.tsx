@@ -42,6 +42,12 @@ const PLAN_DESCRIPTION_KEYS: Record<string, string> = {
   business: "pricing.planDescBusiness",
 };
 
+const PLAN_AUDIENCE_KEYS: Record<string, string> = {
+  starter: "pricing.planAudienceStarter",
+  pro: "pricing.planAudiencePro",
+  business: "pricing.planAudienceBusiness",
+};
+
 export function PricingContent({
   plans,
   purchaseDisabled = false,
@@ -158,6 +164,9 @@ export function PricingContent({
           <p className="mx-auto mt-4 max-w-2xl text-balance text-base text-muted-foreground sm:text-lg">
             {t("pricing.heroDesc")}
           </p>
+          <p className="mx-auto mt-3 max-w-2xl text-balance text-sm text-muted-foreground">
+            {t("pricing.budgetNote")}
+          </p>
         </div>
 
         {purchaseDisabled ? (
@@ -169,6 +178,7 @@ export function PricingContent({
         <div className="mx-auto mt-10 grid max-w-5xl grid-cols-1 gap-6 sm:mt-16 md:grid-cols-3">
           {plans.map((plan) => {
             const descriptionKey = PLAN_DESCRIPTION_KEYS[plan.plan_id];
+            const audienceKey = PLAN_AUDIENCE_KEYS[plan.plan_id];
             const canPurchase = plan.enabled && !purchaseDisabled;
             const isHighlight = plan.plan_id === "pro";
 
@@ -177,27 +187,30 @@ export function PricingContent({
                 key={plan.plan_id}
                 className={
                   isHighlight
-                    ? "border-primary shadow-md ring-1 ring-primary/20"
-                    : ""
+                    ? "flex flex-col border-primary shadow-md ring-1 ring-primary/20"
+                    : "flex flex-col"
                 }
               >
-                <CardHeader>
+                <CardHeader className="flex-1">
                   <div className="flex items-center justify-between gap-2">
                     <CardTitle>{plan.name}</CardTitle>
                     {plan.badge ? (
-                      <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-medium">
+                      <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
                         {plan.badge}
                       </span>
                     ) : null}
                   </div>
-                  <CardDescription>
+                  {audienceKey ? (
+                    <p className="text-xs font-medium text-primary">
+                      {t(audienceKey)}
+                    </p>
+                  ) : null}
+                  <CardDescription className="text-sm leading-relaxed">
                     {plan.description ?? (descriptionKey ? t(descriptionKey) : null)}
-                    {plan.plan_id === "starter" ? (
-                      <span className="mt-2 block text-muted-foreground">
-                        {t("pricing.starterUse")}
-                      </span>
-                    ) : null}
                   </CardDescription>
+                  <p className="text-sm text-muted-foreground">
+                    {t("pricing.planCreditsUse")}
+                  </p>
                   <div className="pt-4">
                     <div className="text-3xl font-semibold tracking-tight">
                       {formatCny(plan.amount_cents)}
@@ -221,9 +234,9 @@ export function PricingContent({
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-0">
                   {canPurchase ? (
-                    <Button asChild className="w-full">
+                    <Button asChild className="w-full" size="lg">
                       <Link href={purchaseHref}>
                         {formatMessage(t("pricing.buyPlan"), { name: plan.name })}
                       </Link>
