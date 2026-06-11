@@ -119,6 +119,7 @@ export function CreditsContentClient({
             <li>{t("dashboard.credits.howItWorksItem3")}</li>
             <li>{t("dashboard.credits.howItWorksItem4")}</li>
             <li>{t("dashboard.credits.howItWorksItem5")}</li>
+            <li>{t("dashboard.credits.howItWorksItem6")}</li>
           </ul>
         </CardContent>
       </Card>

@@ -5,7 +5,6 @@ import { flushSync } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  AlertTriangle,
   Check,
   CheckCircle2,
   Copy,
@@ -22,6 +21,7 @@ import {
 } from "lucide-react";
 
 import { CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
+import { PlaygroundErrorPanel } from "@/components/playground-error-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -1671,32 +1671,7 @@ function ResponsePanel({
 
   if (error) {
     return (
-      <div className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-4">
-        <div className="flex items-center gap-2 text-sm font-medium text-destructive">
-          <AlertTriangle className="h-4 w-4" />
-          {t("dashboard.playground.requestFailed")}
-          {error.status > 0 ? (
-            <Badge variant="outline" className="ml-1">
-              HTTP {error.status}
-            </Badge>
-          ) : null}
-        </div>
-        <dl className="grid gap-1 text-sm">
-          <div className="flex flex-wrap gap-x-2">
-            <dt className="text-muted-foreground">{t("dashboard.playground.errorCode")}</dt>
-            <dd className="font-mono">{error.code ?? "n/a"}</dd>
-          </div>
-          <div className="flex flex-wrap gap-x-2">
-            <dt className="text-muted-foreground">{t("dashboard.playground.errorMessage")}</dt>
-            <dd>{error.message}</dd>
-          </div>
-        </dl>
-        {error.status === 402 || error.code === "insufficient_credits" ? (
-          <Button asChild size="sm" variant="outline" className="w-fit">
-            <Link href="/dashboard/credits">{t("dashboard.playground.addCredits")}</Link>
-          </Button>
-        ) : null}
-      </div>
+      <PlaygroundErrorPanel scope="imagePlayground" error={error} t={t} />
     );
   }
 
@@ -1957,7 +1932,12 @@ function toPlaygroundError(
     return {
       status: err.status,
       code: err.code,
-      message: imagePlaygroundErrorMessage(err.status, err.code, t),
+      message: imagePlaygroundErrorMessage(
+        err.status,
+        err.code,
+        t,
+        err.message
+      ),
     };
   }
   if (err instanceof TypeError) {

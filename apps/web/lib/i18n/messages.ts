@@ -681,12 +681,17 @@ export const messages = {
             "Missing API key. Create and paste an active key first.",
           invalidToken:
             "API key is invalid or revoked. Create a new key.",
+          invalidOrMissingToken:
+            "API key is invalid or missing. Select or create an API key.",
           insufficientCredits:
-            "Insufficient credits. Top up and try again.",
+            "Insufficient credits. Top up credits first.",
           modelNotFound:
             "Model not found or not available. Try another model.",
           upstreamError:
-            "The selected model is busy or the upstream provider is temporarily unavailable. Try gpt-5.4 or gpt-5.5.",
+            "The selected model is temporarily unavailable or under high load.",
+          upstreamTimeout:
+            "The selected model is temporarily unavailable or under high load.",
+          switchModelHint: "Try switching to gpt-5.4 or gpt-5.5 and retry.",
           rateLimited: "Too many requests. Please try again later.",
           unknown: "Request failed. Please try again later.",
           missingPrompt: "Please enter a prompt.",
@@ -783,14 +788,18 @@ export const messages = {
             "Missing API key. Create and paste an active key first.",
           invalidToken:
             "API key is invalid or revoked. Create a new key.",
+          invalidOrMissingToken:
+            "API key is invalid or missing. Select or create an API key.",
           insufficientCredits:
-            "Insufficient credits. Top up and try again.",
+            "Insufficient credits. Top up credits first.",
           upstreamTimeout:
-            "Image generation timed out. Please try again later.",
+            "The image model is temporarily unavailable or slow. Try again later or switch models.",
           upstreamError:
-            "Image service is temporarily unavailable. Try again or switch models.",
+            "The image model is temporarily unavailable or slow. Try again later or switch models.",
           imageGenerationFailed:
-            "Image generation failed. Check your prompt and try again.",
+            "The image model is temporarily unavailable or slow. Try again later or switch models.",
+          billingNotChargedHint:
+            "Failed requests are usually not charged. See Usage / Credits for the official record.",
           missingPrompt: "Please enter a prompt.",
           keyNotRetrievable:
             "For security, full keys aren't stored long-term. Paste your key or create a new test key.",
@@ -813,6 +822,8 @@ export const messages = {
         howItWorksItem4:
           "Playground and API calls charge credits only after a successful response.",
         howItWorksItem5: "Failed requests are not charged.",
+        howItWorksItem6:
+          "The Credits ledger is the authoritative record of balance changes; debits follow successful requests.",
         currentBalance: "Current balance",
         lastChange: "Last change",
         todayConsumed: "Consumed today",
@@ -920,6 +931,8 @@ export const messages = {
         howItWorksItem3:
           "Balance and totals on Credits match this page — Usage and Credits are the source of truth.",
         howItWorksItem4: "Failed requests are listed here but are not charged.",
+        howItWorksItem5:
+          "Failed requests help with troubleshooting and are usually not charged; successful requests record tokens and credits_charged.",
         recentRequests: "Recent requests",
         recentRequestsDesc:
           "Last 50 entries, newest first. Run a request in the Chat Playground or Image Playground to generate more.",
@@ -1062,7 +1075,9 @@ export const messages = {
       },
       chatModelNote: {
         "gpt-5.4":
-          "Recommended test model for Playground and OpenAI-compatible chat calls.",
+          "Recommended test model — stable priority for Playground and API calls.",
+        "gpt-5.5":
+          "Recommended test model — stable priority alongside gpt-5.4.",
         "gemini-3.1-pro":
           "May be unavailable during high load. For testing, try gpt-5.4 first.",
         "gemini-3-pro":
@@ -2423,10 +2438,13 @@ export const messages = {
         errors: {
           missingToken: "缺少 API Key，请先创建并选择可用密钥。",
           invalidToken: "API Key 无效或已吊销，请重新创建。",
-          insufficientCredits: "余额不足，请充值后再试。",
+          invalidOrMissingToken:
+            "API Key 无效或缺失，请选择或创建 API Key。",
+          insufficientCredits: "余额不足，请先充值 credits。",
           modelNotFound: "模型不存在或暂未开放，请换一个模型。",
-          upstreamError:
-            "当前模型负载较高或上游暂时异常。建议切换 gpt-5.4 / gpt-5.5 后重试。",
+          upstreamError: "当前模型暂时不可用或负载较高。",
+          upstreamTimeout: "当前模型暂时不可用或负载较高。",
+          switchModelHint: "建议切换 gpt-5.4 / gpt-5.5 后重试。",
           rateLimited: "请求过快，请稍后再试。",
           unknown: "请求失败，请稍后重试。",
           missingPrompt: "请输入测试内容。",
@@ -2515,10 +2533,15 @@ export const messages = {
         errors: {
           missingToken: "缺少 API Key，请先创建并选择可用密钥。",
           invalidToken: "API Key 无效或已吊销，请重新创建。",
-          insufficientCredits: "余额不足，请充值后再试。",
-          upstreamTimeout: "图像生成超时，请稍后重试。",
-          upstreamError: "图像服务暂时不可用，请稍后重试或切换模型。",
-          imageGenerationFailed: "图像生成失败，请检查 prompt 后重试。",
+          invalidOrMissingToken:
+            "API Key 无效或缺失，请选择或创建 API Key。",
+          insufficientCredits: "余额不足，请先充值 credits。",
+          upstreamTimeout: "图片模型暂时不可用或生成较慢，请稍后重试或切换模型。",
+          upstreamError: "图片模型暂时不可用或生成较慢，请稍后重试或切换模型。",
+          imageGenerationFailed:
+            "图片模型暂时不可用或生成较慢，请稍后重试或切换模型。",
+          billingNotChargedHint:
+            "失败请求通常不会扣费，以 Usage / Credits 记录为准。",
           missingPrompt: "请输入 prompt。",
           keyNotRetrievable:
             "出于安全考虑，完整 key 不会长期保存。请粘贴 key，或重新创建一个测试 Key。",
@@ -2540,6 +2563,8 @@ export const messages = {
           "Image API（POST /v1/images/generations）按每次成功生成扣费。",
         howItWorksItem4: "Playground 与 API 仅在请求成功后才扣费。",
         howItWorksItem5: "失败请求不扣费。",
+        howItWorksItem6:
+          "Credits 账本是余额变化准账本；扣费以成功请求记录为准。",
         currentBalance: "当前 credits 余额",
         lastChange: "最近一次变动",
         todayConsumed: "今日消耗 credits",
@@ -2643,6 +2668,8 @@ export const messages = {
         howItWorksItem3:
           "Credits 页余额与本页记录一致——Usage 与 Credits 是核账来源。",
         howItWorksItem4: "失败请求会显示在此，但不扣费。",
+        howItWorksItem5:
+          "失败请求用于排查，一般不扣 credits；成功请求会记录 tokens 与 credits_charged。",
         recentRequests: "最近请求",
         recentRequestsDesc:
           "最近 50 条，按时间倒序。在 Chat Playground 或 Image Playground 发起请求以产生更多记录。",
@@ -2780,7 +2807,8 @@ export const messages = {
         "gpt-5.5": "适合对话 / 代码 / 通用任务",
       },
       chatModelNote: {
-        "gpt-5.4": "推荐测试模型，当前可用于 Playground 与 OpenAI-compatible chat 调用。",
+        "gpt-5.4": "推荐测试模型 / 稳定优先，可用于 Playground 与 API 调用。",
+        "gpt-5.5": "推荐测试模型 / 稳定优先，可与 gpt-5.4 互换使用。",
         "gemini-3.1-pro":
           "高负载时可能暂时不可用，测试阶段建议优先使用 gpt-5.4。",
         "gemini-3-pro": "高负载时可能暂时不可用，测试阶段建议优先使用 gpt-5.4。",

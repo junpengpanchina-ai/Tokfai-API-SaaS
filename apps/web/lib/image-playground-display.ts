@@ -65,51 +65,19 @@ export function resolveImageCreatedAt(
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+import { resolvePlaygroundRiskMessage } from "@/lib/playground-risk-errors";
+
 export function imagePlaygroundErrorMessage(
   status: number,
   code: string | undefined,
-  t: (key: string) => string
+  t: (key: string) => string,
+  rawMessage?: string
 ): string {
-  const normalized = (code ?? "").toLowerCase();
-
-  const codeMap: Record<string, string> = {
-    missing_token: "dashboard.imagePlayground.errors.missingToken",
-    missing_api_key: "dashboard.imagePlayground.errors.missingToken",
-    no_api_key: "dashboard.imagePlayground.errors.missingToken",
-    key_not_revealable: "dashboard.imagePlayground.errors.keyNotRetrievable",
-    invalid_token: "dashboard.imagePlayground.errors.invalidToken",
-    invalid_api_key: "dashboard.imagePlayground.errors.invalidToken",
-    insufficient_credits: "dashboard.imagePlayground.errors.insufficientCredits",
-    upstream_timeout: "dashboard.imagePlayground.errors.upstreamTimeout",
-    upstream_error: "dashboard.imagePlayground.errors.upstreamError",
-    image_generation_failed:
-      "dashboard.imagePlayground.errors.imageGenerationFailed",
-    missing_prompt: "dashboard.imagePlayground.errors.missingPrompt",
-  };
-
-  if (status === 402 || normalized === "insufficient_credits") {
-    return t("dashboard.imagePlayground.errors.insufficientCredits");
-  }
-
-  if (
-    normalized === "upstream_error" ||
-    normalized === "upstream_timeout" ||
-    normalized === "image_generation_failed" ||
-    status === 502 ||
-    status >= 500
-  ) {
-    const key = codeMap[normalized];
-    return key ? t(key) : t("dashboard.imagePlayground.errors.upstreamError");
-  }
-
-  if (status === 401 && !codeMap[normalized]) {
-    return t("dashboard.imagePlayground.errors.invalidToken");
-  }
-
-  const key = codeMap[normalized];
-  if (key) {
-    return t(key);
-  }
-
-  return t("dashboard.imagePlayground.errors.unknown");
+  return resolvePlaygroundRiskMessage(
+    "imagePlayground",
+    status,
+    code,
+    t,
+    rawMessage
+  );
 }

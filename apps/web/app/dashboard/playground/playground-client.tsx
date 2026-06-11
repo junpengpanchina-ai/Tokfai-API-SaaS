@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
+import { PlaygroundErrorPanel } from "@/components/playground-error-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +43,7 @@ import {
   getChatModelById,
   isAvailableChatModel,
 } from "@/lib/model-catalog";
+import { resolvePlaygroundRiskMessage } from "@/lib/playground-risk-errors";
 import {
   isFullTokfaiApiKey,
   TOKFAI_API_KEY_PLACEHOLDER,
@@ -856,49 +858,7 @@ function ResponsePanel({
           copiedId={null}
           onCopyRequestId={undefined}
         />
-        <div className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-4">
-          <div className="flex items-center gap-2 text-sm font-medium text-destructive">
-            <AlertTriangle className="h-4 w-4" />
-            {t("dashboard.playground.requestFailed")}
-            {error.status > 0 ? (
-              <Badge variant="outline" className="ml-1">
-                HTTP {error.status}
-              </Badge>
-            ) : null}
-          </div>
-          <dl className="grid gap-1 text-sm">
-            {error.code ? (
-              <div className="flex flex-wrap gap-x-2">
-                <dt className="text-muted-foreground">
-                  {t("dashboard.playground.errorCode")}
-                </dt>
-                <dd className="font-mono">{error.code}</dd>
-              </div>
-            ) : null}
-            <div className="flex flex-wrap gap-x-2">
-              <dt className="text-muted-foreground">
-                {t("dashboard.playground.errorMessage")}
-              </dt>
-              <dd>{error.message}</dd>
-            </div>
-          </dl>
-          {error.status === 402 ||
-          error.code === "insufficient_credits" ? (
-            <Button asChild size="sm" variant="outline" className="w-fit">
-              <Link href="/dashboard/credits">
-                {t("dashboard.playground.addCredits")}
-              </Link>
-            </Button>
-          ) : null}
-          {error.code === "key_not_revealable" ||
-          error.code === "missing_api_key" ? (
-            <Button asChild size="sm" variant="outline" className="w-fit">
-              <Link href="/dashboard/api-keys">
-                {t("dashboard.playground.manageApiKeys")}
-              </Link>
-            </Button>
-          ) : null}
-        </div>
+        <PlaygroundErrorPanel scope="playground" error={error} t={t} />
       </div>
     );
   }
@@ -1118,71 +1078,13 @@ class PlaygroundValidationError extends Error {
   }
 }
 
-function isUpstreamModelLoadError(
-  status: number,
-  code: string | undefined,
-  message?: string
-): boolean {
-  const normalized = (code ?? "").toLowerCase();
-  const detail = (message ?? "").toLowerCase();
-
-  if (
-    normalized === "upstream_error" ||
-    status === 502 ||
-    detail.includes("model load") ||
-    detail.includes("load is too high")
-  ) {
-    return true;
-  }
-
-  return status >= 500 || status === 503 || status === 504;
-}
-
 function playgroundErrorMessage(
   status: number,
   code: string | undefined,
   t: (key: string) => string,
   message?: string
 ): string {
-  const normalized = (code ?? "").toLowerCase();
-
-  if (status === 402 || normalized === "insufficient_credits") {
-    return t("dashboard.playground.errors.insufficientCredits");
-  }
-
-  if (isUpstreamModelLoadError(status, code, message)) {
-    return t("dashboard.playground.errors.upstreamError");
-  }
-
-  const codeMap: Record<string, string> = {
-    missing_token: "dashboard.playground.errors.missingToken",
-    missing_api_key: "dashboard.playground.errors.missingToken",
-    no_api_key: "dashboard.playground.errors.missingToken",
-    key_not_revealable: "dashboard.playground.errors.keyNotRetrievable",
-    invalid_token: "dashboard.playground.errors.invalidToken",
-    invalid_api_key: "dashboard.playground.errors.invalidToken",
-    insufficient_credits: "dashboard.playground.errors.insufficientCredits",
-    model_not_found: "dashboard.playground.errors.modelNotFound",
-    upstream_auth_error: "dashboard.playground.errors.upstreamError",
-    upstream_rate_limited: "dashboard.playground.errors.upstreamError",
-    rate_limited: "dashboard.playground.errors.rateLimited",
-    missing_prompt: "dashboard.playground.errors.missingPrompt",
-  };
-
-  if (status === 401 && !codeMap[normalized]) {
-    return t("dashboard.playground.errors.invalidToken");
-  }
-
-  if (status === 404 && !codeMap[normalized]) {
-    return t("dashboard.playground.errors.modelNotFound");
-  }
-
-  const key = codeMap[normalized];
-  if (key) {
-    return t(key);
-  }
-
-  return t("dashboard.playground.errors.unknown");
+  return resolvePlaygroundRiskMessage("playground", status, code, t, message);
 }
 
 function toPlaygroundError(

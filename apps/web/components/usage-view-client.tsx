@@ -81,6 +81,7 @@ export function UsageViewClient({ state }: { state: UsagePageState }) {
             <li>{t("dashboard.usage.howItWorksItem2")}</li>
             <li>{t("dashboard.usage.howItWorksItem3")}</li>
             <li>{t("dashboard.usage.howItWorksItem4")}</li>
+            <li>{t("dashboard.usage.howItWorksItem5")}</li>
           </ul>
         </CardContent>
       </Card>
