@@ -13,7 +13,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { resolveAuthErrorMessage } from "@/lib/auth/auth-errors";
+import {
+  resolveAuthErrorMessage,
+  resolveUnknownAuthErrorMessage,
+} from "@/lib/auth/auth-errors";
+import { assignAfterAuth } from "@/lib/auth/auth-success-flash";
 import { resolvePostLoginPath } from "@/lib/auth/login-redirect";
 import { getOAuthRedirectOrigin } from "@/lib/auth/site-url";
 import { useI18n } from "@/lib/i18n/i18n-provider";
@@ -47,33 +51,41 @@ export function SignupForm({
     setInfo(null);
     setLoading(true);
 
-    const supabase = createClient();
-    const origin = getOAuthRedirectOrigin();
-    const callbackUrl = new URL(`${origin}/auth/callback`);
-    callbackUrl.searchParams.set("next", postLoginPath);
+    try {
+      const supabase = createClient();
+      const origin = getOAuthRedirectOrigin();
+      const callbackUrl = new URL(`${origin}/auth/callback`);
+      callbackUrl.searchParams.set("next", postLoginPath);
 
-    const { data, error: authError } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        emailRedirectTo: callbackUrl.toString(),
-      },
-    });
+      const { data, error: authError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          emailRedirectTo: callbackUrl.toString(),
+        },
+      });
 
-    setLoading(false);
+      if (authError) {
+        setError(resolveAuthErrorMessage(authError, t));
+        setLoading(false);
+        return;
+      }
 
-    if (authError) {
-      setError(resolveAuthErrorMessage(authError, t));
-      return;
-    }
+      if (data.user && !data.session) {
+        setInfo(t("auth.signup.confirmEmail"));
+        setLoading(false);
+        return;
+      }
 
-    if (data.user && !data.session) {
-      setInfo(t("auth.signup.confirmEmail"));
-      return;
-    }
+      if (data.session) {
+        assignAfterAuth(postLoginPath, "signup");
+        return;
+      }
 
-    if (data.session) {
-      window.location.assign(postLoginPath);
+      setLoading(false);
+    } catch (err) {
+      setError(resolveUnknownAuthErrorMessage(t, err));
+      setLoading(false);
     }
   }
 
@@ -82,19 +94,24 @@ export function SignupForm({
     setInfo(null);
     setGoogleLoading(true);
 
-    const callbackUrl = new URL(`${getOAuthRedirectOrigin()}/auth/callback`);
-    callbackUrl.searchParams.set("next", postLoginPath);
+    try {
+      const callbackUrl = new URL(`${getOAuthRedirectOrigin()}/auth/callback`);
+      callbackUrl.searchParams.set("next", postLoginPath);
 
-    const supabase = createClient();
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: callbackUrl.toString(),
-      },
-    });
+      const supabase = createClient();
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: callbackUrl.toString(),
+        },
+      });
 
-    if (oauthError) {
-      setError(resolveAuthErrorMessage(oauthError, t));
+      if (oauthError) {
+        setError(resolveAuthErrorMessage(oauthError, t));
+        setGoogleLoading(false);
+      }
+    } catch (err) {
+      setError(resolveUnknownAuthErrorMessage(t, err));
       setGoogleLoading(false);
     }
   }
@@ -110,11 +127,12 @@ export function SignupForm({
       <CardContent>
         <form onSubmit={handleSubmit} className="flex min-w-0 flex-col gap-4">
           <div className="flex min-w-0 flex-col gap-2">
-            <Label htmlFor="email">{t("auth.signup.email")}</Label>
+            <Label htmlFor="signup-email">{t("auth.signup.email")}</Label>
             <Input
-              id="email"
+              id="signup-email"
               type="email"
               autoComplete="email"
+              inputMode="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -123,9 +141,9 @@ export function SignupForm({
             />
           </div>
           <div className="flex min-w-0 flex-col gap-2">
-            <Label htmlFor="password">{t("auth.signup.password")}</Label>
+            <Label htmlFor="signup-password">{t("auth.signup.password")}</Label>
             <Input
-              id="password"
+              id="signup-password"
               type="password"
               autoComplete="new-password"
               required
@@ -143,7 +161,10 @@ export function SignupForm({
             </p>
           ) : null}
           {info ? (
-            <p className="text-sm text-muted-foreground break-words" role="status">
+            <p
+              className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground break-words"
+              role="status"
+            >
               {info}
             </p>
           ) : null}

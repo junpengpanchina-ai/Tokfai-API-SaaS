@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { AUTH_SUCCESS_COOKIE } from "@/lib/auth/auth-success-flash";
 import { loginPathWithError, resolvePostLoginPath } from "@/lib/auth/login-redirect";
 import { authDebug } from "@/lib/auth/debug";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
@@ -56,5 +57,12 @@ export async function GET(request: Request) {
     origin,
   });
 
-  return NextResponse.redirect(new URL(nextPath, origin));
+  const response = NextResponse.redirect(new URL(nextPath, origin));
+  response.cookies.set(AUTH_SUCCESS_COOKIE, "login", {
+    maxAge: 120,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+  return response;
 }

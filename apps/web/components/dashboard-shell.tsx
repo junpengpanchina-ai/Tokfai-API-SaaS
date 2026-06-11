@@ -1,3 +1,4 @@
+import { AuthSuccessToast } from "@/components/auth-success-toast";
 import { DashboardFooter } from "@/components/dashboard-footer";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { DashboardMobileNav, DashboardSidebar } from "@/components/dashboard-nav";
@@ -17,6 +18,7 @@ export async function DashboardShell({
 
   return (
     <div className="min-h-svh overflow-x-hidden md:flex">
+      <AuthSuccessToast />
       <DashboardSidebar />
       <div className="flex min-h-svh min-w-0 flex-1 flex-col overflow-x-hidden">
         <DashboardHeader email={email} />

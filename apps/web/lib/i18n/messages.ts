@@ -118,11 +118,11 @@ export const messages = {
         noAccount: "No account?",
         createOne: "Create one",
         errorMissingCode: "Missing OAuth code.",
-        errorOAuthFailed: "Google login failed. Please try again.",
+        errorOAuthFailed: "Google sign-in failed. Please try again.",
       },
       signup: {
         title: "Create your account",
-        description: "Start building in under a minute.",
+        description: "Get started with API keys, credits, and Playgrounds.",
         email: "Email",
         emailPlaceholder: "you@example.com",
         password: "Password",
@@ -137,6 +137,11 @@ export const messages = {
         confirmEmail:
           "Check your email — we sent a confirmation link to finish signup.",
       },
+      success: {
+        welcomeBack: "You're signed in. Welcome back!",
+        accountCreated: "Account created. You're all set!",
+        dismiss: "Dismiss",
+      },
       errors: {
         generic: "Something went wrong. Please try again.",
         invalidCredentials: "Incorrect email or password.",
@@ -147,6 +152,7 @@ export const messages = {
         weakPassword: "Password must be at least 8 characters.",
         signupsDisabled: "Sign-ups are currently unavailable.",
         rateLimited: "Too many attempts. Please wait a moment and try again.",
+        network: "Network error. Check your connection and try again.",
       },
     },
     dashboard: {
@@ -1872,7 +1878,7 @@ export const messages = {
       },
       signup: {
         title: "创建账号",
-        description: "一分钟内即可开始集成。",
+        description: "注册后即可管理 API Key、积分与 Playground。",
         email: "邮箱",
         emailPlaceholder: "you@example.com",
         password: "密码",
@@ -1886,6 +1892,11 @@ export const messages = {
         logIn: "去登录",
         confirmEmail: "请查收邮件，点击确认链接完成注册。",
       },
+      success: {
+        welcomeBack: "登录成功，欢迎回来！",
+        accountCreated: "账号已创建，可以开始使用了。",
+        dismiss: "关闭",
+      },
       errors: {
         generic: "出错了，请稍后重试。",
         invalidCredentials: "邮箱或密码不正确。",
@@ -1895,6 +1906,7 @@ export const messages = {
         weakPassword: "密码至少需要 8 位字符。",
         signupsDisabled: "当前暂不支持注册。",
         rateLimited: "尝试次数过多，请稍后再试。",
+        network: "网络异常，请检查连接后重试。",
       },
     },
     dashboard: {

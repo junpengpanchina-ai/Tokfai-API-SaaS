@@ -15,8 +15,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   resolveAuthErrorMessage,
+  resolveUnknownAuthErrorMessage,
   resolveUrlAuthErrorMessage,
 } from "@/lib/auth/auth-errors";
+import { assignAfterAuth } from "@/lib/auth/auth-success-flash";
 import { resolvePostLoginPath } from "@/lib/auth/login-redirect";
 import { getOAuthRedirectOrigin } from "@/lib/auth/site-url";
 import { useI18n } from "@/lib/i18n/i18n-provider";
@@ -52,39 +54,48 @@ export function LoginForm({
     setError(null);
     setLoading(true);
 
-    const supabase = createClient();
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
+    try {
+      const supabase = createClient();
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
 
-    setLoading(false);
+      if (authError) {
+        setError(resolveAuthErrorMessage(authError, t));
+        setLoading(false);
+        return;
+      }
 
-    if (authError) {
-      setError(resolveAuthErrorMessage(authError, t));
-      return;
+      assignAfterAuth(postLoginPath, "login");
+    } catch (err) {
+      setError(resolveUnknownAuthErrorMessage(t, err));
+      setLoading(false);
     }
-
-    window.location.assign(postLoginPath);
   }
 
   async function handleGoogleLogin() {
     setError(null);
     setGoogleLoading(true);
 
-    const callbackUrl = new URL(`${getOAuthRedirectOrigin()}/auth/callback`);
-    callbackUrl.searchParams.set("next", postLoginPath);
+    try {
+      const callbackUrl = new URL(`${getOAuthRedirectOrigin()}/auth/callback`);
+      callbackUrl.searchParams.set("next", postLoginPath);
 
-    const supabase = createClient();
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: callbackUrl.toString(),
-      },
-    });
+      const supabase = createClient();
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: callbackUrl.toString(),
+        },
+      });
 
-    if (oauthError) {
-      setError(resolveAuthErrorMessage(oauthError, t));
+      if (oauthError) {
+        setError(resolveAuthErrorMessage(oauthError, t));
+        setGoogleLoading(false);
+      }
+    } catch (err) {
+      setError(resolveUnknownAuthErrorMessage(t, err));
       setGoogleLoading(false);
     }
   }
@@ -105,6 +116,7 @@ export function LoginForm({
               id="email"
               type="email"
               autoComplete="email"
+              inputMode="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}

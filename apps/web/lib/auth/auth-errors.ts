@@ -75,11 +75,48 @@ export function resolveAuthErrorMessageKey(
     return "auth.errors.rateLimited";
   }
 
+  if (
+    message.includes("fetch") ||
+    message.includes("network") ||
+    message.includes("timeout") ||
+    message.includes("connection") ||
+    code === "network_error"
+  ) {
+    return "auth.errors.network";
+  }
+
   if (message.includes("oauth") || message.includes("provider")) {
     return "auth.login.errorOAuthFailed";
   }
 
   return "auth.errors.generic";
+}
+
+/** Map unexpected client failures (thrown errors) to i18n. */
+export function resolveUnknownAuthErrorMessage(
+  t: (key: string) => string,
+  err?: unknown
+): string {
+  if (err instanceof TypeError) {
+    const message = normalizeAuthText(err.message);
+    if (message.includes("fetch") || message.includes("network")) {
+      return t("auth.errors.network");
+    }
+  }
+
+  if (err instanceof Error) {
+    const message = normalizeAuthText(err.message);
+    if (
+      message.includes("fetch") ||
+      message.includes("network") ||
+      message.includes("timeout") ||
+      message.includes("connection")
+    ) {
+      return t("auth.errors.network");
+    }
+  }
+
+  return t("auth.errors.generic");
 }
 
 export function resolveAuthErrorMessage(
