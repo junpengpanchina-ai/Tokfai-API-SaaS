@@ -193,3 +193,71 @@ To **test 429 locally on server**, temporarily set `TOKFAI_RATE_LIMIT_RPM=5` or 
 | A Normal | `TOTAL_REQUESTS=20 CONCURRENCY=2` | 20× HTTP 200, `http_502=0` |
 | B Low RPM | `TOKFAI_RATE_LIMIT_RPM=5` + `CONCURRENCY=5` | HTTP 429, codes `too_many_*`, not 502 |
 | C Restore | `unset TOKFAI_RATE_LIMIT_RPM` + `CONCURRENCY=1` | Success |
+
+### Production verification / DMIT smoke results
+
+**Status:** ✅ P761.1 passed on production DMIT (2026-06-13)
+
+#### A — Normal load (default guards)
+
+**Env:**
+
+```bash
+TOKFAI_RATE_LIMIT_RPM=60
+TOKFAI_MAX_CONCURRENCY_PER_KEY=5
+TOKFAI_GLOBAL_UPSTREAM_CONCURRENCY=50
+TOKFAI_UPSTREAM_TIMEOUT_MS=90000
+TOKFAI_TOTAL_REQUEST_TIMEOUT_MS=120000
+```
+
+**Command:** `TOTAL_REQUESTS=20 CONCURRENCY=2 TOKFAI_MODEL=auto-fast`
+
+| Metric | Result |
+|--------|--------|
+| completed / success / failed | 20 / 20 / 0 |
+| success_rate | 100.00% |
+| HTTP 200 / 429 / 502 | 20 / 0 / 0 |
+| error_code_distribution | (none) |
+| credits_sum | 0.002741 |
+| request_id samples | ✅ present |
+| wall_time_ms | 202661 |
+| latency p50 / p95 / max | 4170ms / 94282ms / 98414ms |
+
+#### B — Low RPM rate-limit (P761.1 fix target)
+
+**Env:** `TOKFAI_RATE_LIMIT_RPM=5` (other defaults unchanged)
+
+**Command:** `TOTAL_REQUESTS=20 CONCURRENCY=5 TOKFAI_MODEL=auto-fast`
+
+| Metric | Result |
+|--------|--------|
+| success / failed | 5 / 15 |
+| success_rate | 25.00% |
+| HTTP 200 / 429 / 502 | 5 / 15 / 0 |
+| error_code_distribution | `too_many_requests`: 15 |
+| credits_sum | 0.000577 (429 rows non-billable) |
+| request_id samples | ✅ present |
+
+#### C — Restore production defaults
+
+**Env:**
+
+```bash
+TOKFAI_RATE_LIMIT_RPM=60
+TOKFAI_RATE_LIMIT_WINDOW_MS=60000
+TOKFAI_MAX_CONCURRENCY_PER_KEY=5
+TOKFAI_GLOBAL_UPSTREAM_CONCURRENCY=50
+TOKFAI_UPSTREAM_TIMEOUT_MS=90000
+TOKFAI_TOTAL_REQUEST_TIMEOUT_MS=120000
+```
+
+**Command:** `TOTAL_REQUESTS=20 CONCURRENCY=2 TOKFAI_MODEL=auto-fast`
+
+| Metric | Result |
+|--------|--------|
+| completed / success / failed | 20 / 20 / 0 |
+| HTTP 200 / 429 / 502 | 20 / 0 / 0 |
+| credits_sum | 0.002741 |
+| request_id samples | ✅ present |
+
+**Conclusion:** P761.1 fix verified. Low-RPM guard rejections return standard **HTTP 429** + `too_many_requests` (not generic 502). 429 responses are **non-billable**; every response carries a traceable `request_id`.
