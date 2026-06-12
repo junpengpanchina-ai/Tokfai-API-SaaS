@@ -21,22 +21,19 @@ export const errorHandler: ErrorHandler = (err, c) => {
   const route = getRoute(c);
 
   if (err instanceof ApiError) {
+    const logFields = {
+      requestId,
+      route,
+      status: err.status,
+      code: err.code,
+      message: err.publicMessage,
+      upstreamStatus: err.upstreamStatus,
+      upstreamErrorMessage: err.upstreamErrorSnippet,
+    };
     if (err.status >= 500) {
-      log.error("api_error_500", {
-        requestId,
-        route,
-        status: err.status,
-        code: err.code,
-        message: err.publicMessage,
-      });
+      log.error("api_error_500", logFields);
     } else {
-      log.warn("api_error", {
-        requestId,
-        route,
-        status: err.status,
-        code: err.code,
-        message: err.publicMessage,
-      });
+      log.warn("api_error", logFields);
     }
     return c.json(err.toJSON(), err.status as never);
   }

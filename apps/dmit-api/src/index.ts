@@ -1,7 +1,7 @@
 import { serve } from "@hono/node-server";
 
 import { buildApp } from "./app.js";
-import { env } from "./env.js";
+import { env, grsaiUpstreamTarget, maskSecret } from "./env.js";
 import { log } from "./logger.js";
 
 const app = buildApp();
@@ -16,12 +16,18 @@ const server = serve(
     hostname,
   },
   (info) => {
+    const chatTarget = grsaiUpstreamTarget(env.GRSAI_CHAT_COMPLETIONS_PATH);
     log.info("dmit_listening", {
       address: info.address,
       port: info.port,
       hostname,
       env: env.NODE_ENV,
       cors: env.CORS_ALLOWED_ORIGINS,
+    });
+    log.info("dmit_grsai_upstream_config", {
+      grsaiBaseHost: chatTarget.host,
+      grsaiChatPath: chatTarget.path,
+      grsaiApiKeyMask: maskSecret(env.GRSAI_API_KEY),
     });
   }
 );

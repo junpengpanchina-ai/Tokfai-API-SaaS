@@ -162,6 +162,11 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       {
         method: "POST",
         json: upstreamBody,
+      },
+      {
+        requestId,
+        route: "/v1/chat/completions",
+        model: resolvedModel,
       }
     );
 
@@ -227,9 +232,13 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       log.warn("chat_completion_failed", {
         requestId,
         route: "/v1/chat/completions",
+        model: resolvedModel,
         status: err.status,
         code: err.code ?? "failed",
         message: err.publicMessage,
+        upstreamStatus: err.upstreamStatus,
+        upstreamErrorMessage: err.upstreamErrorSnippet,
+        latencyMs: Date.now() - startedAt,
       });
 
       throw err;
@@ -376,11 +385,12 @@ function upstreamFailureFields(
   }
 
   const upstreamStatus =
-    code === "upstream_rate_limited"
+    err.upstreamStatus ??
+    (code === "upstream_rate_limited"
       ? 429
       : code === "upstream_auth_error"
         ? 403
-        : 502;
+        : 502);
 
   return {
     upstream_status: upstreamStatus,

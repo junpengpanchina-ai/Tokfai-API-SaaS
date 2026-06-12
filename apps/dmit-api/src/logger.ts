@@ -20,6 +20,16 @@ const ALLOWED_FIELD_KEYS = new Set([
   "adminUserId",
   "email",
   "authSource",
+  "model",
+  "upstreamHost",
+  "upstreamPath",
+  "upstreamStatus",
+  "upstreamErrorCode",
+  "upstreamErrorMessage",
+  "latencyMs",
+  "grsaiBaseHost",
+  "grsaiChatPath",
+  "grsaiApiKeyMask",
 ]);
 
 /**

@@ -89,19 +89,46 @@ const Schema = z
     .default("https://tokfai.com,http://localhost:3000")
     .transform(csv),
   })
-  .transform((data) => ({
-    ...data,
-    GRSAI_BASE_URL:
-      data.GRSAI_BASE_URL ?? data.GRSAI_API_BASE ?? "https://grsaiapi.com",
-    GRSAI_CHAT_COMPLETIONS_PATH: data.GRSAI_CHAT_COMPLETIONS_PATH.startsWith(
-      "/"
-    )
+  .transform((data) => {
+    const rawBase =
+      data.GRSAI_BASE_URL ?? data.GRSAI_API_BASE ?? "https://grsaiapi.com";
+    const chatPath = data.GRSAI_CHAT_COMPLETIONS_PATH.startsWith("/")
       ? data.GRSAI_CHAT_COMPLETIONS_PATH
-      : `/${data.GRSAI_CHAT_COMPLETIONS_PATH}`,
-    GRSAI_IMAGE_GENERATE_PATH: data.GRSAI_IMAGE_GENERATE_PATH.startsWith("/")
+      : `/${data.GRSAI_CHAT_COMPLETIONS_PATH}`;
+    const imagePath = data.GRSAI_IMAGE_GENERATE_PATH.startsWith("/")
       ? data.GRSAI_IMAGE_GENERATE_PATH
-      : `/${data.GRSAI_IMAGE_GENERATE_PATH}`,
-  }));
+      : `/${data.GRSAI_IMAGE_GENERATE_PATH}`;
+
+    return {
+      ...data,
+      // GRSAI paths already include /v1/... — strip a trailing /v1 from base
+      // so GRSAI_API_BASE=https://host/v1 does not become .../v1/v1/chat/...
+      GRSAI_BASE_URL: normalizeGrsaiBaseUrl(rawBase),
+      GRSAI_CHAT_COMPLETIONS_PATH: chatPath,
+      GRSAI_IMAGE_GENERATE_PATH: imagePath,
+    };
+  });
+
+/** Host + pathname for upstream diagnostics (no secrets). */
+export function grsaiUpstreamTarget(path: string): { host: string; path: string } {
+  const base = env.GRSAI_BASE_URL.replace(/\/+$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = new URL(`${base}${normalizedPath}`);
+  return { host: url.host, path: url.pathname };
+}
+
+export function maskSecret(value: string): string {
+  if (value.length <= 8) return `**** (len=${value.length})`;
+  return `${value.slice(0, 4)}…${value.slice(-4)} (len=${value.length})`;
+}
+
+function normalizeGrsaiBaseUrl(raw: string): string {
+  const trimmed = raw.replace(/\/+$/, "");
+  if (trimmed.endsWith("/v1")) {
+    return trimmed.slice(0, -3);
+  }
+  return trimmed;
+}
 
 export type Env = z.infer<typeof Schema>;
 

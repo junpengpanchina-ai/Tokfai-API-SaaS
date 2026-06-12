@@ -27,6 +27,10 @@ export class ApiError extends Error {
   readonly code?: string;
   readonly type?: ErrorType;
   readonly publicMessage: string;
+  /** Actual upstream HTTP status (server logs / usage_logs only). */
+  readonly upstreamStatus?: number;
+  /** Truncated upstream body snippet (server logs only). */
+  readonly upstreamErrorSnippet?: string;
 
   constructor(args: {
     status: number;
@@ -35,6 +39,8 @@ export class ApiError extends Error {
     type?: ErrorType;
     /** Optional override; defaults to `message`. */
     publicMessage?: string;
+    upstreamStatus?: number;
+    upstreamErrorSnippet?: string;
   }) {
     super(args.message);
     this.name = "ApiError";
@@ -42,6 +48,8 @@ export class ApiError extends Error {
     this.code = args.code;
     this.type = args.type;
     this.publicMessage = args.publicMessage ?? args.message;
+    this.upstreamStatus = args.upstreamStatus;
+    this.upstreamErrorSnippet = args.upstreamErrorSnippet;
   }
 
   toJSON(): { error: ApiErrorPayload } {
