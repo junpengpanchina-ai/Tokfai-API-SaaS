@@ -5,6 +5,8 @@ import { ArrowRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { dashboardCtaHref } from "@/lib/auth/public-cta";
+import { useAuth } from "@/lib/auth/auth-provider";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import {
   TOKFAI_API_BASE_URL,
@@ -37,6 +39,9 @@ const DEV_SNIPPET = [
 
 export function HomeExtraSections() {
   const { t } = useI18n();
+  const { user } = useAuth();
+  const isLoggedIn = Boolean(user);
+  const dashHref = (path: string) => dashboardCtaHref(path, isLoggedIn);
 
   return (
     <>
@@ -99,7 +104,7 @@ export function HomeExtraSections() {
                   {t("home.devLabelModels")}
                 </span>
                 <Link
-                  href="/dashboard/models"
+                  href={dashHref("/dashboard/models")}
                   className="font-mono text-sm text-primary underline-offset-4 hover:underline sm:text-right"
                 >
                   /dashboard/models
@@ -110,7 +115,7 @@ export function HomeExtraSections() {
                   {t("common.chatPlayground")}
                 </span>
                 <Link
-                  href="/dashboard/playground"
+                  href={dashHref("/dashboard/playground")}
                   className="font-mono text-sm text-primary underline-offset-4 hover:underline sm:text-right"
                 >
                   /dashboard/playground
@@ -121,7 +126,7 @@ export function HomeExtraSections() {
                   {t("common.imagePlayground")}
                 </span>
                 <Link
-                  href="/dashboard/image-playground"
+                  href={dashHref("/dashboard/image-playground")}
                   className="font-mono text-sm text-primary underline-offset-4 hover:underline sm:text-right"
                 >
                   /dashboard/image-playground
@@ -142,7 +147,7 @@ export function HomeExtraSections() {
           </Card>
           <div className="mt-6 flex justify-center">
             <Button asChild variant="ghost" size="sm">
-              <Link href="/dashboard/docs">
+              <Link href={dashHref("/dashboard/docs")}>
                 {t("home.fullApiReference")}
                 <ArrowRight className="h-4 w-4" />
               </Link>

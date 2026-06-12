@@ -891,6 +891,28 @@ function ResponsePanel({
         t={t}
       />
 
+      <div className="flex flex-col gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
+        <div className="flex items-start gap-2">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+          <p className="text-muted-foreground">
+            {t("dashboard.playground.successBalanceHint")}{" "}
+            <Link
+              href="/dashboard/usage"
+              className="underline underline-offset-4"
+            >
+              {t("dashboard.playground.viewUsage")}
+            </Link>{" "}
+            /{" "}
+            <Link
+              href="/dashboard/credits"
+              className="underline underline-offset-4"
+            >
+              {t("dashboard.playground.viewCredits")}
+            </Link>
+          </p>
+        </div>
+      </div>
+
       <div className="rounded-md border bg-muted/40 p-4">
         <p className="mb-2 text-xs font-medium text-muted-foreground">
           {t("dashboard.playground.responseContent")}
@@ -1037,6 +1059,7 @@ function PlaygroundFooter({ t }: { t: (key: string) => string }) {
   const links = [
     { href: "/dashboard/models", label: t("dashboard.playground.viewModels") },
     { href: "/dashboard/docs", label: t("dashboard.playground.viewDocs") },
+    { href: "/dashboard/usage", label: t("dashboard.playground.viewUsage") },
     {
       href: "/dashboard/credits",
       label: t("dashboard.playground.viewCreditsLedger"),

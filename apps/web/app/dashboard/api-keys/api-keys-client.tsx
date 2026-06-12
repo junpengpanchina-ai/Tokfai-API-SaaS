@@ -317,6 +317,11 @@ function IntegrationGuide({ t }: { t: (key: string) => string }) {
             </Link>
           </Button>
           <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/dashboard/playground">
+              {t("dashboard.apiKeys.tryChatPlayground")}
+            </Link>
+          </Button>
+          <Button type="button" variant="outline" size="sm" asChild>
             <Link href="/dashboard/image-playground">
               {t("dashboard.apiKeys.tryImagePlayground")}
             </Link>
@@ -408,6 +413,11 @@ function OneTimeSecretCard({
             onClick={onDismiss}
           >
             {t("dashboard.apiKeys.savedMyKey")}
+          </Button>
+          <Button type="button" variant="ghost" className="w-full sm:w-auto" asChild>
+            <Link href="/dashboard/playground">
+              {t("dashboard.apiKeys.tryChatPlayground")}
+            </Link>
           </Button>
           <Button type="button" variant="ghost" className="w-full sm:w-auto" asChild>
             <Link href="/dashboard/docs">

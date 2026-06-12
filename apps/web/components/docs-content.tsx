@@ -343,6 +343,11 @@ export function DocsContent({
               </Link>
             </Button>
             <Button asChild variant="outline" size="sm">
+              <Link href={dashHref("/dashboard/image-playground")}>
+                {t("docs.quickstartLinksImagePlayground")}
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
               <Link href="#client-integrations">{t("docs.sectionClientIntegrations")}</Link>
             </Button>
           </div>

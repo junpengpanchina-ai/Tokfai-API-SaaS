@@ -22,6 +22,7 @@ export function HomeHero() {
   const isLoggedIn = Boolean(user);
 
   const creditsHref = dashboardCtaHref("/dashboard/credits", isLoggedIn);
+  const dashboardHref = dashboardCtaHref("/dashboard", isLoggedIn);
   const imagePlaygroundHref = dashboardCtaHref(
     "/dashboard/image-playground",
     isLoggedIn
@@ -91,6 +92,11 @@ export function HomeHero() {
           <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
             <Link href={docsHref}>{t("home.readDocs")}</Link>
           </Button>
+          {isLoggedIn ? (
+            <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
+              <Link href={dashboardHref}>{t("nav.dashboard")}</Link>
+            </Button>
+          ) : null}
         </div>
       </div>
     </section>

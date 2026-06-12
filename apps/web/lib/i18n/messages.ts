@@ -676,6 +676,9 @@ export const messages = {
         responsePlaceholder: "The model response will appear here after you send.",
         viewModels: "View models",
         viewDocs: "View docs",
+        successBalanceHint: "Recorded in",
+        viewUsage: "View Usage",
+        viewCredits: "View Credits",
         errors: {
           missingToken:
             "Missing API key. Create and paste an active key first.",
@@ -2435,6 +2438,9 @@ export const messages = {
         responsePlaceholder: "发送测试后，模型回复将显示在这里。",
         viewModels: "查看模型",
         viewDocs: "查看文档",
+        successBalanceHint: "已记录至",
+        viewUsage: "查看 Usage",
+        viewCredits: "查看 Credits",
         errors: {
           missingToken: "缺少 API Key，请先创建并选择可用密钥。",
           invalidToken: "API Key 无效或已吊销，请重新创建。",
