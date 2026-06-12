@@ -102,6 +102,12 @@ const Schema = z
     .int()
     .positive()
     .default(50),
+  TOKFAI_BATCH_MAX_ITEMS: z.coerce.number().int().positive().default(100),
+  TOKFAI_BATCH_ITEM_CONCURRENCY: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(2),
   BOT_MODEL: z.string().min(1).default("auto-fast"),
 
   STRIPE_SECRET_KEY: z.string().min(1).optional(),

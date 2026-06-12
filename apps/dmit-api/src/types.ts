@@ -136,3 +136,47 @@ export interface AuthedUser {
   id: string;
   email: string | null;
 }
+
+export type ChatBatchStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "partial_failed"
+  | "cancelled";
+
+export type ChatBatchItemStatus = "pending" | "running" | "succeeded" | "failed";
+
+export interface ChatBatchRow {
+  id: string;
+  user_id: string;
+  api_key_id: string | null;
+  model: string;
+  requested_model: string;
+  status: ChatBatchStatus;
+  total_items: number;
+  succeeded_items: number;
+  failed_items: number;
+  credits_charged: string | number;
+  created_at: string;
+  updated_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface ChatBatchItemRow {
+  id: string;
+  batch_id: string;
+  index: number;
+  status: ChatBatchItemStatus;
+  input: unknown;
+  output: unknown | null;
+  error_code: string | null;
+  error_message: string | null;
+  request_id: string | null;
+  credits_charged: string | number;
+  created_at: string;
+  updated_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+}

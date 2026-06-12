@@ -15,6 +15,7 @@ import {
 import { catalogRoutes } from "./routes/catalog.js";
 import { modelRoutes } from "./routes/models.js";
 import { chatRoutes } from "./routes/chat.js";
+import { batchRoutes } from "./routes/batch.js";
 import { imageRoutes } from "./routes/images.js";
 import { adminRoutes } from "./routes/admin.js";
 import { announcementRoutes } from "./routes/announcements.js";
@@ -38,6 +39,7 @@ export function buildApp() {
   app.route("/", modelRoutes);
   app.route("/", announcementRoutes);
   app.route("/", chatRoutes);
+  app.route("/", batchRoutes);
   app.route("/", imageRoutes);
   app.route("/admin", adminRoutes);
 
