@@ -2,7 +2,7 @@
 
 > Goal: prove Tokfai’s **gateway layer** stays stable under heavy single-customer traffic — not that upstream GRSAI never throttles.
 
-Default integration model: **gemini-3-flash** (Phase 1). gpt-5.4 / gpt-5.5 remain high-quality options, not first-call defaults.
+Default integration model: **auto-fast** (smart routing). Real models (e.g. gemini-3-flash, gpt-5.4) remain available for explicit calls. See [P760 smart routing](./p760-smart-model-routing.md).
 
 ---
 
@@ -28,7 +28,7 @@ Default integration model: **gemini-3-flash** (Phase 1). gpt-5.4 / gpt-5.5 remai
 | **Failed billing** | Failures call `usage_logs.insert` with `billable=false`, `credits_charged=null` — **no debit RPC**. | Low double-charge risk on failures. | Keep; verify in Usage UI after load test. |
 | **Duplicate retry** | Each HTTP request gets new `request_id` unless client sends `X-Request-Id`. Retries = **new billable call** if upstream succeeded but client timed out. | **Medium** — client retry storms can double-charge. | Document idempotency limits; suggest client retry only on 503/429 with backoff; **future:** idempotent debit keyed by client request id. |
 | **usage_logs writes** | One insert per request (success via RPC, failure via direct insert). `request_id` **UNIQUE**. | Insert-heavy; index `(user_id, created_at desc)` helps dashboard reads; writes still ~100k rows. | **Suggest:** archive policy for old logs; watch Supabase connection pool & disk. |
-| **Upstream GRSAI** | Chat `fetch` has **no AbortSignal timeout** (images have `IMAGE_REQUEST_TIMEOUT_MS`). Errors mapped to `upstream_model_busy` (503), `model_not_available` (400), etc. | Upstream 400/503 under concurrency; hung connections if GRSAI stalls. | **Suggest:** chat upstream timeout 60–120s; cap concurrent upstream per process. |
+| **Upstream GRSAI** | Chat `fetch` uses `GRSAI_CHAT_TIMEOUT_MS` (default 90s) via AbortSignal. Smart routing (`auto-*`) retries on busy/timeout. Errors mapped to `upstream_model_busy` (503), `model_not_available` (400), etc. | Upstream 400/503 under concurrency; hung connections if timeout misconfigured. | Keep 90s timeout; use `auto-fast` for soak tests; cap concurrent upstream per process. |
 | **Node / PM2** | Default `ecosystem.config.cjs`: **single** `dmit-api` process, autorestart. | Event-loop blocking, memory growth, single-core ceiling. | **Suggest:** `instances: 2` + sticky-less stateless design; monitor RSS & event loop lag. |
 | **Nginx** | Not managed in repo. Typical risks: `proxy_read_timeout`, `worker_connections`, body size. | Long chat latency → 504 at edge; connection exhaustion. | **Suggest:** `proxy_read_timeout 120s`; `client_max_body_size 1m`; rate limit zone per IP/key at edge (future). |
 | **Rate limiting** | **None** in DMIT today for `/v1/chat/completions`. | Single customer can hammer API and DB. | See §5 minimal rate-limit proposal. |
@@ -49,7 +49,7 @@ Default integration model: **gemini-3-flash** (Phase 1). gpt-5.4 / gpt-5.5 remai
 |----------|---------|
 | `TOKFAI_API_BASE` | `https://api.tokfai.com/v1` |
 | `TOKFAI_API_KEY` | *(required)* |
-| `TOKFAI_MODEL` | `gemini-3-flash` |
+| `TOKFAI_MODEL` | `auto-fast` |
 | `TOTAL_REQUESTS` | `100` |
 | `CONCURRENCY` | `5` |
 
@@ -66,6 +66,17 @@ TOKFAI_API_KEY=sk-tokfai_xxx TOTAL_REQUESTS=1000 CONCURRENCY=5 \
 ```
 
 Prompt is fixed to **`Say ok only.`** — no retries on failure. API key is never printed (masked prefix/suffix only).
+
+**Model selection:**
+
+| Use case | `TOKFAI_MODEL` |
+|----------|----------------|
+| Default smoke / Stage A–B | `auto-fast` (script default) |
+| Quality soak | `auto-pro` |
+| Bulk low-cost | `auto-cheap` |
+| Customer wants one upstream only | Real model ID (no silent fallback) |
+
+See [P760 smart routing](./p760-smart-model-routing.md).
 
 ### Metrics reported
 

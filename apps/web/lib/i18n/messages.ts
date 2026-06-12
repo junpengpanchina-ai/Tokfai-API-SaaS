@@ -334,6 +334,19 @@ export const messages = {
           "Figures below are for budgeting only. Actual charges follow Usage and Credits ledger records.",
         salesTip:
           "Start with a small package to complete integration testing. Confirm model, quality, and consumption before scaling volume.",
+        smartRoutingTitle: "Alias / Smart routing",
+        smartRoutingDesc:
+          "Use auto-* aliases for a stable entry point. Tokfai tries upstream models in order and returns the model that actually succeeded.",
+        smartRoutingAlias: {
+          "auto-fast":
+            "Recommended default — fast, stable chat. Fallback: gemini-3-flash → gemini-2.5-flash → gemini-3-pro.",
+          "auto-pro":
+            "High quality — gpt-5.5 → gpt-5.4 → gemini-3.1-pro → gemini-3-pro.",
+          "auto-cheap":
+            "Low-cost batch — gemini-2.5-flash → gemini-3-flash.",
+        },
+        smartRoutingRealModelNote:
+          "You can still pass a real model ID (e.g. gpt-5.4). Tokfai will not auto-fallback for explicit IDs — you get upstream_model_busy if that model is hot.",
         howToEstimateTitle: "How to estimate call cost?",
         howToEstimateItem1:
           "Chat models bill input tokens and output tokens separately.",
@@ -551,7 +564,7 @@ export const messages = {
         oneTimeSecretDesc:
           "Copy and store this key now — it is shown only once at creation.",
         nextStepsHint:
-          "Next: test with gemini-3-flash in Chat Playground, then follow Docs to connect Cursor, Cherry Studio, or the OpenAI SDK.",
+          "Next: test with auto-fast in Chat Playground, then follow Docs to connect Cursor, Cherry Studio, or the OpenAI SDK.",
         yourApiKey: "Your API key",
         authorizationHeader: "Authorization header",
         copyFullKey: "Copy full key",
@@ -662,6 +675,21 @@ export const messages = {
         statusSuccess: "Success",
         statusFailed: "Failed",
         modelId: "Model ID",
+        requestedModel: "Requested model",
+        resolvedModel: "Resolved model",
+        smartAlias: {
+          "auto-fast": "auto-fast (recommended)",
+          "auto-pro": "auto-pro (high quality)",
+          "auto-cheap": "auto-cheap (low cost batch)",
+        },
+        smartAliasDesc: {
+          "auto-fast":
+            "Smart routing — tries gemini-3-flash → gemini-2.5-flash → gemini-3-pro.",
+          "auto-pro":
+            "Smart routing — tries gpt-5.5 → gpt-5.4 → gemini-3.1-pro → gemini-3-pro.",
+          "auto-cheap":
+            "Smart routing — tries gemini-2.5-flash → gemini-3-flash.",
+        },
         responseContent: "Response",
         requestId: "request_id",
         createdAt: "created_at",
@@ -699,11 +727,15 @@ export const messages = {
           upstreamTimeout:
             "The selected model is temporarily unavailable or under high load.",
           upstreamModelBusy:
-            "This model is under high load. Retry shortly or switch to gemini-3-flash.",
+            "This model is under high load. Retry shortly or switch to auto-fast.",
           modelNotAvailable:
             "This model is not available for API calls. Switch to a recommended model.",
+          allUpstreamsUnavailable:
+            "Available models are busy right now. Retry shortly or lower concurrency.",
+          allUpstreamsHint:
+            "Try auto-fast, reduce concurrency, or retry in a few minutes.",
           switchModelHint:
-            "Try gemini-3-flash first for integration tests. gpt-5.4 / gpt-5.5 are high-quality models that may be busy under load.",
+            "Try auto-fast for stable routing. gpt-5.4 / gpt-5.5 are high-quality models that may be busy under load.",
           rateLimited: "Too many requests. Please try again later.",
           unknown: "Request failed. Please try again later.",
           missingPrompt: "Please enter a prompt.",
@@ -1076,6 +1108,9 @@ export const messages = {
     },
     catalog: {
       chatUseCase: {
+        "auto-fast": "Smart routing — fast, stable chat (recommended default)",
+        "auto-pro": "Smart routing — high-quality chat",
+        "auto-cheap": "Smart routing — low-cost batch chat",
         "gemini-3.1-pro": "Chat, code, and general tasks",
         "gemini-3-pro": "Chat, code, and general tasks",
         "gemini-3-flash": "Chat, code, and general tasks",
@@ -1086,8 +1121,14 @@ export const messages = {
         "gpt-5.5": "Chat, code, and general tasks",
       },
       chatModelNote: {
+        "auto-fast":
+          "Recommended default — Tokfai picks the first available model in the fallback chain.",
+        "auto-pro":
+          "High-quality alias — tries gpt-5.5 first, then falls back to other Pro models.",
+        "auto-cheap":
+          "Low-cost alias — prefers gemini-2.5-flash, then gemini-3-flash.",
         "gemini-3-flash":
-          "Recommended test model — best for first API integration and Playground checks.",
+          "Stable real model — also used as the first hop in auto-fast.",
         "gpt-5.4":
           "High-quality model — may be unavailable when upstream load is high.",
         "gpt-5.5":
@@ -1095,11 +1136,11 @@ export const messages = {
         "gpt-4o-mini":
           "May be unavailable depending on upstream registration — not recommended for integration examples.",
         "gemini-3.1-pro":
-          "May be unavailable during high load. For testing, try gemini-3-flash first.",
+          "May be unavailable during high load. For stable routing, use auto-fast or auto-pro.",
         "gemini-3-pro":
-          "May be unavailable during high load. For testing, try gemini-3-flash first.",
+          "May be unavailable during high load. For stable routing, use auto-fast or auto-pro.",
         "gemini-2.5-pro":
-          "May be unavailable during high load. For testing, try gemini-3-flash first.",
+          "May be unavailable during high load. For stable routing, use auto-fast or auto-pro.",
       },
       imageUseCase: {
         "gpt-image-2": "Text-to-image, image-to-image, high-quality images",
@@ -1133,7 +1174,7 @@ export const messages = {
       setupStep3:
         "Set base URL to https://api.tokfai.com/v1 and send Authorization: Bearer sk-tokfai_… on every request.",
       setupStep4:
-        "Send a test request with model gemini-3-flash, or try Chat Playground and Image Playground first.",
+        "Send a test request with model auto-fast, or try Chat Playground and Image Playground first.",
       setupPlaygroundHint:
         "Recommended flow: create your key in API Keys, then validate chat and image calls in Playground before wiring your app.",
       worksWithLabel: "Works with",
@@ -1150,7 +1191,7 @@ export const messages = {
       quickstartStep3:
         "Set your client base URL to https://api.tokfai.com/v1 and send Authorization: Bearer sk-tokfai_… on every request.",
       quickstartStep4:
-        "Make your first call — POST /v1/chat/completions for chat (start with gemini-3-flash) or POST /v1/images/generations for images.",
+        "Make your first call — POST /v1/chat/completions for chat (start with auto-fast) or POST /v1/images/generations for images.",
       quickstartFirstCallTitle: "First call example",
       quickstartLinksApiKeys: "API Keys",
       quickstartLinksCredits: "Credits",
@@ -1181,7 +1222,18 @@ export const messages = {
       chatPlaygroundLink: "Chat Playground",
       recommendedModelTitle: "Recommended model",
       recommendedModelDesc:
-        "Start with gemini-3-flash for integration and Playground tests. gpt-5.4 / gpt-5.5 are high-quality options that may be busy under load.",
+        "Start with auto-fast for integration and Playground tests — Tokfai routes to the first available fast model. Use auto-pro for quality, auto-cheap for batch. gpt-5.4 / gpt-5.5 remain explicit high-quality IDs that may be busy under load.",
+      smartRoutingTitle: "Smart routing aliases",
+      smartRoutingDesc:
+        "Pass auto-fast, auto-pro, or auto-cheap as the model field. The response model field shows which upstream model succeeded. Explicit model IDs do not auto-fallback.",
+      smartRoutingAutoFast:
+        "auto-fast — default fast & stable: gemini-3-flash → gemini-2.5-flash → gemini-3-pro",
+      smartRoutingAutoPro:
+        "auto-pro — high quality: gpt-5.5 → gpt-5.4 → gemini-3.1-pro → gemini-3-pro",
+      smartRoutingAutoCheap:
+        "auto-cheap — low cost: gemini-2.5-flash → gemini-3-flash",
+      smartRoutingRealModelNote:
+        "Real model IDs (e.g. gemini-3-flash, gpt-5.4) are still supported. Tokfai returns upstream_model_busy when that specific model is hot — no silent fallback.",
       modelIdLabel: "Model ID",
       authSectionDesc:
         "Every API request must include your API key in the Authorization header. Dashboard session tokens are not accepted on /v1/chat/completions or /v1/images/generations.",
@@ -1189,7 +1241,7 @@ export const messages = {
       authHeaderDesc: "Include on every request.",
       authVerifyTitle: "Verify your key — GET /v1/models",
       chatCompletionsDesc:
-        "Send chat messages and receive a model response via POST /chat/completions. Recommended starting model: gemini-3-flash.",
+        "Send chat messages and receive a model response via POST /chat/completions. Recommended starting model: auto-fast (smart routing).",
       chatSdkJsTitle: "OpenAI JavaScript SDK",
       chatSdkPythonTitle: "OpenAI Python SDK",
       chatSdkDesc: "Use the official OpenAI SDK with baseURL set to Tokfai.",
@@ -1235,9 +1287,9 @@ export const messages = {
         "Order: health (no key) → models (auth) → chat completion (auth + credits). All use Base URL https://api.tokfai.com/v1.",
       externalVerifyHealthTitle: "1. Health check (no API key)",
       externalVerifyModelsTitle: "2. List models",
-      externalVerifyChatTitle: "3. Chat completion (model gemini-3-flash)",
+      externalVerifyChatTitle: "3. Chat completion (model auto-fast)",
       externalVerificationModelNote:
-        "Start with gemini-3-flash for integration smoke tests. gpt-5.4 and gpt-5.5 are high-quality models — retry or switch if you see upstream_model_busy (HTTP 503). Do not use gpt-4o-mini; it is not registered upstream.",
+        "Start with auto-fast for integration smoke tests — Tokfai auto-routes when upstream models are busy. Use auto-pro for quality workloads. Explicit gpt-5.4 / gpt-5.5 may return upstream_model_busy (HTTP 503). Do not use gpt-4o-mini; it is not registered upstream.",
       cherryStudioLabel: "Cherry Studio",
       cherryStudioSteps:
         "Settings → Provider → OpenAI-compatible. Set API Host, API Key, and default model as below.",
@@ -1246,7 +1298,7 @@ export const messages = {
       cherryStudioError402:
         "Top up credits in Dashboard → Credits before sending requests from Cherry Studio.",
       cherryStudioError404:
-        "Pick a Tokfai model ID such as gemini-3-flash. Browse available IDs on the Models page.",
+        "Pick a Tokfai model ID such as auto-fast. Browse available IDs on the Models page.",
       cherryStudioError500:
         "The model service is temporarily unavailable — retry in a few minutes or switch models.",
       cursorLabel: "Cursor",
@@ -1257,12 +1309,12 @@ export const messages = {
       cursorError402:
         "Top up credits in Dashboard → Credits before using Cursor chat with Tokfai.",
       cursorError404:
-        "Choose a Tokfai model ID (e.g. gemini-3-flash) in the model picker. See Models for the full list.",
+        "Choose a Tokfai model ID (e.g. auto-fast) in the model picker. See Models for the full list.",
       cursorError500:
         "Retry the request or pick another model — upstream services may be briefly unavailable.",
       openAiSdkLabel: "OpenAI SDK",
       openAiSdkSteps:
-        "Set baseURL to https://api.tokfai.com/v1 and apiKey to your sk-tokfai_… key. Use gemini-3-flash as the default chat model for first tests.",
+        "Set baseURL to https://api.tokfai.com/v1 and apiKey to your sk-tokfai_… key. Use auto-fast as the default chat model for first tests.",
       openAiSdkExamplesHint: "Full JavaScript and Python examples are in",
       clientApiKeyHintPrefix: "Replace sk-tokfai_xxx with a key from",
       clientApiKeyHintLink: "API Keys",
@@ -1336,7 +1388,7 @@ export const messages = {
       cherryApiHost: "API Host",
       cherryApiKey: "API Key",
       cherryModel: "Model",
-      cherryModelValue: "gemini-3-flash",
+      cherryModelValue: "auto-fast",
       cursorTitle: "Cursor",
       cursorDesc: "Add Tokfai as a custom OpenAI-compatible provider.",
       cursorStep1: "Choose OpenAI Compatible / Custom Provider.",
@@ -2142,6 +2194,19 @@ export const messages = {
           "以下仅为预算参考，实际扣费以 Usage / Credits 账本为准。",
         salesTip:
           "建议先用小套餐完成接入测试，确认模型、质量和消耗后再放量。",
+        smartRoutingTitle: "别名 / 智能路由",
+        smartRoutingDesc:
+          "使用 auto-* 别名作为稳定入口。Tokfai 按顺序尝试上游模型，并在响应中返回实际成功的 model。",
+        smartRoutingAlias: {
+          "auto-fast":
+            "推荐默认 — 快速稳定对话。回退顺序：gemini-3-flash → gemini-2.5-flash → gemini-3-pro。",
+          "auto-pro":
+            "高质量 — gpt-5.5 → gpt-5.4 → gemini-3.1-pro → gemini-3-pro。",
+          "auto-cheap":
+            "低成本批量 — gemini-2.5-flash → gemini-3-flash。",
+        },
+        smartRoutingRealModelNote:
+          "仍可传入真实 model ID（如 gpt-5.4）。明确指定时 Tokfai 不会自动 fallback — 若该模型繁忙将返回 upstream_model_busy。",
         howToEstimateTitle: "如何估算调用成本？",
         howToEstimateItem1: "对话模型按 input tokens 与 output tokens 分别计费。",
         howToEstimateItem2: "图片模型通常按「每张图」计费。",
@@ -2342,7 +2407,7 @@ export const messages = {
         apiKeyCreatedNamed: "API 密钥已创建：{name}",
         oneTimeSecretDesc: "请立即复制并妥善保存——完整密钥仅在创建时展示一次。",
         nextStepsHint:
-          "下一步：先用 gemini-3-flash 在 Chat Playground 测试，再按 Docs 接入 Cursor、Cherry Studio 或 OpenAI SDK。",
+          "下一步：先用 auto-fast 在 Chat Playground 测试，再按 Docs 接入 Cursor、Cherry Studio 或 OpenAI SDK。",
         yourApiKey: "你的 API 密钥",
         authorizationHeader: "Authorization header",
         copyFullKey: "复制完整密钥",
@@ -2448,6 +2513,21 @@ export const messages = {
         statusSuccess: "成功",
         statusFailed: "失败",
         modelId: "模型 ID",
+        requestedModel: "请求 model",
+        resolvedModel: "实际 model",
+        smartAlias: {
+          "auto-fast": "auto-fast（推荐）",
+          "auto-pro": "auto-pro（高质量）",
+          "auto-cheap": "auto-cheap（批量低成本）",
+        },
+        smartAliasDesc: {
+          "auto-fast":
+            "智能路由 — 依次尝试 gemini-3-flash → gemini-2.5-flash → gemini-3-pro。",
+          "auto-pro":
+            "智能路由 — 依次尝试 gpt-5.5 → gpt-5.4 → gemini-3.1-pro → gemini-3-pro。",
+          "auto-cheap":
+            "智能路由 — 依次尝试 gemini-2.5-flash → gemini-3-flash。",
+        },
         responseContent: "回复内容",
         requestId: "request_id",
         createdAt: "created_at",
@@ -2479,11 +2559,15 @@ export const messages = {
           upstreamError: "当前模型暂时不可用或负载较高。",
           upstreamTimeout: "当前模型暂时不可用或负载较高。",
           upstreamModelBusy:
-            "当前模型负载较高，请稍后重试或切换 gemini-3-flash。",
+            "当前模型负载较高，请稍后重试或切换 auto-fast。",
           modelNotAvailable:
             "当前模型暂不可用，请切换推荐模型。",
           switchModelHint:
-            "首次接入建议优先使用 gemini-3-flash。gpt-5.4 / gpt-5.5 为高质量模型，高负载时可能暂时不可用。",
+            "建议优先使用 auto-fast 智能路由。gpt-5.4 / gpt-5.5 为高质量模型，高负载时可能暂时不可用。",
+          allUpstreamsUnavailable:
+            "当前可用模型繁忙，请稍后重试或降低并发。",
+          allUpstreamsHint:
+            "可尝试 auto-fast、降低并发，或稍后再试。",
           rateLimited: "请求过快，请稍后再试。",
           unknown: "请求失败，请稍后重试。",
           missingPrompt: "请输入测试内容。",
@@ -2836,6 +2920,9 @@ export const messages = {
     },
     catalog: {
       chatUseCase: {
+        "auto-fast": "智能路由 — 快速稳定对话（推荐默认）",
+        "auto-pro": "智能路由 — 高质量对话",
+        "auto-cheap": "智能路由 — 低成本批量对话",
         "gemini-3.1-pro": "适合对话 / 代码 / 通用任务",
         "gemini-3-pro": "适合对话 / 代码 / 通用任务",
         "gemini-3-flash": "适合对话 / 代码 / 通用任务",
@@ -2846,16 +2933,19 @@ export const messages = {
         "gpt-5.5": "适合对话 / 代码 / 通用任务",
       },
       chatModelNote: {
-        "gemini-3-flash": "推荐测试模型 / 更适合首次接入验收与 Playground。",
+        "auto-fast": "推荐默认 — Tokfai 在 fallback 链中选择首个可用模型。",
+        "auto-pro": "高质量别名 — 优先 gpt-5.5，再回退到其他 Pro 模型。",
+        "auto-cheap": "低成本别名 — 优先 gemini-2.5-flash，再 gemini-3-flash。",
+        "gemini-3-flash": "稳定真实模型 — 也是 auto-fast 的第一跳。",
         "gpt-5.4": "高质量模型，上游高负载时可能暂时不可用。",
         "gpt-5.5": "高质量模型，上游高负载时可能暂时不可用。",
         "gpt-4o-mini": "可能不可用，视上游注册状态，请勿作为接入示例。",
         "gemini-3.1-pro":
-          "高负载时可能暂时不可用，测试阶段建议优先使用 gemini-3-flash。",
+          "高负载时可能暂时不可用。稳定路由请使用 auto-fast 或 auto-pro。",
         "gemini-3-pro":
-          "高负载时可能暂时不可用，测试阶段建议优先使用 gemini-3-flash。",
+          "高负载时可能暂时不可用。稳定路由请使用 auto-fast 或 auto-pro。",
         "gemini-2.5-pro":
-          "高负载时可能暂时不可用，测试阶段建议优先使用 gemini-3-flash。",
+          "高负载时可能暂时不可用。稳定路由请使用 auto-fast 或 auto-pro。",
       },
       imageUseCase: {
         "gpt-image-2": "适合文生图 / 图生图 / 高质量图片",
@@ -2889,7 +2979,7 @@ export const messages = {
       setupStep3:
         "将 base URL 设为 https://api.tokfai.com/v1，每次请求携带 Authorization: Bearer sk-tokfai_…。",
       setupStep4:
-        "使用 model gemini-3-flash 发送测试请求，或先在 Chat Playground 与 Image Playground 验证。",
+        "使用 model auto-fast 发送测试请求，或先在 Chat Playground 与 Image Playground 验证。",
       setupPlaygroundHint:
         "推荐流程：先在 API Keys 创建密钥，再在 Playground 验证对话与图像调用，最后接入你的应用。",
       worksWithLabel: "兼容",
@@ -2906,7 +2996,7 @@ export const messages = {
       quickstartStep3:
         "将客户端 base URL 设为 https://api.tokfai.com/v1，每次请求携带 Authorization: Bearer sk-tokfai_…。",
       quickstartStep4:
-        "发起第一次调用 — POST /v1/chat/completions（对话，建议从 gemini-3-flash 开始）或 POST /v1/images/generations（图像）。",
+        "发起第一次调用 — POST /v1/chat/completions（对话，建议从 auto-fast 开始）或 POST /v1/images/generations（图像）。",
       quickstartFirstCallTitle: "第一次调用示例",
       quickstartLinksApiKeys: "API Keys",
       quickstartLinksCredits: "Credits",
@@ -2937,7 +3027,18 @@ export const messages = {
       chatPlaygroundLink: "Chat Playground",
       recommendedModelTitle: "推荐模型",
       recommendedModelDesc:
-        "首次接入建议从 gemini-3-flash 开始 Playground 与 API 测试。gpt-5.4 / gpt-5.5 为高质量模型，高负载时可能暂时不可用。",
+        "首次接入建议从 auto-fast 开始 Playground 与 API 测试 — Tokfai 会在上游繁忙时自动切换。高质量场景用 auto-pro，批量低成本用 auto-cheap。gpt-5.4 / gpt-5.5 为明确指定的高质量 ID，高负载时可能暂时不可用。",
+      smartRoutingTitle: "智能路由别名",
+      smartRoutingDesc:
+        "在 model 字段传入 auto-fast、auto-pro 或 auto-cheap。响应中的 model 字段为实际成功的上游模型。明确指定 model ID 时不会自动 fallback。",
+      smartRoutingAutoFast:
+        "auto-fast — 默认快速稳定：gemini-3-flash → gemini-2.5-flash → gemini-3-pro",
+      smartRoutingAutoPro:
+        "auto-pro — 高质量：gpt-5.5 → gpt-5.4 → gemini-3.1-pro → gemini-3-pro",
+      smartRoutingAutoCheap:
+        "auto-cheap — 低成本：gemini-2.5-flash → gemini-3-flash",
+      smartRoutingRealModelNote:
+        "仍可使用真实 model ID（如 gemini-3-flash、gpt-5.4）。该模型繁忙时返回 upstream_model_busy，不会静默切换。",
       modelIdLabel: "Model ID",
       authSectionDesc:
         "每次 API 请求必须在 Authorization header 中携带 API Key。/v1/chat/completions 与 /v1/images/generations 不接受 Dashboard 会话 token。",
@@ -2945,7 +3046,7 @@ export const messages = {
       authHeaderDesc: "每次请求都需要携带。",
       authVerifyTitle: "验证密钥 — GET /v1/models",
       chatCompletionsDesc:
-        "通过 POST /chat/completions 发送对话消息并获取模型回复。推荐起始模型：gemini-3-flash。",
+        "通过 POST /chat/completions 发送对话消息并获取模型回复。推荐起始模型：auto-fast（智能路由）。",
       chatSdkJsTitle: "OpenAI JavaScript SDK",
       chatSdkPythonTitle: "OpenAI Python SDK",
       chatSdkDesc: "使用官方 OpenAI SDK，将 baseURL 指向 Tokfai。",
@@ -2989,9 +3090,9 @@ export const messages = {
         "顺序：health（无需 key）→ models（需鉴权）→ chat completion（需鉴权 + credits）。Base URL 均为 https://api.tokfai.com/v1。",
       externalVerifyHealthTitle: "1. 健康检查（无需 API Key）",
       externalVerifyModelsTitle: "2. 列出 models",
-      externalVerifyChatTitle: "3. Chat completion（model gemini-3-flash）",
+      externalVerifyChatTitle: "3. Chat completion（model auto-fast）",
       externalVerificationModelNote:
-        "首次接入建议用 gemini-3-flash 做 smoke test。gpt-5.4 / gpt-5.5 为高质量模型，高负载时可能返回 upstream_model_busy（HTTP 503），请重试或切换模型。请勿使用 gpt-4o-mini，上游未注册。",
+        "首次接入建议用 auto-fast 做 smoke test — 上游繁忙时 Tokfai 会自动切换。高质量场景用 auto-pro。明确指定 gpt-5.4 / gpt-5.5 可能返回 upstream_model_busy（HTTP 503）。请勿使用 gpt-4o-mini，上游未注册。",
       cherryStudioLabel: "Cherry Studio",
       cherryStudioSteps:
         "Settings → Provider → OpenAI-compatible。按下方表格填写 API Host、API Key 与默认 model。",
@@ -3000,7 +3101,7 @@ export const messages = {
       cherryStudioError402:
         "在 Cherry Studio 发请求前，先在 Dashboard → Credits 充值 credits。",
       cherryStudioError404:
-        "选择 Tokfai model ID，例如 gemini-3-flash。完整列表见 Models 页面。",
+        "选择 Tokfai model ID，例如 auto-fast。完整列表见 Models 页面。",
       cherryStudioError500:
         "模型服务暂时不可用 — 稍后重试或切换 model。",
       cursorLabel: "Cursor",
@@ -3011,12 +3112,12 @@ export const messages = {
       cursorError402:
         "在 Cursor 中使用 Tokfai 对话前，先在 Dashboard → Credits 充值 credits。",
       cursorError404:
-        "在 model 选择器中选择 Tokfai model ID（如 gemini-3-flash）。完整列表见 Models。",
+        "在 model 选择器中选择 Tokfai model ID（如 auto-fast）。完整列表见 Models。",
       cursorError500:
         "重试请求或切换 model — 上游服务可能短暂不可用。",
       openAiSdkLabel: "OpenAI SDK",
       openAiSdkSteps:
-        "将 baseURL 设为 https://api.tokfai.com/v1，apiKey 设为 sk-tokfai_… 密钥。首次接入默认对话 model 建议使用 gemini-3-flash。",
+        "将 baseURL 设为 https://api.tokfai.com/v1，apiKey 设为 sk-tokfai_… 密钥。首次接入默认对话 model 建议使用 auto-fast。",
       openAiSdkExamplesHint: "完整 JavaScript 与 Python 示例见",
       clientApiKeyHintPrefix: "将 sk-tokfai_xxx 替换为",
       clientApiKeyHintLink: "API Keys",
@@ -3087,7 +3188,7 @@ export const messages = {
       cherryApiHost: "API Host",
       cherryApiKey: "API Key",
       cherryModel: "Model",
-      cherryModelValue: "gemini-3-flash",
+      cherryModelValue: "auto-fast",
       cursorTitle: "Cursor 配置",
       cursorDesc: "将 Tokfai 添加为 OpenAI 兼容的自定义 Provider。",
       cursorStep1: "选择 OpenAI Compatible / Custom Provider。",

@@ -42,17 +42,19 @@ import {
   AVAILABLE_CHAT_MODEL_IDS,
   getChatModelById,
   isAvailableChatModel,
+  PLAYGROUND_CHAT_MODEL_IDS,
 } from "@/lib/model-catalog";
 import { resolvePlaygroundRiskMessage } from "@/lib/playground-risk-errors";
 import {
   isFullTokfaiApiKey,
+  isSmartModelAlias,
   TOKFAI_API_KEY_PLACEHOLDER,
   TOKFAI_CHAT_COMPLETIONS_ENDPOINT,
   TOKFAI_RECOMMENDED_MODEL,
 } from "@/lib/tokfai-api";
 
 const DEFAULT_MODEL = TOKFAI_RECOMMENDED_MODEL;
-const MODEL_OPTIONS = AVAILABLE_CHAT_MODEL_IDS;
+const MODEL_OPTIONS = PLAYGROUND_CHAT_MODEL_IDS;
 const REVEAL_KEY_TIMEOUT_MS = 30_000;
 const PLAYGROUND_TEST_KEY_NAME = "playground-test";
 
@@ -457,16 +459,25 @@ export function PlaygroundClient({
             >
               {MODEL_OPTIONS.map((m) => {
                 const entry = getChatModelById(m);
+                const aliasLabel = isSmartModelAlias(m)
+                  ? t(`dashboard.playground.smartAlias.${m}`)
+                  : null;
                 return (
                   <option key={m} value={m}>
-                    {entry ? `${entry.displayName} (${m})` : m}
+                    {aliasLabel ??
+                      (entry ? `${entry.displayName} (${m})` : m)}
                   </option>
                 );
               })}
             </select>
-            {selectedModelEntry?.description ? (
+            {selectedModelEntry?.description && !isSmartModelAlias(model) ? (
               <p className="text-xs text-muted-foreground">
                 {selectedModelEntry.description}
+              </p>
+            ) : null}
+            {isSmartModelAlias(model) ? (
+              <p className="text-xs text-muted-foreground">
+                {t(`dashboard.playground.smartAliasDesc.${model}`)}
               </p>
             ) : null}
           </div>
@@ -542,6 +553,7 @@ export function PlaygroundClient({
             loading={loading}
             error={error}
             result={result}
+            requestedModelId={model}
             completedAt={completedAt}
             copiedId={copiedId}
             onCopyRequestId={copyText}
@@ -824,6 +836,7 @@ function ResponsePanel({
   loading,
   error,
   result,
+  requestedModelId,
   completedAt,
   copiedId,
   onCopyRequestId,
@@ -832,6 +845,7 @@ function ResponsePanel({
   loading: boolean;
   error: PlaygroundError | null;
   result: ChatCompletionResponse | null;
+  requestedModelId: string;
   completedAt: string | null;
   copiedId: string | null;
   onCopyRequestId: (id: string, value: string) => void;
@@ -878,12 +892,17 @@ function ResponsePanel({
   const requestId =
     result.tokfai?.request_id ?? result.request_id ?? null;
   const creditsCharged = resolveCreditsCharged(result);
+  const resolvedModel = result.tokfai?.resolved_model ?? result.model;
+  const requestedModel = result.tokfai?.requested_model ?? requestedModelId;
 
   return (
     <div className="flex flex-col gap-4">
       <ResultMeta
         status="success"
-        modelId={result.model}
+        modelId={resolvedModel}
+        requestedModel={
+          requestedModel !== resolvedModel ? requestedModel : null
+        }
         requestId={requestId}
         completedAt={completedAt}
         copiedId={copiedId}
@@ -943,6 +962,7 @@ function ResponsePanel({
 function ResultMeta({
   status,
   modelId,
+  requestedModel,
   requestId,
   completedAt,
   copiedId,
@@ -951,6 +971,7 @@ function ResultMeta({
 }: {
   status: "success" | "failed";
   modelId: string | null;
+  requestedModel?: string | null;
   requestId: string | null;
   completedAt: string | null;
   copiedId: string | null;
@@ -984,9 +1005,17 @@ function ResultMeta({
         {modelId ? (
           <div className="flex flex-wrap gap-x-2">
             <dt className="text-muted-foreground">
-              {t("dashboard.playground.modelId")}
+              {t("dashboard.playground.resolvedModel")}
             </dt>
             <dd className="font-mono">{modelId}</dd>
+          </div>
+        ) : null}
+        {requestedModel ? (
+          <div className="flex flex-wrap gap-x-2">
+            <dt className="text-muted-foreground">
+              {t("dashboard.playground.requestedModel")}
+            </dt>
+            <dd className="font-mono">{requestedModel}</dd>
           </div>
         ) : null}
         {requestId ? (

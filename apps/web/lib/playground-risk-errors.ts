@@ -20,6 +20,7 @@ const UPSTREAM_CODES = new Set([
   "upstream_auth_error",
   "upstream_rate_limited",
   "upstream_model_busy",
+  "all_upstreams_unavailable",
   "image_generation_failed",
   "network_error",
 ]);
@@ -106,6 +107,10 @@ export function resolvePlaygroundRiskMessage(
       return t(`${prefix}.upstreamError`);
     }
 
+    if (normalized === "all_upstreams_unavailable") {
+      return t(`${prefix}.allUpstreamsUnavailable`);
+    }
+
     if (normalized === "upstream_model_busy") {
       return t(`${prefix}.upstreamModelBusy`);
     }
@@ -157,6 +162,9 @@ export function playgroundRiskHintKey(
   const normalized = (code ?? "").toLowerCase();
 
   if (kind === "upstream") {
+    if (normalized === "all_upstreams_unavailable") {
+      return "dashboard.playground.errors.allUpstreamsHint";
+    }
     return scope === "imagePlayground"
       ? "dashboard.imagePlayground.errors.billingNotChargedHint"
       : "dashboard.playground.errors.switchModelHint";

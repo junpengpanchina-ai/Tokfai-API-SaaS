@@ -632,6 +632,9 @@ export interface ChatCompletionChoice {
 export interface TokfaiCompletionExtension {
   credits_charged?: number;
   request_id?: string;
+  requested_model?: string;
+  resolved_model?: string;
+  fallback_attempts?: number;
 }
 
 export interface ChatCompletionResponse {

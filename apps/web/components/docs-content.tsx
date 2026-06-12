@@ -601,6 +601,19 @@ export function DocsContent({
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("docs.smartRoutingTitle")}</CardTitle>
+          <CardDescription>{t("docs.smartRoutingDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2 text-sm text-muted-foreground">
+          <p>{t("docs.smartRoutingAutoFast")}</p>
+          <p>{t("docs.smartRoutingAutoPro")}</p>
+          <p>{t("docs.smartRoutingAutoCheap")}</p>
+          <p className="pt-1 text-foreground/90">{t("docs.smartRoutingRealModelNote")}</p>
+        </CardContent>
+      </Card>
+
       <Card id="authentication">
         <CardHeader>
           <CardTitle>{t("docs.sectionAuthentication")}</CardTitle>

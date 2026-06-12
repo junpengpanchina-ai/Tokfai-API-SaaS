@@ -7,7 +7,7 @@
  *
  * Optional env:
  *   TOKFAI_API_BASE   default https://api.tokfai.com/v1
- *   TOKFAI_MODEL      default gemini-3-flash
+ *   TOKFAI_MODEL      default auto-fast
  *   TOTAL_REQUESTS    default 100
  *   CONCURRENCY       default 5
  */
@@ -17,7 +17,7 @@ const BASE = (process.env.TOKFAI_API_BASE ?? "https://api.tokfai.com/v1").replac
   ""
 );
 const API_KEY = process.env.TOKFAI_API_KEY ?? "";
-const MODEL = process.env.TOKFAI_MODEL ?? "gemini-3-flash";
+const MODEL = process.env.TOKFAI_MODEL ?? "auto-fast";
 const TOTAL_REQUESTS = Math.max(
   1,
   parseInt(process.env.TOTAL_REQUESTS ?? "100", 10) || 100

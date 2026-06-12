@@ -66,7 +66,12 @@ const Schema = z
     .int()
     .positive()
     .default(120_000),
-  BOT_MODEL: z.string().min(1).default("gemini-3.1-pro"),
+  GRSAI_CHAT_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(90_000),
+  BOT_MODEL: z.string().min(1).default("auto-fast"),
 
   STRIPE_SECRET_KEY: z.string().min(1).optional(),
   STRIPE_WEBHOOK_SECRET: z.string().min(1),

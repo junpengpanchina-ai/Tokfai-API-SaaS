@@ -31,6 +31,10 @@ const ALLOWED_FIELD_KEYS = new Set([
   "grsaiBaseHost",
   "grsaiChatPath",
   "grsaiApiKeyMask",
+  "requestedModel",
+  "resolvedModel",
+  "attemptModel",
+  "attemptIndex",
 ]);
 
 /**

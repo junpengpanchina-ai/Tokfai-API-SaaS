@@ -166,7 +166,7 @@ export function UsageQuerySection({
               id="usage-model"
               value={model}
               onChange={(event) => setModel(event.target.value)}
-              placeholder="gemini-3-flash"
+              placeholder="auto-fast"
             />
           </div>
 

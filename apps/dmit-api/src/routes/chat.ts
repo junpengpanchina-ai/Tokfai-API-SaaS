@@ -14,7 +14,15 @@ import {
   isModelAllowedForChat,
   priceCreditsFor,
 } from "../catalog/modelCatalog.js";
-import { grsaiFetch } from "../upstream/grsai.js";
+import { grsaiFetch, isChatFallbackEligible } from "../upstream/grsai.js";
+import {
+  resolveModelAttempts,
+} from "../upstream/modelAliases.js";
+import {
+  filterAttemptsByCircuitBreaker,
+  recordModelFailure,
+  recordModelSuccess,
+} from "../upstream/modelCircuitBreaker.js";
 
 const ChatMessageSchema = z
   .object({
@@ -57,7 +65,9 @@ const UPSTREAM_ERROR_CODES = new Set([
   "upstream_rate_limited",
   "upstream_model_busy",
   "model_not_available",
+  "upstream_timeout",
   "upstream_error",
+  "all_upstreams_unavailable",
 ]);
 
 /**
@@ -85,19 +95,19 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     );
   }
 
-  const resolvedModel = parsed.data.model || env.BOT_MODEL;
+  const requestedModel = parsed.data.model || env.BOT_MODEL;
   const stream = parsed.data.stream ?? false;
 
-  if (!(await isModelAllowedForChat(resolvedModel))) {
+  if (!(await isModelAllowedForChat(requestedModel))) {
     await writeUsageLog(
       failedUsageLog({
         user_id: caller.userId,
         api_key_id: caller.apiKeyId,
-        model: resolvedModel,
+        model: requestedModel,
         status: "failed",
         request_id: requestId,
         error_code: "model_not_found",
-        error_message: `The model \`${resolvedModel}\` does not exist.`,
+        error_message: `The model \`${requestedModel}\` does not exist.`,
         latency_ms: Date.now() - startedAt,
       })
     );
@@ -107,11 +117,12 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       route: "/v1/chat/completions",
       status: 404,
       code: "model_not_found",
-      message: `The model \`${resolvedModel}\` does not exist.`,
+      message: `The model \`${requestedModel}\` does not exist.`,
+      requestedModel,
     });
 
     throw ApiError.notFound(
-      `The model \`${resolvedModel}\` does not exist.`,
+      `The model \`${requestedModel}\` does not exist.`,
       "model_not_found"
     );
   }
@@ -121,7 +132,7 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       failedUsageLog({
         user_id: caller.userId,
         api_key_id: caller.apiKeyId,
-        model: resolvedModel,
+        model: requestedModel,
         status: "failed",
         request_id: requestId,
         error_code: "stream_not_supported",
@@ -136,6 +147,7 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       status: 400,
       code: "stream_not_supported",
       message: "Streaming is not supported yet.",
+      requestedModel,
     });
 
     return c.json(
@@ -150,102 +162,171 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     );
   }
 
-  const upstreamBody = {
-    ...parsed.data,
-    model: resolvedModel,
-    stream,
-  };
+  const { isAlias, attempts: rawAttempts } = resolveModelAttempts(requestedModel);
+  const attempts = isAlias
+    ? filterAttemptsByCircuitBreaker(rawAttempts)
+    : rawAttempts;
+
+  if (isAlias && attempts.length === 0) {
+    const err = allUpstreamsUnavailableError();
+    await logChatFailure({
+      caller,
+      requestId,
+      requestedModel,
+      startedAt,
+      err,
+    });
+    throw err;
+  }
 
   try {
     await assertHasCredits(caller.userId);
 
-    const { data, upstreamId } = await grsaiFetch<ChatCompletionResponse>(
-      env.GRSAI_CHAT_COMPLETIONS_PATH,
-      {
-        method: "POST",
-        json: upstreamBody,
-      },
-      {
-        requestId,
-        route: "/v1/chat/completions",
-        model: resolvedModel,
-      }
-    );
+    let lastError: ApiError | null = null;
 
-    const usage = normalizeUsage(data.usage);
-    const billedModel = data.model ?? resolvedModel;
-    const creditsCharged = await calculateCreditsCharged(billedModel, usage);
+    for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
+      const attemptModel = attempts[attemptIndex]!;
+      const attemptStartedAt = Date.now();
 
-    await recordSuccessfulUsageAndDebit({
-      user_id: caller.userId,
-      api_key_id: caller.apiKeyId,
-      model: billedModel,
-      status: "succeeded",
-      prompt_tokens: usage.promptTokens,
-      completion_tokens: usage.completionTokens,
-      total_tokens: usage.totalTokens,
-      credits_charged: creditsCharged,
-      request_id: requestId,
-      upstream_id: upstreamId,
-      error_code: null,
-      error_message: null,
-      latency_ms: Date.now() - startedAt,
-      billable: true,
-      finish_reason: extractFinishReason(data),
-      upstream_status: null,
-      upstream_error_code: null,
-      safety_reason: null,
-    });
+      try {
+        const upstreamBody = {
+          ...parsed.data,
+          model: attemptModel,
+          stream: false,
+        };
 
-    log.info("chat_completion_succeeded", {
-      requestId,
-      route: "/v1/chat/completions",
-      status: 200,
-      code: "succeeded",
-      message: "Chat completion succeeded.",
-    });
+        const { data, upstreamId } = await grsaiFetch<ChatCompletionResponse>(
+          env.GRSAI_CHAT_COMPLETIONS_PATH,
+          {
+            method: "POST",
+            json: upstreamBody,
+          },
+          {
+            requestId,
+            route: "/v1/chat/completions",
+            model: attemptModel,
+            requestedModel,
+          }
+        );
 
-    return c.json({
-      ...data,
-      credits_charged: creditsCharged,
-      request_id: requestId,
-      tokfai: {
-        credits_charged: creditsCharged,
-        request_id: requestId,
-      },
-    });
-  } catch (err) {
-    if (err instanceof ApiError) {
-      await writeUsageLog(
-        failedUsageLog({
+        recordModelSuccess(attemptModel);
+
+        const usage = normalizeUsage(data.usage);
+        const resolvedModel = data.model ?? attemptModel;
+        const creditsCharged = await calculateCreditsCharged(resolvedModel, usage);
+
+        await recordSuccessfulUsageAndDebit({
           user_id: caller.userId,
           api_key_id: caller.apiKeyId,
           model: resolvedModel,
-          status:
-            err.code === "upstream_rate_limited" ||
-            err.code === "upstream_model_busy"
-              ? "rate_limited"
-              : "failed",
+          status: "succeeded",
+          prompt_tokens: usage.promptTokens,
+          completion_tokens: usage.completionTokens,
+          total_tokens: usage.totalTokens,
+          credits_charged: creditsCharged,
           request_id: requestId,
-          error_code: err.code ?? null,
-          error_message: err.publicMessage,
+          upstream_id: upstreamId,
+          error_code: null,
+          error_message: null,
           latency_ms: Date.now() - startedAt,
-          ...upstreamFailureFields(err),
-        })
-      );
+          billable: true,
+          finish_reason: extractFinishReason(data),
+          upstream_status: null,
+          upstream_error_code: null,
+          safety_reason: isAlias ? requestedModel : null,
+        });
 
-      log.warn("chat_completion_failed", {
-        requestId,
-        route: "/v1/chat/completions",
-        model: resolvedModel,
-        status: err.status,
-        code: err.code ?? "failed",
-        message: err.publicMessage,
-        upstreamStatus: err.upstreamStatus,
-        upstreamErrorMessage: err.upstreamErrorSnippet,
-        latencyMs: Date.now() - startedAt,
-      });
+        log.info("chat_completion_succeeded", {
+          requestId,
+          route: "/v1/chat/completions",
+          status: 200,
+          code: "succeeded",
+          message: "Chat completion succeeded.",
+          requestedModel,
+          resolvedModel,
+          attemptModel,
+          attemptIndex,
+          latencyMs: Date.now() - startedAt,
+        });
 
+        return c.json({
+          ...data,
+          model: resolvedModel,
+          credits_charged: creditsCharged,
+          request_id: requestId,
+          tokfai: {
+            credits_charged: creditsCharged,
+            request_id: requestId,
+            requested_model: requestedModel,
+            resolved_model: resolvedModel,
+            ...(isAlias ? { fallback_attempts: attemptIndex + 1 } : {}),
+          },
+        });
+      } catch (err) {
+        if (!(err instanceof ApiError)) {
+          throw err;
+        }
+
+        lastError = err;
+
+        log.warn("chat_model_fallback_attempt", {
+          requestId,
+          route: "/v1/chat/completions",
+          requestedModel,
+          attemptModel,
+          attemptIndex,
+          status: err.status,
+          code: err.code ?? "failed",
+          upstreamStatus: err.upstreamStatus,
+          upstreamErrorMessage: err.upstreamErrorSnippet,
+          latencyMs: Date.now() - attemptStartedAt,
+        });
+
+        if (isAlias && isChatFallbackEligible(err)) {
+          recordModelFailure(attemptModel, err.code);
+        }
+
+        const hasNextAttempt = isAlias && attemptIndex < attempts.length - 1;
+        if (hasNextAttempt && isChatFallbackEligible(err)) {
+          continue;
+        }
+
+        if (isAlias && isChatFallbackEligible(err)) {
+          const exhausted = allUpstreamsUnavailableError();
+          await logChatFailure({
+            caller,
+            requestId,
+            requestedModel,
+            startedAt,
+            err: exhausted,
+            lastAttempt: err,
+          });
+          throw exhausted;
+        }
+
+        await logChatFailure({
+          caller,
+          requestId,
+          requestedModel,
+          startedAt,
+          err,
+        });
+        throw err;
+      }
+    }
+
+    const fallbackErr =
+      lastError ?? allUpstreamsUnavailableError();
+    await logChatFailure({
+      caller,
+      requestId,
+      requestedModel,
+      startedAt,
+      err: fallbackErr,
+    });
+    throw fallbackErr;
+  } catch (err) {
+    if (err instanceof ApiError) {
       throw err;
     }
 
@@ -253,7 +334,7 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       failedUsageLog({
         user_id: caller.userId,
         api_key_id: caller.apiKeyId,
-        model: resolvedModel,
+        model: requestedModel,
         status: "failed",
         request_id: requestId,
         error_code: "server_error",
@@ -268,6 +349,7 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       status: 500,
       code: "server_error",
       message: "Internal error.",
+      requestedModel,
     });
 
     throw ApiError.internal(
@@ -393,8 +475,12 @@ function upstreamFailureFields(
     err.upstreamStatus ??
     (code === "upstream_rate_limited"
       ? 429
+      : code === "upstream_model_busy" || code === "all_upstreams_unavailable"
+        ? 503
       : code === "upstream_auth_error"
         ? 403
+        : code === "upstream_timeout"
+          ? 504
         : 502);
 
   return {
@@ -437,6 +523,58 @@ async function recordSuccessfulUsageAndDebit(
     `Usage billing failed: ${error.message}`,
     "usage_billing_failed"
   );
+}
+
+function allUpstreamsUnavailableError(): ApiError {
+  return new ApiError({
+    status: 503,
+    message: "All fallback upstream models unavailable.",
+    code: "all_upstreams_unavailable",
+    type: "upstream_error",
+    publicMessage: "当前可用模型繁忙，请稍后重试。",
+  });
+}
+
+async function logChatFailure(args: {
+  caller: ReturnType<typeof getChatCaller>;
+  requestId: string;
+  requestedModel: string;
+  startedAt: number;
+  err: ApiError;
+  lastAttempt?: ApiError;
+}): Promise<void> {
+  const { caller, requestId, requestedModel, startedAt, err, lastAttempt } = args;
+
+  await writeUsageLog(
+    failedUsageLog({
+      user_id: caller.userId,
+      api_key_id: caller.apiKeyId,
+      model: requestedModel,
+      status:
+        err.code === "upstream_rate_limited" ||
+        err.code === "upstream_model_busy" ||
+        err.code === "all_upstreams_unavailable"
+          ? "rate_limited"
+          : "failed",
+      request_id: requestId,
+      error_code: err.code ?? null,
+      error_message: err.publicMessage,
+      latency_ms: Date.now() - startedAt,
+      ...upstreamFailureFields(lastAttempt ?? err),
+    })
+  );
+
+  log.warn("chat_completion_failed", {
+    requestId,
+    route: "/v1/chat/completions",
+    requestedModel,
+    status: err.status,
+    code: err.code ?? "failed",
+    message: err.publicMessage,
+    upstreamStatus: (lastAttempt ?? err).upstreamStatus,
+    upstreamErrorMessage: (lastAttempt ?? err).upstreamErrorSnippet,
+    latencyMs: Date.now() - startedAt,
+  });
 }
 
 function insufficientCreditsError(): ApiError {

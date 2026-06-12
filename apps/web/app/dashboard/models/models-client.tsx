@@ -9,6 +9,7 @@ import {
   Terminal,
   BookOpen,
   Info,
+  Route,
 } from "lucide-react";
 
 import { CodeBlock, CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
@@ -35,7 +36,10 @@ import {
   summarizeModelsCatalog,
   type ModelsTableRow,
 } from "@/lib/models-page";
-import { TOKFAI_RECOMMENDED_MODEL } from "@/lib/tokfai-api";
+import {
+  TOKFAI_RECOMMENDED_MODEL,
+  TOKFAI_SMART_MODEL_ALIASES,
+} from "@/lib/tokfai-api";
 
 const CHAT_COMPLETIONS_CURL = `curl https://api.tokfai.com/v1/chat/completions \\
   -H "Authorization: Bearer sk-tokfai_xxx" \\
@@ -111,6 +115,27 @@ export function ModelsClient({
           <p className="font-medium text-foreground/90">
             {t("dashboard.models.salesTip")}
           </p>
+        </CardContent>
+      </Card>
+
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Route className="h-4 w-4 shrink-0" />
+            {t("dashboard.models.smartRoutingTitle")}
+          </CardTitle>
+          <CardDescription>{t("dashboard.models.smartRoutingDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 text-sm">
+          {TOKFAI_SMART_MODEL_ALIASES.map((aliasId) => (
+            <div key={aliasId} className="rounded-md border bg-background/80 px-3 py-2.5">
+              <p className="font-mono text-xs font-medium text-foreground">{aliasId}</p>
+              <p className="mt-1 text-muted-foreground">
+                {t(`dashboard.models.smartRoutingAlias.${aliasId}`)}
+              </p>
+            </div>
+          ))}
+          <p className="text-muted-foreground">{t("dashboard.models.smartRoutingRealModelNote")}</p>
         </CardContent>
       </Card>
 

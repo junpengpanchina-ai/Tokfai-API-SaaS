@@ -11,12 +11,14 @@ const BASE = env.GRSAI_BASE_URL.replace(/\/+$/, "");
 
 export interface UpstreamFetchOptions extends Omit<RequestInit, "body"> {
   json?: unknown;
+  timeoutMs?: number;
 }
 
 export interface GrsaiLogContext {
   requestId?: string;
   route?: string;
   model?: string;
+  requestedModel?: string;
 }
 
 interface ParsedUpstreamError {
@@ -61,15 +63,42 @@ function parseUpstreamErrorBody(bodyText: string): ParsedUpstreamError {
   }
 }
 
+function isTimeoutError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  return err.name === "TimeoutError" || err.name === "AbortError";
+}
+
+/** Whether auto-* aliases may try the next model in the chain. */
+export function isChatFallbackEligible(err: ApiError): boolean {
+  const code = err.code;
+  if (
+    !code ||
+    code === "upstream_auth_error" ||
+    code === "insufficient_credits"
+  ) {
+    return false;
+  }
+  if (code === "upstream_error") {
+    return (err.upstreamStatus ?? 502) >= 500;
+  }
+  return [
+    "upstream_model_busy",
+    "model_not_available",
+    "upstream_timeout",
+    "upstream_rate_limited",
+  ].includes(code);
+}
+
 export async function grsaiFetch<T = unknown>(
   path: string,
   options: UpstreamFetchOptions = {},
   logContext: GrsaiLogContext = {}
 ): Promise<{ data: T; upstreamId: string | null }> {
-  const { json, headers, ...init } = options;
+  const { json, headers, timeoutMs, ...init } = options;
   const upstreamUrl = buildUpstreamUrl(path);
   const { host, path: upstreamPath } = grsaiUpstreamTarget(path);
   const startedAt = Date.now();
+  const effectiveTimeoutMs = timeoutMs ?? env.GRSAI_CHAT_TIMEOUT_MS;
 
   const finalHeaders = new Headers(headers);
   finalHeaders.set("Authorization", `Bearer ${env.GRSAI_API_KEY}`);
@@ -77,11 +106,40 @@ export async function grsaiFetch<T = unknown>(
     finalHeaders.set("Content-Type", "application/json");
   }
 
-  const res = await fetch(upstreamUrl, {
-    ...init,
-    headers: finalHeaders,
-    body: json !== undefined ? JSON.stringify(json) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(upstreamUrl, {
+      ...init,
+      headers: finalHeaders,
+      body: json !== undefined ? JSON.stringify(json) : undefined,
+      signal: AbortSignal.timeout(effectiveTimeoutMs),
+    });
+  } catch (err) {
+    const latencyMs = Date.now() - startedAt;
+    if (isTimeoutError(err)) {
+      log.warn("grsai_upstream_timeout", {
+        requestId: logContext.requestId,
+        route: logContext.route,
+        model: logContext.model,
+        requestedModel: logContext.requestedModel,
+        upstreamHost: host,
+        upstreamPath,
+        upstreamStatus: 504,
+        upstreamErrorCode: "upstream_timeout",
+        latencyMs,
+      });
+      throw new ApiError({
+        status: 504,
+        message: "Upstream provider timed out.",
+        code: "upstream_timeout",
+        type: "upstream_error",
+        publicMessage: "Upstream provider timed out.",
+        upstreamStatus: 504,
+        upstreamErrorSnippet: "timeout",
+      });
+    }
+    throw err;
+  }
 
   const upstreamId =
     res.headers.get("x-request-id") ?? res.headers.get("x-upstream-id");
@@ -98,6 +156,7 @@ export async function grsaiFetch<T = unknown>(
       requestId: logContext.requestId,
       route: logContext.route,
       model: logContext.model,
+      requestedModel: logContext.requestedModel,
       upstreamHost: host,
       upstreamPath,
       upstreamStatus: res.status,
@@ -156,8 +215,7 @@ function mapUpstreamError(
       status: 503,
       code: "upstream_model_busy",
       type: "upstream_error",
-      publicMessage:
-        "当前模型负载较高，请稍后重试或切换推荐模型。",
+      publicMessage: "当前模型负载较高，请稍后重试或切换推荐模型。",
     };
   }
 

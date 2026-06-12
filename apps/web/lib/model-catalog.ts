@@ -595,15 +595,15 @@ export type DashboardUseCaseEntry = {
 export const DASHBOARD_USE_CASES: DashboardUseCaseEntry[] = [
   {
     id: "chat_general",
-    recommendedModelIds: ["gemini-3-flash", "gpt-5.4", "gpt-5.5"],
+    recommendedModelIds: ["auto-fast", "auto-pro", "gemini-3-flash"],
     playground: "chat",
-    defaultModelId: "gemini-3-flash",
+    defaultModelId: "auto-fast",
   },
   {
     id: "fast_low_cost_chat",
-    recommendedModelIds: ["gemini-3-flash", "gemini-3.5-flash"],
+    recommendedModelIds: ["auto-cheap", "gemini-3-flash", "gemini-3.5-flash"],
     playground: "chat",
-    defaultModelId: "gemini-3-flash",
+    defaultModelId: "auto-cheap",
   },
   {
     id: "text_to_image",
@@ -677,8 +677,15 @@ export const AVAILABLE_CHAT_MODEL_IDS = CHAT_MODELS.filter(
   (model) => model.status === "available"
 ).map((model) => model.id);
 
+export const PLAYGROUND_CHAT_MODEL_IDS = [
+  "auto-fast",
+  "auto-pro",
+  "auto-cheap",
+  ...AVAILABLE_CHAT_MODEL_IDS,
+] as const;
+
 export function isAvailableChatModel(modelId: string): boolean {
-  return AVAILABLE_CHAT_MODEL_IDS.includes(modelId);
+  return (PLAYGROUND_CHAT_MODEL_IDS as readonly string[]).includes(modelId);
 }
 
 export function isAvailableImageModel(modelId: string): boolean {

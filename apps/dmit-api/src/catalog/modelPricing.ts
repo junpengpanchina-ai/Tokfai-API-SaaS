@@ -1,6 +1,7 @@
 import { log } from "../logger.js";
 import { supabase } from "../supabase.js";
 import { getModelConfig } from "../upstream/modelCatalog.js";
+import { isModelAlias, listAliasModelsForCatalog } from "../upstream/modelAliases.js";
 import { priceFor } from "../upstream/pricing.js";
 
 export type ModelBillingType = "chat" | "image";
@@ -300,6 +301,8 @@ export async function priceCreditsForImage(model: string): Promise<number> {
 }
 
 export async function isModelAllowedForChat(model: string): Promise<boolean> {
+  if (isModelAlias(model)) return true;
+
   const fromDb = await isModelAllowedFromDb(model, "chat");
   if (fromDb !== null) return fromDb;
 
@@ -391,17 +394,23 @@ const DEFAULT_OWNED_BY = "tokfai";
 
 /** Visible catalog for GET /v1/models — DB first, then pricing.ts fallback. */
 export async function listCatalogModels(): Promise<OpenAiModelListItem[]> {
+  const aliases = listAliasModelsForCatalog();
   const fromDb = await listCatalogModelsFromDb();
-  if (fromDb !== null) return fromDb;
+  const base =
+    fromDb ??
+    (await (async () => {
+      const { listAllowedModels } = await import("../upstream/pricing.js");
+      const now = Math.floor(Date.now() / 1000);
+      return listAllowedModels().map((id) => ({
+        id,
+        object: "model" as const,
+        created: now,
+        owned_by: DEFAULT_OWNED_BY,
+      }));
+    })());
 
-  const { listAllowedModels } = await import("../upstream/pricing.js");
-  const now = Math.floor(Date.now() / 1000);
-  return listAllowedModels().map((id) => ({
-    id,
-    object: "model" as const,
-    created: now,
-    owned_by: DEFAULT_OWNED_BY,
-  }));
+  const aliasIds = new Set(aliases.map((row) => row.id));
+  return [...aliases, ...base.filter((row) => !aliasIds.has(row.id))];
 }
 
 async function listCatalogModelsFromDb(): Promise<OpenAiModelListItem[] | null> {
