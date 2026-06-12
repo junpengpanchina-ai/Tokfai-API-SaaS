@@ -23,6 +23,8 @@ import {
   TOKFAI_API_KEY_PLACEHOLDER,
   TOKFAI_BILLING_POLICY,
   TOKFAI_CHAT_COMPLETIONS_ENDPOINT,
+  TOKFAI_CLIENT_TEST_PROMPT,
+  TOKFAI_HEALTH_URL,
   TOKFAI_IMAGES_GENERATIONS_FULL_PATH,
   TOKFAI_MODELS_ENDPOINT,
   TOKFAI_PLAYGROUND_POLICY,
@@ -39,6 +41,8 @@ const AUTH_HEADER = `Authorization: Bearer ${API_KEY_PLACEHOLDER}`;
 
 const MODELS_CURL = `curl https://api.tokfai.com/v1/models \\
   -H "Authorization: Bearer sk-tokfai_xxx"`;
+
+const HEALTH_CURL = `curl https://api.tokfai.com/v1/health`;
 
 const CHAT_COMPLETIONS_CURL = `curl https://api.tokfai.com/v1/chat/completions \\
   -H "Authorization: Bearer sk-tokfai_xxx" \\
@@ -84,7 +88,9 @@ const client = new OpenAI({
 const completion = await client.chat.completions.create({
   model: "${DEFAULT_MODEL}",
   messages: [{ role: "user", content: "Hello from Tokfai" }],
-});`;
+});
+
+console.log(completion.choices[0]?.message?.content);`;
 
 const OPENAI_PYTHON_EXAMPLE = `from openai import OpenAI
 
@@ -96,7 +102,9 @@ client = OpenAI(
 completion = client.chat.completions.create(
     model="${DEFAULT_MODEL}",
     messages=[{"role": "user", "content": "Hello from Tokfai"}],
-)`;
+)
+
+print(completion.choices[0].message.content)`;
 
 const OPENAI_JS_IMAGE_EXAMPLE = `import OpenAI from "openai";
 
@@ -126,7 +134,8 @@ image = client.images.generate(
 
 const COMPAT_CLIENT_CONFIG = `Base URL: https://api.tokfai.com/v1
 API Key: sk-tokfai_xxx
-Model: ${DEFAULT_MODEL}`;
+Model: ${DEFAULT_MODEL}
+Test prompt: ${TOKFAI_CLIENT_TEST_PROMPT}`;
 
 const SETUP_FLOW_STEP_KEYS = [
   "docs.setupStep1",
@@ -194,6 +203,11 @@ const CLIENT_CONFIG_ROWS = [
   { id: "base-url", labelKey: "docs.baseUrlTitle", value: BASE_URL },
   { id: "api-key", labelKey: "docs.clientIntegrationApiKeyLabel", value: API_KEY_PLACEHOLDER },
   { id: "model-id", labelKey: "docs.clientIntegrationModelLabel", value: DEFAULT_MODEL },
+  {
+    id: "test-prompt",
+    labelKey: "docs.clientIntegrationTestPromptLabel",
+    value: TOKFAI_CLIENT_TEST_PROMPT,
+  },
 ] as const;
 
 type ErrorRow = {
@@ -403,6 +417,54 @@ export function DocsContent({
         </CardContent>
       </Card>
 
+      <Card id="external-verification">
+        <CardHeader>
+          <CardTitle>{t("docs.externalVerificationTitle")}</CardTitle>
+          <CardDescription>{t("docs.externalVerificationDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <p className="text-sm text-muted-foreground">
+            {t("docs.externalVerificationHint")}
+          </p>
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">{t("docs.externalVerifyHealthTitle")}</h3>
+            <CodeBlock
+              id="health-curl"
+              label="curl"
+              code={HEALTH_CURL}
+              copied={copiedId === "health-curl"}
+              onCopy={copyText}
+              copyLabel={t("docs.copy")}
+              copiedLabel={t("docs.copied")}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">{t("docs.externalVerifyModelsTitle")}</h3>
+            <CodeBlock
+              id="external-models-curl"
+              label="curl"
+              code={MODELS_CURL}
+              copied={copiedId === "external-models-curl"}
+              onCopy={copyText}
+              copyLabel={t("docs.copy")}
+              copiedLabel={t("docs.copied")}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">{t("docs.externalVerifyChatTitle")}</h3>
+            <CodeBlock
+              id="external-chat-curl"
+              label="curl"
+              code={CHAT_COMPLETIONS_CURL}
+              copied={copiedId === "external-chat-curl"}
+              onCopy={copyText}
+              copyLabel={t("docs.copy")}
+              copiedLabel={t("docs.copied")}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">{t("docs.sectionNavTitle")}</CardTitle>
@@ -412,6 +474,10 @@ export function DocsContent({
             <DocsSectionLink
               href="#three-minute-setup"
               label={t("docs.threeMinuteSetupTitle")}
+            />
+            <DocsSectionLink
+              href="#external-verification"
+              label={t("docs.externalVerificationTitle")}
             />
             <DocsSectionLink href="#authentication" label={t("docs.sectionAuthentication")} />
             <DocsSectionLink href="#chat-completions" label={t("docs.sectionChatCompletions")} />

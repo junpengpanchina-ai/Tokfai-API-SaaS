@@ -892,24 +892,31 @@ function ResponsePanel({
       />
 
       <div className="flex flex-col gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
-        <div className="flex items-start gap-2">
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-          <p className="text-muted-foreground">
-            {t("dashboard.playground.successBalanceHint")}{" "}
-            <Link
-              href="/dashboard/usage"
-              className="underline underline-offset-4"
-            >
-              {t("dashboard.playground.viewUsage")}
-            </Link>{" "}
-            /{" "}
-            <Link
-              href="/dashboard/credits"
-              className="underline underline-offset-4"
-            >
-              {t("dashboard.playground.viewCredits")}
-            </Link>
-          </p>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+            <p className="text-muted-foreground">
+              {t("dashboard.playground.successBalanceHint")}{" "}
+              <Link
+                href="/dashboard/usage"
+                className="underline underline-offset-4"
+              >
+                {t("dashboard.playground.viewUsage")}
+              </Link>{" "}
+              /{" "}
+              <Link
+                href="/dashboard/credits"
+                className="underline underline-offset-4"
+              >
+                {t("dashboard.playground.viewCredits")}
+              </Link>
+            </p>
+          </div>
+          {requestId ? (
+            <p className="pl-6 text-muted-foreground">
+              {t("dashboard.playground.successReconcileHint")}
+            </p>
+          ) : null}
         </div>
       </div>
 

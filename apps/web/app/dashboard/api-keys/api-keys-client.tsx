@@ -371,6 +371,9 @@ function OneTimeSecretCard({
         <CardDescription className="text-sm text-emerald-900/90 dark:text-emerald-100/90">
           {t("dashboard.apiKeys.oneTimeSecretDesc")}
         </CardDescription>
+        <p className="text-sm text-emerald-900/80 dark:text-emerald-100/80">
+          {t("dashboard.apiKeys.nextStepsHint")}
+        </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">

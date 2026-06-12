@@ -550,6 +550,8 @@ export const messages = {
         apiKeyCreatedNamed: "API key created: {name}",
         oneTimeSecretDesc:
           "Copy and store this key now — it is shown only once at creation.",
+        nextStepsHint:
+          "Next: paste this key into curl, Cursor, Cherry Studio, or the OpenAI SDK — or test in Chat / Image Playground and read the API docs.",
         yourApiKey: "Your API key",
         authorizationHeader: "Authorization header",
         copyFullKey: "Copy full key",
@@ -677,6 +679,8 @@ export const messages = {
         viewModels: "View models",
         viewDocs: "View docs",
         successBalanceHint: "Recorded in",
+        successReconcileHint:
+          "Copy request_id above to match this call in Usage / Credits.",
         viewUsage: "View Usage",
         viewCredits: "View Credits",
         errors: {
@@ -1214,6 +1218,15 @@ export const messages = {
       clientIntegrationFixColumn: "What to check",
       clientIntegrationApiKeyLabel: "API Key",
       clientIntegrationModelLabel: "Model",
+      clientIntegrationTestPromptLabel: "Test prompt",
+      externalVerificationTitle: "External verification (curl)",
+      externalVerificationDesc:
+        "Run these three commands from your terminal after replacing sk-tokfai_xxx with your API key.",
+      externalVerificationHint:
+        "Order: health (no key) → models (auth) → chat completion (auth + credits). All use Base URL https://api.tokfai.com/v1.",
+      externalVerifyHealthTitle: "1. Health check (no API key)",
+      externalVerifyModelsTitle: "2. List models",
+      externalVerifyChatTitle: "3. Chat completion (model gpt-5.4)",
       cherryStudioLabel: "Cherry Studio",
       cherryStudioSteps:
         "Settings → Provider → OpenAI-compatible. Set API Host, API Key, and default model as below.",
@@ -2317,6 +2330,8 @@ export const messages = {
         apiKeyCreated: "API 密钥已创建",
         apiKeyCreatedNamed: "API 密钥已创建：{name}",
         oneTimeSecretDesc: "请立即复制并妥善保存——完整密钥仅在创建时展示一次。",
+        nextStepsHint:
+          "下一步：将密钥粘贴到 curl、Cursor、Cherry Studio 或 OpenAI SDK，或在 Chat / Image Playground 测试并阅读 API 文档。",
         yourApiKey: "你的 API 密钥",
         authorizationHeader: "Authorization header",
         copyFullKey: "复制完整密钥",
@@ -2439,6 +2454,8 @@ export const messages = {
         viewModels: "查看模型",
         viewDocs: "查看文档",
         successBalanceHint: "已记录至",
+        successReconcileHint:
+          "可复制上方 request_id，在 Usage / Credits 中对账本次调用。",
         viewUsage: "查看 Usage",
         viewCredits: "查看 Credits",
         errors: {
@@ -2944,7 +2961,16 @@ export const messages = {
       clientIntegrationErrorsTitle: "常见错误",
       clientIntegrationFixColumn: "排查建议",
       clientIntegrationApiKeyLabel: "API Key",
-      clientIntegrationModelLabel: "Model",
+      clientIntegrationModelLabel: "Model ID",
+      clientIntegrationTestPromptLabel: "测试 prompt",
+      externalVerificationTitle: "外部验收命令（curl）",
+      externalVerificationDesc:
+        "在终端运行以下三条命令，将 sk-tokfai_xxx 替换为你的 API Key。",
+      externalVerificationHint:
+        "顺序：health（无需 key）→ models（需鉴权）→ chat completion（需鉴权 + credits）。Base URL 均为 https://api.tokfai.com/v1。",
+      externalVerifyHealthTitle: "1. 健康检查（无需 API Key）",
+      externalVerifyModelsTitle: "2. 列出 models",
+      externalVerifyChatTitle: "3. Chat completion（model gpt-5.4）",
       cherryStudioLabel: "Cherry Studio",
       cherryStudioSteps:
         "Settings → Provider → OpenAI-compatible。按下方表格填写 API Host、API Key 与默认 model。",
