@@ -157,7 +157,7 @@ function mapUpstreamError(
       code: "upstream_model_busy",
       type: "upstream_error",
       publicMessage:
-        "当前模型负载较高，请稍后重试或切换其他模型。",
+        "当前模型负载较高，请稍后重试或切换推荐模型。",
     };
   }
 

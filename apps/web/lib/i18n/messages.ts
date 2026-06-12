@@ -551,7 +551,7 @@ export const messages = {
         oneTimeSecretDesc:
           "Copy and store this key now — it is shown only once at creation.",
         nextStepsHint:
-          "Next: paste this key into curl, Cursor, Cherry Studio, or the OpenAI SDK — or test in Chat / Image Playground and read the API docs.",
+          "Next: test with gemini-3-flash in Chat Playground, then follow Docs to connect Cursor, Cherry Studio, or the OpenAI SDK.",
         yourApiKey: "Your API key",
         authorizationHeader: "Authorization header",
         copyFullKey: "Copy full key",
@@ -699,7 +699,7 @@ export const messages = {
           upstreamTimeout:
             "The selected model is temporarily unavailable or under high load.",
           upstreamModelBusy:
-            "This model is under high load. Retry shortly or switch to a recommended model.",
+            "This model is under high load. Retry shortly or switch to gemini-3-flash.",
           modelNotAvailable:
             "This model is not available for API calls. Switch to a recommended model.",
           switchModelHint:
@@ -1093,7 +1093,7 @@ export const messages = {
         "gpt-5.5":
           "High-quality model — may be unavailable when upstream load is high.",
         "gpt-4o-mini":
-          "Not registered upstream — do not use for customer integration examples.",
+          "May be unavailable depending on upstream registration — not recommended for integration examples.",
         "gemini-3.1-pro":
           "May be unavailable during high load. For testing, try gemini-3-flash first.",
         "gemini-3-pro":
@@ -2342,7 +2342,7 @@ export const messages = {
         apiKeyCreatedNamed: "API 密钥已创建：{name}",
         oneTimeSecretDesc: "请立即复制并妥善保存——完整密钥仅在创建时展示一次。",
         nextStepsHint:
-          "下一步：将密钥粘贴到 curl、Cursor、Cherry Studio 或 OpenAI SDK，或在 Chat / Image Playground 测试并阅读 API 文档。",
+          "下一步：先用 gemini-3-flash 在 Chat Playground 测试，再按 Docs 接入 Cursor、Cherry Studio 或 OpenAI SDK。",
         yourApiKey: "你的 API 密钥",
         authorizationHeader: "Authorization header",
         copyFullKey: "复制完整密钥",
@@ -2479,7 +2479,7 @@ export const messages = {
           upstreamError: "当前模型暂时不可用或负载较高。",
           upstreamTimeout: "当前模型暂时不可用或负载较高。",
           upstreamModelBusy:
-            "当前模型负载较高，请稍后重试或切换推荐模型。",
+            "当前模型负载较高，请稍后重试或切换 gemini-3-flash。",
           modelNotAvailable:
             "当前模型暂不可用，请切换推荐模型。",
           switchModelHint:
@@ -2849,7 +2849,7 @@ export const messages = {
         "gemini-3-flash": "推荐测试模型 / 更适合首次接入验收与 Playground。",
         "gpt-5.4": "高质量模型，上游高负载时可能暂时不可用。",
         "gpt-5.5": "高质量模型，上游高负载时可能暂时不可用。",
-        "gpt-4o-mini": "上游未注册，请勿作为客户接入示例模型。",
+        "gpt-4o-mini": "可能不可用，视上游注册状态，请勿作为接入示例。",
         "gemini-3.1-pro":
           "高负载时可能暂时不可用，测试阶段建议优先使用 gemini-3-flash。",
         "gemini-3-pro":
