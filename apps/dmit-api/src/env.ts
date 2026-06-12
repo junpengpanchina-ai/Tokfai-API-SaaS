@@ -71,6 +71,37 @@ const Schema = z
     .int()
     .positive()
     .default(90_000),
+  TOKFAI_UPSTREAM_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(90_000),
+  TOKFAI_TOTAL_REQUEST_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(120_000),
+  TOKFAI_CHAT_BODY_MAX_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(1_048_576),
+  TOKFAI_RATE_LIMIT_RPM: z.coerce.number().int().positive().default(60),
+  TOKFAI_RATE_LIMIT_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(60_000),
+  TOKFAI_MAX_CONCURRENCY_PER_KEY: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(5),
+  TOKFAI_GLOBAL_UPSTREAM_CONCURRENCY: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(50),
   BOT_MODEL: z.string().min(1).default("auto-fast"),
 
   STRIPE_SECRET_KEY: z.string().min(1).optional(),

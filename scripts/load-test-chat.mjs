@@ -1,16 +1,21 @@
 #!/usr/bin/env node
 /**
- * Tokfai chat completions load smoke test (P759).
+ * Tokfai chat completions load smoke test (P759 / P761).
  *
  * Usage:
  *   TOKFAI_API_KEY=sk-tokfai_... node scripts/load-test-chat.mjs
  *
  * Optional env:
- *   TOKFAI_API_BASE   default https://api.tokfai.com/v1
- *   TOKFAI_MODEL      default auto-fast
- *   TOTAL_REQUESTS    default 100
- *   CONCURRENCY       default 5
+ *   TOKFAI_API_BASE        default https://api.tokfai.com/v1
+ *   TOKFAI_MODEL           default auto-fast
+ *   TOTAL_REQUESTS         default 100
+ *   CONCURRENCY            default 5
+ *   STOP_ON_ERROR_RATE     default 1 (disabled); e.g. 0.2 stops when errors > 20%
  */
+
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const BASE = (process.env.TOKFAI_API_BASE ?? "https://api.tokfai.com/v1").replace(
   /\/+$/,
@@ -26,9 +31,29 @@ const CONCURRENCY = Math.max(
   1,
   parseInt(process.env.CONCURRENCY ?? "5", 10) || 5
 );
+const STOP_ON_ERROR_RATE = Math.min(
+  1,
+  Math.max(0, parseFloat(process.env.STOP_ON_ERROR_RATE ?? "1") || 1)
+);
 
 const PROMPT = "Say ok only.";
 const ENDPOINT = `${BASE}/chat/completions`;
+const RESULTS_DIR = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "load-test-results"
+);
+const RESULTS_FILE = join(RESULTS_DIR, "latest.json");
+
+const GATEWAY_ERROR_CODES = [
+  "too_many_requests",
+  "too_many_concurrent_requests",
+  "gateway_overloaded",
+  "upstream_timeout",
+  "upstream_model_busy",
+  "all_upstreams_unavailable",
+  "upstream_error",
+];
 
 function maskKey(key) {
   if (!key || key.length <= 12) return "(not set)";
@@ -72,6 +97,7 @@ async function runOne(index) {
       body?.tokfai?.request_id ??
       res.headers.get("x-request-id") ??
       null;
+    const resolvedModel = body?.model ?? body?.tokfai?.resolved_model ?? null;
     const credits =
       typeof body?.credits_charged === "number"
         ? body.credits_charged
@@ -86,7 +112,9 @@ async function runOne(index) {
       errorCode,
       latencyMs,
       requestId,
+      resolvedModel,
       creditsCharged: res.ok ? credits : 0,
+      rateLimitRemaining: res.headers.get("x-ratelimit-remaining"),
     };
   } catch (err) {
     return {
@@ -96,22 +124,29 @@ async function runOne(index) {
       errorCode: "network_error",
       latencyMs: performance.now() - started,
       requestId: null,
+      resolvedModel: null,
       creditsCharged: 0,
       networkMessage: err instanceof Error ? err.message : String(err),
     };
   }
 }
 
-async function runPool(total, concurrency, worker) {
-  const results = new Array(total);
+async function runPool(total, concurrency, worker, shouldStop) {
+  const results = [];
   let next = 0;
+  let stoppedEarly = false;
 
   async function workerLoop() {
     while (true) {
+      if (shouldStop()) {
+        stoppedEarly = true;
+        return;
+      }
       const i = next;
       next += 1;
       if (i >= total) return;
-      results[i] = await worker(i);
+      const result = await worker(i);
+      results.push(result);
     }
   }
 
@@ -120,21 +155,27 @@ async function runPool(total, concurrency, worker) {
     () => workerLoop()
   );
   await Promise.all(workers);
-  return results;
+  return { results, stoppedEarly };
 }
 
-function printReport(results, wallMs) {
+function buildSummary(results, wallMs, stoppedEarly) {
   const statusCounts = {};
   const errorCounts = {};
+  const gatewayCounts = Object.fromEntries(
+    GATEWAY_ERROR_CODES.map((code) => [code, 0])
+  );
   const latencies = [];
   let success = 0;
   let failed = 0;
   let totalCredits = 0;
+  let http429 = 0;
   const requestIdSamples = [];
 
   for (const r of results) {
     const statusKey = r.status === 0 ? "network" : String(r.status);
     statusCounts[statusKey] = (statusCounts[statusKey] ?? 0) + 1;
+
+    if (r.status === 429) http429 += 1;
 
     if (r.ok) {
       success += 1;
@@ -143,6 +184,9 @@ function printReport(results, wallMs) {
       failed += 1;
       const code = r.errorCode ?? `http_${r.status}`;
       errorCounts[code] = (errorCounts[code] ?? 0) + 1;
+      if (code in gatewayCounts) {
+        gatewayCounts[code] += 1;
+      }
     }
 
     latencies.push(r.latencyMs);
@@ -153,43 +197,88 @@ function printReport(results, wallMs) {
   }
 
   latencies.sort((a, b) => a - b);
-  const rps = wallMs > 0 ? (results.length / wallMs) * 1000 : 0;
+  const completed = results.length;
+  const errorRate = completed > 0 ? failed / completed : 0;
+  const rps = wallMs > 0 ? (completed / wallMs) * 1000 : 0;
 
+  return {
+    endpoint: ENDPOINT,
+    model: MODEL,
+    apiKeyMask: maskKey(API_KEY),
+    totalPlanned: TOTAL_REQUESTS,
+    totalCompleted: completed,
+    concurrency: CONCURRENCY,
+    stopOnErrorRate: STOP_ON_ERROR_RATE,
+    stoppedEarly,
+    success,
+    failed,
+    successRate: completed > 0 ? success / completed : 0,
+    errorRate,
+    http429,
+    wallTimeMs: Math.round(wallMs),
+    rps,
+    latencyMs: {
+      p50: Math.round(percentile(latencies, 50)),
+      p95: Math.round(percentile(latencies, 95)),
+      max: Math.round(latencies.at(-1) ?? 0),
+    },
+    creditsSum: totalCredits,
+    statusCounts,
+    errorCounts,
+    gatewayErrorCounts: gatewayCounts,
+    requestIdSamples,
+    finishedAt: new Date().toISOString(),
+  };
+}
+
+function printReport(summary) {
   console.log("");
   console.log("=== Tokfai chat load test summary ===");
-  console.log(`endpoint:     ${ENDPOINT}`);
-  console.log(`model:        ${MODEL}`);
-  console.log(`api_key:      ${maskKey(API_KEY)}`);
-  console.log(`total:        ${results.length}`);
-  console.log(`concurrency:  ${CONCURRENCY}`);
-  console.log(`success:      ${success}`);
-  console.log(`failed:       ${failed}`);
-  console.log(`success_rate: ${((success / results.length) * 100).toFixed(2)}%`);
-  console.log(`wall_time_ms: ${Math.round(wallMs)}`);
-  console.log(`rps:          ${rps.toFixed(2)}`);
-  console.log(`latency_p50:  ${percentile(latencies, 50).toFixed(0)} ms`);
-  console.log(`latency_p95:  ${percentile(latencies, 95).toFixed(0)} ms`);
-  console.log(`latency_max:  ${(latencies.at(-1) ?? 0).toFixed(0)} ms`);
-  console.log(`credits_sum:  ${totalCredits.toFixed(6)}`);
+  console.log(`endpoint:     ${summary.endpoint}`);
+  console.log(`model:        ${summary.model}`);
+  console.log(`api_key:      ${summary.apiKeyMask}`);
+  console.log(`planned:      ${summary.totalPlanned}`);
+  console.log(`completed:    ${summary.totalCompleted}`);
+  console.log(`concurrency:  ${summary.concurrency}`);
+  if (summary.stoppedEarly) {
+    console.log(`stopped:      early (error rate > ${summary.stopOnErrorRate * 100}%)`);
+  }
+  console.log(`success:      ${summary.success}`);
+  console.log(`failed:       ${summary.failed}`);
+  console.log(`success_rate: ${(summary.successRate * 100).toFixed(2)}%`);
+  console.log(`http_429:     ${summary.http429}`);
+  console.log(`wall_time_ms: ${summary.wallTimeMs}`);
+  console.log(`rps:          ${summary.rps.toFixed(2)}`);
+  console.log(`latency_p50:  ${summary.latencyMs.p50} ms`);
+  console.log(`latency_p95:  ${summary.latencyMs.p95} ms`);
+  console.log(`latency_max:  ${summary.latencyMs.max} ms`);
+  console.log(`credits_sum:  ${summary.creditsSum.toFixed(6)}`);
+  console.log("");
+  console.log("Gateway / upstream error codes:");
+  for (const [k, v] of Object.entries(summary.gatewayErrorCounts)) {
+    if (v > 0) console.log(`  ${k}: ${v}`);
+  }
   console.log("");
   console.log("HTTP status distribution:");
-  for (const [k, v] of Object.entries(statusCounts).sort()) {
+  for (const [k, v] of Object.entries(summary.statusCounts).sort()) {
     console.log(`  ${k}: ${v}`);
   }
   console.log("");
   console.log("Error code distribution (failed only):");
-  if (Object.keys(errorCounts).length === 0) {
+  if (Object.keys(summary.errorCounts).length === 0) {
     console.log("  (none)");
   } else {
-    for (const [k, v] of Object.entries(errorCounts).sort()) {
+    for (const [k, v] of Object.entries(summary.errorCounts).sort()) {
       console.log(`  ${k}: ${v}`);
     }
   }
   console.log("");
   console.log("request_id samples:");
-  for (const id of requestIdSamples) {
+  for (const id of summary.requestIdSamples) {
     console.log(`  ${id}`);
   }
+  console.log("");
+  console.log(`JSON summary: ${RESULTS_FILE}`);
   console.log("");
 }
 
@@ -202,14 +291,30 @@ async function main() {
   }
 
   console.log(
-    `Starting load test: ${TOTAL_REQUESTS} requests, concurrency ${CONCURRENCY}`
+    `Starting load test: ${TOTAL_REQUESTS} requests, concurrency ${CONCURRENCY}, model ${MODEL}`
   );
+  if (STOP_ON_ERROR_RATE < 1) {
+    console.log(`Early stop enabled when error rate > ${STOP_ON_ERROR_RATE * 100}%`);
+  }
 
   const wallStart = performance.now();
-  const results = await runPool(TOTAL_REQUESTS, CONCURRENCY, runOne);
+  const { results, stoppedEarly } = await runPool(
+    TOTAL_REQUESTS,
+    CONCURRENCY,
+    runOne,
+    () => {
+      if (STOP_ON_ERROR_RATE >= 1 || results.length < 5) return false;
+      const failed = results.filter((r) => !r.ok).length;
+      return failed / results.length > STOP_ON_ERROR_RATE;
+    }
+  );
   const wallMs = performance.now() - wallStart;
 
-  printReport(results, wallMs);
+  const summary = buildSummary(results, wallMs, stoppedEarly);
+  printReport(summary);
+
+  await mkdir(RESULTS_DIR, { recursive: true });
+  await writeFile(RESULTS_FILE, `${JSON.stringify(summary, null, 2)}\n`, "utf8");
 }
 
 main().catch((err) => {

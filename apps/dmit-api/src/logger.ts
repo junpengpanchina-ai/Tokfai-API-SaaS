@@ -35,6 +35,10 @@ const ALLOWED_FIELD_KEYS = new Set([
   "resolvedModel",
   "attemptModel",
   "attemptIndex",
+  "apiKeyId",
+  "limitKey",
+  "keyInflight",
+  "globalInflight",
 ]);
 
 /**

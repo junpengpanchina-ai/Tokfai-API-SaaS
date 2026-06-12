@@ -8,6 +8,7 @@ import {
   getChatCaller,
   requireApiKeyOrSupabaseJwt,
 } from "../middleware/chatAuth.js";
+import { chatGatewayMiddleware } from "../middleware/chatGateway.js";
 import { supabase } from "../supabase.js";
 import type { UsageLogInsert } from "../types.js";
 import {
@@ -23,6 +24,17 @@ import {
   recordModelFailure,
   recordModelSuccess,
 } from "../upstream/modelCircuitBreaker.js";
+import {
+  gatewayLimitKey,
+  getGlobalUpstreamInflight,
+  getKeyInflight,
+  releaseGlobalUpstream,
+  tryAcquireGlobalUpstream,
+} from "../gateway/concurrency.js";
+import {
+  logGatewayOverloaded,
+  logGatewayRejection,
+} from "./chatGatewayLogs.js";
 
 const ChatMessageSchema = z
   .object({
@@ -68,6 +80,7 @@ const UPSTREAM_ERROR_CODES = new Set([
   "upstream_timeout",
   "upstream_error",
   "all_upstreams_unavailable",
+  "gateway_overloaded",
 ]);
 
 /**
@@ -80,13 +93,30 @@ const UPSTREAM_ERROR_CODES = new Set([
 export const chatRoutes = new Hono();
 
 chatRoutes.use("/v1/chat/completions", requireApiKeyOrSupabaseJwt);
+chatRoutes.use("/v1/chat/completions", chatGatewayMiddleware);
 
 chatRoutes.post("/v1/chat/completions", async (c) => {
   const startedAt = Date.now();
   const caller = getChatCaller(c);
   const requestId = c.get("requestId" as never) as string;
+  const limitKey = gatewayLimitKey(caller.apiKeyId, caller.userId);
 
-  const body = await readJsonBody(c.req.json());
+  let body: unknown;
+  try {
+    body = await readJsonBodyWithLimit(c);
+  } catch (err) {
+    if (err instanceof ApiError && err.code === "request_body_too_large") {
+      await logGatewayRejection({
+        caller,
+        requestId,
+        err,
+        limitKey,
+        keyInflight: getKeyInflight(limitKey),
+        globalInflight: getGlobalUpstreamInflight(),
+      });
+    }
+    throw err;
+  }
   const parsed = ChatCompletionRequestSchema.safeParse(body);
   if (!parsed.success) {
     throw ApiError.badRequest(
@@ -188,6 +218,46 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       const attemptModel = attempts[attemptIndex]!;
       const attemptStartedAt = Date.now();
 
+      const remainingTotalMs = env.TOKFAI_TOTAL_REQUEST_TIMEOUT_MS - (Date.now() - startedAt);
+      if (remainingTotalMs <= 0) {
+        const timeoutErr = ApiError.requestTimeout();
+        if (isAlias && attemptIndex > 0) {
+          const exhausted = allUpstreamsUnavailableError();
+          await logChatFailure({
+            caller,
+            requestId,
+            requestedModel,
+            startedAt,
+            err: exhausted,
+            lastAttempt: timeoutErr,
+          });
+          throw exhausted;
+        }
+        await logChatFailure({
+          caller,
+          requestId,
+          requestedModel,
+          startedAt,
+          err: timeoutErr,
+        });
+        throw timeoutErr;
+      }
+
+      if (!tryAcquireGlobalUpstream()) {
+        const err = ApiError.gatewayOverloaded();
+        await logGatewayOverloaded({
+          caller,
+          requestId,
+          err,
+          limitKey,
+          keyInflight: getKeyInflight(limitKey),
+          globalInflight: getGlobalUpstreamInflight(),
+          requestedModel,
+          startedAt,
+        });
+        throw err;
+      }
+
       try {
         const upstreamBody = {
           ...parsed.data,
@@ -195,11 +265,17 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
           stream: false,
         };
 
+        const perAttemptTimeoutMs = Math.min(
+          env.TOKFAI_UPSTREAM_TIMEOUT_MS,
+          remainingTotalMs
+        );
+
         const { data, upstreamId } = await grsaiFetch<ChatCompletionResponse>(
           env.GRSAI_CHAT_COMPLETIONS_PATH,
           {
             method: "POST",
             json: upstreamBody,
+            timeoutMs: perAttemptTimeoutMs,
           },
           {
             requestId,
@@ -312,6 +388,8 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
           err,
         });
         throw err;
+      } finally {
+        releaseGlobalUpstream();
       }
     }
 
@@ -359,9 +437,26 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
   }
 });
 
-async function readJsonBody(bodyPromise: Promise<unknown>): Promise<unknown> {
+async function readJsonBodyWithLimit(c: {
+  req: {
+    text: () => Promise<string>;
+    header: (name: string) => string | undefined;
+  };
+}): Promise<unknown> {
+  const raw = await c.req.text().catch(() => {
+    throw ApiError.badRequest("Invalid JSON body.", "invalid_request_error");
+  });
+
+  if (raw.length > env.TOKFAI_CHAT_BODY_MAX_BYTES) {
+    throw ApiError.payloadTooLarge();
+  }
+
+  if (!raw.trim()) {
+    throw ApiError.badRequest("Invalid JSON body.", "invalid_request_error");
+  }
+
   try {
-    return await bodyPromise;
+    return JSON.parse(raw) as unknown;
   } catch {
     throw ApiError.badRequest("Invalid JSON body.", "invalid_request_error");
   }

@@ -98,7 +98,8 @@ export async function grsaiFetch<T = unknown>(
   const upstreamUrl = buildUpstreamUrl(path);
   const { host, path: upstreamPath } = grsaiUpstreamTarget(path);
   const startedAt = Date.now();
-  const effectiveTimeoutMs = timeoutMs ?? env.GRSAI_CHAT_TIMEOUT_MS;
+  const effectiveTimeoutMs =
+    timeoutMs ?? env.TOKFAI_UPSTREAM_TIMEOUT_MS ?? env.GRSAI_CHAT_TIMEOUT_MS;
 
   const finalHeaders = new Headers(headers);
   finalHeaders.set("Authorization", `Bearer ${env.GRSAI_API_KEY}`);
@@ -133,7 +134,7 @@ export async function grsaiFetch<T = unknown>(
         message: "Upstream provider timed out.",
         code: "upstream_timeout",
         type: "upstream_error",
-        publicMessage: "Upstream provider timed out.",
+        publicMessage: "上游模型响应超时，请稍后重试或切换模型。",
         upstreamStatus: 504,
         upstreamErrorSnippet: "timeout",
       });
