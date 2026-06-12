@@ -22,6 +22,111 @@ export interface ApiErrorPayload {
   type?: ErrorType;
 }
 
+/** Stable gateway guard codes — must not be remapped to generic 502. */
+export const GATEWAY_GUARD_ERROR_CODES = new Set([
+  "too_many_requests",
+  "too_many_concurrent_requests",
+  "gateway_overloaded",
+  "request_body_too_large",
+  "upstream_timeout",
+]);
+
+/** Canonical HTTP status for known gateway / upstream guard codes. */
+export const STATUS_BY_ERROR_CODE: Record<string, number> = {
+  too_many_requests: 429,
+  too_many_concurrent_requests: 429,
+  gateway_overloaded: 503,
+  request_body_too_large: 413,
+  upstream_timeout: 504,
+};
+
+export function shouldIncludeRequestIdInError(status: number): boolean {
+  return status === 429 || status === 503 || status === 504;
+}
+
+export function buildClientErrorBody(
+  err: ApiError,
+  requestId?: string
+): { error: ApiErrorPayload; request_id?: string } {
+  const body = err.toJSON();
+  if (requestId && shouldIncludeRequestIdInError(err.status)) {
+    return { ...body, request_id: requestId };
+  }
+  return body;
+}
+
+function isErrorType(value: unknown): value is ErrorType {
+  return (
+    value === "auth_error" ||
+    value === "validation_error" ||
+    value === "rate_limit_error" ||
+    value === "billing_error" ||
+    value === "not_found" ||
+    value === "upstream_error" ||
+    value === "server_error" ||
+    value === "not_implemented"
+  );
+}
+
+/**
+ * Preserve structured errors that already carry status/statusCode/code/message
+ * instead of treating them as unhandled 500s.
+ */
+export function coerceToApiError(err: unknown): ApiError | null {
+  if (err instanceof ApiError) {
+    return err;
+  }
+
+  if (!err || typeof err !== "object") {
+    return null;
+  }
+
+  const candidate = err as {
+    status?: unknown;
+    statusCode?: unknown;
+    code?: unknown;
+    message?: unknown;
+    type?: unknown;
+    publicMessage?: unknown;
+  };
+
+  const code =
+    typeof candidate.code === "string" ? candidate.code : undefined;
+
+  const rawStatus = candidate.status ?? candidate.statusCode;
+  let status =
+    typeof rawStatus === "number" && rawStatus >= 400 && rawStatus < 600
+      ? rawStatus
+      : undefined;
+
+  if (code && code in STATUS_BY_ERROR_CODE) {
+    status = STATUS_BY_ERROR_CODE[code]!;
+  }
+
+  if (!status) {
+    return null;
+  }
+
+  const message =
+    typeof candidate.message === "string"
+      ? candidate.message
+      : err instanceof Error
+        ? err.message
+        : "Request failed.";
+  const publicMessage =
+    typeof candidate.publicMessage === "string"
+      ? candidate.publicMessage
+      : message;
+
+  return new ApiError({
+    status,
+    message,
+    publicMessage,
+    code,
+    type: isErrorType(candidate.type) ? candidate.type : undefined,
+  });
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly code?: string;

@@ -1,6 +1,10 @@
 import type { Context, ErrorHandler } from "hono";
 
-import { ApiError } from "../errors.js";
+import {
+  ApiError,
+  buildClientErrorBody,
+  coerceToApiError,
+} from "../errors.js";
 import { log } from "../logger.js";
 
 function getRequestId(c: Context): string | undefined {
@@ -11,31 +15,49 @@ function getRoute(c: Context): string {
   return `${c.req.method} ${c.req.path}`;
 }
 
+function logApiError(
+  err: ApiError,
+  requestId: string | undefined,
+  route: string
+): void {
+  const logFields = {
+    requestId,
+    route,
+    status: err.status,
+    code: err.code,
+    message: err.publicMessage,
+    upstreamStatus: err.upstreamStatus,
+    upstreamErrorMessage: err.upstreamErrorSnippet,
+  };
+  if (err.status >= 500) {
+    log.error("api_error_500", logFields);
+  } else {
+    log.warn("api_error", logFields);
+  }
+}
+
+/** Send a standard API error envelope without going through onError. */
+export function respondApiError(
+  c: Context,
+  err: ApiError,
+  requestId?: string
+) {
+  return c.json(buildClientErrorBody(err, requestId), err.status as never);
+}
+
 /**
- * Hono catch-all error handler. Converts thrown `ApiError`s into the
- * standard envelope. Anything else becomes a 500 with a generic message —
- * we never leak internal error details to the client.
+ * Hono catch-all error handler. Converts thrown `ApiError`s (and structured
+ * errors with status/statusCode/code/message) into the standard envelope.
+ * Gateway guard codes keep their HTTP status — never remapped to generic 502.
  */
 export const errorHandler: ErrorHandler = (err, c) => {
   const requestId = getRequestId(c);
   const route = getRoute(c);
+  const apiErr = coerceToApiError(err);
 
-  if (err instanceof ApiError) {
-    const logFields = {
-      requestId,
-      route,
-      status: err.status,
-      code: err.code,
-      message: err.publicMessage,
-      upstreamStatus: err.upstreamStatus,
-      upstreamErrorMessage: err.upstreamErrorSnippet,
-    };
-    if (err.status >= 500) {
-      log.error("api_error_500", logFields);
-    } else {
-      log.warn("api_error", logFields);
-    }
-    return c.json(err.toJSON(), err.status as never);
+  if (apiErr) {
+    logApiError(apiErr, requestId, route);
+    return respondApiError(c, apiErr, requestId);
   }
 
   log.error("unhandled", {

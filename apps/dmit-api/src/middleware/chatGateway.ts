@@ -11,7 +11,12 @@ import {
 } from "../gateway/concurrency.js";
 import { checkRateLimit } from "../gateway/rateLimit.js";
 import { getChatCaller } from "./chatAuth.js";
+import { respondApiError } from "./error.js";
 import { logGatewayRejection } from "../routes/chatGatewayLogs.js";
+
+function bodyTooLargeError(): ApiError {
+  return ApiError.payloadTooLarge();
+}
 
 function assertBodySizeWithinLimit(contentLengthHeader: string | undefined): void {
   if (!contentLengthHeader) return;
@@ -20,8 +25,31 @@ function assertBodySizeWithinLimit(contentLengthHeader: string | undefined): voi
   if (!Number.isFinite(contentLength) || contentLength < 0) return;
 
   if (contentLength > env.TOKFAI_CHAT_BODY_MAX_BYTES) {
-    throw ApiError.payloadTooLarge();
+    throw bodyTooLargeError();
   }
+}
+
+async function rejectGatewayGuard(
+  c: Parameters<MiddlewareHandler>[0],
+  args: {
+    caller: ReturnType<typeof getChatCaller>;
+    requestId: string;
+    err: ApiError;
+    limitKey: string;
+  }
+) {
+  const { caller, requestId, err, limitKey } = args;
+
+  await logGatewayRejection({
+    caller,
+    requestId,
+    err,
+    limitKey,
+    keyInflight: getKeyInflight(limitKey),
+    globalInflight: getGlobalUpstreamInflight(),
+  });
+
+  return respondApiError(c, err, requestId);
 }
 
 /**
@@ -37,14 +65,7 @@ export const chatGatewayMiddleware: MiddlewareHandler = async (c, next) => {
     assertBodySizeWithinLimit(c.req.header("content-length"));
   } catch (err) {
     if (err instanceof ApiError && err.code === "request_body_too_large") {
-      await logGatewayRejection({
-        caller,
-        requestId,
-        err,
-        limitKey,
-        keyInflight: getKeyInflight(limitKey),
-        globalInflight: getGlobalUpstreamInflight(),
-      });
+      return rejectGatewayGuard(c, { caller, requestId, err, limitKey });
     }
     throw err;
   }
@@ -55,29 +76,21 @@ export const chatGatewayMiddleware: MiddlewareHandler = async (c, next) => {
   c.header("X-RateLimit-Reset", String(Math.ceil(rate.resetAt / 1000)));
 
   if (!rate.allowed) {
-    const err = ApiError.tooManyRequests();
-    await logGatewayRejection({
+    return rejectGatewayGuard(c, {
       caller,
       requestId,
-      err,
+      err: ApiError.tooManyRequests(),
       limitKey,
-      keyInflight: getKeyInflight(limitKey),
-      globalInflight: getGlobalUpstreamInflight(),
     });
-    throw err;
   }
 
   if (!tryAcquireKeyConcurrency(limitKey)) {
-    const err = ApiError.tooManyConcurrentRequests();
-    await logGatewayRejection({
+    return rejectGatewayGuard(c, {
       caller,
       requestId,
-      err,
+      err: ApiError.tooManyConcurrentRequests(),
       limitKey,
-      keyInflight: getKeyInflight(limitKey),
-      globalInflight: getGlobalUpstreamInflight(),
     });
-    throw err;
   }
 
   try {

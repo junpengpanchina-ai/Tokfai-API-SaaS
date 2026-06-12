@@ -53,7 +53,19 @@ const GATEWAY_ERROR_CODES = [
   "upstream_model_busy",
   "all_upstreams_unavailable",
   "upstream_error",
+  "request_body_too_large",
 ];
+
+/** Infer stable error code when body is missing or unparsed (e.g. proxy HTML). */
+function inferErrorCode(status, parsedCode) {
+  if (parsedCode) return parsedCode;
+  if (status === 429) return "too_many_requests";
+  if (status === 503) return "gateway_overloaded";
+  if (status === 504) return "upstream_timeout";
+  if (status === 413) return "request_body_too_large";
+  if (status === 0) return "network_error";
+  return null;
+}
 
 function maskKey(key) {
   if (!key || key.length <= 12) return "(not set)";
@@ -91,7 +103,9 @@ async function runOne(index) {
       body = { parse_error: true, raw: text.slice(0, 200) };
     }
 
-    const errorCode = body?.error?.code ?? null;
+    const errorCode =
+      inferErrorCode(res.status, body?.error?.code ?? null) ??
+      (res.status === 0 ? "network_error" : `http_${res.status}`);
     const requestId =
       body?.request_id ??
       body?.tokfai?.request_id ??

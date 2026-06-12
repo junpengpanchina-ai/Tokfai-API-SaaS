@@ -143,6 +143,7 @@ proxy_connect_timeout 10s;
 | `apps/dmit-api/src/gateway/rateLimit.ts` | Per-key fixed window RPM |
 | `apps/dmit-api/src/gateway/concurrency.ts` | Per-key + global upstream pools |
 | `apps/dmit-api/src/middleware/chatGateway.ts` | Auth-after guards on `/v1/chat/completions` |
+| `apps/dmit-api/src/middleware/error.ts` | Preserves guard HTTP statuses + `request_id` on 429/503/504 |
 | `apps/dmit-api/src/routes/chatGatewayLogs.ts` | Non-billable gateway usage rows |
 | `apps/dmit-api/src/routes/chat.ts` | Body limit, total timeout, global acquire per fallback attempt |
 
@@ -163,3 +164,32 @@ TOKFAI_API_KEY=sk-tokfai_... TOTAL_REQUESTS=20 CONCURRENCY=2 node scripts/load-t
 ```
 
 To **test 429 locally on server**, temporarily set `TOKFAI_RATE_LIMIT_RPM=5` or `TOKFAI_MAX_CONCURRENCY_PER_KEY=1`, restart PM2, rerun load test, then restore defaults.
+
+---
+
+## 11. P761.1 — Gateway guard error status preservation
+
+**Problem:** Low-RPM load tests saw HTTP **502** / `http_502` instead of **429** `too_many_requests` / `too_many_concurrent_requests`.
+
+**Fix:**
+
+| Code | HTTP | `request_id` in body |
+|------|------|----------------------|
+| `too_many_requests` | 429 | ✅ |
+| `too_many_concurrent_requests` | 429 | ✅ |
+| `gateway_overloaded` | 503 | ✅ |
+| `request_body_too_large` | 413 | — |
+| `upstream_timeout` | 504 | ✅ |
+
+- `chatGateway` middleware **returns** guard errors directly (no throw → onError indirection).
+- `middleware/error.ts` preserves `status` / `statusCode` / `code` on structured errors; never remaps guards to generic 502.
+- 429 gateway rejections remain **non-billable** (`usage_logs.billable=false`).
+- `scripts/load-test-chat.mjs` infers gateway codes from HTTP status when the body is empty.
+
+**Acceptance:**
+
+| Case | Command | Expected |
+|------|---------|----------|
+| A Normal | `TOTAL_REQUESTS=20 CONCURRENCY=2` | 20× HTTP 200, `http_502=0` |
+| B Low RPM | `TOKFAI_RATE_LIMIT_RPM=5` + `CONCURRENCY=5` | HTTP 429, codes `too_many_*`, not 502 |
+| C Restore | `unset TOKFAI_RATE_LIMIT_RPM` + `CONCURRENCY=1` | Success |
