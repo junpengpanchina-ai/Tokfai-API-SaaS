@@ -158,6 +158,40 @@ Expected:
 2. Poll until `completed` / `partial_failed` / `failed`
 3. GET items → each row has `request_id`; successes have `output` + `credits_charged > 0`
 
+### Production smoke results
+
+**Status:** ✅ P762 passed on production DMIT (2026-06-13)
+
+**Environment:**
+
+| Setting | Value |
+|---------|-------|
+| API base | `https://api.tokfai.com/v1` |
+| Model | `auto-fast` |
+| Script | `scripts/test-batch-chat.mjs` |
+| Items | 5 |
+
+**Results:**
+
+| Metric | Result |
+|--------|--------|
+| Batch created | ✅ |
+| Final batch status | `completed` |
+| succeeded_items / failed_items | 5 / 0 |
+| credits_charged | 0.000939 |
+| Items returned | 5 / 5 |
+| Item status | all `succeeded` |
+| request_id present | 5 / 5 |
+| Script outcome | Smoke test passed |
+
+**Observations:**
+
+- Early poll cycles showed `running` with `succeeded=0/5`, `failed=0`, `credits=0` — the worker waits for upstream completion; with slow `auto-fast` upstream, the batch stays `running` until items finish.
+- Final state: all 5 items `completed`.
+- Smart routing / fallback visible in server logs; some items fell back from `gemini-3-flash` to `gemini-2.5-flash`.
+- Successful items debited normally; no failed items in this run.
+- Each item `request_id` supports per-row tracing in Usage / logs.
+
 ---
 
 ## 9. Roadmap (out of scope)
