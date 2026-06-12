@@ -698,7 +698,12 @@ export const messages = {
             "The selected model is temporarily unavailable or under high load.",
           upstreamTimeout:
             "The selected model is temporarily unavailable or under high load.",
-          switchModelHint: "Try switching to gpt-5.4 or gpt-5.5 and retry.",
+          upstreamModelBusy:
+            "This model is under high load. Retry shortly or switch to a recommended model.",
+          modelNotAvailable:
+            "This model is not available for API calls. Switch to a recommended model.",
+          switchModelHint:
+            "Try gemini-3-flash first for integration tests. gpt-5.4 / gpt-5.5 are high-quality models that may be busy under load.",
           rateLimited: "Too many requests. Please try again later.",
           unknown: "Request failed. Please try again later.",
           missingPrompt: "Please enter a prompt.",
@@ -1081,16 +1086,20 @@ export const messages = {
         "gpt-5.5": "Chat, code, and general tasks",
       },
       chatModelNote: {
+        "gemini-3-flash":
+          "Recommended test model — best for first API integration and Playground checks.",
         "gpt-5.4":
-          "Recommended test model — stable priority for Playground and API calls.",
+          "High-quality model — may be unavailable when upstream load is high.",
         "gpt-5.5":
-          "Recommended test model — stable priority alongside gpt-5.4.",
+          "High-quality model — may be unavailable when upstream load is high.",
+        "gpt-4o-mini":
+          "Not registered upstream — do not use for customer integration examples.",
         "gemini-3.1-pro":
-          "May be unavailable during high load. For testing, try gpt-5.4 first.",
+          "May be unavailable during high load. For testing, try gemini-3-flash first.",
         "gemini-3-pro":
-          "May be unavailable during high load. For testing, try gpt-5.4 first.",
+          "May be unavailable during high load. For testing, try gemini-3-flash first.",
         "gemini-2.5-pro":
-          "May be unavailable during high load. For testing, try gpt-5.4 first.",
+          "May be unavailable during high load. For testing, try gemini-3-flash first.",
       },
       imageUseCase: {
         "gpt-image-2": "Text-to-image, image-to-image, high-quality images",
@@ -1124,7 +1133,7 @@ export const messages = {
       setupStep3:
         "Set base URL to https://api.tokfai.com/v1 and send Authorization: Bearer sk-tokfai_… on every request.",
       setupStep4:
-        "Send a test request with model gpt-5.4, or try Chat Playground and Image Playground first.",
+        "Send a test request with model gemini-3-flash, or try Chat Playground and Image Playground first.",
       setupPlaygroundHint:
         "Recommended flow: create your key in API Keys, then validate chat and image calls in Playground before wiring your app.",
       worksWithLabel: "Works with",
@@ -1141,7 +1150,7 @@ export const messages = {
       quickstartStep3:
         "Set your client base URL to https://api.tokfai.com/v1 and send Authorization: Bearer sk-tokfai_… on every request.",
       quickstartStep4:
-        "Make your first call — POST /v1/chat/completions for chat (start with gpt-5.4) or POST /v1/images/generations for images.",
+        "Make your first call — POST /v1/chat/completions for chat (start with gemini-3-flash) or POST /v1/images/generations for images.",
       quickstartFirstCallTitle: "First call example",
       quickstartLinksApiKeys: "API Keys",
       quickstartLinksCredits: "Credits",
@@ -1172,7 +1181,7 @@ export const messages = {
       chatPlaygroundLink: "Chat Playground",
       recommendedModelTitle: "Recommended model",
       recommendedModelDesc:
-        "Start with gpt-5.4 for general chat and Playground tests. Pass it in the model field on chat completion requests.",
+        "Start with gemini-3-flash for integration and Playground tests. gpt-5.4 / gpt-5.5 are high-quality options that may be busy under load.",
       modelIdLabel: "Model ID",
       authSectionDesc:
         "Every API request must include your API key in the Authorization header. Dashboard session tokens are not accepted on /v1/chat/completions or /v1/images/generations.",
@@ -1180,7 +1189,7 @@ export const messages = {
       authHeaderDesc: "Include on every request.",
       authVerifyTitle: "Verify your key — GET /v1/models",
       chatCompletionsDesc:
-        "Send chat messages and receive a model response via POST /chat/completions. Recommended starting model: gpt-5.4.",
+        "Send chat messages and receive a model response via POST /chat/completions. Recommended starting model: gemini-3-flash.",
       chatSdkJsTitle: "OpenAI JavaScript SDK",
       chatSdkPythonTitle: "OpenAI Python SDK",
       chatSdkDesc: "Use the official OpenAI SDK with baseURL set to Tokfai.",
@@ -1226,7 +1235,9 @@ export const messages = {
         "Order: health (no key) → models (auth) → chat completion (auth + credits). All use Base URL https://api.tokfai.com/v1.",
       externalVerifyHealthTitle: "1. Health check (no API key)",
       externalVerifyModelsTitle: "2. List models",
-      externalVerifyChatTitle: "3. Chat completion (model gpt-5.4)",
+      externalVerifyChatTitle: "3. Chat completion (model gemini-3-flash)",
+      externalVerificationModelNote:
+        "Start with gemini-3-flash for integration smoke tests. gpt-5.4 and gpt-5.5 are high-quality models — retry or switch if you see upstream_model_busy (HTTP 503). Do not use gpt-4o-mini; it is not registered upstream.",
       cherryStudioLabel: "Cherry Studio",
       cherryStudioSteps:
         "Settings → Provider → OpenAI-compatible. Set API Host, API Key, and default model as below.",
@@ -1235,7 +1246,7 @@ export const messages = {
       cherryStudioError402:
         "Top up credits in Dashboard → Credits before sending requests from Cherry Studio.",
       cherryStudioError404:
-        "Pick a Tokfai model ID such as gpt-5.4. Browse available IDs on the Models page.",
+        "Pick a Tokfai model ID such as gemini-3-flash. Browse available IDs on the Models page.",
       cherryStudioError500:
         "The model service is temporarily unavailable — retry in a few minutes or switch models.",
       cursorLabel: "Cursor",
@@ -1246,12 +1257,12 @@ export const messages = {
       cursorError402:
         "Top up credits in Dashboard → Credits before using Cursor chat with Tokfai.",
       cursorError404:
-        "Choose a Tokfai model ID (e.g. gpt-5.4) in the model picker. See Models for the full list.",
+        "Choose a Tokfai model ID (e.g. gemini-3-flash) in the model picker. See Models for the full list.",
       cursorError500:
         "Retry the request or pick another model — upstream services may be briefly unavailable.",
       openAiSdkLabel: "OpenAI SDK",
       openAiSdkSteps:
-        "Set baseURL to https://api.tokfai.com/v1 and apiKey to your sk-tokfai_… key. Use gpt-5.4 as the default chat model.",
+        "Set baseURL to https://api.tokfai.com/v1 and apiKey to your sk-tokfai_… key. Use gemini-3-flash as the default chat model for first tests.",
       openAiSdkExamplesHint: "Full JavaScript and Python examples are in",
       clientApiKeyHintPrefix: "Replace sk-tokfai_xxx with a key from",
       clientApiKeyHintLink: "API Keys",
@@ -1325,7 +1336,7 @@ export const messages = {
       cherryApiHost: "API Host",
       cherryApiKey: "API Key",
       cherryModel: "Model",
-      cherryModelValue: "gpt-5.4",
+      cherryModelValue: "gemini-3-flash",
       cursorTitle: "Cursor",
       cursorDesc: "Add Tokfai as a custom OpenAI-compatible provider.",
       cursorStep1: "Choose OpenAI Compatible / Custom Provider.",
@@ -2467,7 +2478,12 @@ export const messages = {
           modelNotFound: "模型不存在或暂未开放，请换一个模型。",
           upstreamError: "当前模型暂时不可用或负载较高。",
           upstreamTimeout: "当前模型暂时不可用或负载较高。",
-          switchModelHint: "建议切换 gpt-5.4 / gpt-5.5 后重试。",
+          upstreamModelBusy:
+            "当前模型负载较高，请稍后重试或切换推荐模型。",
+          modelNotAvailable:
+            "当前模型暂不可用，请切换推荐模型。",
+          switchModelHint:
+            "首次接入建议优先使用 gemini-3-flash。gpt-5.4 / gpt-5.5 为高质量模型，高负载时可能暂时不可用。",
           rateLimited: "请求过快，请稍后再试。",
           unknown: "请求失败，请稍后重试。",
           missingPrompt: "请输入测试内容。",
@@ -2830,13 +2846,16 @@ export const messages = {
         "gpt-5.5": "适合对话 / 代码 / 通用任务",
       },
       chatModelNote: {
-        "gpt-5.4": "推荐测试模型 / 稳定优先，可用于 Playground 与 API 调用。",
-        "gpt-5.5": "推荐测试模型 / 稳定优先，可与 gpt-5.4 互换使用。",
+        "gemini-3-flash": "推荐测试模型 / 更适合首次接入验收与 Playground。",
+        "gpt-5.4": "高质量模型，上游高负载时可能暂时不可用。",
+        "gpt-5.5": "高质量模型，上游高负载时可能暂时不可用。",
+        "gpt-4o-mini": "上游未注册，请勿作为客户接入示例模型。",
         "gemini-3.1-pro":
-          "高负载时可能暂时不可用，测试阶段建议优先使用 gpt-5.4。",
-        "gemini-3-pro": "高负载时可能暂时不可用，测试阶段建议优先使用 gpt-5.4。",
+          "高负载时可能暂时不可用，测试阶段建议优先使用 gemini-3-flash。",
+        "gemini-3-pro":
+          "高负载时可能暂时不可用，测试阶段建议优先使用 gemini-3-flash。",
         "gemini-2.5-pro":
-          "高负载时可能暂时不可用，测试阶段建议优先使用 gpt-5.4。",
+          "高负载时可能暂时不可用，测试阶段建议优先使用 gemini-3-flash。",
       },
       imageUseCase: {
         "gpt-image-2": "适合文生图 / 图生图 / 高质量图片",
@@ -2870,7 +2889,7 @@ export const messages = {
       setupStep3:
         "将 base URL 设为 https://api.tokfai.com/v1，每次请求携带 Authorization: Bearer sk-tokfai_…。",
       setupStep4:
-        "使用 model gpt-5.4 发送测试请求，或先在 Chat Playground 与 Image Playground 验证。",
+        "使用 model gemini-3-flash 发送测试请求，或先在 Chat Playground 与 Image Playground 验证。",
       setupPlaygroundHint:
         "推荐流程：先在 API Keys 创建密钥，再在 Playground 验证对话与图像调用，最后接入你的应用。",
       worksWithLabel: "兼容",
@@ -2887,7 +2906,7 @@ export const messages = {
       quickstartStep3:
         "将客户端 base URL 设为 https://api.tokfai.com/v1，每次请求携带 Authorization: Bearer sk-tokfai_…。",
       quickstartStep4:
-        "发起第一次调用 — POST /v1/chat/completions（对话，建议从 gpt-5.4 开始）或 POST /v1/images/generations（图像）。",
+        "发起第一次调用 — POST /v1/chat/completions（对话，建议从 gemini-3-flash 开始）或 POST /v1/images/generations（图像）。",
       quickstartFirstCallTitle: "第一次调用示例",
       quickstartLinksApiKeys: "API Keys",
       quickstartLinksCredits: "Credits",
@@ -2918,7 +2937,7 @@ export const messages = {
       chatPlaygroundLink: "Chat Playground",
       recommendedModelTitle: "推荐模型",
       recommendedModelDesc:
-        "通用对话与 Playground 测试建议从 gpt-5.4 开始，在 chat completions 请求的 model 字段传入。",
+        "首次接入建议从 gemini-3-flash 开始 Playground 与 API 测试。gpt-5.4 / gpt-5.5 为高质量模型，高负载时可能暂时不可用。",
       modelIdLabel: "Model ID",
       authSectionDesc:
         "每次 API 请求必须在 Authorization header 中携带 API Key。/v1/chat/completions 与 /v1/images/generations 不接受 Dashboard 会话 token。",
@@ -2926,7 +2945,7 @@ export const messages = {
       authHeaderDesc: "每次请求都需要携带。",
       authVerifyTitle: "验证密钥 — GET /v1/models",
       chatCompletionsDesc:
-        "通过 POST /chat/completions 发送对话消息并获取模型回复。推荐起始模型：gpt-5.4。",
+        "通过 POST /chat/completions 发送对话消息并获取模型回复。推荐起始模型：gemini-3-flash。",
       chatSdkJsTitle: "OpenAI JavaScript SDK",
       chatSdkPythonTitle: "OpenAI Python SDK",
       chatSdkDesc: "使用官方 OpenAI SDK，将 baseURL 指向 Tokfai。",
@@ -2970,7 +2989,9 @@ export const messages = {
         "顺序：health（无需 key）→ models（需鉴权）→ chat completion（需鉴权 + credits）。Base URL 均为 https://api.tokfai.com/v1。",
       externalVerifyHealthTitle: "1. 健康检查（无需 API Key）",
       externalVerifyModelsTitle: "2. 列出 models",
-      externalVerifyChatTitle: "3. Chat completion（model gpt-5.4）",
+      externalVerifyChatTitle: "3. Chat completion（model gemini-3-flash）",
+      externalVerificationModelNote:
+        "首次接入建议用 gemini-3-flash 做 smoke test。gpt-5.4 / gpt-5.5 为高质量模型，高负载时可能返回 upstream_model_busy（HTTP 503），请重试或切换模型。请勿使用 gpt-4o-mini，上游未注册。",
       cherryStudioLabel: "Cherry Studio",
       cherryStudioSteps:
         "Settings → Provider → OpenAI-compatible。按下方表格填写 API Host、API Key 与默认 model。",
@@ -2979,7 +3000,7 @@ export const messages = {
       cherryStudioError402:
         "在 Cherry Studio 发请求前，先在 Dashboard → Credits 充值 credits。",
       cherryStudioError404:
-        "选择 Tokfai model ID，例如 gpt-5.4。完整列表见 Models 页面。",
+        "选择 Tokfai model ID，例如 gemini-3-flash。完整列表见 Models 页面。",
       cherryStudioError500:
         "模型服务暂时不可用 — 稍后重试或切换 model。",
       cursorLabel: "Cursor",
@@ -2990,12 +3011,12 @@ export const messages = {
       cursorError402:
         "在 Cursor 中使用 Tokfai 对话前，先在 Dashboard → Credits 充值 credits。",
       cursorError404:
-        "在 model 选择器中选择 Tokfai model ID（如 gpt-5.4）。完整列表见 Models。",
+        "在 model 选择器中选择 Tokfai model ID（如 gemini-3-flash）。完整列表见 Models。",
       cursorError500:
         "重试请求或切换 model — 上游服务可能短暂不可用。",
       openAiSdkLabel: "OpenAI SDK",
       openAiSdkSteps:
-        "将 baseURL 设为 https://api.tokfai.com/v1，apiKey 设为 sk-tokfai_… 密钥。默认对话 model 建议使用 gpt-5.4。",
+        "将 baseURL 设为 https://api.tokfai.com/v1，apiKey 设为 sk-tokfai_… 密钥。首次接入默认对话 model 建议使用 gemini-3-flash。",
       openAiSdkExamplesHint: "完整 JavaScript 与 Python 示例见",
       clientApiKeyHintPrefix: "将 sk-tokfai_xxx 替换为",
       clientApiKeyHintLink: "API Keys",
@@ -3066,7 +3087,7 @@ export const messages = {
       cherryApiHost: "API Host",
       cherryApiKey: "API Key",
       cherryModel: "Model",
-      cherryModelValue: "gpt-5.4",
+      cherryModelValue: "gemini-3-flash",
       cursorTitle: "Cursor 配置",
       cursorDesc: "将 Tokfai 添加为 OpenAI 兼容的自定义 Provider。",
       cursorStep1: "选择 OpenAI Compatible / Custom Provider。",

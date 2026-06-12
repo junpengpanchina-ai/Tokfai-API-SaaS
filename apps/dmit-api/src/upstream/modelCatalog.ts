@@ -115,7 +115,7 @@ export const MODEL_CATALOG: Record<string, TokfaiModelCatalogItem> = {
     kind: "chat",
     input_per_1k: 0.00015,
     output_per_1k: 0.0006,
-    note: "Low cost OpenAI-compatible chat model."
+    note: "Not registered upstream — listed for catalog compatibility only."
   },
 
   "gpt-5.4": {

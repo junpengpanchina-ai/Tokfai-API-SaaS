@@ -55,6 +55,8 @@ interface ChatCompletionResponse {
 const UPSTREAM_ERROR_CODES = new Set([
   "upstream_auth_error",
   "upstream_rate_limited",
+  "upstream_model_busy",
+  "model_not_available",
   "upstream_error",
 ]);
 
@@ -220,7 +222,10 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
           api_key_id: caller.apiKeyId,
           model: resolvedModel,
           status:
-            err.code === "upstream_rate_limited" ? "rate_limited" : "failed",
+            err.code === "upstream_rate_limited" ||
+            err.code === "upstream_model_busy"
+              ? "rate_limited"
+              : "failed",
           request_id: requestId,
           error_code: err.code ?? null,
           error_message: err.publicMessage,

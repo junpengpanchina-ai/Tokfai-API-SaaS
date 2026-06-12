@@ -452,6 +452,9 @@ export function DocsContent({
           </div>
           <div className="flex flex-col gap-2">
             <h3 className="text-sm font-medium">{t("docs.externalVerifyChatTitle")}</h3>
+            <p className="text-sm text-muted-foreground">
+              {t("docs.externalVerificationModelNote")}
+            </p>
             <CodeBlock
               id="external-chat-curl"
               label="curl"

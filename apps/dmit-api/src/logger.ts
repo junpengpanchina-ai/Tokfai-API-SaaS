@@ -25,6 +25,7 @@ const ALLOWED_FIELD_KEYS = new Set([
   "upstreamPath",
   "upstreamStatus",
   "upstreamErrorCode",
+  "upstreamCode",
   "upstreamErrorMessage",
   "latencyMs",
   "grsaiBaseHost",

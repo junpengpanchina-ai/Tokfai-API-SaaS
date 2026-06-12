@@ -26,7 +26,7 @@ export function PlaygroundErrorPanel({
   t: (key: string) => string;
 }) {
   const kind = classifyPlaygroundError(error.status, error.code);
-  const hintKey = playgroundRiskHintKey(scope, kind);
+  const hintKey = playgroundRiskHintKey(scope, kind, error.code);
 
   return (
     <div className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4">
@@ -67,7 +67,9 @@ export function PlaygroundErrorPanel({
         </Button>
       ) : null}
 
-      {kind === "upstream" && scope === "playground" ? (
+      {(kind === "upstream" ||
+        (kind === "validation" && error.code === "model_not_available")) &&
+      scope === "playground" ? (
         <Button asChild size="sm" variant="outline" className="w-fit">
           <Link href="/dashboard/models">{t("dashboard.playground.viewModels")}</Link>
         </Button>

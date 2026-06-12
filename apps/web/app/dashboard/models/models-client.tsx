@@ -35,12 +35,13 @@ import {
   summarizeModelsCatalog,
   type ModelsTableRow,
 } from "@/lib/models-page";
+import { TOKFAI_RECOMMENDED_MODEL } from "@/lib/tokfai-api";
 
 const CHAT_COMPLETIONS_CURL = `curl https://api.tokfai.com/v1/chat/completions \\
   -H "Authorization: Bearer sk-tokfai_xxx" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "gpt-5.4",
+    "model": "${TOKFAI_RECOMMENDED_MODEL}",
     "messages": [
       {"role": "user", "content": "Hello Tokfai"}
     ]

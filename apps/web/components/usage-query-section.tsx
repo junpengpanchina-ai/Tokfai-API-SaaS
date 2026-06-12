@@ -166,7 +166,7 @@ export function UsageQuerySection({
               id="usage-model"
               value={model}
               onChange={(event) => setModel(event.target.value)}
-              placeholder="gpt-4o-mini"
+              placeholder="gemini-3-flash"
             />
           </div>
 

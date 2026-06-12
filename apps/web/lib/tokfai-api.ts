@@ -13,7 +13,10 @@ export const IMAGE_REFERENCE_SYSTEM_HINT =
   "Use the input image(s) as visual reference. Preserve the main subject unless the user asks otherwise.";
 export const TOKFAI_API_KEY_FORMAT = "sk-tokfai_...";
 export const TOKFAI_API_KEY_PLACEHOLDER = "sk-tokfai_xxx";
-export const TOKFAI_RECOMMENDED_MODEL = "gpt-5.4";
+/** Default chat model for docs, Playground, and first integration tests. */
+export const TOKFAI_RECOMMENDED_MODEL = "gemini-3-flash";
+/** Premium chat models — may return upstream_model_busy under high load. */
+export const TOKFAI_PREMIUM_CHAT_MODELS = ["gpt-5.4", "gpt-5.5"] as const;
 export const TOKFAI_CLIENT_TEST_PROMPT =
   "Hello from Tokfai — reply in one sentence.";
 export const TOKFAI_HEALTH_URL = "https://api.tokfai.com/v1/health";

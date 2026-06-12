@@ -148,7 +148,7 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     description: "GPT 5.4 chat model for OpenAI-compatible workloads.",
     pricing: chatPricing(0.7, 1.4, 6, 12),
     traits: { speed: "medium", quality: "high", cost: "medium" },
-    categories: ["recommended"],
+    categories: ["high_quality"],
     catalogMeta: catalogMeta(),
   },
   {
@@ -595,9 +595,9 @@ export type DashboardUseCaseEntry = {
 export const DASHBOARD_USE_CASES: DashboardUseCaseEntry[] = [
   {
     id: "chat_general",
-    recommendedModelIds: ["gpt-5.4", "gpt-5.5"],
+    recommendedModelIds: ["gemini-3-flash", "gpt-5.4", "gpt-5.5"],
     playground: "chat",
-    defaultModelId: "gpt-5.4",
+    defaultModelId: "gemini-3-flash",
   },
   {
     id: "fast_low_cost_chat",

@@ -19,6 +19,7 @@ const UPSTREAM_CODES = new Set([
   "upstream_timeout",
   "upstream_auth_error",
   "upstream_rate_limited",
+  "upstream_model_busy",
   "image_generation_failed",
   "network_error",
 ]);
@@ -39,6 +40,10 @@ export function classifyPlaygroundError(
     normalized === "key_not_revealable"
   ) {
     return "auth";
+  }
+
+  if (normalized === "model_not_available") {
+    return "validation";
   }
 
   if (
@@ -65,25 +70,6 @@ export function classifyPlaygroundError(
   }
 
   return "unknown";
-}
-
-function isUpstreamLoadSignal(
-  status: number,
-  code: string | undefined,
-  rawMessage?: string
-): boolean {
-  const normalized = (code ?? "").toLowerCase();
-  const detail = (rawMessage ?? "").toLowerCase();
-
-  return (
-    UPSTREAM_CODES.has(normalized) ||
-    status === 502 ||
-    status === 503 ||
-    status === 504 ||
-    status >= 500 ||
-    detail.includes("model load") ||
-    detail.includes("load is too high")
-  );
 }
 
 /** Friendly i18n message — never returns raw upstream/provider text. */
@@ -120,12 +106,12 @@ export function resolvePlaygroundRiskMessage(
       return t(`${prefix}.upstreamError`);
     }
 
-    if (normalized === "upstream_timeout" || status === 504) {
-      return t(`${prefix}.upstreamTimeout`);
+    if (normalized === "upstream_model_busy") {
+      return t(`${prefix}.upstreamModelBusy`);
     }
 
-    if (isUpstreamLoadSignal(status, code, rawMessage)) {
-      return t(`${prefix}.upstreamError`);
+    if (normalized === "upstream_timeout" || status === 504) {
+      return t(`${prefix}.upstreamTimeout`);
     }
 
     return t(`${prefix}.upstreamError`);
@@ -136,6 +122,10 @@ export function resolvePlaygroundRiskMessage(
   }
 
   if (kind === "validation") {
+    if (normalized === "model_not_available") {
+      return t(`${prefix}.modelNotAvailable`);
+    }
+
     if (normalized === "key_reveal_timeout") {
       return t("dashboard.playground.apiKeyLoadTimedOut");
     }
@@ -161,12 +151,24 @@ export function resolvePlaygroundRiskMessage(
 
 export function playgroundRiskHintKey(
   scope: "playground" | "imagePlayground",
-  kind: PlaygroundErrorKind
+  kind: PlaygroundErrorKind,
+  code?: string | null
 ): string | null {
+  const normalized = (code ?? "").toLowerCase();
+
   if (kind === "upstream") {
     return scope === "imagePlayground"
       ? "dashboard.imagePlayground.errors.billingNotChargedHint"
       : "dashboard.playground.errors.switchModelHint";
   }
+
+  if (
+    kind === "validation" &&
+    scope === "playground" &&
+    normalized === "model_not_available"
+  ) {
+    return "dashboard.playground.errors.switchModelHint";
+  }
+
   return null;
 }
