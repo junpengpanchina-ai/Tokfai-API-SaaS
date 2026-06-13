@@ -14,9 +14,13 @@ const ALGORITHM = "aes-256-gcm";
 const IV_BYTES = 12;
 const MIN_SECRET_CHARS = 32;
 
-function encryptionKey(): Buffer {
+export function isKeyEncryptionConfigured(): boolean {
   const secret = env.TOKFAI_KEY_ENCRYPTION_SECRET;
-  if (!secret || secret.length < MIN_SECRET_CHARS) {
+  return Boolean(secret && secret.length >= MIN_SECRET_CHARS);
+}
+
+function encryptionKey(): Buffer {
+  if (!isKeyEncryptionConfigured()) {
     log.error("key_encryption_config_error", {
       status: 500,
       code: "key_encryption_config_error",
@@ -27,7 +31,15 @@ function encryptionKey(): Buffer {
       "missing_key_encryption_secret"
     );
   }
-  return createHash("sha256").update(secret).digest();
+  return createHash("sha256")
+    .update(env.TOKFAI_KEY_ENCRYPTION_SECRET!)
+    .digest();
+}
+
+/** Returns null when encryption is not configured — key auth still works via hash. */
+export function encryptSecretIfConfigured(secret: string): string | null {
+  if (!isKeyEncryptionConfigured()) return null;
+  return encryptSecret(secret);
 }
 
 export function encryptSecret(secret: string): string {

@@ -1,12 +1,13 @@
 import { Hono } from "hono";
 
 import { generateApiKey } from "../auth/apiKey.js";
-import { encryptSecret } from "../auth/keyEncryption.js";
+import { encryptSecretIfConfigured } from "../auth/keyEncryption.js";
 import { ApiError } from "../errors.js";
 import { requireSupabaseJwt } from "../middleware/supabaseJwt.js";
 import { supabase } from "../supabase.js";
 import type { AuthedUser } from "../types.js";
 import {
+  logCreateApiKeyFailed,
   readApiKeyId,
   revealApiKey,
   revokeApiKey,
@@ -76,7 +77,7 @@ keyRoutes.post("/v1/keys", async (c) => {
   }
 
   const material = generateApiKey();
-  const encryptedSecret = encryptSecret(material.fullKey);
+  const encryptedSecret = encryptSecretIfConfigured(material.fullKey);
   const sb = supabase();
   const { data, error } = await sb
     .from("api_keys")
@@ -92,6 +93,7 @@ keyRoutes.post("/v1/keys", async (c) => {
     .single();
 
   if (error) {
+    logCreateApiKeyFailed(user.id, "keys_create_failed", error.message);
     throw ApiError.internal(
       `Failed to create API key: ${error.message}`,
       "keys_create_failed"

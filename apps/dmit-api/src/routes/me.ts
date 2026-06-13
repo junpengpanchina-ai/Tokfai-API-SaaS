@@ -1,11 +1,12 @@
 import { Hono } from "hono";
 
 import { generateApiKey } from "../auth/apiKey.js";
-import { encryptSecret } from "../auth/keyEncryption.js";
+import { encryptSecretIfConfigured } from "../auth/keyEncryption.js";
 import { ApiError } from "../errors.js";
 import { requireSupabaseJwt } from "../middleware/supabaseJwt.js";
 import { supabase } from "../supabase.js";
 import {
+  logCreateApiKeyFailed,
   readApiKeyId,
   revealApiKey,
   revokeApiKey,
@@ -413,22 +414,27 @@ meRoutes.post("/api-keys", async (c) => {
     );
   }
 
-  const { data: existingKey, error: existingKeyError } = await supabase()
+  const { data: existingKeys, error: existingKeyError } = await supabase()
     .from("api_keys")
     .select("id")
     .eq("user_id", user.id)
     .eq("name", name)
     .is("revoked_at", null)
-    .maybeSingle();
+    .limit(1);
 
   if (existingKeyError) {
+    logCreateApiKeyFailed(
+      user.id,
+      "me_api_keys_name_check_failed",
+      existingKeyError.message
+    );
     throw ApiError.internal(
       `Failed to check API key name uniqueness: ${existingKeyError.message}`,
       "me_api_keys_name_check_failed"
     );
   }
 
-  if (existingKey) {
+  if ((existingKeys ?? []).length > 0) {
     throw new ApiError({
       status: 409,
       message: "An active API key with this name already exists.",
@@ -441,7 +447,7 @@ meRoutes.post("/api-keys", async (c) => {
   const plainKey = material.fullKey;
   const keyHash = material.hash;
   const keyPrefix = material.prefix;
-  const encryptedSecret = encryptSecret(plainKey);
+  const encryptedSecret = encryptSecretIfConfigured(plainKey);
   const { data, error } = await supabase()
     .from("api_keys")
     .insert({
@@ -456,6 +462,7 @@ meRoutes.post("/api-keys", async (c) => {
     .single();
 
   if (error) {
+    logCreateApiKeyFailed(user.id, "me_api_keys_create_failed", error.message);
     throw ApiError.internal(
       `Failed to create API key: ${error.message}`,
       "me_api_keys_create_failed"
@@ -472,7 +479,7 @@ meRoutes.post("/api-keys", async (c) => {
         created_at: data.created_at,
         last_used_at: data.last_used_at,
         revoked_at: data.revoked_at,
-        can_reveal: !data.revoked_at,
+        can_reveal: Boolean(encryptedSecret && !data.revoked_at),
       },
       /** Full plaintext key — only on POST create or explicit owner reveal. */
       secret: plainKey,

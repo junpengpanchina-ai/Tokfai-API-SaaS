@@ -39,6 +39,9 @@ const ALLOWED_FIELD_KEYS = new Set([
   "limitKey",
   "keyInflight",
   "globalInflight",
+  "dbErrorMessage",
+  "tokenPrefix",
+  "keyId",
 ]);
 
 /**
