@@ -184,7 +184,8 @@ TOKFAI_API_KEY=sk-tokfai_... node scripts/test-redis-gateway-state.mjs
 ```
 
 - Reads `/v1/health` → `redis.enabled` / `redis.connected`
-- Sends concurrent chat requests; verifies `X-RateLimit-*` headers
+- **Fails** if `enabled=true` and `connected=false` (P764.1)
+- Sends concurrent chat requests; verifies `X-RateLimit-*` headers and prints status distribution
 - When Redis disabled, prints fallback notice and still passes
 
 ### Existing batch smokes (unchanged)
@@ -210,7 +211,8 @@ Must pass with Redis disabled (default production config).
 | `apps/dmit-api/src/batch/worker.ts` | Lock acquire/release |
 | `apps/dmit-api/src/routes/health.ts` | `redis` status field |
 | `scripts/repair-stuck-batches.mjs` | Optional lock-aware repair |
-| `scripts/test-redis-gateway-state.mjs` | Health + rate limit probe |
+| `scripts/test-redis-gateway-state.mjs` | Health + rate limit probe (P764.1 enable validation) |
+| `docs/p764-1-redis-provider-options.md` | Upstash vs self-hosted vs cloud Redis |
 
 ---
 
@@ -219,6 +221,7 @@ Must pass with Redis disabled (default production config).
 | Phase | Topic |
 |-------|--------|
 | **P764** | Redis shared gateway state + batch lock (this doc) |
+| **P764.1** | Production Redis enable runbook + provider options |
 | **P765** | Persistent batch job queue (BullMQ / Redis streams) |
 | **P766** | Worker leases, heartbeats, multi-instance batch resume |
 | Future | Redis-backed idempotency, probe-model-health integration |
@@ -299,3 +302,113 @@ Regression against P763 cancel path; pending items not processed after cancel.
 **Conclusion:**
 
 P764 production validation passed in **Redis disabled fallback** mode. Behavior remains compatible with P763 — chat, batch, and cancel main paths unchanged. Configure `TOKFAI_REDIS_ENABLED=true` + `TOKFAI_REDIS_URL` in a follow-up deploy to verify cross-instance shared state.
+
+---
+
+## 15. P764.1 — Production Redis enable runbook
+
+Use this checklist when turning on Redis in production after P764 fallback smoke (commit `616ad80`) passes.
+
+**Provider choice:** see [p764-1-redis-provider-options.md](./p764-1-redis-provider-options.md). **Current recommendation:** start with **Upstash Redis**; move to dedicated/self-hosted Redis at higher scale.
+
+### Prerequisites
+
+- P764 code deployed (`1d2b7ec` or later)
+- P764 fallback smoke green (`616ad80`)
+- Redis instance provisioned (Upstash or other)
+- Connection string stored in DMIT host env only — **never commit, log, or paste into docs**
+
+### Enable
+
+On the DMIT host, set in `apps/dmit-api/.env` (or PM2 ecosystem env):
+
+```bash
+TOKFAI_REDIS_ENABLED=true
+TOKFAI_REDIS_URL=<your-redis-url-from-provider-console>
+TOKFAI_REDIS_KEY_PREFIX=tokfai
+```
+
+Replace `<your-redis-url-from-provider-console>` with the provider connection string. Do **not** copy the URL into Slack, tickets, or this repo.
+
+Restart:
+
+```bash
+git pull origin main
+cd apps/dmit-api
+npm ci
+npm run build
+pm2 restart dmit-api --update-env
+pm2 save
+```
+
+### Verify health
+
+```bash
+curl -s https://api.tokfai.com/v1/health | jq '{ ok, redis }'
+```
+
+| Field | Expected (enabled) |
+|-------|-------------------|
+| `ok` | `true` |
+| `redis.enabled` | `true` |
+| `redis.connected` | `true` |
+
+If `enabled=true` but `connected=false`, DMIT falls back to in-memory gateway state — treat as **misconfiguration** (bad URL, network, TLS, or Redis down). Fix before continuing.
+
+### Smoke sequence (Redis enabled)
+
+```bash
+# 1. Gateway + Redis health
+TOKFAI_API_KEY=sk-tokfai_... node scripts/test-redis-gateway-state.mjs
+
+# 2. Batch regression
+TOKFAI_API_KEY=sk-tokfai_... node scripts/test-batch-chat.mjs
+
+# 3. Cancel regression
+TOKFAI_API_KEY=sk-tokfai_... node scripts/test-batch-cancel.mjs
+```
+
+`test-redis-gateway-state.mjs` **fails** when `redis.enabled=true` and `redis.connected=false`. With Redis disabled, `connected=false` is expected and the script passes.
+
+### What Redis enables (smoke scope)
+
+| Capability | Verified by |
+|------------|-------------|
+| Shared RPM / rate-limit headers | Gateway state script |
+| Shared per-key / global inflight | Gateway state script (concurrent probe) |
+| Shared circuit breaker | Implicit via chat path; no separate script in P764.1 |
+| Batch distributed lock | Batch chat + cancel regression (no duplicate processing) |
+
+Main paths must remain unchanged: `/v1/chat/completions`, batch create/poll/cancel.
+
+### Rollback
+
+If Redis causes issues, disable without code rollback:
+
+```bash
+unset TOKFAI_REDIS_ENABLED
+unset TOKFAI_REDIS_URL
+pm2 restart dmit-api --update-env
+pm2 save
+```
+
+Or set `TOKFAI_REDIS_ENABLED=false` in `.env` and restart.
+
+Confirm fallback:
+
+```bash
+curl -s https://api.tokfai.com/v1/health | jq .redis
+# { "enabled": false, "connected": false }
+```
+
+DMIT returns to P761–P763 in-memory gateway behavior immediately.
+
+### Security
+
+- **Never** log `TOKFAI_REDIS_URL` (DMIT logs prefix only on connect)
+- **Never** expose Redis URL in `/v1/health`, docs, or smoke script output
+- **Never** print API keys in smoke scripts (masked prefix/suffix only)
+
+### Production smoke results (Redis enabled)
+
+_To be filled after P764.1 enable deploy._
