@@ -20,7 +20,7 @@ export function ApiKeysErrorView({
   code,
 }: {
   message?: string;
-  messageKey?: "auth" | "temp";
+  messageKey?: "auth" | "load" | "temp";
   method: string;
   url: string;
   httpStatus?: number;
@@ -30,9 +30,11 @@ export function ApiKeysErrorView({
   const displayMessage =
     messageKey === "auth"
       ? t("dashboard.apiKeys.loadErrorAuthDesc")
-      : messageKey === "temp"
+      : messageKey === "load"
         ? t("dashboard.apiKeys.loadErrorTempDesc")
-        : (message ?? t("dashboard.apiKeys.loadErrorTempDesc"));
+        : messageKey === "temp"
+          ? t("dashboard.apiKeys.loadErrorTempDesc")
+          : (message ?? t("dashboard.apiKeys.loadErrorTempDesc"));
 
   return (
     <div className="flex flex-col gap-6">

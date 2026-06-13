@@ -528,7 +528,7 @@ export const messages = {
         loadError: "Could not load API keys",
         loadErrorAuthDesc: "Your session has expired. Please sign in again.",
         loadErrorTempDesc:
-          "API keys could not be loaded right now. Please try again later.",
+          "Unable to load API keys. Please try again later.",
         authHeaderHint: "Use this key in",
         quickStart: "Quick start",
         quickStartDesc: "Send your key on every request to the Tokfai API.",
@@ -589,6 +589,8 @@ export const messages = {
         active: "Active",
         legacyKeyMessage:
           "Create a new key to copy the full secret. Legacy keys that cannot be revealed must be replaced.",
+        fullKeyUnavailable:
+          "Full key is not available. Create a new key.",
         emptyTitle:
           "No API keys yet. Create your first key to start testing — the full secret is shown once, so copy it immediately.",
         emptyCreateFirst: "Create your first API key",
@@ -2374,7 +2376,7 @@ export const messages = {
           "创建密钥以向 {baseUrl} 发起认证请求。完整密钥仅在创建时展示一次；活跃密钥可通过「复制密钥」再次获取。",
         loadError: "无法加载 API 密钥",
         loadErrorAuthDesc: "登录状态异常，请重新登录。",
-        loadErrorTempDesc: "API 密钥暂时无法加载，请稍后重试。",
+        loadErrorTempDesc: "无法加载 API 密钥，请稍后重试。",
         authHeaderHint: "在请求中使用",
         quickStart: "快速上手",
         quickStartDesc: "每次请求 Tokfai API 时都需要携带密钥。",
@@ -2432,6 +2434,7 @@ export const messages = {
         active: "活跃",
         legacyKeyMessage:
           "请创建新密钥以复制完整 secret。无法揭示的旧密钥需替换。",
+        fullKeyUnavailable: "完整密钥不可用，请创建新密钥。",
         emptyTitle:
           "还没有 API 密钥。创建第一把密钥即可开始测试——完整 secret 仅展示一次，请立即复制。",
         emptyCreateFirst: "创建第一个 API Key",

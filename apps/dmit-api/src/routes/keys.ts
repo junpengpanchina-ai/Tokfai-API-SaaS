@@ -1,11 +1,14 @@
 import { Hono } from "hono";
 
 import { generateApiKey } from "../auth/apiKey.js";
-import { encryptSecretIfConfigured } from "../auth/keyEncryption.js";
 import { ApiError } from "../errors.js";
 import { requireSupabaseJwt } from "../middleware/supabaseJwt.js";
 import { supabase } from "../supabase.js";
 import type { AuthedUser } from "../types.js";
+import {
+  buildApiKeyInsertPayload,
+  insertApiKeyRow,
+} from "../lib/apiKeysDb.js";
 import {
   logCreateApiKeyFailed,
   readApiKeyId,
@@ -77,25 +80,16 @@ keyRoutes.post("/v1/keys", async (c) => {
   }
 
   const material = generateApiKey();
-  const encryptedSecret = encryptSecretIfConfigured(material.fullKey);
-  const sb = supabase();
-  const { data, error } = await sb
-    .from("api_keys")
-    .insert({
-      user_id: user.id,
-      name,
-      key_id: material.keyId,
-      prefix: material.prefix,
-      hash: material.hash,
-      encrypted_secret: encryptedSecret,
-    })
-    .select("id, name, prefix, created_at, last_used_at, revoked_at")
-    .single();
+  const insertPayload = buildApiKeyInsertPayload(user.id, name, material);
+  const { data, error } = await insertApiKeyRow(insertPayload);
 
-  if (error) {
-    logCreateApiKeyFailed(user.id, "keys_create_failed", error.message);
+  if (error || !data) {
+    logCreateApiKeyFailed(user.id, "keys_create_failed", {
+      message: error?.message ?? "Insert returned no row.",
+      code: error?.code,
+    });
     throw ApiError.internal(
-      `Failed to create API key: ${error.message}`,
+      `Failed to create API key: ${error?.message ?? "Insert returned no row."}`,
       "keys_create_failed"
     );
   }

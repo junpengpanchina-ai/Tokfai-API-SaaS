@@ -70,14 +70,22 @@ interface ActionErrorState {
   url?: string;
 }
 
-const LEGACY_KEY_MESSAGE_KEY = "dashboard.apiKeys.legacyKeyMessage";
+const LEGACY_KEY_MESSAGE_KEY = "dashboard.apiKeys.fullKeyUnavailable";
 
 export function ApiKeysClient({
   accessToken,
   initialKeys,
+  listLoadFailed = false,
+  listLoadError,
 }: {
   accessToken: string;
   initialKeys: ApiKeyListItem[];
+  listLoadFailed?: boolean;
+  listLoadError?: {
+    message?: string;
+    code?: string;
+    httpStatus?: number;
+  };
 }) {
   const { t } = useI18n();
   const [keys, setKeys] = useState<ApiKeyListItem[]>(initialKeys);
@@ -245,6 +253,18 @@ export function ApiKeysClient({
           <CardDescription>{t("dashboard.apiKeys.yourApiKeysDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
+          {listLoadFailed ? (
+            <ActionErrorAlert
+              error={{
+                message:
+                  listLoadError?.message ??
+                  t("dashboard.apiKeys.loadErrorTempDesc"),
+                status: listLoadError?.httpStatus ?? 500,
+                code: listLoadError?.code,
+              }}
+              className="mb-4"
+            />
+          ) : null}
           {revokeError ? (
             <ActionErrorAlert error={revokeError} className="mb-4" />
           ) : null}
@@ -256,7 +276,7 @@ export function ApiKeysClient({
               onRevoke={handleRevoke}
               t={t}
             />
-          ) : (
+          ) : listLoadFailed ? null : (
             <EmptyState t={t} />
           )}
         </CardContent>
@@ -513,7 +533,7 @@ function ApiKeysTable({
             const isActive = key.status === "active";
             const isCopying = copyingId === key.id;
             const keyCopied = copiedKeyId === key.id;
-            const canReveal = key.can_reveal !== false;
+            const canReveal = key.can_reveal === true;
 
             return (
               <tr key={key.id} className="border-b last:border-0">
@@ -689,8 +709,7 @@ function meKeyToListItem(key: MeKeyLike): ApiKeyListItem {
     last_used_at: key.last_used_at,
     revoked_at: key.revoked_at ?? null,
     can_reveal:
-      key.can_reveal ??
-      (status === "active" ? true : false),
+      key.can_reveal === true && status === "active",
   };
 }
 
@@ -716,8 +735,12 @@ function toActionError(
   fallback?: { method: string; url: string }
 ): ActionErrorState {
   if (err instanceof DmitApiError) {
+    const detail =
+      err.code && err.message
+        ? `${err.message} (${err.code})`
+        : err.message;
     return {
-      message: userMessageForDashboardError(err.status, err.code, err.message),
+      message: userMessageForDashboardError(err.status, err.code, detail),
       status: err.status,
       code: err.code,
       method: err.requestMethod ?? fallback?.method,

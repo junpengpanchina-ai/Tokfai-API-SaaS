@@ -1,10 +1,14 @@
 import { Hono } from "hono";
 
 import { generateApiKey } from "../auth/apiKey.js";
-import { encryptSecretIfConfigured } from "../auth/keyEncryption.js";
 import { ApiError } from "../errors.js";
 import { requireSupabaseJwt } from "../middleware/supabaseJwt.js";
 import { supabase } from "../supabase.js";
+import {
+  buildApiKeyInsertPayload,
+  insertApiKeyRow,
+  listApiKeysForUser,
+} from "../lib/apiKeysDb.js";
 import {
   logCreateApiKeyFailed,
   readApiKeyId,
@@ -13,7 +17,6 @@ import {
 } from "./apiKeyActions.js";
 import { resolveCreditOrderDisplayStatus } from "../lib/creditOrders.js";
 import type {
-  ApiKeyRow,
   AuthedUser,
   CreditLedgerRow,
   CreditOrderRow,
@@ -346,11 +349,7 @@ meRoutes.delete("/api-keys/:id", async (c) => {
 
 meRoutes.get("/api-keys", async (c) => {
   const user = authedUser(c);
-  const { data, error } = await supabase()
-    .from("api_keys")
-    .select("id, name, prefix, created_at, last_used_at, revoked_at, encrypted_secret")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+  const { data, error } = await listApiKeysForUser(user.id);
 
   if (error) {
     throw ApiError.internal(
@@ -359,27 +358,7 @@ meRoutes.get("/api-keys", async (c) => {
     );
   }
 
-  const keys = ((data ?? []) as Pick<
-    ApiKeyRow,
-    | "id"
-    | "name"
-    | "prefix"
-    | "created_at"
-    | "last_used_at"
-    | "revoked_at"
-    | "encrypted_secret"
-  >[]).map((key) => ({
-    id: key.id,
-    name: key.name,
-    prefix: key.prefix,
-    status: key.revoked_at ? "revoked" : "active",
-    created_at: key.created_at,
-    last_used_at: key.last_used_at,
-    revoked_at: key.revoked_at,
-    can_reveal: Boolean(key.encrypted_secret && !key.revoked_at),
-  }));
-
-  return c.json({ data: keys });
+  return c.json({ data });
 });
 
 meRoutes.post("/api-keys", async (c) => {
@@ -423,11 +402,10 @@ meRoutes.post("/api-keys", async (c) => {
     .limit(1);
 
   if (existingKeyError) {
-    logCreateApiKeyFailed(
-      user.id,
-      "me_api_keys_name_check_failed",
-      existingKeyError.message
-    );
+    logCreateApiKeyFailed(user.id, "me_api_keys_name_check_failed", {
+      message: existingKeyError.message,
+      code: existingKeyError.code,
+    });
     throw ApiError.internal(
       `Failed to check API key name uniqueness: ${existingKeyError.message}`,
       "me_api_keys_name_check_failed"
@@ -445,26 +423,17 @@ meRoutes.post("/api-keys", async (c) => {
 
   const material = generateApiKey();
   const plainKey = material.fullKey;
-  const keyHash = material.hash;
   const keyPrefix = material.prefix;
-  const encryptedSecret = encryptSecretIfConfigured(plainKey);
-  const { data, error } = await supabase()
-    .from("api_keys")
-    .insert({
-      user_id: user.id,
-      name,
-      key_id: material.keyId,
-      prefix: keyPrefix,
-      hash: keyHash,
-      encrypted_secret: encryptedSecret,
-    })
-    .select("id, name, prefix, created_at, last_used_at, revoked_at")
-    .single();
+  const insertPayload = buildApiKeyInsertPayload(user.id, name, material);
+  const { data, error } = await insertApiKeyRow(insertPayload);
 
-  if (error) {
-    logCreateApiKeyFailed(user.id, "me_api_keys_create_failed", error.message);
+  if (error || !data) {
+    logCreateApiKeyFailed(user.id, "me_api_keys_create_failed", {
+      message: error?.message ?? "Insert returned no row.",
+      code: error?.code,
+    });
     throw ApiError.internal(
-      `Failed to create API key: ${error.message}`,
+      `Failed to create API key: ${error?.message ?? "Insert returned no row."}`,
       "me_api_keys_create_failed"
     );
   }
@@ -479,7 +448,7 @@ meRoutes.post("/api-keys", async (c) => {
         created_at: data.created_at,
         last_used_at: data.last_used_at,
         revoked_at: data.revoked_at,
-        can_reveal: Boolean(encryptedSecret && !data.revoked_at),
+        can_reveal: insertPayload.can_reveal && !data.revoked_at,
       },
       /** Full plaintext key — only on POST create or explicit owner reveal. */
       secret: plainKey,

@@ -1,13 +1,13 @@
 import type { Context } from "hono";
 
-import { decryptSecret, encryptSecretIfConfigured } from "../auth/keyEncryption.js";
+import { decryptSecret } from "../auth/keyEncryption.js";
 import { maskApiKeyId } from "../auth/apiKey.js";
 import { ApiError } from "../errors.js";
 import { log } from "../logger.js";
 import { supabase } from "../supabase.js";
+import { revokeApiKeyRow } from "../lib/apiKeysDb.js";
 import type { ApiKeyRow, AuthedUser } from "../types.js";
 
-type RevokedApiKeyRow = Pick<ApiKeyRow, "id" | "revoked_at">;
 type ApiKeyOwnerRow = Pick<ApiKeyRow, "id" | "prefix" | "key_id">;
 
 const RESERVED_ROUTE_IDS = new Set(["revoke", "reveal"]);
@@ -16,9 +16,14 @@ function authedUser(c: { get: (key: never) => unknown }): AuthedUser {
   return c.get("user" as never) as AuthedUser;
 }
 
-function truncateDbError(message: string, max = 160): string {
+function truncateDbError(message: string, max = 180): string {
   const trimmed = message.trim();
   return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max)}…`;
+}
+
+export interface DbErrorInfo {
+  message?: string;
+  code?: string;
 }
 
 export async function readApiKeyId(c: Context): Promise<string> {
@@ -98,13 +103,7 @@ export async function revokeApiKey(c: Context, id: string) {
   }
 
   const revokedAt = new Date().toISOString();
-  const { data, error } = await supabase()
-    .from("api_keys")
-    .update({ revoked_at: revokedAt })
-    .eq("id", owner.id)
-    .eq("user_id", user.id)
-    .select("id, revoked_at")
-    .maybeSingle<RevokedApiKeyRow>();
+  const { data, error } = await revokeApiKeyRow(owner.id, user.id, revokedAt);
 
   if (error) {
     log.warn("revoke_api_key_failed", {
@@ -201,14 +200,26 @@ export async function revealApiKey(c: Context, id: string) {
 export function logCreateApiKeyFailed(
   userId: string,
   errorCode: string,
-  dbErrorMessage?: string
+  dbError?: DbErrorInfo | string
 ) {
+  const info =
+    typeof dbError === "string"
+      ? { message: dbError }
+      : dbError;
+  const dbErrorMessage = info?.message
+    ? truncateDbError(info.message)
+    : undefined;
+  const dbErrorCode =
+    info && "code" in info && typeof info.code === "string"
+      ? info.code
+      : undefined;
+
   log.error("create_api_key_failed", {
     userId,
     code: errorCode,
-    dbErrorMessage: dbErrorMessage
-      ? truncateDbError(dbErrorMessage)
-      : undefined,
-    message: "Failed to create API key.",
+    dbErrorMessage,
+    message: dbErrorCode
+      ? `Failed to create API key (db_code=${dbErrorCode}).`
+      : "Failed to create API key.",
   });
 }

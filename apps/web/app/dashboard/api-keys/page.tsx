@@ -25,9 +25,10 @@ type ApiKeysState =
   | { status: "ready"; keys: ApiKeyListItem[] }
   | {
       status: "error";
-      messageKey: "auth" | "temp";
+      messageKey: "auth" | "load";
       code?: string;
       httpStatus?: number;
+      message?: string;
       method: string;
       url: string;
     };
@@ -63,22 +64,32 @@ export default async function ApiKeysPage() {
 
   const state = await loadApiKeys(session.access_token);
 
-  if (state.status === "ready") {
+  if (state.status === "error" && state.messageKey === "auth") {
     return (
-      <ApiKeysClient
-        accessToken={session.access_token}
-        initialKeys={state.keys}
+      <ApiKeysErrorView
+        messageKey={state.messageKey}
+        code={state.code}
+        httpStatus={state.httpStatus}
+        method={state.method}
+        url={state.url}
       />
     );
   }
 
   return (
-    <ApiKeysErrorView
-      messageKey={state.messageKey}
-      code={state.code}
-      httpStatus={state.httpStatus}
-      method={state.method}
-      url={state.url}
+    <ApiKeysClient
+      accessToken={session.access_token}
+      initialKeys={state.status === "ready" ? state.keys : []}
+      listLoadFailed={state.status === "error"}
+      listLoadError={
+        state.status === "error"
+          ? {
+              message: state.message,
+              code: state.code,
+              httpStatus: state.httpStatus,
+            }
+          : undefined
+      }
     />
   );
 }
@@ -99,16 +110,18 @@ async function loadApiKeys(accessToken: string): Promise<ApiKeysState> {
       return {
         status: "error",
         messageKey:
-          err.status === 401 || err.status === 403 ? "auth" : "temp",
+          err.status === 401 || err.status === 403 ? "auth" : "load",
         code: err.code,
         httpStatus: err.status,
+        message: err.message,
         method: "GET",
         url,
       };
     }
     return {
       status: "error",
-      messageKey: "temp",
+      messageKey: "load",
+      message: "Unable to load API keys. Please try again later.",
       method: "GET",
       url,
     };
