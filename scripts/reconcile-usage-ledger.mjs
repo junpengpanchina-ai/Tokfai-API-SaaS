@@ -11,10 +11,10 @@
  *   LIMIT                  default 500 rows per check
  */
 
-import { createClient } from "../apps/dmit-api/node_modules/@supabase/supabase-js/dist/index.mjs";
-
-const SUPABASE_URL = process.env.SUPABASE_URL ?? "";
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+import {
+  createSupabaseAdminClient,
+  requireSupabaseAdminEnv,
+} from "./lib/supabase-admin.mjs";
 const DRY_RUN =
   process.env.DRY_RUN !== "0" &&
   process.env.DRY_RUN !== "false" &&
@@ -27,17 +27,6 @@ const LIMIT = Math.max(
   10,
   parseInt(process.env.LIMIT ?? "500", 10) || 500
 );
-
-function requireEnv() {
-  if (!SUPABASE_URL.startsWith("http")) {
-    console.error("Set SUPABASE_URL before running this script.");
-    process.exit(1);
-  }
-  if (!SERVICE_ROLE_KEY || SERVICE_ROLE_KEY.length < 20) {
-    console.error("Set SUPABASE_SERVICE_ROLE_KEY before running this script.");
-    process.exit(1);
-  }
-}
 
 function sinceIso() {
   return new Date(Date.now() - LOOKBACK_HOURS * 60 * 60 * 1000).toISOString();
@@ -180,12 +169,10 @@ function printAnomalies(title, rows) {
 }
 
 async function main() {
-  requireEnv();
+  requireSupabaseAdminEnv();
 
   const since = sinceIso();
-  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const supabase = createSupabaseAdminClient();
 
   console.log("=== P765 usage / ledger reconcile (report only) ===");
   console.log(`mode:           ${DRY_RUN ? "dry-run (report only)" : "live report"}`);

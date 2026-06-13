@@ -19,22 +19,11 @@
  *   --idempotency-key         optional; default derived from kind + user + amount + note
  */
 
-import { createClient } from "../apps/dmit-api/node_modules/@supabase/supabase-js/dist/index.mjs";
 import { createHash } from "node:crypto";
-
-const SUPABASE_URL = process.env.SUPABASE_URL ?? "";
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-
-function requireEnv() {
-  if (!SUPABASE_URL.startsWith("http")) {
-    console.error("Set SUPABASE_URL before running this script.");
-    process.exit(1);
-  }
-  if (!SERVICE_ROLE_KEY || SERVICE_ROLE_KEY.length < 20) {
-    console.error("Set SUPABASE_SERVICE_ROLE_KEY before running this script.");
-    process.exit(1);
-  }
-}
+import {
+  createSupabaseAdminClient,
+  requireSupabaseAdminEnv,
+} from "./lib/supabase-admin.mjs";
 
 function parseArgs(argv) {
   const kind = argv[2];
@@ -60,7 +49,7 @@ function defaultIdempotencyKey(kind, flags) {
 }
 
 async function main() {
-  requireEnv();
+  requireSupabaseAdminEnv();
 
   const { kind, flags } = parseArgs(process.argv);
   if (kind !== "grant" && kind !== "reverse") {
@@ -88,9 +77,7 @@ async function main() {
     process.exit(1);
   }
 
-  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const supabase = createSupabaseAdminClient();
 
   console.log("=== P765 admin credit adjustment ===");
   console.log(`kind:       ${kind}`);
