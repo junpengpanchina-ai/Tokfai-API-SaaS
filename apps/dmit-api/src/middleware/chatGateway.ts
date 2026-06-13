@@ -45,8 +45,8 @@ async function rejectGatewayGuard(
     requestId,
     err,
     limitKey,
-    keyInflight: getKeyInflight(limitKey),
-    globalInflight: getGlobalUpstreamInflight(),
+    keyInflight: await getKeyInflight(limitKey),
+    globalInflight: await getGlobalUpstreamInflight(),
   });
 
   return respondApiError(c, err, requestId);
@@ -70,7 +70,7 @@ export const chatGatewayMiddleware: MiddlewareHandler = async (c, next) => {
     throw err;
   }
 
-  const rate = checkRateLimit(limitKey);
+  const rate = await checkRateLimit(limitKey);
   c.header("X-RateLimit-Limit", String(rate.limit));
   c.header("X-RateLimit-Remaining", String(rate.remaining));
   c.header("X-RateLimit-Reset", String(Math.ceil(rate.resetAt / 1000)));
@@ -84,7 +84,7 @@ export const chatGatewayMiddleware: MiddlewareHandler = async (c, next) => {
     });
   }
 
-  if (!tryAcquireKeyConcurrency(limitKey)) {
+  if (!(await tryAcquireKeyConcurrency(limitKey))) {
     return rejectGatewayGuard(c, {
       caller,
       requestId,
@@ -96,6 +96,6 @@ export const chatGatewayMiddleware: MiddlewareHandler = async (c, next) => {
   try {
     await next();
   } finally {
-    releaseKeyConcurrency(limitKey);
+    await releaseKeyConcurrency(limitKey);
   }
 };

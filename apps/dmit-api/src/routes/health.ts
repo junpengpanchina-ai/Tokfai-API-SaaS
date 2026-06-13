@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import { env } from "../env.js";
+import { getRedisHealthStatus } from "../redis/client.js";
 
 export const healthRoutes = new Hono();
 
@@ -22,6 +23,7 @@ healthRoutes.get("/v1/health", (c) =>
     service: "dmit",
     version: "0.1.0",
     now: new Date().toISOString(),
+    redis: getRedisHealthStatus(),
   })
 );
 

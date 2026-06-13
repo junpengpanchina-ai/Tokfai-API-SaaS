@@ -123,6 +123,18 @@ const Schema = z
     .int()
     .min(0)
     .default(1),
+  TOKFAI_BATCH_LOCK_TTL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(900_000),
+  TOKFAI_REDIS_ENABLED: z
+    .string()
+    .optional()
+    .default("false")
+    .transform((raw) => raw === "true" || raw === "1"),
+  TOKFAI_REDIS_URL: z.string().url().optional(),
+  TOKFAI_REDIS_KEY_PREFIX: z.string().min(1).default("tokfai"),
   BOT_MODEL: z.string().min(1).default("auto-fast"),
 
   STRIPE_SECRET_KEY: z.string().min(1).optional(),

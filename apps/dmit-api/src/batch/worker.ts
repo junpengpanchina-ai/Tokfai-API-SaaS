@@ -18,23 +18,36 @@ import {
   RETRYABLE_BATCH_ERROR_CODES,
 } from "./constants.js";
 import { finalizeBatch } from "./finalize.js";
+import { releaseBatchLock, tryAcquireBatchLock } from "./lock.js";
 
 const activeBatches = new Set<string>();
 
 export function enqueueBatchProcessing(batchId: string): void {
+  void enqueueBatchProcessingAsync(batchId);
+}
+
+async function enqueueBatchProcessingAsync(batchId: string): Promise<void> {
   if (activeBatches.has(batchId)) return;
+
+  const lockAcquired = await tryAcquireBatchLock(batchId);
+  if (!lockAcquired) {
+    log.info("batch_lock_skip", { batchId });
+    return;
+  }
+
   activeBatches.add(batchId);
 
-  void processBatch(batchId)
-    .catch((err) => {
-      log.error("batch_worker_failed", {
-        batchId,
-        message: err instanceof Error ? err.message : String(err),
-      });
-    })
-    .finally(() => {
-      activeBatches.delete(batchId);
+  try {
+    await processBatch(batchId);
+  } catch (err) {
+    log.error("batch_worker_failed", {
+      batchId,
+      message: err instanceof Error ? err.message : String(err),
     });
+  } finally {
+    activeBatches.delete(batchId);
+    await releaseBatchLock(batchId);
+  }
 }
 
 async function processBatch(batchId: string): Promise<void> {

@@ -45,8 +45,8 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
         requestId,
         err,
         limitKey,
-        keyInflight: getKeyInflight(limitKey),
-        globalInflight: getGlobalUpstreamInflight(),
+        keyInflight: await getKeyInflight(limitKey),
+        globalInflight: await getGlobalUpstreamInflight(),
       });
     }
     throw err;

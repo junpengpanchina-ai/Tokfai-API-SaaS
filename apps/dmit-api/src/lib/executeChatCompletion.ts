@@ -158,7 +158,7 @@ export async function executeChatCompletion(
 
   const { isAlias, attempts: rawAttempts } = resolveModelAttempts(requestedModel);
   const attempts = isAlias
-    ? filterAttemptsByCircuitBreaker(rawAttempts)
+    ? await filterAttemptsByCircuitBreaker(rawAttempts)
     : rawAttempts;
 
   if (isAlias && attempts.length === 0) {
@@ -211,7 +211,7 @@ export async function executeChatCompletion(
         return failureResult(timeoutErr, requestId);
       }
 
-      if (!tryAcquireGlobalUpstream()) {
+      if (!(await tryAcquireGlobalUpstream())) {
         const err = ApiError.gatewayOverloaded();
         await logGatewayOverloaded({
           caller,
@@ -253,7 +253,7 @@ export async function executeChatCompletion(
           }
         );
 
-        recordModelSuccess(attemptModel);
+        await recordModelSuccess(attemptModel);
 
         const usage = normalizeUsage(data.usage);
         const resolvedModel = data.model ?? attemptModel;
@@ -336,7 +336,7 @@ export async function executeChatCompletion(
         });
 
         if (isAlias && isChatFallbackEligible(err)) {
-          recordModelFailure(attemptModel, err.code);
+          await recordModelFailure(attemptModel, err.code);
         }
 
         const hasNextAttempt = isAlias && attemptIndex < attempts.length - 1;
@@ -368,7 +368,7 @@ export async function executeChatCompletion(
         });
         return failureResult(err, requestId);
       } finally {
-        releaseGlobalUpstream();
+        await releaseGlobalUpstream();
       }
     }
 

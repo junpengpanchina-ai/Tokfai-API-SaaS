@@ -10,13 +10,23 @@
  * Optional env:
  *   STUCK_BATCH_MS          default 900000 (TOKFAI_BATCH_MAX_RUNTIME_MS)
  *   STUCK_ITEM_MS           default 180000 (TOKFAI_BATCH_ITEM_TIMEOUT_MS)
+ *   STUCK_ITEM_MS           default 180000 (TOKFAI_BATCH_ITEM_TIMEOUT_MS)
  *   DRY_RUN                 default false — set to 1 to preview only
+ *   TOKFAI_REDIS_URL        optional — when set with repair lock checks
+ *   TOKFAI_REDIS_ENABLED    optional — set to true to skip batches with active Redis lock
+ *   TOKFAI_REDIS_KEY_PREFIX default tokfai
  */
 
-import { createClient } from "../apps/dmit-api/node_modules/@supabase/supabase-js/dist/index.mjs";
+import { createClient as createSupabaseClient } from "../apps/dmit-api/node_modules/@supabase/supabase-js/dist/index.mjs";
+import { createClient as createRedisClient } from "../apps/dmit-api/node_modules/redis/dist/index.mjs";
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? "";
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+const REDIS_URL = process.env.TOKFAI_REDIS_URL ?? "";
+const REDIS_ENABLED =
+  process.env.TOKFAI_REDIS_ENABLED === "1" ||
+  process.env.TOKFAI_REDIS_ENABLED === "true";
+const REDIS_KEY_PREFIX = process.env.TOKFAI_REDIS_KEY_PREFIX ?? "tokfai";
 const STUCK_BATCH_MS = Math.max(
   60_000,
   parseInt(process.env.STUCK_BATCH_MS ?? "900000", 10) || 900_000
@@ -119,13 +129,22 @@ async function finalizeBatch(supabase, batchId, batchStatus) {
     .eq("id", batchId);
 }
 
-async function repairBatch(supabase, batch) {
+async function repairBatch(supabase, redis, batch) {
   const batchAgeMs = batch.started_at
     ? Date.now() - new Date(batch.started_at).getTime()
     : Date.now() - new Date(batch.created_at).getTime();
 
   if (batchAgeMs < STUCK_BATCH_MS) {
     return false;
+  }
+
+  if (redis) {
+    const lockKey = `${REDIS_KEY_PREFIX}:batch:lock:${batch.id}`;
+    const held = await redis.exists(lockKey);
+    if (held === 1) {
+      console.log(`  skip batch ${batch.id}: redis lock held by active worker`);
+      return false;
+    }
   }
 
   console.log(
@@ -204,13 +223,35 @@ async function repairBatch(supabase, batch) {
 async function main() {
   requireEnv();
 
-  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+  const supabase = createSupabaseClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  let redis = null;
+  if (REDIS_ENABLED && REDIS_URL) {
+    try {
+      redis = createRedisClient({ url: REDIS_URL });
+      await redis.connect();
+      console.log("Redis lock checks enabled for repair.");
+    } catch (err) {
+      console.warn(
+        `Redis unavailable for repair lock checks: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+      console.warn(
+        "Continuing repair without lock checks — may conflict with an active worker."
+      );
+    }
+  } else {
+    console.log(
+      "Redis lock checks disabled — repair may conflict with an active worker."
+    );
+  }
+
   const cutoff = new Date(Date.now() - STUCK_BATCH_MS).toISOString();
 
-  console.log("=== P763 repair stuck batches ===");
+  console.log("=== P763/P764 repair stuck batches ===");
   console.log(`stuck_batch_ms: ${STUCK_BATCH_MS}`);
   console.log(`stuck_item_ms:  ${STUCK_ITEM_MS}`);
   console.log(`dry_run:        ${DRY_RUN}`);
@@ -235,9 +276,13 @@ async function main() {
 
   let repaired = 0;
   for (const batch of batches) {
-    if (await repairBatch(supabase, batch)) {
+    if (await repairBatch(supabase, redis, batch)) {
       repaired += 1;
     }
+  }
+
+  if (redis) {
+    await redis.quit().catch(() => undefined);
   }
 
   console.log("");

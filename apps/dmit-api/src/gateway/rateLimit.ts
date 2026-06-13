@@ -1,4 +1,6 @@
 import { env } from "../env.js";
+import { log } from "../logger.js";
+import { getRedisClient, redisKey } from "../redis/client.js";
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -12,10 +14,25 @@ interface WindowState {
   windowStart: number;
 }
 
-/** Process-local fixed-window rate limiter keyed by api_key_id or user id. */
+/** Process-local fallback when Redis is disabled or unavailable. */
 const windows = new Map<string, WindowState>();
 
-export function checkRateLimit(limitKey: string): RateLimitResult {
+export async function checkRateLimit(limitKey: string): Promise<RateLimitResult> {
+  const redis = getRedisClient();
+  if (redis) {
+    try {
+      return await checkRateLimitRedis(redis, limitKey);
+    } catch (err) {
+      log.warn("redis_rate_limit_fallback", {
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return checkRateLimitMemory(limitKey);
+}
+
+function checkRateLimitMemory(limitKey: string): RateLimitResult {
   const windowMs = env.TOKFAI_RATE_LIMIT_WINDOW_MS;
   const limit = env.TOKFAI_RATE_LIMIT_RPM;
   const now = Date.now();
@@ -37,6 +54,34 @@ export function checkRateLimit(limitKey: string): RateLimitResult {
     allowed: true,
     limit,
     remaining: Math.max(0, limit - state.count),
+    resetAt,
+  };
+}
+
+async function checkRateLimitRedis(
+  redis: NonNullable<ReturnType<typeof getRedisClient>>,
+  limitKey: string
+): Promise<RateLimitResult> {
+  const windowMs = env.TOKFAI_RATE_LIMIT_WINDOW_MS;
+  const limit = env.TOKFAI_RATE_LIMIT_RPM;
+  const now = Date.now();
+  const windowBucket = Math.floor(now / windowMs);
+  const key = redisKey("rate", limitKey, String(windowBucket));
+  const resetAt = (windowBucket + 1) * windowMs;
+
+  const count = await redis.incr(key);
+  if (count === 1) {
+    await redis.pExpire(key, windowMs);
+  }
+
+  if (count > limit) {
+    return { allowed: false, limit, remaining: 0, resetAt };
+  }
+
+  return {
+    allowed: true,
+    limit,
+    remaining: Math.max(0, limit - count),
     resetAt,
   };
 }
