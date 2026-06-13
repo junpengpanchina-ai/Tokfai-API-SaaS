@@ -216,3 +216,5 @@ Expected:
 | `scripts/test-batch-chat.mjs` | Smoke script |
 
 Sync `/v1/chat/completions` is unchanged for existing clients.
+
+Batch Queue 后续需要结合 model health probe，避免批量任务长期卡在不健康模型上。
