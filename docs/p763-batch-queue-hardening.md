@@ -192,6 +192,73 @@ Creates a 10-item batch, cancels immediately, verifies pending items are not pro
 
 Both scripts exit with a friendly error when `TOKFAI_API_KEY` is missing.
 
+### Production smoke results
+
+**Status:** ✅ P763 passed on production DMIT (2026-06-13)
+
+**Deploy:**
+
+```bash
+git pull origin main
+npm ci
+npm run build
+pm2 restart dmit-api --update-env
+pm2 save
+```
+
+**Environment:**
+
+| Setting | Value |
+|---------|-------|
+| API base | `https://api.tokfai.com/v1` |
+| Model | `auto-fast` |
+| Migration | `supabase/migrations/0027_p763_batch_queue_hardening.sql` — applied via Supabase SQL Editor |
+
+#### 1. Batch chat smoke
+
+| Setting | Value |
+|---------|-------|
+| Script | `scripts/test-batch-chat.mjs` |
+| Items | 5 |
+
+| Metric | Result |
+|--------|--------|
+| Final batch status | `completed` |
+| succeeded_items / failed_items | 5 / 0 |
+| credits_charged | 0.001147 |
+| batch_duration | 20.7s |
+| poll_duration | 24.3s |
+| Items returned | 5 / 5 |
+| Item status | all `succeeded` |
+| request_id present | 5 / 5 |
+| max_attempts | 1 |
+| Script outcome | Smoke test passed |
+
+#### 2. Batch cancel smoke
+
+| Setting | Value |
+|---------|-------|
+| Script | `scripts/test-batch-cancel.mjs` |
+| Items | 10 |
+
+| Metric | Result |
+|--------|--------|
+| Created batch status | `pending` |
+| Cancel immediately | ✅ succeeded |
+| Final batch status | `cancelled` |
+| succeeded_items / failed_items | 0 / 0 |
+| Cancelled items | 10 |
+| Pending items | 0 |
+| Cancelled item attempt_count | 0 (each) |
+| Cancelled item error_code | `batch_cancelled` (each) |
+| Script outcome | Cancel test passed |
+
+**Conclusion:**
+
+P763 production validation passed. Batch queue now supports timeout / retry / cancel / repair foundations. Normal batches reach `completed`; cancel stops pending items from executing; unexecuted items are not charged.
+
+**Note:** `npm audit` currently reports 2 moderate + 2 high vulnerabilities — not a blocker for this release; track separately in a dependency security task.
+
 ---
 
 ## 12. API summary (unchanged + new)
