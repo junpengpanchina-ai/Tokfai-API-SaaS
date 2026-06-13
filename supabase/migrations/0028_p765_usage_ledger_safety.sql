@@ -95,7 +95,26 @@ revoke all on function public.lookup_usage_idempotency(uuid, text, text)
 grant execute on function public.lookup_usage_idempotency(uuid, text, text)
   to service_role;
 
-create or replace function public.record_usage_and_debit(
+-- Return type changes numeric -> jsonb; replace all overloads explicitly.
+do $$
+declare
+  r record;
+begin
+  for r in
+    select pg_get_function_identity_arguments(p.oid) as args
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = 'record_usage_and_debit'
+  loop
+    execute format(
+      'drop function if exists public.record_usage_and_debit(%s)',
+      r.args
+    );
+  end loop;
+end $$;
+
+create function public.record_usage_and_debit(
   p_user_id             uuid,
   p_api_key_id          uuid,
   p_model               text,
@@ -249,15 +268,6 @@ begin
   );
 end;
 $$;
-
-revoke all on function public.record_usage_and_debit(
-  uuid, uuid, text, int, int, int, numeric, text, text, int
-) from public, anon, authenticated;
-
-revoke all on function public.record_usage_and_debit(
-  uuid, uuid, text, int, int, int, numeric, text, text, int,
-  boolean, text, int, text, text
-) from public, anon, authenticated;
 
 revoke all on function public.record_usage_and_debit(
   uuid, uuid, text, int, int, int, numeric, text, text, int,
