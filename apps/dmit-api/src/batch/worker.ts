@@ -12,6 +12,12 @@ import type {
   ChatBatchRow,
   ChatBatchStatus,
 } from "../types.js";
+import {
+  BATCH_CANCELLED_BY_TIMEOUT_CODE,
+  BATCH_ITEM_TIMEOUT_CODE,
+  RETRYABLE_BATCH_ERROR_CODES,
+} from "./constants.js";
+import { finalizeBatch } from "./finalize.js";
 
 const activeBatches = new Set<string>();
 
@@ -33,20 +39,40 @@ export function enqueueBatchProcessing(batchId: string): void {
 
 async function processBatch(batchId: string): Promise<void> {
   const batch = await loadBatch(batchId);
-  if (!batch || batch.status !== "pending") {
+  if (!batch || !isProcessableBatchStatus(batch.status)) {
     return;
   }
 
-  const now = new Date().toISOString();
-  await supabase()
-    .from("chat_batches")
-    .update({
-      status: "running",
-      started_at: now,
-      updated_at: now,
-    })
-    .eq("id", batchId)
-    .eq("status", "pending");
+  if (batch.status === "cancelled") {
+    await finalizeBatch(batchId);
+    return;
+  }
+
+  if (batch.status === "pending") {
+    const now = new Date().toISOString();
+    const { data: updated } = await supabase()
+      .from("chat_batches")
+      .update({
+        status: "running",
+        started_at: now,
+        updated_at: now,
+      })
+      .eq("id", batchId)
+      .eq("status", "pending")
+      .select("*")
+      .maybeSingle();
+
+    if (!updated) {
+      const latest = await loadBatch(batchId);
+      if (latest?.status === "cancelled") {
+        await finalizeBatch(batchId);
+      }
+      return;
+    }
+
+    batch.status = "running";
+    batch.started_at = now;
+  }
 
   const { data: items, error: itemsError } = await supabase()
     .from("chat_batch_items")
@@ -68,14 +94,19 @@ async function processBatch(batchId: string): Promise<void> {
     apiKeyId: batch.api_key_id,
   };
 
+  const pendingItems = (items as ChatBatchItemRow[]).filter(
+    (item) => item.status === "pending"
+  );
+
   await runPool(
-    items as ChatBatchItemRow[],
+    pendingItems,
     env.TOKFAI_BATCH_ITEM_CONCURRENCY,
     async (item) => {
       try {
         await processBatchItem({
+          batchId,
           batch,
-          item: item as ChatBatchItemRow,
+          item,
           caller,
         });
       } catch (err) {
@@ -86,6 +117,7 @@ async function processBatch(batchId: string): Promise<void> {
         });
         await markItemFailed(item.id, {
           requestId: generateRequestId(),
+          attemptCount: 0,
           errorCode: "server_error",
           errorMessage: "Internal error.",
         });
@@ -93,28 +125,24 @@ async function processBatch(batchId: string): Promise<void> {
     }
   );
 
+  await failTimedOutNonTerminalItems(batchId, batch);
   await finalizeBatch(batchId);
 }
 
 async function processBatchItem(args: {
+  batchId: string;
   batch: ChatBatchRow;
   item: ChatBatchItemRow;
   caller: ChatCaller;
 }): Promise<void> {
-  const { batch, item, caller } = args;
-  const requestId = generateRequestId();
-  const startedAt = new Date().toISOString();
+  const { batchId, batch, item, caller } = args;
+  const maxAttempts = 1 + env.TOKFAI_BATCH_ITEM_MAX_RETRIES;
 
-  await supabase()
-    .from("chat_batch_items")
-    .update({
-      status: "running",
-      request_id: requestId,
-      started_at: startedAt,
-      updated_at: startedAt,
-    })
-    .eq("id", item.id)
-    .eq("status", "pending");
+  const skipReason = await getItemSkipReason(batchId, batch);
+  if (skipReason) {
+    await markItemTerminal(item.id, skipReason);
+    return;
+  }
 
   const parsed = ChatCompletionRequestSchema.safeParse({
     ...(item.input as Record<string, unknown>),
@@ -124,49 +152,233 @@ async function processBatchItem(args: {
 
   if (!parsed.success) {
     await markItemFailed(item.id, {
-      requestId,
+      requestId: generateRequestId(),
+      attemptCount: 1,
       errorCode: "invalid_request_error",
       errorMessage: "Invalid batch item input.",
     });
     return;
   }
 
-  const result = await executeChatCompletion({
-    caller,
-    requestId,
-    body: parsed.data,
-    route: "/v1/batches/chat",
-  });
+  let lastRequestId = generateRequestId();
+  let lastErrorCode = "server_error";
+  let lastErrorMessage = "Request failed.";
 
-  if (result.ok) {
-    const completedAt = new Date().toISOString();
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const skip = await getItemSkipReason(batchId, batch);
+    if (skip) {
+      await markItemTerminal(item.id, skip);
+      return;
+    }
+
+    lastRequestId = generateRequestId();
+    const startedAt = new Date().toISOString();
+
+    const { data: claimed, error: claimError } = await supabase()
+      .from("chat_batch_items")
+      .update({
+        status: "running",
+        request_id: lastRequestId,
+        attempt_count: attempt,
+        started_at: item.started_at ?? startedAt,
+        updated_at: startedAt,
+      })
+      .eq("id", item.id)
+      .eq("status", "pending")
+      .select("id");
+
+    if (claimError || !claimed?.length) {
+      return;
+    }
+
+    const result = await runWithItemTimeout(
+      executeChatCompletion({
+        caller,
+        requestId: lastRequestId,
+        body: parsed.data,
+        route: "/v1/batches/chat",
+      }),
+      env.TOKFAI_BATCH_ITEM_TIMEOUT_MS
+    );
+
+    if (result.kind === "timeout") {
+      lastErrorCode = BATCH_ITEM_TIMEOUT_CODE;
+      lastErrorMessage = "Batch item exceeded maximum runtime.";
+      log.warn("batch_item_timeout", {
+        batchId,
+        itemId: item.id,
+        attempt,
+        timeoutMs: env.TOKFAI_BATCH_ITEM_TIMEOUT_MS,
+      });
+    } else if (result.value.ok) {
+      const completedAt = new Date().toISOString();
+      await supabase()
+        .from("chat_batch_items")
+        .update({
+          status: "succeeded",
+          output: result.value.response,
+          credits_charged: result.value.creditsCharged,
+          error_code: null,
+          error_message: null,
+          completed_at: completedAt,
+          updated_at: completedAt,
+        })
+        .eq("id", item.id);
+      return;
+    } else {
+      lastErrorCode = result.value.errorCode;
+      lastErrorMessage = result.value.errorMessage;
+    }
+
+    const canRetry =
+      attempt < maxAttempts &&
+      RETRYABLE_BATCH_ERROR_CODES.has(lastErrorCode);
+
+    if (canRetry) {
+      log.info("batch_item_retry", {
+        batchId,
+        itemId: item.id,
+        attempt,
+        nextAttempt: attempt + 1,
+        errorCode: lastErrorCode,
+      });
+      await supabase()
+        .from("chat_batch_items")
+        .update({
+          status: "pending",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", item.id)
+        .eq("status", "running");
+      continue;
+    }
+
+    await markItemFailed(item.id, {
+      requestId: lastRequestId,
+      attemptCount: attempt,
+      errorCode: lastErrorCode,
+      errorMessage: lastErrorMessage,
+    });
+    return;
+  }
+}
+
+type ItemSkipReason = {
+  errorCode: string;
+  errorMessage: string;
+};
+
+async function getItemSkipReason(
+  batchId: string,
+  batch: ChatBatchRow
+): Promise<ItemSkipReason | null> {
+  const latest = await loadBatch(batchId);
+  if (!latest) {
+    return {
+      errorCode: "batch_not_found",
+      errorMessage: "Batch not found.",
+    };
+  }
+
+  if (latest.status === "cancelled") {
+    return {
+      errorCode: "batch_cancelled",
+      errorMessage: "Batch cancelled by user.",
+    };
+  }
+
+  if (isBatchRuntimeExceeded(latest)) {
+    return {
+      errorCode: BATCH_CANCELLED_BY_TIMEOUT_CODE,
+      errorMessage: "Batch exceeded maximum runtime.",
+    };
+  }
+
+  return null;
+}
+
+function isBatchRuntimeExceeded(batch: ChatBatchRow): boolean {
+  if (!batch.started_at) return false;
+  const elapsed = Date.now() - new Date(batch.started_at).getTime();
+  return elapsed > env.TOKFAI_BATCH_MAX_RUNTIME_MS;
+}
+
+async function failTimedOutNonTerminalItems(
+  batchId: string,
+  batch: ChatBatchRow
+): Promise<void> {
+  if (!isBatchRuntimeExceeded(batch)) {
+    const latest = await loadBatch(batchId);
+    if (!latest || !isBatchRuntimeExceeded(latest)) return;
+  }
+
+  const now = new Date().toISOString();
+  const { data: staleItems } = await supabase()
+    .from("chat_batch_items")
+    .select("id, status, started_at")
+    .eq("batch_id", batchId)
+    .in("status", ["pending", "running", "cancel_requested"]);
+
+  if (!staleItems?.length) return;
+
+  for (const item of staleItems) {
+    const itemTimedOut =
+      item.status === "running" || item.status === "cancel_requested"
+        ? item.started_at &&
+          Date.now() - new Date(item.started_at).getTime() >
+            env.TOKFAI_BATCH_ITEM_TIMEOUT_MS
+        : true;
+
+    if (!itemTimedOut) continue;
+
     await supabase()
       .from("chat_batch_items")
       .update({
-        status: "succeeded",
-        output: result.response,
-        credits_charged: result.creditsCharged,
-        error_code: null,
-        error_message: null,
-        completed_at: completedAt,
-        updated_at: completedAt,
+        status: "failed",
+        error_code:
+          item.status === "pending"
+            ? BATCH_CANCELLED_BY_TIMEOUT_CODE
+            : BATCH_ITEM_TIMEOUT_CODE,
+        error_message:
+          item.status === "pending"
+            ? "Batch exceeded maximum runtime."
+            : "Batch item exceeded maximum runtime.",
+        credits_charged: 0,
+        completed_at: now,
+        updated_at: now,
       })
-      .eq("id", item.id);
-
-    return;
+      .eq("id", item.id)
+      .in("status", ["pending", "running", "cancel_requested"]);
   }
+}
 
-  await markItemFailed(item.id, {
-    requestId,
-    errorCode: result.errorCode,
-    errorMessage: result.errorMessage,
-  });
+async function markItemTerminal(
+  itemId: string,
+  reason: ItemSkipReason
+): Promise<void> {
+  const now = new Date().toISOString();
+  const status =
+    reason.errorCode === "batch_cancelled" ? "cancelled" : "failed";
+
+  await supabase()
+    .from("chat_batch_items")
+    .update({
+      status,
+      error_code: reason.errorCode,
+      error_message: reason.errorMessage,
+      credits_charged: 0,
+      completed_at: now,
+      updated_at: now,
+    })
+    .eq("id", itemId)
+    .in("status", ["pending", "running"]);
 }
 
 async function markItemFailed(
   itemId: string,
   args: {
     requestId: string;
+    attemptCount: number;
     errorCode: string;
     errorMessage: string;
   }
@@ -177,6 +389,7 @@ async function markItemFailed(
     .update({
       status: "failed",
       request_id: args.requestId,
+      attempt_count: args.attemptCount,
       error_code: args.errorCode,
       error_message: args.errorMessage,
       credits_charged: 0,
@@ -184,58 +397,6 @@ async function markItemFailed(
       updated_at: completedAt,
     })
     .eq("id", itemId);
-}
-
-async function finalizeBatch(
-  batchId: string,
-  forcedStatus?: ChatBatchStatus
-): Promise<void> {
-  const { data: items, error } = await supabase()
-    .from("chat_batch_items")
-    .select("status, credits_charged")
-    .eq("batch_id", batchId);
-
-  if (error || !items) {
-    log.error("batch_finalize_failed", {
-      batchId,
-      message: error?.message ?? "items missing",
-    });
-    return;
-  }
-
-  let succeeded = 0;
-  let failed = 0;
-  let creditsCharged = 0;
-
-  for (const item of items) {
-    if (item.status === "succeeded") {
-      succeeded += 1;
-      creditsCharged += toNumber(item.credits_charged);
-    } else if (item.status === "failed") {
-      failed += 1;
-    }
-  }
-
-  const status: ChatBatchStatus =
-    forcedStatus ??
-    (succeeded === items.length
-      ? "completed"
-      : failed === items.length
-        ? "failed"
-        : "partial_failed");
-
-  const completedAt = new Date().toISOString();
-  await supabase()
-    .from("chat_batches")
-    .update({
-      status,
-      succeeded_items: succeeded,
-      failed_items: failed,
-      credits_charged: roundCreditAmount(creditsCharged),
-      completed_at: completedAt,
-      updated_at: completedAt,
-    })
-    .eq("id", batchId);
 }
 
 async function loadBatch(batchId: string): Promise<ChatBatchRow | null> {
@@ -279,13 +440,29 @@ async function runPool<T>(
   await Promise.all(workers);
 }
 
-function toNumber(value: string | number | null | undefined): number {
-  if (typeof value === "number") return value;
-  if (typeof value === "string") return Number(value);
-  return 0;
+type TimedResult<T> =
+  | { kind: "ok"; value: T }
+  | { kind: "timeout" };
+
+async function runWithItemTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number
+): Promise<TimedResult<T>> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    const result = await Promise.race([
+      promise.then((value) => ({ kind: "ok" as const, value })),
+      new Promise<{ kind: "timeout" }>((resolve) => {
+        timer = setTimeout(() => resolve({ kind: "timeout" }), timeoutMs);
+      }),
+    ]);
+    return result;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
-function roundCreditAmount(amount: number): number {
-  if (!Number.isFinite(amount) || amount <= 0) return 0;
-  return Math.ceil(amount * 1_000_000) / 1_000_000;
+function isProcessableBatchStatus(status: ChatBatchStatus): boolean {
+  return status === "pending" || status === "running";
 }

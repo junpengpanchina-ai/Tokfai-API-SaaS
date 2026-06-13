@@ -145,7 +145,13 @@ export type ChatBatchStatus =
   | "partial_failed"
   | "cancelled";
 
-export type ChatBatchItemStatus = "pending" | "running" | "succeeded" | "failed";
+export type ChatBatchItemStatus =
+  | "pending"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "cancelled"
+  | "cancel_requested";
 
 export interface ChatBatchRow {
   id: string;
@@ -174,6 +180,7 @@ export interface ChatBatchItemRow {
   error_code: string | null;
   error_message: string | null;
   request_id: string | null;
+  attempt_count: number;
   credits_charged: string | number;
   created_at: string;
   updated_at: string;

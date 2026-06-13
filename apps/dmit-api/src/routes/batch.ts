@@ -8,7 +8,9 @@ import type { VerifiedApiKey } from "../auth/apiKey.js";
 import { supabase } from "../supabase.js";
 import { isModelAllowedForChat } from "../catalog/modelCatalog.js";
 import { formatBatchId, parseBatchId } from "../batch/batchIds.js";
+import { finalizeBatch } from "../batch/finalize.js";
 import { enqueueBatchProcessing } from "../batch/worker.js";
+import { BATCH_CANCELLED_CODE } from "../batch/constants.js";
 import {
   ChatMessageSchema,
   ChatCompletionRequestSchema,
@@ -162,6 +164,74 @@ batchRoutes.get("/v1/batches/:id/items", async (c) => {
   });
 });
 
+batchRoutes.post("/v1/batches/:id/cancel", async (c) => {
+  const apiKey = c.get("apiKey" as never) as VerifiedApiKey;
+  const batch = await loadOwnedBatch(c.req.param("id"), apiKey.userId);
+
+  if (batch.status !== "pending" && batch.status !== "running") {
+    throw ApiError.badRequest(
+      "Batch cannot be cancelled in its current state.",
+      "batch_not_cancellable"
+    );
+  }
+
+  const now = new Date().toISOString();
+
+  const { error: batchError } = await supabase()
+    .from("chat_batches")
+    .update({
+      status: "cancelled",
+      updated_at: now,
+    })
+    .eq("id", batch.id)
+    .in("status", ["pending", "running"]);
+
+  if (batchError) {
+    throw ApiError.internal(batchError.message, "batch_cancel_failed");
+  }
+
+  await supabase()
+    .from("chat_batch_items")
+    .update({
+      status: "cancelled",
+      error_code: BATCH_CANCELLED_CODE,
+      error_message: "Batch cancelled by user.",
+      credits_charged: 0,
+      completed_at: now,
+      updated_at: now,
+    })
+    .eq("batch_id", batch.id)
+    .eq("status", "pending");
+
+  await supabase()
+    .from("chat_batch_items")
+    .update({
+      status: "cancel_requested",
+      updated_at: now,
+    })
+    .eq("batch_id", batch.id)
+    .eq("status", "running");
+
+  if (batch.status === "pending") {
+    await finalizeBatch(batch.id);
+  }
+
+  const { data: updated, error: reloadError } = await supabase()
+    .from("chat_batches")
+    .select("*")
+    .eq("id", batch.id)
+    .maybeSingle();
+
+  if (reloadError || !updated) {
+    throw ApiError.internal(
+      reloadError?.message ?? "Failed to reload batch.",
+      "batch_load_failed"
+    );
+  }
+
+  return c.json(formatBatchSummary(updated as ChatBatchRow));
+});
+
 async function loadOwnedBatch(
   rawId: string,
   userId: string
@@ -217,6 +287,7 @@ function formatBatchItem(item: ChatBatchItemRow) {
     error_code: item.error_code,
     error_message: item.error_message,
     request_id: item.request_id,
+    attempt_count: item.attempt_count ?? 0,
     credits_charged: toNumber(item.credits_charged),
     created_at: item.created_at,
     updated_at: item.updated_at,

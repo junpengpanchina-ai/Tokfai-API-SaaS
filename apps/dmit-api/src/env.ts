@@ -108,6 +108,21 @@ const Schema = z
     .int()
     .positive()
     .default(2),
+  TOKFAI_BATCH_ITEM_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(180_000),
+  TOKFAI_BATCH_MAX_RUNTIME_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(900_000),
+  TOKFAI_BATCH_ITEM_MAX_RETRIES: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .default(1),
   BOT_MODEL: z.string().min(1).default("auto-fast"),
 
   STRIPE_SECRET_KEY: z.string().min(1).optional(),

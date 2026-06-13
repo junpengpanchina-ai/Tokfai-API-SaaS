@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * P762 batch chat queue smoke test.
+ * P762/P763 batch chat queue smoke test.
  *
  * Usage:
  *   TOKFAI_API_KEY=sk-tokfai_... node scripts/test-batch-chat.mjs
@@ -42,6 +42,11 @@ function maskKey(key) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function formatDuration(ms) {
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
 }
 
 async function apiFetch(path, options = {}) {
@@ -124,7 +129,7 @@ async function pollBatch(batchId) {
     );
 
     if (terminal.has(batch.status)) {
-      return batch;
+      return { batch, pollDurationMs: Date.now() - started };
     }
 
     await sleep(POLL_INTERVAL_MS);
@@ -140,8 +145,15 @@ function printItemsSummary(itemsBody) {
   console.log(`Items (${items.length} returned, total ${itemsBody.total ?? "?"}):`);
 
   for (const item of items) {
+    const duration =
+      item.started_at && item.completed_at
+        ? formatDuration(
+            new Date(item.completed_at).getTime() -
+              new Date(item.started_at).getTime()
+          )
+        : "-";
     console.log(
-      `  [${item.index}] status=${item.status} credits=${item.credits_charged ?? 0} request_id=${item.request_id ?? "(none)"} error=${item.error_code ?? "-"}`
+      `  [${item.index}] status=${item.status} attempt_count=${item.attempt_count ?? 0} credits=${item.credits_charged ?? 0} duration=${duration} request_id=${item.request_id ?? "(none)"} error=${item.error_code ?? "-"}`
     );
   }
 
@@ -150,12 +162,19 @@ function printItemsSummary(itemsBody) {
     .filter(Boolean);
   const succeeded = items.filter((item) => item.status === "succeeded").length;
   const failed = items.filter((item) => item.status === "failed").length;
+  const cancelled = items.filter((item) => item.status === "cancelled").length;
+  const maxAttempts = Math.max(
+    0,
+    ...items.map((item) => item.attempt_count ?? 0)
+  );
 
   console.log("");
   console.log("Summary:");
-  console.log(`  succeeded: ${succeeded}`);
-  console.log(`  failed:    ${failed}`);
-  console.log(`  request_ids present: ${requestIds.length}/${items.length}`);
+  console.log(`  succeeded:     ${succeeded}`);
+  console.log(`  failed:        ${failed}`);
+  console.log(`  cancelled:     ${cancelled}`);
+  console.log(`  max_attempts:  ${maxAttempts}`);
+  console.log(`  request_ids:   ${requestIds.length}/${items.length}`);
 }
 
 async function main() {
@@ -166,12 +185,14 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("=== P762 batch chat smoke test ===");
+  console.log("=== P762/P763 batch chat smoke test ===");
   console.log(`api_base:   ${BASE}`);
   console.log(`api_key:    ${maskKey(API_KEY)}`);
   console.log(`model:      ${MODEL}`);
   console.log(`items:      ${BATCH_ITEM_COUNT}`);
   console.log("");
+
+  const runStarted = Date.now();
 
   console.log("Creating batch…");
   const created = await createBatch();
@@ -179,7 +200,13 @@ async function main() {
   console.log("");
 
   console.log("Polling batch status…");
-  const finalBatch = await pollBatch(created.id);
+  const { batch: finalBatch, pollDurationMs } = await pollBatch(created.id);
+  const batchDurationMs =
+    finalBatch.completed_at && finalBatch.started_at
+      ? new Date(finalBatch.completed_at).getTime() -
+        new Date(finalBatch.started_at).getTime()
+      : Date.now() - runStarted;
+
   console.log("");
   console.log("Final batch:");
   console.log(`  id:               ${finalBatch.id}`);
@@ -187,6 +214,8 @@ async function main() {
   console.log(`  succeeded_items:  ${finalBatch.succeeded_items}`);
   console.log(`  failed_items:     ${finalBatch.failed_items}`);
   console.log(`  credits_charged:  ${finalBatch.credits_charged}`);
+  console.log(`  batch_duration:   ${formatDuration(batchDurationMs)}`);
+  console.log(`  poll_duration:    ${formatDuration(pollDurationMs)}`);
   console.log("");
 
   const itemsBody = await getBatchItems(created.id);
