@@ -227,4 +227,75 @@ Must pass with Redis disabled (default production config).
 
 ## 14. Production smoke results
 
-_To be filled after first Redis-enabled or fallback-only production deploy._
+**Status:** ✅ P764 passed on production DMIT — Redis disabled fallback mode (2026-06-13)
+
+**Deploy:**
+
+```bash
+git pull origin main
+npm ci
+npm run build
+pm2 restart dmit-api --update-env
+pm2 save
+```
+
+**Environment:**
+
+| Setting | Value |
+|---------|-------|
+| API base | `https://api.tokfai.com/v1` |
+| Redis mode | Disabled fallback |
+| `TOKFAI_REDIS_ENABLED` | `false` / unset |
+| `TOKFAI_REDIS_URL` | unset |
+
+#### A. Health
+
+| Metric | Result |
+|--------|--------|
+| `GET /v1/health` | HTTP 200 |
+| `redis.enabled` | `false` |
+| `redis.connected` | `false` |
+| Service | ok |
+
+#### B. Redis gateway state script
+
+| Setting | Value |
+|---------|-------|
+| Script | `scripts/test-redis-gateway-state.mjs` |
+
+| Metric | Result |
+|--------|--------|
+| Fallback mode | Redis disabled fallback detected |
+| Concurrent chat requests | 3 — all HTTP 200 |
+| Rate limit headers | present on all responses |
+| `X-RateLimit-Limit` | `60` |
+| `X-RateLimit-Remaining` | `58` / `57` / `59` |
+| Script outcome | Redis gateway state smoke test passed |
+
+#### C. Batch chat regression
+
+| Setting | Value |
+|---------|-------|
+| Script | `scripts/test-batch-chat.mjs` |
+
+| Metric | Result |
+|--------|--------|
+| Script outcome | Smoke test passed |
+
+Regression against P763 batch chat path; no Redis-related regression observed.
+
+#### D. Batch cancel regression
+
+| Setting | Value |
+|---------|-------|
+| Script | `scripts/test-batch-cancel.mjs` |
+
+| Metric | Result |
+|--------|--------|
+| Script outcome | Cancel test passed |
+
+Regression against P763 cancel path; pending items not processed after cancel.
+
+**Conclusion:**
+
+P764 production validation passed in **Redis disabled fallback** mode. Behavior remains compatible with P763 — chat, batch, and cancel main paths unchanged. Configure `TOKFAI_REDIS_ENABLED=true` + `TOKFAI_REDIS_URL` in a follow-up deploy to verify cross-instance shared state.
