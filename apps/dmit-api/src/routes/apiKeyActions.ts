@@ -4,8 +4,8 @@ import { decryptSecret } from "../auth/keyEncryption.js";
 import { maskApiKeyId } from "../auth/apiKey.js";
 import { ApiError } from "../errors.js";
 import { log } from "../logger.js";
-import { supabase } from "../supabase.js";
-import { revokeApiKeyRow } from "../lib/apiKeysDb.js";
+import { isSupabaseAdminConfigured, supabaseAdmin } from "../supabase.js";
+import { apiKeysAdminConfigError, revokeApiKeyRow } from "../lib/apiKeysDb.js";
 import type { ApiKeyRow, AuthedUser } from "../types.js";
 
 type ApiKeyOwnerRow = Pick<ApiKeyRow, "id" | "prefix" | "key_id">;
@@ -45,11 +45,18 @@ export async function readApiKeyId(c: Context): Promise<string> {
   return "";
 }
 
+function requireAdminClient() {
+  if (!isSupabaseAdminConfigured()) {
+    throw apiKeysAdminConfigError();
+  }
+  return supabaseAdmin();
+}
+
 async function resolveApiKeyOwnerRow(
   userId: string,
   identifier: string
 ): Promise<ApiKeyOwnerRow | null> {
-  const sb = supabase();
+  const sb = requireAdminClient();
   const baseSelect = "id, prefix, key_id";
 
   const byId = await sb
@@ -154,7 +161,7 @@ export async function revealApiKey(c: Context, id: string) {
     throw ApiError.notFound("API key not found.", "api_key_not_found");
   }
 
-  const { data, error } = await supabase()
+  const { data, error } = await requireAdminClient()
     .from("api_keys")
     .select<string, { encrypted_secret: string | null; revoked_at: string | null }>(
       "encrypted_secret, revoked_at"

@@ -30,7 +30,7 @@ const Schema = z
     .transform(csv),
 
   SUPABASE_URL: z.string().url(),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
   SUPABASE_JWT_SECRET: z.string().min(20),
   TOKFAI_ADMIN_EMAILS: z
     .string()

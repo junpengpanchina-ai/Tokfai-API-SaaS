@@ -3,8 +3,9 @@ import { Hono } from "hono";
 import { generateApiKey } from "../auth/apiKey.js";
 import { ApiError } from "../errors.js";
 import { requireSupabaseJwt } from "../middleware/supabaseJwt.js";
-import { supabase } from "../supabase.js";
+import { isSupabaseAdminConfigured, supabaseAdmin } from "../supabase.js";
 import {
+  apiKeysAdminConfigError,
   buildApiKeyInsertPayload,
   insertApiKeyRow,
   listApiKeysForUser,
@@ -136,7 +137,7 @@ async function attachApiKeyPrefixes(
 
   const prefixById = new Map<string, string>();
   if (apiKeyIds.length > 0) {
-    const { data: keys, error } = await supabase()
+    const { data: keys, error } = await supabaseAdmin()
       .from("api_keys")
       .select("id, prefix")
       .eq("user_id", userId)
@@ -228,7 +229,7 @@ meRoutes.use("*", requireSupabaseJwt);
 
 meRoutes.get("/credits", async (c) => {
   const user = authedUser(c);
-  const { data, error } = await supabase()
+  const { data, error } = await supabaseAdmin()
     .from("profiles")
     .select(
       "id, email, credits_balance, total_credits_purchased, total_credits_used, updated_at"
@@ -262,7 +263,7 @@ meRoutes.get("/credits", async (c) => {
 meRoutes.get("/credits/ledger", async (c) => {
   const user = authedUser(c);
   const limit = parseLimit(c.req.query("limit"));
-  const { data, error } = await supabase()
+  const { data, error } = await supabaseAdmin()
     .from("credit_ledger")
     .select("id, created_at, type, amount, balance_after, reason, reference_id")
     .eq("user_id", user.id)
@@ -283,7 +284,7 @@ meRoutes.get("/credits/ledger", async (c) => {
 meRoutes.get("/credits/orders", async (c) => {
   const user = authedUser(c);
   const limit = parseLimit(c.req.query("limit"));
-  const { data, error } = await supabase()
+  const { data, error } = await supabaseAdmin()
     .from("credit_orders")
     .select(
       "id, plan_id, status, currency, amount_cents, credits, stripe_checkout_session_id, created_at, updated_at, paid_at"
@@ -363,6 +364,11 @@ meRoutes.get("/api-keys", async (c) => {
 
 meRoutes.post("/api-keys", async (c) => {
   const user = authedUser(c);
+  if (!isSupabaseAdminConfigured()) {
+    logCreateApiKeyFailed(user.id, "config_error");
+    throw apiKeysAdminConfigError();
+  }
+
   let body: unknown;
   try {
     body = await c.req.json();
@@ -393,7 +399,7 @@ meRoutes.post("/api-keys", async (c) => {
     );
   }
 
-  const { data: existingKeys, error: existingKeyError } = await supabase()
+  const { data: existingKeys, error: existingKeyError } = await supabaseAdmin()
     .from("api_keys")
     .select("id")
     .eq("user_id", user.id)
@@ -470,7 +476,7 @@ meRoutes.post("/api-keys/:id/reveal", async (c) => {
 meRoutes.get("/usage", async (c) => {
   const user = authedUser(c);
   const limit = parseLimit(c.req.query("limit"));
-  const { data, error } = await supabase()
+  const { data, error } = await supabaseAdmin()
     .from("usage_logs")
     .select(USAGE_LIST_SELECT)
     .eq("user_id", user.id)
@@ -511,7 +517,7 @@ meRoutes.get("/usage/summary", async (c) => {
 
   const filters: UsageQueryFilters = { apiKeyId, model, status };
 
-  let summaryQuery = supabase()
+  let summaryQuery = supabaseAdmin()
     .from("usage_logs")
     .select("status, prompt_tokens, completion_tokens, total_tokens, credits_charged")
     .eq("user_id", user.id)
@@ -525,7 +531,7 @@ meRoutes.get("/usage/summary", async (c) => {
     summaryQuery = summaryQuery.neq("status", "succeeded");
   }
 
-  let dataQuery = supabase()
+  let dataQuery = supabaseAdmin()
     .from("usage_logs")
     .select(USAGE_SUMMARY_SELECT)
     .eq("user_id", user.id)

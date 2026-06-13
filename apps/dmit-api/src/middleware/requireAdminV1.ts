@@ -3,7 +3,7 @@ import type { Context, MiddlewareHandler } from "hono";
 import { extractBearer } from "../auth/jwt.js";
 import { env } from "../env.js";
 import { log } from "../logger.js";
-import { supabase } from "../supabase.js";
+import { supabaseAdmin, supabaseAuth } from "../supabase.js";
 import type { AuthedUser } from "../types.js";
 
 export type AdminAuthSource = "admin_users" | "legacy_allowlist";
@@ -123,7 +123,7 @@ async function lookupActiveAdminUser(
     filters.push(`email.eq.${normalizedEmail}`);
   }
 
-  const { data, error } = await supabase()
+  const { data, error } = await supabaseAdmin()
     .from("admin_users")
     .select("id, user_id, email, status, revoked_at")
     .eq("status", "active")
@@ -209,7 +209,7 @@ async function verifyAccessTokenWithSupabase(
     const {
       data: { user },
       error,
-    } = await supabase().auth.getUser(token);
+    } = await supabaseAuth().auth.getUser(token);
 
     if (error || !user?.id) {
       return null;

@@ -2,10 +2,28 @@ import type { PostgrestError } from "@supabase/supabase-js";
 
 import { encryptSecretIfConfigured } from "../auth/keyEncryption.js";
 import type { NewApiKeyMaterial } from "../auth/apiKey.js";
-import { supabase } from "../supabase.js";
+import { ApiError } from "../errors.js";
+import { isSupabaseAdminConfigured, supabaseAdmin } from "../supabase.js";
 import type { ApiKeyRow } from "../types.js";
 
 /** Columns present in production before P766.2. */
+export function apiKeysAdminConfigError(): ApiError {
+  return new ApiError({
+    status: 503,
+    message: "SUPABASE_SERVICE_ROLE_KEY is not configured.",
+    publicMessage: "API key management is temporarily unavailable.",
+    code: "config_error",
+    type: "server_error",
+  });
+}
+
+function requireAdminClient() {
+  if (!isSupabaseAdminConfigured()) {
+    throw apiKeysAdminConfigError();
+  }
+  return supabaseAdmin();
+}
+
 export const API_KEY_BASE_SELECT =
   "id, name, prefix, key_id, created_at, last_used_at, revoked_at";
 
@@ -69,7 +87,7 @@ function isMissingCanRevealColumn(error: PostgrestError | null): boolean {
 export async function listApiKeysForUser(
   userId: string
 ): Promise<{ data: ApiKeyListItem[]; error: PostgrestError | null }> {
-  const sb = supabase();
+  const sb = requireAdminClient();
   const primary = await sb
     .from("api_keys")
     .select<string, ApiKeyListRow>(API_KEY_LIST_SELECT)
@@ -141,7 +159,7 @@ export async function insertApiKeyRow(
   > | null;
   error: PostgrestError | null;
 }> {
-  const sb = supabase();
+  const sb = requireAdminClient();
   const withCanReveal = await sb
     .from("api_keys")
     .insert(payload)
@@ -178,7 +196,7 @@ export async function revokeApiKeyRow(
   data: Pick<ApiKeyRow, "id" | "revoked_at"> | null;
   error: PostgrestError | null;
 }> {
-  const sb = supabase();
+  const sb = requireAdminClient();
   const withFlag = await sb
     .from("api_keys")
     .update({ revoked_at: revokedAt, can_reveal: false })

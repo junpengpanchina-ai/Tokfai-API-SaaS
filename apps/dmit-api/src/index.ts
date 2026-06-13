@@ -4,6 +4,9 @@ import { buildApp } from "./app.js";
 import { env, grsaiUpstreamTarget, maskSecret } from "./env.js";
 import { log } from "./logger.js";
 import { closeRedis, initRedis } from "./redis/client.js";
+import { warnSupabaseAdminConfig } from "./supabase.js";
+
+warnSupabaseAdminConfig();
 
 await initRedis();
 

@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 
 import { ApiError } from "../errors.js";
 import { log } from "../logger.js";
-import { supabase } from "../supabase.js";
+import { supabaseAdmin } from "../supabase.js";
 import type { ApiKeyRow } from "../types.js";
 import { hashSecret, safeEqualHex } from "./hash.js";
 
@@ -94,7 +94,7 @@ function deriveKeyIdFromModernToken(rawToken: string): string | null {
 async function fetchActiveKeyByHash(
   candidate: string
 ): Promise<ApiKeyAuthRow | null> {
-  const { data, error } = await supabase()
+  const { data, error } = await supabaseAdmin()
     .from("api_keys")
     .select<string, ApiKeyAuthRow>(
       "id, user_id, name, key_id, prefix, hash, created_at, last_used_at, revoked_at"
@@ -114,7 +114,7 @@ async function fetchActiveKeyByHash(
 async function fetchActiveKeyByKeyId(
   keyId: string
 ): Promise<ApiKeyAuthRow | null> {
-  const { data, error } = await supabase()
+  const { data, error } = await supabaseAdmin()
     .from("api_keys")
     .select<string, ApiKeyAuthRow>(
       "id, user_id, name, key_id, prefix, hash, created_at, last_used_at, revoked_at"
@@ -143,7 +143,7 @@ function logInvalidToken(rawToken: string, lookup: "hash" | "key_id" | "legacy")
 }
 
 function touchLastUsedAt(rowId: string): void {
-  void supabase()
+  void supabaseAdmin()
     .from("api_keys")
     .update({ last_used_at: new Date().toISOString() })
     .eq("id", rowId)

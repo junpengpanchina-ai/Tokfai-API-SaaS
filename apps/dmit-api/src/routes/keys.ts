@@ -3,11 +3,12 @@ import { Hono } from "hono";
 import { generateApiKey } from "../auth/apiKey.js";
 import { ApiError } from "../errors.js";
 import { requireSupabaseJwt } from "../middleware/supabaseJwt.js";
-import { supabase } from "../supabase.js";
-import type { AuthedUser } from "../types.js";
+import { isSupabaseAdminConfigured } from "../supabase.js";
 import {
+  apiKeysAdminConfigError,
   buildApiKeyInsertPayload,
   insertApiKeyRow,
+  listApiKeysForUser,
 } from "../lib/apiKeysDb.js";
 import {
   logCreateApiKeyFailed,
@@ -15,6 +16,7 @@ import {
   revealApiKey,
   revokeApiKey,
 } from "./apiKeyActions.js";
+import type { AuthedUser } from "../types.js";
 
 const MAX_NAME_LEN = 64;
 
@@ -33,12 +35,7 @@ keyRoutes.use("/v1/keys/*", requireSupabaseJwt);
 
 keyRoutes.get("/v1/keys", async (c) => {
   const user = authedUser(c);
-  const sb = supabase();
-  const { data, error } = await sb
-    .from("api_keys")
-    .select("id, name, prefix, created_at, last_used_at, revoked_at")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+  const { data, error } = await listApiKeysForUser(user.id);
 
   if (error) {
     throw ApiError.internal(
@@ -47,11 +44,16 @@ keyRoutes.get("/v1/keys", async (c) => {
     );
   }
 
-  return c.json({ data: data ?? [] });
+  return c.json({ data });
 });
 
 keyRoutes.post("/v1/keys", async (c) => {
   const user = authedUser(c);
+  if (!isSupabaseAdminConfigured()) {
+    logCreateApiKeyFailed(user.id, "config_error");
+    throw apiKeysAdminConfigError();
+  }
+
   let body: unknown;
   try {
     body = await c.req.json();

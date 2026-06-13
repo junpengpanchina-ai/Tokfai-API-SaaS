@@ -1,6 +1,6 @@
 import { ApiError } from "../errors.js";
 import { log } from "../logger.js";
-import { supabase } from "../supabase.js";
+import { supabaseAuth } from "../supabase.js";
 import type { AuthedUser } from "../types.js";
 
 /**
@@ -12,9 +12,9 @@ import type { AuthedUser } from "../types.js";
  * validate the token against the project's current signing keys.
  */
 export async function verifySupabaseJwt(token: string): Promise<AuthedUser> {
-  let result: Awaited<ReturnType<ReturnType<typeof supabase>["auth"]["getUser"]>>;
+  let result: Awaited<ReturnType<ReturnType<typeof supabaseAuth>["auth"]["getUser"]>>;
   try {
-    result = await supabase().auth.getUser(token);
+    result = await supabaseAuth().auth.getUser(token);
   } catch {
     log.warn("supabase_auth_invalid_token", {
       status: 401,
