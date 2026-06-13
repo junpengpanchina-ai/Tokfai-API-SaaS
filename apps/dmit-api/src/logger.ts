@@ -42,6 +42,9 @@ const ALLOWED_FIELD_KEYS = new Set([
   "dbErrorMessage",
   "tokenPrefix",
   "keyId",
+  "providerId",
+  "providerIndex",
+  "dbErrorCode",
 ]);
 
 /**

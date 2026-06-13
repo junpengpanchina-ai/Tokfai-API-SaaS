@@ -113,9 +113,25 @@ export function mapUpstreamError(
   const combined = `${parsed.message} ${parsed.type} ${parsed.code} ${bodyText}`.toLowerCase();
 
   if (
+    combined.includes("<html") ||
+    combined.includes("bad gateway") ||
+    combined.includes("cloudflare")
+  ) {
+    return {
+      status: 502,
+      code: "upstream_error",
+      type: "upstream_error",
+      publicMessage: "Upstream provider failed.",
+    };
+  }
+
+  if (
     status === 401 ||
     status === 403 ||
-    combined.includes("apikey")
+    combined.includes("apikey") ||
+    combined.includes("api key") ||
+    combined.includes("invalid key") ||
+    combined.includes("unauthorized")
   ) {
     return {
       status: 502,
@@ -243,10 +259,11 @@ export async function providerFetch<T = unknown>(
       upstreamHost: host,
       upstreamPath,
       upstreamStatus: res.status,
-      upstreamCode,
+      upstreamCode: upstreamCode,
       upstreamErrorCode: mapped.code,
       upstreamErrorMessage,
       latencyMs,
+      message: `Upstream ${provider.id} HTTP ${res.status}`,
     });
 
     throw new ApiError({

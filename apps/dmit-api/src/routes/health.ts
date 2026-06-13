@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
-import { env } from "../env.js";
+import { describeProviders } from "../upstream/providers.js";
+import { env, grsaiUpstreamTarget, maskSecret } from "../env.js";
 import { getRedisHealthStatus } from "../redis/client.js";
 
 export const healthRoutes = new Hono();
@@ -17,15 +18,27 @@ function healthCheckPayload() {
 /** Production load-balancer / uptime probe — no auth. */
 healthRoutes.get("/health", (c) => c.json(healthCheckPayload()));
 
-healthRoutes.get("/v1/health", (c) =>
-  c.json({
+healthRoutes.get("/v1/health", (c) => {
+  const chatTarget = grsaiUpstreamTarget(env.GRSAI_CHAT_COMPLETIONS_PATH);
+  return c.json({
     ok: true,
     service: "dmit",
     version: "0.1.0",
     now: new Date().toISOString(),
     redis: getRedisHealthStatus(),
-  })
-);
+    upstream: {
+      grsaiApiKeyMask: maskSecret(env.GRSAI_API_KEY),
+      grsaiBaseHost: chatTarget.host,
+      grsaiChatPath: chatTarget.path,
+      providers: describeProviders().map((p) => ({
+        id: p.id,
+        enabled: p.enabled,
+        host: p.host,
+        chatPath: p.chatPath,
+      })),
+    },
+  });
+});
 
 healthRoutes.get("/debug/routes", (c) =>
   c.json({

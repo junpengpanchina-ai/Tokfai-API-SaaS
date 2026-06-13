@@ -18,6 +18,7 @@ import {
   recordModelFailure,
   recordModelSuccess,
 } from "../upstream/modelCircuitBreaker.js";
+import { buildUpstreamChatBody } from "./upstreamChatBody.js";
 import {
   releaseGlobalUpstream,
   tryAcquireGlobalUpstream,
@@ -284,11 +285,7 @@ export async function executeChatCompletion(
         }
 
         try {
-          const upstreamBody = {
-            ...input.body,
-            model: attemptModel,
-            stream: false,
-          };
+          const upstreamBody = buildUpstreamChatBody(input.body, attemptModel);
 
           const perAttemptTimeoutMs = Math.min(
             env.TOKFAI_UPSTREAM_TIMEOUT_MS,
