@@ -10,8 +10,9 @@ import {
   isModelAllowedForChat,
   priceCreditsFor,
 } from "../catalog/modelCatalog.js";
-import { grsaiFetch, isChatFallbackEligible } from "../upstream/grsai.js";
+import { providerFetch, isChatFallbackEligible } from "../upstream/grsai.js";
 import { resolveModelAttempts } from "../upstream/modelAliases.js";
+import { resolveProviderAttempts } from "../upstream/providers.js";
 import {
   filterAttemptsByCircuitBreaker,
   recordModelFailure,
@@ -219,201 +220,244 @@ export async function executeChatCompletion(
 
     for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
       const attemptModel = attempts[attemptIndex]!;
-      const attemptStartedAt = Date.now();
+      const providerAttempts = resolveProviderAttempts(attemptModel);
 
-      const remainingTotalMs =
-        env.TOKFAI_TOTAL_REQUEST_TIMEOUT_MS - (Date.now() - startedAt);
-      if (remainingTotalMs <= 0) {
-        const timeoutErr = ApiError.requestTimeout();
-        if (isAlias && attemptIndex > 0) {
-          const exhausted = allUpstreamsUnavailableError();
-          await logChatFailure({
-            caller,
-            requestId,
-            requestedModel,
-            startedAt,
-            err: exhausted,
-            lastAttempt: timeoutErr,
-            route,
-          });
-          return failureResult(exhausted, requestId);
-        }
-        await logChatFailure({
-          caller,
-          requestId,
-          requestedModel,
-          startedAt,
-          err: timeoutErr,
-          route,
-        });
-        return failureResult(timeoutErr, requestId);
-      }
-
-      if (!(await tryAcquireGlobalUpstream())) {
-        const err = ApiError.gatewayOverloaded();
-        await logGatewayOverloaded({
-          caller,
-          requestId,
-          err,
-          limitKey,
-          keyInflight: 0,
-          globalInflight: 0,
-          requestedModel,
-          startedAt,
-        });
-        return failureResult(err, requestId);
-      }
-
-      try {
-        const upstreamBody = {
-          ...input.body,
-          model: attemptModel,
-          stream: false,
-        };
-
-        const perAttemptTimeoutMs = Math.min(
-          env.TOKFAI_UPSTREAM_TIMEOUT_MS,
-          remainingTotalMs
-        );
-
-        const { data, upstreamId } = await grsaiFetch<ChatCompletionResponse>(
-          env.GRSAI_CHAT_COMPLETIONS_PATH,
-          {
-            method: "POST",
-            json: upstreamBody,
-            timeoutMs: perAttemptTimeoutMs,
-          },
-          {
-            requestId,
-            route,
-            model: attemptModel,
-            requestedModel,
-          }
-        );
-
-        await recordModelSuccess(attemptModel);
-
-        const usage = normalizeUsage(data.usage);
-        const resolvedModel = data.model ?? attemptModel;
-        const creditsCharged = await calculateCreditsCharged(resolvedModel, usage);
-
-        const response: Record<string, unknown> = {
-          ...data,
-          model: resolvedModel,
-          credits_charged: creditsCharged,
-          request_id: requestId,
-          tokfai: {
-            credits_charged: creditsCharged,
-            request_id: requestId,
-            requested_model: requestedModel,
-            resolved_model: resolvedModel,
-            ...(isAlias ? { fallback_attempts: attemptIndex + 1 } : {}),
-          },
-        };
-
-        await recordSuccessfulUsageAndDebit(
-          {
-            user_id: caller.userId,
-            api_key_id: caller.apiKeyId,
-            model: resolvedModel,
-            status: "succeeded",
-            prompt_tokens: usage.promptTokens,
-            completion_tokens: usage.completionTokens,
-            total_tokens: usage.totalTokens,
-            credits_charged: creditsCharged,
-            request_id: requestId,
-            upstream_id: upstreamId,
-            error_code: null,
-            error_message: null,
-            latency_ms: Date.now() - startedAt,
-            billable: true,
-            finish_reason: extractFinishReason(data),
-            upstream_status: null,
-            upstream_error_code: null,
-            safety_reason: isAlias ? requestedModel : null,
-          },
-          {
-            idempotencyKey: input.idempotencyKey ?? null,
-            endpoint: route,
-            responseSnapshot: response,
-          }
-        );
-
-        log.info("chat_completion_succeeded", {
-          requestId,
-          route,
-          status: 200,
-          code: "succeeded",
-          message: "Chat completion succeeded.",
-          requestedModel,
-          resolvedModel,
-          attemptModel,
-          attemptIndex,
-          latencyMs: Date.now() - startedAt,
-        });
-
-        return {
-          ok: true,
-          response,
-          creditsCharged,
-          resolvedModel,
-          requestedModel,
-          requestId,
-        };
-      } catch (err) {
-        if (!(err instanceof ApiError)) {
-          throw err;
-        }
-
-        lastError = err;
-
-        log.warn("chat_model_fallback_attempt", {
-          requestId,
-          route,
-          requestedModel,
-          attemptModel,
-          attemptIndex,
-          status: err.status,
-          code: err.code ?? "failed",
-          upstreamStatus: err.upstreamStatus,
-          upstreamErrorMessage: err.upstreamErrorSnippet,
-          latencyMs: Date.now() - attemptStartedAt,
-        });
-
-        if (isAlias && isChatFallbackEligible(err)) {
-          await recordModelFailure(attemptModel, err.code);
-        }
-
-        const hasNextAttempt = isAlias && attemptIndex < attempts.length - 1;
-        if (hasNextAttempt && isChatFallbackEligible(err)) {
+      if (providerAttempts.length === 0) {
+        lastError = allUpstreamsUnavailableError();
+        if (isAlias && attemptIndex < attempts.length - 1) {
           continue;
         }
+        break;
+      }
 
-        if (isAlias && isChatFallbackEligible(err)) {
-          const exhausted = allUpstreamsUnavailableError();
+      let modelAttemptFailed = false;
+
+      for (
+        let providerIndex = 0;
+        providerIndex < providerAttempts.length;
+        providerIndex++
+      ) {
+        const provider = providerAttempts[providerIndex]!;
+        const attemptStartedAt = Date.now();
+
+        const remainingTotalMs =
+          env.TOKFAI_TOTAL_REQUEST_TIMEOUT_MS - (Date.now() - startedAt);
+        if (remainingTotalMs <= 0) {
+          const timeoutErr = ApiError.requestTimeout();
+          if (isAlias && attemptIndex > 0) {
+            const exhausted = allUpstreamsUnavailableError();
+            await logChatFailure({
+              caller,
+              requestId,
+              requestedModel,
+              startedAt,
+              err: exhausted,
+              lastAttempt: timeoutErr,
+              route,
+            });
+            return failureResult(exhausted, requestId);
+          }
           await logChatFailure({
             caller,
             requestId,
             requestedModel,
             startedAt,
-            err: exhausted,
-            lastAttempt: err,
+            err: timeoutErr,
             route,
           });
-          return failureResult(exhausted, requestId);
+          return failureResult(timeoutErr, requestId);
         }
 
-        await logChatFailure({
-          caller,
-          requestId,
-          requestedModel,
-          startedAt,
-          err,
-          route,
-        });
-        return failureResult(err, requestId);
-      } finally {
-        await releaseGlobalUpstream();
+        if (!(await tryAcquireGlobalUpstream())) {
+          const err = ApiError.gatewayOverloaded();
+          await logGatewayOverloaded({
+            caller,
+            requestId,
+            err,
+            limitKey,
+            keyInflight: 0,
+            globalInflight: 0,
+            requestedModel,
+            startedAt,
+          });
+          return failureResult(err, requestId);
+        }
+
+        try {
+          const upstreamBody = {
+            ...input.body,
+            model: attemptModel,
+            stream: false,
+          };
+
+          const perAttemptTimeoutMs = Math.min(
+            env.TOKFAI_UPSTREAM_TIMEOUT_MS,
+            remainingTotalMs
+          );
+
+          const { data, upstreamId } = await providerFetch<ChatCompletionResponse>(
+            provider,
+            provider.chatPath,
+            {
+              method: "POST",
+              json: upstreamBody,
+              timeoutMs: perAttemptTimeoutMs,
+            },
+            {
+              requestId,
+              route,
+              model: attemptModel,
+              requestedModel,
+              providerId: provider.id,
+            }
+          );
+
+          await recordModelSuccess(attemptModel);
+
+          const usage = normalizeUsage(data.usage);
+          const resolvedModel = data.model ?? attemptModel;
+          const creditsCharged = await calculateCreditsCharged(resolvedModel, usage);
+
+          const response: Record<string, unknown> = {
+            ...data,
+            model: resolvedModel,
+            credits_charged: creditsCharged,
+            request_id: requestId,
+            tokfai: {
+              credits_charged: creditsCharged,
+              request_id: requestId,
+              requested_model: requestedModel,
+              resolved_model: resolvedModel,
+              ...(isAlias ? { fallback_attempts: attemptIndex + 1 } : {}),
+            },
+          };
+
+          await recordSuccessfulUsageAndDebit(
+            {
+              user_id: caller.userId,
+              api_key_id: caller.apiKeyId,
+              model: resolvedModel,
+              status: "succeeded",
+              prompt_tokens: usage.promptTokens,
+              completion_tokens: usage.completionTokens,
+              total_tokens: usage.totalTokens,
+              credits_charged: creditsCharged,
+              request_id: requestId,
+              upstream_id: upstreamId,
+              error_code: null,
+              error_message: null,
+              latency_ms: Date.now() - startedAt,
+              billable: true,
+              finish_reason: extractFinishReason(data),
+              upstream_status: null,
+              upstream_error_code: null,
+              safety_reason: isAlias ? requestedModel : null,
+            },
+            {
+              idempotencyKey: input.idempotencyKey ?? null,
+              endpoint: route,
+              responseSnapshot: response,
+            }
+          );
+
+          log.info("chat_completion_succeeded", {
+            requestId,
+            route,
+            status: 200,
+            code: "succeeded",
+            message: "Chat completion succeeded.",
+            requestedModel,
+            resolvedModel,
+            attemptModel,
+            attemptIndex,
+            providerId: provider.id,
+            providerIndex,
+            latencyMs: Date.now() - startedAt,
+          });
+
+          return {
+            ok: true,
+            response,
+            creditsCharged,
+            resolvedModel,
+            requestedModel,
+            requestId,
+          };
+        } catch (err) {
+          if (!(err instanceof ApiError)) {
+            throw err;
+          }
+
+          lastError = err;
+
+          log.warn("chat_provider_fallback_attempt", {
+            requestId,
+            route,
+            requestedModel,
+            attemptModel,
+            attemptIndex,
+            providerId: provider.id,
+            providerIndex,
+            status: err.status,
+            code: err.code ?? "failed",
+            upstreamStatus: err.upstreamStatus,
+            upstreamErrorMessage: err.upstreamErrorSnippet,
+            latencyMs: Date.now() - attemptStartedAt,
+          });
+
+          const hasNextProvider =
+            providerIndex < providerAttempts.length - 1 &&
+            isChatFallbackEligible(err);
+
+          if (hasNextProvider) {
+            continue;
+          }
+
+          modelAttemptFailed = true;
+
+          if (isAlias && isChatFallbackEligible(err)) {
+            await recordModelFailure(attemptModel, err.code);
+          }
+
+          const hasNextModel =
+            isAlias &&
+            attemptIndex < attempts.length - 1 &&
+            isChatFallbackEligible(err);
+
+          if (hasNextModel) {
+            break;
+          }
+
+          if (isAlias && isChatFallbackEligible(err)) {
+            const exhausted = allUpstreamsUnavailableError();
+            await logChatFailure({
+              caller,
+              requestId,
+              requestedModel,
+              startedAt,
+              err: exhausted,
+              lastAttempt: err,
+              route,
+            });
+            return failureResult(exhausted, requestId);
+          }
+
+          await logChatFailure({
+            caller,
+            requestId,
+            requestedModel,
+            startedAt,
+            err,
+            route,
+          });
+          return failureResult(err, requestId);
+        } finally {
+          await releaseGlobalUpstream();
+        }
+      }
+
+      if (modelAttemptFailed && isAlias && attemptIndex < attempts.length - 1) {
+        continue;
       }
     }
 

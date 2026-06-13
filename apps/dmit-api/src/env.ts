@@ -102,6 +102,19 @@ const Schema = z
     .int()
     .positive()
     .default(50),
+  TOKFAI_UPSTREAM_SECONDARY_BASE_URL: z.string().url().optional(),
+  TOKFAI_UPSTREAM_SECONDARY_API_KEY: z.string().min(1).optional(),
+  TOKFAI_UPSTREAM_SECONDARY_CHAT_PATH: z
+    .string()
+    .min(1)
+    .default("/v1/chat/completions"),
+  TOKFAI_UPSTREAM_SECONDARY_ENABLED: z
+    .string()
+    .optional()
+    .default("false")
+    .transform((raw) => raw === "true" || raw === "1"),
+  TOKFAI_MODEL_PROVIDER_ORDER_GPT_5_4: z.string().optional(),
+  TOKFAI_MODEL_PROVIDER_ORDER_GPT_5_5: z.string().optional(),
   TOKFAI_BATCH_MAX_ITEMS: z.coerce.number().int().positive().default(100),
   TOKFAI_BATCH_ITEM_CONCURRENCY: z.coerce
     .number()

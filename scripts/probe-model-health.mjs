@@ -13,6 +13,10 @@
  *   PROMPT                 default "Say ok only."
  *   TIMEOUT_MS             default 120000
  *   STOP_ON_ERROR_RATE     default 1 (disabled)
+ *
+ * Provider-level attempt stats are not exposed in API responses.
+ * Per-provider health breakdown is planned for P766.1 — this script
+ * reports model-level success/latency only.
  */
 
 import { mkdir, writeFile } from "node:fs/promises";
@@ -408,6 +412,9 @@ async function main() {
   console.log(`concurrency:        ${CONCURRENCY}`);
   console.log(`prompt:             ${PROMPT}`);
   console.log(`timeout_ms:         ${TIMEOUT_MS}`);
+  console.log(
+    "provider_stats:     model-level only (provider breakdown → P766.1)"
+  );
   if (STOP_ON_ERROR_RATE < 1) {
     console.log(
       `early_stop:         when error rate > ${STOP_ON_ERROR_RATE * 100}% per model`
