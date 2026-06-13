@@ -49,6 +49,10 @@ export interface UsageLogInsert {
   upstream_status: number | null;
   upstream_error_code: string | null;
   safety_reason: string | null;
+  idempotency_key?: string | null;
+  endpoint?: string | null;
+  billing_status?: string;
+  billing_error?: string | null;
 }
 
 /** Read-only fields returned by GET /v1/me/usage and /v1/me/usage/summary */

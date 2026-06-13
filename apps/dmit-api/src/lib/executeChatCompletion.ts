@@ -22,6 +22,10 @@ import {
   tryAcquireGlobalUpstream,
 } from "../gateway/concurrency.js";
 import { logGatewayOverloaded } from "../routes/chatGatewayLogs.js";
+import {
+  lookupBillingIdempotency,
+  recordSuccessfulUsageAndDebit as persistSuccessfulUsageAndDebit,
+} from "./usageBilling.js";
 
 export const ChatMessageSchema = z
   .object({
@@ -80,6 +84,7 @@ export interface ExecuteChatCompletionInput {
   body: ChatCompletionRequestBody;
   route?: string;
   limitKey?: string;
+  idempotencyKey?: string | null;
 }
 
 export type ExecuteChatCompletionResult =
@@ -121,7 +126,8 @@ export async function executeChatCompletion(
         error_code: "model_not_found",
         error_message: `The model \`${requestedModel}\` does not exist.`,
         latency_ms: Date.now() - startedAt,
-      })
+      }),
+      route
     );
 
     return {
@@ -144,7 +150,8 @@ export async function executeChatCompletion(
         error_code: "stream_not_supported",
         error_message: "Streaming is not supported yet.",
         latency_ms: Date.now() - startedAt,
-      })
+      }),
+      route
     );
 
     return {
@@ -172,6 +179,37 @@ export async function executeChatCompletion(
       route,
     });
     return failureResult(err, requestId);
+  }
+
+  if (input.idempotencyKey && caller.apiKeyId) {
+    const replay = await lookupBillingIdempotency({
+      apiKeyId: caller.apiKeyId,
+      idempotencyKey: input.idempotencyKey,
+      endpoint: route,
+    });
+
+    if (replay?.responseSnapshot) {
+      log.info("chat_completion_idempotent_replay", {
+        requestId: replay.requestId,
+        route,
+        idempotencyKey: input.idempotencyKey,
+      });
+
+      const snapshot = replay.responseSnapshot;
+      const resolvedModel =
+        typeof snapshot.model === "string"
+          ? snapshot.model
+          : requestedModel;
+
+      return {
+        ok: true,
+        response: snapshot,
+        creditsCharged: replay.creditsCharged,
+        resolvedModel,
+        requestedModel,
+        requestId: replay.requestId || requestId,
+      };
+    }
   }
 
   try {
@@ -259,40 +297,6 @@ export async function executeChatCompletion(
         const resolvedModel = data.model ?? attemptModel;
         const creditsCharged = await calculateCreditsCharged(resolvedModel, usage);
 
-        await recordSuccessfulUsageAndDebit({
-          user_id: caller.userId,
-          api_key_id: caller.apiKeyId,
-          model: resolvedModel,
-          status: "succeeded",
-          prompt_tokens: usage.promptTokens,
-          completion_tokens: usage.completionTokens,
-          total_tokens: usage.totalTokens,
-          credits_charged: creditsCharged,
-          request_id: requestId,
-          upstream_id: upstreamId,
-          error_code: null,
-          error_message: null,
-          latency_ms: Date.now() - startedAt,
-          billable: true,
-          finish_reason: extractFinishReason(data),
-          upstream_status: null,
-          upstream_error_code: null,
-          safety_reason: isAlias ? requestedModel : null,
-        });
-
-        log.info("chat_completion_succeeded", {
-          requestId,
-          route,
-          status: 200,
-          code: "succeeded",
-          message: "Chat completion succeeded.",
-          requestedModel,
-          resolvedModel,
-          attemptModel,
-          attemptIndex,
-          latencyMs: Date.now() - startedAt,
-        });
-
         const response: Record<string, unknown> = {
           ...data,
           model: resolvedModel,
@@ -306,6 +310,47 @@ export async function executeChatCompletion(
             ...(isAlias ? { fallback_attempts: attemptIndex + 1 } : {}),
           },
         };
+
+        await recordSuccessfulUsageAndDebit(
+          {
+            user_id: caller.userId,
+            api_key_id: caller.apiKeyId,
+            model: resolvedModel,
+            status: "succeeded",
+            prompt_tokens: usage.promptTokens,
+            completion_tokens: usage.completionTokens,
+            total_tokens: usage.totalTokens,
+            credits_charged: creditsCharged,
+            request_id: requestId,
+            upstream_id: upstreamId,
+            error_code: null,
+            error_message: null,
+            latency_ms: Date.now() - startedAt,
+            billable: true,
+            finish_reason: extractFinishReason(data),
+            upstream_status: null,
+            upstream_error_code: null,
+            safety_reason: isAlias ? requestedModel : null,
+          },
+          {
+            idempotencyKey: input.idempotencyKey ?? null,
+            endpoint: route,
+            responseSnapshot: response,
+          }
+        );
+
+        log.info("chat_completion_succeeded", {
+          requestId,
+          route,
+          status: 200,
+          code: "succeeded",
+          message: "Chat completion succeeded.",
+          requestedModel,
+          resolvedModel,
+          attemptModel,
+          attemptIndex,
+          latencyMs: Date.now() - startedAt,
+        });
 
         return {
           ok: true,
@@ -397,7 +442,8 @@ export async function executeChatCompletion(
         error_code: "server_error",
         error_message: "Internal error.",
         latency_ms: Date.now() - startedAt,
-      })
+      }),
+      route
     );
 
     log.error("chat_completion_failed", {
@@ -553,39 +599,31 @@ function upstreamFailureFields(
 }
 
 async function recordSuccessfulUsageAndDebit(
-  entry: UsageLogInsert
-): Promise<void> {
-  const { error } = await supabase().rpc("record_usage_and_debit", {
-    p_user_id: entry.user_id,
-    p_api_key_id: entry.api_key_id,
-    p_model: entry.model,
-    p_prompt_tokens: entry.prompt_tokens,
-    p_completion_tokens: entry.completion_tokens,
-    p_total_tokens: entry.total_tokens,
-    p_credits_charged: entry.credits_charged ?? 0,
-    p_request_id: entry.request_id,
-    p_upstream_id: entry.upstream_id,
-    p_latency_ms: entry.latency_ms,
-    p_billable: entry.billable,
-    p_finish_reason: entry.finish_reason,
-    p_upstream_status: entry.upstream_status,
-    p_upstream_error_code: entry.upstream_error_code,
-    p_safety_reason: entry.safety_reason,
-  });
-
-  if (!error) return;
-
-  if (
-    error.code === "P0001" ||
-    error.message.toLowerCase().includes("insufficient_credits")
-  ) {
-    throw insufficientCreditsError();
+  entry: UsageLogInsert,
+  args: {
+    idempotencyKey?: string | null;
+    endpoint: string;
+    responseSnapshot?: Record<string, unknown> | null;
   }
+): Promise<void> {
+  try {
+    await persistSuccessfulUsageAndDebit(entry, args);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const code =
+      err && typeof err === "object" && "code" in err
+        ? String((err as { code?: string }).code ?? "")
+        : "";
 
-  throw ApiError.internal(
-    `Usage billing failed: ${error.message}`,
-    "usage_billing_failed"
-  );
+    if (code === "P0001" || message.toLowerCase().includes("insufficient_credits")) {
+      throw insufficientCreditsError();
+    }
+
+    throw ApiError.internal(
+      `Usage billing failed: ${message}`,
+      "usage_billing_failed"
+    );
+  }
 }
 
 function allUpstreamsUnavailableError(): ApiError {
@@ -626,7 +664,8 @@ async function logChatFailure(args: {
       error_message: err.publicMessage,
       latency_ms: Date.now() - startedAt,
       ...upstreamFailureFields(lastAttempt ?? err),
-    })
+    }),
+    route
   );
 
   log.warn("chat_completion_failed", {
@@ -651,8 +690,17 @@ function insufficientCreditsError(): ApiError {
   });
 }
 
-async function writeUsageLog(entry: UsageLogInsert): Promise<void> {
-  const { error } = await supabase().from("usage_logs").insert(entry);
+async function writeUsageLog(
+  entry: UsageLogInsert,
+  endpoint: string
+): Promise<void> {
+  const { error } = await supabase().from("usage_logs").insert({
+    ...entry,
+    endpoint,
+    billing_status: entry.billing_status ?? "not_billable",
+    idempotency_key: entry.idempotency_key ?? null,
+    billing_error: entry.billing_error ?? null,
+  });
   if (error) {
     log.warn("usage_log_insert_failed", {
       requestId: entry.request_id,

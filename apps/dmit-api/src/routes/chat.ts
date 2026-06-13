@@ -16,6 +16,7 @@ import {
   ChatCompletionRequestSchema,
   executeChatCompletion,
 } from "../lib/executeChatCompletion.js";
+import { parseIdempotencyKey } from "../lib/idempotency.js";
 import { logGatewayRejection } from "./chatGatewayLogs.js";
 
 /**
@@ -60,11 +61,22 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     );
   }
 
+  const rawIdempotencyKey =
+    c.req.header("idempotency-key") ?? c.req.header("Idempotency-Key");
+  const idempotencyKey = parseIdempotencyKey(rawIdempotencyKey);
+  if (rawIdempotencyKey && !idempotencyKey) {
+    throw ApiError.badRequest(
+      "Invalid Idempotency-Key header.",
+      "invalid_idempotency_key"
+    );
+  }
+
   const result = await executeChatCompletion({
     caller,
     requestId,
     body: parsed.data,
     limitKey,
+    idempotencyKey,
   });
 
   if (!result.ok) {

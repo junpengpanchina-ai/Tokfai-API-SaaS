@@ -7,6 +7,7 @@ import {
   ChatCompletionRequestSchema,
   executeChatCompletion,
 } from "../lib/executeChatCompletion.js";
+import { batchItemIdempotencyKey } from "../lib/idempotency.js";
 import type {
   ChatBatchItemRow,
   ChatBatchRow,
@@ -210,6 +211,7 @@ async function processBatchItem(args: {
         requestId: lastRequestId,
         body: parsed.data,
         route: "/v1/batches/chat",
+        idempotencyKey: batchItemIdempotencyKey(item.id),
       }),
       env.TOKFAI_BATCH_ITEM_TIMEOUT_MS
     );
