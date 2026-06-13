@@ -207,4 +207,87 @@ SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/reconcile-usage-ledg
 
 ## 11. Production smoke results
 
-_To be filled after migration apply + DMIT deploy._
+**Status:** ✅ P765 passed on production DMIT (2026-06-13)
+
+**Deploy:**
+
+```bash
+git pull origin main
+npm ci
+npm run build
+pm2 restart dmit-api --update-env
+pm2 save
+```
+
+**Environment:**
+
+| Setting | Value |
+|---------|-------|
+| API base | `https://api.tokfai.com/v1` |
+| Migration | `supabase/migrations/0028_p765_usage_ledger_safety.sql` — applied via Supabase SQL Editor |
+| Node.js (admin scripts) | v20.20.2 |
+
+#### A. Batch regression
+
+| Setting | Value |
+|---------|-------|
+| Script | `scripts/test-batch-chat.mjs` |
+
+| Metric | Result |
+|--------|--------|
+| Final batch status | `completed` |
+| succeeded_items / failed_items | 5 / 0 |
+| credits_charged | 0.000995 |
+| request_id present | 5 / 5 |
+| Script outcome | Smoke test passed |
+
+#### B. Idempotency-Key replay
+
+| Metric | Result |
+|--------|--------|
+| First request | HTTP 200 |
+| Replay request | HTTP 200 |
+| Replay response `id` | Same as first |
+| Replay `request_id` | Same as first |
+| Replay `credits_charged` | Same as first (`0.000156`) |
+| Replay `created` timestamp | Same as first |
+| Conclusion | Idempotency replay reuses first successful result and prevents duplicate upstream call / duplicate billing |
+
+#### C. Admin adjustment — missing service role
+
+| Setting | Value |
+|---------|-------|
+| Script | `scripts/admin-adjust-credits.mjs` |
+| Env | `SUPABASE_SERVICE_ROLE_KEY` unset |
+
+| Metric | Result |
+|--------|--------|
+| Exit behavior | Friendly error: `Set SUPABASE_SERVICE_ROLE_KEY before running this script.` |
+| Sensitive output | No service role key printed |
+
+#### D. Reconcile dry-run
+
+| Setting | Value |
+|---------|-------|
+| Script | `scripts/reconcile-usage-ledger.mjs` |
+| `SUPABASE_URL` | Project root URL (not `/rest/v1/`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | service_role key |
+
+| Metric | Result |
+|--------|--------|
+| mode | dry-run / report only |
+| lookback_hours | 168 |
+| A. Charged usage without debit | 0 |
+| B. Non-billable usage with debit | 0 |
+| C. Batch header vs items credits mismatch | 0 |
+| Outcome | No anomalies found in lookback window |
+
+#### P765.1 — Node 20 admin scripts fix
+
+| Setting | Value |
+|---------|-------|
+| Commit | `184b947` |
+| Fix | Supabase admin scripts use `ws` WebSocket transport on Node.js < 22 |
+| Verified | `scripts/reconcile-usage-ledger.mjs` runs on Node.js v20.20.2 |
+
+**Conclusion:** P765 production validation passed. Tokfai now supports `Idempotency-Key` duplicate-charge prevention, stable batch-item idempotency keys, enhanced usage/billing status, ops adjustment scripts, and ledger reconciliation. Production dry-run reconcile found no missing debits, no erroneous debits, and no batch credit mismatches. Ledger principle unchanged: charge only on success, never on failure; Redis is not the ledger — Supabase `credit_ledger` / `usage_logs` remain the audit source of truth.
