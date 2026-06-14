@@ -273,6 +273,7 @@ export const messages = {
           "First-run setup complete — your key, test call, and usage trail are ready.",
       },
       shell: {
+        productTagline: "OpenAI-compatible API gateway",
         creditsWithBalance: "Credits: {balance}",
         sidebarCreditsLabel: "Credits balance",
         lowCredits: "Low credits",
@@ -2294,6 +2295,7 @@ export const messages = {
           "首次接入已完成——密钥、测试调用与用量记录已就绪。",
       },
       shell: {
+        productTagline: "OpenAI 兼容 API 网关",
         creditsWithBalance: "积分：{balance}",
         sidebarCreditsLabel: "积分余额",
         lowCredits: "积分较低",

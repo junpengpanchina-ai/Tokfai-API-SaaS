@@ -107,7 +107,7 @@ export function CustomerIntegrationGuide({
   return (
     <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-8">
       <nav
-        className="lg:sticky lg:top-24 lg:z-10 lg:max-h-[calc(100vh-7rem)] lg:w-44 shrink-0 overflow-y-auto rounded-lg border bg-muted/30 p-3 lg:self-start"
+        className="lg:sticky lg:top-6 lg:z-10 lg:max-h-[calc(100vh-3rem)] lg:w-44 shrink-0 overflow-y-auto rounded-lg border bg-muted/30 p-3 lg:self-start"
         aria-label={t("integration.navTitle")}
       >
         <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -166,7 +166,7 @@ export function CustomerIntegrationGuide({
           </div>
         </div>
 
-        <Card id="quick-start" className="scroll-mt-24">
+        <Card id="quick-start" className="scroll-mt-6">
           <CardHeader>
             <CardTitle>{t("integration.quickStartTitle")}</CardTitle>
             <CardDescription>{t("integration.quickStartDesc")}</CardDescription>
@@ -203,7 +203,7 @@ export function CustomerIntegrationGuide({
           </CardContent>
         </Card>
 
-        <Card id="curl-examples" className="scroll-mt-24">
+        <Card id="curl-examples" className="scroll-mt-6">
           <CardHeader>
             <CardTitle>{t("integration.curlTitle")}</CardTitle>
             <CardDescription>{t("integration.curlDesc")}</CardDescription>
@@ -230,7 +230,7 @@ export function CustomerIntegrationGuide({
           </CardContent>
         </Card>
 
-        <Card id="openai-sdk" className="scroll-mt-24">
+        <Card id="openai-sdk" className="scroll-mt-6">
           <CardHeader>
             <CardTitle>{t("integration.sdkTitle")}</CardTitle>
             <CardDescription>{t("integration.sdkDesc")}</CardDescription>
@@ -284,7 +284,7 @@ export function CustomerIntegrationGuide({
           </CardContent>
         </Card>
 
-        <Card id="cursor-integration" className="scroll-mt-24">
+        <Card id="cursor-integration" className="scroll-mt-6">
           <CardHeader>
             <CardTitle>{t("integration.cursorTitle")}</CardTitle>
             <CardDescription>{t("integration.cursorDesc")}</CardDescription>
@@ -325,7 +325,7 @@ export function CustomerIntegrationGuide({
           </CardContent>
         </Card>
 
-        <Card id="cherry-studio" className="scroll-mt-24">
+        <Card id="cherry-studio" className="scroll-mt-6">
           <CardHeader>
             <CardTitle>{t("integration.cherryTitle")}</CardTitle>
             <CardDescription>{t("integration.cherryDesc")}</CardDescription>
@@ -373,7 +373,7 @@ export function CustomerIntegrationGuide({
           </CardContent>
         </Card>
 
-        <Card id="models-guide" className="scroll-mt-24">
+        <Card id="models-guide" className="scroll-mt-6">
           <CardHeader>
             <CardTitle>{t("integration.modelsTitle")}</CardTitle>
             <CardDescription>{t("integration.modelsDesc")}</CardDescription>
@@ -399,7 +399,7 @@ export function CustomerIntegrationGuide({
           </CardContent>
         </Card>
 
-        <Card id="error-codes" className="scroll-mt-24">
+        <Card id="error-codes" className="scroll-mt-6">
           <CardHeader>
             <CardTitle>{t("integration.errorsTitle")}</CardTitle>
             <CardDescription>{t("integration.errorsDesc")}</CardDescription>
@@ -409,7 +409,7 @@ export function CustomerIntegrationGuide({
           </CardContent>
         </Card>
 
-        <Card id="billing-usage" className="scroll-mt-24">
+        <Card id="billing-usage" className="scroll-mt-6">
           <CardHeader>
             <CardTitle>{t("integration.billingTitle")}</CardTitle>
             <CardDescription>{t("integration.billingDesc")}</CardDescription>
@@ -433,7 +433,7 @@ export function CustomerIntegrationGuide({
           </CardContent>
         </Card>
 
-        <Card id="batch-api" className="scroll-mt-24">
+        <Card id="batch-api" className="scroll-mt-6">
           <CardHeader>
             <CardTitle>{t("integration.batchTitle")}</CardTitle>
             <CardDescription>{t("integration.batchDesc")}</CardDescription>

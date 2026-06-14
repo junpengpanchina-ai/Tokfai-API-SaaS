@@ -12,7 +12,13 @@ const LOCALE_OPTIONS: { value: Locale; label: string }[] = [
   { value: "zh", label: "中文" },
 ];
 
-export function LanguageSwitcher() {
+export function LanguageSwitcher({
+  dropUp = false,
+  className,
+}: {
+  dropUp?: boolean;
+  className?: string;
+}) {
   const { locale, setLocale, t } = useI18n();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -35,7 +41,7 @@ export function LanguageSwitcher() {
     LOCALE_OPTIONS.find((option) => option.value === locale)?.label ?? "English";
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div className={cn("relative", className)} ref={containerRef}>
       <Button
         type="button"
         variant="ghost"
@@ -47,14 +53,17 @@ export function LanguageSwitcher() {
         onClick={() => setOpen((prev) => !prev)}
       >
         <Globe className="h-4 w-4" />
-        <span className="hidden sm:inline">{currentLabel}</span>
+        <span>{currentLabel}</span>
       </Button>
 
       {open ? (
         <div
           role="listbox"
           aria-label={t("common.language")}
-          className="absolute right-0 top-full z-50 mt-1 min-w-[9rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+          className={cn(
+            "absolute z-50 min-w-[9rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
+            dropUp ? "bottom-full mb-1 left-0" : "right-0 top-full mt-1"
+          )}
         >
           {LOCALE_OPTIONS.map((option) => {
             const selected = option.value === locale;

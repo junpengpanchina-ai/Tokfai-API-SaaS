@@ -1,1 +1,4 @@
-export { DashboardMobileNav, DashboardSidebar } from "@/components/dashboard-nav";
+export {
+  DashboardMobileShell,
+  DashboardSidebar,
+} from "@/components/dashboard-nav";
