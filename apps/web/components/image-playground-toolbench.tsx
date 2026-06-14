@@ -33,9 +33,8 @@ import { isLowCreditsBalance } from "@/lib/dashboard-shell-credits";
 import {
   hasGeneratedImageBase64,
   resolveGeneratedImageUrl,
-  resolveImageCreatedAt,
 } from "@/lib/image-playground-display";
-import { formatCreditsPrecise, formatCreditBalanceNumber } from "@/lib/format";
+import { formatCreditsPrecise, formatCreditBalanceDisplay } from "@/lib/format";
 import {
   formatImageCreditsAmount,
   formatImageModelSelectLabel,
@@ -49,10 +48,10 @@ import {
 import { formatMessage, type Locale } from "@/lib/i18n/messages";
 import { TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
 
-/** Shared layout tokens for the three-column Image Playground toolbench. */
+/** Shared layout tokens for the Image Playground two-column toolbench. */
 export const IMAGE_PLAYGROUND_TOOLBENCH = {
   grid:
-    "grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(220px,0.68fr)_minmax(260px,0.92fr)] lg:items-start lg:gap-4",
+    "grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-[minmax(560px,1fr)_minmax(360px,400px)] lg:items-start lg:gap-4",
   card: "shadow-none overflow-hidden",
   cardHeader: "space-y-0.5 px-4 py-3",
   cardTitle: "text-sm font-medium leading-tight",
@@ -60,9 +59,9 @@ export const IMAGE_PLAYGROUND_TOOLBENCH = {
   cardContent: "px-4 pb-4 pt-0",
   control: "h-9",
   select:
-    "flex h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
+    "flex h-8 w-full rounded-md border border-input bg-muted/30 px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
   stickyColumn:
-    "min-w-0 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-1.75rem)] lg:overflow-y-auto lg:overflow-x-hidden",
+    "min-w-0 lg:col-start-2 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-1.75rem)] lg:overflow-y-auto lg:overflow-x-hidden",
 } as const;
 
 const IMAGE_API_DOCS_HREF = "/docs#image-generations";
@@ -277,7 +276,7 @@ export function ImagePlaygroundSettingsSidebar({
   t,
 }: ImagePlaygroundSettingsSidebarProps) {
   const balanceDisplay = creditsLoaded
-    ? formatCreditBalanceNumber(creditsBalance ?? 0)
+    ? formatCreditBalanceDisplay(creditsBalance ?? 0)
     : "—";
   const lowCredits = creditsLoaded && isLowCreditsBalance({
     balance: creditsBalance ?? 0,
@@ -287,101 +286,92 @@ export function ImagePlaygroundSettingsSidebar({
     creditsLoaded &&
     estimatedCredits != null &&
     (creditsBalance ?? 0) < estimatedCredits;
+  const showTopUp = lowCredits || insufficientCredits;
 
   return (
-    <Card className={IMAGE_PLAYGROUND_TOOLBENCH.card}>
-      <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
-        <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
-          {t("dashboard.imagePlayground.toolbenchSettings")}
+    <Card className={`${IMAGE_PLAYGROUND_TOOLBENCH.card} border-muted/60`}>
+      <CardHeader className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardHeader} pb-2`}>
+        <CardTitle className="text-xs font-medium text-muted-foreground">
+          {t("dashboard.imagePlayground.settings")}
         </CardTitle>
-        <CardDescription className={IMAGE_PLAYGROUND_TOOLBENCH.cardDescription}>
-          {t("dashboard.imagePlayground.toolbenchSettingsDesc")}
-        </CardDescription>
       </CardHeader>
       <CardContent
-        className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex flex-col gap-3`}
+        className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex flex-col gap-2.5`}
       >
-        <div className="rounded-lg border bg-muted/30 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-medium text-muted-foreground">
-              {t("dashboard.credits.currentBalance")}
-            </span>
-            {lowCredits ? (
-              <Badge variant="warning" className="text-[10px]">
-                {t("dashboard.shell.lowCredits")}
-              </Badge>
-            ) : null}
-          </div>
-          <p className="mt-1 font-mono text-lg font-semibold tabular-nums">
-            {balanceDisplay}
+        <div className="flex items-baseline justify-between gap-2 text-xs">
+          <span className="text-muted-foreground">
+            {t("dashboard.credits.currentBalance")}
+          </span>
+          <span className="font-mono tabular-nums text-foreground">{balanceDisplay}</span>
+        </div>
+        {estimatedCredits != null ? (
+          <p className="text-[11px] text-muted-foreground">
+            {formatMessage(t("dashboard.imagePlayground.estimatedCost"), {
+              credits: formatImageCreditsAmount(estimatedCredits, locale),
+            })}
           </p>
-          {estimatedCredits != null ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {formatMessage(t("dashboard.imagePlayground.estimatedCost"), {
-                credits: formatImageCreditsAmount(estimatedCredits, locale),
-              })}
-            </p>
-          ) : null}
-          {insufficientCredits ? (
-            <p className="mt-2 text-xs font-medium text-destructive">
-              {t("dashboard.imagePlayground.toolbenchInsufficientCredits")}
-            </p>
-          ) : null}
-          <Button asChild size="sm" className={`mt-3 w-full ${IMAGE_PLAYGROUND_TOOLBENCH.control}`}>
+        ) : null}
+        {insufficientCredits ? (
+          <p className="text-[11px] font-medium text-destructive">
+            {t("dashboard.imagePlayground.toolbenchInsufficientCredits")}
+          </p>
+        ) : null}
+        {lowCredits ? (
+          <Badge variant="warning" className="text-[10px]">
+            {t("dashboard.shell.lowCredits")}
+          </Badge>
+        ) : null}
+        {showTopUp ? (
+          <Button asChild size="sm" variant="outline" className="h-8 w-full text-xs">
             <Link href="/dashboard/credits">
-              <Wallet className="h-4 w-4" />
+              <Wallet className="h-3.5 w-3.5" />
               {t("dashboard.imagePlayground.topUp")}
             </Link>
           </Button>
-        </div>
+        ) : null}
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="toolbench-model" className="text-xs text-muted-foreground">
-            {t("dashboard.imagePlayground.toolbenchModelLabel")}
-          </Label>
-          <select
-            id="toolbench-model"
-            value={model}
-            onChange={(e) => onModelChange(e.target.value as ImagePlaygroundModelId)}
-            disabled={loading}
-            className={IMAGE_PLAYGROUND_TOOLBENCH.select}
-          >
-            {IMAGE_PLAYGROUND_MODEL_IDS.map((m) => (
-              <option key={m} value={m}>
-                {formatImageModelSelectLabel(m, locale)}
-              </option>
-            ))}
-          </select>
-          <p className="text-[11px] leading-snug text-muted-foreground">
-            {t("dashboard.imagePlayground.toolbenchModelHint")}
-          </p>
-          {isModelComingSoon ? (
-            <p className="text-xs font-medium text-destructive">
-              {t("dashboard.imagePlayground.modelComingSoon")}
-            </p>
-          ) : null}
-        </div>
+        <div className="grid grid-cols-1 gap-2 border-t pt-2.5 sm:grid-cols-2 lg:grid-cols-1">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="toolbench-model" className="text-[11px] text-muted-foreground">
+              {t("dashboard.imagePlayground.toolbenchModelLabel")}
+            </Label>
+            <select
+              id="toolbench-model"
+              value={model}
+              onChange={(e) => onModelChange(e.target.value as ImagePlaygroundModelId)}
+              disabled={loading}
+              className={IMAGE_PLAYGROUND_TOOLBENCH.select}
+            >
+              {IMAGE_PLAYGROUND_MODEL_IDS.map((m) => (
+                <option key={m} value={m}>
+                  {formatImageModelSelectLabel(m, locale)}
+                </option>
+              ))}
+            </select>
+            {isModelComingSoon ? (
+              <p className="text-[11px] font-medium text-destructive">
+                {t("dashboard.imagePlayground.modelComingSoon")}
+              </p>
+            ) : null}
+          </div>
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="toolbench-size" className="text-xs text-muted-foreground">
-            {t("dashboard.imagePlayground.size")}
-          </Label>
-          <select
-            id="toolbench-size"
-            value={size}
-            onChange={(e) => onSizeChange(e.target.value as ImagePlaygroundSize)}
-            disabled={loading}
-            className={IMAGE_PLAYGROUND_TOOLBENCH.select}
-          >
-            {IMAGE_PLAYGROUND_SIZES.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="toolbench-size" className="text-[11px] text-muted-foreground">
+              {t("dashboard.imagePlayground.size")}
+            </Label>
+            <select
+              id="toolbench-size"
+              value={size}
+              onChange={(e) => onSizeChange(e.target.value as ImagePlaygroundSize)}
+              disabled={loading}
+              className={IMAGE_PLAYGROUND_TOOLBENCH.select}
+            >
+              {IMAGE_PLAYGROUND_SIZES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
         </div>
-
-        <p className="text-xs text-muted-foreground">
-          {t("dashboard.imagePlayground.toolbenchBillingNote")}
-        </p>
       </CardContent>
     </Card>
   );
@@ -392,7 +382,7 @@ export interface ImagePlaygroundGenerateActionsProps {
   hasUploadingImages: boolean;
   isModelComingSoon: boolean;
   copyRequestStatus: "idle" | "copied";
-  layout?: "row" | "grid";
+  layout?: "row" | "stack";
   onCopyApiRequest: () => void;
   t: (key: string) => string;
 }
@@ -407,8 +397,8 @@ export function ImagePlaygroundGenerateActions({
   t,
 }: ImagePlaygroundGenerateActionsProps) {
   const layoutClass =
-    layout === "grid"
-      ? "grid grid-cols-1 gap-2 sm:grid-cols-2"
+    layout === "stack"
+      ? "flex flex-col gap-2"
       : "flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center";
 
   return (
@@ -416,7 +406,7 @@ export function ImagePlaygroundGenerateActions({
       <Button
         type="submit"
         disabled={loading || hasUploadingImages || isModelComingSoon}
-        className={`w-full sm:w-auto ${IMAGE_PLAYGROUND_TOOLBENCH.control}`}
+        className={`w-full font-medium shadow-sm sm:w-auto ${layout === "stack" ? "h-10" : IMAGE_PLAYGROUND_TOOLBENCH.control}`}
       >
         {loading ? (
           <>
@@ -440,7 +430,7 @@ export function ImagePlaygroundGenerateActions({
         variant="outline"
         disabled={loading || hasUploadingImages}
         onClick={onCopyApiRequest}
-        className={`w-full sm:w-auto ${IMAGE_PLAYGROUND_TOOLBENCH.control}`}
+        className={`w-full sm:w-auto ${layout === "stack" ? "h-9" : IMAGE_PLAYGROUND_TOOLBENCH.control}`}
       >
         {copyRequestStatus === "copied" ? (
           <>
@@ -459,30 +449,13 @@ export function ImagePlaygroundGenerateActions({
 }
 
 export interface ImagePlaygroundServiceDocsPanelProps {
-  copyRequestStatus: "idle" | "copied";
-  loading: boolean;
-  hasUploadingImages: boolean;
-  onCopyApiRequest: () => void;
   t: (key: string) => string;
 }
 
 export function ImagePlaygroundServiceDocsPanel({
-  copyRequestStatus,
-  loading,
-  hasUploadingImages,
-  onCopyApiRequest,
   t,
 }: ImagePlaygroundServiceDocsPanelProps) {
   const shortcuts = [
-    {
-      id: "copy",
-      label: t("dashboard.imagePlayground.copyApiRequest"),
-      icon: Copy,
-      onClick: onCopyApiRequest,
-      copied: copyRequestStatus === "copied",
-      copiedLabel: t("dashboard.apiKeys.copied"),
-      href: undefined as string | undefined,
-    },
     {
       id: "image-docs",
       label: t("dashboard.imagePlayground.toolbenchViewImageApiDocs"),
@@ -510,55 +483,29 @@ export function ImagePlaygroundServiceDocsPanel({
   ];
 
   return (
-    <Card className={IMAGE_PLAYGROUND_TOOLBENCH.card}>
-      <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
-        <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
+    <Card className={`${IMAGE_PLAYGROUND_TOOLBENCH.card} border-muted/60`}>
+      <CardHeader className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardHeader} pb-2`}>
+        <CardTitle className="text-xs font-medium text-muted-foreground">
           {t("dashboard.imagePlayground.toolbenchServiceDocs")}
         </CardTitle>
-        <CardDescription className={IMAGE_PLAYGROUND_TOOLBENCH.cardDescription}>
-          {t("dashboard.imagePlayground.toolbenchServiceDocsDesc")}
-        </CardDescription>
       </CardHeader>
       <CardContent className={IMAGE_PLAYGROUND_TOOLBENCH.cardContent}>
-        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-1">
+        <div className="flex flex-col gap-0.5">
           {shortcuts.map((item) => {
             const Icon = item.icon;
-            if (item.href) {
-              return (
-                <Button
-                  key={item.id}
-                  asChild
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className={`h-9 justify-start gap-2 px-3 text-xs font-normal`}
-                >
-                  <Link href={item.href}>
-                    <Icon className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                </Button>
-              );
-            }
-
             return (
               <Button
                 key={item.id}
+                asChild
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                disabled={loading || hasUploadingImages}
-                onClick={item.onClick}
-                className="h-9 justify-start gap-2 px-3 text-xs font-normal"
+                className="h-8 justify-start gap-2 px-2 text-xs font-normal text-muted-foreground hover:text-foreground"
               >
-                {item.copied ? (
-                  <Check className="h-3.5 w-3.5 shrink-0" />
-                ) : (
-                  <Icon className="h-3.5 w-3.5 shrink-0" />
-                )}
-                <span className="truncate">
-                  {item.copied ? item.copiedLabel : item.label}
-                </span>
+                <Link href={item.href}>
+                  <Icon className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                  <span className="truncate">{item.label}</span>
+                </Link>
               </Button>
             );
           })}
@@ -640,27 +587,13 @@ export function ImagePlaygroundResultArea({
           <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
             {t("dashboard.imagePlayground.resultTitle")}
           </CardTitle>
-          <CardDescription className={IMAGE_PLAYGROUND_TOOLBENCH.cardDescription}>
-            {t("dashboard.imagePlayground.toolbenchResultEmptyDesc")}
-          </CardDescription>
         </CardHeader>
         <CardContent className={IMAGE_PLAYGROUND_TOOLBENCH.cardContent}>
-          <div className="flex min-h-[min(200px,28vh)] flex-col items-center justify-center gap-2.5 rounded-lg border border-dashed bg-muted/20 px-4 py-6 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/60">
-              <ImageIcon className="h-8 w-8 text-muted-foreground/70" />
-            </div>
-            <p className="text-sm font-medium text-foreground">
+          <div className="flex min-h-[min(160px,24vh)] flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/15 px-4 py-5 text-center">
+            <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
+            <p className="text-sm text-muted-foreground">
               {t("dashboard.imagePlayground.toolbenchResultPlaceholder")}
             </p>
-            <p className="max-w-sm text-xs text-muted-foreground">
-              {isImageToImage
-                ? t("dashboard.imagePlayground.imageToImageHint")
-                : t("dashboard.imagePlayground.toolbenchResultSampleHint")}
-            </p>
-            <div className="mt-1 flex flex-wrap justify-center gap-2">
-              <Badge variant="secondary">{t("dashboard.imagePlayground.textToImage")}</Badge>
-              <Badge variant="outline">{t("dashboard.imagePlayground.imageToImage")}</Badge>
-            </div>
           </div>
         </CardContent>
       </Card>

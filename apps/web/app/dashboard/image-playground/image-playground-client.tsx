@@ -734,7 +734,7 @@ export function ImagePlaygroundClient({
       </div>
 
       <div className={IMAGE_PLAYGROUND_TOOLBENCH.grid}>
-        <div className="flex min-w-0 flex-col gap-3 lg:col-start-1">
+        <div className="order-1 flex min-w-0 flex-col gap-3 lg:col-start-1">
           <ImagePlaygroundCompactKeyRow
             keyPanelView={keyPanelView}
             localKeys={localKeys}
@@ -781,13 +781,13 @@ export function ImagePlaygroundClient({
               <textarea
                 ref={promptRef}
                 id="prompt"
-                rows={3}
+                rows={4}
                 required
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 disabled={loading}
                 placeholder={promptPlaceholder}
-                className="flex min-h-[4.5rem] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex min-h-[5.5rem] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               />
 
               <ImageInputsPanel
@@ -834,7 +834,32 @@ export function ImagePlaygroundClient({
           </Card>
         </div>
 
-        <div className="min-w-0 lg:col-start-2">
+        <div className="order-2 min-w-0 lg:hidden">
+          <ImagePlaygroundGenerateActions
+            loading={loading}
+            hasUploadingImages={hasUploadingImages}
+            isModelComingSoon={isModelComingSoon}
+            copyRequestStatus={copyRequestStatus}
+            layout="stack"
+            onCopyApiRequest={() => void handleCopyApiRequest()}
+            t={t}
+          />
+        </div>
+
+        <div
+          className={`${IMAGE_PLAYGROUND_TOOLBENCH.stickyColumn} order-3 flex flex-col gap-3`}
+        >
+          <ImagePlaygroundResultArea
+            loading={loading}
+            error={error}
+            result={result}
+            completedAt={completedAt}
+            inputImagesCount={
+              result?.input_images_count ?? lastRequestInputCount
+            }
+            isImageToImage={isImageToImage}
+            t={t}
+          />
           <ImagePlaygroundSettingsSidebar
             model={model}
             size={size}
@@ -848,41 +873,7 @@ export function ImagePlaygroundClient({
             onSizeChange={setSize}
             t={t}
           />
-        </div>
-
-        <div className="min-w-0 lg:col-start-1 lg:hidden">
-          <ImagePlaygroundGenerateActions
-            loading={loading}
-            hasUploadingImages={hasUploadingImages}
-            isModelComingSoon={isModelComingSoon}
-            copyRequestStatus={copyRequestStatus}
-            layout="grid"
-            onCopyApiRequest={() => void handleCopyApiRequest()}
-            t={t}
-          />
-        </div>
-
-        <div className={`${IMAGE_PLAYGROUND_TOOLBENCH.stickyColumn} lg:col-start-3`}>
-          <div className="flex flex-col gap-3">
-            <ImagePlaygroundResultArea
-              loading={loading}
-              error={error}
-              result={result}
-              completedAt={completedAt}
-              inputImagesCount={
-                result?.input_images_count ?? lastRequestInputCount
-              }
-              isImageToImage={isImageToImage}
-              t={t}
-            />
-            <ImagePlaygroundServiceDocsPanel
-              copyRequestStatus={copyRequestStatus}
-              loading={loading}
-              hasUploadingImages={hasUploadingImages}
-              onCopyApiRequest={() => void handleCopyApiRequest()}
-              t={t}
-            />
-          </div>
+          <ImagePlaygroundServiceDocsPanel t={t} />
         </div>
       </div>
     </form>
@@ -899,7 +890,7 @@ function PromptPresets({
   t: (key: string) => string;
 }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-1.5">
       {IMAGE_PLAYGROUND_PRESET_IDS.map((presetId) => (
         <Button
           key={presetId}
@@ -907,6 +898,7 @@ function PromptPresets({
           size="sm"
           variant="outline"
           disabled={loading}
+          className="h-7 px-2.5 text-xs"
           onClick={() => onSelect(presetId)}
         >
           {t(imagePlaygroundPresetLabelKey(presetId))}
@@ -1050,8 +1042,8 @@ function ImageInputsPanel({
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        className={`flex flex-col items-center justify-center gap-1 rounded-md border border-dashed px-3 text-center transition-colors ${
-          toolbench ? "py-3" : "py-5 sm:py-6"
+        className={`flex flex-col items-center justify-center gap-0.5 rounded-md border border-dashed px-3 text-center transition-colors ${
+          toolbench ? "py-2" : "py-5 sm:py-6"
         } ${
           isDragging
             ? "border-primary bg-primary/10 ring-2 ring-primary/30"
@@ -1067,14 +1059,16 @@ function ImageInputsPanel({
           }
         }}
       >
-        <div className="pointer-events-none flex flex-col items-center gap-1.5">
-          <Upload className="h-5 w-5 text-muted-foreground" />
-          <p className="text-sm font-medium">
+        <div className="pointer-events-none flex flex-col items-center gap-0.5">
+          <Upload className={`text-muted-foreground ${toolbench ? "h-4 w-4" : "h-5 w-5"}`} />
+          <p className={toolbench ? "text-xs font-medium" : "text-sm font-medium"}>
             {t("dashboard.imagePlayground.inputImagesDragTitle")}
           </p>
-          <p className="text-xs text-muted-foreground">
-            {t("dashboard.imagePlayground.inputImagesDragHint")}
-          </p>
+          {toolbench ? null : (
+            <p className="text-xs text-muted-foreground">
+              {t("dashboard.imagePlayground.inputImagesDragHint")}
+            </p>
+          )}
         </div>
         <input
           ref={fileInputRef}
@@ -1087,10 +1081,10 @@ function ImageInputsPanel({
         />
       </div>
 
-      <div className="flex flex-row items-center gap-3">
+      <div className="flex flex-row items-center gap-2">
         <Input
           type="url"
-          className="min-w-0 flex-1"
+          className={`min-w-0 flex-1 ${toolbench ? "h-8 text-xs" : ""}`}
           placeholder={t("dashboard.imagePlayground.inputImagesUrlPlaceholder")}
           value={imageUrlDraft}
           onChange={(event) => onImageUrlDraftChange(event.target.value)}
@@ -1107,7 +1101,7 @@ function ImageInputsPanel({
           variant="outline"
           disabled={loading || atLimit || !imageUrlDraft.trim()}
           onClick={onAddImageUrl}
-          className="shrink-0"
+          className={`shrink-0 ${toolbench ? "h-8 px-2 text-xs" : ""}`}
         >
           <Plus className="h-4 w-4" />
           {t("dashboard.imagePlayground.addImageUrl")}

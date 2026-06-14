@@ -6,7 +6,6 @@ import { useState } from "react";
 
 import {
   DashboardSidebarCreditsSummary,
-  formatShellCreditsAmount,
 } from "@/components/dashboard-credits-balance";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
@@ -79,7 +78,6 @@ export function DashboardMobileShell({
   const { t } = useI18n();
   const { items, isAdminRoute, sections } = useShellNav(pathname);
   const ariaLabelKey = isAdminRoute ? "admin.nav.sections" : "nav.dashboard";
-  const creditsAmount = formatShellCreditsAmount(credits);
   const displayEmail = truncateEmail(email);
 
   return (
@@ -113,8 +111,6 @@ export function DashboardMobileShell({
           {items.map((item) => {
             const active = isNavItemActive(pathname, item, isAdminRoute);
             const Icon = item.icon;
-            const isCreditsItem =
-              !isAdminRoute && item.href === "/dashboard/credits";
 
             return (
               <Link
@@ -131,11 +127,6 @@ export function DashboardMobileShell({
               >
                 <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 <span className="whitespace-nowrap">{t(item.labelKey)}</span>
-                {isCreditsItem ? (
-                  <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
-                    {creditsAmount}
-                  </span>
-                ) : null}
               </Link>
             );
           })}
@@ -156,7 +147,6 @@ export function DashboardSidebar({
   const { t } = useI18n();
   const { items, isAdminRoute, sections } = useShellNav(pathname);
   const ariaLabelKey = isAdminRoute ? "admin.nav.sections" : "nav.dashboard";
-  const creditsAmount = formatShellCreditsAmount(credits);
   const displayEmail = truncateEmail(email);
 
   return (
@@ -184,18 +174,16 @@ export function DashboardSidebar({
                 key={item.href}
                 item={item}
                 active={isNavItemActive(pathname, item, isAdminRoute)}
-                isCreditsItem={false}
-                creditsAmount={creditsAmount}
                 t={t}
               />
             ))}
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             {sections!.map((section) => (
               <div key={section.id}>
                 <p
-                  className="px-3 pb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+                  className="px-3 pb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70"
                 >
                   {t(section.labelKey)}
                 </p>
@@ -205,8 +193,6 @@ export function DashboardSidebar({
                       key={item.href}
                       item={item}
                       active={isNavItemActive(pathname, item, isAdminRoute)}
-                      isCreditsItem={item.href === "/dashboard/credits"}
-                      creditsAmount={creditsAmount}
                       t={t}
                     />
                   ))}
@@ -232,14 +218,10 @@ export function DashboardSidebar({
 function DashboardNavLink({
   item,
   active,
-  isCreditsItem,
-  creditsAmount,
   t,
 }: {
   item: (typeof DASHBOARD_NAV_ITEMS)[number];
   active: boolean;
-  isCreditsItem: boolean;
-  creditsAmount: string;
   t: (key: string) => string;
 }) {
   const Icon = item.icon;
@@ -249,7 +231,7 @@ function DashboardNavLink({
       href={item.href}
       prefetch={item.prefetch}
       className={cn(
-        "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+        "flex h-9 items-center gap-2.5 rounded-md px-3 text-sm transition-colors",
         active
           ? "bg-background text-foreground shadow-sm"
           : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
@@ -258,11 +240,6 @@ function DashboardNavLink({
     >
       <Icon className="h-4 w-4 shrink-0" />
       <span className="min-w-0 truncate">{t(item.labelKey)}</span>
-      {isCreditsItem ? (
-        <span className="ml-auto font-mono text-[11px] tabular-nums text-muted-foreground">
-          {creditsAmount}
-        </span>
-      ) : null}
     </Link>
   );
 }

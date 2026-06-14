@@ -8,6 +8,12 @@ const CREDITS = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 6,
 });
 
+/** Shell / sidebar balance display — up to 2 decimal places. */
+const CREDITS_SHELL = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
+
 export function formatCreditsPrecise(
   value: number | null | undefined
 ): string {
@@ -25,6 +31,13 @@ export function formatCredits(value: number | null | undefined): string {
 /** Numeric credits amount for shell labels (no "credits" suffix). */
 export function formatCreditBalanceNumber(value: number | null | undefined): string {
   return CREDITS.format(value ?? 0);
+}
+
+/** Rounded credits for sidebar and shell UI (max 2 decimal places). */
+export function formatCreditBalanceDisplay(
+  value: number | null | undefined
+): string {
+  return CREDITS_SHELL.format(value ?? 0);
 }
 
 export function formatDateTime(iso: string | null | undefined): string {
