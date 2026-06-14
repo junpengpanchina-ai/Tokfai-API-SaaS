@@ -733,8 +733,10 @@ export function ImagePlaygroundClient({
         </Badge>
       </div>
 
-      <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.35fr)_320px]">
-        <div className="flex min-w-0 flex-col gap-4">
+      <div
+        className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(248px,0.72fr)_minmax(280px,1fr)] lg:items-start lg:gap-5"
+      >
+        <div className="flex min-w-0 flex-col gap-4 lg:col-start-1">
           <ImagePlaygroundCompactKeyRow
             keyPanelView={keyPanelView}
             localKeys={localKeys}
@@ -863,7 +865,25 @@ export function ImagePlaygroundClient({
               </div>
             </CardContent>
           </Card>
+        </div>
 
+        <div className="min-w-0 lg:col-start-2">
+          <ImagePlaygroundSettingsSidebar
+            model={model}
+            size={size}
+            loading={loading}
+            creditsBalance={initialCreditsBalance}
+            creditsLoaded={creditsLoaded}
+            estimatedCredits={selectedModelCredits}
+            isModelComingSoon={isModelComingSoon}
+            locale={locale}
+            onModelChange={setModel}
+            onSizeChange={setSize}
+            t={t}
+          />
+        </div>
+
+        <div className="min-w-0 lg:col-start-3 lg:sticky lg:top-6 lg:self-start">
           <ImagePlaygroundResultArea
             loading={loading}
             error={error}
@@ -876,20 +896,6 @@ export function ImagePlaygroundClient({
             t={t}
           />
         </div>
-
-        <ImagePlaygroundSettingsSidebar
-          model={model}
-          size={size}
-          loading={loading}
-          creditsBalance={initialCreditsBalance}
-          creditsLoaded={creditsLoaded}
-          estimatedCredits={selectedModelCredits}
-          isModelComingSoon={isModelComingSoon}
-          locale={locale}
-          onModelChange={setModel}
-          onSizeChange={setSize}
-          t={t}
-        />
       </div>
     </form>
   );

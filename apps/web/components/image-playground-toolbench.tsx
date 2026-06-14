@@ -37,7 +37,6 @@ import {
   formatImageModelSelectLabel,
 } from "@/lib/model-pricing-display";
 import {
-  getImageModelById,
   IMAGE_PLAYGROUND_MODEL_IDS,
   IMAGE_PLAYGROUND_SIZES,
   type ImagePlaygroundModelId,
@@ -254,7 +253,6 @@ export function ImagePlaygroundSettingsSidebar({
   onSizeChange,
   t,
 }: ImagePlaygroundSettingsSidebarProps) {
-  const modelEntry = getImageModelById(model);
   const balanceDisplay = creditsLoaded
     ? formatCreditBalanceNumber(creditsBalance ?? 0)
     : "—";
@@ -268,16 +266,16 @@ export function ImagePlaygroundSettingsSidebar({
     (creditsBalance ?? 0) < estimatedCredits;
 
   return (
-    <Card className="lg:sticky lg:top-6 lg:self-start shadow-none">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">
+    <Card className="shadow-none">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium">
           {t("dashboard.imagePlayground.toolbenchSettings")}
         </CardTitle>
         <CardDescription className="text-xs">
           {t("dashboard.imagePlayground.toolbenchSettingsDesc")}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4 pt-0">
+      <CardContent className="flex flex-col gap-3 pt-0">
         <div className="rounded-lg border bg-muted/30 p-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-muted-foreground">
@@ -312,8 +310,8 @@ export function ImagePlaygroundSettingsSidebar({
           </Button>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="toolbench-model" className="text-xs">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="toolbench-model" className="text-xs text-muted-foreground">
             {t("dashboard.imagePlayground.toolbenchModelLabel")}
           </Label>
           <select
@@ -329,7 +327,7 @@ export function ImagePlaygroundSettingsSidebar({
               </option>
             ))}
           </select>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[11px] leading-snug text-muted-foreground">
             {t("dashboard.imagePlayground.toolbenchModelHint")}
           </p>
           {isModelComingSoon ? (
@@ -337,13 +335,10 @@ export function ImagePlaygroundSettingsSidebar({
               {t("dashboard.imagePlayground.modelComingSoon")}
             </p>
           ) : null}
-          {modelEntry?.description ? (
-            <p className="text-xs text-muted-foreground">{modelEntry.description}</p>
-          ) : null}
         </div>
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="toolbench-size" className="text-xs">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="toolbench-size" className="text-xs text-muted-foreground">
             {t("dashboard.imagePlayground.size")}
           </Label>
           <select
@@ -392,10 +387,11 @@ export function ImagePlaygroundResultArea({
   t: (key: string) => string;
 }) {
   const { copiedId, copyText } = useCopyToClipboard();
+  const resultCardClass = "shadow-none w-full";
 
   if (loading) {
     return (
-      <Card className="shadow-none">
+      <Card className={resultCardClass}>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">{t("dashboard.imagePlayground.resultTitle")}</CardTitle>
         </CardHeader>
@@ -409,7 +405,7 @@ export function ImagePlaygroundResultArea({
 
   if (error) {
     return (
-      <Card className="shadow-none">
+      <Card className={resultCardClass}>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">{t("dashboard.imagePlayground.resultTitle")}</CardTitle>
         </CardHeader>
@@ -425,7 +421,7 @@ export function ImagePlaygroundResultArea({
 
   if (!result) {
     return (
-      <Card className="shadow-none">
+      <Card className={resultCardClass}>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">{t("dashboard.imagePlayground.resultTitle")}</CardTitle>
           <CardDescription className="text-xs">
@@ -433,7 +429,7 @@ export function ImagePlaygroundResultArea({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-muted/20 px-4 py-10 text-center">
+          <div className="flex min-h-[min(360px,52vh)] flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-muted/20 px-4 py-8 text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/60">
               <ImageIcon className="h-8 w-8 text-muted-foreground/70" />
             </div>
@@ -462,7 +458,7 @@ export function ImagePlaygroundResultArea({
   const requestCopyId = "image-result-request-id";
 
   return (
-    <Card className="shadow-none border-emerald-500/20">
+    <Card className={`${resultCardClass} border-emerald-500/20`}>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <CheckCircle2 className="h-4 w-4 text-emerald-600" />

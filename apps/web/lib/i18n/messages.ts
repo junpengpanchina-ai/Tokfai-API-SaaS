@@ -825,7 +825,7 @@ export const messages = {
         toolbenchBillingNote: "Successful generations debit credits. Failed calls are usually not charged.",
         toolbenchPromptTitle: "Prompt & reference images",
         toolbenchResultPlaceholder: "Your generated image will appear here",
-        toolbenchResultEmptyDesc: "Sample result area — run a test to preview billing and request_id.",
+        toolbenchResultEmptyDesc: "Results stay visible on the right while you edit prompt and settings.",
         toolbenchResultSampleHint: "Try a preset prompt or upload a reference image for image-to-image.",
         subtitle:
           "Test text-to-image and image-to-image through {endpoint}. Drag images, paste URLs, or use prompt-only for text-to-image. Successful generations debit credits. Failed calls are not charged.",
@@ -2891,8 +2891,8 @@ export const messages = {
         toolbenchInsufficientCredits: "余额不足——请先充值再生成。",
         toolbenchBillingNote: "成功生成会扣 credits，失败通常不扣费。",
         toolbenchPromptTitle: "Prompt 与参考图",
-        toolbenchResultPlaceholder: "生成的图片将显示在这里",
-        toolbenchResultEmptyDesc: "示例结果区——运行测试后可查看扣费与 request_id。",
+        toolbenchResultPlaceholder: "生成结果会显示在这里",
+        toolbenchResultEmptyDesc: "右侧结果区在编辑提示词和设置时保持可见。",
         toolbenchResultSampleHint: "试试预设 Prompt，或上传参考图进行图生图。",
         subtitle:
           "通过 {endpoint} 测试文生图与图生图。可拖拽图片、粘贴 URL，或仅用 prompt 文生图。成功生成会扣费，失败不扣费。",
