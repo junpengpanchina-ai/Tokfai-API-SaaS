@@ -1,22 +1,24 @@
 #!/usr/bin/env node
 /**
- * P762.5 — Model health probe (multi-model diagnostics).
+ * P766.4 — Model / provider health probe (production acceptance).
  *
  * Usage:
  *   TOKFAI_API_KEY=sk-tokfai_... node scripts/probe-model-health.mjs
  *
+ * P766.4 acceptance preset (models + thresholds):
+ *   P766_4_ACCEPTANCE=1 TOKFAI_API_KEY=sk-tokfai_... node scripts/probe-model-health.mjs
+ *
  * Optional env:
  *   TOKFAI_API_BASE        default https://api.tokfai.com/v1
  *   MODELS                 comma-separated model IDs
- *   REQUESTS_PER_MODEL     default 5
+ *   REQUESTS_PER_MODEL     default 5 (3 when P766_4_ACCEPTANCE=1)
  *   CONCURRENCY            default 1
  *   PROMPT                 default "Say ok only."
  *   TIMEOUT_MS             default 120000
  *   STOP_ON_ERROR_RATE     default 1 (disabled)
+ *   MIN_SUCCESS_RATE       default 0.8 for auto-* when P766_4_ACCEPTANCE=1
  *
- * Provider-level attempt stats are not exposed in API responses.
- * Per-provider health breakdown is planned for P766.1 — this script
- * reports model-level success/latency only.
+ * Never logs the full API key — masked prefix only.
  */
 
 import { mkdir, writeFile } from "node:fs/promises";
@@ -28,15 +30,37 @@ const BASE = (process.env.TOKFAI_API_BASE ?? "https://api.tokfai.com/v1").replac
   ""
 );
 const API_KEY = process.env.TOKFAI_API_KEY ?? "";
-const DEFAULT_MODELS =
-  "auto-fast,auto-pro,gemini-3-flash,gemini-2.5-flash,gemini-3-pro,gemini-3.1-pro,gpt-5.4,gpt-5.5";
+
+const P766_4_ACCEPTANCE =
+  process.env.P766_4_ACCEPTANCE === "1" ||
+  process.env.P766_4_ACCEPTANCE === "true" ||
+  process.env.ACCEPTANCE === "p766.4";
+
+const P766_4_MODELS = [
+  "auto-fast",
+  "auto-pro",
+  "auto-cheap",
+  "gpt-5.4",
+  "gpt-5.5",
+  "gemini-3-flash",
+];
+
+const DEFAULT_MODELS = P766_4_ACCEPTANCE
+  ? P766_4_MODELS.join(",")
+  : P766_4_MODELS.join(",");
+
 const MODELS = (process.env.MODELS ?? DEFAULT_MODELS)
   .split(",")
   .map((m) => m.trim())
   .filter(Boolean);
+
 const REQUESTS_PER_MODEL = Math.max(
   1,
-  parseInt(process.env.REQUESTS_PER_MODEL ?? "5", 10) || 5
+  parseInt(
+    process.env.REQUESTS_PER_MODEL ??
+      (P766_4_ACCEPTANCE ? "3" : "5"),
+    10
+  ) || (P766_4_ACCEPTANCE ? 3 : 5)
 );
 const CONCURRENCY = Math.max(
   1,
@@ -51,6 +75,16 @@ const STOP_ON_ERROR_RATE = Math.min(
   1,
   Math.max(0, parseFloat(process.env.STOP_ON_ERROR_RATE ?? "1") || 1)
 );
+const MIN_SUCCESS_RATE = Math.min(
+  1,
+  Math.max(
+    0,
+    parseFloat(
+      process.env.MIN_SUCCESS_RATE ??
+        (P766_4_ACCEPTANCE ? "0.8" : "0")
+    ) || (P766_4_ACCEPTANCE ? 0.8 : 0)
+  )
+);
 
 const ENDPOINT = `${BASE}/chat/completions`;
 const RESULTS_DIR = join(
@@ -59,6 +93,8 @@ const RESULTS_DIR = join(
   "model-health-results"
 );
 const RESULTS_FILE = join(RESULTS_DIR, "latest.json");
+
+const AUTO_ALIASES = new Set(["auto-fast", "auto-pro", "auto-cheap"]);
 
 function maskKey(key) {
   if (!key || key.length <= 12) return "(not set)";
@@ -85,6 +121,13 @@ function inferErrorCode(status, parsedCode) {
   if (status === 413) return "request_body_too_large";
   if (status === 0) return "network_error";
   return null;
+}
+
+function topKey(counts) {
+  const entries = Object.entries(counts);
+  if (entries.length === 0) return null;
+  entries.sort((a, b) => b[1] - a[1]);
+  return entries[0][0];
 }
 
 async function runPool(total, concurrency, worker, shouldStop) {
@@ -184,7 +227,7 @@ async function runOne(model, index) {
       requestId,
       requestedModel,
       resolvedModel,
-      creditsCharged: res.ok ? credits : 0,
+      creditsCharged: credits,
       timedOut,
       upstreamBusy: errorCode === "upstream_model_busy",
       modelNotAvailable: errorCode === "model_not_available",
@@ -222,9 +265,11 @@ function buildModelSummary(model, results, planned, stoppedEarly) {
   const resolvedModelDistribution = {};
   const latencies = [];
   const requestIdSamples = [];
+  const errorCodeSamples = [];
   let success = 0;
   let failed = 0;
   let creditsSum = 0;
+  let failedCreditsNonZero = 0;
   let timeoutCount = 0;
   let upstreamBusyCount = 0;
   let modelNotAvailableCount = 0;
@@ -244,6 +289,10 @@ function buildModelSummary(model, results, planned, stoppedEarly) {
       failed += 1;
       const code = r.errorCode ?? `http_${r.status}`;
       errorCodeDistribution[code] = (errorCodeDistribution[code] ?? 0) + 1;
+      if (r.creditsCharged > 0) failedCreditsNonZero += 1;
+      if (errorCodeSamples.length < 5 && code) {
+        errorCodeSamples.push(code);
+      }
     }
 
     if (r.timedOut) timeoutCount += 1;
@@ -259,6 +308,8 @@ function buildModelSummary(model, results, planned, stoppedEarly) {
 
   latencies.sort((a, b) => a - b);
   const completed = results.length;
+  const resolvedModelSample = topKey(resolvedModelDistribution);
+  const topErrorCode = topKey(errorCodeDistribution);
 
   return {
     model,
@@ -269,13 +320,17 @@ function buildModelSummary(model, results, planned, stoppedEarly) {
     success_rate: completed > 0 ? success / completed : 0,
     http_status_distribution: httpStatusDistribution,
     error_code_distribution: errorCodeDistribution,
+    error_code_samples: errorCodeSamples,
+    top_error_code: topErrorCode,
     latencyMs: {
       p50: Math.round(percentile(latencies, 50)),
       p95: Math.round(percentile(latencies, 95)),
       max: Math.round(latencies.at(-1) ?? 0),
     },
     resolved_model_distribution: resolvedModelDistribution,
+    resolved_model_sample: resolvedModelSample,
     credits_sum: creditsSum,
+    failed_credits_nonzero: failedCreditsNonZero,
     request_id_samples: requestIdSamples,
     timeout_count: timeoutCount,
     upstream_busy_count: upstreamBusyCount,
@@ -294,40 +349,45 @@ function printSummaryTable(summaries) {
   console.log("=== Model health probe summary ===");
   console.log(
     [
-      pad("model", 18),
-      pad("done", 5),
+      pad("model", 16),
       pad("ok", 4),
       pad("fail", 5),
       pad("rate%", 6),
-      pad("p50ms", 7),
-      pad("p95ms", 7),
-      pad("maxms", 7),
-      pad("busy", 5),
-      pad("tout", 5),
-      pad("na", 4),
+      pad("http", 6),
+      pad("err_code", 22),
+      pad("resolved", 18),
+      pad("p50", 7),
+      pad("p95", 7),
       pad("req_id", 6),
     ].join(" ")
   );
-  console.log("-".repeat(95));
+  console.log("-".repeat(110));
 
   for (const s of summaries) {
+    const httpSummary = Object.entries(s.http_status_distribution)
+      .map(([k, v]) => `${k}:${v}`)
+      .join(",");
+    const errDisplay =
+      s.failed > 0
+        ? (s.top_error_code ?? s.error_code_samples[0] ?? "—")
+        : "—";
+    const resolvedDisplay = s.resolved_model_sample ?? "—";
     const reqIdOk =
-      s.completed > 0 && s.request_id_samples.length === s.success
-        ? `${s.request_id_samples.length}/${s.success}`
-        : `${s.request_id_samples.length}/?`;
+      s.request_id_samples.length > 0
+        ? `${s.request_id_samples.length}`
+        : "0";
+
     console.log(
       [
-        pad(s.model, 18),
-        pad(s.completed, 5),
+        pad(s.model, 16),
         pad(s.success, 4),
         pad(s.failed, 5),
         pad((s.success_rate * 100).toFixed(1), 6),
+        pad(httpSummary.slice(0, 6), 6),
+        pad(errDisplay, 22),
+        pad(resolvedDisplay, 18),
         pad(s.latencyMs.p50, 7),
         pad(s.latencyMs.p95, 7),
-        pad(s.latencyMs.max, 7),
-        pad(s.upstream_busy_count, 5),
-        pad(s.timeout_count, 5),
-        pad(s.model_not_available_count, 4),
         pad(reqIdOk, 6),
       ].join(" ")
     );
@@ -337,21 +397,24 @@ function printSummaryTable(summaries) {
 
 function printModelDetail(s) {
   console.log(`--- ${s.model} ---`);
-  console.log(`  planned:      ${s.planned}`);
-  console.log(`  completed:    ${s.completed}`);
-  console.log(`  success:      ${s.success}`);
-  console.log(`  failed:       ${s.failed}`);
-  console.log(`  success_rate: ${(s.success_rate * 100).toFixed(2)}%`);
+  console.log(`  planned:           ${s.planned}`);
+  console.log(`  completed:         ${s.completed}`);
+  console.log(`  success:           ${s.success}`);
+  console.log(`  failed:            ${s.failed}`);
+  console.log(`  success_rate:      ${(s.success_rate * 100).toFixed(2)}%`);
   if (s.stoppedEarly) {
-    console.log(`  stopped:      early (error rate > ${STOP_ON_ERROR_RATE * 100}%)`);
+    console.log(
+      `  stopped:           early (error rate > ${STOP_ON_ERROR_RATE * 100}%)`
+    );
   }
-  console.log(`  latency p50:  ${s.latencyMs.p50} ms`);
-  console.log(`  latency p95:  ${s.latencyMs.p95} ms`);
-  console.log(`  latency max:  ${s.latencyMs.max} ms`);
-  console.log(`  credits_sum:  ${s.credits_sum.toFixed(6)}`);
-  console.log(`  timeout:      ${s.timeout_count}`);
-  console.log(`  upstream_busy:${s.upstream_busy_count}`);
-  console.log(`  model_na:     ${s.model_not_available_count}`);
+  console.log(`  latency p50:       ${s.latencyMs.p50} ms`);
+  console.log(`  latency p95:       ${s.latencyMs.p95} ms`);
+  console.log(`  latency max:       ${s.latencyMs.max} ms`);
+  console.log(`  credits_sum:       ${s.credits_sum.toFixed(6)} (success only)`);
+  console.log(`  failed_credits>0:  ${s.failed_credits_nonzero}`);
+  console.log(`  timeout:           ${s.timeout_count}`);
+  console.log(`  upstream_busy:     ${s.upstream_busy_count}`);
+  console.log(`  model_na:          ${s.model_not_available_count}`);
   console.log("  HTTP status:");
   for (const [k, v] of Object.entries(s.http_status_distribution).sort()) {
     console.log(`    ${k}: ${v}`);
@@ -381,6 +444,66 @@ function printModelDetail(s) {
   console.log("");
 }
 
+function evaluateAcceptance(summaries) {
+  const lines = [];
+  let allPass = true;
+
+  for (const s of summaries) {
+    const isAuto = AUTO_ALIASES.has(s.model);
+    const minRate = isAuto && MIN_SUCCESS_RATE > 0 ? MIN_SUCCESS_RATE : 0;
+    const rateOk = s.success_rate >= minRate;
+    const billingOk = s.failed_credits_nonzero === 0;
+    const pass = rateOk && billingOk;
+
+    if (!pass) allPass = false;
+
+    const reasons = [];
+    if (!rateOk) {
+      reasons.push(
+        `success_rate ${(s.success_rate * 100).toFixed(1)}% < ${(minRate * 100).toFixed(0)}%`
+      );
+    }
+    if (!billingOk) {
+      reasons.push(`failed requests charged credits (${s.failed_credits_nonzero})`);
+    }
+
+    lines.push({
+      model: s.model,
+      pass,
+      success_rate: s.success_rate,
+      min_rate: minRate,
+      failed_credits_nonzero: s.failed_credits_nonzero,
+      resolved_model_sample: s.resolved_model_sample,
+      request_id_samples: s.request_id_samples,
+      reason: reasons.length ? reasons.join("; ") : "ok",
+    });
+  }
+
+  return { allPass, lines };
+}
+
+function printAcceptanceReport(evaluation) {
+  console.log("=== P766.4 acceptance gate ===");
+  for (const row of evaluation.lines) {
+    const status = row.pass ? "PASS" : "FAIL";
+    console.log(
+      `  [${status}] ${row.model}: rate=${(row.success_rate * 100).toFixed(1)}%` +
+        (row.resolved_model_sample ? ` resolved=${row.resolved_model_sample}` : "") +
+        (row.request_id_samples[0] ? ` req_id=${row.request_id_samples[0]}` : "")
+    );
+    if (!row.pass) {
+      console.log(`         ${row.reason}`);
+    }
+  }
+  console.log("");
+  console.log(
+    evaluation.allPass
+      ? "Acceptance: PASS"
+      : "Acceptance: FAIL — see rows above"
+  );
+  console.log("");
+}
+
 async function probeModel(model) {
   const { results, stoppedEarly } = await runPool(
     REQUESTS_PER_MODEL,
@@ -404,7 +527,11 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("=== P762.5 model health probe ===");
+  const title = P766_4_ACCEPTANCE
+    ? "P766.4 provider health acceptance probe"
+    : "P766 model health probe";
+
+  console.log(`=== ${title} ===`);
   console.log(`endpoint:           ${ENDPOINT}`);
   console.log(`api_key:            ${maskKey(API_KEY)}`);
   console.log(`models:             ${MODELS.join(", ")}`);
@@ -412,9 +539,9 @@ async function main() {
   console.log(`concurrency:        ${CONCURRENCY}`);
   console.log(`prompt:             ${PROMPT}`);
   console.log(`timeout_ms:         ${TIMEOUT_MS}`);
-  console.log(
-    "provider_stats:     model-level only (provider breakdown → P766.1)"
-  );
+  if (P766_4_ACCEPTANCE) {
+    console.log(`min_success_rate:   ${(MIN_SUCCESS_RATE * 100).toFixed(0)}% (auto-* aliases)`);
+  }
   if (STOP_ON_ERROR_RATE < 1) {
     console.log(
       `early_stop:         when error rate > ${STOP_ON_ERROR_RATE * 100}% per model`
@@ -438,7 +565,13 @@ async function main() {
     printModelDetail(s);
   }
 
+  const acceptance = evaluateAcceptance(modelSummaries);
+  if (P766_4_ACCEPTANCE || MIN_SUCCESS_RATE > 0) {
+    printAcceptanceReport(acceptance);
+  }
+
   const report = {
+    probe: P766_4_ACCEPTANCE ? "p766.4" : "p766",
     endpoint: ENDPOINT,
     apiKeyMask: maskKey(API_KEY),
     models: MODELS,
@@ -447,8 +580,10 @@ async function main() {
     prompt: PROMPT,
     timeoutMs: TIMEOUT_MS,
     stopOnErrorRate: STOP_ON_ERROR_RATE,
+    minSuccessRate: MIN_SUCCESS_RATE,
     wallTimeMs: Math.round(wallMs),
     finishedAt: new Date().toISOString(),
+    acceptance: acceptance,
     modelsReport: modelSummaries,
   };
 
@@ -457,6 +592,10 @@ async function main() {
 
   console.log(`JSON report: ${RESULTS_FILE}`);
   console.log("");
+
+  if (P766_4_ACCEPTANCE && !acceptance.allPass) {
+    process.exit(1);
+  }
 }
 
 main().catch((err) => {

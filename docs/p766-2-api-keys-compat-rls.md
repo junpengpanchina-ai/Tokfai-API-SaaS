@@ -46,3 +46,8 @@ Apply migration before or with DMIT deploy.
 Wrong `SUPABASE_SERVICE_ROLE_KEY` on the DMIT host (publishable/anon or short
 secret) was the production blocker after P766.2. Ops fix + smoke results:
 [docs/p766-3-api-key-production-recovery.md](./p766-3-api-key-production-recovery.md).
+
+## Provider health acceptance (P766.4)
+
+Multi-model probe + pass criteria:
+[docs/p766-4-provider-health-production-acceptance.md](./p766-4-provider-health-production-acceptance.md).
