@@ -44,10 +44,11 @@ import {
   userMessageForDashboardError,
   userMessageForDmitError,
 } from "@/lib/dmit-messages";
+import { extractDmitActionErrorDetails } from "@/lib/dmit-error-details";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
 import { DashboardFirstRunOnboardingCard } from "@/components/dashboard-first-run-onboarding";
-import { CopyableSnippetField } from "@/components/copyable-snippet-field";
+import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
 import {
   authorizationHeader,
   chatCompletionsCurl,
@@ -73,6 +74,7 @@ interface ActionErrorState {
   message: string;
   status: number;
   code?: string;
+  requestId?: string;
   method?: string;
   url?: string;
 }
@@ -276,6 +278,7 @@ export function ApiKeysClient({
                 status: listLoadError?.httpStatus ?? 500,
                 code: listLoadError?.code,
               }}
+              title={t("dashboard.apiKeys.loadError")}
               className="mb-4"
             />
           ) : null}
@@ -290,7 +293,9 @@ export function ApiKeysClient({
               onRevoke={handleRevoke}
               t={t}
             />
-          ) : listLoadFailed ? null : (
+          ) : listLoadFailed ? (
+            <ListLoadFailedState t={t} />
+          ) : (
             <EmptyState t={t} />
           )}
         </CardContent>
@@ -496,6 +501,22 @@ function OneTimeSecretCard({
               </>
             )}
           </Button>
+          <CopyConfigAction
+            id="one-time-copy-auth"
+            value={authHeaderValue}
+            copiedId={snippetCopiedId}
+            onCopy={handleSnippetCopy}
+            label={t("dashboard.apiKeys.copyAuthHeader")}
+            copiedLabel={t("dashboard.apiKeys.copied")}
+          />
+          <CopyConfigAction
+            id="one-time-copy-curl"
+            value={curlExample}
+            copiedId={snippetCopiedId}
+            onCopy={handleSnippetCopy}
+            label={t("dashboard.apiKeys.copyCurl")}
+            copiedLabel={t("dashboard.apiKeys.copied")}
+          />
           <Button
             type="button"
             variant="outline"
@@ -708,19 +729,76 @@ function ApiKeysTable({
 function ActionErrorAlert({
   error,
   className,
+  title,
+  t: translate,
 }: {
   error: ActionErrorState;
   className?: string;
+  title?: string;
+  t?: (key: string) => string;
 }) {
+  const { t: i18nT } = useI18n();
+  const t = translate ?? i18nT;
+
   return (
     <Card className={`border-destructive/30 bg-destructive/5 ${className ?? ""}`}>
-      <CardContent className="flex items-start gap-2 pt-4">
-        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-        <p className="text-sm text-destructive" role="alert">
-          {error.message}
-        </p>
+      <CardContent className="flex flex-col gap-2 pt-4">
+        <div className="flex items-start gap-2">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+          <div className="min-w-0 flex-1 space-y-1">
+            {title ? (
+              <p className="text-sm font-medium text-destructive">{title}</p>
+            ) : null}
+            <p className="text-sm text-destructive" role="alert">
+              {error.message}
+            </p>
+            <dl className="space-y-0.5 text-xs text-destructive/90">
+              {error.status > 0 ? (
+                <div>
+                  <span className="font-medium">
+                    {t("dashboard.apiKeys.errorHttpStatus")}:{" "}
+                  </span>
+                  <span className="font-mono">{error.status}</span>
+                </div>
+              ) : null}
+              {error.code ? (
+                <div>
+                  <span className="font-medium">
+                    {t("dashboard.apiKeys.errorCode")}:{" "}
+                  </span>
+                  <span className="font-mono">{error.code}</span>
+                </div>
+              ) : null}
+              {error.requestId ? (
+                <div className="break-all">
+                  <span className="font-medium">
+                    {t("dashboard.apiKeys.errorRequestId")}:{" "}
+                  </span>
+                  <span className="font-mono">{error.requestId}</span>
+                </div>
+              ) : null}
+            </dl>
+          </div>
+        </div>
       </CardContent>
     </Card>
+  );
+}
+
+function ListLoadFailedState({ t }: { t: (key: string) => string }) {
+  return (
+    <div
+      className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed border-destructive/30 bg-destructive/5 py-12 text-center"
+      role="status"
+    >
+      <AlertTriangle className="h-8 w-8 text-destructive/80" />
+      <p className="text-sm font-medium text-destructive">
+        {t("dashboard.apiKeys.listUnavailableTitle")}
+      </p>
+      <p className="max-w-md text-sm text-muted-foreground">
+        {t("dashboard.apiKeys.listUnavailableDesc")}
+      </p>
+    </div>
   );
 }
 
@@ -812,14 +890,16 @@ function toActionError(
   fallback?: { method: string; url: string }
 ): ActionErrorState {
   if (err instanceof DmitApiError) {
+    const { code, requestId } = extractDmitActionErrorDetails(err);
     const detail =
-      err.code && err.message
-        ? `${err.message} (${err.code})`
+      code && err.message
+        ? `${err.message} (${code})`
         : err.message;
     return {
-      message: userMessageForDashboardError(err.status, err.code, detail),
+      message: userMessageForDashboardError(err.status, code, detail),
       status: err.status,
-      code: err.code,
+      code,
+      requestId,
       method: err.requestMethod ?? fallback?.method,
       url: err.requestUrl ?? fallback?.url,
     };

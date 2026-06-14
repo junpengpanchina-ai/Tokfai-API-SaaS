@@ -44,6 +44,7 @@ import {
   isAvailableChatModel,
   PLAYGROUND_CHAT_MODEL_IDS,
 } from "@/lib/model-catalog";
+import { extractRequestIdFromBody } from "@/lib/dmit-error-details";
 import { resolvePlaygroundRiskMessage } from "@/lib/playground-risk-errors";
 import {
   isFullTokfaiApiKey,
@@ -107,6 +108,7 @@ interface PlaygroundError {
   status: number;
   code?: string;
   message: string;
+  requestId?: string;
 }
 
 type KeyPanelView = "select" | "paste" | "empty";
@@ -866,11 +868,11 @@ function ResponsePanel({
         <ResultMeta
           status="failed"
           modelId={null}
-          requestId={null}
+          requestId={error.requestId ?? null}
           completedAt={completedAt}
           t={t}
-          copiedId={null}
-          onCopyRequestId={undefined}
+          copiedId={copiedId}
+          onCopyRequestId={onCopyRequestId}
         />
         <PlaygroundErrorPanel scope="playground" error={error} t={t} />
       </div>
@@ -1060,15 +1062,15 @@ function UsageDetails({
   const items: Array<{ label: string; value: string }> = [
     {
       label: t("dashboard.playground.inputTokens"),
-      value: formatInt(usage.prompt_tokens),
+      value: formatOptionalTokenCount(usage.prompt_tokens, t),
     },
     {
       label: t("dashboard.playground.outputTokens"),
-      value: formatInt(usage.completion_tokens),
+      value: formatOptionalTokenCount(usage.completion_tokens, t),
     },
     {
       label: t("dashboard.playground.totalTokens"),
-      value: formatInt(usage.total_tokens),
+      value: formatOptionalTokenCount(usage.total_tokens, t),
     },
   ];
 
@@ -1171,6 +1173,7 @@ function toPlaygroundError(
         t,
         err.message
       ),
+      requestId: extractRequestIdFromBody(err.body),
     };
   }
   if (err instanceof TypeError) {
@@ -1192,4 +1195,14 @@ function toPlaygroundError(
     code: "unknown_error",
     message: t("dashboard.playground.errors.unknown"),
   };
+}
+
+function formatOptionalTokenCount(
+  value: number | undefined | null,
+  t: (key: string) => string
+): string {
+  if (value === undefined || value === null || !Number.isFinite(Number(value))) {
+    return t("dashboard.playground.tokensNotReturned");
+  }
+  return formatInt(value);
 }

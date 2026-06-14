@@ -14,6 +14,7 @@ export type PlaygroundErrorPanelError = {
   status: number;
   code?: string | null;
   message: string;
+  requestId?: string | null;
 };
 
 export function PlaygroundErrorPanel({
@@ -41,6 +42,23 @@ export function PlaygroundErrorPanel({
       </div>
 
       <p className="text-sm leading-relaxed text-foreground">{error.message}</p>
+
+      <dl className="space-y-1 text-xs text-muted-foreground">
+        {error.code ? (
+          <div>
+            <span className="font-medium">{t("dashboard.playground.errorCode")}: </span>
+            <span className="font-mono text-foreground">{error.code}</span>
+          </div>
+        ) : null}
+        {error.requestId ? (
+          <div className="break-all">
+            <span className="font-medium">
+              {t("dashboard.playground.errorRequestId")}:{" "}
+            </span>
+            <span className="font-mono text-foreground">{error.requestId}</span>
+          </div>
+        ) : null}
+      </dl>
 
       {hintKey ? (
         <p className="text-sm text-muted-foreground">{t(hintKey)}</p>

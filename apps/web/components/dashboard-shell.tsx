@@ -3,6 +3,7 @@ import { DashboardFooter } from "@/components/dashboard-footer";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { DashboardMobileNav, DashboardSidebar } from "@/components/dashboard-nav";
 import { loadDashboardShellCredits } from "@/lib/load-dashboard-shell-credits";
+import type { DashboardShellCredits } from "@/lib/dashboard-shell-credits";
 import { createClient } from "@/lib/supabase/server";
 
 export async function DashboardShell({
@@ -16,9 +17,14 @@ export async function DashboardShell({
   } = await supabase.auth.getUser();
 
   const email = user?.email ?? "";
-  const credits = user
-    ? await loadDashboardShellCredits(user.id)
-    : { balance: null, loaded: false };
+  let credits = { balance: null, loaded: false } as DashboardShellCredits;
+  if (user) {
+    try {
+      credits = await loadDashboardShellCredits(user.id);
+    } catch {
+      credits = { balance: null, loaded: false };
+    }
+  }
 
   return (
     <div className="min-h-svh overflow-x-hidden md:flex">

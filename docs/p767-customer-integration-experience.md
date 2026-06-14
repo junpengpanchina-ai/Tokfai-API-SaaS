@@ -275,6 +275,74 @@ Sign-off:
 
 ---
 
+## P767.4 — Production UX regression hardening
+
+### Current risks (pre-hardening)
+
+| Risk | Symptom |
+| --- | --- |
+| DMIT `service_role` misconfigured (publishable key in PM2) | API key create/list 500, RLS insert denied |
+| List load failure | Empty state shown as “No API keys yet” |
+| Credits profile read failure | Potential dashboard shell crash |
+| Playground token display | Misleading `0` when upstream omitted usage fields |
+| Missing production smoke | No single CLI for models + chat + `request_id` |
+
+### Fixes (this phase)
+
+| Area | Hardening |
+| --- | --- |
+| Dashboard shell | Credits load wrapped in try/catch; failure shows `Credits: —` |
+| API Keys | List failure shows explicit error + dedicated unavailable state; create/revoke/copy errors show HTTP/code/`request_id` |
+| Legacy keys | `can_reveal=false` shows create-new-key message, no Copy key |
+| Playground | Success meta + Usage/Credits links; tokens show `—` when not returned; errors show code + `request_id` |
+| Docs | Section `scroll-mt-24` for sticky header/TOC; copy buttons retained |
+| CLI | `scripts/production-ux-smoke.mjs` |
+
+### Out of scope (unchanged)
+
+- Billing core, Stripe Checkout/Portal, webhook handler
+- `credit_ledger`, `record_usage_and_debit`, usage ledger debit logic
+- DMIT credit debiting routes
+
+### Production smoke
+
+```bash
+TOKFAI_API_KEY=sk-tokfai_xxx node scripts/production-ux-smoke.mjs
+```
+
+Checks:
+
+- `GET /v1/models` → HTTP 200
+- `POST /v1/chat/completions` `model=auto-fast` → HTTP 200
+- Response includes `request_id` and resolved model
+- On failure: prints HTTP status, `error.code`, `error.message`
+
+### P767.4 acceptance checklist
+
+| # | Check |
+| --- | --- |
+| 1 | `npm run typecheck` + `npm run build` (web) |
+| 2 | Dashboard routes show credits; failure shows `—` |
+| 3 | API Keys list 500 → error UI, not empty-state |
+| 4 | Playground success/failure panels complete |
+| 5 | Docs EN/ZH — no raw i18n keys |
+| 6 | `production-ux-smoke.mjs` pass with valid key |
+| 7 | No billing / Stripe / webhook / ledger changes |
+
+### P767.4 acceptance record
+
+```text
+Date:
+Operator:
+git origin/main includes f6e35e9 + P767.4: yes / no
+production-ux-smoke.mjs: pass / fail
+Dashboard manual regression (6 routes): pass / fail
+i18n raw keys: none / list
+Sign-off:
+```
+
+---
+
 ## Related
 
 - [P766.3 API key recovery](./p766-3-api-key-production-recovery.md)
