@@ -46,6 +46,7 @@ import {
 } from "@/lib/dmit-messages";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
+import { DashboardFirstRunOnboardingCard } from "@/components/dashboard-first-run-onboarding";
 import { chatCompletionsCurl } from "@/lib/customer-integration-snippets";
 import {
   TOKFAI_API_BASE_URL,
@@ -185,6 +186,8 @@ export function ApiKeysClient({
     setCopyFullKeyStatus("idle");
   }
 
+  const hasActiveApiKey = keys.some((k) => k.status === "active");
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -197,6 +200,11 @@ export function ApiKeysClient({
           })}
         </p>
       </div>
+
+      <DashboardFirstRunOnboardingCard
+        variant="apiKeys"
+        hasActiveApiKey={hasActiveApiKey}
+      />
 
       <SecurityGuide t={t} />
 

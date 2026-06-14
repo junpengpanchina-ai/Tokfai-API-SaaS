@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { DashboardAnnouncementsOverview } from "@/components/dashboard-announcements-overview";
+import { DashboardFirstRunOnboardingCard } from "@/components/dashboard-first-run-onboarding";
 import type { PublicAnnouncement } from "@/lib/announcements";
 import type { DashboardOverviewData } from "@/lib/dashboard-overview";
 import {
@@ -203,6 +204,13 @@ export function DashboardOverviewContent({
       </div>
 
       <DashboardAnnouncementsOverview announcements={announcements} />
+
+      <DashboardFirstRunOnboardingCard
+        hasActiveApiKey={overview.hasActiveApiKey}
+        hasChatSuccess={overview.hasChatPlaygroundSuccess}
+        hasRecentUsage={overview.requestsLast7Days > 0}
+        variant="dashboard"
+      />
 
       {!isReturning ? <StatePriorityBanner phase={phase} t={t} /> : null}
 

@@ -161,7 +161,7 @@ export const messages = {
       overview: {
         title: "Overview",
         subtitle:
-          "Top up credits, create an API key, read Quickstart, and run Chat and Image Playground tests — then review Usage and Credits.",
+          "Top up credits, create an API key, read the integration guide, and run Chat Playground — then review Usage and Credits.",
         subtitleReturning:
           "Your API is active. Monitor usage, manage credits, or run another Playground test.",
         continueTitle: "Continue where you left off",
@@ -176,8 +176,8 @@ export const messages = {
         stateNeedsApiKeyAction: "Create API key",
         stateNeedsFirstCallTitle: "Run your first API test",
         stateNeedsFirstCallBody:
-          "Your key is ready. Read Quickstart for base URL and model setup, then send a test in Playground.",
-        stateNeedsFirstCallQuickstart: "View Quickstart",
+          "Your key is ready. Read the integration guide for base URL and model setup, then send a test in Playground.",
+        stateNeedsFirstCallQuickstart: "View integration docs",
         stateNeedsFirstCallPlayground: "Chat Playground",
         onboardingTitle: "New user checklist",
         onboardingDesc:
@@ -192,9 +192,9 @@ export const messages = {
         onboardingStep2Title: "Create API Key",
         onboardingStep2Body:
           "Generate an sk-tokfai_ key. The full secret is shown once at creation.",
-        onboardingStep3Title: "View Quickstart",
+        onboardingStep3Title: "Integration guide",
         onboardingStep3Body:
-          "You only need three things: base URL, API Key, and a model ID.",
+          "Base URL, API key, and model auto-fast — plus Cursor, Cherry Studio, and SDK examples.",
         onboardingStep4Title: "Chat Playground test",
         onboardingStep4Body:
           "Send one test chat request to verify your key and balance.",
@@ -246,6 +246,30 @@ export const messages = {
         pricingAnnouncementTitle: "Model pricing & capabilities updated",
         pricingAnnouncementDesc:
           "Model pricing and capability notes have been updated. Image models are billed per generation, while chat models are billed by tokens. Successful requests debit credits; failed requests are not charged. Usage and Credits remain the source of truth.",
+      },
+      firstRun: {
+        title: "Get started in about 3 minutes",
+        desc:
+          "Create a key, test in Playground, read the integration guide, then confirm usage and credits.",
+        highlightBaseUrl: "Base URL: {baseUrl}",
+        highlightModel: "Recommended model: {model}",
+        highlightOneKey: "One API key works across multiple models.",
+        highlightRequestId:
+          "Usage and credits are traceable by request_id in Dashboard → Usage.",
+        flowStep1: "Create an API key and copy the full sk-tokfai_… secret.",
+        flowStep2: "Send a test chat in Playground with model auto-fast.",
+        flowStep3:
+          "Read the integration guide (Cursor or Cherry Studio sections).",
+        flowStep4:
+          "Open Usage to verify request_id, tokens, and credits_charged.",
+        createApiKey: "Create API key",
+        tryPlayground: "Try Chat Playground",
+        cursorGuide: "View Cursor guide",
+        cherryGuide: "View Cherry Studio guide",
+        checkUsage: "Check Usage",
+        viewIntegrationDocs: "View integration docs",
+        allComplete:
+          "First-run setup complete — your key, test call, and usage trail are ready.",
       },
       announcements: {
         announcements: "Announcements",
@@ -2138,7 +2162,7 @@ export const messages = {
       overview: {
         title: "Overview",
         subtitle:
-          "充值积分、创建 API Key、阅读 Quickstart、完成 Chat 与 Image Playground 测试，再查看 Usage 与 Credits。",
+          "充值积分、创建 API Key、阅读接入指南、在 Chat Playground 测试，然后查看 Usage 与 Credits。",
         subtitleReturning:
           "API 已可用。查看用量、管理积分，或继续 Playground 测试。",
         continueTitle: "继续使用",
@@ -2153,8 +2177,8 @@ export const messages = {
         stateNeedsApiKeyAction: "创建 API Key",
         stateNeedsFirstCallTitle: "发起第一次 API 测试",
         stateNeedsFirstCallBody:
-          "密钥已就绪。阅读 Quickstart 了解 Base URL 与 model 配置，然后在 Playground 发送测试请求。",
-        stateNeedsFirstCallQuickstart: "查看 Quickstart",
+          "密钥已就绪。阅读接入指南了解 Base URL 与 model 配置，然后在 Playground 发送测试请求。",
+        stateNeedsFirstCallQuickstart: "查看接入文档",
         stateNeedsFirstCallPlayground: "Chat Playground",
         onboardingTitle: "新手五步",
         onboardingDesc: "从注册到完成第一次对话与图像 API 调用。",
@@ -2166,9 +2190,9 @@ export const messages = {
         onboardingStep2Title: "创建 API Key",
         onboardingStep2Body:
           "生成 sk-tokfai_ 密钥。完整 secret 仅在创建时展示一次。",
-        onboardingStep3Title: "查看 Quickstart",
+        onboardingStep3Title: "接入指南",
         onboardingStep3Body:
-          "只需三件事：Base URL、API Key 和 model ID。",
+          "Base URL、API Key 与 model auto-fast，以及 Cursor、Cherry Studio 与 SDK 示例。",
         onboardingStep4Title: "Chat Playground 测试",
         onboardingStep4Body:
           "发送一次对话测试，验证密钥与余额是否正常。",
@@ -2215,6 +2239,29 @@ export const messages = {
         pricingAnnouncementTitle: "模型价格与能力说明已更新",
         pricingAnnouncementDesc:
           "模型价格与能力说明已更新。图片模型按次计费，对话模型按 token 计费。成功请求会扣除 credits，失败请求不扣费，实际记录以 Usage 与 Credits 为准。",
+      },
+      firstRun: {
+        title: "约 3 分钟完成首次接入",
+        desc:
+          "创建密钥 → Playground 测试 → 阅读接入指南 → 在 Usage 核对用量与积分。",
+        highlightBaseUrl: "Base URL：{baseUrl}",
+        highlightModel: "推荐模型：{model}",
+        highlightOneKey: "一把 API Key 可调用多个模型。",
+        highlightRequestId:
+          "用量与积分可通过 request_id 在 Dashboard → Usage 中追溯。",
+        flowStep1: "创建 API Key 并复制完整 sk-tokfai_… secret。",
+        flowStep2: "在 Playground 用 auto-fast 发送一次对话测试。",
+        flowStep3: "阅读接入指南（Cursor 或 Cherry Studio 章节）。",
+        flowStep4:
+          "打开 Usage 核对 request_id、tokens 与 credits_charged。",
+        createApiKey: "创建 API Key",
+        tryPlayground: "打开 Chat Playground",
+        cursorGuide: "查看 Cursor 指南",
+        cherryGuide: "查看 Cherry Studio 指南",
+        checkUsage: "查看 Usage",
+        viewIntegrationDocs: "查看接入文档",
+        allComplete:
+          "首次接入已完成——密钥、测试调用与用量记录已就绪。",
       },
       announcements: {
         announcements: "公告",

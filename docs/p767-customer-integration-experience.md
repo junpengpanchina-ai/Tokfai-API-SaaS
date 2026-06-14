@@ -96,6 +96,72 @@ Sign in
 
 ---
 
+## P767.1 — Dashboard first-run onboarding
+
+### Deliverables
+
+| Item | Location |
+| --- | --- |
+| First-run onboarding card | `apps/web/components/dashboard-first-run-onboarding.tsx` |
+| Dashboard overview (top) | `apps/web/components/dashboard-overview-content.tsx` |
+| API Keys page (top) | `apps/web/app/dashboard/api-keys/api-keys-client.tsx` |
+| i18n | `dashboard.firstRun.*` (EN + ZH) |
+
+### Card content
+
+Highlights:
+
+- Base URL: `https://api.tokfai.com/v1`
+- Recommended model: `auto-fast`
+- One API key for multiple models
+- Usage and credits traceable by `request_id`
+
+Flow steps (with checkmarks when detected):
+
+1. Create API key
+2. Chat Playground test (`hasChatPlaygroundSuccess`)
+3. Integration docs (Cursor / Cherry links)
+4. Check Usage (`requestsLast7Days > 0`)
+
+### Action buttons
+
+| Button | Target |
+| --- | --- |
+| Create API key | `/dashboard/api-keys#create-api-key` |
+| Try Chat Playground | `/dashboard/playground` |
+| View Cursor guide | `/dashboard/docs#cursor-integration` |
+| View Cherry Studio guide | `/dashboard/docs#cherry-studio` |
+| Check Usage | `/dashboard/usage` |
+| View integration docs | `/dashboard/docs` |
+
+Dashboard home hides the full card when all three signals are true (active key,
+chat success, recent usage); shows a compact “complete” banner. API Keys page
+shows the full card until the user has an active key (then compact complete).
+
+### P767.1 acceptance checklist
+
+| # | Check |
+| --- | --- |
+| 1 | `npm run typecheck` + `npm run build` (web) |
+| 2 | Overview + API Keys show onboarding card — no raw i18n keys |
+| 3 | All five primary buttons navigate correctly |
+| 4 | Playground → Docs (Cursor/Cherry) → Usage path is clickable end-to-end |
+| 5 | No billing / Stripe / webhook / ledger code changes |
+
+### P767.1 acceptance record
+
+```text
+Date:
+Operator:
+Overview card visible: yes / no
+API Keys card visible: yes / no
+Create API key → Playground → Cursor guide → Usage: pass / fail
+i18n raw keys observed: none / list
+Sign-off:
+```
+
+---
+
 ## Related
 
 - [P766.3 API key recovery](./p766-3-api-key-production-recovery.md)
