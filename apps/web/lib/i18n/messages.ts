@@ -824,6 +824,14 @@ export const messages = {
         imageToImage: "Image to Image",
         inputImagesReference:
           "Input images added — generation will use them as visual reference.",
+        inputImagesTitle: "Input images",
+        inputImagesDesc:
+          "Drag, upload, or paste URLs. Up to {max} images (PNG, JPG, WEBP). Leave empty for text-to-image.",
+        inputImagesDragTitle: "Drag images here or click to upload",
+        inputImagesDragHint: "PNG, JPG, WEBP · max 10 MB each",
+        inputImagesUrlPlaceholder:
+          "Image or page URL — Tokfai extracts the image when possible",
+        addImageUrl: "Add URL",
         imageToImageHint:
           "Image-to-image mode: Tokfai will preserve the uploaded subject and apply your prompt as style/edit instructions.",
         waitingForImages:
@@ -918,6 +926,8 @@ export const messages = {
           unknown: "Request failed. Please try again later.",
           pageImageNotFound:
             "Could not find a usable image on this page. Try another URL or upload the image directly.",
+          tooManyImages: "Up to {max} input images are allowed.",
+          invalidDrop: "Drop PNG, JPG, or WEBP image files.",
         },
       },
       credits: {
@@ -2865,6 +2875,13 @@ export const messages = {
         textToImage: "文生图",
         imageToImage: "图生图",
         inputImagesReference: "已添加输入图——生成时将作为视觉参考。",
+        inputImagesTitle: "输入图片",
+        inputImagesDesc:
+          "拖拽、上传或粘贴 URL。最多 {max} 张（PNG、JPG、WEBP）。留空则为文生图。",
+        inputImagesDragTitle: "拖拽图片到此处或点击上传",
+        inputImagesDragHint: "PNG、JPG、WEBP · 单张最大 10 MB",
+        inputImagesUrlPlaceholder: "图片或网页 URL——Tokfai 会尝试自动提取图片",
+        addImageUrl: "添加 URL",
         imageToImageHint:
           "图生图模式：Tokfai 会保留上传主体，并按 prompt 进行风格/编辑。",
         waitingForImages: "等待输入图上传或解析完成…",
@@ -2950,6 +2967,8 @@ export const messages = {
           unknown: "请求失败，请稍后重试。",
           pageImageNotFound:
             "无法从该页面解析可用图片。请换用其他 URL 或直接上传图片。",
+          tooManyImages: "最多允许 {max} 张输入图。",
+          invalidDrop: "请拖入 PNG、JPG 或 WEBP 图片文件。",
         },
       },
       credits: {

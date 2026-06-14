@@ -781,47 +781,79 @@ export function ImagePlaygroundClient({
             </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <ApiKeySection
-              keyPanelView={keyPanelView}
-              localKeys={localKeys}
-              selectedKey={selectedKey}
-              selectedKeyId={selectedKeyId}
-              apiKey={apiKey}
-              showApiKey={showApiKey}
-              creatingKey={creatingKey}
-              createKeyError={createKeyError}
-              createdSecret={createdSecret}
-              createdBannerKeyId={createdBannerKeyId}
-              loading={loading}
-              onCreateTestKey={handleCreateTestKey}
-              onKeyPanelViewChange={setKeyPanelView}
-              onSelectedKeyChange={setSelectedKeyId}
-              onApiKeyChange={setApiKey}
-              onShowApiKeyChange={setShowApiKey}
-              onFocusPrompt={focusPrompt}
-              t={t}
-            />
+            <div
+              className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(320px,0.9fr)_minmax(420px,1.1fr)] lg:gap-6"
+            >
+              <Card className="h-fit shadow-none">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <KeyRound className="h-4 w-4 text-muted-foreground" />
+                    {t("dashboard.playground.apiKey")}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <ApiKeySection
+                    embedded
+                    keyPanelView={keyPanelView}
+                    localKeys={localKeys}
+                    selectedKey={selectedKey}
+                    selectedKeyId={selectedKeyId}
+                    apiKey={apiKey}
+                    showApiKey={showApiKey}
+                    creatingKey={creatingKey}
+                    createKeyError={createKeyError}
+                    createdSecret={createdSecret}
+                    createdBannerKeyId={createdBannerKeyId}
+                    loading={loading}
+                    onCreateTestKey={handleCreateTestKey}
+                    onKeyPanelViewChange={setKeyPanelView}
+                    onSelectedKeyChange={setSelectedKeyId}
+                    onApiKeyChange={setApiKey}
+                    onShowApiKeyChange={setShowApiKey}
+                    onFocusPrompt={focusPrompt}
+                    t={t}
+                  />
+                </CardContent>
+              </Card>
 
-            <ImageInputsPanel
-              imageInputs={imageInputs}
-              imageUrlDraft={imageUrlDraft}
-              loading={loading}
-              fileInputRef={fileInputRef}
-              onImageUrlDraftChange={setImageUrlDraft}
-              onAddImageUrl={() => addImageUrl(imageUrlDraft)}
-              onRemoveImage={removeImageInput}
-              onPreviewError={markPreviewError}
-              onPreviewReady={markPreviewReady}
-              onUploadFiles={uploadFiles}
-              onDropInvalid={reportDropError}
-              onBrowseClick={() => fileInputRef.current?.click()}
-              onFileInputChange={(event) => {
-                if (event.target.files) {
-                  void uploadFiles(event.target.files);
-                  event.target.value = "";
-                }
-              }}
-            />
+              <Card className="shadow-none">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Upload className="h-4 w-4 text-muted-foreground" />
+                    {t("dashboard.imagePlayground.inputImagesTitle")}
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    {formatMessage(t("dashboard.imagePlayground.inputImagesDesc"), {
+                      max: MAX_PLAYGROUND_INPUT_IMAGES,
+                    })}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <ImageInputsPanel
+                    embedded
+                    imageInputs={imageInputs}
+                    imageUrlDraft={imageUrlDraft}
+                    loading={loading}
+                    fileInputRef={fileInputRef}
+                    onImageUrlDraftChange={setImageUrlDraft}
+                    onAddImageUrl={() => addImageUrl(imageUrlDraft)}
+                    onRemoveImage={removeImageInput}
+                    onPreviewError={markPreviewError}
+                    onPreviewReady={markPreviewReady}
+                    onUploadFiles={uploadFiles}
+                    onDropInvalid={reportDropError}
+                    onBrowseClick={() => fileInputRef.current?.click()}
+                    onFileInputChange={(event) => {
+                      if (event.target.files) {
+                        void uploadFiles(event.target.files);
+                        event.target.value = "";
+                      }
+                    }}
+                    t={t}
+                  />
+                </CardContent>
+              </Card>
+            </div>
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="prompt">Prompt</Label>
@@ -1079,6 +1111,8 @@ function ImageInputsPanel({
   onDropInvalid,
   onBrowseClick,
   onFileInputChange,
+  embedded = false,
+  t,
 }: {
   imageInputs: ImageInputItem[];
   imageUrlDraft: string;
@@ -1093,6 +1127,8 @@ function ImageInputsPanel({
   onDropInvalid: (message: string, code: string) => void;
   onBrowseClick: () => void;
   onFileInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  embedded?: boolean;
+  t: (key: string) => string;
 }) {
   const atLimit = imageInputs.length >= MAX_PLAYGROUND_INPUT_IMAGES;
   const [isDragging, setIsDragging] = useState(false);
@@ -1141,7 +1177,9 @@ function ImageInputsPanel({
 
     if (atLimit) {
       onDropInvalid(
-        `Up to ${MAX_PLAYGROUND_INPUT_IMAGES} input images are allowed.`,
+        formatMessage(t("dashboard.imagePlayground.errors.tooManyImages"), {
+          max: MAX_PLAYGROUND_INPUT_IMAGES,
+        }),
         "too_many_images"
       );
       return;
@@ -1150,7 +1188,7 @@ function ImageInputsPanel({
     const files = getDroppedFiles(event.dataTransfer);
     if (files.length === 0) {
       onDropInvalid(
-        "Drop PNG, JPG, or WEBP image files.",
+        t("dashboard.imagePlayground.errors.invalidDrop"),
         "invalid_drop"
       );
       return;
@@ -1164,27 +1202,35 @@ function ImageInputsPanel({
     onBrowseClick();
   };
 
-  return (
-    <div className="flex flex-col gap-3 rounded-md border bg-muted/20 p-4">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <Upload className="h-4 w-4 text-muted-foreground" />
-        Input images
-      </div>
+  const shellClass = embedded
+    ? "flex flex-col gap-2"
+    : "flex flex-col gap-3 rounded-md border bg-muted/20 p-4";
 
-      <p className="text-xs text-muted-foreground">
-        Drag images or paste an image URL. Up to {MAX_PLAYGROUND_INPUT_IMAGES}{" "}
-        images. Supported: PNG, JPG, WEBP. Leave empty for text-to-image.
-      </p>
+  return (
+    <div className={shellClass}>
+      {!embedded ? (
+        <>
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Upload className="h-4 w-4 text-muted-foreground" />
+            {t("dashboard.imagePlayground.inputImagesTitle")}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {formatMessage(t("dashboard.imagePlayground.inputImagesDesc"), {
+              max: MAX_PLAYGROUND_INPUT_IMAGES,
+            })}
+          </p>
+        </>
+      ) : null}
 
       <div
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        className={`flex flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 py-8 text-center transition-colors ${
+        className={`flex flex-col items-center justify-center gap-1.5 rounded-md border border-dashed px-3 py-5 text-center transition-colors sm:py-6 ${
           isDragging
             ? "border-primary bg-primary/10 ring-2 ring-primary/30"
-            : "border-muted-foreground/30 bg-background"
+            : "border-muted-foreground/30 bg-muted/20"
         } ${loading || atLimit ? "opacity-60" : "cursor-pointer"}`}
         onClick={handleZoneClick}
         role="button"
@@ -1196,11 +1242,13 @@ function ImageInputsPanel({
           }
         }}
       >
-        <div className="pointer-events-none flex flex-col items-center gap-2">
+        <div className="pointer-events-none flex flex-col items-center gap-1.5">
           <Upload className="h-5 w-5 text-muted-foreground" />
-          <p className="text-sm font-medium">Drag images here or click to upload</p>
+          <p className="text-sm font-medium">
+            {t("dashboard.imagePlayground.inputImagesDragTitle")}
+          </p>
           <p className="text-xs text-muted-foreground">
-            PNG, JPG, WEBP · max 10 MB each
+            {t("dashboard.imagePlayground.inputImagesDragHint")}
           </p>
         </div>
         <input
@@ -1214,10 +1262,11 @@ function ImageInputsPanel({
         />
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="flex flex-row items-center gap-3">
         <Input
           type="url"
-          placeholder="Paste an image URL or a webpage URL. Tokfai will try to extract the image automatically."
+          className="min-w-0 flex-1"
+          placeholder={t("dashboard.imagePlayground.inputImagesUrlPlaceholder")}
           value={imageUrlDraft}
           onChange={(event) => onImageUrlDraftChange(event.target.value)}
           disabled={loading || atLimit}
@@ -1236,12 +1285,12 @@ function ImageInputsPanel({
           className="shrink-0"
         >
           <Plus className="h-4 w-4" />
-          Add URL
+          {t("dashboard.imagePlayground.addImageUrl")}
         </Button>
       </div>
 
       {imageInputs.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
           {imageInputs.map((item) => (
             <ImageInputThumbnail
               key={item.id}
@@ -1379,6 +1428,7 @@ function formatUrlLabel(url: string): string {
 }
 
 function ApiKeySection({
+  embedded = false,
   keyPanelView,
   localKeys,
   selectedKey,
@@ -1415,14 +1465,19 @@ function ApiKeySection({
   onApiKeyChange: (value: string) => void;
   onShowApiKeyChange: (show: boolean) => void;
   onFocusPrompt: () => void;
+  embedded?: boolean;
   t: (key: string) => string;
 }) {
   const { copiedId, copyText } = useCopyToClipboard();
   const secretCopied = copiedId === "image-playground-created-secret";
 
+  const shellClass = embedded
+    ? "flex flex-col gap-3"
+    : "flex flex-col gap-4 rounded-md border bg-muted/20 p-4";
+
   if (keyPanelView === "paste") {
     return (
-      <div className="flex flex-col gap-3 rounded-md border bg-muted/20 p-4">
+      <div className={shellClass}>
         <div className="flex items-center gap-2 text-sm font-medium">
           <KeyRound className="h-4 w-4 text-muted-foreground" />
           {t("dashboard.playground.pasteKey")}
@@ -1482,9 +1537,17 @@ function ApiKeySection({
 
   if (keyPanelView === "empty" || localKeys.length === 0) {
     return (
-      <div className="flex flex-col gap-4 rounded-md border border-dashed bg-muted/20 p-4">
+      <div
+        className={
+          embedded
+            ? "flex flex-col gap-3"
+            : "flex flex-col gap-4 rounded-md border border-dashed bg-muted/20 p-4"
+        }
+      >
         <div className="flex items-start gap-2">
-          <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+          {!embedded ? (
+            <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+          ) : null}
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium">
               {t("dashboard.imagePlayground.noKeyTitle")}
@@ -1534,11 +1597,13 @@ function ApiKeySection({
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-md border bg-muted/20 p-4">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <KeyRound className="h-4 w-4 text-muted-foreground" />
-        {t("dashboard.playground.apiKey")}
-      </div>
+    <div className={shellClass}>
+      {!embedded ? (
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <KeyRound className="h-4 w-4 text-muted-foreground" />
+          {t("dashboard.playground.apiKey")}
+        </div>
+      ) : null}
 
       {createdSecret && createdBannerKeyId === selectedKeyId ? (
         <CreatedKeyBanner
