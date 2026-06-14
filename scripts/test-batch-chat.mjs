@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 /**
- * P762/P763 batch chat queue smoke test.
+ * P762/P763 batch chat queue smoke test (console summary only).
+ *
+ * For P768 production acceptance + batch-test-results/latest.json, use:
+ *   node scripts/batch-production-acceptance.mjs
  *
  * Usage:
  *   TOKFAI_API_KEY=sk-tokfai_... node scripts/test-batch-chat.mjs

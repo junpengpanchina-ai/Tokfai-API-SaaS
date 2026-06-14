@@ -18,3 +18,8 @@ apps/web/.env.*
 apps/dmit-api/dmit_check.sh
 apps/dmit-api/dmit_helper.sh
 apps/dmit-api/es
+
+# local acceptance / load-test artifacts (scripts write latest.json)
+batch-test-results/
+model-health-results/
+load-test-results/
