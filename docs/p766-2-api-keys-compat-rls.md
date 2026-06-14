@@ -40,3 +40,9 @@ TOKFAI_API_KEY=sk-tokfai_... node scripts/test-api-keys-management.mjs
 ```
 
 Apply migration before or with DMIT deploy.
+
+## Production recovery (P766.3)
+
+Wrong `SUPABASE_SERVICE_ROLE_KEY` on the DMIT host (publishable/anon or short
+secret) was the production blocker after P766.2. Ops fix + smoke results:
+[docs/p766-3-api-key-production-recovery.md](./p766-3-api-key-production-recovery.md).
