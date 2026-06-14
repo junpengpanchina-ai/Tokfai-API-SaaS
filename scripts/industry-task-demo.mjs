@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * P769 — Industry task template demo (maps templates → /v1/batches/chat).
+ * P769 — Industry API integration demo (example templates → Tokfai /v1/batches/chat).
+ * Self-serve API walkthrough — not a managed service.
  *
  * Usage:
  *   node scripts/industry-task-demo.mjs list
@@ -63,7 +64,8 @@ function sleep(ms) {
 }
 
 function usage() {
-  console.log("P769 industry task template demo");
+  console.log("P769 industry API integration examples (Tokfai batch API)");
+  console.log("Use your API Key — Tokfai is a gateway, not an agency.");
   console.log("");
   console.log("  node scripts/industry-task-demo.mjs list");
   console.log("  node scripts/industry-task-demo.mjs show <template_id>");
@@ -77,13 +79,15 @@ function usage() {
 }
 
 function cmdList() {
-  console.log("=== P769 industry task templates ===");
+  console.log("=== P769 industry API integration templates ===");
+  console.log("Integration examples for POST /v1/batches/chat (your API Key).");
   console.log("");
   for (const t of INDUSTRY_TASK_TEMPLATES) {
     console.log(`${t.template_id}`);
+    console.log(`  kind:      ${t.integration_kind ?? "batch_example"}`);
     console.log(`  model:     ${t.recommended_model}`);
     console.log(`  use_case:  ${truncate(t.use_case, 120)}`);
-    console.log(`  examples:  ${t.example_inputs.length} batch items`);
+    console.log(`  examples:  ${t.example_inputs.length} batch_example items`);
     console.log("");
   }
 }
@@ -95,9 +99,11 @@ function cmdShow(templateId) {
     process.exit(1);
   }
 
-  console.log(`=== ${template.template_id} ===`);
+  console.log(`=== ${template.template_id} (integration_template) ===`);
+  console.log(`integration_kind: ${template.integration_kind ?? "batch_example"}`);
   console.log(`use_case: ${template.use_case}`);
   console.log(`recommended_model: ${template.recommended_model}`);
+  console.log("Tokfai provides API access; you run your own systems and workflows.");
   console.log("");
   console.log("input_schema:");
   console.log(JSON.stringify(template.input_schema, null, 2));
@@ -157,15 +163,16 @@ async function cmdRun(templateId) {
 
   const batchBody = buildBatchRequest(template, template.example_inputs);
 
-  console.log("=== P769 industry task demo (live batch) ===");
+  console.log("=== P769 Tokfai API batch integration demo ===");
+  console.log("Creating batch via Tokfai API (your key → api.tokfai.com).");
   console.log(`api_base:   ${BASE}`);
   console.log(`api_key:    ${maskKey(API_KEY)}`);
   console.log(`template:   ${template.template_id}`);
   console.log(`model:      ${batchBody.model}`);
-  console.log(`items:      ${batchBody.items.length}`);
+  console.log(`items:      ${batchBody.items.length} batch_example rows`);
   console.log("");
 
-  console.log("POST /v1/batches/chat …");
+  console.log("POST /v1/batches/chat (Tokfai batch API) …");
   const { res: createRes, body: created } = await apiFetch("/batches/chat", {
     method: "POST",
     body: JSON.stringify(batchBody),
@@ -178,7 +185,7 @@ async function cmdRun(templateId) {
 
   console.log(`  batch_id=${created.id} status=${created.status}`);
   console.log("");
-  console.log("Polling …");
+  console.log("Polling GET /v1/batches/{id} …");
 
   const started = Date.now();
   let finalBatch = created;
@@ -229,16 +236,20 @@ async function cmdRun(templateId) {
     .map((i) => i.request_id);
 
   console.log("");
-  console.log("Usage / Credits trace:");
-  console.log("  Dashboard → Usage: search each request_id below");
-  console.log("  Dashboard → Credits: verify debits match item credits_charged");
+  console.log("Trace via Tokfai dashboard (metering for your API calls):");
+  console.log("  Usage → search each request_id below");
+  console.log("  Credits → verify debits match item credits_charged");
   for (const id of requestIds) {
     console.log(`  - ${id}`);
   }
 
   const ok = (finalBatch.succeeded_items ?? 0) > 0;
   console.log("");
-  console.log(ok ? "Demo completed." : "Demo finished with zero successes.");
+  console.log(
+    ok
+      ? "API integration demo completed."
+      : "API demo finished with zero succeeded items — check errors above."
+  );
   if (!ok) process.exit(1);
 }
 

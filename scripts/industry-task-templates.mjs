@@ -1,13 +1,15 @@
 /**
- * P769 — Industry task template definitions (client-side prompt layer only).
- * Used by scripts/industry-task-demo.mjs and documented in docs/p769-industry-task-templates.md.
+ * P769 — Industry API integration templates (client-side batch examples only).
+ * Reference code for customers calling Tokfai API — not managed operations.
+ * Used by scripts/industry-task-demo.mjs and docs/p769-industry-task-templates.md.
  */
 
 export const INDUSTRY_TASK_TEMPLATES = [
   {
     template_id: "ecommerce_product_copy",
+    integration_kind: "batch_example",
     use_case:
-      "Bulk-generate storefront-ready product titles, bullet points, and short descriptions from SKU attributes.",
+      "API example: your system sends SKU fields; you call POST /v1/batches/chat to receive listing copy per row.",
     recommended_model: "auto-fast",
     input_schema: {
       type: "object",
@@ -96,8 +98,9 @@ export const INDUSTRY_TASK_TEMPLATES = [
   },
   {
     template_id: "customer_service_qa",
+    integration_kind: "batch_example",
     use_case:
-      "Draft consistent customer-service replies from ticket text plus product and policy context.",
+      "API example: your ticket system sends question + context JSON; Tokfai batch API returns draft reply text per item.",
     recommended_model: "auto-fast",
     input_schema: {
       type: "object",
@@ -158,8 +161,9 @@ export const INDUSTRY_TASK_TEMPLATES = [
   },
   {
     template_id: "medical_case_summary",
+    integration_kind: "batch_example",
     use_case:
-      "Turn clinic visit notes into a structured admin summary for referral packets (not a diagnosis).",
+      "API example: your HIS/clinic app sends visit fields; Tokfai batch API returns structured admin summary text (not diagnosis).",
     recommended_model: "auto-pro",
     input_schema: {
       type: "object",
@@ -227,8 +231,9 @@ export const INDUSTRY_TASK_TEMPLATES = [
   },
   {
     template_id: "image_assist_prompt",
+    integration_kind: "batch_example",
     use_case:
-      "Generate detailed image-generation prompts from a short creative brief (for Tokfai Image API or external tools).",
+      "API example: your app sends a creative brief JSON; Tokfai batch API returns image-gen prompt text for Image API or downstream tools.",
     recommended_model: "auto-pro",
     input_schema: {
       type: "object",

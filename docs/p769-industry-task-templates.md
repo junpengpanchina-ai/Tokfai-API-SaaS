@@ -1,65 +1,102 @@
-# P769 — Industry task templates MVP
+# P769 — Industry API integration templates (API examples)
 
 Companion docs:
 
 - [P768 — Batch production acceptance](./p768-batch-production-acceptance.md)
 - [P762 — Batch Chat Queue MVP](./p762-batch-chat-queue-mvp.md)
 
-Scope: **template + demo layer only** — no billing core, Stripe, webhook,
+Scope: **integration examples + demo only** — no billing core, Stripe, webhook,
 `credit_ledger`, `record_usage_and_debit`, or DMIT route changes.
-
-P768 confirmed production batch flow (create → items → worker → credits →
-`request_id`). P769 adds **customer-readable task templates** that map industry
-inputs to batch chat items.
 
 ---
 
-## What this is
+## Product positioning
+
+**Tokfai is an API gateway / model relay / API Key provider** — not an agency,
+managed operations vendor, or done-for-you service.
+
+These files are **industry API integration examples**. They show how a customer
+can call Tokfai with **their own API Key**, **their own systems**, and **their
+own business workflows**:
+
+1. Map domain fields → chat `messages`
+2. `POST /v1/batches/chat` with their `sk-tokfai_…` key
+3. Poll batch and item status
+4. Trace each succeeded call via `request_id` in Usage / Credits
+
+Tokfai does **not** run the customer's storefront, ticket queue, or clinic ops.
+Templates are copy-paste starting points for **self-serve API integration**.
+
+For KA/CKA accounts (e.g. hospitals), the same pattern can be extended into
+**scenario-specific integration solutions** — still API-first, customer-owned
+infrastructure, not Tokfai-operated services.
+
+---
+
+## Commercial layers (Tokfai product stack)
+
+| Layer | What the customer gets | P769 fits here |
+| --- | --- | --- |
+| **L1 — API Key gateway** | `sk-tokfai_…`, OpenAI-compatible `/v1/chat/completions`, credits metering | Foundation — all examples use API Key auth |
+| **L2 — Integration docs & Playground** | Docs, API Keys UI, Chat/Image Playground, `request_id` visibility | Customers test single calls before batch |
+| **L3 — Industry API examples** | `scripts/industry-task-templates.mjs` + this doc — batch JSON per vertical | **P769 / P769.1** |
+| **L4 — KA/CKA scenario landing** | Hospital, ecommerce, CS playbook pages; scenario docs + sample code | Upgrade L3 templates per account vertical |
+| **L5 — Enterprise workflow integration** | Customer ERP/CRM/HIS wires Tokfai into internal pipelines | Customer engineering + Tokfai API; not Tokfai ops |
+
+P769 ships at **L3**. Sales and solutions can reference L4/L5 without implying
+Tokfai operates the customer's business.
+
+---
+
+## What this is (technical)
 
 | Layer | Location | Role |
 | --- | --- | --- |
-| Template definitions | `scripts/industry-task-templates.mjs` | `input_schema`, `prompt_builder`, examples |
-| Demo CLI | `scripts/industry-task-demo.mjs` | list / show / print-batch / run |
+| Integration templates | `scripts/industry-task-templates.mjs` | `input_schema`, `prompt_builder`, `batch_example` inputs |
+| Demo CLI | `scripts/industry-task-demo.mjs` | list / show / print-batch / run against live API |
 | Batch API (unchanged) | `POST /v1/batches/chat` | Accepts `model` + `items[]` with `messages` |
 
-Templates are **not** a new API endpoint. Customers copy the pattern: fill
-structured fields → build prompts → submit a batch → poll → trace via
-`request_id`.
+Templates are **not** a new API endpoint. They are reference code: structured
+fields → prompts → batch body → poll → `request_id` / `credits_charged`.
 
 ---
 
-## Templates (MVP)
+## Integration examples (MVP)
 
-| `template_id` | Use case | `recommended_model` | Example items |
+| `template_id` | API example summary | `recommended_model` | `batch_example` items |
 | --- | --- | --- | --- |
-| `ecommerce_product_copy` | Product titles, bullets, descriptions from SKU facts | `auto-fast` | 3 |
-| `customer_service_qa` | CS replies from ticket + product + policy context | `auto-fast` | 3 |
-| `medical_case_summary` | Admin clinical summary (not diagnosis) | `auto-pro` | 2 |
-| `image_assist_prompt` | Image-gen prompt from creative brief | `auto-pro` | 3 |
+| `ecommerce_product_copy` | Call batch API to generate listing copy from SKU JSON | `auto-fast` | 3 |
+| `customer_service_qa` | Call batch API to draft replies from ticket + context JSON | `auto-fast` | 3 |
+| `medical_case_summary` | Call batch API for admin note structuring (not diagnosis) | `auto-pro` | 2 |
+| `image_assist_prompt` | Call batch API to build image-gen prompts from brief JSON | `auto-pro` | 3 |
 
 Each template exports:
 
 - `template_id`
-- `use_case`
-- `input_schema` (JSON Schema–style for docs / validation)
+- `integration_kind` — `batch_example`
+- `use_case` — how the **customer** calls Tokfai API
+- `input_schema` — fields your system should send
 - `prompt_builder(input)` → chat user message
 - `recommended_model`
-- `example_inputs` → converted to `example batch items`
+- `example_inputs` → sample rows for `print-batch` / `run`
 
 ---
 
-## Customer workflow
+## Customer API integration workflow
 
-### 1. Pick a template
+You bring: API Key, HTTP client, and your business data. Tokfai provides the
+gateway and metering.
+
+### 1. Pick an integration example
 
 ```bash
 node scripts/industry-task-demo.mjs list
 node scripts/industry-task-demo.mjs show ecommerce_product_copy
 ```
 
-### 2. Copy structure and fill your data
+### 2. Map your system data to `input_schema`
 
-Use `input_schema` fields. Example for ecommerce:
+Example payload your app might already have:
 
 ```json
 {
@@ -71,16 +108,16 @@ Use `input_schema` fields. Example for ecommerce:
 }
 ```
 
-Build the user message with the same rules as `prompt_builder` in
-`industry-task-templates.mjs`, or import that module in your own Node script.
+Build `messages` using the same rules as `prompt_builder` in
+`industry-task-templates.mjs`, or import that module in Node.
 
-### 3. Preview the batch JSON
+### 3. Preview the Tokfai batch request body
 
 ```bash
 node scripts/industry-task-demo.mjs print-batch ecommerce_product_copy
 ```
 
-Output is ready for `POST /v1/batches/chat`:
+Ready for `POST /v1/batches/chat`:
 
 ```json
 {
@@ -91,7 +128,7 @@ Output is ready for `POST /v1/batches/chat`:
 }
 ```
 
-### 4. Create the batch
+### 4. Create batch via Tokfai API
 
 ```http
 POST https://api.tokfai.com/v1/batches/chat
@@ -127,18 +164,18 @@ Per item:
 | `credits_charged` | Debited only on `succeeded` (0 on failure) |
 | `error_code` | Failure classification |
 
-### 7. Trace Usage and Credits
+### 7. Verify Usage and Credits (your dashboard)
 
 1. **Usage** (`tokfai.com/dashboard/usage`) — search each succeeded
    `request_id`.
-2. **Credits** (`tokfai.com/dashboard/credits`) — confirm ledger debits match
+2. **Credits** (`tokfai.com/dashboard/credits`) — confirm debits match
    summed `credits_charged` on succeeded items.
 
 Failed and cancelled items should **not** debit (P768 verified).
 
 ---
 
-## Live demo (one command)
+## Live API demo (your key, Tokfai gateway)
 
 ```bash
 TOKFAI_API_KEY=sk-tokfai_<48hex> \
@@ -146,9 +183,8 @@ TOKFAI_API_KEY=sk-tokfai_<48hex> \
   node scripts/industry-task-demo.mjs run ecommerce_product_copy
 ```
 
-Runs example inputs → batch → poll → prints `request_id` list for Usage lookup.
-
-Other templates:
+Submits example `batch_example` items through **your** API Key → Tokfai batch
+API → poll → prints `request_id` values for Usage lookup.
 
 ```bash
 node scripts/industry-task-demo.mjs run customer_service_qa
@@ -158,48 +194,48 @@ node scripts/industry-task-demo.mjs run image_assist_prompt
 
 ---
 
-## Template details
+## Example details (API integration angle)
 
 ### `ecommerce_product_copy`
 
-**Input fields:** `product_name`, `category`, `key_features[]`, `tone`,
-`locale`
+**Your app sends:** `product_name`, `category`, `key_features[]`, `tone`, `locale`
 
-**Output format:** `TITLE`, `BULLETS`, `DESCRIPTION`
+**Tokfai returns:** chat completion per item (`TITLE`, `BULLETS`, `DESCRIPTION` in text)
 
-**Why `auto-fast`:** High volume, short copy, cost-efficient.
+**Model:** `auto-fast` — high-volume, short outputs, lower cost per call.
 
 ### `customer_service_qa`
 
-**Input fields:** `customer_question`, `product_context`, `policy_notes`,
-`locale`
+**Your app sends:** `customer_question`, `product_context`, `policy_notes`, `locale`
 
-**Output:** Single customer-facing email-style reply.
+**Tokfai returns:** one reply text per ticket row in your batch.
 
-**Why `auto-fast`:** Many tickets, consistent tone, fast turnaround.
+**Model:** `auto-fast` — many parallel tickets via batch queue.
 
 ### `medical_case_summary`
 
-**Input fields:** `patient_context`, `chief_complaint`, `symptoms[]`,
+**Your app sends:** `patient_context`, `chief_complaint`, `symptoms[]`,
 `clinician_notes`, `locale`
 
-**Output:** `SUMMARY`, `KEY_FINDINGS`, `SUGGESTED_FOLLOW_UP`, `DATA_GAPS`
+**Tokfai returns:** structured admin summary text — **not** diagnosis or
+patient-facing advice. KA hospital accounts may wrap this in L4 scenario docs
+and internal compliance review.
 
-**Disclaimer:** Administrative documentation only — not diagnosis or
-patient-facing advice. Use `auto-pro` for longer, structured output.
+**Model:** `auto-pro` — longer structured output.
 
 ### `image_assist_prompt`
 
-**Input fields:** `subject`, `style`, `mood`, `aspect_ratio`,
-`negative_hints`, `locale`
+**Your app sends:** `subject`, `style`, `mood`, `aspect_ratio`, `negative_hints`,
+`locale`
 
-**Output:** `PROMPT` + `NEGATIVE_PROMPT` for Tokfai Image API or external tools.
+**Tokfai returns:** `PROMPT` + `NEGATIVE_PROMPT` text for Tokfai Image API or
+other image endpoints.
 
-**Why `auto-pro`:** Richer creative phrasing for image models.
+**Model:** `auto-pro` — richer creative phrasing.
 
 ---
 
-## Integrating in your app
+## Wire into your backend
 
 Minimal Node pattern (same repo):
 
@@ -210,7 +246,7 @@ import {
 } from "./scripts/industry-task-templates.mjs";
 
 const template = getTemplate("ecommerce_product_copy");
-const myRows = [
+const rowsFromYourDb = [
   {
     product_name: "SKU-100",
     category: "Electronics",
@@ -219,19 +255,25 @@ const myRows = [
   },
 ];
 
-const body = buildBatchRequest(template, myRows);
-// fetch POST /v1/batches/chat with body
+const body = buildBatchRequest(template, rowsFromYourDb);
+await fetch("https://api.tokfai.com/v1/batches/chat", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer process.env.TOKFAI_API_KEY`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(body),
+});
 ```
 
-For non-Node clients, copy `print-batch` JSON and replace `items` with your
-own `messages` built from the template rules in this doc.
+Non-Node clients: use `print-batch` JSON as the request body template.
 
 ---
 
 ## Limits (batch API — unchanged)
 
 - Max **100 items** per batch
-- Items processed by background worker (sequential-ish, shared upstream pool)
+- Items processed by background worker (shared upstream pool)
 - Each succeeded item debits credits individually
 - No batch idempotency key in MVP
 
@@ -239,13 +281,14 @@ See [P762](./p762-batch-chat-queue-mvp.md) for full API reference.
 
 ---
 
-## Out of scope (P769)
+## Out of scope (P769 / P769.1)
 
+- Tokfai-managed operations or agency deliverables
 - New DMIT routes (`/v1/templates/*`)
 - Dashboard UI for templates
-- Stripe / billing / webhook changes
-- Template versioning or hosted template registry
-- Automatic Usage API from API key (dashboard RLS reads only)
+- Stripe / billing / webhook / debit logic changes
+- Template hosting registry or versioning service
+- Usage API from API key alone (dashboard RLS reads only)
 
 ---
 
@@ -256,4 +299,4 @@ cd apps/dmit-api && npm run typecheck && npm run build
 cd apps/web && npm run typecheck && npm run build
 ```
 
-No app code changes expected for P769 (scripts + docs only).
+Scripts + docs only — no app code changes expected.
