@@ -549,7 +549,14 @@ export const messages = {
         securityItem3:
           "The full secret is shown once at creation. After that, use Copy key on active keys to copy the full secret again.",
         viewApiDocs: "View API docs",
+        tryChatPlayground: "Try Chat Playground",
         tryImagePlayground: "Try Image Playground",
+        cursorGuide: "Cursor guide",
+        cherryStudioGuide: "Cherry Studio guide",
+        baseUrlLabel: "Base URL",
+        recommendedModelLabel: "Recommended model",
+        curlExampleLabel: "curl example (ready to run)",
+        copyCurl: "Copy curl",
         createApiKey: "Create API key",
         createApiKeyDesc:
           "Optional name for your reference. Leave blank to use the default name.",
@@ -1411,6 +1418,105 @@ export const messages = {
       openPlayground: "Open Playground",
       copy: "Copy",
       copied: "Copied",
+    },
+    integration: {
+      pageTitle: "Tokfai integration guide",
+      pageSubtitle:
+        "Tokfai is an OpenAI-compatible AI gateway. Use one API key, one base URL, and the same request format as OpenAI.",
+      valueProps:
+        "One key, multiple models, smart routing, usage tracking, and credit billing — without managing upstream providers yourself.",
+      navTitle: "Contents",
+      navQuickStart: "Quick Start",
+      navCurl: "curl examples",
+      navOpenAiSdk: "OpenAI SDK",
+      navCursor: "Cursor",
+      navCherry: "Cherry Studio",
+      navModels: "Models guide",
+      navErrors: "Error codes",
+      navBilling: "Billing & Usage",
+      navBatch: "Batch API",
+      ctaCreateKey: "Create API key",
+      ctaPlayground: "Try Chat Playground",
+      quickStartTitle: "Quick Start (about 3 minutes)",
+      quickStartDesc:
+        "Create a key, copy the secret once, then send your first chat request.",
+      quickStep1:
+        "Sign in → API Keys → Create API key. Copy the full sk-tokfai_… secret immediately.",
+      quickStep2:
+        "Set Base URL to https://api.tokfai.com/v1 and Authorization: Bearer <your key>.",
+      quickStep3:
+        "Start with model auto-fast (recommended). Tokfai routes to the first available fast model.",
+      quickStep4:
+        "Check Usage for request_id and credits_charged. Failed calls are generally not billed.",
+      baseUrlLabel: "Base URL",
+      recommendedModelLabel: "Recommended model",
+      authHeaderLabel: "Authorization header",
+      curlTitle: "curl examples",
+      curlDesc: "Replace sk-tokfai_xxx with your API key, then run in a terminal.",
+      sdkTitle: "OpenAI SDK (Node.js & Python)",
+      sdkDesc:
+        "Point the official OpenAI SDK at Tokfai — only baseURL / base_url and apiKey change.",
+      cursorTitle: "Cursor integration",
+      cursorDesc: "Add Tokfai as a custom OpenAI-compatible provider in Cursor.",
+      cursorStep1: "Open Cursor Settings → Models → add OpenAI-compatible provider.",
+      cursorStep2: "Base URL: https://api.tokfai.com/v1",
+      cursorStep3: "API Key: your sk-tokfai_… secret from API Keys.",
+      cursorStep4: "Model: auto-fast (recommended) or any id from GET /v1/models.",
+      cherryTitle: "Cherry Studio integration",
+      cherryDesc: "Configure Cherry Studio as an OpenAI-compatible provider.",
+      cherryProvider: "Provider",
+      cherryApiHost: "API Host",
+      cherryApiKey: "API Key",
+      cherryModel: "Model",
+      modelsTitle: "Models guide",
+      modelsDesc:
+        "Use smart routing aliases for resilient chat. The response model field shows which model actually served your request.",
+      modelAutoFast:
+        "auto-fast — recommended default for integrations and Playground (fast & stable).",
+      modelAutoPro:
+        "auto-pro — higher quality; may route through premium models first.",
+      modelAutoCheap:
+        "auto-cheap — low-cost batch workloads; not for latency-sensitive chat.",
+      modelsExplicitNote:
+        "Explicit ids (gpt-5.4, gpt-5.5, gemini-3-flash, …) do not silently switch to another model — use auto-* when you want fallback.",
+      browseModels: "Browse all models",
+      errorsTitle: "Error codes",
+      errorsDesc:
+        "Stable error.code values returned in JSON. Use request_id from the response or Usage for support.",
+      codeColumn: "Code",
+      meaningColumn: "What to do",
+      billingTitle: "Billing & Usage",
+      billingDesc:
+        "Credits are debited on successful API calls. Monitor balance and per-request usage in the dashboard.",
+      billingFailedNote:
+        "Failed requests (upstream busy, timeout, auth errors, etc.) are recorded for troubleshooting and are generally not charged.",
+      billingRequestIdNote:
+        "Every response includes request_id — match it in Dashboard → Usage to verify tokens and credits_charged.",
+      linkUsage: "Open Usage",
+      linkCredits: "Open Credits",
+      batchTitle: "Batch API guide",
+      batchDesc:
+        "Submit many chat prompts in one request and poll for results — ideal for bulk jobs instead of high concurrency on /chat/completions.",
+      batchNote:
+        "POST /v1/batches/chat returns 202 immediately. Poll GET /v1/batches/{id} until completed. Each successful item debits credits individually.",
+      footerHint: "Need image API or full reference?",
+      footerDocsLink: "Extended API reference",
+      copy: "Copy",
+      copied: "Copied",
+      error: {
+        missing_token: "Send Authorization: Bearer sk-tokfai_… on every request.",
+        invalid_token: "Check the key is complete, active, and not revoked.",
+        insufficient_credits: "Top up credits in Dashboard → Credits.",
+        upstream_model_busy:
+          "That model is busy — retry shortly or use auto-fast / auto-pro.",
+        all_upstreams_unavailable:
+          "All models in the routing chain are busy — retry later or reduce concurrency.",
+        upstream_timeout: "Upstream took too long — retry or switch to auto-fast.",
+        too_many_requests: "Slow down requests per minute for this API key.",
+        too_many_concurrent_requests:
+          "Too many parallel requests — lower concurrency or use the Batch API.",
+        request_body_too_large: "Reduce message size or split into smaller requests.",
+      },
     },
     admin: {
       nav: {
@@ -2396,7 +2502,14 @@ export const messages = {
         securityItem3:
           "完整 secret 仅在创建时完整展示；之后可通过活跃密钥的「复制密钥」再次复制完整 secret。",
         viewApiDocs: "查看 API 文档",
+        tryChatPlayground: "打开 Chat Playground",
         tryImagePlayground: "体验 Image Playground",
+        cursorGuide: "Cursor 接入指南",
+        cherryStudioGuide: "Cherry Studio 接入指南",
+        baseUrlLabel: "Base URL",
+        recommendedModelLabel: "推荐模型",
+        curlExampleLabel: "curl 示例（可直接运行）",
+        copyCurl: "复制 curl",
         createApiKey: "创建 API 密钥",
         createApiKeyDesc: "可选名称，便于区分。留空则使用默认名称。",
         keyName: "密钥名称",
@@ -3212,6 +3325,101 @@ export const messages = {
       openPlayground: "打开 Playground",
       copy: "复制",
       copied: "已复制",
+    },
+    integration: {
+      pageTitle: "Tokfai 接入指南",
+      pageSubtitle:
+        "Tokfai 是 OpenAI 兼容的 AI 网关。使用同一个 API Key、同一个 Base URL、与 OpenAI 相同的请求格式即可接入。",
+      valueProps:
+        "一把密钥、多个模型、智能路由、用量追踪与积分计费——无需自行管理上游供应商。",
+      navTitle: "目录",
+      navQuickStart: "快速开始",
+      navCurl: "curl 示例",
+      navOpenAiSdk: "OpenAI SDK",
+      navCursor: "Cursor",
+      navCherry: "Cherry Studio",
+      navModels: "模型说明",
+      navErrors: "错误码",
+      navBilling: "计费与用量",
+      navBatch: "Batch API",
+      ctaCreateKey: "创建 API Key",
+      ctaPlayground: "打开 Chat Playground",
+      quickStartTitle: "快速开始（约 3 分钟）",
+      quickStartDesc: "创建密钥、复制 secret，然后发送第一条对话请求。",
+      quickStep1:
+        "登录 → API Keys → 创建密钥。立即复制完整 sk-tokfai_… secret。",
+      quickStep2:
+        "Base URL 设为 https://api.tokfai.com/v1，请求头携带 Authorization: Bearer <你的密钥>。",
+      quickStep3:
+        "模型先用 auto-fast（推荐）。Tokfai 会自动路由到当前可用的快速模型。",
+      quickStep4:
+        "在 Usage 查看 request_id 与 credits_charged。失败请求通常不扣费。",
+      baseUrlLabel: "Base URL",
+      recommendedModelLabel: "推荐模型",
+      authHeaderLabel: "Authorization 请求头",
+      curlTitle: "curl 示例",
+      curlDesc: "将 sk-tokfai_xxx 替换为你的密钥后在终端运行。",
+      sdkTitle: "OpenAI SDK（Node.js & Python）",
+      sdkDesc: "使用官方 OpenAI SDK，只需修改 baseURL / base_url 与 apiKey。",
+      cursorTitle: "Cursor 接入",
+      cursorDesc: "在 Cursor 中添加 Tokfai 作为 OpenAI 兼容 Provider。",
+      cursorStep1: "打开 Cursor 设置 → Models → 添加 OpenAI 兼容 Provider。",
+      cursorStep2: "Base URL：https://api.tokfai.com/v1",
+      cursorStep3: "API Key：在 API Keys 页面复制的 sk-tokfai_… secret。",
+      cursorStep4: "Model：auto-fast（推荐）或 GET /v1/models 中的任意 id。",
+      cherryTitle: "Cherry Studio 接入",
+      cherryDesc: "按 OpenAI 兼容方式配置 Cherry Studio。",
+      cherryProvider: "Provider",
+      cherryApiHost: "API Host",
+      cherryApiKey: "API Key",
+      cherryModel: "Model",
+      modelsTitle: "模型说明",
+      modelsDesc:
+        "对话建议使用智能路由别名。响应中的 model 字段表示实际提供服务的模型。",
+      modelAutoFast:
+        "auto-fast — 推荐默认，适合接入与 Playground（快速稳定）。",
+      modelAutoPro: "auto-pro — 更高质量，可能优先走高端模型。",
+      modelAutoCheap:
+        "auto-cheap — 低成本批量任务，不适合延迟敏感的对话。",
+      modelsExplicitNote:
+        "显式模型 id（gpt-5.4、gpt-5.5、gemini-3-flash 等）不会静默切换到其他模型——需要容错请用 auto-*。",
+      browseModels: "浏览全部模型",
+      errorsTitle: "错误码",
+      errorsDesc:
+        "JSON 响应中的稳定 error.code。请结合 request_id 或在 Usage 中排查。",
+      codeColumn: "错误码",
+      meaningColumn: "处理建议",
+      billingTitle: "计费与用量",
+      billingDesc: "成功调用扣除积分。在控制台查看余额与每次请求用量。",
+      billingFailedNote:
+        "失败请求（上游繁忙、超时、鉴权错误等）会记录用于排查，通常不扣费。",
+      billingRequestIdNote:
+        "每次响应包含 request_id — 在 Dashboard → Usage 中核对 tokens 与 credits_charged。",
+      linkUsage: "打开 Usage",
+      linkCredits: "打开 Credits",
+      batchTitle: "Batch API 指南",
+      batchDesc:
+        "一次提交多条对话并轮询结果，适合批量任务，避免对 /chat/completions 高并发压测。",
+      batchNote:
+        "POST /v1/batches/chat 立即返回 202。轮询 GET /v1/batches/{id} 直至完成。每条成功 item 单独扣费。",
+      footerHint: "需要图像 API 或完整参考？",
+      footerDocsLink: "扩展 API 参考",
+      copy: "复制",
+      copied: "已复制",
+      error: {
+        missing_token: "每次请求需携带 Authorization: Bearer sk-tokfai_…。",
+        invalid_token: "检查密钥是否完整、未吊销且格式正确。",
+        insufficient_credits: "请在 Dashboard → Credits 充值积分。",
+        upstream_model_busy:
+          "该模型繁忙 — 稍后重试或改用 auto-fast / auto-pro。",
+        all_upstreams_unavailable:
+          "路由链上模型均繁忙 — 稍后重试或降低并发。",
+        upstream_timeout: "上游响应超时 — 重试或改用 auto-fast。",
+        too_many_requests: "请求过快，请降低每分钟请求数。",
+        too_many_concurrent_requests:
+          "并发过高 — 降低并发或使用 Batch API。",
+        request_body_too_large: "请求体过大，请缩短内容或拆分请求。",
+      },
     },
     admin: {
       nav: {

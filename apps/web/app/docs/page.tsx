@@ -1,4 +1,4 @@
-import { DocsContent } from "@/components/docs-content";
+import { CustomerIntegrationGuide } from "@/components/customer-integration-guide";
 import { PublicFooter } from "@/components/public-footer";
 import { PublicHeader } from "@/components/public-header";
 
@@ -8,8 +8,8 @@ export default function DocsPage() {
       <PublicHeader />
 
       <main className="container min-w-0 flex-1 overflow-x-hidden py-16">
-        <div className="mx-auto max-w-4xl">
-          <DocsContent showDashboardLinks={false} />
+        <div className="mx-auto max-w-5xl">
+          <CustomerIntegrationGuide showDashboardLinks={false} />
         </div>
       </main>
 

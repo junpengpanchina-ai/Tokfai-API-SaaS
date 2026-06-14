@@ -46,9 +46,11 @@ import {
 } from "@/lib/dmit-messages";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
+import { chatCompletionsCurl } from "@/lib/customer-integration-snippets";
 import {
   TOKFAI_API_BASE_URL,
   TOKFAI_API_KEY_PLACEHOLDER,
+  TOKFAI_RECOMMENDED_MODEL,
 } from "@/lib/tokfai-api";
 
 export interface ApiKeyListItem {
@@ -342,6 +344,16 @@ function IntegrationGuide({ t }: { t: (key: string) => string }) {
             </Link>
           </Button>
           <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/dashboard/docs#cursor-integration">
+              {t("dashboard.apiKeys.cursorGuide")}
+            </Link>
+          </Button>
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/dashboard/docs#cherry-studio">
+              {t("dashboard.apiKeys.cherryStudioGuide")}
+            </Link>
+          </Button>
+          <Button type="button" variant="outline" size="sm" asChild>
             <Link href="/dashboard/image-playground">
               {t("dashboard.apiKeys.tryImagePlayground")}
             </Link>
@@ -368,10 +380,20 @@ function OneTimeSecretCard({
   t: (key: string) => string;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
+  const [curlCopied, setCurlCopied] = useState(false);
+  const curlExample = chatCompletionsCurl(secret, TOKFAI_RECOMMENDED_MODEL);
 
   useEffect(() => {
     cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [secret]);
+
+  async function handleCopyCurl() {
+    const ok = await copyToClipboard(curlExample);
+    if (ok) {
+      setCurlCopied(true);
+      window.setTimeout(() => setCurlCopied(false), 2000);
+    }
+  }
 
   return (
     <Card
@@ -407,12 +429,38 @@ function OneTimeSecretCard({
             {secret}
           </code>
         </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <Label className="text-xs uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
+              {t("dashboard.apiKeys.baseUrlLabel")}
+            </Label>
+            <code className="block rounded-md border border-emerald-200 bg-white p-3 font-mono text-xs dark:border-emerald-800 dark:bg-background">
+              {TOKFAI_API_BASE_URL}
+            </code>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label className="text-xs uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
+              {t("dashboard.apiKeys.recommendedModelLabel")}
+            </Label>
+            <code className="block rounded-md border border-emerald-200 bg-white p-3 font-mono text-xs dark:border-emerald-800 dark:bg-background">
+              {TOKFAI_RECOMMENDED_MODEL}
+            </code>
+          </div>
+        </div>
         <div className="flex flex-col gap-2">
           <Label className="text-xs uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
             {t("dashboard.apiKeys.authorizationHeader")}
           </Label>
           <code className="block overflow-x-auto rounded-md border border-emerald-200 bg-white p-3 font-mono text-xs leading-relaxed text-foreground dark:border-emerald-800 dark:bg-background">
             Authorization: Bearer {secret}
+          </code>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label className="text-xs uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
+            {t("dashboard.apiKeys.curlExampleLabel")}
+          </Label>
+          <code className="block max-h-48 overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-emerald-200 bg-white p-3 font-mono text-xs leading-relaxed text-foreground dark:border-emerald-800 dark:bg-background">
+            {curlExample}
           </code>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -433,19 +481,47 @@ function OneTimeSecretCard({
             type="button"
             variant="outline"
             className="w-full sm:w-auto"
+            onClick={handleCopyCurl}
+          >
+            {curlCopied ? (
+              <>
+                <Check className="h-4 w-4" />
+                {t("dashboard.apiKeys.copied")}
+              </>
+            ) : (
+              <>
+                <Copy className="h-4 w-4" />
+                {t("dashboard.apiKeys.copyCurl")}
+              </>
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full sm:w-auto"
             onClick={onDismiss}
           >
             {t("dashboard.apiKeys.savedMyKey")}
           </Button>
-          <Button type="button" variant="ghost" className="w-full sm:w-auto" asChild>
+          <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
             <Link href="/dashboard/playground">
               {t("dashboard.apiKeys.tryChatPlayground")}
             </Link>
           </Button>
-          <Button type="button" variant="ghost" className="w-full sm:w-auto" asChild>
+          <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
             <Link href="/dashboard/docs">
-              {t("dashboard.apiKeys.readDocs")}
-              <ExternalLink className="h-4 w-4" />
+              {t("dashboard.apiKeys.viewDocs")}
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+          <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
+            <Link href="/dashboard/docs#cursor-integration">
+              {t("dashboard.apiKeys.cursorGuide")}
+            </Link>
+          </Button>
+          <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
+            <Link href="/dashboard/docs#cherry-studio">
+              {t("dashboard.apiKeys.cherryStudioGuide")}
             </Link>
           </Button>
         </div>

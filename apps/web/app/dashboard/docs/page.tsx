@@ -1,9 +1,9 @@
-import { QuickstartContent } from "@/components/quickstart-content";
+import { CustomerIntegrationGuide } from "@/components/customer-integration-guide";
 
 export const metadata = {
-  title: "Quickstart",
+  title: "Integration guide",
 };
 
 export default function DashboardDocsPage() {
-  return <QuickstartContent />;
+  return <CustomerIntegrationGuide showDashboardLinks />;
 }
