@@ -53,7 +53,7 @@ export function DashboardHeader({
   }
 
   return (
-    <header className="sticky top-0 z-30 flex shrink-0 flex-col gap-2 border-b bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:h-16 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:py-0">
+    <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <Link href="/" className="flex shrink-0 items-center gap-2 md:hidden">
           <div className="grid h-7 w-7 place-items-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
@@ -62,14 +62,14 @@ export function DashboardHeader({
           <span className="text-sm font-semibold tracking-tight">Tokfai</span>
         </Link>
         <div
-          className="min-w-0 text-xs text-muted-foreground sm:text-sm"
+          className="min-w-0 truncate text-xs text-muted-foreground sm:text-sm"
           title={email || undefined}
         >
           <span className="hidden sm:inline">{t("common.signedInAs")} </span>
           <span className="font-medium text-foreground">{displayEmail}</span>
         </div>
       </div>
-      <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-1 sm:self-auto">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2">
         <DashboardHeaderCredits credits={credits} />
         <div className="flex items-center gap-1">
           <LanguageSwitcher />

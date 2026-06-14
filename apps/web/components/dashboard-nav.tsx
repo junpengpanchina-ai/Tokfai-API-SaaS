@@ -64,7 +64,7 @@ export function DashboardMobileNav({
   return (
     <nav
       aria-label={t(ariaLabelKey)}
-      className="sticky top-[4.75rem] z-20 shrink-0 border-b bg-muted/40 backdrop-blur scrollbar-thin-x md:hidden sm:top-16"
+      className="sticky top-14 z-20 shrink-0 border-b bg-muted/40 backdrop-blur scrollbar-thin-x md:hidden"
     >
       <div className="flex gap-1 overflow-x-auto p-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((item) => {
@@ -113,8 +113,8 @@ export function DashboardSidebar({
   const creditsAmount = formatShellCreditsAmount(credits);
 
   return (
-    <aside className="hidden md:sticky md:top-0 md:z-40 md:flex md:h-svh md:w-60 md:shrink-0 md:flex-col md:self-start border-r bg-muted/30">
-      <div className="flex h-16 shrink-0 items-center gap-2 border-b px-6">
+    <div className="flex h-full w-full flex-col">
+      <div className="flex h-14 shrink-0 items-center gap-2 border-b px-6">
         <Link href="/" className="flex items-center gap-2">
           <div className="grid h-7 w-7 place-items-center rounded-md bg-primary text-primary-foreground font-bold text-sm">
             T
@@ -125,7 +125,7 @@ export function DashboardSidebar({
 
       <nav
         aria-label={t(ariaLabelKey)}
-        className="min-h-0 flex-1 overflow-y-auto p-3"
+        className="min-h-0 flex-1 overflow-y-auto px-3 py-4"
       >
         <div className="flex flex-col gap-1">
           {items.map((item) => {
@@ -178,10 +178,10 @@ export function DashboardSidebar({
       </nav>
 
       {!isAdminRoute ? (
-        <div className="shrink-0 border-t p-3">
+        <div className="shrink-0 border-t bg-muted/30 p-3">
           <DashboardSidebarCreditsSummary credits={credits} />
         </div>
       ) : null}
-    </aside>
+    </div>
   );
 }

@@ -2,8 +2,8 @@ import { AuthSuccessToast } from "@/components/auth-success-toast";
 import { DashboardFooter } from "@/components/dashboard-footer";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { DashboardMobileNav, DashboardSidebar } from "@/components/dashboard-nav";
-import { loadDashboardShellCredits } from "@/lib/load-dashboard-shell-credits";
 import type { DashboardShellCredits } from "@/lib/dashboard-shell-credits";
+import { loadDashboardShellCredits } from "@/lib/load-dashboard-shell-credits";
 import { createClient } from "@/lib/supabase/server";
 
 export async function DashboardShell({
@@ -27,16 +27,22 @@ export async function DashboardShell({
   }
 
   return (
-    <div className="min-h-svh overflow-x-hidden md:flex">
+    <div className="min-h-svh overflow-x-hidden bg-background">
       <AuthSuccessToast />
-      <DashboardSidebar credits={credits} />
-      <div className="flex min-h-svh min-w-0 flex-1 flex-col overflow-x-hidden">
-        <DashboardHeader email={email} credits={credits} />
-        <DashboardMobileNav credits={credits} />
-        <main className="min-w-0 flex-1 p-4 sm:p-6 md:p-8">
-          <div className="mx-auto w-full max-w-6xl">{children}</div>
-        </main>
-        <DashboardFooter />
+      <DashboardHeader email={email} credits={credits} />
+      <div className="relative flex min-w-0">
+        <aside
+          className="fixed left-0 top-14 z-30 hidden h-[calc(100vh-3.5rem)] w-60 border-r bg-muted/30 md:flex md:flex-col"
+        >
+          <DashboardSidebar credits={credits} />
+        </aside>
+        <div className="flex min-w-0 flex-1 flex-col md:pl-60">
+          <DashboardMobileNav credits={credits} />
+          <main className="min-h-[calc(100vh-3.5rem)] min-w-0 flex-1 px-4 py-6 sm:px-6 md:py-8">
+            <div className="mx-auto w-full max-w-6xl">{children}</div>
+          </main>
+          <DashboardFooter />
+        </div>
       </div>
     </div>
   );

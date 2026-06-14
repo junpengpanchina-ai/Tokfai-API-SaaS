@@ -107,7 +107,7 @@ export function CustomerIntegrationGuide({
   return (
     <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-8">
       <nav
-        className="lg:sticky lg:top-20 lg:z-10 lg:max-h-[calc(100vh-5.5rem)] lg:w-44 shrink-0 overflow-y-auto rounded-lg border bg-muted/30 p-3 lg:self-start"
+        className="lg:sticky lg:top-24 lg:z-10 lg:max-h-[calc(100vh-7rem)] lg:w-44 shrink-0 overflow-y-auto rounded-lg border bg-muted/30 p-3 lg:self-start"
         aria-label={t("integration.navTitle")}
       >
         <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
