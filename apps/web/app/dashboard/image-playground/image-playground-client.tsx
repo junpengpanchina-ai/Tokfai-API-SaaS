@@ -2,17 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Check,
-  CheckCircle2,
   Copy,
-  Eye,
-  EyeOff,
-  ImageIcon,
-  Info,
-  KeyRound,
   Loader2,
   Plus,
   Sparkles,
@@ -20,8 +13,11 @@ import {
   X,
 } from "lucide-react";
 
-import { CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
-import { PlaygroundErrorPanel } from "@/components/playground-error-panel";
+import {
+  ImagePlaygroundCompactKeyRow,
+  ImagePlaygroundResultArea,
+  ImagePlaygroundSettingsSidebar,
+} from "@/components/image-playground-toolbench";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,36 +37,24 @@ import {
   type ImageGenerationResponse,
 } from "@/lib/dmit/client";
 import {
-  hasGeneratedImageBase64,
   imagePlaygroundErrorMessage,
-  resolveGeneratedImageUrl,
   resolveImageCreatedAt,
 } from "@/lib/image-playground-display";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
 import {
-  formatImageCreditsAmount,
-  formatImageModelPriceForModelId,
-  formatImageModelSelectLabel,
-  formatImageReferenceYuanForModelId,
-} from "@/lib/model-pricing-display";
-import {
   getImageModelById,
   getImageModelCreditsPerRequest,
   IMAGE_PLAYGROUND_DEFAULT_MODEL,
-  IMAGE_PLAYGROUND_MODEL_IDS,
-  IMAGE_PLAYGROUND_SIZES,
   isAvailableImageModel,
   type ImagePlaygroundModelId,
   type ImagePlaygroundSize,
 } from "@/lib/model-catalog";
-import { formatCreditsPrecise, formatDateTime } from "@/lib/format";
 import {
   isFullTokfaiApiKey,
   IMAGE_PLAYGROUND_IMAGE_TO_IMAGE_PLACEHOLDER,
   IMAGE_PLAYGROUND_TEXT_TO_IMAGE_PLACEHOLDER,
   TOKFAI_API_KEY_PLACEHOLDER,
-  TOKFAI_IMAGES_GENERATIONS_FULL_PATH,
   TOKFAI_IMAGES_GENERATIONS_ENDPOINT,
 } from "@/lib/tokfai-api";
 import { buildImageGenerationCurl } from "@/lib/image-api-curl";
@@ -144,6 +128,7 @@ interface PlaygroundError {
   status: number;
   code?: string;
   message: string;
+  requestId?: string;
 }
 
 type KeyPanelView = "select" | "paste" | "empty";
@@ -227,10 +212,14 @@ export function ImagePlaygroundClient({
   accessToken,
   activeKeys,
   initialModel,
+  initialCreditsBalance = null,
+  creditsLoaded = false,
 }: {
   accessToken: string;
   activeKeys: ImagePlaygroundApiKeyOption[];
   initialModel?: string;
+  initialCreditsBalance?: number | null;
+  creditsLoaded?: boolean;
 }) {
   const { t, locale } = useI18n();
   const router = useRouter();
@@ -305,7 +294,6 @@ export function ImagePlaygroundClient({
       ? (sessionSecrets[createdBannerKeyId] ?? null)
       : null;
 
-  const inputImageCount = readyImageUrls.length;
   const hasInputImages = imageInputs.some((item) => item.status !== "error");
   const isImageToImage = hasInputImages;
   const promptPlaceholder = isImageToImage
@@ -313,8 +301,6 @@ export function ImagePlaygroundClient({
     : IMAGE_PLAYGROUND_TEXT_TO_IMAGE_PLACEHOLDER;
 
   const selectedModelCredits = getImageModelCreditsPerRequest(model);
-  const selectedModelPrice = formatImageModelPriceForModelId(model, locale);
-  const selectedModelReferencePrice = formatImageReferenceYuanForModelId(model, locale);
 
   const hasUploadingImages = imageInputs.some(
     (item) => item.status === "uploading" || item.status === "resolving"
@@ -543,11 +529,6 @@ export function ImagePlaygroundClient({
     }
   }
 
-  function focusPrompt() {
-    promptRef.current?.focus();
-    promptRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }
-
   async function handleCopyApiRequest() {
     const trimmedPrompt = prompt.trim() || IMAGE_PLAYGROUND_DEFAULT_PROMPT;
     const curl = buildImageGenerationCurl({
@@ -733,135 +714,61 @@ export function ImagePlaygroundClient({
       onDrop={(event) => {
         event.preventDefault();
       }}
-      className="flex min-w-0 flex-col gap-6"
+      className="flex min-w-0 flex-col gap-4"
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             {t("dashboard.imagePlayground.title")}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {formatMessage(t("dashboard.imagePlayground.subtitle"), {
-              endpoint: TOKFAI_IMAGES_GENERATIONS_FULL_PATH,
-            })}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t("dashboard.imagePlayground.usesOwnKey")}
+            {t("dashboard.imagePlayground.toolbenchSubtitle")}
           </p>
         </div>
         <Badge
           variant="secondary"
-          className="max-w-full shrink-0 self-start break-all font-mono text-xs sm:max-w-none"
+          className="max-w-full shrink-0 self-start break-all font-mono text-xs"
         >
           {TOKFAI_IMAGES_GENERATIONS_ENDPOINT}
         </Badge>
       </div>
 
-      <div className="flex items-start gap-2 rounded-md border border-blue-500/30 bg-blue-500/5 px-4 py-3 text-sm text-muted-foreground">
-        <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-        <span>{t("dashboard.imagePlayground.billingHint")}</span>
-      </div>
+      <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.35fr)_320px]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <ImagePlaygroundCompactKeyRow
+            keyPanelView={keyPanelView}
+            localKeys={localKeys}
+            selectedKey={selectedKey}
+            selectedKeyId={selectedKeyId}
+            apiKey={apiKey}
+            showApiKey={showApiKey}
+            creatingKey={creatingKey}
+            createKeyError={createKeyError}
+            createdSecret={createdSecret}
+            createdBannerKeyId={createdBannerKeyId}
+            loading={loading}
+            onCreateTestKey={handleCreateTestKey}
+            onKeyPanelViewChange={setKeyPanelView}
+            onSelectedKeyChange={setSelectedKeyId}
+            onApiKeyChange={setApiKey}
+            onShowApiKeyChange={setShowApiKey}
+            t={t}
+          />
 
-      <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <Card className="min-w-0">
-          <CardHeader>
-            <CardTitle>{t("dashboard.imagePlayground.request")}</CardTitle>
-            <CardDescription>{t("dashboard.imagePlayground.requestDesc")}</CardDescription>
-            <div className="mt-3 flex flex-col gap-1">
-              <Badge variant={isImageToImage ? "default" : "secondary"}>
-                {isImageToImage
-                  ? t("dashboard.imagePlayground.imageToImage")
-                  : t("dashboard.imagePlayground.textToImage")}
-              </Badge>
-              {isImageToImage ? (
-                <p className="text-xs text-muted-foreground">
-                  {t("dashboard.imagePlayground.inputImagesReference")}
-                </p>
-              ) : null}
-            </div>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div
-              className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(320px,0.9fr)_minmax(420px,1.1fr)] lg:gap-6"
-            >
-              <Card className="h-fit shadow-none">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <KeyRound className="h-4 w-4 text-muted-foreground" />
-                    {t("dashboard.playground.apiKey")}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <ApiKeySection
-                    embedded
-                    keyPanelView={keyPanelView}
-                    localKeys={localKeys}
-                    selectedKey={selectedKey}
-                    selectedKeyId={selectedKeyId}
-                    apiKey={apiKey}
-                    showApiKey={showApiKey}
-                    creatingKey={creatingKey}
-                    createKeyError={createKeyError}
-                    createdSecret={createdSecret}
-                    createdBannerKeyId={createdBannerKeyId}
-                    loading={loading}
-                    onCreateTestKey={handleCreateTestKey}
-                    onKeyPanelViewChange={setKeyPanelView}
-                    onSelectedKeyChange={setSelectedKeyId}
-                    onApiKeyChange={setApiKey}
-                    onShowApiKeyChange={setShowApiKey}
-                    onFocusPrompt={focusPrompt}
-                    t={t}
-                  />
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-none">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Upload className="h-4 w-4 text-muted-foreground" />
-                    {t("dashboard.imagePlayground.inputImagesTitle")}
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    {formatMessage(t("dashboard.imagePlayground.inputImagesDesc"), {
-                      max: MAX_PLAYGROUND_INPUT_IMAGES,
-                    })}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <ImageInputsPanel
-                    embedded
-                    imageInputs={imageInputs}
-                    imageUrlDraft={imageUrlDraft}
-                    loading={loading}
-                    fileInputRef={fileInputRef}
-                    onImageUrlDraftChange={setImageUrlDraft}
-                    onAddImageUrl={() => addImageUrl(imageUrlDraft)}
-                    onRemoveImage={removeImageInput}
-                    onPreviewError={markPreviewError}
-                    onPreviewReady={markPreviewReady}
-                    onUploadFiles={uploadFiles}
-                    onDropInvalid={reportDropError}
-                    onBrowseClick={() => fileInputRef.current?.click()}
-                    onFileInputChange={(event) => {
-                      if (event.target.files) {
-                        void uploadFiles(event.target.files);
-                        event.target.value = "";
-                      }
-                    }}
-                    t={t}
-                  />
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="prompt">Prompt</Label>
-              {isImageToImage ? (
-                <p className="text-xs text-muted-foreground">
-                  {t("dashboard.imagePlayground.imageToImageHint")}
-                </p>
-              ) : null}
+          <Card className="shadow-none">
+            <CardHeader className="pb-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="text-base">
+                  {t("dashboard.imagePlayground.toolbenchPromptTitle")}
+                </CardTitle>
+                <Badge variant={isImageToImage ? "default" : "secondary"}>
+                  {isImageToImage
+                    ? t("dashboard.imagePlayground.imageToImage")
+                    : t("dashboard.imagePlayground.textToImage")}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 pt-0">
               <PromptPresets
                 loading={loading}
                 onSelect={(presetId) =>
@@ -872,7 +779,7 @@ export function ImagePlaygroundClient({
               <textarea
                 ref={promptRef}
                 id="prompt"
-                rows={6}
+                rows={4}
                 required
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
@@ -880,15 +787,60 @@ export function ImagePlaygroundClient({
                 placeholder={promptPlaceholder}
                 className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               />
-            </div>
 
-            <div className="flex w-full min-w-0 flex-col items-stretch gap-2 sm:items-end">
+              <ImageInputsPanel
+                embedded
+                toolbench
+                imageInputs={imageInputs}
+                imageUrlDraft={imageUrlDraft}
+                loading={loading}
+                fileInputRef={fileInputRef}
+                onImageUrlDraftChange={setImageUrlDraft}
+                onAddImageUrl={() => addImageUrl(imageUrlDraft)}
+                onRemoveImage={removeImageInput}
+                onPreviewError={markPreviewError}
+                onPreviewReady={markPreviewReady}
+                onUploadFiles={uploadFiles}
+                onDropInvalid={reportDropError}
+                onBrowseClick={() => fileInputRef.current?.click()}
+                onFileInputChange={(event) => {
+                  if (event.target.files) {
+                    void uploadFiles(event.target.files);
+                    event.target.value = "";
+                  }
+                }}
+                t={t}
+              />
+
               {hasUploadingImages ? (
                 <p className="text-xs text-muted-foreground">
                   {t("dashboard.imagePlayground.waitingForImages")}
                 </p>
               ) : null}
-              <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                <Button
+                  type="submit"
+                  disabled={loading || hasUploadingImages || isModelComingSoon}
+                  className="w-full sm:w-auto"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {t("dashboard.imagePlayground.generating")}
+                    </>
+                  ) : hasUploadingImages ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {t("dashboard.imagePlayground.preparingImages")}
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      {t("dashboard.imagePlayground.generate")}
+                    </>
+                  )}
+                </Button>
                 <Button
                   type="button"
                   variant="outline"
@@ -908,164 +860,37 @@ export function ImagePlaygroundClient({
                     </>
                   )}
                 </Button>
-                <Button
-                  type="submit"
-                  disabled={loading || hasUploadingImages || isModelComingSoon}
-                  className="w-full sm:w-auto"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {t("dashboard.imagePlayground.generating")}
-                    </>
-                  ) : hasUploadingImages ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {t("dashboard.imagePlayground.preparingImages")}
-                    </>
-                  ) : (
-                    <>
-                      <ImageIcon className="h-4 w-4" />
-                      {t("dashboard.imagePlayground.generate")}
-                    </>
-                  )}
-                </Button>
               </div>
-              {selectedModelCredits != null ? (
-                <p className="text-xs font-medium text-foreground">
-                  {formatMessage(t("dashboard.imagePlayground.estimatedCost"), {
-                    credits: formatImageCreditsAmount(selectedModelCredits, locale),
-                  })}
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  {t("dashboard.imagePlayground.priceFallback")}
-                </p>
-              )}
-              {copyRequestStatus === "copied" ? (
-                <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                  {formatMessage(t("dashboard.imagePlayground.curlCopied"), {
-                    placeholder: TOKFAI_API_KEY_PLACEHOLDER,
-                  })}
-                </p>
-              ) : null}
-              <div className="flex w-full flex-col items-end gap-1 text-right">
-                <p className="text-xs text-muted-foreground">
-                  {formatMessage(t("dashboard.imagePlayground.inputImagesCount"), {
-                    count: inputImageCount,
-                  })}
-                </p>
-                {inputImageCount > 0 ? (
-                  <p className="max-w-md text-xs text-muted-foreground">
-                    {t("dashboard.imagePlayground.visualReferenceNote")}
-                  </p>
-                ) : null}
-              </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            <ResponsePanel
-              loading={loading}
-              error={error}
-              result={result}
-              completedAt={completedAt}
-              inputImagesCount={
-                result?.input_images_count ?? lastRequestInputCount
-              }
-              t={t}
-            />
-          </CardContent>
-        </Card>
+          <ImagePlaygroundResultArea
+            loading={loading}
+            error={error}
+            result={result}
+            completedAt={completedAt}
+            inputImagesCount={
+              result?.input_images_count ?? lastRequestInputCount
+            }
+            isImageToImage={isImageToImage}
+            t={t}
+          />
+        </div>
 
-        <Card className="min-w-0 lg:row-span-1">
-          <CardHeader>
-            <CardTitle>{t("dashboard.imagePlayground.settings")}</CardTitle>
-            <CardDescription>{t("dashboard.imagePlayground.settingsDesc")}</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="model">Model</Label>
-              <select
-                id="model"
-                value={model}
-                onChange={(e) => setModel(e.target.value as ImagePlaygroundModelId)}
-                disabled={loading}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {IMAGE_PLAYGROUND_MODEL_IDS.map((m) => (
-                  <option key={m} value={m}>
-                    {formatImageModelSelectLabel(m, locale)}
-                  </option>
-                ))}
-              </select>
-              {selectedModelPrice ? (
-                <p className="text-xs text-muted-foreground">
-                  {formatMessage(t("dashboard.imagePlayground.currentModelPrice"), {
-                    price: selectedModelPrice,
-                  })}
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  {t("dashboard.imagePlayground.priceFallback")}
-                </p>
-              )}
-              {selectedModelReferencePrice ? (
-                <p className="text-xs text-muted-foreground">
-                  {formatMessage(t("dashboard.imagePlayground.currentReferencePrice"), {
-                    price: selectedModelReferencePrice,
-                  })}
-                </p>
-              ) : null}
-              {selectedModelEntry?.description ? (
-                <p className="text-xs text-muted-foreground">
-                  {selectedModelEntry.description}
-                </p>
-              ) : null}
-              {isModelComingSoon ? (
-                <p className="text-xs font-medium text-destructive">
-                  {t("dashboard.imagePlayground.modelComingSoon")}
-                </p>
-              ) : null}
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="size">{t("dashboard.imagePlayground.size")}</Label>
-              <select
-                id="size"
-                value={size}
-                onChange={(e) => setSize(e.target.value as ImagePlaygroundSize)}
-                disabled={loading}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {IMAGE_PLAYGROUND_SIZES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              {t("dashboard.imagePlayground.needKey")}{" "}
-              <Link
-                href="/dashboard/api-keys"
-                className="underline underline-offset-4"
-              >
-                {t("dashboard.imagePlayground.createApiKey")}
-              </Link>
-              . {t("dashboard.imagePlayground.needCredits")}{" "}
-              <Link
-                href="/dashboard/credits"
-                className="underline underline-offset-4"
-              >
-                {t("dashboard.imagePlayground.topUp")}
-              </Link>
-              .
-            </p>
-          </CardContent>
-        </Card>
+        <ImagePlaygroundSettingsSidebar
+          model={model}
+          size={size}
+          loading={loading}
+          creditsBalance={initialCreditsBalance}
+          creditsLoaded={creditsLoaded}
+          estimatedCredits={selectedModelCredits}
+          isModelComingSoon={isModelComingSoon}
+          locale={locale}
+          onModelChange={setModel}
+          onSizeChange={setSize}
+          t={t}
+        />
       </div>
-
-      <ImagePlaygroundFooter t={t} />
     </form>
   );
 }
@@ -1112,6 +937,7 @@ function ImageInputsPanel({
   onBrowseClick,
   onFileInputChange,
   embedded = false,
+  toolbench = false,
   t,
 }: {
   imageInputs: ImageInputItem[];
@@ -1128,6 +954,7 @@ function ImageInputsPanel({
   onBrowseClick: () => void;
   onFileInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   embedded?: boolean;
+  toolbench?: boolean;
   t: (key: string) => string;
 }) {
   const atLimit = imageInputs.length >= MAX_PLAYGROUND_INPUT_IMAGES;
@@ -1203,7 +1030,9 @@ function ImageInputsPanel({
   };
 
   const shellClass = embedded
-    ? "flex flex-col gap-2"
+    ? toolbench
+      ? "flex flex-col gap-2"
+      : "flex flex-col gap-2"
     : "flex flex-col gap-3 rounded-md border bg-muted/20 p-4";
 
   return (
@@ -1227,7 +1056,9 @@ function ImageInputsPanel({
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        className={`flex flex-col items-center justify-center gap-1.5 rounded-md border border-dashed px-3 py-5 text-center transition-colors sm:py-6 ${
+        className={`flex flex-col items-center justify-center gap-1 rounded-md border border-dashed px-3 text-center transition-colors ${
+          toolbench ? "py-3" : "py-5 sm:py-6"
+        } ${
           isDragging
             ? "border-primary bg-primary/10 ring-2 ring-primary/30"
             : "border-muted-foreground/30 bg-muted/20"
@@ -1290,7 +1121,13 @@ function ImageInputsPanel({
       </div>
 
       {imageInputs.length > 0 ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
+        <div
+          className={
+            toolbench
+              ? "grid grid-cols-4 gap-1.5 sm:grid-cols-4"
+              : "grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2"
+          }
+        >
           {imageInputs.map((item) => (
             <ImageInputThumbnail
               key={item.id}
@@ -1427,531 +1264,6 @@ function formatUrlLabel(url: string): string {
   }
 }
 
-function ApiKeySection({
-  embedded = false,
-  keyPanelView,
-  localKeys,
-  selectedKey,
-  selectedKeyId,
-  apiKey,
-  showApiKey,
-  creatingKey,
-  createKeyError,
-  createdSecret,
-  createdBannerKeyId,
-  loading,
-  onCreateTestKey,
-  onKeyPanelViewChange,
-  onSelectedKeyChange,
-  onApiKeyChange,
-  onShowApiKeyChange,
-  onFocusPrompt,
-  t,
-}: {
-  keyPanelView: KeyPanelView;
-  localKeys: ImagePlaygroundApiKeyOption[];
-  selectedKey: ImagePlaygroundApiKeyOption | null;
-  selectedKeyId: string;
-  apiKey: string;
-  showApiKey: boolean;
-  creatingKey: boolean;
-  createKeyError: string | null;
-  createdSecret: string | null;
-  createdBannerKeyId: string | null;
-  loading: boolean;
-  onCreateTestKey: () => void;
-  onKeyPanelViewChange: (view: KeyPanelView) => void;
-  onSelectedKeyChange: (id: string) => void;
-  onApiKeyChange: (value: string) => void;
-  onShowApiKeyChange: (show: boolean) => void;
-  onFocusPrompt: () => void;
-  embedded?: boolean;
-  t: (key: string) => string;
-}) {
-  const { copiedId, copyText } = useCopyToClipboard();
-  const secretCopied = copiedId === "image-playground-created-secret";
-
-  const shellClass = embedded
-    ? "flex flex-col gap-3"
-    : "flex flex-col gap-4 rounded-md border bg-muted/20 p-4";
-
-  if (keyPanelView === "paste") {
-    return (
-      <div className={shellClass}>
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <KeyRound className="h-4 w-4 text-muted-foreground" />
-          {t("dashboard.playground.pasteKey")}
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="api-key">{t("dashboard.playground.fullApiKey")}</Label>
-          <div className="flex gap-2">
-            <Input
-              id="api-key"
-              type={showApiKey ? "text" : "password"}
-              autoComplete="off"
-              spellCheck={false}
-              placeholder={TOKFAI_API_KEY_PLACEHOLDER}
-              value={apiKey}
-              onChange={(e) => onApiKeyChange(e.target.value)}
-              disabled={loading}
-              className="font-mono"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              disabled={loading}
-              aria-label={
-                showApiKey
-                  ? t("dashboard.playground.hideKey")
-                  : t("dashboard.playground.showKey")
-              }
-              onClick={() => onShowApiKeyChange(!showApiKey)}
-            >
-              {showApiKey ? (
-                <EyeOff className="h-4 w-4" />
-              ) : (
-                <Eye className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {t("dashboard.playground.pasteKeySecurityHint")}
-          </p>
-        </div>
-        {localKeys.length > 0 ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={loading}
-            className="w-fit"
-            onClick={() => onKeyPanelViewChange("select")}
-          >
-            {t("dashboard.playground.selectKey")}
-          </Button>
-        ) : null}
-      </div>
-    );
-  }
-
-  if (keyPanelView === "empty" || localKeys.length === 0) {
-    return (
-      <div
-        className={
-          embedded
-            ? "flex flex-col gap-3"
-            : "flex flex-col gap-4 rounded-md border border-dashed bg-muted/20 p-4"
-        }
-      >
-        <div className="flex items-start gap-2">
-          {!embedded ? (
-            <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-          ) : null}
-          <div className="flex flex-col gap-1">
-            <p className="text-sm font-medium">
-              {t("dashboard.imagePlayground.noKeyTitle")}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {t("dashboard.imagePlayground.noKeyBody")}
-            </p>
-          </div>
-        </div>
-        {createKeyError ? (
-          <p className="text-sm text-destructive">{createKeyError}</p>
-        ) : null}
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            size="sm"
-            disabled={loading || creatingKey}
-            onClick={onCreateTestKey}
-          >
-            {creatingKey ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("dashboard.imagePlayground.creatingTestKey")}
-              </>
-            ) : (
-              t("dashboard.imagePlayground.createTestKey")
-            )}
-          </Button>
-          <Button asChild type="button" size="sm" variant="outline">
-            <Link href="/dashboard/api-keys">
-              {t("dashboard.imagePlayground.goToApiKeys")}
-            </Link>
-          </Button>
-        </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className="h-auto w-fit px-0 text-xs text-muted-foreground"
-          disabled={loading}
-          onClick={() => onKeyPanelViewChange("paste")}
-        >
-          {t("dashboard.playground.pasteOtherKey")}
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className={shellClass}>
-      {!embedded ? (
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <KeyRound className="h-4 w-4 text-muted-foreground" />
-          {t("dashboard.playground.apiKey")}
-        </div>
-      ) : null}
-
-      {createdSecret && createdBannerKeyId === selectedKeyId ? (
-        <CreatedKeyBanner
-          secret={createdSecret}
-          secretCopied={secretCopied}
-          onCopy={() =>
-            copyText("image-playground-created-secret", createdSecret)
-          }
-          onTestNow={onFocusPrompt}
-          t={t}
-        />
-      ) : null}
-
-      {selectedKey ? (
-        <p className="text-sm text-muted-foreground">
-          {formatMessage(t("dashboard.playground.currentKeySelection"), {
-            name: selectedKey.name,
-            prefix: selectedKey.prefix || "sk-tokfai",
-          })}
-        </p>
-      ) : null}
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="api-key-select">{t("dashboard.playground.selectKey")}</Label>
-        <select
-          id="api-key-select"
-          value={selectedKeyId}
-          onChange={(e) => onSelectedKeyChange(e.target.value)}
-          disabled={loading}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {localKeys.map((row) => (
-            <option key={row.id} value={row.id}>
-              {row.name} ({row.prefix || "no prefix"})
-            </option>
-          ))}
-        </select>
-        <p className="text-xs text-muted-foreground">
-          {t("dashboard.playground.secretNotStored")}
-        </p>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={loading}
-          onClick={() => onKeyPanelViewChange("paste")}
-        >
-          {t("dashboard.playground.pasteOtherKey")}
-        </Button>
-        <Button asChild type="button" size="sm" variant="outline">
-          <Link href="/dashboard/api-keys">
-            {t("dashboard.playground.manageApiKeys")}
-          </Link>
-        </Button>
-      </div>
-
-      <p className="text-xs text-muted-foreground">
-        {t("dashboard.playground.manageApiKeysHint")}
-      </p>
-    </div>
-  );
-}
-
-function CreatedKeyBanner({
-  secret,
-  secretCopied,
-  onCopy,
-  onTestNow,
-  t,
-}: {
-  secret: string;
-  secretCopied: boolean;
-  onCopy: () => void;
-  onTestNow: () => void;
-  t: (key: string) => string;
-}) {
-  return (
-    <div className="flex flex-col gap-3 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4">
-      <div className="flex items-start gap-2 text-sm text-emerald-800 dark:text-emerald-200">
-        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-        <span>{t("dashboard.playground.testKeyCreated")}</span>
-      </div>
-      <code className="break-all rounded-md border bg-background px-3 py-2 font-mono text-sm">
-        {secret}
-      </code>
-      <p className="text-xs text-muted-foreground">
-        {t("dashboard.playground.secretOnceHint")}
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <CopyButton
-          copied={secretCopied}
-          onCopy={onCopy}
-          copyLabel={t("dashboard.playground.copySecret")}
-          copiedLabel={t("dashboard.playground.copied")}
-        />
-        <Button type="button" size="sm" variant="outline" onClick={onTestNow}>
-          {t("dashboard.playground.testNow")}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function ResponsePanel({
-  loading,
-  error,
-  result,
-  completedAt,
-  inputImagesCount,
-  t,
-}: {
-  loading: boolean;
-  error: PlaygroundError | null;
-  result: ImageGenerationResponse | null;
-  completedAt: string | null;
-  inputImagesCount: number | null | undefined;
-  t: (key: string) => string;
-}) {
-  if (loading) {
-    return (
-      <div className="flex items-center gap-2 rounded-md border bg-muted/40 p-4 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        {t("dashboard.imagePlayground.generatingImage")}
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <PlaygroundErrorPanel scope="imagePlayground" error={error} t={t} />
-    );
-  }
-
-  if (!result) {
-    return (
-      <div className="flex items-center gap-2 rounded-md border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
-        <Sparkles className="h-4 w-4" />
-        {t("dashboard.imagePlayground.generatedImagePlaceholder")}
-      </div>
-    );
-  }
-
-  const imageUrl = resolveGeneratedImageUrl(result);
-  const base64Only = !imageUrl && hasGeneratedImageBase64(result);
-  const creditsCharged = resolveImageCreditsCharged(result);
-  const createdAt =
-    completedAt ?? resolveImageCreatedAt(result) ?? null;
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
-        <div className="flex items-start gap-2">
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-          <div className="flex flex-col gap-1">
-            {creditsCharged != null ? (
-              <p>
-                {formatMessage(t("dashboard.imagePlayground.successCreditsCharged"), {
-                  credits: formatCreditsPrecise(creditsCharged),
-                })}
-              </p>
-            ) : (
-              <p>{t("dashboard.imagePlayground.successNoCreditsHint")}</p>
-            )}
-            <p className="text-muted-foreground">
-              {t("dashboard.imagePlayground.successBalanceHint")}{" "}
-              <Link
-                href="/dashboard/usage"
-                className="underline underline-offset-4"
-              >
-                {t("dashboard.imagePlayground.viewUsage")}
-              </Link>{" "}
-              /{" "}
-              <Link
-                href="/dashboard/credits"
-                className="underline underline-offset-4"
-              >
-                {t("dashboard.imagePlayground.viewCredits")}
-              </Link>
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {imageUrl ? (
-        <div className="overflow-hidden rounded-md border bg-muted/20">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={imageUrl}
-            alt="Generated image"
-            className="mx-auto max-h-[min(480px,70vh)] w-full max-w-full object-contain"
-          />
-        </div>
-      ) : base64Only ? (
-        <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-muted-foreground">
-          {t("dashboard.imagePlayground.base64OnlyHint")}
-        </div>
-      ) : (
-        <div className="rounded-md border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
-          {t("dashboard.imagePlayground.generatedImagePlaceholder")}
-        </div>
-      )}
-
-      <MetadataPanel
-        result={result}
-        imageUrl={imageUrl}
-        createdAt={createdAt}
-        inputImagesCount={inputImagesCount ?? result.input_images_count ?? 0}
-        t={t}
-      />
-    </div>
-  );
-}
-
-function resolveImageCreditsCharged(
-  result: ImageGenerationResponse
-): number | null {
-  const raw = result.credits_charged;
-  if (raw == null) return null;
-  const value = typeof raw === "number" ? raw : Number(raw);
-  if (!Number.isFinite(value) || value <= 0) return null;
-  return value;
-}
-
-function MetadataPanel({
-  result,
-  imageUrl,
-  createdAt,
-  inputImagesCount,
-  t,
-}: {
-  result: ImageGenerationResponse;
-  imageUrl: string | null;
-  createdAt: string | null;
-  inputImagesCount: number;
-  t: (key: string) => string;
-}) {
-  const { copiedId, copyText } = useCopyToClipboard();
-  const urlCopyId = "image-playground-url";
-  const requestCopyId = "image-playground-request-id";
-
-  const creditsCharged = resolveImageCreditsCharged(result);
-
-  return (
-    <div className="flex flex-col gap-3 rounded-md border bg-card p-4">
-      {imageUrl ? (
-        <div className="flex flex-col gap-2">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-            {t("dashboard.imagePlayground.metaImageUrl")}
-          </Label>
-          <code className="block overflow-x-auto rounded-md border bg-muted/40 p-3 font-mono text-xs break-all">
-            {imageUrl}
-          </code>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild type="button" size="sm" variant="outline" className="w-fit">
-              <a href={imageUrl} download target="_blank" rel="noopener noreferrer">
-                {t("dashboard.imagePlayground.downloadImage")}
-              </a>
-            </Button>
-            <CopyButton
-              copied={copiedId === urlCopyId}
-              onCopy={() => copyText(urlCopyId, imageUrl)}
-              copyLabel={t("dashboard.imagePlayground.copyImageUrl")}
-              copiedLabel={t("dashboard.imagePlayground.copiedImageUrl")}
-            />
-          </div>
-        </div>
-      ) : null}
-
-      <dl className="grid gap-2 text-sm">
-        <div className="flex flex-wrap gap-x-2">
-          <dt className="text-muted-foreground">
-            {t("dashboard.imagePlayground.metaModel")}
-          </dt>
-          <dd className="font-mono">{result.model}</dd>
-        </div>
-        {createdAt ? (
-          <div className="flex flex-wrap gap-x-2">
-            <dt className="text-muted-foreground">
-              {t("dashboard.imagePlayground.metaCreatedAt")}
-            </dt>
-            <dd className="font-mono">{formatDateTime(createdAt)}</dd>
-          </div>
-        ) : null}
-        {creditsCharged != null ? (
-          <div className="flex flex-wrap gap-x-2">
-            <dt className="text-muted-foreground">
-              {t("dashboard.imagePlayground.metaCreditsCharged")}
-            </dt>
-            <dd className="font-mono">{formatCreditsPrecise(creditsCharged)}</dd>
-          </div>
-        ) : null}
-        <div className="flex flex-wrap gap-x-2">
-          <dt className="text-muted-foreground">
-            {t("dashboard.imagePlayground.metaInputImages")}
-          </dt>
-          <dd className="font-mono">{inputImagesCount}</dd>
-        </div>
-        {result.request_id ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <dt className="text-muted-foreground">
-              {t("dashboard.imagePlayground.metaRequestId")}
-            </dt>
-            <dd className="font-mono break-all">{result.request_id}</dd>
-            <CopyButton
-              copied={copiedId === requestCopyId}
-              onCopy={() => copyText(requestCopyId, result.request_id!)}
-              copyLabel={t("dashboard.imagePlayground.copyRequestId")}
-              copiedLabel={t("dashboard.imagePlayground.copiedRequestId")}
-              size="icon"
-            />
-          </div>
-        ) : null}
-      </dl>
-    </div>
-  );
-}
-
-function ImagePlaygroundFooter({ t }: { t: (key: string) => string }) {
-  const links = [
-    { href: "/dashboard/usage", label: t("dashboard.imagePlayground.viewUsage") },
-    {
-      href: "/dashboard/credits",
-      label: t("dashboard.imagePlayground.viewCredits"),
-    },
-    {
-      href: "/dashboard/models",
-      label: t("dashboard.imagePlayground.viewModels"),
-    },
-    {
-      href: "/dashboard/api-keys",
-      label: t("dashboard.playground.manageApiKeys"),
-    },
-  ] as const;
-
-  return (
-    <div className="flex flex-wrap gap-2 border-t pt-4">
-      {links.map((link) => (
-        <Button key={link.href} asChild variant="outline" size="sm">
-          <Link href={link.href}>{link.label}</Link>
-        </Button>
-      ))}
-    </div>
-  );
-}
-
 class PlaygroundValidationError extends Error {
   readonly code: string;
 
@@ -2003,6 +1315,7 @@ function toPlaygroundError(
         t,
         err.message
       ),
+      requestId: extractDmitRequestId(err.body),
     };
   }
   if (err instanceof TypeError) {
@@ -2024,6 +1337,21 @@ function toPlaygroundError(
     code: "unknown_error",
     message: imagePlaygroundErrorMessage(503, undefined, t),
   };
+}
+
+function extractDmitRequestId(body: unknown): string | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const record = body as Record<string, unknown>;
+  if (typeof record.request_id === "string") return record.request_id;
+  const nested = record.error;
+  if (
+    nested &&
+    typeof nested === "object" &&
+    typeof (nested as { request_id?: string }).request_id === "string"
+  ) {
+    return (nested as { request_id: string }).request_id;
+  }
+  return undefined;
 }
 
 function playgroundErrorMessage(

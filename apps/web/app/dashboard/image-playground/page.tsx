@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { loginPathWithNext } from "@/lib/auth/login-redirect";
 import { dmitServerFetch } from "@/lib/dmit/server";
+import { loadDashboardShellCredits } from "@/lib/load-dashboard-shell-credits";
 import { createClient } from "@/lib/supabase/server";
 
 import {
@@ -38,12 +39,15 @@ export default async function ImagePlaygroundPage({
 
   const accessToken = session?.access_token ?? "";
   const activeKeys = accessToken ? await loadActiveKeys(accessToken) : [];
+  const shellCredits = await loadDashboardShellCredits(user.id);
 
   return (
     <ImagePlaygroundClient
       accessToken={accessToken}
       activeKeys={activeKeys}
       initialModel={searchParams?.model}
+      initialCreditsBalance={shellCredits.balance}
+      creditsLoaded={shellCredits.loaded}
     />
   );
 }

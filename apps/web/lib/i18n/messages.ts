@@ -813,6 +813,20 @@ export const messages = {
       },
       imagePlayground: {
         title: "Image Playground",
+        toolbenchSubtitle:
+          "Prompt → optional reference images → Generate. Charged only on successful API responses.",
+        toolbenchCurrentKey: "Current API Key",
+        toolbenchNoKey: "Create an API Key to call the Image API from your account.",
+        toolbenchSettings: "Generation settings",
+        toolbenchSettingsDesc: "Default model works for most tests. Change size if needed.",
+        toolbenchModelLabel: "Model",
+        toolbenchModelHint: "Recommended default — switch only if you need a specific image model.",
+        toolbenchInsufficientCredits: "Insufficient credits — top up before generating.",
+        toolbenchBillingNote: "Successful generations debit credits. Failed calls are usually not charged.",
+        toolbenchPromptTitle: "Prompt & reference images",
+        toolbenchResultPlaceholder: "Your generated image will appear here",
+        toolbenchResultEmptyDesc: "Sample result area — run a test to preview billing and request_id.",
+        toolbenchResultSampleHint: "Try a preset prompt or upload a reference image for image-to-image.",
         subtitle:
           "Test text-to-image and image-to-image through {endpoint}. Drag images, paste URLs, or use prompt-only for text-to-image. Successful generations debit credits. Failed calls are not charged.",
         usesOwnKey:
@@ -2866,6 +2880,20 @@ export const messages = {
       },
       imagePlayground: {
         title: "Image Playground",
+        toolbenchSubtitle:
+          "输入 Prompt → 可选参考图 → 生成。仅成功响应才扣费。",
+        toolbenchCurrentKey: "当前 API Key",
+        toolbenchNoKey: "创建 API Key 后即可从你的账户调用 Image API。",
+        toolbenchSettings: "生成设置",
+        toolbenchSettingsDesc: "默认模型可直接体验，按需调整尺寸。",
+        toolbenchModelLabel: "模型",
+        toolbenchModelHint: "推荐默认模型——仅在需要特定图像模型时切换。",
+        toolbenchInsufficientCredits: "余额不足——请先充值再生成。",
+        toolbenchBillingNote: "成功生成会扣 credits，失败通常不扣费。",
+        toolbenchPromptTitle: "Prompt 与参考图",
+        toolbenchResultPlaceholder: "生成的图片将显示在这里",
+        toolbenchResultEmptyDesc: "示例结果区——运行测试后可查看扣费与 request_id。",
+        toolbenchResultSampleHint: "试试预设 Prompt，或上传参考图进行图生图。",
         subtitle:
           "通过 {endpoint} 测试文生图与图生图。可拖拽图片、粘贴 URL，或仅用 prompt 文生图。成功生成会扣费，失败不扣费。",
         usesOwnKey: "使用你的 sk-tokfai_ 密钥——与外部客户端相同路径。",
