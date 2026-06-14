@@ -47,7 +47,11 @@ import {
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
 import { DashboardFirstRunOnboardingCard } from "@/components/dashboard-first-run-onboarding";
-import { chatCompletionsCurl } from "@/lib/customer-integration-snippets";
+import { CopyableSnippetField } from "@/components/copyable-snippet-field";
+import {
+  authorizationHeader,
+  chatCompletionsCurl,
+} from "@/lib/customer-integration-snippets";
 import {
   TOKFAI_API_BASE_URL,
   TOKFAI_API_KEY_PLACEHOLDER,
@@ -388,18 +392,19 @@ function OneTimeSecretCard({
   t: (key: string) => string;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
-  const [curlCopied, setCurlCopied] = useState(false);
+  const [snippetCopiedId, setSnippetCopiedId] = useState<string | null>(null);
   const curlExample = chatCompletionsCurl(secret, TOKFAI_RECOMMENDED_MODEL);
+  const authHeaderValue = authorizationHeader(secret);
 
   useEffect(() => {
     cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [secret]);
 
-  async function handleCopyCurl() {
-    const ok = await copyToClipboard(curlExample);
+  async function handleSnippetCopy(id: string, value: string) {
+    const ok = await copyToClipboard(value);
     if (ok) {
-      setCurlCopied(true);
-      window.setTimeout(() => setCurlCopied(false), 2000);
+      setSnippetCopiedId(id);
+      window.setTimeout(() => setSnippetCopiedId(null), 2000);
     }
   }
 
@@ -438,14 +443,16 @@ function OneTimeSecretCard({
           </code>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <Label className="text-xs uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
-              {t("dashboard.apiKeys.baseUrlLabel")}
-            </Label>
-            <code className="block rounded-md border border-emerald-200 bg-white p-3 font-mono text-xs dark:border-emerald-800 dark:bg-background">
-              {TOKFAI_API_BASE_URL}
-            </code>
-          </div>
+          <CopyableSnippetField
+            label={t("dashboard.apiKeys.baseUrlLabel")}
+            value={TOKFAI_API_BASE_URL}
+            copyId="base-url"
+            copiedId={snippetCopiedId}
+            onCopy={handleSnippetCopy}
+            copyLabel={t("dashboard.apiKeys.copyBaseUrl")}
+            copiedLabel={t("dashboard.apiKeys.copied")}
+            className="[&_code]:border-emerald-200 [&_code]:bg-white dark:[&_code]:border-emerald-800 dark:[&_code]:bg-background"
+          />
           <div className="flex flex-col gap-2">
             <Label className="text-xs uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
               {t("dashboard.apiKeys.recommendedModelLabel")}
@@ -455,22 +462,26 @@ function OneTimeSecretCard({
             </code>
           </div>
         </div>
-        <div className="flex flex-col gap-2">
-          <Label className="text-xs uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
-            {t("dashboard.apiKeys.authorizationHeader")}
-          </Label>
-          <code className="block overflow-x-auto rounded-md border border-emerald-200 bg-white p-3 font-mono text-xs leading-relaxed text-foreground dark:border-emerald-800 dark:bg-background">
-            Authorization: Bearer {secret}
-          </code>
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label className="text-xs uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
-            {t("dashboard.apiKeys.curlExampleLabel")}
-          </Label>
-          <code className="block max-h-48 overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-emerald-200 bg-white p-3 font-mono text-xs leading-relaxed text-foreground dark:border-emerald-800 dark:bg-background">
-            {curlExample}
-          </code>
-        </div>
+        <CopyableSnippetField
+          label={t("dashboard.apiKeys.authorizationHeader")}
+          value={authHeaderValue}
+          copyId="auth-header"
+          copiedId={snippetCopiedId}
+          onCopy={handleSnippetCopy}
+          copyLabel={t("dashboard.apiKeys.copyAuthHeader")}
+          copiedLabel={t("dashboard.apiKeys.copied")}
+          className="[&_code]:border-emerald-200 [&_code]:bg-white dark:[&_code]:border-emerald-800 dark:[&_code]:bg-background"
+        />
+        <CopyableSnippetField
+          label={t("dashboard.apiKeys.curlExampleLabel")}
+          value={curlExample}
+          copyId="curl-test"
+          copiedId={snippetCopiedId}
+          onCopy={handleSnippetCopy}
+          copyLabel={t("dashboard.apiKeys.copyCurl")}
+          copiedLabel={t("dashboard.apiKeys.copied")}
+          className="[&_code]:max-h-48 [&_code]:whitespace-pre-wrap [&_code]:break-all [&_code]:border-emerald-200 [&_code]:bg-white dark:[&_code]:border-emerald-800 dark:[&_code]:bg-background"
+        />
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <Button type="button" className="w-full sm:w-auto" onClick={onCopy}>
             {copyStatus === "copied" ? (
@@ -482,24 +493,6 @@ function OneTimeSecretCard({
               <>
                 <Copy className="h-4 w-4" />
                 {t("dashboard.apiKeys.copyFullKey")}
-              </>
-            )}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full sm:w-auto"
-            onClick={handleCopyCurl}
-          >
-            {curlCopied ? (
-              <>
-                <Check className="h-4 w-4" />
-                {t("dashboard.apiKeys.copied")}
-              </>
-            ) : (
-              <>
-                <Copy className="h-4 w-4" />
-                {t("dashboard.apiKeys.copyCurl")}
               </>
             )}
           </Button>

@@ -5,5 +5,9 @@ export const metadata = {
 };
 
 export default function DashboardDocsPage() {
-  return <CustomerIntegrationGuide showDashboardLinks />;
+  return (
+    <div className="w-full max-w-none">
+      <CustomerIntegrationGuide showDashboardLinks />
+    </div>
+  );
 }

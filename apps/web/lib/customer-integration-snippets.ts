@@ -80,6 +80,20 @@ Base URL: https://api.tokfai.com/v1
 API Key: sk-tokfai_xxx
 Model: ${TOKFAI_RECOMMENDED_MODEL}`;
 
+export const CHERRY_STUDIO_CONFIG_SNIPPET = `Provider: OpenAI Compatible
+API Host: https://api.tokfai.com/v1
+API Key: sk-tokfai_xxx
+Model: ${TOKFAI_RECOMMENDED_MODEL}`;
+
+export const OPENAI_SDK_CONFIG_SNIPPET = `Base URL: https://api.tokfai.com/v1
+API Key: sk-tokfai_xxx
+Model: ${TOKFAI_RECOMMENDED_MODEL}
+Authorization header: Bearer sk-tokfai_xxx`;
+
+export function authorizationHeader(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
+  return `Authorization: Bearer ${apiKey}`;
+}
+
 export const BATCH_CHAT_CURL = `curl https://api.tokfai.com/v1/batches/chat \\
   -H "Authorization: Bearer sk-tokfai_xxx" \\
   -H "Content-Type: application/json" \\

@@ -22,6 +22,11 @@ export function formatCredits(value: number | null | undefined): string {
   return `${CREDITS.format(value ?? 0)} credits`;
 }
 
+/** Numeric credits amount for shell labels (no "credits" suffix). */
+export function formatCreditBalanceNumber(value: number | null | undefined): string {
+  return CREDITS.format(value ?? 0);
+}
+
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);

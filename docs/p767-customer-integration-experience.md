@@ -162,6 +162,119 @@ Sign-off:
 
 ---
 
+## P767.2 — Wording polish & copyable configs
+
+### Deliverables
+
+| Item | Location |
+| --- | --- |
+| Product essentials bullets (unified wording) | `customer-integration-guide.tsx` |
+| Copy config / Copy curl on Cursor, Cherry, OpenAI SDK | `CopyConfigAction` + `CodeBlock` |
+| API Keys success card copy fields | `CopyableSnippetField` in `api-keys-client.tsx` |
+| Snippet helpers | `customer-integration-snippets.ts` (`authorizationHeader`, config snippets) |
+| i18n | `integration.copyConfig`, `integration.copyCurl`, `integration.essential*`, `dashboard.apiKeys.copyBaseUrl`, `copyAuthHeader` |
+
+### Unified customer wording
+
+- Base URL: `https://api.tokfai.com/v1`
+- Recommended model: `auto-fast`
+- One API key can route multiple upstream models
+- Successful requests are charged; failed upstream requests are generally not charged
+- Use `request_id` to trace Usage and Credits
+
+### API Keys post-create copy actions
+
+| Button | Copies |
+| --- | --- |
+| Copy Base URL | `https://api.tokfai.com/v1` |
+| Copy Authorization header | `Authorization: Bearer <full secret>` |
+| Copy curl test | Pre-filled `chat/completions` curl with user's secret |
+| Copy full key | Full `sk-tokfai_…` secret |
+
+### P767.2 acceptance checklist
+
+| # | Check |
+| --- | --- |
+| 1 | `npm run typecheck` + `npm run build` (web) |
+| 2 | `/dashboard/docs`: essentials bullets + Copy config / Copy curl on Cursor, Cherry, SDK |
+| 3 | `/dashboard/api-keys`: post-create card Copy Base URL / Auth header / curl test work |
+| 4 | No raw i18n keys on docs or API Keys pages |
+| 5 | No billing / Stripe / webhook / ledger / DMIT API changes |
+
+### P767.2 acceptance record
+
+```text
+Date:
+Operator:
+/dashboard/docs Copy config + Copy curl (Cursor / Cherry / SDK): pass / fail
+/dashboard/api-keys copy fields (Base URL / Auth / curl): pass / fail
+npm run typecheck: pass / fail
+npm run build: pass / fail
+i18n raw keys observed: none / list
+Sign-off:
+```
+
+---
+
+## P767.3 — Dashboard shell credits visibility & sticky navigation
+
+### Deliverables
+
+| Item | Location |
+| --- | --- |
+| Shell credits loader (profiles RLS read) | `apps/web/lib/dashboard-shell-credits.ts` |
+| Header + sidebar credits UI | `apps/web/components/dashboard-credits-balance.tsx` |
+| Sticky header (always sticky on desktop) | `apps/web/components/dashboard-header.tsx` |
+| Sidebar credits badge + bottom summary | `apps/web/components/dashboard-nav.tsx` |
+| Docs TOC sticky offset | `customer-integration-guide.tsx` |
+| i18n | `dashboard.shell.*` (EN + ZH) |
+
+### Behavior
+
+| Surface | Display |
+| --- | --- |
+| Top bar | `Credits: {balance}` / `积分：{balance}` + Top up / 充值 |
+| Load failure | `Credits: —` — page functions normally |
+| Low balance (`< 1` credit) | `Low credits` / `积分较低` badge |
+| Sidebar Credits nav | Label + monospace balance under menu item |
+| Sidebar footer | Compact balance card + top up link |
+
+### Layout
+
+- Dashboard sidebar: `sticky top-0 h-svh` — does not scroll away
+- Top header: `sticky top-0` on all breakpoints (removed `md:static`)
+- Docs in-page TOC: `sticky top-20` with scrollable max-height
+
+No billing / Stripe / webhook / ledger / DMIT debit logic changes.
+
+### P767.3 acceptance checklist
+
+| # | Check |
+| --- | --- |
+| 1 | `npm run typecheck` + `npm run build` (web) |
+| 2 | `/dashboard`, `/dashboard/api-keys`, `/dashboard/docs`, `/dashboard/playground`, `/dashboard/credits` show header balance |
+| 3 | Sidebar fixed on desktop; docs TOC sticky while scrolling |
+| 4 | EN / ZH switch — no raw i18n keys |
+| 5 | Credits load failure shows `—` without breaking page |
+| 6 | No billing / Stripe / webhook / ledger / DMIT changes |
+
+### P767.3 acceptance record
+
+```text
+Date:
+Operator:
+Header credits visible on all dashboard routes: pass / fail
+Sidebar fixed + credits badge/footer: pass / fail
+Docs scroll — header + TOC sticky: pass / fail
+Low credits hint (< 1): pass / fail
+i18n EN/ZH: pass / fail
+npm run typecheck: pass / fail
+npm run build: pass / fail
+Sign-off:
+```
+
+---
+
 ## Related
 
 - [P766.3 API key recovery](./p766-3-api-key-production-recovery.md)

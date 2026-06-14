@@ -253,9 +253,10 @@ export const messages = {
           "Create a key, test in Playground, read the integration guide, then confirm usage and credits.",
         highlightBaseUrl: "Base URL: {baseUrl}",
         highlightModel: "Recommended model: {model}",
-        highlightOneKey: "One API key works across multiple models.",
+        highlightOneKey:
+          "One API key can route multiple upstream models.",
         highlightRequestId:
-          "Usage and credits are traceable by request_id in Dashboard → Usage.",
+          "Use request_id to trace Usage and Credits in the dashboard.",
         flowStep1: "Create an API key and copy the full sk-tokfai_… secret.",
         flowStep2: "Send a test chat in Playground with model auto-fast.",
         flowStep3:
@@ -270,6 +271,12 @@ export const messages = {
         viewIntegrationDocs: "View integration docs",
         allComplete:
           "First-run setup complete — your key, test call, and usage trail are ready.",
+      },
+      shell: {
+        creditsWithBalance: "Credits: {balance}",
+        sidebarCreditsLabel: "Credits balance",
+        lowCredits: "Low credits",
+        topUp: "Top up",
       },
       announcements: {
         announcements: "Announcements",
@@ -579,8 +586,10 @@ export const messages = {
         cherryStudioGuide: "Cherry Studio guide",
         baseUrlLabel: "Base URL",
         recommendedModelLabel: "Recommended model",
-        curlExampleLabel: "curl example (ready to run)",
-        copyCurl: "Copy curl",
+        curlExampleLabel: "curl test (ready to run)",
+        copyBaseUrl: "Copy Base URL",
+        copyAuthHeader: "Copy Authorization header",
+        copyCurl: "Copy curl test",
         createApiKey: "Create API key",
         createApiKeyDesc:
           "Optional name for your reference. Leave blank to use the default name.",
@@ -1448,7 +1457,15 @@ export const messages = {
       pageSubtitle:
         "Tokfai is an OpenAI-compatible AI gateway. Use one API key, one base URL, and the same request format as OpenAI.",
       valueProps:
-        "One key, multiple models, smart routing, usage tracking, and credit billing — without managing upstream providers yourself.",
+        "Tokfai is an OpenAI-compatible AI gateway — one key, smart routing, usage tracking, and credit billing.",
+      essentialBaseUrl: "Base URL: {baseUrl}",
+      essentialModel: "Recommended model: {model}",
+      essentialOneKey:
+        "One API key can route multiple upstream models.",
+      essentialBilling:
+        "Successful requests are charged; failed upstream requests are generally not charged.",
+      essentialRequestId:
+        "Use request_id to trace Usage and Credits in the dashboard.",
       navTitle: "Contents",
       navQuickStart: "Quick Start",
       navCurl: "curl examples",
@@ -1511,11 +1528,13 @@ export const messages = {
       meaningColumn: "What to do",
       billingTitle: "Billing & Usage",
       billingDesc:
-        "Credits are debited on successful API calls. Monitor balance and per-request usage in the dashboard.",
+        "Monitor balance and per-request usage in Dashboard → Usage and Credits.",
+      billingSuccessNote:
+        "Successful API requests debit credits according to model pricing and token usage.",
       billingFailedNote:
-        "Failed requests (upstream busy, timeout, auth errors, etc.) are recorded for troubleshooting and are generally not charged.",
+        "Failed upstream requests (busy, timeout, auth errors, etc.) are recorded for troubleshooting and are generally not charged.",
       billingRequestIdNote:
-        "Every response includes request_id — match it in Dashboard → Usage to verify tokens and credits_charged.",
+        "Every response includes request_id — match it in Dashboard → Usage and Credits to verify tokens and credits_charged.",
       linkUsage: "Open Usage",
       linkCredits: "Open Credits",
       batchTitle: "Batch API guide",
@@ -1527,6 +1546,9 @@ export const messages = {
       footerDocsLink: "Extended API reference",
       copy: "Copy",
       copied: "Copied",
+      copyConfig: "Copy config",
+      copyCurl: "Copy curl",
+      copyCode: "Copy code",
       error: {
         missing_token: "Send Authorization: Bearer sk-tokfai_… on every request.",
         invalid_token: "Check the key is complete, active, and not revoked.",
@@ -2246,9 +2268,9 @@ export const messages = {
           "创建密钥 → Playground 测试 → 阅读接入指南 → 在 Usage 核对用量与积分。",
         highlightBaseUrl: "Base URL：{baseUrl}",
         highlightModel: "推荐模型：{model}",
-        highlightOneKey: "一把 API Key 可调用多个模型。",
+        highlightOneKey: "一把 API Key 可路由多个上游模型。",
         highlightRequestId:
-          "用量与积分可通过 request_id 在 Dashboard → Usage 中追溯。",
+          "使用 request_id 在控制台追溯 Usage 与 Credits。",
         flowStep1: "创建 API Key 并复制完整 sk-tokfai_… secret。",
         flowStep2: "在 Playground 用 auto-fast 发送一次对话测试。",
         flowStep3: "阅读接入指南（Cursor 或 Cherry Studio 章节）。",
@@ -2262,6 +2284,12 @@ export const messages = {
         viewIntegrationDocs: "查看接入文档",
         allComplete:
           "首次接入已完成——密钥、测试调用与用量记录已就绪。",
+      },
+      shell: {
+        creditsWithBalance: "积分：{balance}",
+        sidebarCreditsLabel: "积分余额",
+        lowCredits: "积分较低",
+        topUp: "充值",
       },
       announcements: {
         announcements: "公告",
@@ -2555,8 +2583,10 @@ export const messages = {
         cherryStudioGuide: "Cherry Studio 接入指南",
         baseUrlLabel: "Base URL",
         recommendedModelLabel: "推荐模型",
-        curlExampleLabel: "curl 示例（可直接运行）",
-        copyCurl: "复制 curl",
+        curlExampleLabel: "curl 测试（可直接运行）",
+        copyBaseUrl: "复制 Base URL",
+        copyAuthHeader: "复制 Authorization header",
+        copyCurl: "复制 curl 测试",
         createApiKey: "创建 API 密钥",
         createApiKeyDesc: "可选名称，便于区分。留空则使用默认名称。",
         keyName: "密钥名称",
@@ -3378,7 +3408,14 @@ export const messages = {
       pageSubtitle:
         "Tokfai 是 OpenAI 兼容的 AI 网关。使用同一个 API Key、同一个 Base URL、与 OpenAI 相同的请求格式即可接入。",
       valueProps:
-        "一把密钥、多个模型、智能路由、用量追踪与积分计费——无需自行管理上游供应商。",
+        "Tokfai 是 OpenAI 兼容的 AI 网关——一把密钥、智能路由、用量追踪与积分计费。",
+      essentialBaseUrl: "Base URL：{baseUrl}",
+      essentialModel: "推荐模型：{model}",
+      essentialOneKey: "一把 API Key 可路由多个上游模型。",
+      essentialBilling:
+        "成功请求会扣费；上游失败的请求通常不扣费。",
+      essentialRequestId:
+        "使用 request_id 在控制台追溯 Usage 与 Credits。",
       navTitle: "目录",
       navQuickStart: "快速开始",
       navCurl: "curl 示例",
@@ -3437,11 +3474,14 @@ export const messages = {
       codeColumn: "错误码",
       meaningColumn: "处理建议",
       billingTitle: "计费与用量",
-      billingDesc: "成功调用扣除积分。在控制台查看余额与每次请求用量。",
+      billingDesc:
+        "在 Dashboard → Usage 与 Credits 查看余额与每次请求用量。",
+      billingSuccessNote:
+        "成功的 API 请求按模型定价与 token 用量扣除积分。",
       billingFailedNote:
-        "失败请求（上游繁忙、超时、鉴权错误等）会记录用于排查，通常不扣费。",
+        "上游失败的请求（繁忙、超时、鉴权错误等）会记录用于排查，通常不扣费。",
       billingRequestIdNote:
-        "每次响应包含 request_id — 在 Dashboard → Usage 中核对 tokens 与 credits_charged。",
+        "每次响应包含 request_id — 在 Dashboard → Usage 与 Credits 中核对 tokens 与 credits_charged。",
       linkUsage: "打开 Usage",
       linkCredits: "打开 Credits",
       batchTitle: "Batch API 指南",
@@ -3453,6 +3493,9 @@ export const messages = {
       footerDocsLink: "扩展 API 参考",
       copy: "复制",
       copied: "已复制",
+      copyConfig: "复制配置",
+      copyCurl: "复制 curl",
+      copyCode: "复制代码",
       error: {
         missing_token: "每次请求需携带 Authorization: Bearer sk-tokfai_…。",
         invalid_token: "检查密钥是否完整、未吊销且格式正确。",

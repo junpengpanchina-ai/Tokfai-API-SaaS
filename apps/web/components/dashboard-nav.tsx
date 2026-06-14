@@ -4,6 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import {
+  DashboardSidebarCreditsSummary,
+  formatShellCreditsAmount,
+} from "@/components/dashboard-credits-balance";
+import {
   ADMIN_NAV_ITEMS,
   isAdminNavActive,
 } from "@/lib/admin-nav";
@@ -11,6 +15,7 @@ import {
   DASHBOARD_NAV_ITEMS,
   isDashboardNavActive,
 } from "@/lib/dashboard-nav";
+import type { DashboardShellCredits } from "@/lib/dashboard-shell-credits";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { cn } from "@/lib/utils";
 
@@ -45,11 +50,16 @@ function isNavItemActive(
   );
 }
 
-export function DashboardMobileNav() {
+export function DashboardMobileNav({
+  credits,
+}: {
+  credits: DashboardShellCredits;
+}) {
   const pathname = usePathname();
   const { t } = useI18n();
   const { items, isAdminRoute } = useShellNav(pathname);
   const ariaLabelKey = isAdminRoute ? "admin.nav.sections" : "nav.dashboard";
+  const creditsAmount = formatShellCreditsAmount(credits);
 
   return (
     <nav
@@ -60,6 +70,9 @@ export function DashboardMobileNav() {
         {items.map((item) => {
           const active = isNavItemActive(pathname, item, isAdminRoute);
           const Icon = item.icon;
+          const isCreditsItem =
+            !isAdminRoute && item.href === "/dashboard/credits";
+
           return (
             <Link
               key={item.href}
@@ -75,6 +88,11 @@ export function DashboardMobileNav() {
             >
               <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
               <span className="whitespace-nowrap">{t(item.labelKey)}</span>
+              {isCreditsItem ? (
+                <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                  {creditsAmount}
+                </span>
+              ) : null}
             </Link>
           );
         })}
@@ -83,14 +101,19 @@ export function DashboardMobileNav() {
   );
 }
 
-export function DashboardSidebar() {
+export function DashboardSidebar({
+  credits,
+}: {
+  credits: DashboardShellCredits;
+}) {
   const pathname = usePathname();
   const { t } = useI18n();
   const { items, isAdminRoute } = useShellNav(pathname);
   const ariaLabelKey = isAdminRoute ? "admin.nav.sections" : "nav.dashboard";
+  const creditsAmount = formatShellCreditsAmount(credits);
 
   return (
-    <aside className="hidden md:sticky md:top-0 md:flex md:h-svh md:w-60 md:shrink-0 md:flex-col md:self-start border-r bg-muted/30">
+    <aside className="hidden md:sticky md:top-0 md:z-40 md:flex md:h-svh md:w-60 md:shrink-0 md:flex-col md:self-start border-r bg-muted/30">
       <div className="flex h-16 shrink-0 items-center gap-2 border-b px-6">
         <Link href="/" className="flex items-center gap-2">
           <div className="grid h-7 w-7 place-items-center rounded-md bg-primary text-primary-foreground font-bold text-sm">
@@ -108,6 +131,8 @@ export function DashboardSidebar() {
           {items.map((item) => {
             const active = isNavItemActive(pathname, item, isAdminRoute);
             const Icon = item.icon;
+            const isCreditsItem =
+              !isAdminRoute && item.href === "/dashboard/credits";
 
             return (
               <div key={item.href}>
@@ -124,18 +149,39 @@ export function DashboardSidebar() {
                       : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
                     "backLink" in item && item.backLink
                       ? "text-muted-foreground"
-                      : undefined
+                      : undefined,
+                    isCreditsItem ? "items-start" : undefined
                   )}
                   aria-current={active ? "page" : undefined}
                 >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {t(item.labelKey)}
+                  <Icon
+                    className={cn(
+                      "h-4 w-4 shrink-0",
+                      isCreditsItem ? "mt-0.5" : undefined
+                    )}
+                  />
+                  {isCreditsItem ? (
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span>{t(item.labelKey)}</span>
+                      <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                        {creditsAmount}
+                      </span>
+                    </span>
+                  ) : (
+                    t(item.labelKey)
+                  )}
                 </Link>
               </div>
             );
           })}
         </div>
       </nav>
+
+      {!isAdminRoute ? (
+        <div className="shrink-0 border-t p-3">
+          <DashboardSidebarCreditsSummary credits={credits} />
+        </div>
+      ) : null}
     </aside>
   );
 }

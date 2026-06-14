@@ -7,6 +7,7 @@ import {
   CopyButton,
   useCopyToClipboard,
 } from "@/components/copy-code-block";
+import { CopyConfigAction } from "@/components/copyable-snippet-field";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -20,18 +21,28 @@ import { useAuth } from "@/lib/auth/auth-provider";
 import {
   BATCH_CHAT_CURL,
   BATCH_POLL_CURL,
+  CHERRY_STUDIO_CONFIG_SNIPPET,
   CUSTOMER_INTEGRATION_ERROR_CODES,
   CURSOR_CONFIG_SNIPPET,
   INTEGRATION_BASE_URL,
   INTEGRATION_DEFAULT_MODEL,
   INTEGRATION_KEY_PLACEHOLDER,
+  OPENAI_SDK_CONFIG_SNIPPET,
   chatCompletionsCurl,
   modelsListCurl,
   OPENAI_JS_SNIPPET,
   OPENAI_PYTHON_SNIPPET,
 } from "@/lib/customer-integration-snippets";
 import { useI18n } from "@/lib/i18n/i18n-provider";
-import { TOKFAI_BILLING_POLICY } from "@/lib/tokfai-api";
+import { formatMessage } from "@/lib/i18n/messages";
+
+const ESSENTIAL_KEYS = [
+  "integration.essentialBaseUrl",
+  "integration.essentialModel",
+  "integration.essentialOneKey",
+  "integration.essentialBilling",
+  "integration.essentialRequestId",
+] as const;
 
 const SECTIONS = [
   { id: "quick-start", navKey: "integration.navQuickStart" },
@@ -94,9 +105,9 @@ export function CustomerIntegrationGuide({
   const docsBase = showDashboardLinks || isLoggedIn ? "/dashboard/docs" : "/docs";
 
   return (
-    <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-10">
+    <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-8">
       <nav
-        className="lg:sticky lg:top-6 lg:w-52 shrink-0 rounded-lg border bg-muted/30 p-4"
+        className="lg:sticky lg:top-20 lg:z-10 lg:max-h-[calc(100vh-5.5rem)] lg:w-44 shrink-0 overflow-y-auto rounded-lg border bg-muted/30 p-3 lg:self-start"
         aria-label={t("integration.navTitle")}
       >
         <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -127,6 +138,20 @@ export function CustomerIntegrationGuide({
           <p className="mt-2 text-sm text-muted-foreground">
             {t("integration.valueProps")}
           </p>
+          <ul className="mt-3 space-y-1.5 text-sm text-muted-foreground">
+            {ESSENTIAL_KEYS.map((key) => (
+              <li key={key} className="flex items-start gap-2">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                <span>
+                  {key === "integration.essentialBaseUrl"
+                    ? formatMessage(t(key), { baseUrl: INTEGRATION_BASE_URL })
+                    : key === "integration.essentialModel"
+                      ? formatMessage(t(key), { model: INTEGRATION_DEFAULT_MODEL })
+                      : t(key)}
+                </span>
+              </li>
+            ))}
+          </ul>
           <div className="mt-4 flex flex-wrap gap-2">
             <Button asChild size="sm">
               <Link href={dashHref("/dashboard/api-keys")}>
@@ -190,7 +215,7 @@ export function CustomerIntegrationGuide({
               code={chatCompletionsCurl()}
               copied={copiedId === "curl-chat"}
               onCopy={copyText}
-              copyLabel={t("integration.copy")}
+              copyLabel={t("integration.copyCurl")}
               copiedLabel={t("integration.copied")}
             />
             <CodeBlock
@@ -199,7 +224,7 @@ export function CustomerIntegrationGuide({
               code={modelsListCurl()}
               copied={copiedId === "curl-models"}
               onCopy={copyText}
-              copyLabel={t("integration.copy")}
+              copyLabel={t("integration.copyCurl")}
               copiedLabel={t("integration.copied")}
             />
           </CardContent>
@@ -211,13 +236,40 @@ export function CustomerIntegrationGuide({
             <CardDescription>{t("integration.sdkDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-wrap gap-2">
+              <CopyConfigAction
+                id="sdk-copy-config"
+                value={OPENAI_SDK_CONFIG_SNIPPET}
+                copiedId={copiedId}
+                onCopy={copyText}
+                label={t("integration.copyConfig")}
+                copiedLabel={t("integration.copied")}
+              />
+              <CopyConfigAction
+                id="sdk-copy-curl"
+                value={chatCompletionsCurl()}
+                copiedId={copiedId}
+                onCopy={copyText}
+                label={t("integration.copyCurl")}
+                copiedLabel={t("integration.copied")}
+              />
+            </div>
+            <CodeBlock
+              id="sdk-config"
+              label="config"
+              code={OPENAI_SDK_CONFIG_SNIPPET}
+              copied={copiedId === "sdk-config"}
+              onCopy={copyText}
+              copyLabel={t("integration.copyConfig")}
+              copiedLabel={t("integration.copied")}
+            />
             <CodeBlock
               id="openai-js"
               label="javascript"
               code={OPENAI_JS_SNIPPET}
               copied={copiedId === "openai-js"}
               onCopy={copyText}
-              copyLabel={t("integration.copy")}
+              copyLabel={t("integration.copyCode")}
               copiedLabel={t("integration.copied")}
             />
             <CodeBlock
@@ -226,7 +278,7 @@ export function CustomerIntegrationGuide({
               code={OPENAI_PYTHON_SNIPPET}
               copied={copiedId === "openai-python"}
               onCopy={copyText}
-              copyLabel={t("integration.copy")}
+              copyLabel={t("integration.copyCode")}
               copiedLabel={t("integration.copied")}
             />
           </CardContent>
@@ -243,13 +295,31 @@ export function CustomerIntegrationGuide({
                 <li key={key}>{t(key)}</li>
               ))}
             </ul>
+            <div className="flex flex-wrap gap-2">
+              <CopyConfigAction
+                id="cursor-copy-config"
+                value={CURSOR_CONFIG_SNIPPET}
+                copiedId={copiedId}
+                onCopy={copyText}
+                label={t("integration.copyConfig")}
+                copiedLabel={t("integration.copied")}
+              />
+              <CopyConfigAction
+                id="cursor-copy-curl"
+                value={chatCompletionsCurl()}
+                copiedId={copiedId}
+                onCopy={copyText}
+                label={t("integration.copyCurl")}
+                copiedLabel={t("integration.copied")}
+              />
+            </div>
             <CodeBlock
               id="cursor-config"
               label="config"
               code={CURSOR_CONFIG_SNIPPET}
               copied={copiedId === "cursor-config"}
               onCopy={copyText}
-              copyLabel={t("integration.copy")}
+              copyLabel={t("integration.copyConfig")}
               copiedLabel={t("integration.copied")}
             />
           </CardContent>
@@ -260,7 +330,34 @@ export function CustomerIntegrationGuide({
             <CardTitle>{t("integration.cherryTitle")}</CardTitle>
             <CardDescription>{t("integration.cherryDesc")}</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-wrap gap-2">
+              <CopyConfigAction
+                id="cherry-copy-config"
+                value={CHERRY_STUDIO_CONFIG_SNIPPET}
+                copiedId={copiedId}
+                onCopy={copyText}
+                label={t("integration.copyConfig")}
+                copiedLabel={t("integration.copied")}
+              />
+              <CopyConfigAction
+                id="cherry-copy-curl"
+                value={chatCompletionsCurl()}
+                copiedId={copiedId}
+                onCopy={copyText}
+                label={t("integration.copyCurl")}
+                copiedLabel={t("integration.copied")}
+              />
+            </div>
+            <CodeBlock
+              id="cherry-config"
+              label="config"
+              code={CHERRY_STUDIO_CONFIG_SNIPPET}
+              copied={copiedId === "cherry-config"}
+              onCopy={copyText}
+              copyLabel={t("integration.copyConfig")}
+              copiedLabel={t("integration.copied")}
+            />
             <ConfigTable
               rows={CHERRY_ROWS.map((row) => ({
                 id: row.id,
@@ -318,7 +415,7 @@ export function CustomerIntegrationGuide({
             <CardDescription>{t("integration.billingDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground">
-            <p>{TOKFAI_BILLING_POLICY}</p>
+            <p>{t("integration.billingSuccessNote")}</p>
             <p>{t("integration.billingFailedNote")}</p>
             <p>{t("integration.billingRequestIdNote")}</p>
             <div className="flex flex-wrap gap-2">
