@@ -19,8 +19,8 @@ import {
 import { dashboardCtaHref } from "@/lib/auth/public-cta";
 import { useAuth } from "@/lib/auth/auth-provider";
 import {
-  BATCH_CHAT_CURL,
   BATCH_POLL_CURL,
+  batchChatCurl,
   CHERRY_STUDIO_CONFIG_SNIPPET,
   CUSTOMER_INTEGRATION_ERROR_CODES,
   CURSOR_CONFIG_SNIPPET,
@@ -45,6 +45,8 @@ const ESSENTIAL_KEYS = [
 ] as const;
 
 const SECTIONS = [
+  { id: "product-positioning", navKey: "integration.navPositioning" },
+  { id: "production-demo-flow", navKey: "integration.navDemoFlow" },
   { id: "quick-start", navKey: "integration.navQuickStart" },
   { id: "curl-examples", navKey: "integration.navCurl" },
   { id: "openai-sdk", navKey: "integration.navOpenAiSdk" },
@@ -72,6 +74,14 @@ const CURSOR_STEPS = [
   "integration.cursorStep2",
   "integration.cursorStep3",
   "integration.cursorStep4",
+] as const;
+
+const DEMO_FLOW_STEPS = [
+  "integration.demoFlowStep1",
+  "integration.demoFlowStep2",
+  "integration.demoFlowStep3",
+  "integration.demoFlowStep4",
+  "integration.demoFlowStep5",
 ] as const;
 
 const QUICK_START_STEPS = [
@@ -159,12 +169,68 @@ export function CustomerIntegrationGuide({
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
-              <Link href={dashHref("/dashboard/playground")}>
-                {t("integration.ctaPlayground")}
+              <Link href={`${docsBase}#production-demo-flow`}>
+                {t("integration.ctaDemoFlow")}
               </Link>
             </Button>
           </div>
         </div>
+
+        <Card id="product-positioning" className="scroll-mt-6 border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle>{t("integration.positioningTitle")}</CardTitle>
+            <CardDescription>{t("integration.positioningDesc")}</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground">
+            <p>{t("integration.positioningGateway")}</p>
+            <p>{t("integration.positioningNotAgency")}</p>
+            <p>{t("integration.positioningYourStack")}</p>
+          </CardContent>
+        </Card>
+
+        <Card id="production-demo-flow" className="scroll-mt-6">
+          <CardHeader>
+            <CardTitle>{t("integration.demoFlowTitle")}</CardTitle>
+            <CardDescription>{t("integration.demoFlowDesc")}</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <ol className="list-decimal space-y-3 pl-5 text-sm text-muted-foreground">
+              {DEMO_FLOW_STEPS.map((key) => (
+                <li key={key}>{t(key)}</li>
+              ))}
+            </ol>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm" variant="outline">
+                <Link href={dashHref("/dashboard/api-keys")}>
+                  {t("integration.demoFlowLinkKeys")}
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href={dashHref("/dashboard/playground")}>
+                  {t("integration.demoFlowLinkPlayground")}
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href={`${docsBase}#batch-api`}>
+                  {t("integration.demoFlowLinkBatch")}
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href={dashHref("/dashboard/usage")}>
+                  {t("integration.demoFlowLinkUsage")}
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href={dashHref("/dashboard/credits")}>
+                  {t("integration.demoFlowLinkCredits")}
+                </Link>
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {t("integration.demoFlowReconcileNote")}
+            </p>
+          </CardContent>
+        </Card>
 
         <Card id="quick-start" className="scroll-mt-6">
           <CardHeader>
@@ -442,10 +508,13 @@ export function CustomerIntegrationGuide({
             <p className="text-sm text-muted-foreground">
               {t("integration.batchNote")}
             </p>
+            <p className="text-sm text-muted-foreground">
+              {t("integration.batchGatewayNote")}
+            </p>
             <CodeBlock
               id="batch-create"
               label="create batch"
-              code={BATCH_CHAT_CURL}
+              code={batchChatCurl()}
               copied={copiedId === "batch-create"}
               onCopy={copyText}
               copyLabel={t("integration.copy")}

@@ -611,7 +611,24 @@ export const messages = {
         oneTimeSecretDesc:
           "Copy and store this key now — it is shown only once at creation.",
         nextStepsHint:
-          "Next: test with auto-fast in Chat Playground, then follow Docs to connect Cursor, Cherry Studio, or the OpenAI SDK.",
+          "Next: call Tokfai API from your stack — curl test, OpenAI SDK, Cursor, Cherry Studio, or Batch API.",
+        nextStepsGatewayNote:
+          "Tokfai is your API gateway. You operate your apps; we provide API access and metering.",
+        nextStepsTitle: "Connect via Tokfai API",
+        nextStepCurl: "Run the curl chat test below (or copy Authorization header).",
+        nextStepSdk: "Copy OpenAI SDK config — only baseURL and apiKey change.",
+        nextStepCursor: "Paste Cursor provider config or open the Cursor guide.",
+        nextStepCherry: "Paste Cherry Studio config or open the Cherry guide.",
+        nextStepBatch: "Copy batch curl to submit multiple items via POST /v1/batches/chat.",
+        sdkConfigLabel: "OpenAI SDK config",
+        batchCurlLabel: "Batch API curl (create batch)",
+        copySdkConfig: "Copy SDK config",
+        copyCursorConfig: "Copy Cursor config",
+        copyCherryConfig: "Copy Cherry config",
+        copyBatchCurl: "Copy batch curl",
+        openAiSdkGuide: "OpenAI SDK guide",
+        batchApiGuide: "Batch API guide",
+        productionDemoFlow: "Production demo flow",
         yourApiKey: "Your API key",
         authorizationHeader: "Authorization header",
         copyFullKey: "Copy full key",
@@ -1462,21 +1479,23 @@ export const messages = {
       copied: "Copied",
     },
     integration: {
-      pageTitle: "Tokfai integration guide",
+      pageTitle: "Tokfai API integration handbook",
       pageSubtitle:
-        "Tokfai is an OpenAI-compatible AI gateway. Use one API key, one base URL, and the same request format as OpenAI.",
+        "Tokfai is an OpenAI-compatible API gateway and model relay. Use your API Key, your systems, and the same request format as OpenAI — Tokfai does not run your business operations for you.",
       valueProps:
-        "Tokfai is an OpenAI-compatible AI gateway — one key, smart routing, usage tracking, and credit billing.",
+        "API Key gateway · smart model routing · per-request Usage · credit metering via request_id.",
       essentialBaseUrl: "Base URL: {baseUrl}",
       essentialModel: "Recommended model: {model}",
       essentialOneKey:
-        "One API key can route multiple upstream models.",
+        "One API key routes to multiple upstream models through Tokfai.",
       essentialBilling:
-        "Successful requests are charged; failed upstream requests are generally not charged.",
+        "Successful API calls debit credits; failed upstream calls are generally not charged.",
       essentialRequestId:
-        "Use request_id to trace Usage and Credits in the dashboard.",
-      navTitle: "Contents",
-      navQuickStart: "Quick Start",
+        "Use request_id to reconcile Usage and Credits in your dashboard.",
+      navTitle: "Handbook",
+      navPositioning: "Product positioning",
+      navDemoFlow: "Production demo flow",
+      navQuickStart: "Quick start",
       navCurl: "curl examples",
       navOpenAiSdk: "OpenAI SDK",
       navCursor: "Cursor",
@@ -1487,6 +1506,36 @@ export const messages = {
       navBatch: "Batch API",
       ctaCreateKey: "Create API key",
       ctaPlayground: "Try Chat Playground",
+      ctaDemoFlow: "Production demo flow",
+      positioningTitle: "Tokfai is an API gateway — not an agency",
+      positioningDesc:
+        "Self-serve API integration. You bring your API Key, your apps, and your workflows.",
+      positioningGateway:
+        "Tokfai provides OpenAI-compatible API access (chat, batch, image), API Key auth, upstream routing, and credit metering.",
+      positioningNotAgency:
+        "Tokfai is not a managed operations or done-for-you agency. We do not run your storefront, ticket queue, or clinic on your behalf.",
+      positioningYourStack:
+        "Industry examples in this handbook show how to call Tokfai API from your stack — copy patterns into your backend, scripts, or IDE clients.",
+      demoFlowTitle: "Production demo flow",
+      demoFlowDesc:
+        "End-to-end path to validate Tokfai API in production: key → chat test → batch → Usage/Credits reconciliation.",
+      demoFlowStep1:
+        "Create an API key (API Keys). Copy the full sk-tokfai_… secret once.",
+      demoFlowStep2:
+        "Send a chat test — Chat Playground or curl / OpenAI SDK with model auto-fast. Confirm HTTP 200 and note request_id.",
+      demoFlowStep3:
+        "Optional bulk path: POST /v1/batches/chat with multiple items, poll GET /v1/batches/{id} until terminal status.",
+      demoFlowStep4:
+        "Open Usage — search each request_id. Confirm tokens, model, and credits_charged on succeeded calls.",
+      demoFlowStep5:
+        "Open Credits — verify ledger debits match succeeded items. Failed or cancelled batch items should not debit.",
+      demoFlowLinkKeys: "API Keys",
+      demoFlowLinkPlayground: "Chat Playground",
+      demoFlowLinkBatch: "Batch API section",
+      demoFlowLinkUsage: "Usage",
+      demoFlowLinkCredits: "Credits",
+      demoFlowReconcileNote:
+        "This flow validates your integration — not Tokfai operating your business. See docs/p770-production-demo-flow.md in the repo for the checklist artifact.",
       quickStartTitle: "Quick Start (about 3 minutes)",
       quickStartDesc:
         "Create a key, copy the secret once, then send your first chat request.",
@@ -1551,6 +1600,8 @@ export const messages = {
         "Submit many chat prompts in one request and poll for results — ideal for bulk jobs instead of high concurrency on /chat/completions.",
       batchNote:
         "POST /v1/batches/chat returns 202 immediately. Poll GET /v1/batches/{id} until completed. Each successful item debits credits individually.",
+      batchGatewayNote:
+        "Batch is an API integration pattern for your systems — submit once from your backend, poll for results, trace each item by request_id.",
       footerHint: "Need image API or full reference?",
       footerDocsLink: "Extended API reference",
       copy: "Copy",
@@ -2615,7 +2666,24 @@ export const messages = {
         apiKeyCreatedNamed: "API 密钥已创建：{name}",
         oneTimeSecretDesc: "请立即复制并妥善保存——完整密钥仅在创建时展示一次。",
         nextStepsHint:
-          "下一步：先用 auto-fast 在 Chat Playground 测试，再按 Docs 接入 Cursor、Cherry Studio 或 OpenAI SDK。",
+          "下一步：从你的技术栈调用 Tokfai API——curl 测试、OpenAI SDK、Cursor、Cherry Studio 或 Batch API。",
+        nextStepsGatewayNote:
+          "Tokfai 是 API 网关。你运营自己的应用；我们提供 API 访问与计量。",
+        nextStepsTitle: "通过 Tokfai API 接入",
+        nextStepCurl: "运行下方 curl 对话测试（或复制 Authorization header）。",
+        nextStepSdk: "复制 OpenAI SDK 配置——仅改 baseURL 与 apiKey。",
+        nextStepCursor: "复制 Cursor 配置或打开 Cursor 指南。",
+        nextStepCherry: "复制 Cherry Studio 配置或打开 Cherry 指南。",
+        nextStepBatch: "复制 Batch curl，通过 POST /v1/batches/chat 提交多条 items。",
+        sdkConfigLabel: "OpenAI SDK 配置",
+        batchCurlLabel: "Batch API curl（创建 batch）",
+        copySdkConfig: "复制 SDK 配置",
+        copyCursorConfig: "复制 Cursor 配置",
+        copyCherryConfig: "复制 Cherry 配置",
+        copyBatchCurl: "复制 Batch curl",
+        openAiSdkGuide: "OpenAI SDK 指南",
+        batchApiGuide: "Batch API 指南",
+        productionDemoFlow: "生产验收流程",
         yourApiKey: "你的 API 密钥",
         authorizationHeader: "Authorization header",
         copyFullKey: "复制完整密钥",
@@ -3422,19 +3490,21 @@ export const messages = {
       copied: "已复制",
     },
     integration: {
-      pageTitle: "Tokfai 接入指南",
+      pageTitle: "Tokfai API 接入手册",
       pageSubtitle:
-        "Tokfai 是 OpenAI 兼容的 AI 网关。使用同一个 API Key、同一个 Base URL、与 OpenAI 相同的请求格式即可接入。",
+        "Tokfai 是 OpenAI 兼容的 API 网关与模型中转。使用你的 API Key、你的系统、与 OpenAI 相同的请求格式——Tokfai 不替你运营业务。",
       valueProps:
-        "Tokfai 是 OpenAI 兼容的 AI 网关——一把密钥、智能路由、用量追踪与积分计费。",
+        "API Key 网关 · 智能路由 · 按请求 Usage · 通过 request_id 积分计量。",
       essentialBaseUrl: "Base URL：{baseUrl}",
       essentialModel: "推荐模型：{model}",
-      essentialOneKey: "一把 API Key 可路由多个上游模型。",
+      essentialOneKey: "一把 API Key 经 Tokfai 路由到多个上游模型。",
       essentialBilling:
-        "成功请求会扣费；上游失败的请求通常不扣费。",
+        "成功的 API 调用会扣积分；上游失败通常不扣费。",
       essentialRequestId:
-        "使用 request_id 在控制台追溯 Usage 与 Credits。",
-      navTitle: "目录",
+        "使用 request_id 在控制台核对 Usage 与 Credits。",
+      navTitle: "手册目录",
+      navPositioning: "产品定位",
+      navDemoFlow: "生产验收流程",
       navQuickStart: "快速开始",
       navCurl: "curl 示例",
       navOpenAiSdk: "OpenAI SDK",
@@ -3446,6 +3516,36 @@ export const messages = {
       navBatch: "Batch API",
       ctaCreateKey: "创建 API Key",
       ctaPlayground: "打开 Chat Playground",
+      ctaDemoFlow: "生产验收流程",
+      positioningTitle: "Tokfai 是 API 网关——不是代运营",
+      positioningDesc:
+        "自助 API 接入。你提供 API Key、应用与工作流。",
+      positioningGateway:
+        "Tokfai 提供 OpenAI 兼容 API（对话、Batch、图像）、API Key 鉴权、上游路由与积分计量。",
+      positioningNotAgency:
+        "Tokfai 不是代运营或托管运营公司，不替你运营店铺、工单或诊所业务。",
+      positioningYourStack:
+        "本手册中的行业示例展示如何从你的技术栈调用 Tokfai API——可复制到后端、脚本或 IDE 客户端。",
+      demoFlowTitle: "生产验收流程",
+      demoFlowDesc:
+        "端到端验证 Tokfai API：创建密钥 → 对话测试 → Batch → Usage/Credits 对账。",
+      demoFlowStep1:
+        "创建 API Key（API Keys 页），立即复制完整 sk-tokfai_… secret。",
+      demoFlowStep2:
+        "发送对话测试——Chat Playground 或 curl / OpenAI SDK，模型 auto-fast，确认 HTTP 200 并记录 request_id。",
+      demoFlowStep3:
+        "可选批量路径：POST /v1/batches/chat 提交多条 items，轮询 GET /v1/batches/{id} 直至终态。",
+      demoFlowStep4:
+        "打开 Usage——搜索每个 request_id，核对 tokens、模型与 credits_charged。",
+      demoFlowStep5:
+        "打开 Credits——核对账本扣费与成功项一致；失败或取消的 batch item 不应扣费。",
+      demoFlowLinkKeys: "API Keys",
+      demoFlowLinkPlayground: "Chat Playground",
+      demoFlowLinkBatch: "Batch API 章节",
+      demoFlowLinkUsage: "Usage",
+      demoFlowLinkCredits: "Credits",
+      demoFlowReconcileNote:
+        "此流程用于验证你的 API 集成——不是 Tokfai 代运营。完整清单见仓库 docs/p770-production-demo-flow.md。",
       quickStartTitle: "快速开始（约 3 分钟）",
       quickStartDesc: "创建密钥、复制 secret，然后发送第一条对话请求。",
       quickStep1:
@@ -3507,6 +3607,8 @@ export const messages = {
         "一次提交多条对话并轮询结果，适合批量任务，避免对 /chat/completions 高并发压测。",
       batchNote:
         "POST /v1/batches/chat 立即返回 202。轮询 GET /v1/batches/{id} 直至完成。每条成功 item 单独扣费。",
+      batchGatewayNote:
+        "Batch 是你系统侧的 API 集成模式——后端一次提交、轮询结果、用 request_id 追溯每条 item。",
       footerHint: "需要图像 API 或完整参考？",
       footerDocsLink: "扩展 API 参考",
       copy: "复制",

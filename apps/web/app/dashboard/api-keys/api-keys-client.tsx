@@ -51,7 +51,11 @@ import { DashboardFirstRunOnboardingCard } from "@/components/dashboard-first-ru
 import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
 import {
   authorizationHeader,
+  batchChatCurl,
   chatCompletionsCurl,
+  cherryStudioConfigSnippet,
+  cursorConfigSnippet,
+  openaiSdkConfigSnippet,
 } from "@/lib/customer-integration-snippets";
 import {
   TOKFAI_API_BASE_URL,
@@ -356,6 +360,11 @@ function IntegrationGuide({ t }: { t: (key: string) => string }) {
             </Link>
           </Button>
           <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/dashboard/docs#production-demo-flow">
+              {t("dashboard.apiKeys.productionDemoFlow")}
+            </Link>
+          </Button>
+          <Button type="button" variant="outline" size="sm" asChild>
             <Link href="/dashboard/playground">
               {t("dashboard.apiKeys.tryChatPlayground")}
             </Link>
@@ -400,6 +409,10 @@ function OneTimeSecretCard({
   const [snippetCopiedId, setSnippetCopiedId] = useState<string | null>(null);
   const curlExample = chatCompletionsCurl(secret, TOKFAI_RECOMMENDED_MODEL);
   const authHeaderValue = authorizationHeader(secret);
+  const sdkConfig = openaiSdkConfigSnippet(secret, TOKFAI_RECOMMENDED_MODEL);
+  const cursorConfig = cursorConfigSnippet(secret, TOKFAI_RECOMMENDED_MODEL);
+  const cherryConfig = cherryStudioConfigSnippet(secret, TOKFAI_RECOMMENDED_MODEL);
+  const batchCurlExample = batchChatCurl(secret, TOKFAI_RECOMMENDED_MODEL);
 
   useEffect(() => {
     cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -434,8 +447,23 @@ function OneTimeSecretCard({
         <p className="text-sm text-emerald-900/80 dark:text-emerald-100/80">
           {t("dashboard.apiKeys.nextStepsHint")}
         </p>
+        <p className="text-xs text-emerald-900/70 dark:text-emerald-100/70">
+          {t("dashboard.apiKeys.nextStepsGatewayNote")}
+        </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
+            {t("dashboard.apiKeys.nextStepsTitle")}
+          </p>
+          <ol className="mt-2 list-decimal space-y-1 pl-4 text-sm text-muted-foreground">
+            <li>{t("dashboard.apiKeys.nextStepCurl")}</li>
+            <li>{t("dashboard.apiKeys.nextStepSdk")}</li>
+            <li>{t("dashboard.apiKeys.nextStepCursor")}</li>
+            <li>{t("dashboard.apiKeys.nextStepCherry")}</li>
+            <li>{t("dashboard.apiKeys.nextStepBatch")}</li>
+          </ol>
+        </div>
         <div className="flex flex-col gap-2">
           <Label className="text-xs uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
             {t("dashboard.apiKeys.yourApiKey")}
@@ -487,6 +515,26 @@ function OneTimeSecretCard({
           copiedLabel={t("dashboard.apiKeys.copied")}
           className="[&_code]:max-h-48 [&_code]:whitespace-pre-wrap [&_code]:break-all [&_code]:border-emerald-200 [&_code]:bg-white dark:[&_code]:border-emerald-800 dark:[&_code]:bg-background"
         />
+        <CopyableSnippetField
+          label={t("dashboard.apiKeys.sdkConfigLabel")}
+          value={sdkConfig}
+          copyId="sdk-config"
+          copiedId={snippetCopiedId}
+          onCopy={handleSnippetCopy}
+          copyLabel={t("dashboard.apiKeys.copySdkConfig")}
+          copiedLabel={t("dashboard.apiKeys.copied")}
+          className="[&_code]:whitespace-pre-wrap [&_code]:break-all [&_code]:border-emerald-200 [&_code]:bg-white dark:[&_code]:border-emerald-800 dark:[&_code]:bg-background"
+        />
+        <CopyableSnippetField
+          label={t("dashboard.apiKeys.batchCurlLabel")}
+          value={batchCurlExample}
+          copyId="batch-curl"
+          copiedId={snippetCopiedId}
+          onCopy={handleSnippetCopy}
+          copyLabel={t("dashboard.apiKeys.copyBatchCurl")}
+          copiedLabel={t("dashboard.apiKeys.copied")}
+          className="[&_code]:max-h-48 [&_code]:whitespace-pre-wrap [&_code]:break-all [&_code]:border-emerald-200 [&_code]:bg-white dark:[&_code]:border-emerald-800 dark:[&_code]:bg-background"
+        />
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <Button type="button" className="w-full sm:w-auto" onClick={onCopy}>
             {copyStatus === "copied" ? (
@@ -517,6 +565,38 @@ function OneTimeSecretCard({
             label={t("dashboard.apiKeys.copyCurl")}
             copiedLabel={t("dashboard.apiKeys.copied")}
           />
+          <CopyConfigAction
+            id="one-time-copy-sdk"
+            value={sdkConfig}
+            copiedId={snippetCopiedId}
+            onCopy={handleSnippetCopy}
+            label={t("dashboard.apiKeys.copySdkConfig")}
+            copiedLabel={t("dashboard.apiKeys.copied")}
+          />
+          <CopyConfigAction
+            id="one-time-copy-cursor"
+            value={cursorConfig}
+            copiedId={snippetCopiedId}
+            onCopy={handleSnippetCopy}
+            label={t("dashboard.apiKeys.copyCursorConfig")}
+            copiedLabel={t("dashboard.apiKeys.copied")}
+          />
+          <CopyConfigAction
+            id="one-time-copy-cherry"
+            value={cherryConfig}
+            copiedId={snippetCopiedId}
+            onCopy={handleSnippetCopy}
+            label={t("dashboard.apiKeys.copyCherryConfig")}
+            copiedLabel={t("dashboard.apiKeys.copied")}
+          />
+          <CopyConfigAction
+            id="one-time-copy-batch"
+            value={batchCurlExample}
+            copiedId={snippetCopiedId}
+            onCopy={handleSnippetCopy}
+            label={t("dashboard.apiKeys.copyBatchCurl")}
+            copiedLabel={t("dashboard.apiKeys.copied")}
+          />
           <Button
             type="button"
             variant="outline"
@@ -534,6 +614,21 @@ function OneTimeSecretCard({
             <Link href="/dashboard/docs">
               {t("dashboard.apiKeys.viewDocs")}
               <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+          <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
+            <Link href="/dashboard/docs#openai-sdk">
+              {t("dashboard.apiKeys.openAiSdkGuide")}
+            </Link>
+          </Button>
+          <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
+            <Link href="/dashboard/docs#batch-api">
+              {t("dashboard.apiKeys.batchApiGuide")}
+            </Link>
+          </Button>
+          <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
+            <Link href="/dashboard/docs#production-demo-flow">
+              {t("dashboard.apiKeys.productionDemoFlow")}
             </Link>
           </Button>
           <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>

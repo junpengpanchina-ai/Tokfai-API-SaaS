@@ -75,35 +75,67 @@ completion = client.chat.completions.create(
 print(completion.choices[0].message.content)
 print("resolved model:", completion.model)`;
 
-export const CURSOR_CONFIG_SNIPPET = `Provider type: OpenAI-compatible (Custom)
+export function openaiSdkConfigSnippet(
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
+  model = TOKFAI_RECOMMENDED_MODEL
+): string {
+  return `Base URL: https://api.tokfai.com/v1
+API Key: ${apiKey}
+Model: ${model}
+Authorization header: Bearer ${apiKey}`;
+}
+
+export function cursorConfigSnippet(
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
+  model = TOKFAI_RECOMMENDED_MODEL
+): string {
+  return `Provider type: OpenAI-compatible (Custom)
 Base URL: https://api.tokfai.com/v1
-API Key: sk-tokfai_xxx
-Model: ${TOKFAI_RECOMMENDED_MODEL}`;
+API Key: ${apiKey}
+Model: ${model}`;
+}
 
-export const CHERRY_STUDIO_CONFIG_SNIPPET = `Provider: OpenAI Compatible
+export function cherryStudioConfigSnippet(
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
+  model = TOKFAI_RECOMMENDED_MODEL
+): string {
+  return `Provider: OpenAI Compatible
 API Host: https://api.tokfai.com/v1
-API Key: sk-tokfai_xxx
-Model: ${TOKFAI_RECOMMENDED_MODEL}`;
+API Key: ${apiKey}
+Model: ${model}`;
+}
 
-export const OPENAI_SDK_CONFIG_SNIPPET = `Base URL: https://api.tokfai.com/v1
-API Key: sk-tokfai_xxx
-Model: ${TOKFAI_RECOMMENDED_MODEL}
-Authorization header: Bearer sk-tokfai_xxx`;
+export const OPENAI_SDK_CONFIG_SNIPPET = openaiSdkConfigSnippet();
+export const CURSOR_CONFIG_SNIPPET = cursorConfigSnippet();
+export const CHERRY_STUDIO_CONFIG_SNIPPET = cherryStudioConfigSnippet();
 
 export function authorizationHeader(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
   return `Authorization: Bearer ${apiKey}`;
 }
 
-export const BATCH_CHAT_CURL = `curl https://api.tokfai.com/v1/batches/chat \\
-  -H "Authorization: Bearer sk-tokfai_xxx" \\
+export function batchChatCurl(
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
+  model = TOKFAI_RECOMMENDED_MODEL
+): string {
+  return `curl https://api.tokfai.com/v1/batches/chat \\
+  -H "Authorization: Bearer ${apiKey}" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "${TOKFAI_RECOMMENDED_MODEL}",
+    "model": "${model}",
     "items": [
       { "messages": [{ "role": "user", "content": "Say ok only." }] },
       { "messages": [{ "role": "user", "content": "Say hello only." }] }
     ]
   }'`;
+}
 
-export const BATCH_POLL_CURL = `curl https://api.tokfai.com/v1/batches/batch_xxx \\
-  -H "Authorization: Bearer sk-tokfai_xxx"`;
+export function batchPollCurl(
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
+  batchId = "batch_xxx"
+): string {
+  return `curl https://api.tokfai.com/v1/batches/${batchId} \\
+  -H "Authorization: Bearer ${apiKey}"`;
+}
+
+export const BATCH_CHAT_CURL = batchChatCurl();
+export const BATCH_POLL_CURL = batchPollCurl();
