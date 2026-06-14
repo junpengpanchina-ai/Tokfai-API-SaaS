@@ -12,6 +12,7 @@ import {
 
 import {
   IMAGE_PLAYGROUND_TOOLBENCH,
+  focusImagePlaygroundResultPanel,
   ImagePlaygroundCompactKeyRow,
   ImagePlaygroundGenerateActions,
   ImagePlaygroundResultArea,
@@ -224,6 +225,11 @@ export function ImagePlaygroundClient({
   const { t, locale } = useI18n();
   const router = useRouter();
   const promptRef = useRef<HTMLTextAreaElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const resultPanelRef = useRef<HTMLDivElement>(null);
+  const resultAttentionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   const [localKeys, setLocalKeys] =
     useState<ImagePlaygroundApiKeyOption[]>(activeKeys);
@@ -261,6 +267,7 @@ export function ImagePlaygroundClient({
   const [copyRequestStatus, setCopyRequestStatus] = useState<"idle" | "copied">(
     "idle"
   );
+  const [resultAttention, setResultAttention] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const readyImageUrls = getReadyImageUrls(imageInputs);
@@ -271,6 +278,30 @@ export function ImagePlaygroundClient({
       setKeyPanelView("select");
     }
   }, [activeKeys, keyPanelView]);
+
+  useEffect(() => {
+    return () => {
+      if (resultAttentionTimeoutRef.current) {
+        clearTimeout(resultAttentionTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  function pulseResultAttention() {
+    setResultAttention(true);
+    if (resultAttentionTimeoutRef.current) {
+      clearTimeout(resultAttentionTimeoutRef.current);
+    }
+    resultAttentionTimeoutRef.current = setTimeout(() => {
+      setResultAttention(false);
+    }, 4000);
+  }
+
+  function focusResultPanel(phase: "onStart" | "onComplete") {
+    requestAnimationFrame(() => {
+      focusImagePlaygroundResultPanel(resultPanelRef.current, phase);
+    });
+  }
 
   useEffect(() => {
     if (
@@ -563,6 +594,8 @@ export function ImagePlaygroundClient({
         code: "model_coming_soon",
         message: t("dashboard.imagePlayground.modelComingSoon"),
       });
+      pulseResultAttention();
+      focusResultPanel("onComplete");
       return;
     }
 
@@ -573,6 +606,8 @@ export function ImagePlaygroundClient({
         code: "missing_prompt",
         message: t("dashboard.imagePlayground.errors.missingPrompt"),
       });
+      pulseResultAttention();
+      focusResultPanel("onComplete");
       return;
     }
 
@@ -586,6 +621,8 @@ export function ImagePlaygroundClient({
         code: "upload_in_progress",
         message: "Wait for input images to finish uploading or resolving.",
       });
+      pulseResultAttention();
+      focusResultPanel("onComplete");
       return;
     }
 
@@ -596,9 +633,13 @@ export function ImagePlaygroundClient({
       resolvedKey = await resolveApiKey();
     } catch (err) {
       setError(toPlaygroundError(err, t));
+      pulseResultAttention();
+      focusResultPanel("onComplete");
       return;
     }
 
+    pulseResultAttention();
+    focusResultPanel("onStart");
     setLoading(true);
     try {
       const payload: Parameters<typeof imageGenerations>[1] = {
@@ -622,6 +663,8 @@ export function ImagePlaygroundClient({
       setError(toPlaygroundError(err, t));
     } finally {
       setLoading(false);
+      pulseResultAttention();
+      focusResultPanel("onComplete");
     }
   }
 
@@ -707,6 +750,7 @@ export function ImagePlaygroundClient({
 
   return (
     <form
+      ref={formRef}
       onSubmit={handleGenerate}
       onDragOver={(event) => {
         event.preventDefault();
@@ -849,17 +893,20 @@ export function ImagePlaygroundClient({
         <div
           className={`${IMAGE_PLAYGROUND_TOOLBENCH.stickyColumn} order-3 flex flex-col gap-3`}
         >
-          <ImagePlaygroundResultArea
-            loading={loading}
-            error={error}
-            result={result}
-            completedAt={completedAt}
-            inputImagesCount={
-              result?.input_images_count ?? lastRequestInputCount
-            }
-            isImageToImage={isImageToImage}
-            t={t}
-          />
+          <div ref={resultPanelRef} className="shrink-0">
+            <ImagePlaygroundResultArea
+              loading={loading}
+              error={error}
+              result={result}
+              completedAt={completedAt}
+              inputImagesCount={
+                result?.input_images_count ?? lastRequestInputCount
+              }
+              attention={resultAttention || loading}
+              onRetry={() => formRef.current?.requestSubmit()}
+              t={t}
+            />
+          </div>
           <ImagePlaygroundSettingsSidebar
             model={model}
             size={size}

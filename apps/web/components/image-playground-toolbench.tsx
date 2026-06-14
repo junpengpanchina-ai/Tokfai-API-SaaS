@@ -11,6 +11,7 @@ import {
   ImageIcon,
   KeyRound,
   Loader2,
+  RotateCw,
   Sparkles,
   Wallet,
 } from "lucide-react";
@@ -47,6 +48,7 @@ import {
 } from "@/lib/model-catalog";
 import { formatMessage, type Locale } from "@/lib/i18n/messages";
 import { TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
+import { cn } from "@/lib/utils";
 
 /** Shared layout tokens for the Image Playground two-column toolbench. */
 export const IMAGE_PLAYGROUND_TOOLBENCH = {
@@ -61,8 +63,39 @@ export const IMAGE_PLAYGROUND_TOOLBENCH = {
   select:
     "flex h-8 w-full rounded-md border border-input bg-muted/30 px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
   stickyColumn:
-    "min-w-0 lg:col-start-2 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-1.75rem)] lg:overflow-y-auto lg:overflow-x-hidden",
+    "min-w-0 shrink-0 lg:col-start-2 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-1.75rem)] lg:overflow-y-auto lg:overflow-x-hidden",
+  resultCard: "min-h-[360px] border bg-card",
+  resultBody:
+    "flex min-h-[min(360px,42vh)] flex-1 flex-col rounded-lg border border-dashed bg-muted/25",
 } as const;
+
+/** Scroll result panel into view on mobile, or when off-screen on desktop. */
+export function focusImagePlaygroundResultPanel(
+  element: HTMLElement | null,
+  phase: "onStart" | "onComplete"
+): void {
+  if (!element || typeof window === "undefined") return;
+
+  const isMobile = window.matchMedia("(max-width: 1023px)").matches;
+
+  if (phase === "onStart" && isMobile) {
+    element.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
+  if (phase === "onComplete") {
+    if (isMobile) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    const rect = element.getBoundingClientRect();
+    const topVisible = rect.top >= -4 && rect.top < window.innerHeight * 0.75;
+    if (!topVisible) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+}
 
 const IMAGE_API_DOCS_HREF = "/docs#image-generations";
 const INTEGRATION_DOCS_HREF = "/dashboard/docs";
@@ -528,7 +561,8 @@ export function ImagePlaygroundResultArea({
   result,
   completedAt,
   inputImagesCount,
-  isImageToImage,
+  attention = false,
+  onRetry,
   t,
 }: {
   loading: boolean;
@@ -536,162 +570,215 @@ export function ImagePlaygroundResultArea({
   result: ImageGenerationResponse | null;
   completedAt: string | null;
   inputImagesCount: number | null | undefined;
-  isImageToImage: boolean;
+  attention?: boolean;
+  onRetry?: () => void;
   t: (key: string) => string;
 }) {
   const { copiedId, copyText } = useCopyToClipboard();
-  const resultCardClass = IMAGE_PLAYGROUND_TOOLBENCH.card;
 
-  if (loading) {
-    return (
-      <Card className={resultCardClass}>
-        <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
-          <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
-            {t("dashboard.imagePlayground.resultTitle")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent
-          className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex items-center gap-2 py-6 text-sm text-muted-foreground`}
-        >
-          <Loader2 className="h-5 w-5 animate-spin" />
-          {t("dashboard.imagePlayground.generatingImage")}
-        </CardContent>
-      </Card>
-    );
-  }
+  const state: "loading" | "error" | "success" | "empty" = loading
+    ? "loading"
+    : error
+      ? "error"
+      : result
+        ? "success"
+        : "empty";
 
-  if (error) {
-    return (
-      <Card className={resultCardClass}>
-        <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
-          <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
-            {t("dashboard.imagePlayground.resultTitle")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent
-          className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex flex-col gap-3`}
-        >
-          <PlaygroundErrorPanel scope="imagePlayground" error={error} t={t} />
-          <p className="text-xs text-muted-foreground">
-            {t("dashboard.imagePlayground.errors.billingNotChargedHint")}
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
+  const title =
+    state === "loading"
+      ? t("dashboard.imagePlayground.toolbenchResultLoadingTitle")
+      : t("dashboard.imagePlayground.toolbenchGenerationResult");
 
-  if (!result) {
-    return (
-      <Card className={resultCardClass}>
-        <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
-          <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
-            {t("dashboard.imagePlayground.resultTitle")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className={IMAGE_PLAYGROUND_TOOLBENCH.cardContent}>
-          <div className="flex min-h-[min(160px,24vh)] flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/15 px-4 py-5 text-center">
-            <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
-            <p className="text-sm text-muted-foreground">
-              {t("dashboard.imagePlayground.toolbenchResultPlaceholder")}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const imageUrl = resolveGeneratedImageUrl(result);
-  const base64Only = !imageUrl && hasGeneratedImageBase64(result);
-  const creditsCharged = resolveResultCredits(result);
-  const requestId = result.request_id ?? null;
-  const requestCopyId = "image-result-request-id";
+  const cardClass = cn(
+    IMAGE_PLAYGROUND_TOOLBENCH.card,
+    IMAGE_PLAYGROUND_TOOLBENCH.resultCard,
+    attention && "ring-2 ring-emerald-200/90 border-emerald-300/70",
+    state === "success" && "border-emerald-500/35",
+    state === "error" && attention && "ring-destructive/15 border-destructive/40",
+    state === "loading" && !attention && "border-primary/25"
+  );
 
   return (
-    <Card className={`${resultCardClass} border-emerald-500/20`}>
+    <Card className={cardClass}>
       <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
-        <CardTitle className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardTitle} flex items-center gap-2`}>
-          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-          {t("dashboard.imagePlayground.resultTitle")}
+        <CardTitle
+          className={cn(
+            IMAGE_PLAYGROUND_TOOLBENCH.cardTitle,
+            state === "loading" && "flex items-center gap-2"
+          )}
+        >
+          {state === "loading" ? (
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
+          ) : state === "success" ? (
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+          ) : null}
+          {title}
         </CardTitle>
       </CardHeader>
       <CardContent
-        className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex flex-col gap-3`}
+        className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex flex-col`}
       >
-        {imageUrl ? (
-          <div className="overflow-hidden rounded-lg border bg-muted/20">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imageUrl}
-              alt="Generated image"
-              className="mx-auto max-h-[min(320px,45vh)] w-full object-contain"
-            />
+        {state === "loading" ? (
+          <div
+            className={`${IMAGE_PLAYGROUND_TOOLBENCH.resultBody} items-center justify-center gap-3 px-4 py-6 text-center`}
+          >
+            <div className="h-28 w-full max-w-xs animate-pulse rounded-md bg-muted/50" />
+            <p className="text-sm font-medium text-foreground">
+              {t("dashboard.imagePlayground.toolbenchResultLoadingTitle")}
+            </p>
+            <p className="max-w-xs text-xs text-muted-foreground">
+              {t("dashboard.imagePlayground.toolbenchResultLoadingHint")}
+            </p>
           </div>
-        ) : base64Only ? (
-          <p className="text-sm text-muted-foreground">
-            {t("dashboard.imagePlayground.base64OnlyHint")}
-          </p>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          {creditsCharged != null ? (
-            <Badge variant="secondary">
-              {formatMessage(t("dashboard.imagePlayground.successCreditsCharged"), {
-                credits: formatCreditsPrecise(creditsCharged),
-              })}
-            </Badge>
-          ) : null}
-          {requestId ? (
-            <code className="max-w-full truncate rounded bg-muted px-2 py-0.5 font-mono text-xs">
-              {requestId}
-            </code>
-          ) : null}
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {requestId ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className={IMAGE_PLAYGROUND_TOOLBENCH.control}
-              onClick={() => copyText(requestCopyId, requestId)}
-            >
-              {copiedId === requestCopyId ? (
-                <>
-                  <Check className="h-4 w-4" />
-                  {t("dashboard.imagePlayground.copiedRequestId")}
-                </>
-              ) : (
-                <>
-                  <Copy className="h-4 w-4" />
-                  {t("dashboard.imagePlayground.copyRequestId")}
-                </>
-              )}
-            </Button>
-          ) : null}
-          <Button
-            asChild
-            size="sm"
-            variant="outline"
-            className={IMAGE_PLAYGROUND_TOOLBENCH.control}
+        {state === "error" ? (
+          <div
+            className={`${IMAGE_PLAYGROUND_TOOLBENCH.resultBody} gap-3 p-4`}
           >
-            <Link href="/dashboard/usage">{t("dashboard.imagePlayground.viewUsage")}</Link>
-          </Button>
-          <Button
-            asChild
-            size="sm"
-            variant="outline"
-            className={IMAGE_PLAYGROUND_TOOLBENCH.control}
-          >
-            <Link href="/dashboard/credits">{t("dashboard.imagePlayground.viewCredits")}</Link>
-          </Button>
-        </div>
+            <PlaygroundErrorPanel scope="imagePlayground" error={error!} t={t} />
+            <p className="text-xs text-muted-foreground">
+              {t("dashboard.imagePlayground.errors.billingNotChargedHint")}
+            </p>
+            {onRetry ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className={IMAGE_PLAYGROUND_TOOLBENCH.control}
+                onClick={onRetry}
+              >
+                <RotateCw className="h-4 w-4" />
+                {t("dashboard.imagePlayground.toolbenchRetry")}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
 
-        {completedAt ? (
-          <p className="text-xs text-muted-foreground">
-            {t("dashboard.imagePlayground.metaCreatedAt")}: {completedAt}
-            {inputImagesCount != null ? ` · ${inputImagesCount} input(s)` : ""}
-          </p>
+        {state === "empty" ? (
+          <div
+            className={`${IMAGE_PLAYGROUND_TOOLBENCH.resultBody} items-center justify-center gap-3 px-4 py-8 text-center`}
+          >
+            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-muted-foreground/20 bg-muted/40">
+              <ImageIcon className="h-7 w-7 text-muted-foreground/70" />
+            </div>
+            <p className="text-sm font-medium text-foreground">
+              {t("dashboard.imagePlayground.toolbenchResultPlaceholder")}
+            </p>
+          </div>
+        ) : null}
+
+        {state === "success" ? (
+          <div className="flex flex-col gap-3">
+            {(() => {
+              const imageUrl = resolveGeneratedImageUrl(result!);
+              const base64Only = !imageUrl && hasGeneratedImageBase64(result!);
+              const creditsCharged = resolveResultCredits(result!);
+              const requestId = result!.request_id ?? null;
+              const resolvedModel = result!.model ?? null;
+              const requestCopyId = "image-result-request-id";
+
+              return (
+                <>
+                  {imageUrl ? (
+                    <div className="overflow-hidden rounded-lg border bg-muted/20">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={imageUrl}
+                        alt="Generated image"
+                        className="mx-auto max-h-[min(480px,55vh)] w-full object-contain"
+                      />
+                    </div>
+                  ) : base64Only ? (
+                    <div
+                      className={`${IMAGE_PLAYGROUND_TOOLBENCH.resultBody} items-center justify-center px-4 py-6`}
+                    >
+                      <p className="text-sm text-muted-foreground">
+                        {t("dashboard.imagePlayground.base64OnlyHint")}
+                      </p>
+                    </div>
+                  ) : null}
+
+                  <div className="flex flex-col gap-2 text-sm">
+                    {requestId ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <code className="max-w-full truncate rounded bg-muted px-2 py-0.5 font-mono text-xs">
+                          {requestId}
+                        </code>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className={`h-8 ${IMAGE_PLAYGROUND_TOOLBENCH.control}`}
+                          onClick={() => copyText(requestCopyId, requestId)}
+                        >
+                          {copiedId === requestCopyId ? (
+                            <>
+                              <Check className="h-3.5 w-3.5" />
+                              {t("dashboard.imagePlayground.copiedRequestId")}
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3.5 w-3.5" />
+                              {t("dashboard.imagePlayground.copyRequestId")}
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    ) : null}
+                    {creditsCharged != null ? (
+                      <p className="text-xs text-muted-foreground">
+                        {formatMessage(
+                          t("dashboard.imagePlayground.successCreditsCharged"),
+                          { credits: formatCreditsPrecise(creditsCharged) }
+                        )}
+                      </p>
+                    ) : null}
+                    {resolvedModel ? (
+                      <p className="text-xs text-muted-foreground">
+                        {t("dashboard.imagePlayground.metaModel")}:{" "}
+                        <span className="font-mono text-foreground">
+                          {resolvedModel}
+                        </span>
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="outline"
+                      className={IMAGE_PLAYGROUND_TOOLBENCH.control}
+                    >
+                      <Link href="/dashboard/usage">
+                        {t("dashboard.imagePlayground.viewUsage")}
+                      </Link>
+                    </Button>
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="outline"
+                      className={IMAGE_PLAYGROUND_TOOLBENCH.control}
+                    >
+                      <Link href="/dashboard/credits">
+                        {t("dashboard.imagePlayground.viewCredits")}
+                      </Link>
+                    </Button>
+                  </div>
+
+                  {completedAt ? (
+                    <p className="text-xs text-muted-foreground">
+                      {t("dashboard.imagePlayground.metaCreatedAt")}: {completedAt}
+                      {inputImagesCount != null
+                        ? ` · ${inputImagesCount} input(s)`
+                        : ""}
+                    </p>
+                  ) : null}
+                </>
+              );
+            })()}
+          </div>
         ) : null}
       </CardContent>
     </Card>
