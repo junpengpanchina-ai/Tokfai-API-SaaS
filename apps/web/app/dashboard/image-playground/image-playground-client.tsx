@@ -4,18 +4,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
-  Check,
-  Copy,
   Loader2,
   Plus,
-  Sparkles,
   Upload,
   X,
 } from "lucide-react";
 
 import {
+  IMAGE_PLAYGROUND_TOOLBENCH,
   ImagePlaygroundCompactKeyRow,
+  ImagePlaygroundGenerateActions,
   ImagePlaygroundResultArea,
+  ImagePlaygroundServiceDocsPanel,
   ImagePlaygroundSettingsSidebar,
 } from "@/components/image-playground-toolbench";
 import { Badge } from "@/components/ui/badge";
@@ -714,7 +714,7 @@ export function ImagePlaygroundClient({
       onDrop={(event) => {
         event.preventDefault();
       }}
-      className="flex min-w-0 flex-col gap-4"
+      className="flex min-w-0 flex-col gap-4 overflow-x-hidden"
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0 flex-1">
@@ -733,10 +733,8 @@ export function ImagePlaygroundClient({
         </Badge>
       </div>
 
-      <div
-        className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(248px,0.72fr)_minmax(280px,1fr)] lg:items-start lg:gap-5"
-      >
-        <div className="flex min-w-0 flex-col gap-4 lg:col-start-1">
+      <div className={IMAGE_PLAYGROUND_TOOLBENCH.grid}>
+        <div className="flex min-w-0 flex-col gap-3 lg:col-start-1">
           <ImagePlaygroundCompactKeyRow
             keyPanelView={keyPanelView}
             localKeys={localKeys}
@@ -757,20 +755,22 @@ export function ImagePlaygroundClient({
             t={t}
           />
 
-          <Card className="shadow-none">
-            <CardHeader className="pb-3">
+          <Card className={IMAGE_PLAYGROUND_TOOLBENCH.card}>
+            <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
               <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="text-base">
+                <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
                   {t("dashboard.imagePlayground.toolbenchPromptTitle")}
                 </CardTitle>
-                <Badge variant={isImageToImage ? "default" : "secondary"}>
+                <Badge variant={isImageToImage ? "default" : "secondary"} className="text-[10px]">
                   {isImageToImage
                     ? t("dashboard.imagePlayground.imageToImage")
                     : t("dashboard.imagePlayground.textToImage")}
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3 pt-0">
+            <CardContent
+              className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex flex-col gap-3`}
+            >
               <PromptPresets
                 loading={loading}
                 onSelect={(presetId) =>
@@ -781,13 +781,13 @@ export function ImagePlaygroundClient({
               <textarea
                 ref={promptRef}
                 id="prompt"
-                rows={4}
+                rows={3}
                 required
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 disabled={loading}
                 placeholder={promptPlaceholder}
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex min-h-[4.5rem] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               />
 
               <ImageInputsPanel
@@ -820,48 +820,15 @@ export function ImagePlaygroundClient({
                 </p>
               ) : null}
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                <Button
-                  type="submit"
-                  disabled={loading || hasUploadingImages || isModelComingSoon}
-                  className="w-full sm:w-auto"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {t("dashboard.imagePlayground.generating")}
-                    </>
-                  ) : hasUploadingImages ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {t("dashboard.imagePlayground.preparingImages")}
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4" />
-                      {t("dashboard.imagePlayground.generate")}
-                    </>
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={loading || hasUploadingImages}
-                  onClick={() => void handleCopyApiRequest()}
-                  className="w-full sm:w-auto"
-                >
-                  {copyRequestStatus === "copied" ? (
-                    <>
-                      <Check className="h-4 w-4" />
-                      {t("dashboard.apiKeys.copied")}
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4" />
-                      {t("dashboard.imagePlayground.copyApiRequest")}
-                    </>
-                  )}
-                </Button>
+              <div className="hidden border-t pt-3 lg:block">
+                <ImagePlaygroundGenerateActions
+                  loading={loading}
+                  hasUploadingImages={hasUploadingImages}
+                  isModelComingSoon={isModelComingSoon}
+                  copyRequestStatus={copyRequestStatus}
+                  onCopyApiRequest={() => void handleCopyApiRequest()}
+                  t={t}
+                />
               </div>
             </CardContent>
           </Card>
@@ -883,18 +850,39 @@ export function ImagePlaygroundClient({
           />
         </div>
 
-        <div className="min-w-0 lg:col-start-3 lg:sticky lg:top-6 lg:self-start">
-          <ImagePlaygroundResultArea
+        <div className="min-w-0 lg:col-start-1 lg:hidden">
+          <ImagePlaygroundGenerateActions
             loading={loading}
-            error={error}
-            result={result}
-            completedAt={completedAt}
-            inputImagesCount={
-              result?.input_images_count ?? lastRequestInputCount
-            }
-            isImageToImage={isImageToImage}
+            hasUploadingImages={hasUploadingImages}
+            isModelComingSoon={isModelComingSoon}
+            copyRequestStatus={copyRequestStatus}
+            layout="grid"
+            onCopyApiRequest={() => void handleCopyApiRequest()}
             t={t}
           />
+        </div>
+
+        <div className={`${IMAGE_PLAYGROUND_TOOLBENCH.stickyColumn} lg:col-start-3`}>
+          <div className="flex flex-col gap-3">
+            <ImagePlaygroundResultArea
+              loading={loading}
+              error={error}
+              result={result}
+              completedAt={completedAt}
+              inputImagesCount={
+                result?.input_images_count ?? lastRequestInputCount
+              }
+              isImageToImage={isImageToImage}
+              t={t}
+            />
+            <ImagePlaygroundServiceDocsPanel
+              copyRequestStatus={copyRequestStatus}
+              loading={loading}
+              hasUploadingImages={hasUploadingImages}
+              onCopyApiRequest={() => void handleCopyApiRequest()}
+              t={t}
+            />
+          </div>
         </div>
       </div>
     </form>

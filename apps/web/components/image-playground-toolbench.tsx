@@ -2,12 +2,16 @@
 
 import Link from "next/link";
 import {
+  BookOpen,
   Check,
   CheckCircle2,
   Copy,
+  FileText,
+  Gauge,
   ImageIcon,
   KeyRound,
   Loader2,
+  Sparkles,
   Wallet,
 } from "lucide-react";
 
@@ -44,6 +48,25 @@ import {
 } from "@/lib/model-catalog";
 import { formatMessage, type Locale } from "@/lib/i18n/messages";
 import { TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
+
+/** Shared layout tokens for the three-column Image Playground toolbench. */
+export const IMAGE_PLAYGROUND_TOOLBENCH = {
+  grid:
+    "grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(220px,0.68fr)_minmax(260px,0.92fr)] lg:items-start lg:gap-4",
+  card: "shadow-none overflow-hidden",
+  cardHeader: "space-y-0.5 px-4 py-3",
+  cardTitle: "text-sm font-medium leading-tight",
+  cardDescription: "text-xs text-muted-foreground",
+  cardContent: "px-4 pb-4 pt-0",
+  control: "h-9",
+  select:
+    "flex h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
+  stickyColumn:
+    "min-w-0 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-1.75rem)] lg:overflow-y-auto lg:overflow-x-hidden",
+} as const;
+
+const IMAGE_API_DOCS_HREF = "/docs#image-generations";
+const INTEGRATION_DOCS_HREF = "/dashboard/docs";
 
 type ImagePlaygroundKeyOption = {
   id: string;
@@ -266,16 +289,18 @@ export function ImagePlaygroundSettingsSidebar({
     (creditsBalance ?? 0) < estimatedCredits;
 
   return (
-    <Card className="shadow-none">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium">
+    <Card className={IMAGE_PLAYGROUND_TOOLBENCH.card}>
+      <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
+        <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
           {t("dashboard.imagePlayground.toolbenchSettings")}
         </CardTitle>
-        <CardDescription className="text-xs">
+        <CardDescription className={IMAGE_PLAYGROUND_TOOLBENCH.cardDescription}>
           {t("dashboard.imagePlayground.toolbenchSettingsDesc")}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3 pt-0">
+      <CardContent
+        className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex flex-col gap-3`}
+      >
         <div className="rounded-lg border bg-muted/30 p-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-muted-foreground">
@@ -302,7 +327,7 @@ export function ImagePlaygroundSettingsSidebar({
               {t("dashboard.imagePlayground.toolbenchInsufficientCredits")}
             </p>
           ) : null}
-          <Button asChild size="sm" className="mt-3 w-full">
+          <Button asChild size="sm" className={`mt-3 w-full ${IMAGE_PLAYGROUND_TOOLBENCH.control}`}>
             <Link href="/dashboard/credits">
               <Wallet className="h-4 w-4" />
               {t("dashboard.imagePlayground.topUp")}
@@ -319,7 +344,7 @@ export function ImagePlaygroundSettingsSidebar({
             value={model}
             onChange={(e) => onModelChange(e.target.value as ImagePlaygroundModelId)}
             disabled={loading}
-            className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+            className={IMAGE_PLAYGROUND_TOOLBENCH.select}
           >
             {IMAGE_PLAYGROUND_MODEL_IDS.map((m) => (
               <option key={m} value={m}>
@@ -346,7 +371,7 @@ export function ImagePlaygroundSettingsSidebar({
             value={size}
             onChange={(e) => onSizeChange(e.target.value as ImagePlaygroundSize)}
             disabled={loading}
-            className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+            className={IMAGE_PLAYGROUND_TOOLBENCH.select}
           >
             {IMAGE_PLAYGROUND_SIZES.map((s) => (
               <option key={s} value={s}>{s}</option>
@@ -357,6 +382,187 @@ export function ImagePlaygroundSettingsSidebar({
         <p className="text-xs text-muted-foreground">
           {t("dashboard.imagePlayground.toolbenchBillingNote")}
         </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+export interface ImagePlaygroundGenerateActionsProps {
+  loading: boolean;
+  hasUploadingImages: boolean;
+  isModelComingSoon: boolean;
+  copyRequestStatus: "idle" | "copied";
+  layout?: "row" | "grid";
+  onCopyApiRequest: () => void;
+  t: (key: string) => string;
+}
+
+export function ImagePlaygroundGenerateActions({
+  loading,
+  hasUploadingImages,
+  isModelComingSoon,
+  copyRequestStatus,
+  layout = "row",
+  onCopyApiRequest,
+  t,
+}: ImagePlaygroundGenerateActionsProps) {
+  const layoutClass =
+    layout === "grid"
+      ? "grid grid-cols-1 gap-2 sm:grid-cols-2"
+      : "flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center";
+
+  return (
+    <div className={layoutClass}>
+      <Button
+        type="submit"
+        disabled={loading || hasUploadingImages || isModelComingSoon}
+        className={`w-full sm:w-auto ${IMAGE_PLAYGROUND_TOOLBENCH.control}`}
+      >
+        {loading ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            {t("dashboard.imagePlayground.generating")}
+          </>
+        ) : hasUploadingImages ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            {t("dashboard.imagePlayground.preparingImages")}
+          </>
+        ) : (
+          <>
+            <Sparkles className="h-4 w-4" />
+            {t("dashboard.imagePlayground.generate")}
+          </>
+        )}
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        disabled={loading || hasUploadingImages}
+        onClick={onCopyApiRequest}
+        className={`w-full sm:w-auto ${IMAGE_PLAYGROUND_TOOLBENCH.control}`}
+      >
+        {copyRequestStatus === "copied" ? (
+          <>
+            <Check className="h-4 w-4" />
+            {t("dashboard.apiKeys.copied")}
+          </>
+        ) : (
+          <>
+            <Copy className="h-4 w-4" />
+            {t("dashboard.imagePlayground.copyApiRequest")}
+          </>
+        )}
+      </Button>
+    </div>
+  );
+}
+
+export interface ImagePlaygroundServiceDocsPanelProps {
+  copyRequestStatus: "idle" | "copied";
+  loading: boolean;
+  hasUploadingImages: boolean;
+  onCopyApiRequest: () => void;
+  t: (key: string) => string;
+}
+
+export function ImagePlaygroundServiceDocsPanel({
+  copyRequestStatus,
+  loading,
+  hasUploadingImages,
+  onCopyApiRequest,
+  t,
+}: ImagePlaygroundServiceDocsPanelProps) {
+  const shortcuts = [
+    {
+      id: "copy",
+      label: t("dashboard.imagePlayground.copyApiRequest"),
+      icon: Copy,
+      onClick: onCopyApiRequest,
+      copied: copyRequestStatus === "copied",
+      copiedLabel: t("dashboard.apiKeys.copied"),
+      href: undefined as string | undefined,
+    },
+    {
+      id: "image-docs",
+      label: t("dashboard.imagePlayground.toolbenchViewImageApiDocs"),
+      icon: BookOpen,
+      href: IMAGE_API_DOCS_HREF,
+    },
+    {
+      id: "usage",
+      label: t("dashboard.imagePlayground.viewUsage"),
+      icon: Gauge,
+      href: "/dashboard/usage",
+    },
+    {
+      id: "credits",
+      label: t("dashboard.imagePlayground.viewCredits"),
+      icon: Wallet,
+      href: "/dashboard/credits",
+    },
+    {
+      id: "integration",
+      label: t("dashboard.imagePlayground.toolbenchOpenIntegrationDocs"),
+      icon: FileText,
+      href: INTEGRATION_DOCS_HREF,
+    },
+  ];
+
+  return (
+    <Card className={IMAGE_PLAYGROUND_TOOLBENCH.card}>
+      <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
+        <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
+          {t("dashboard.imagePlayground.toolbenchServiceDocs")}
+        </CardTitle>
+        <CardDescription className={IMAGE_PLAYGROUND_TOOLBENCH.cardDescription}>
+          {t("dashboard.imagePlayground.toolbenchServiceDocsDesc")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className={IMAGE_PLAYGROUND_TOOLBENCH.cardContent}>
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-1">
+          {shortcuts.map((item) => {
+            const Icon = item.icon;
+            if (item.href) {
+              return (
+                <Button
+                  key={item.id}
+                  asChild
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className={`h-9 justify-start gap-2 px-3 text-xs font-normal`}
+                >
+                  <Link href={item.href}>
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                </Button>
+              );
+            }
+
+            return (
+              <Button
+                key={item.id}
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={loading || hasUploadingImages}
+                onClick={item.onClick}
+                className="h-9 justify-start gap-2 px-3 text-xs font-normal"
+              >
+                {item.copied ? (
+                  <Check className="h-3.5 w-3.5 shrink-0" />
+                ) : (
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                )}
+                <span className="truncate">
+                  {item.copied ? item.copiedLabel : item.label}
+                </span>
+              </Button>
+            );
+          })}
+        </div>
       </CardContent>
     </Card>
   );
@@ -387,15 +593,19 @@ export function ImagePlaygroundResultArea({
   t: (key: string) => string;
 }) {
   const { copiedId, copyText } = useCopyToClipboard();
-  const resultCardClass = "shadow-none w-full";
+  const resultCardClass = IMAGE_PLAYGROUND_TOOLBENCH.card;
 
   if (loading) {
     return (
       <Card className={resultCardClass}>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">{t("dashboard.imagePlayground.resultTitle")}</CardTitle>
+        <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
+          <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
+            {t("dashboard.imagePlayground.resultTitle")}
+          </CardTitle>
         </CardHeader>
-        <CardContent className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
+        <CardContent
+          className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex items-center gap-2 py-6 text-sm text-muted-foreground`}
+        >
           <Loader2 className="h-5 w-5 animate-spin" />
           {t("dashboard.imagePlayground.generatingImage")}
         </CardContent>
@@ -406,10 +616,14 @@ export function ImagePlaygroundResultArea({
   if (error) {
     return (
       <Card className={resultCardClass}>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">{t("dashboard.imagePlayground.resultTitle")}</CardTitle>
+        <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
+          <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
+            {t("dashboard.imagePlayground.resultTitle")}
+          </CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3">
+        <CardContent
+          className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex flex-col gap-3`}
+        >
           <PlaygroundErrorPanel scope="imagePlayground" error={error} t={t} />
           <p className="text-xs text-muted-foreground">
             {t("dashboard.imagePlayground.errors.billingNotChargedHint")}
@@ -422,14 +636,16 @@ export function ImagePlaygroundResultArea({
   if (!result) {
     return (
       <Card className={resultCardClass}>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">{t("dashboard.imagePlayground.resultTitle")}</CardTitle>
-          <CardDescription className="text-xs">
+        <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
+          <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
+            {t("dashboard.imagePlayground.resultTitle")}
+          </CardTitle>
+          <CardDescription className={IMAGE_PLAYGROUND_TOOLBENCH.cardDescription}>
             {t("dashboard.imagePlayground.toolbenchResultEmptyDesc")}
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex min-h-[min(360px,52vh)] flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-muted/20 px-4 py-8 text-center">
+        <CardContent className={IMAGE_PLAYGROUND_TOOLBENCH.cardContent}>
+          <div className="flex min-h-[min(200px,28vh)] flex-col items-center justify-center gap-2.5 rounded-lg border border-dashed bg-muted/20 px-4 py-6 text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/60">
               <ImageIcon className="h-8 w-8 text-muted-foreground/70" />
             </div>
@@ -459,20 +675,22 @@ export function ImagePlaygroundResultArea({
 
   return (
     <Card className={`${resultCardClass} border-emerald-500/20`}>
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
+      <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
+        <CardTitle className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardTitle} flex items-center gap-2`}>
           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
           {t("dashboard.imagePlayground.resultTitle")}
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+      <CardContent
+        className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex flex-col gap-3`}
+      >
         {imageUrl ? (
           <div className="overflow-hidden rounded-lg border bg-muted/20">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={imageUrl}
               alt="Generated image"
-              className="mx-auto max-h-[min(420px,60vh)] w-full object-contain"
+              className="mx-auto max-h-[min(320px,45vh)] w-full object-contain"
             />
           </div>
         ) : base64Only ? (
@@ -502,6 +720,7 @@ export function ImagePlaygroundResultArea({
               type="button"
               size="sm"
               variant="outline"
+              className={IMAGE_PLAYGROUND_TOOLBENCH.control}
               onClick={() => copyText(requestCopyId, requestId)}
             >
               {copiedId === requestCopyId ? (
@@ -517,10 +736,20 @@ export function ImagePlaygroundResultArea({
               )}
             </Button>
           ) : null}
-          <Button asChild size="sm" variant="outline">
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            className={IMAGE_PLAYGROUND_TOOLBENCH.control}
+          >
             <Link href="/dashboard/usage">{t("dashboard.imagePlayground.viewUsage")}</Link>
           </Button>
-          <Button asChild size="sm" variant="outline">
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            className={IMAGE_PLAYGROUND_TOOLBENCH.control}
+          >
             <Link href="/dashboard/credits">{t("dashboard.imagePlayground.viewCredits")}</Link>
           </Button>
         </div>

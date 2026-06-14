@@ -19,53 +19,82 @@ export interface DashboardNavItem {
   prefetch?: boolean;
 }
 
-export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = [
+export interface DashboardNavSection {
+  id: string;
+  labelKey: string;
+  items: DashboardNavItem[];
+}
+
+export const DASHBOARD_NAV_SECTIONS: DashboardNavSection[] = [
   {
-    href: "/dashboard",
-    labelKey: "nav.overview",
-    icon: LayoutDashboard,
-    exact: true,
-    prefetch: true,
+    id: "workspace",
+    labelKey: "nav.sectionWorkspace",
+    items: [
+      {
+        href: "/dashboard",
+        labelKey: "nav.overview",
+        icon: LayoutDashboard,
+        exact: true,
+        prefetch: true,
+      },
+      {
+        href: "/dashboard/api-keys",
+        labelKey: "nav.apiKeys",
+        icon: KeyRound,
+        prefetch: false,
+      },
+      {
+        href: "/dashboard/playground",
+        labelKey: "nav.playground",
+        icon: Terminal,
+        prefetch: false,
+      },
+      {
+        href: "/dashboard/image-playground",
+        labelKey: "nav.imagePlayground",
+        icon: ImageIcon,
+        prefetch: false,
+      },
+    ],
   },
   {
-    href: "/dashboard/api-keys",
-    labelKey: "nav.apiKeys",
-    icon: KeyRound,
-    prefetch: false,
+    id: "metering",
+    labelKey: "nav.sectionMetering",
+    items: [
+      {
+        href: "/dashboard/models",
+        labelKey: "nav.models",
+        icon: Boxes,
+        prefetch: true,
+      },
+      { href: "/dashboard/usage", labelKey: "nav.usage", icon: Gauge, prefetch: true },
+      {
+        href: "/dashboard/credits",
+        labelKey: "nav.credits",
+        icon: CreditCard,
+        prefetch: false,
+      },
+    ],
   },
   {
-    href: "/dashboard/playground",
-    labelKey: "nav.playground",
-    icon: Terminal,
-    prefetch: false,
+    id: "service",
+    labelKey: "nav.sectionService",
+    items: [
+      { href: "/dashboard/docs", labelKey: "nav.docs", icon: BookOpen, prefetch: true },
+      {
+        href: "/dashboard/announcements",
+        labelKey: "nav.announcements",
+        icon: Megaphone,
+        prefetch: true,
+      },
+    ],
   },
-  {
-    href: "/dashboard/image-playground",
-    labelKey: "nav.imagePlayground",
-    icon: ImageIcon,
-    prefetch: false,
-  },
-  {
-    href: "/dashboard/models",
-    labelKey: "nav.models",
-    icon: Boxes,
-    prefetch: true,
-  },
-  {
-    href: "/dashboard/announcements",
-    labelKey: "nav.announcements",
-    icon: Megaphone,
-    prefetch: true,
-  },
-  { href: "/dashboard/usage", labelKey: "nav.usage", icon: Gauge, prefetch: true },
-  {
-    href: "/dashboard/credits",
-    labelKey: "nav.credits",
-    icon: CreditCard,
-    prefetch: false,
-  },
-  { href: "/dashboard/docs", labelKey: "nav.docs", icon: BookOpen, prefetch: true },
 ];
+
+/** Flat list for mobile tab bar and other consumers that need a single sequence. */
+export const DASHBOARD_NAV_ITEMS: DashboardNavItem[] = DASHBOARD_NAV_SECTIONS.flatMap(
+  (section) => section.items
+);
 
 export function isDashboardNavActive(
   pathname: string,

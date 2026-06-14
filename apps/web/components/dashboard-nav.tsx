@@ -17,6 +17,7 @@ import {
 import { useAuth } from "@/lib/auth/auth-provider";
 import {
   DASHBOARD_NAV_ITEMS,
+  DASHBOARD_NAV_SECTIONS,
   isDashboardNavActive,
 } from "@/lib/dashboard-nav";
 import type { DashboardShellCredits } from "@/lib/dashboard-shell-credits";
@@ -29,12 +30,14 @@ function useShellNav(pathname: string) {
   if (isAdminRoute) {
     return {
       isAdminRoute: true as const,
+      sections: null,
       items: ADMIN_NAV_ITEMS,
     };
   }
 
   return {
     isAdminRoute: false as const,
+    sections: DASHBOARD_NAV_SECTIONS,
     items: DASHBOARD_NAV_ITEMS,
   };
 }
@@ -74,7 +77,7 @@ export function DashboardMobileShell({
 }) {
   const pathname = usePathname();
   const { t } = useI18n();
-  const { items, isAdminRoute } = useShellNav(pathname);
+  const { items, isAdminRoute, sections } = useShellNav(pathname);
   const ariaLabelKey = isAdminRoute ? "admin.nav.sections" : "nav.dashboard";
   const creditsAmount = formatShellCreditsAmount(credits);
   const displayEmail = truncateEmail(email);
@@ -151,7 +154,7 @@ export function DashboardSidebar({
 }) {
   const pathname = usePathname();
   const { t } = useI18n();
-  const { items, isAdminRoute } = useShellNav(pathname);
+  const { items, isAdminRoute, sections } = useShellNav(pathname);
   const ariaLabelKey = isAdminRoute ? "admin.nav.sections" : "nav.dashboard";
   const creditsAmount = formatShellCreditsAmount(credits);
   const displayEmail = truncateEmail(email);
@@ -174,54 +177,44 @@ export function DashboardSidebar({
         aria-label={t(ariaLabelKey)}
         className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-3"
       >
-        <div className="flex flex-col gap-1">
-          {items.map((item) => {
-            const active = isNavItemActive(pathname, item, isAdminRoute);
-            const Icon = item.icon;
-            const isCreditsItem =
-              !isAdminRoute && item.href === "/dashboard/credits";
-
-            return (
-              <div key={item.href}>
-                {"backLink" in item && item.backLink ? (
-                  <div className="my-2 border-t pt-2" />
-                ) : null}
-                <Link
-                  href={item.href}
-                  prefetch={item.prefetch}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                    active
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
-                    "backLink" in item && item.backLink
-                      ? "text-muted-foreground"
-                      : undefined,
-                    isCreditsItem ? "items-start" : undefined
-                  )}
-                  aria-current={active ? "page" : undefined}
+        {isAdminRoute ? (
+          <div className="flex flex-col gap-0.5">
+            {items.map((item) => (
+              <DashboardNavLink
+                key={item.href}
+                item={item}
+                active={isNavItemActive(pathname, item, isAdminRoute)}
+                isCreditsItem={false}
+                creditsAmount={creditsAmount}
+                t={t}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {sections!.map((section) => (
+              <div key={section.id}>
+                <p
+                  className="px-3 pb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
                 >
-                  <Icon
-                    className={cn(
-                      "h-4 w-4 shrink-0",
-                      isCreditsItem ? "mt-0.5" : undefined
-                    )}
-                  />
-                  {isCreditsItem ? (
-                    <span className="flex min-w-0 flex-col gap-0.5">
-                      <span>{t(item.labelKey)}</span>
-                      <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                        {creditsAmount}
-                      </span>
-                    </span>
-                  ) : (
-                    t(item.labelKey)
-                  )}
-                </Link>
+                  {t(section.labelKey)}
+                </p>
+                <div className="flex flex-col gap-0.5">
+                  {section.items.map((item) => (
+                    <DashboardNavLink
+                      key={item.href}
+                      item={item}
+                      active={isNavItemActive(pathname, item, isAdminRoute)}
+                      isCreditsItem={item.href === "/dashboard/credits"}
+                      creditsAmount={creditsAmount}
+                      t={t}
+                    />
+                  ))}
+                </div>
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </nav>
 
       <div className="shrink-0 border-t bg-muted/30">
@@ -233,6 +226,44 @@ export function DashboardSidebar({
         <DashboardSidebarAccount email={displayEmail} fullEmail={email} />
       </div>
     </div>
+  );
+}
+
+function DashboardNavLink({
+  item,
+  active,
+  isCreditsItem,
+  creditsAmount,
+  t,
+}: {
+  item: (typeof DASHBOARD_NAV_ITEMS)[number];
+  active: boolean;
+  isCreditsItem: boolean;
+  creditsAmount: string;
+  t: (key: string) => string;
+}) {
+  const Icon = item.icon;
+
+  return (
+    <Link
+      href={item.href}
+      prefetch={item.prefetch}
+      className={cn(
+        "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+        active
+          ? "bg-background text-foreground shadow-sm"
+          : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
+      )}
+      aria-current={active ? "page" : undefined}
+    >
+      <Icon className="h-4 w-4 shrink-0" />
+      <span className="min-w-0 truncate">{t(item.labelKey)}</span>
+      {isCreditsItem ? (
+        <span className="ml-auto font-mono text-[11px] tabular-nums text-muted-foreground">
+          {creditsAmount}
+        </span>
+      ) : null}
+    </Link>
   );
 }
 
