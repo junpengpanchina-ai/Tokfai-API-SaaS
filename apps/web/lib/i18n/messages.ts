@@ -583,6 +583,14 @@ export const messages = {
           "If a key is leaked or exposed, revoke it immediately and create a replacement.",
         securityItem3:
           "The full secret is shown once at creation. After that, use Copy key on active keys to copy the full secret again.",
+        securityItem4:
+          "One API Key works for Chat, Image, and Batch — you do not need separate keys per model.",
+        securityItem5:
+          "If a key is leaked or exposed, Revoke it immediately and create a replacement.",
+        apiKeyUnderstandingTitle: "What is a Tokfai API Key?",
+        apiKeyUnderstandingDesc:
+          "Your credential to call Tokfai APIs — same rules as the API Key chapter in Docs.",
+        viewApiKeyDocs: "API Key docs",
         viewApiDocs: "View API docs",
         quickStartDocs: "Quick start guide",
         tryChatPlayground: "Try Chat Playground",
@@ -630,11 +638,11 @@ export const messages = {
         integrationLinksTitle: "Try and verify",
         nextStepsTitle: "Connect via Tokfai API",
         nextStepCurl:
-          "Copy the one-line chat curl below and paste into zsh (Authorization header included).",
-        nextStepSdk: "Copy OpenAI SDK config — only baseURL and apiKey change.",
-        nextStepCursor: "Paste Cursor provider config or open the Cursor guide.",
-        nextStepCherry: "Paste Cherry Studio config or open the Cherry guide.",
-        nextStepBatch: "Copy batch curl to submit multiple items via POST /v1/batches/chat.",
+          "Copy one-line models curl to verify auth, or one-line chat curl for a full test (same as Docs API Key chapter).",
+        nextStepSdk: "See Docs for OpenAI SDK, Cursor, and Cherry Studio.",
+        nextStepCursor: "Cursor setup is in the Cursor chapter in Docs.",
+        nextStepCherry: "Cherry Studio setup is in the Cherry chapter in Docs.",
+        nextStepBatch: "Batch API is in the Batch chapter in Docs.",
         sdkConfigLabel: "OpenAI SDK config",
         batchCurlLabel: "Batch API curl (create batch)",
         copySdkConfig: "Copy SDK config",
@@ -1633,17 +1641,49 @@ export const messages = {
       quickStartChapterFailure:
         "missing_token or invalid_token — fix the header; copy request_id into Usage if unsure.",
       apiKeyTitle: "API Key",
-      apiKeyDesc: "Authenticate every Tokfai API call with your secret key.",
+      apiKeyDesc:
+        "Your credential for every Tokfai API call — one key routes Chat, Image, and Batch.",
+      apiKeyCredential:
+        "A Tokfai API Key is your credential to call Tokfai APIs. Send it on every request to https://api.tokfai.com/v1.",
+      apiKeyBulletAuthHeader:
+        "Header format is always Authorization: Bearer sk-tokfai_xxx (replace xxx with your secret).",
+      apiKeyBulletOneTime:
+        "The full secret is shown once when you create a key — copy it immediately.",
+      apiKeyBulletReveal:
+        "Active keys can be copied again from API Keys via Copy key (reveal).",
+      apiKeyBulletRevoke:
+        "If a key is leaked, Revoke it immediately and create a new key.",
+      apiKeyBulletOneKeyAllApis:
+        "One API Key works for Chat API, Image API, and Batch API — you do not need a separate key per model.",
+      apiKeyBulletServerSide:
+        "Store keys on servers, scripts, IDE, or gateway configs only — never in public frontends or public source code.",
+      apiKeyCopyNowTitle: "You can copy now",
+      apiKeyVerifyCurlTitle: "Verify your key (one-line)",
+      apiKeyVerifyCurlLabel: "One-line models curl (verify auth)",
+      apiKeyChatCurlLabel: "One-line chat curl (full test)",
+      apiKeyVerifyNote:
+        "Paste the one-line models curl into any terminal (Mac, Windows PowerShell, or Linux). HTTP 200 means your key is valid. No Tokfai project folder required.",
+      apiKeyLiveKeyNote:
+        "Your API key from this session is already filled in these curls.",
+      apiKeyErrorsTitle: "Common auth errors",
+      apiKeyErrorMissingToken:
+        "missing_token — no Authorization header was sent. Use the one-line copy buttons; do not paste multi-line curl with broken line breaks.",
+      apiKeyErrorInvalidToken:
+        "invalid_token — key is incomplete, revoked, or wrong format. Create a new key or use Copy key on an active key.",
       apiKeyBody:
         "Create a key in API Keys. Copy the full sk-tokfai_… secret once — Tokfai cannot show it again. Never put keys in client-side code or public source code.",
       apiKeyFormatLabel: "Key format",
-      apiKeyChapterPurpose: "Prove your backend can authenticate to Tokfai.",
+      apiKeyChapterPurpose:
+        "Understand what an API Key is and prove your requests authenticate correctly.",
       apiKeyChapterCopy:
-        "Authorization: Bearer sk-tokfai_… on every request to /v1/*.",
+        "Authorization: Bearer sk-tokfai_… and the one-line models curl below.",
       apiKeyChapterVerify:
-        "A test call returns HTTP 200 instead of missing_token / invalid_token.",
+        "One-line models curl returns HTTP 200 (not missing_token / invalid_token).",
       apiKeyChapterFailure:
-        "invalid_token — key incomplete, revoked, or wrong format; fix in API Keys.",
+        "missing_token or invalid_token — see error explanations below; fix the header or key in API Keys.",
+      copyAuthHeader: "Copy Authorization header",
+      copyOneLineModelsCurl: "Copy one-line Models curl",
+      copyOneLineChatCurl: "Copy one-line Chat curl",
       chatApiTitle: "Chat API",
       chatApiDesc:
         "OpenAI-compatible chat completions — POST /v1/chat/completions and GET /v1/models.",
@@ -2940,6 +2980,14 @@ export const messages = {
           "若密钥泄露或误提交到 git，请立即 Revoke 并创建新密钥。",
         securityItem3:
           "完整 secret 仅在创建时完整展示；之后可通过活跃密钥的「复制密钥」再次复制完整 secret。",
+        securityItem4:
+          "一把 API Key 可用于 Chat、Image、Batch——无需为每个模型单独创建密钥。",
+        securityItem5:
+          "若密钥泄露或误提交，请立即 Revoke 并创建新密钥。",
+        apiKeyUnderstandingTitle: "什么是 Tokfai API Key？",
+        apiKeyUnderstandingDesc:
+          "调用 Tokfai API 的凭证——规则与文档 API Key 章节一致。",
+        viewApiKeyDocs: "API Key 文档",
         viewApiDocs: "查看 API 文档",
         quickStartDocs: "快速上手指南",
         tryChatPlayground: "打开 Chat Playground",
@@ -2985,11 +3033,11 @@ export const messages = {
         integrationLinksTitle: "体验与核对",
         nextStepsTitle: "通过 Tokfai API 接入",
         nextStepCurl:
-          "复制下方单行 chat curl，粘贴到 zsh 运行（已包含 Authorization 头）。",
-        nextStepSdk: "复制 OpenAI SDK 配置——仅改 baseURL 与 apiKey。",
-        nextStepCursor: "复制 Cursor 配置或打开 Cursor 指南。",
-        nextStepCherry: "复制 Cherry Studio 配置或打开 Cherry 指南。",
-        nextStepBatch: "复制 Batch curl，通过 POST /v1/batches/chat 提交多条 items。",
+          "复制单行 models curl 验证鉴权，或单行 chat curl 做完整测试（与文档 API Key 章节一致）。",
+        nextStepSdk: "更多接入方式见文档：OpenAI SDK、Cursor、Cherry Studio。",
+        nextStepCursor: "Cursor 配置见文档 Cursor 章节。",
+        nextStepCherry: "Cherry Studio 配置见文档 Cherry 章节。",
+        nextStepBatch: "Batch API 见文档 Batch 章节。",
         sdkConfigLabel: "OpenAI SDK 配置",
         batchCurlLabel: "Batch API curl（创建 batch）",
         copySdkConfig: "复制 SDK 配置",
@@ -3940,17 +3988,48 @@ export const messages = {
       quickStartChapterFailure:
         "missing_token 或 invalid_token — 检查请求头；不确定时在 Usage 搜 request_id。",
       apiKeyTitle: "API Key",
-      apiKeyDesc: "用密钥为每次 Tokfai API 调用鉴权。",
+      apiKeyDesc:
+        "每次 Tokfai API 调用的凭证——一把 Key 即可调用 Chat、Image 与 Batch。",
+      apiKeyCredential:
+        "Tokfai API Key 是调用 Tokfai API 的凭证。每次请求 https://api.tokfai.com/v1 时都需要携带。",
+      apiKeyBulletAuthHeader:
+        "请求头格式固定为 Authorization: Bearer sk-tokfai_xxx（xxx 替换为你的 secret）。",
+      apiKeyBulletOneTime:
+        "完整 secret 仅在创建密钥时展示一次——请立即复制保存。",
+      apiKeyBulletReveal:
+        "活跃密钥可在 API Keys 页面通过「复制密钥」（reveal）再次获取完整 secret。",
+      apiKeyBulletRevoke:
+        "密钥泄露后请立即 Revoke，并创建新密钥。",
+      apiKeyBulletOneKeyAllApis:
+        "一把 API Key 可用于 Chat API、Image API、Batch API——无需为每个模型单独创建密钥。",
+      apiKeyBulletServerSide:
+        "密钥只应放在服务端、脚本、IDE 或网关配置中——不要写入公开前端或公开源码。",
+      apiKeyCopyNowTitle: "你现在就可以复制",
+      apiKeyVerifyCurlTitle: "验证密钥（单行）",
+      apiKeyVerifyCurlLabel: "单行 models curl（验证鉴权）",
+      apiKeyChatCurlLabel: "单行 chat curl（完整测试）",
+      apiKeyVerifyNote:
+        "将单行 models curl 粘贴到任意终端（Mac Terminal、Windows PowerShell 或 Linux shell）。HTTP 200 表示密钥有效。无需进入 Tokfai 工程目录。",
+      apiKeyLiveKeyNote: "本浏览器会话中的 API Key 已自动填入下方 curl。",
+      apiKeyErrorsTitle: "常见鉴权错误",
+      apiKeyErrorMissingToken:
+        "missing_token — 未发送 Authorization 请求头。请用单行复制按钮；不要粘贴因换行断裂的多行 curl。",
+      apiKeyErrorInvalidToken:
+        "invalid_token — 密钥不完整、已吊销或格式错误。请创建新密钥，或在活跃密钥上使用「复制密钥」。",
       apiKeyBody:
         "在 API Keys 创建密钥，立即复制完整 sk-tokfai_… secret（无法再次查看）。勿将密钥放入前端或公开源码。",
       apiKeyFormatLabel: "密钥格式",
-      apiKeyChapterPurpose: "证明你的后端能向 Tokfai 完成鉴权。",
+      apiKeyChapterPurpose:
+        "理解 API Key 的作用，并验证请求能正确完成鉴权。",
       apiKeyChapterCopy:
-        "每次 /v1/* 请求携带 Authorization: Bearer sk-tokfai_…。",
+        "Authorization: Bearer sk-tokfai_… 与下方单行 models curl。",
       apiKeyChapterVerify:
-        "测试请求返回 HTTP 200，而非 missing_token / invalid_token。",
+        "单行 models curl 返回 HTTP 200（而非 missing_token / invalid_token）。",
       apiKeyChapterFailure:
-        "invalid_token — 密钥不完整、已吊销或格式错误；在 API Keys 重新创建。",
+        "missing_token 或 invalid_token — 见下方错误说明；在 API Keys 修正请求头或密钥。",
+      copyAuthHeader: "复制 Authorization header",
+      copyOneLineModelsCurl: "复制单行 Models curl",
+      copyOneLineChatCurl: "复制单行 Chat curl",
       chatApiTitle: "Chat API",
       chatApiDesc:
         "OpenAI 兼容对话 — POST /v1/chat/completions 与 GET /v1/models。",

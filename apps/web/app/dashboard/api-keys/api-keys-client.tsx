@@ -48,24 +48,15 @@ import { extractDmitActionErrorDetails } from "@/lib/dmit-error-details";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
 import { DashboardFirstRunOnboardingCard } from "@/components/dashboard-first-run-onboarding";
-import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
+import { ApiKeyChapterCopyPanel } from "@/components/api-key-chapter-copy";
+import { CopyConfigAction } from "@/components/copyable-snippet-field";
 import {
   setQuickStartApiKeySecret,
   clearQuickStartApiKeySecret,
 } from "@/lib/customer-quick-start-key-session";
-import { quickStartChatCurlOneLine } from "@/lib/customer-quick-start-snippets";
-import {
-  authorizationHeader,
-  batchCreateCurlOneLine,
-  cherryStudioConfigSnippet,
-  cursorConfigSnippet,
-  modelsCurlOneLine,
-  openaiSdkConfigSnippet,
-} from "@/lib/customer-integration-snippets";
 import {
   TOKFAI_API_BASE_URL,
   TOKFAI_API_KEY_PLACEHOLDER,
-  TOKFAI_RECOMMENDED_MODEL,
 } from "@/lib/tokfai-api";
 
 export interface ApiKeyListItem {
@@ -225,7 +216,7 @@ export function ApiKeysClient({
 
       <SecurityGuide t={t} />
 
-      <IntegrationGuide t={t} />
+      <ApiKeyUnderstandingGuide t={t} />
 
       {oneTimeSecret ? (
         <OneTimeSecretCard
@@ -330,28 +321,32 @@ function SecurityGuide({ t }: { t: (key: string) => string }) {
           <li>{t("dashboard.apiKeys.securityItem1")}</li>
           <li>{t("dashboard.apiKeys.securityItem2")}</li>
           <li>{t("dashboard.apiKeys.securityItem3")}</li>
+          <li>{t("dashboard.apiKeys.securityItem4")}</li>
+          <li>{t("dashboard.apiKeys.securityItem5")}</li>
         </ul>
       </CardContent>
     </Card>
   );
 }
 
-function IntegrationGuide({ t }: { t: (key: string) => string }) {
+function ApiKeyUnderstandingGuide({ t }: { t: (key: string) => string }) {
   return (
     <Card className="border-muted bg-muted/30">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <BookOpen className="h-4 w-4 shrink-0" />
-          {t("dashboard.apiKeys.quickStart")}
+          {t("dashboard.apiKeys.apiKeyUnderstandingTitle")}
         </CardTitle>
-        <CardDescription>{t("dashboard.apiKeys.quickStartDesc")}</CardDescription>
+        <CardDescription>{t("dashboard.apiKeys.apiKeyUnderstandingDesc")}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
-          <li>{t("dashboard.apiKeys.quickStartItem1")}</li>
-          <li>{t("dashboard.apiKeys.quickStartItem2")}</li>
-          <li>{t("dashboard.apiKeys.quickStartItem3")}</li>
-          <li>{t("dashboard.apiKeys.quickStartItem4")}</li>
+          <li>{t("integration.apiKeyBulletAuthHeader")}</li>
+          <li>{t("integration.apiKeyBulletOneTime")}</li>
+          <li>{t("integration.apiKeyBulletReveal")}</li>
+          <li>{t("integration.apiKeyBulletRevoke")}</li>
+          <li>{t("integration.apiKeyBulletOneKeyAllApis")}</li>
+          <li>{t("integration.apiKeyBulletServerSide")}</li>
         </ul>
         <p className="text-sm text-muted-foreground">
           {t("dashboard.apiKeys.authHeaderHint")}{" "}
@@ -361,8 +356,8 @@ function IntegrationGuide({ t }: { t: (key: string) => string }) {
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/dashboard/docs">
-              {t("dashboard.apiKeys.viewApiDocs")}
+            <Link href="/dashboard/docs#api-key">
+              {t("dashboard.apiKeys.viewApiKeyDocs")}
               <ExternalLink className="h-3.5 w-3.5" />
             </Link>
           </Button>
@@ -372,23 +367,8 @@ function IntegrationGuide({ t }: { t: (key: string) => string }) {
             </Link>
           </Button>
           <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/dashboard/playground">
-              {t("dashboard.apiKeys.tryChatPlayground")}
-            </Link>
-          </Button>
-          <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/dashboard/image-playground">
-              {t("dashboard.apiKeys.tryImagePlayground")}
-            </Link>
-          </Button>
-          <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/dashboard/docs#cursor-integration">
-              {t("dashboard.apiKeys.cursorGuide")}
-            </Link>
-          </Button>
-          <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/dashboard/docs#cherry-studio">
-              {t("dashboard.apiKeys.cherryStudioGuide")}
+            <Link href="/dashboard/docs">
+              {t("dashboard.apiKeys.viewApiDocs")}
             </Link>
           </Button>
         </div>
@@ -414,13 +394,6 @@ function OneTimeSecretCard({
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [snippetCopiedId, setSnippetCopiedId] = useState<string | null>(null);
-  const chatCurlOneLineExample = quickStartChatCurlOneLine(secret);
-  const modelsCurlOneLineExample = modelsCurlOneLine(secret);
-  const authHeaderValue = authorizationHeader(secret);
-  const sdkConfig = openaiSdkConfigSnippet(secret, TOKFAI_RECOMMENDED_MODEL);
-  const cursorConfig = cursorConfigSnippet(secret);
-  const cherryConfig = cherryStudioConfigSnippet(secret, TOKFAI_RECOMMENDED_MODEL);
-  const batchCurlOneLineExample = batchCreateCurlOneLine(secret, TOKFAI_RECOMMENDED_MODEL);
 
   useEffect(() => {
     cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -525,76 +498,21 @@ function OneTimeSecretCard({
             {secret}
           </code>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <CopyableSnippetField
-            label={t("dashboard.apiKeys.baseUrlLabel")}
-            value={TOKFAI_API_BASE_URL}
-            copyId="base-url"
-            copiedId={snippetCopiedId}
-            onCopy={handleSnippetCopy}
-            copyLabel={t("dashboard.apiKeys.copyBaseUrl")}
-            copiedLabel={t("dashboard.apiKeys.copied")}
-            className="[&_code]:border-emerald-200 [&_code]:bg-white dark:[&_code]:border-emerald-800 dark:[&_code]:bg-background"
-          />
-          <div className="flex flex-col gap-2">
-            <Label className="text-xs uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
-              {t("dashboard.apiKeys.recommendedModelLabel")}
-            </Label>
-            <code className="block rounded-md border border-emerald-200 bg-white p-3 font-mono text-xs dark:border-emerald-800 dark:bg-background">
-              {TOKFAI_RECOMMENDED_MODEL}
-            </code>
+        <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
+            {t("integration.apiKeyCopyNowTitle")}
+          </p>
+          <div className="mt-3">
+            <ApiKeyChapterCopyPanel
+              apiKey={secret}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              idPrefix="one-time-secret"
+              showKeyFormat={false}
+              variant="success-card"
+            />
           </div>
         </div>
-        <CopyableSnippetField
-          label={t("dashboard.apiKeys.authorizationHeader")}
-          value={authHeaderValue}
-          copyId="auth-header"
-          copiedId={snippetCopiedId}
-          onCopy={handleSnippetCopy}
-          copyLabel={t("dashboard.apiKeys.copyAuthHeader")}
-          copiedLabel={t("dashboard.apiKeys.copied")}
-          className="[&_code]:border-emerald-200 [&_code]:bg-white dark:[&_code]:border-emerald-800 dark:[&_code]:bg-background"
-        />
-        <CopyableSnippetField
-          label={t("dashboard.apiKeys.curlOneLineLabel")}
-          value={chatCurlOneLineExample}
-          copyId="curl-test"
-          copiedId={snippetCopiedId}
-          onCopy={handleSnippetCopy}
-          copyLabel={t("dashboard.apiKeys.copyOneLineChatCurl")}
-          copiedLabel={t("dashboard.apiKeys.copied")}
-          className="[&_code]:max-h-32 [&_code]:whitespace-pre-wrap [&_code]:break-all [&_code]:border-emerald-200 [&_code]:bg-white dark:[&_code]:border-emerald-800 dark:[&_code]:bg-background"
-        />
-        <CopyableSnippetField
-          label={t("dashboard.apiKeys.modelsCurlOneLineLabel")}
-          value={modelsCurlOneLineExample}
-          copyId="models-curl"
-          copiedId={snippetCopiedId}
-          onCopy={handleSnippetCopy}
-          copyLabel={t("dashboard.apiKeys.copyOneLineModelsCurl")}
-          copiedLabel={t("dashboard.apiKeys.copied")}
-          className="[&_code]:max-h-32 [&_code]:whitespace-pre-wrap [&_code]:break-all [&_code]:border-emerald-200 [&_code]:bg-white dark:[&_code]:border-emerald-800 dark:[&_code]:bg-background"
-        />
-        <CopyableSnippetField
-          label={t("dashboard.apiKeys.sdkConfigLabel")}
-          value={sdkConfig}
-          copyId="sdk-config"
-          copiedId={snippetCopiedId}
-          onCopy={handleSnippetCopy}
-          copyLabel={t("dashboard.apiKeys.copySdkConfig")}
-          copiedLabel={t("dashboard.apiKeys.copied")}
-          className="[&_code]:whitespace-pre-wrap [&_code]:break-all [&_code]:border-emerald-200 [&_code]:bg-white dark:[&_code]:border-emerald-800 dark:[&_code]:bg-background"
-        />
-        <CopyableSnippetField
-          label={t("dashboard.apiKeys.batchCurlOneLineLabel")}
-          value={batchCurlOneLineExample}
-          copyId="batch-curl"
-          copiedId={snippetCopiedId}
-          onCopy={handleSnippetCopy}
-          copyLabel={t("dashboard.apiKeys.copyOneLineBatchCurl")}
-          copiedLabel={t("dashboard.apiKeys.copied")}
-          className="[&_code]:max-h-32 [&_code]:whitespace-pre-wrap [&_code]:break-all [&_code]:border-emerald-200 [&_code]:bg-white dark:[&_code]:border-emerald-800 dark:[&_code]:bg-background"
-        />
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <Button type="button" className="w-full sm:w-auto" onClick={onCopy}>
             {copyStatus === "copied" ? (
@@ -609,62 +527,11 @@ function OneTimeSecretCard({
               </>
             )}
           </Button>
-          <CopyConfigAction
-            id="one-time-copy-auth"
-            value={authHeaderValue}
-            copiedId={snippetCopiedId}
-            onCopy={handleSnippetCopy}
-            label={t("dashboard.apiKeys.copyAuthHeader")}
-            copiedLabel={t("dashboard.apiKeys.copied")}
-          />
-          <CopyConfigAction
-            id="one-time-copy-curl"
-            value={chatCurlOneLineExample}
-            copiedId={snippetCopiedId}
-            onCopy={handleSnippetCopy}
-            label={t("dashboard.apiKeys.copyOneLineChatCurl")}
-            copiedLabel={t("dashboard.apiKeys.copied")}
-          />
-          <CopyConfigAction
-            id="one-time-copy-models-curl"
-            value={modelsCurlOneLineExample}
-            copiedId={snippetCopiedId}
-            onCopy={handleSnippetCopy}
-            label={t("dashboard.apiKeys.copyOneLineModelsCurl")}
-            copiedLabel={t("dashboard.apiKeys.copied")}
-          />
-          <CopyConfigAction
-            id="one-time-copy-sdk"
-            value={sdkConfig}
-            copiedId={snippetCopiedId}
-            onCopy={handleSnippetCopy}
-            label={t("dashboard.apiKeys.copySdkConfig")}
-            copiedLabel={t("dashboard.apiKeys.copied")}
-          />
-          <CopyConfigAction
-            id="one-time-copy-cursor"
-            value={cursorConfig}
-            copiedId={snippetCopiedId}
-            onCopy={handleSnippetCopy}
-            label={t("dashboard.apiKeys.copyCursorConfig")}
-            copiedLabel={t("dashboard.apiKeys.copied")}
-          />
-          <CopyConfigAction
-            id="one-time-copy-cherry"
-            value={cherryConfig}
-            copiedId={snippetCopiedId}
-            onCopy={handleSnippetCopy}
-            label={t("dashboard.apiKeys.copyCherryConfig")}
-            copiedLabel={t("dashboard.apiKeys.copied")}
-          />
-          <CopyConfigAction
-            id="one-time-copy-batch"
-            value={batchCurlOneLineExample}
-            copiedId={snippetCopiedId}
-            onCopy={handleSnippetCopy}
-            label={t("dashboard.apiKeys.copyOneLineBatchCurl")}
-            copiedLabel={t("dashboard.apiKeys.copied")}
-          />
+          <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
+            <Link href="/dashboard/docs#api-key">
+              {t("dashboard.apiKeys.viewApiKeyDocs")}
+            </Link>
+          </Button>
           <Button
             type="button"
             variant="outline"

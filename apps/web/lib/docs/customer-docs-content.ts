@@ -79,7 +79,9 @@ export type CustomerDocBlock =
   | { type: "bullets"; items: string[] }
   | { type: "ordered"; items: string[] }
   | { type: "code"; id: string; label: string; snippetKey: CustomerDocSnippetKey }
-  | { type: "one-line-curl"; id: string; titleKey: string }
+  | { type: "one-line-curl"; id: string; titleKey: string; snippetKey?: CustomerDocSnippetKey }
+  | { type: "api-key-copy-panel"; id: string }
+  | { type: "api-key-errors" }
   | { type: "copy-fields"; id: string; fields: CustomerDocCopyField[] }
   | { type: "error-table" }
   | { type: "model-list" }
@@ -356,13 +358,39 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       verify: VERIFY_USAGE_CREDITS,
     },
     blocks: [
-      { type: "paragraph", textKey: "integration.apiKeyBody" },
-      { type: "paragraph", textKey: "integration.placeholderKeyNote" },
-      { type: "copy-fields", id: "api-key", fields: CUSTOMER_DOC_API_KEY_FIELDS },
+      { type: "paragraph", textKey: "integration.apiKeyCredential" },
+      {
+        type: "bullets",
+        items: [
+          "integration.apiKeyBulletAuthHeader",
+          "integration.apiKeyBulletOneTime",
+          "integration.apiKeyBulletReveal",
+          "integration.apiKeyBulletRevoke",
+          "integration.apiKeyBulletOneKeyAllApis",
+          "integration.apiKeyBulletServerSide",
+        ],
+      },
+      { type: "api-key-copy-panel", id: "api-key-copy" },
+      { type: "paragraph", textKey: "integration.apiKeyVerifyNote" },
+      { type: "api-key-errors" },
+      {
+        type: "code",
+        id: "api-key-models-readable",
+        label: "models (readable)",
+        snippetKey: "models-curl",
+      },
       {
         type: "dashboard-links",
         links: [
           { id: "keys", labelKey: "integration.ctaCreateKey", href: "/dashboard/api-keys" },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+          {
+            id: "quick-start",
+            labelKey: "integration.ctaQuickStart",
+            href: "/dashboard/docs",
+            hash: "quick-start",
+          },
         ],
       },
     ],

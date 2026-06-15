@@ -8,6 +8,7 @@ import {
   CopyButton,
   useCopyToClipboard,
 } from "@/components/copy-code-block";
+import { ApiKeyChapterCopyPanel } from "@/components/api-key-chapter-copy";
 import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,6 +46,7 @@ import {
   resolveDocChatCurlDisplay,
   resolveDocCurlSnippetCopy,
 } from "@/lib/customer-quick-start-snippets";
+import { modelsVerifyCurlMultiline } from "@/lib/customer-api-key-chapter";
 import { useQuickStartApiKey } from "@/lib/use-quick-start-api-key";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
@@ -352,7 +354,13 @@ function DocBlock({
       const displayCode =
         block.snippetKey === "chat-curl" && sectionId === "quick-start"
           ? resolveDocChatCurlDisplay(quickStartApiKey)
-          : CUSTOMER_DOC_SNIPPET_DISPLAY[block.snippetKey];
+          : block.snippetKey === "models-curl" && sectionId === "api-key"
+            ? modelsVerifyCurlMultiline(
+                isQuickStartKeyPlaceholder(quickStartApiKey)
+                  ? undefined
+                  : quickStartApiKey
+              )
+            : CUSTOMER_DOC_SNIPPET_DISPLAY[block.snippetKey];
       const copyValue = isCurlSnippet
         ? resolveDocCurlSnippetCopy(block.snippetKey, quickStartApiKey)
         : CUSTOMER_DOC_SNIPPET_COPY[block.snippetKey];
@@ -374,7 +382,8 @@ function DocBlock({
         />
       );
     case "one-line-curl":
-      const liveCurl = quickStartChatCurlOneLine(quickStartApiKey);
+      const oneLineSnippetKey = block.snippetKey ?? "chat-curl";
+      const liveCurl = resolveDocCurlSnippetCopy(oneLineSnippetKey, quickStartApiKey);
       const keyIsPlaceholder = isQuickStartKeyPlaceholder(quickStartApiKey);
       return (
         <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
@@ -385,7 +394,11 @@ function DocBlock({
               : t("integration.quickStartKeyHintLive")}
           </p>
           <CopyableSnippetField
-            label={t("integration.quickStartCopyNowLabel")}
+            label={
+              oneLineSnippetKey === "models-curl"
+                ? t("integration.apiKeyVerifyCurlLabel")
+                : t("integration.quickStartCopyNowLabel")
+            }
             value={liveCurl}
             copyId={block.id}
             copiedId={copiedId}
@@ -404,6 +417,31 @@ function DocBlock({
               copiedLabel={t("integration.copied")}
             />
           </div>
+        </div>
+      );
+    case "api-key-copy-panel":
+      return (
+        <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
+          <p className="text-sm font-semibold text-foreground">
+            {t("integration.apiKeyCopyNowTitle")}
+          </p>
+          <ApiKeyChapterCopyPanel
+            apiKey={quickStartApiKey}
+            copiedId={copiedId}
+            onCopy={onCopy}
+            idPrefix={block.id}
+            showKeyFormat={true}
+          />
+        </div>
+      );
+    case "api-key-errors":
+      return (
+        <div className="rounded-lg border bg-muted/30 p-4 text-sm">
+          <p className="font-medium text-foreground">{t("integration.apiKeyErrorsTitle")}</p>
+          <ul className="mt-2 list-disc space-y-2 pl-5 text-muted-foreground">
+            <li>{t("integration.apiKeyErrorMissingToken")}</li>
+            <li>{t("integration.apiKeyErrorInvalidToken")}</li>
+          </ul>
         </div>
       );
     case "copy-fields":
