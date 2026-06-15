@@ -182,7 +182,7 @@ export const messages = {
           "Your key is ready. Read the integration guide for base URL and model setup, then send a test in Playground.",
         stateNeedsFirstCallQuickstart: "View integration docs",
         stateNeedsFirstCallPlayground: "Chat Playground",
-        onboardingTitle: "New user checklist",
+        onboardingTitle: "Getting started",
         onboardingDesc:
           "Five steps from sign-up to your first chat and image API calls.",
         onboardingTitleReturning: "Setup progress",
@@ -580,7 +580,7 @@ export const messages = {
         securityItem1:
           "Store keys on your server only — never embed them in mobile apps, browsers, or public frontends.",
         securityItem2:
-          "If a key is leaked or committed to git, revoke it immediately and create a replacement.",
+          "If a key is leaked or exposed, revoke it immediately and create a replacement.",
         securityItem3:
           "The full secret is shown once at creation. After that, use Copy key on active keys to copy the full secret again.",
         viewApiDocs: "View API docs",
@@ -1672,7 +1672,7 @@ export const messages = {
       usageChapterFailure:
         "No Usage row — wrong key or call never succeeded; compare error.code and request_id when present.",
       errorsChapterPurpose:
-        "Decode API errors without internal runbooks.",
+        "Decode API errors using stable error.code values.",
       errorsChapterCopy:
         "error.code from JSON responses (table below).",
       errorsChapterVerify:
@@ -1716,57 +1716,74 @@ export const messages = {
         "Your integration returns HTTP 200 and request_id; Usage shows your test calls.",
       industryChapterFailure:
         "Use error.code + request_id from the response; search Usage for the same request_id.",
+      industryScenariosLabel: "Example API use cases",
       industryIntegrationLabel: "API call pattern",
       industryVerifyLabel: "Verify success",
       industryFailureLabel: "If it fails",
       industry: {
         hospital: {
-          title: "Hospital / clinic — chart assist",
+          title: "Hospital / clinic — API integration examples",
           purpose:
-            "Your EMR or clinic app sends visit notes to POST /v1/chat/completions for structuring and summary drafts.",
+            "Your hospital systems call Tokfai APIs — Tokfai does not operate your clinic or patient queue.",
+          scenario1:
+            "AI customer-service replies from your clinic app or portal (your staff reviews outbound messages).",
+          scenario2:
+            "Case and chart summaries via POST /v1/chat/completions with de-identified clinical text.",
+          scenario3:
+            "Assist image workflow prompts via POST /v1/images/generations (your team controls clinical use).",
           notManaged:
-            "Tokfai does not operate the clinic or patient queue — your system calls the API with your API Key.",
+            "Tokfai provides API access only — not hospital operations, scheduling, or patient care.",
           boundary:
-            "Medical AI boundary: assists documentation and prompts only. Does not diagnose, prescribe, or replace physician judgment.",
+            "Medical boundary: AI assists documentation and prompts only. Does not diagnose, prescribe, or replace physician judgment.",
           integration:
-            "Backend POST /v1/chat/completions, model auto-pro, messages with de-identified note text; optional Batch for bulk chart prep.",
+            "Chat API for summaries and patient-facing chat backends; Image API for assist prompts; optional Batch for bulk chart prep.",
           verify:
-            "HTTP 200, request_id in JSON; Usage shows tokens and credits for succeeded calls only.",
+            "HTTP 200, request_id in JSON; Usage shows tokens or image credits for succeeded calls only.",
           failure:
-            "upstream_timeout or insufficient_credits — check request_id in Usage; never use output as a diagnosis.",
+            "upstream_timeout or insufficient_credits — check request_id in Usage; never treat model output as a diagnosis.",
         },
         automotive: {
-          title: "Automotive — owner manual Q&A",
+          title: "Automotive — API integration examples",
           purpose:
-            "Your vehicle app or dealer portal calls Chat API to answer manual questions from your content.",
+            "Your vehicle or dealer software calls Tokfai — Tokfai does not run your dealership or service desk.",
+          scenario1: "Owner manual Q&A in your vehicle app or dealer portal.",
+          scenario2: "After-sales ticket classification from your CRM or service webhook.",
+          scenario3:
+            "Vehicle damage photo description from your claims backend (Chat or Image API).",
           notManaged:
-            "Tokfai does not run your dealership CRM — your app sends requests with your API Key.",
+            "Tokfai does not answer drivers or agents — your backend sends API requests with your API Key.",
           integration:
-            "POST /v1/chat/completions from your backend with auto-fast and manual snippets in the user message.",
+            "POST /v1/chat/completions for manual Q&A and ticket labels; Image API or chat with image context for damage descriptions.",
           verify:
-            "HTTP 200 with answer text and request_id; Usage row for each driver question.",
+            "HTTP 200 with answer text and request_id; Usage row per API call.",
           failure:
             "model_not_available or gateway_overloaded — retry; search request_id in Usage.",
         },
         ecommerce: {
-          title: "E-commerce — bulk product copy",
+          title: "E-commerce — API integration examples",
           purpose:
-            "Your catalog system submits many product attributes via Batch API for titles and descriptions.",
+            "Your catalog and support stack calls Tokfai — Tokfai does not operate your store or CS team.",
+          scenario1: "Product descriptions and marketing copy from your PIM or CMS.",
+          scenario2: "Batch titles and bullet points for many SKUs via Batch API.",
+          scenario3: "Store customer-service Q&A from your helpdesk integration.",
           notManaged:
-            "Tokfai does not manage your storefront — your backend creates and polls batch jobs.",
+            "Tokfai does not manage listings or reply to buyers — your systems submit API jobs.",
           integration:
-            "POST /v1/batches/chat with one item per SKU; poll GET /v1/batches/{id}; model auto-cheap or auto-fast.",
+            "Batch API for bulk copy; Chat API for real-time buyer Q&A; model auto-cheap or auto-fast.",
           verify:
-            "Batch completed; each succeeded item has request_id in Usage with credits_charged.",
+            "Batch completed or chat HTTP 200; each succeeded call has request_id in Usage.",
           failure:
             "batch_cancelled — no charge for cancelled items; insufficient_credits before large batches.",
         },
         support: {
-          title: "AI customer service — ticket triage",
+          title: "AI customer service — API integration examples",
           purpose:
-            "Your helpdesk or CRM webhook handler calls Chat API to suggest tags, priority, or draft replies.",
+            "Your helpdesk platform calls Tokfai per ticket — Tokfai does not sit in your support queue.",
+          scenario1: "Ticket classification, routing labels, and priority suggestions.",
+          scenario2: "FAQ answers grounded in snippets from your knowledge base.",
+          scenario3: "Conversation summaries for agent handoff and QA.",
           notManaged:
-            "Tokfai does not answer tickets for you — your platform calls the API per ticket event.",
+            "Tokfai does not answer tickets — your webhook or worker calls the API with your API Key.",
           integration:
             "POST /v1/chat/completions with ticket subject/body in messages; model auto-fast; stream optional.",
           verify:
@@ -3968,56 +3985,72 @@ export const messages = {
       industryChapterFailure:
         "用响应中的 error.code + request_id；在 Usage 搜索同一 request_id。",
       industryIntegrationLabel: "API 调用方式",
+      industryScenariosLabel: "API 接入示例场景",
       industryVerifyLabel: "验证成功",
       industryFailureLabel: "失败时",
       industry: {
         hospital: {
-          title: "医院 / 诊所 — 病历辅助整理",
+          title: "医院 / 诊所 — API 接入示例",
           purpose:
-            "你的 EMR 或诊所系统将就诊记录发往 POST /v1/chat/completions，做结构化与摘要草稿。",
+            "你的医院系统调用 Tokfai API——Tokfai 不运营诊所或患者队列。",
+          scenario1:
+            "诊所 App 或门户的 AI 客服回复（由你的工作人员审核外发内容）。",
+          scenario2:
+            "通过 POST /v1/chat/completions 对脱敏病历做病例摘要与结构化。",
+          scenario3:
+            "通过 POST /v1/images/generations 辅助图像工作流提示词（临床用途由你的团队把控）。",
           notManaged:
-            "Tokfai 不运营诊所或患者队列——你的系统用 API Key 调用 API。",
+            "Tokfai 仅提供 API 接入——不运营医院业务、排班或诊疗。",
           boundary:
             "医疗边界：AI 仅辅助整理与提示，不诊断、不开方、不替代医生判断。",
           integration:
-            "后端 POST /v1/chat/completions，模型 auto-pro，messages 传入脱敏病历文本；大批量可用 Batch。",
+            "Chat API 用于摘要与患者侧对话后端；Image API 用于辅助提示词；大批量可用 Batch。",
           verify:
-            "HTTP 200，JSON 含 request_id；Usage 显示 tokens 与扣费（仅成功调用）。",
+            "HTTP 200，JSON 含 request_id；Usage 显示 tokens 或图像扣费（仅成功调用）。",
           failure:
-            "upstream_timeout 或 insufficient_credits — 在 Usage 查 request_id；勿将输出当作诊断。",
+            "upstream_timeout 或 insufficient_credits — 在 Usage 查 request_id；勿将模型输出当作诊断。",
         },
         automotive: {
-          title: "车企 — 车主手册问答",
+          title: "车企 — API 接入示例",
           purpose:
-            "你的车机 App 或经销商门户用 Chat API 基于自有手册内容回答问题。",
+            "你的车机或经销商软件调用 Tokfai——Tokfai 不运营经销商或售后坐席。",
+          scenario1: "车机 App 或经销商门户的车主手册问答。",
+          scenario2: "CRM 或服务 webhook 的售后工单分类。",
+          scenario3: "理赔后端对车损照片生成描述（Chat 或 Image API）。",
           notManaged:
-            "Tokfai 不运营经销商 CRM——你的应用携带 API Key 发起请求。",
+            "Tokfai 不直接回答车主或坐席——你的后端携带 API Key 发起请求。",
           integration:
-            "后端 POST /v1/chat/completions，auto-fast，user message 含手册片段。",
+            "POST /v1/chat/completions 做手册问答与工单标签；车损场景可用 Image API 或带图像上下文的 Chat。",
           verify:
-            "HTTP 200 有回答与 request_id；Usage 记录每次车主提问。",
+            "HTTP 200 有回答与 request_id；Usage 记录每次 API 调用。",
           failure:
             "model_not_available 或 gateway_overloaded — 重试；在 Usage 搜 request_id。",
         },
         ecommerce: {
-          title: "电商 — 批量商品文案",
+          title: "电商 — API 接入示例",
           purpose:
-            "你的商品系统通过 Batch API 批量提交 SKU 属性生成标题与描述。",
+            "你的商品与客服系统调用 Tokfai——Tokfai 不运营店铺或客服团队。",
+          scenario1: "PIM 或 CMS 的商品描述与营销文案生成。",
+          scenario2: "通过 Batch API 批量生成多 SKU 标题与卖点。",
+          scenario3: "帮助台集成中的店铺客服问答。",
           notManaged:
-            "Tokfai 不运营店铺——你的后端创建并轮询 batch 任务。",
+            "Tokfai 不管理商品或回复买家——你的系统提交 API 任务。",
           integration:
-            "POST /v1/batches/chat，每个 SKU 一条 item；轮询 GET /v1/batches/{id}；模型 auto-cheap 或 auto-fast。",
+            "Batch API 做批量文案；Chat API 做实时买家问答；模型 auto-cheap 或 auto-fast。",
           verify:
-            "Batch 完成；每条成功 item 在 Usage 有 request_id 与 credits_charged。",
+            "Batch 完成或 Chat 返回 HTTP 200；每次成功调用在 Usage 有 request_id。",
           failure:
             "batch_cancelled 不扣费；大批量前检查 insufficient_credits。",
         },
         support: {
-          title: "AI 客服 — 工单分流",
+          title: "AI 客服 — API 接入示例",
           purpose:
-            "你的工单/CRM webhook 调用 Chat API 建议标签、优先级或回复草稿。",
+            "你的工单平台按事件调用 Tokfai——Tokfai 不坐在你的客服队列里。",
+          scenario1: "工单分类、路由标签与优先级建议。",
+          scenario2: "基于知识库片段的 FAQ 回答。",
+          scenario3: "对话摘要，供坐席交接与质检。",
           notManaged:
-            "Tokfai 不替你回复工单——你的平台按工单事件调用 API。",
+            "Tokfai 不回复工单——你的 webhook 或 worker 用 API Key 调用 API。",
           integration:
             "POST /v1/chat/completions，messages 含工单标题与正文；模型 auto-fast；可选 stream。",
           verify:

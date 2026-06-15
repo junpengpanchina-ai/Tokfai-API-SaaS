@@ -33,6 +33,7 @@ import {
   type CustomerDocChapterGuide,
   type CustomerDocCopyField,
   type CustomerDocDashboardLink,
+  CUSTOMER_DOC_INDUSTRY_SCENARIO_KEYS,
   type CustomerDocIndustryId,
   type CustomerDocSection,
 } from "@/lib/docs/customer-docs-content";
@@ -432,11 +433,20 @@ function IndustryExampleCard({
   const boundaryKey = `${prefix}.boundary`;
   const boundary = t(boundaryKey);
   const hasBoundary = boundary !== boundaryKey;
+  const scenarios = CUSTOMER_DOC_INDUSTRY_SCENARIO_KEYS[id];
 
   return (
     <div className="rounded-lg border bg-background p-4">
       <h3 className="text-sm font-semibold">{t(`${prefix}.title`)}</h3>
       <p className="mt-1 text-sm text-muted-foreground">{t(`${prefix}.purpose`)}</p>
+      <p className="mt-2 text-xs font-medium text-muted-foreground">
+        {t("integration.industryScenariosLabel")}
+      </p>
+      <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+        {scenarios.map((key) => (
+          <li key={key}>{t(key)}</li>
+        ))}
+      </ul>
       <p className="mt-2 text-xs text-muted-foreground">{t(`${prefix}.notManaged`)}</p>
       {hasBoundary ? (
         <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-400">

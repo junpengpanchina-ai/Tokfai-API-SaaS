@@ -179,6 +179,32 @@ export const CUSTOMER_DOC_INDUSTRY_IDS = [
 
 export type CustomerDocIndustryId = (typeof CUSTOMER_DOC_INDUSTRY_IDS)[number];
 
+export const CUSTOMER_DOC_INDUSTRY_SCENARIO_KEYS: Record<
+  CustomerDocIndustryId,
+  string[]
+> = {
+  hospital: [
+    "integration.industry.hospital.scenario1",
+    "integration.industry.hospital.scenario2",
+    "integration.industry.hospital.scenario3",
+  ],
+  automotive: [
+    "integration.industry.automotive.scenario1",
+    "integration.industry.automotive.scenario2",
+    "integration.industry.automotive.scenario3",
+  ],
+  ecommerce: [
+    "integration.industry.ecommerce.scenario1",
+    "integration.industry.ecommerce.scenario2",
+    "integration.industry.ecommerce.scenario3",
+  ],
+  support: [
+    "integration.industry.support.scenario1",
+    "integration.industry.support.scenario2",
+    "integration.industry.support.scenario3",
+  ],
+};
+
 const chapter = (
   purposeKey: string,
   copyKey: string,
