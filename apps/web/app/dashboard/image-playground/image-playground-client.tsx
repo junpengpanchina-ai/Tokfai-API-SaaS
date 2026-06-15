@@ -13,11 +13,9 @@ import {
 import {
   IMAGE_PLAYGROUND_TOOLBENCH,
   focusImagePlaygroundResultPanel,
-  ImagePlaygroundApiKeyCard,
   ImagePlaygroundGenerateActions,
   ImagePlaygroundResultArea,
-  ImagePlaygroundServiceDocsPanel,
-  ImagePlaygroundSettingsSidebar,
+  ImagePlaygroundRunSettingsPanel,
 } from "@/components/image-playground-toolbench";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -780,7 +778,7 @@ export function ImagePlaygroundClient({
       <div className={IMAGE_PLAYGROUND_TOOLBENCH.shell}>
         <div className={IMAGE_PLAYGROUND_TOOLBENCH.grid}>
           <div className="order-1 min-w-0 lg:col-start-2 lg:row-start-1">
-            <ImagePlaygroundApiKeyCard
+            <ImagePlaygroundRunSettingsPanel
               keyPanelView={keyPanelView}
               localKeys={localKeys}
               selectedKey={selectedKey}
@@ -797,12 +795,21 @@ export function ImagePlaygroundClient({
               onSelectedKeyChange={setSelectedKeyId}
               onApiKeyChange={setApiKey}
               onShowApiKeyChange={setShowApiKey}
+              model={model}
+              size={size}
+              creditsBalance={initialCreditsBalance}
+              creditsLoaded={creditsLoaded}
+              estimatedCredits={selectedModelCredits}
+              isModelComingSoon={isModelComingSoon}
+              locale={locale}
+              onModelChange={setModel}
+              onSizeChange={setSize}
               t={t}
             />
           </div>
 
           <div className="order-2 min-w-0 lg:col-start-1 lg:row-start-1">
-            <Card className={IMAGE_PLAYGROUND_TOOLBENCH.card}>
+            <Card className={IMAGE_PLAYGROUND_TOOLBENCH.inputCard}>
               <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
                 <div className="flex flex-wrap items-center gap-2">
                   <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
@@ -816,7 +823,7 @@ export function ImagePlaygroundClient({
                 </div>
               </CardHeader>
               <CardContent
-                className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex flex-col gap-3`}
+                className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex flex-col gap-2.5`}
               >
                 <PromptPresets
                   loading={loading}
@@ -828,13 +835,13 @@ export function ImagePlaygroundClient({
                 <textarea
                   ref={promptRef}
                   id="prompt"
-                  rows={4}
+                  rows={3}
                   required
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   disabled={loading}
                   placeholder={promptPlaceholder}
-                  className="flex min-h-[5.5rem] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-28 min-h-[7rem] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                 />
 
                 <ImageInputsPanel
@@ -881,22 +888,6 @@ export function ImagePlaygroundClient({
             </Card>
           </div>
 
-          <div className="order-3 min-w-0 lg:col-start-2">
-            <ImagePlaygroundSettingsSidebar
-              model={model}
-              size={size}
-              loading={loading}
-              creditsBalance={initialCreditsBalance}
-              creditsLoaded={creditsLoaded}
-              estimatedCredits={selectedModelCredits}
-              isModelComingSoon={isModelComingSoon}
-              locale={locale}
-              onModelChange={setModel}
-              onSizeChange={setSize}
-              t={t}
-            />
-          </div>
-
           <div className="order-4 min-w-0 lg:hidden">
             <ImagePlaygroundGenerateActions
               loading={loading}
@@ -923,16 +914,6 @@ export function ImagePlaygroundClient({
               }
               attention={resultAttention || loading}
               onRetry={() => formRef.current?.requestSubmit()}
-              t={t}
-            />
-          </div>
-
-          <div className="order-6 min-w-0 lg:col-start-2">
-            <ImagePlaygroundServiceDocsPanel
-              copyRequestStatus={copyRequestStatus}
-              loading={loading}
-              hasUploadingImages={hasUploadingImages}
-              onCopyApiRequest={() => void handleCopyApiRequest()}
               t={t}
             />
           </div>
@@ -1105,7 +1086,7 @@ function ImageInputsPanel({
         onDragOver={handleDragOver}
         onDrop={handleDrop}
         className={`flex flex-col items-center justify-center gap-0.5 rounded-md border border-dashed px-3 text-center transition-colors ${
-          toolbench ? "py-2" : "py-5 sm:py-6"
+          toolbench ? "py-6" : "py-5 sm:py-6"
         } ${
           isDragging
             ? "border-primary bg-primary/10 ring-2 ring-primary/30"

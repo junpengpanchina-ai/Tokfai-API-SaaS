@@ -2,14 +2,10 @@
 
 import Link from "next/link";
 import {
-  BookOpen,
   Check,
   CheckCircle2,
   Copy,
-  FileText,
-  Gauge,
   ImageIcon,
-  KeyRound,
   Loader2,
   RotateCw,
   Sparkles,
@@ -52,14 +48,15 @@ import { cn } from "@/lib/utils";
 
 /** Shared layout tokens for the Image Playground three-column toolbench. */
 export const IMAGE_PLAYGROUND_TOOLBENCH = {
-  shell: "mx-auto w-full min-w-0 max-w-[1600px] px-6",
+  shell: "mx-auto w-full min-w-0 max-w-[1680px] px-6",
   grid:
-    "grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(420px,1fr)_340px_minmax(420px,1fr)] lg:items-start xl:grid-cols-[1fr_360px_1fr]",
+    "grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[minmax(460px,1fr)_360px_minmax(460px,1fr)] lg:items-start xl:grid-cols-[1.05fr_360px_1.05fr]",
   card: "shadow-none overflow-hidden border bg-card",
   cardHeader: "space-y-0.5 px-4 py-3",
   cardTitle: "text-sm font-medium leading-tight",
   cardDescription: "text-xs text-muted-foreground",
   cardContent: "px-4 pb-4 pt-0",
+  inputCard: "min-h-[520px] shadow-none overflow-hidden border bg-card",
   control: "h-9",
   select:
     "flex h-9 w-full rounded-md border border-input bg-muted/30 px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
@@ -67,9 +64,8 @@ export const IMAGE_PLAYGROUND_TOOLBENCH = {
   resultCard: "min-h-[560px] border bg-card",
   resultBody:
     "flex min-h-[min(480px,52vh)] flex-1 flex-col rounded-lg border border-dashed bg-muted/25",
+  settingsStack: "shadow-none overflow-hidden border bg-card",
 } as const;
-
-const BATCH_API_DOCS_HREF = "/dashboard/docs#batch-api";
 
 /** Scroll result panel into view on mobile, or when off-screen on desktop. */
 export function focusImagePlaygroundResultPanel(
@@ -129,190 +125,7 @@ export interface ImagePlaygroundCompactKeyRowProps {
   onSelectedKeyChange: (id: string) => void;
   onApiKeyChange: (value: string) => void;
   onShowApiKeyChange: (show: boolean) => void;
-  embedded?: boolean;
   t: (key: string) => string;
-}
-
-export function ImagePlaygroundApiKeyCard(
-  props: ImagePlaygroundCompactKeyRowProps
-) {
-  const { t } = props;
-  return (
-    <Card className={IMAGE_PLAYGROUND_TOOLBENCH.card}>
-      <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
-        <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
-          {t("dashboard.imagePlayground.toolbenchApiKeyTitle")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className={IMAGE_PLAYGROUND_TOOLBENCH.cardContent}>
-        <ImagePlaygroundCompactKeyRow {...props} embedded />
-        <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-          {t("dashboard.imagePlayground.toolbenchKeySecretHint")}
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
-
-export function ImagePlaygroundCompactKeyRow({
-  keyPanelView,
-  localKeys,
-  selectedKey,
-  selectedKeyId,
-  apiKey,
-  showApiKey,
-  creatingKey,
-  createKeyError,
-  createdSecret,
-  createdBannerKeyId,
-  loading,
-  onCreateTestKey,
-  onKeyPanelViewChange,
-  onSelectedKeyChange,
-  onApiKeyChange,
-  onShowApiKeyChange,
-  embedded = false,
-  t,
-}: ImagePlaygroundCompactKeyRowProps) {
-  const { copiedId, copyText } = useCopyToClipboard();
-  const secretCopied = copiedId === "image-playground-created-secret";
-  const shellClass = embedded
-    ? "flex flex-col gap-2"
-    : "flex flex-col gap-2 rounded-lg border bg-muted/30 px-3 py-2.5";
-
-  if (keyPanelView === "paste") {
-    return (
-      <div className={shellClass}>
-        <div className="flex flex-wrap items-center gap-2">
-          <KeyRound className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span className="text-sm font-medium">{t("dashboard.playground.pasteKey")}</span>
-          {localKeys.length > 0 ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2 text-xs"
-              disabled={loading}
-              onClick={() => onKeyPanelViewChange("select")}
-            >
-              {t("dashboard.playground.selectKey")}
-            </Button>
-          ) : null}
-        </div>
-        <Input
-          type={showApiKey ? "text" : "password"}
-          autoComplete="off"
-          spellCheck={false}
-          placeholder={TOKFAI_API_KEY_PLACEHOLDER}
-          value={apiKey}
-          onChange={(e) => onApiKeyChange(e.target.value)}
-          disabled={loading}
-          className="h-9 font-mono text-xs"
-        />
-      </div>
-    );
-  }
-
-  if (keyPanelView === "empty" || localKeys.length === 0) {
-    return (
-      <div
-        className={
-          embedded
-            ? "flex flex-col gap-2"
-            : "flex flex-col gap-2 rounded-lg border border-dashed bg-muted/30 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
-        }
-      >
-        <p className="text-sm text-muted-foreground">
-          {t("dashboard.imagePlayground.toolbenchNoKey")}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            size="sm"
-            disabled={loading || creatingKey}
-            onClick={onCreateTestKey}
-          >
-            {creatingKey ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              t("dashboard.imagePlayground.createTestKey")
-            )}
-          </Button>
-          <Button asChild type="button" size="sm" variant="outline">
-            <Link href="/dashboard/api-keys">
-              {t("dashboard.imagePlayground.createApiKey")}
-            </Link>
-          </Button>
-        </div>
-        {createKeyError ? (
-          <p className="text-xs text-destructive sm:col-span-2">{createKeyError}</p>
-        ) : null}
-      </div>
-    );
-  }
-
-  return (
-    <div className={shellClass}>
-      {createdSecret && createdBannerKeyId === selectedKeyId ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2 py-1.5 text-xs text-emerald-800 dark:text-emerald-200">
-          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-          <span className="min-w-0 flex-1">{t("dashboard.playground.testKeyCreated")}</span>
-          <CopyButton
-            copied={secretCopied}
-            onCopy={() => copyText("image-playground-created-secret", createdSecret)}
-            copyLabel={t("dashboard.playground.copySecret")}
-            copiedLabel={t("dashboard.playground.copied")}
-          />
-        </div>
-      ) : null}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <Label
-          htmlFor="image-api-key-select"
-          className="shrink-0 text-xs font-medium text-muted-foreground sm:w-28"
-        >
-          {t("dashboard.imagePlayground.toolbenchCurrentKey")}
-        </Label>
-        <select
-          id="image-api-key-select"
-          value={selectedKeyId}
-          onChange={(e) => onSelectedKeyChange(e.target.value)}
-          disabled={loading}
-          className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-        >
-          {localKeys.map((row) => (
-            <option key={row.id} value={row.id}>
-              {row.name} ({row.prefix || "sk-tokfai"})
-            </option>
-          ))}
-        </select>
-        <div className="flex shrink-0 flex-wrap gap-1.5">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-9"
-            disabled={loading}
-            onClick={() => onKeyPanelViewChange("paste")}
-          >
-            {t("dashboard.playground.pasteOtherKey")}
-          </Button>
-          <Button asChild type="button" size="sm" variant="outline" className="h-9">
-            <Link href="/dashboard/api-keys">
-              {t("dashboard.playground.manageApiKeys")}
-            </Link>
-          </Button>
-        </div>
-      </div>
-      {selectedKey ? (
-        <p className="text-xs text-muted-foreground">
-          {formatMessage(t("dashboard.playground.currentKeySelection"), {
-            name: selectedKey.name,
-            prefix: selectedKey.prefix || "sk-tokfai",
-          })}
-        </p>
-      ) : null}
-    </div>
-  );
 }
 
 export interface ImagePlaygroundSettingsSidebarProps {
@@ -329,10 +142,182 @@ export interface ImagePlaygroundSettingsSidebarProps {
   t: (key: string) => string;
 }
 
-export function ImagePlaygroundSettingsSidebar({
+function ImagePlaygroundSettingsKeySection({
+  keyPanelView,
+  localKeys,
+  selectedKey,
+  selectedKeyId,
+  apiKey,
+  showApiKey,
+  creatingKey,
+  createKeyError,
+  createdSecret,
+  createdBannerKeyId,
+  loading,
+  onCreateTestKey,
+  onKeyPanelViewChange,
+  onSelectedKeyChange,
+  onApiKeyChange,
+  onShowApiKeyChange,
+  t,
+}: ImagePlaygroundCompactKeyRowProps) {
+  const { copiedId, copyText } = useCopyToClipboard();
+  const secretCopied = copiedId === "image-playground-created-secret";
+
+  if (keyPanelView === "paste") {
+    return (
+      <div className="max-h-[110px] space-y-1.5 overflow-hidden">
+        <Label className="text-xs text-muted-foreground">
+          {t("dashboard.imagePlayground.toolbenchApiKeyLabel")}
+        </Label>
+        <Input
+          type={showApiKey ? "text" : "password"}
+          autoComplete="off"
+          spellCheck={false}
+          placeholder={TOKFAI_API_KEY_PLACEHOLDER}
+          value={apiKey}
+          onChange={(e) => onApiKeyChange(e.target.value)}
+          disabled={loading}
+          className="h-9 font-mono text-xs"
+        />
+        <div className="flex gap-1">
+          {localKeys.length > 0 ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs"
+              disabled={loading}
+              onClick={() => onKeyPanelViewChange("select")}
+            >
+              {t("dashboard.playground.selectKey")}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  if (keyPanelView === "empty" || localKeys.length === 0) {
+    return (
+      <div className="max-h-[110px] space-y-2 overflow-hidden">
+        <Label className="text-xs text-muted-foreground">
+          {t("dashboard.imagePlayground.toolbenchApiKeyLabel")}
+        </Label>
+        <p className="text-xs text-muted-foreground">
+          {t("dashboard.imagePlayground.toolbenchNoKey")}
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          <Button
+            type="button"
+            size="sm"
+            className="h-7 text-xs"
+            disabled={loading || creatingKey}
+            onClick={onCreateTestKey}
+          >
+            {creatingKey ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              t("dashboard.imagePlayground.createTestKey")
+            )}
+          </Button>
+          <Button asChild type="button" size="sm" variant="outline" className="h-7 text-xs">
+            <Link href="/dashboard/api-keys">
+              {t("dashboard.imagePlayground.createApiKey")}
+            </Link>
+          </Button>
+        </div>
+        {createKeyError ? (
+          <p className="text-[11px] text-destructive">{createKeyError}</p>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-h-[110px] space-y-1.5 overflow-hidden">
+      {createdSecret && createdBannerKeyId === selectedKeyId ? (
+        <div className="flex items-center gap-1.5 rounded border border-emerald-500/30 bg-emerald-500/5 px-2 py-1 text-[11px] text-emerald-800 dark:text-emerald-200">
+          <CheckCircle2 className="h-3 w-3 shrink-0" />
+          <span className="min-w-0 flex-1 truncate">
+            {t("dashboard.playground.testKeyCreated")}
+          </span>
+          <CopyButton
+            copied={secretCopied}
+            onCopy={() => copyText("image-playground-created-secret", createdSecret)}
+            copyLabel={t("dashboard.playground.copySecret")}
+            copiedLabel={t("dashboard.playground.copied")}
+          />
+        </div>
+      ) : null}
+      <Label htmlFor="image-api-key-select" className="text-xs text-muted-foreground">
+        {t("dashboard.imagePlayground.toolbenchApiKeyLabel")}
+      </Label>
+      <select
+        id="image-api-key-select"
+        value={selectedKeyId}
+        onChange={(e) => onSelectedKeyChange(e.target.value)}
+        disabled={loading}
+        className={IMAGE_PLAYGROUND_TOOLBENCH.select}
+      >
+        {localKeys.map((row) => (
+          <option key={row.id} value={row.id}>
+            {row.name} ({row.prefix || "sk-tokfai"})
+          </option>
+        ))}
+      </select>
+      <div className="flex flex-wrap gap-1">
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-7 px-2 text-xs"
+          disabled={loading}
+          onClick={() => onKeyPanelViewChange("paste")}
+        >
+          {t("dashboard.imagePlayground.toolbenchPasteKeyShort")}
+        </Button>
+        <Button asChild type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs">
+          <Link href="/dashboard/api-keys">
+            {t("dashboard.imagePlayground.toolbenchManageKeysShort")}
+          </Link>
+        </Button>
+      </div>
+      {selectedKey ? (
+        <p className="truncate text-[11px] text-muted-foreground">
+          {formatMessage(t("dashboard.imagePlayground.toolbenchCurrentKeyLine"), {
+            name: selectedKey.name,
+            prefix: selectedKey.prefix || "sk-tokfai",
+          })}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+export interface ImagePlaygroundRunSettingsPanelProps
+  extends ImagePlaygroundCompactKeyRowProps,
+    ImagePlaygroundSettingsSidebarProps {}
+
+export function ImagePlaygroundRunSettingsPanel({
+  keyPanelView,
+  localKeys,
+  selectedKey,
+  selectedKeyId,
+  apiKey,
+  showApiKey,
+  creatingKey,
+  createKeyError,
+  createdSecret,
+  createdBannerKeyId,
+  loading,
+  onCreateTestKey,
+  onKeyPanelViewChange,
+  onSelectedKeyChange,
+  onApiKeyChange,
+  onShowApiKeyChange,
   model,
   size,
-  loading,
   creditsBalance,
   creditsLoaded,
   estimatedCredits,
@@ -341,7 +326,7 @@ export function ImagePlaygroundSettingsSidebar({
   onModelChange,
   onSizeChange,
   t,
-}: ImagePlaygroundSettingsSidebarProps) {
+}: ImagePlaygroundRunSettingsPanelProps) {
   const balanceDisplay = creditsLoaded
     ? formatCreditBalanceDisplay(creditsBalance ?? 0)
     : "—";
@@ -353,49 +338,100 @@ export function ImagePlaygroundSettingsSidebar({
     creditsLoaded &&
     estimatedCredits != null &&
     (creditsBalance ?? 0) < estimatedCredits;
+
+  const docLinks = [
+    {
+      id: "image-docs",
+      label: t("dashboard.imagePlayground.toolbenchViewImageApiDocs"),
+      href: IMAGE_API_DOCS_HREF,
+    },
+    {
+      id: "usage",
+      label: t("dashboard.imagePlayground.viewUsage"),
+      href: "/dashboard/usage",
+    },
+    {
+      id: "credits",
+      label: t("dashboard.imagePlayground.viewCredits"),
+      href: "/dashboard/credits",
+    },
+    {
+      id: "integration",
+      label: t("dashboard.imagePlayground.toolbenchOpenIntegrationDocs"),
+      href: INTEGRATION_DOCS_HREF,
+    },
+  ];
+
   return (
-    <Card className={IMAGE_PLAYGROUND_TOOLBENCH.card}>
+    <Card className={IMAGE_PLAYGROUND_TOOLBENCH.settingsStack}>
       <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
         <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
-          {t("dashboard.imagePlayground.toolbenchCreditsModelTitle")}
+          {t("dashboard.imagePlayground.toolbenchRunSettings")}
         </CardTitle>
       </CardHeader>
-      <CardContent
-        className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex flex-col gap-2.5`}
-      >
-        <div className="flex items-baseline justify-between gap-2 text-xs">
-          <span className="text-muted-foreground">
-            {t("dashboard.credits.currentBalance")}
-          </span>
-          <span className="font-mono tabular-nums text-foreground">{balanceDisplay}</span>
-        </div>
-        {estimatedCredits != null ? (
-          <p className="text-xs text-muted-foreground">
-            {formatMessage(t("dashboard.imagePlayground.estimatedCost"), {
-              credits: formatImageCreditsAmount(estimatedCredits, locale),
-            })}
-          </p>
-        ) : null}
-        {insufficientCredits ? (
-          <p className="text-[11px] font-medium text-destructive">
-            {t("dashboard.imagePlayground.toolbenchInsufficientCredits")}
-          </p>
-        ) : null}
-        {lowCredits ? (
-          <Badge variant="warning" className="text-[10px]">
-            {t("dashboard.shell.lowCredits")}
-          </Badge>
-        ) : null}
-        <Button asChild size="sm" variant="outline" className={`w-full ${IMAGE_PLAYGROUND_TOOLBENCH.control}`}>
-          <Link href="/dashboard/credits">
-            <Wallet className="h-4 w-4" />
-            {t("dashboard.imagePlayground.topUp")}
-          </Link>
-        </Button>
+      <CardContent className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex flex-col gap-3`}>
+        <ImagePlaygroundSettingsKeySection
+          keyPanelView={keyPanelView}
+          localKeys={localKeys}
+          selectedKey={selectedKey}
+          selectedKeyId={selectedKeyId}
+          apiKey={apiKey}
+          showApiKey={showApiKey}
+          creatingKey={creatingKey}
+          createKeyError={createKeyError}
+          createdSecret={createdSecret}
+          createdBannerKeyId={createdBannerKeyId}
+          loading={loading}
+          onCreateTestKey={onCreateTestKey}
+          onKeyPanelViewChange={onKeyPanelViewChange}
+          onSelectedKeyChange={onSelectedKeyChange}
+          onApiKeyChange={onApiKeyChange}
+          onShowApiKeyChange={onShowApiKeyChange}
+          t={t}
+        />
 
-        <div className="flex flex-col gap-2 border-t pt-2.5">
+        <div className="flex items-start justify-between gap-3 border-t pt-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-muted-foreground">
+              {t("dashboard.imagePlayground.toolbenchBalanceLabel")}
+            </p>
+            <p className="font-mono text-base font-semibold tabular-nums leading-tight">
+              {balanceDisplay}
+            </p>
+            {estimatedCredits != null ? (
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {formatMessage(t("dashboard.imagePlayground.estimatedCost"), {
+                  credits: formatImageCreditsAmount(estimatedCredits, locale),
+                })}
+              </p>
+            ) : null}
+            {insufficientCredits ? (
+              <p className="mt-1 text-[11px] font-medium text-destructive">
+                {t("dashboard.imagePlayground.toolbenchInsufficientCredits")}
+              </p>
+            ) : null}
+            {lowCredits ? (
+              <Badge variant="warning" className="mt-1 text-[10px]">
+                {t("dashboard.shell.lowCredits")}
+              </Badge>
+            ) : null}
+          </div>
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            className="h-8 shrink-0 text-xs"
+          >
+            <Link href="/dashboard/credits">
+              <Wallet className="h-3.5 w-3.5" />
+              {t("dashboard.imagePlayground.topUp")}
+            </Link>
+          </Button>
+        </div>
+
+        <div className="flex flex-col gap-2 border-t pt-3">
           <div className="flex flex-col gap-1">
-            <Label htmlFor="toolbench-model" className="text-[11px] text-muted-foreground">
+            <Label htmlFor="toolbench-model" className="text-xs text-muted-foreground">
               {t("dashboard.imagePlayground.toolbenchModelLabel")}
             </Label>
             <select
@@ -417,9 +453,8 @@ export function ImagePlaygroundSettingsSidebar({
               </p>
             ) : null}
           </div>
-
           <div className="flex flex-col gap-1">
-            <Label htmlFor="toolbench-size" className="text-[11px] text-muted-foreground">
+            <Label htmlFor="toolbench-size" className="text-xs text-muted-foreground">
               {t("dashboard.imagePlayground.size")}
             </Label>
             <select
@@ -433,6 +468,29 @@ export function ImagePlaygroundSettingsSidebar({
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
+          </div>
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            {t("dashboard.imagePlayground.toolbenchBillingNoteShort")}
+          </p>
+        </div>
+
+        <div className="space-y-1 border-t pt-3">
+          <p className="text-xs font-medium text-muted-foreground">
+            {t("dashboard.imagePlayground.toolbenchServiceDocs")}
+          </p>
+          <div className="flex flex-col">
+            {docLinks.map((item) => (
+              <Button
+                key={item.id}
+                asChild
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 justify-start px-1 text-xs font-normal text-muted-foreground hover:text-foreground"
+              >
+                <Link href={item.href}>{item.label}</Link>
+              </Button>
+            ))}
           </div>
         </div>
       </CardContent>
@@ -508,126 +566,6 @@ export function ImagePlaygroundGenerateActions({
         )}
       </Button>
     </div>
-  );
-}
-
-export interface ImagePlaygroundServiceDocsPanelProps {
-  copyRequestStatus: "idle" | "copied";
-  loading: boolean;
-  hasUploadingImages: boolean;
-  onCopyApiRequest: () => void;
-  t: (key: string) => string;
-}
-
-export function ImagePlaygroundServiceDocsPanel({
-  copyRequestStatus,
-  loading,
-  hasUploadingImages,
-  onCopyApiRequest,
-  t,
-}: ImagePlaygroundServiceDocsPanelProps) {
-  const shortcuts: Array<{
-    id: string;
-    label: string;
-    icon: typeof BookOpen;
-    href?: string;
-    onClick?: () => void;
-    copied?: boolean;
-    copiedLabel?: string;
-  }> = [
-    {
-      id: "copy",
-      label: t("dashboard.imagePlayground.copyApiRequest"),
-      icon: Copy,
-      onClick: onCopyApiRequest,
-      copied: copyRequestStatus === "copied",
-      copiedLabel: t("dashboard.apiKeys.copied"),
-    },
-    {
-      id: "image-docs",
-      label: t("dashboard.imagePlayground.toolbenchViewImageApiDocs"),
-      icon: BookOpen,
-      href: IMAGE_API_DOCS_HREF,
-    },
-    {
-      id: "usage",
-      label: t("dashboard.imagePlayground.viewUsage"),
-      icon: Gauge,
-      href: "/dashboard/usage",
-    },
-    {
-      id: "credits",
-      label: t("dashboard.imagePlayground.viewCredits"),
-      icon: Wallet,
-      href: "/dashboard/credits",
-    },
-    {
-      id: "batch",
-      label: t("dashboard.imagePlayground.toolbenchViewBatchApi"),
-      icon: FileText,
-      href: BATCH_API_DOCS_HREF,
-    },
-    {
-      id: "integration",
-      label: t("dashboard.imagePlayground.toolbenchOpenIntegrationDocs"),
-      icon: FileText,
-      href: INTEGRATION_DOCS_HREF,
-    },
-  ];
-
-  return (
-    <Card className={IMAGE_PLAYGROUND_TOOLBENCH.card}>
-      <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
-        <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
-          {t("dashboard.imagePlayground.toolbenchServiceDocs")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className={IMAGE_PLAYGROUND_TOOLBENCH.cardContent}>
-        <div className="flex flex-col gap-0.5">
-          {shortcuts.map((item) => {
-            const Icon = item.icon;
-            if (item.href) {
-              return (
-                <Button
-                  key={item.id}
-                  asChild
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 justify-start gap-2 px-2 text-xs font-normal text-muted-foreground hover:text-foreground"
-                >
-                  <Link href={item.href}>
-                    <Icon className="h-3.5 w-3.5 shrink-0 opacity-70" />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                </Button>
-              );
-            }
-
-            return (
-              <Button
-                key={item.id}
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={loading || hasUploadingImages}
-                onClick={item.onClick}
-                className="h-9 justify-start gap-2 px-2 text-xs font-normal text-muted-foreground hover:text-foreground"
-              >
-                {item.copied ? (
-                  <Check className="h-3.5 w-3.5 shrink-0" />
-                ) : (
-                  <Icon className="h-3.5 w-3.5 shrink-0 opacity-70" />
-                )}
-                <span className="truncate">
-                  {item.copied ? item.copiedLabel : item.label}
-                </span>
-              </Button>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
