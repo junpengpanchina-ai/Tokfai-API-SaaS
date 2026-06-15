@@ -8,7 +8,7 @@ import {
   CopyButton,
   useCopyToClipboard,
 } from "@/components/copy-code-block";
-import { CopyConfigAction } from "@/components/copyable-snippet-field";
+import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -39,6 +39,13 @@ import {
   type CustomerDocIndustryId,
   type CustomerDocSection,
 } from "@/lib/docs/customer-docs-content";
+import {
+  isQuickStartKeyPlaceholder,
+  quickStartChatCurlOneLine,
+  resolveDocChatCurlDisplay,
+  resolveDocCurlSnippetCopy,
+} from "@/lib/customer-quick-start-snippets";
+import { useQuickStartApiKey } from "@/lib/use-quick-start-api-key";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
@@ -64,6 +71,7 @@ export function CustomerIntegrationGuide({
   const { user } = useAuth();
   const { copiedId, copyText } = useCopyToClipboard();
   const isLoggedIn = Boolean(user);
+  const quickStartApiKey = useQuickStartApiKey();
 
   function dashHref(path: string): string {
     if (showDashboardLinks || isLoggedIn) return path;
@@ -171,6 +179,7 @@ export function CustomerIntegrationGuide({
             linkHref={linkHref}
             dashHref={dashHref}
             docsBase={docsBase}
+            quickStartApiKey={quickStartApiKey}
           />
         ))}
 
@@ -203,6 +212,7 @@ function DocSectionCard({
   linkHref,
   dashHref,
   docsBase,
+  quickStartApiKey,
 }: {
   section: CustomerDocSection;
   t: (key: string) => string;
@@ -211,6 +221,7 @@ function DocSectionCard({
   linkHref: (link: CustomerDocDashboardLink) => string;
   dashHref: (path: string) => string;
   docsBase: string;
+  quickStartApiKey: string;
 }) {
   return (
     <Card
@@ -234,6 +245,7 @@ function DocSectionCard({
           copiedId={copiedId}
           onCopy={onCopy}
           linkHref={linkHref}
+          quickStartApiKey={quickStartApiKey}
         />
         <ChapterGuidePanel guide={section.chapterGuide} t={t} />
         {section.id === "openai-sdk" ? (
@@ -248,7 +260,7 @@ function DocSectionCard({
             />
             <CopyConfigAction
               id="sdk-copy-curl"
-              value={CUSTOMER_DOC_SNIPPET_COPY["chat-curl"]}
+              value={resolveDocCurlSnippetCopy("chat-curl", quickStartApiKey)}
               copiedId={copiedId}
               onCopy={onCopy}
               label={t("integration.copyOneLineCurl")}
@@ -284,10 +296,12 @@ function DocSectionCard({
           <DocBlock
             key={`${section.id}-${index}`}
             block={block}
+            sectionId={section.id}
             t={t}
             copiedId={copiedId}
             onCopy={onCopy}
             linkHref={linkHref}
+            quickStartApiKey={quickStartApiKey}
           />
         ))}
       </CardContent>
@@ -297,16 +311,20 @@ function DocSectionCard({
 
 function DocBlock({
   block,
+  sectionId,
   t,
   copiedId,
   onCopy,
   linkHref,
+  quickStartApiKey,
 }: {
   block: CustomerDocBlock;
+  sectionId: string;
   t: (key: string) => string;
   copiedId: string | null;
   onCopy: (id: string, value: string) => void;
   linkHref: (link: CustomerDocDashboardLink) => string;
+  quickStartApiKey: string;
 }) {
   switch (block.type) {
     case "paragraph":
@@ -330,9 +348,14 @@ function DocBlock({
         </ol>
       );
     case "code":
-      const displayCode = CUSTOMER_DOC_SNIPPET_DISPLAY[block.snippetKey];
-      const copyValue = CUSTOMER_DOC_SNIPPET_COPY[block.snippetKey];
       const isCurlSnippet = block.snippetKey.includes("curl");
+      const displayCode =
+        block.snippetKey === "chat-curl" && sectionId === "quick-start"
+          ? resolveDocChatCurlDisplay(quickStartApiKey)
+          : CUSTOMER_DOC_SNIPPET_DISPLAY[block.snippetKey];
+      const copyValue = isCurlSnippet
+        ? resolveDocCurlSnippetCopy(block.snippetKey, quickStartApiKey)
+        : CUSTOMER_DOC_SNIPPET_COPY[block.snippetKey];
       const copyLabel = isCurlSnippet
         ? t("integration.copyOneLineCurl")
         : block.snippetKey.includes("config")
@@ -349,6 +372,39 @@ function DocBlock({
           copyLabel={copyLabel}
           copiedLabel={t("integration.copied")}
         />
+      );
+    case "one-line-curl":
+      const liveCurl = quickStartChatCurlOneLine(quickStartApiKey);
+      const keyIsPlaceholder = isQuickStartKeyPlaceholder(quickStartApiKey);
+      return (
+        <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
+          <p className="text-sm font-semibold text-foreground">{t(block.titleKey)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {keyIsPlaceholder
+              ? t("integration.quickStartKeyHintPlaceholder")
+              : t("integration.quickStartKeyHintLive")}
+          </p>
+          <CopyableSnippetField
+            label={t("integration.quickStartCopyNowLabel")}
+            value={liveCurl}
+            copyId={block.id}
+            copiedId={copiedId}
+            onCopy={onCopy}
+            copyLabel={t("integration.copyOneLineCurl")}
+            copiedLabel={t("integration.copied")}
+            className="mt-3 [&_code]:max-h-32 [&_code]:whitespace-pre-wrap [&_code]:break-all"
+          />
+          <div className="mt-2 flex flex-wrap gap-2">
+            <CopyConfigAction
+              id={`${block.id}-action`}
+              value={liveCurl}
+              copiedId={copiedId}
+              onCopy={onCopy}
+              label={t("integration.copyOneLineCurl")}
+              copiedLabel={t("integration.copied")}
+            />
+          </div>
+        </div>
       );
     case "copy-fields":
       return (
@@ -408,6 +464,7 @@ function ChapterNowPanel({
   copiedId,
   onCopy,
   linkHref,
+  quickStartApiKey,
 }: {
   chapterNow: CustomerDocChapterNow;
   sectionId: string;
@@ -415,6 +472,7 @@ function ChapterNowPanel({
   copiedId: string | null;
   onCopy: (id: string, value: string) => void;
   linkHref: (link: CustomerDocDashboardLink) => string;
+  quickStartApiKey: string;
 }) {
   const copySnippetKey = chapterNow.copySnippetKey;
   const copyId = `chapter-now-${sectionId}-${copySnippetKey ?? "none"}`;
@@ -441,7 +499,10 @@ function ChapterNowPanel({
         {copySnippetKey ? (
           <CopyConfigAction
             id={copyId}
-            value={CUSTOMER_DOC_SNIPPET_COPY[copySnippetKey]}
+            value={resolveDocCurlSnippetCopy(
+              copySnippetKey,
+              isCurlCopy ? quickStartApiKey : undefined
+            )}
             copiedId={copiedId}
             onCopy={onCopy}
             label={

@@ -1627,9 +1627,9 @@ export const messages = {
       quickStartChapterPurpose:
         "Send your first successful API call in minutes.",
       quickStartChapterCopy:
-        "Base URL, recommended model auto-fast, and Authorization: Bearer <your key>.",
+        "One-line chat curl below (same format as the API Keys success card).",
       quickStartChapterVerify:
-        "HTTP 200 response with request_id; Usage row appears for the call.",
+        "HTTP 200 with content, request_id, credits_charged; Usage and Credits rows match request_id.",
       quickStartChapterFailure:
         "missing_token or invalid_token — fix the header; copy request_id into Usage if unsure.",
       apiKeyTitle: "API Key",
@@ -1810,7 +1810,30 @@ export const messages = {
       },
       quickStartTitle: "Quick start",
       quickStartDesc:
-        "Create a key, copy the secret once, then send your first chat request.",
+        "Six steps: sign in, create a key, copy one-line curl, run in any terminal, confirm HTTP 200, reconcile in Usage / Credits.",
+      quickStartStep1: "Sign in to the Tokfai Dashboard.",
+      quickStartStep2:
+        "Open API Keys → Create API key. Copy the full sk-tokfai_… secret (shown once at creation).",
+      quickStartStep3:
+        "Copy the one-line curl below — or from the API Keys success card right after you create a key.",
+      quickStartStep4:
+        "Paste into any terminal: Mac Terminal, Windows PowerShell, or Linux shell. You do not need to open any Tokfai project folder.",
+      quickStartStep5:
+        "Expect HTTP 200 JSON with assistant content in choices, plus request_id and credits_charged.",
+      quickStartStep6:
+        "Copy request_id from the response. Search it in Usage and Credits to reconcile tokens and debits.",
+      quickStartTerminalNote:
+        "Tokfai is a cloud API. Run curl from any folder on your computer — no clone, no cd, no local Tokfai codebase required.",
+      quickStartCopyNowTitle: "You can copy now",
+      quickStartCopyNowLabel: "One-line chat curl",
+      quickStartKeyHintLive:
+        "Your API key from this browser session is already filled in.",
+      quickStartKeyHintPlaceholder:
+        "Showing placeholder sk-tokfai_xxx — create a key on API Keys, then copy curl from the success card or refresh this page.",
+      quickStartExpectedResponse:
+        "A successful response includes choices[0].message.content, request_id, and credits_charged. If you see missing_token, the Authorization header was not sent — use the one-line copy button above.",
+      quickStartReconcileNote:
+        "Open Usage, search request_id, confirm model, tokens, and credits_charged. Open Credits to match the debit for succeeded calls only.",
       quickStep1:
         "Sign in → API Keys → Create API key. Copy the full sk-tokfai_… secret immediately.",
       quickStep2:
@@ -3911,9 +3934,9 @@ export const messages = {
       quickStartChapterPurpose:
         "几分钟内发出第一条成功 API 请求。",
       quickStartChapterCopy:
-        "Base URL、推荐模型 auto-fast、Authorization: Bearer <你的密钥>。",
+        "下方单行 chat curl（与 API Keys 成功卡片格式一致）。",
       quickStartChapterVerify:
-        "HTTP 200 且响应含 request_id；Usage 出现对应记录。",
+        "HTTP 200 含回复内容、request_id、credits_charged；Usage 与 Credits 可按 request_id 核对。",
       quickStartChapterFailure:
         "missing_token 或 invalid_token — 检查请求头；不确定时在 Usage 搜 request_id。",
       apiKeyTitle: "API Key",
@@ -4092,7 +4115,30 @@ export const messages = {
         },
       },
       quickStartTitle: "快速开始",
-      quickStartDesc: "创建密钥、复制 secret，然后发送第一条对话请求。",
+      quickStartDesc:
+        "六步完成：登录 → 创建密钥 → 复制单行 curl → 任意终端运行 → 确认 HTTP 200 → 在 Usage / Credits 对账。",
+      quickStartStep1: "登录 Tokfai Dashboard。",
+      quickStartStep2:
+        "打开 API Keys → 创建密钥。立即复制完整 sk-tokfai_… secret（仅创建时展示一次）。",
+      quickStartStep3:
+        "复制下方单行 curl——或在创建密钥后的 API Keys 成功卡片中复制。",
+      quickStartStep4:
+        "粘贴到任意终端：Mac Terminal、Windows PowerShell 或 Linux shell。无需进入任何 Tokfai 工程目录。",
+      quickStartStep5:
+        "应得到 HTTP 200 JSON，含 choices 中的回复、request_id 与 credits_charged。",
+      quickStartStep6:
+        "从响应复制 request_id，在 Usage 与 Credits 中搜索核对 tokens 与扣费。",
+      quickStartTerminalNote:
+        "Tokfai 是云端 API。在电脑任意目录运行 curl 即可——无需 clone、无需 cd、无需本地 Tokfai 代码库。",
+      quickStartCopyNowTitle: "你现在就可以复制",
+      quickStartCopyNowLabel: "单行 chat curl",
+      quickStartKeyHintLive: "已自动填入本浏览器会话中创建的 API Key。",
+      quickStartKeyHintPlaceholder:
+        "当前为占位符 sk-tokfai_xxx——请在 API Keys 创建密钥，从成功卡片复制 curl 或刷新本页。",
+      quickStartExpectedResponse:
+        "成功响应包含 choices[0].message.content、request_id 与 credits_charged。若出现 missing_token，说明未带上 Authorization——请用上方单行复制按钮。",
+      quickStartReconcileNote:
+        "打开 Usage 搜索 request_id，核对 model、tokens、credits_charged。打开 Credits 核对成功调用的扣费记录。",
       quickStep1:
         "登录 → API Keys → 创建密钥。立即复制完整 sk-tokfai_… secret。",
       quickStep2:

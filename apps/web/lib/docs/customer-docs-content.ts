@@ -79,6 +79,7 @@ export type CustomerDocBlock =
   | { type: "bullets"; items: string[] }
   | { type: "ordered"; items: string[] }
   | { type: "code"; id: string; label: string; snippetKey: CustomerDocSnippetKey }
+  | { type: "one-line-curl"; id: string; titleKey: string }
   | { type: "copy-fields"; id: string; fields: CustomerDocCopyField[] }
   | { type: "error-table" }
   | { type: "model-list" }
@@ -293,9 +294,9 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
     ),
     chapterNow: {
       try: {
-        id: "playground",
-        labelKey: "integration.demoFlowLinkPlayground",
-        href: "/dashboard/playground",
+        id: "keys",
+        labelKey: "integration.ctaCreateKey",
+        href: "/dashboard/api-keys",
       },
       copySnippetKey: "chat-curl",
       verify: VERIFY_USAGE_CREDITS,
@@ -304,19 +305,33 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       {
         type: "ordered",
         items: [
-          "integration.quickStep1",
-          "integration.quickStep2",
-          "integration.quickStep3",
-          "integration.quickStep4",
+          "integration.quickStartStep1",
+          "integration.quickStartStep2",
+          "integration.quickStartStep3",
+          "integration.quickStartStep4",
+          "integration.quickStartStep5",
+          "integration.quickStartStep6",
         ],
       },
+      { type: "paragraph", textKey: "integration.quickStartTerminalNote" },
+      { type: "one-line-curl", id: "quick-start-live-curl", titleKey: "integration.quickStartCopyNowTitle" },
+      { type: "paragraph", textKey: "integration.quickStartExpectedResponse" },
+      { type: "paragraph", textKey: "integration.quickStartReconcileNote" },
       { type: "paragraph", textKey: "integration.placeholderKeyNote" },
       { type: "copy-fields", id: "quick-start", fields: CUSTOMER_DOC_QUICK_START_FIELDS },
       {
         type: "code",
-        id: "quick-start-chat-curl",
-        label: "chat (readable)",
+        id: "quick-start-chat-curl-readable",
+        label: "readable multi-line",
         snippetKey: "chat-curl",
+      },
+      {
+        type: "dashboard-links",
+        links: [
+          { id: "keys", labelKey: "integration.ctaCreateKey", href: "/dashboard/api-keys" },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+        ],
       },
     ],
   },

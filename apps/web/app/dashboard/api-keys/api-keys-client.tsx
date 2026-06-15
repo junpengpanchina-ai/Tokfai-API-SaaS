@@ -50,9 +50,13 @@ import { formatMessage } from "@/lib/i18n/messages";
 import { DashboardFirstRunOnboardingCard } from "@/components/dashboard-first-run-onboarding";
 import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
 import {
+  setQuickStartApiKeySecret,
+  clearQuickStartApiKeySecret,
+} from "@/lib/customer-quick-start-key-session";
+import { quickStartChatCurlOneLine } from "@/lib/customer-quick-start-snippets";
+import {
   authorizationHeader,
   batchCreateCurlOneLine,
-  chatCurlOneLine,
   cherryStudioConfigSnippet,
   cursorConfigSnippet,
   modelsCurlOneLine,
@@ -130,6 +134,7 @@ export function ApiKeysClient({
         { accessToken }
       );
       setOneTimeSecret(result.secret);
+      setQuickStartApiKeySecret(result.secret);
       setCreatedKey(result.api_key);
       setCopyFullKeyStatus("idle");
       applyCreateResult(result);
@@ -192,6 +197,7 @@ export function ApiKeysClient({
   }
 
   function dismissOneTimeSecret() {
+    clearQuickStartApiKeySecret();
     setOneTimeSecret(null);
     setCreatedKey(null);
     setCopyFullKeyStatus("idle");
@@ -408,7 +414,7 @@ function OneTimeSecretCard({
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [snippetCopiedId, setSnippetCopiedId] = useState<string | null>(null);
-  const chatCurlOneLineExample = chatCurlOneLine(secret);
+  const chatCurlOneLineExample = quickStartChatCurlOneLine(secret);
   const modelsCurlOneLineExample = modelsCurlOneLine(secret);
   const authHeaderValue = authorizationHeader(secret);
   const sdkConfig = openaiSdkConfigSnippet(secret, TOKFAI_RECOMMENDED_MODEL);
