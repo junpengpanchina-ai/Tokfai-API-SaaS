@@ -410,7 +410,7 @@ function OneTimeSecretCard({
   const curlExample = chatCompletionsCurl(secret, TOKFAI_RECOMMENDED_MODEL);
   const authHeaderValue = authorizationHeader(secret);
   const sdkConfig = openaiSdkConfigSnippet(secret, TOKFAI_RECOMMENDED_MODEL);
-  const cursorConfig = cursorConfigSnippet(secret, TOKFAI_RECOMMENDED_MODEL);
+  const cursorConfig = cursorConfigSnippet(secret);
   const cherryConfig = cherryStudioConfigSnippet(secret, TOKFAI_RECOMMENDED_MODEL);
   const batchCurlExample = batchChatCurl(secret, TOKFAI_RECOMMENDED_MODEL);
 

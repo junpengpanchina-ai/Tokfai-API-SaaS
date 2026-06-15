@@ -14,11 +14,11 @@ export const CUSTOMER_INTEGRATION_ERROR_CODES = [
   "invalid_token",
   "insufficient_credits",
   "upstream_model_busy",
-  "all_upstreams_unavailable",
+  "model_not_available",
   "upstream_timeout",
   "too_many_requests",
-  "too_many_concurrent_requests",
-  "request_body_too_large",
+  "gateway_overloaded",
+  "batch_cancelled",
 ] as const;
 
 export type CustomerIntegrationErrorCode =
@@ -86,13 +86,12 @@ Authorization header: Bearer ${apiKey}`;
 }
 
 export function cursorConfigSnippet(
-  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
-  model = TOKFAI_RECOMMENDED_MODEL
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER
 ): string {
-  return `Provider type: OpenAI-compatible (Custom)
+  return `Provider: OpenAI-compatible
 Base URL: https://api.tokfai.com/v1
 API Key: ${apiKey}
-Model: ${model}`;
+Model: auto-fast / auto-pro`;
 }
 
 export function cherryStudioConfigSnippet(
