@@ -30,28 +30,15 @@ import {
   CUSTOMER_DOC_SNIPPETS,
   CUSTOMER_INTEGRATION_ERROR_CODES,
   type CustomerDocBlock,
+  type CustomerDocChapterGuide,
   type CustomerDocCopyField,
   type CustomerDocDashboardLink,
+  type CustomerDocIndustryId,
   type CustomerDocSection,
 } from "@/lib/docs/customer-docs-content";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
-
-/** Nav label keys aligned with section ids. */
-const SECTION_NAV_KEYS: Record<string, string> = {
-  "product-positioning": "integration.navPositioning",
-  "production-demo-flow": "integration.navDemoFlow",
-  "quick-start": "integration.navQuickStart",
-  "curl-examples": "integration.navCurl",
-  "openai-sdk": "integration.navOpenAiSdk",
-  "cursor-integration": "integration.navCursor",
-  "cherry-studio": "integration.navCherry",
-  "models-guide": "integration.navModels",
-  "error-codes": "integration.navErrors",
-  "billing-usage": "integration.navBilling",
-  "batch-api": "integration.navBatch",
-};
 
 /** Offset for dashboard mobile sticky header when scrolling to in-page anchors. */
 const DOC_SECTION_SCROLL_MARGIN = "scroll-mt-24 md:scroll-mt-20 lg:scroll-mt-6";
@@ -128,7 +115,7 @@ export function CustomerIntegrationGuide({
                 }}
                 className="block whitespace-nowrap rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-background hover:text-foreground lg:whitespace-normal"
               >
-                {t(SECTION_NAV_KEYS[section.id])}
+                {t(section.navKey)}
               </a>
             </li>
           ))}
@@ -237,6 +224,7 @@ function DocSectionCard({
         ) : null}
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        <ChapterGuidePanel guide={section.chapterGuide} t={t} />
         {section.id === "openai-sdk" ? (
           <div className="flex flex-wrap gap-2">
             <CopyConfigAction
@@ -291,13 +279,6 @@ function DocSectionCard({
             linkHref={linkHref}
           />
         ))}
-        {section.id === "models-guide" ? (
-          <Button asChild variant="outline" size="sm">
-            <Link href={dashHref("/dashboard/models")}>
-              {t("integration.browseModels")}
-            </Link>
-          </Button>
-        ) : null}
       </CardContent>
     </Card>
   );
@@ -394,9 +375,84 @@ function DocBlock({
           ))}
         </div>
       );
+    case "industry-cards":
+      return (
+        <div className="flex flex-col gap-4">
+          {block.ids.map((id) => (
+            <IndustryExampleCard key={id} id={id} t={t} />
+          ))}
+        </div>
+      );
     default:
       return null;
   }
+}
+
+function ChapterGuidePanel({
+  guide,
+  t,
+}: {
+  guide: CustomerDocChapterGuide;
+  t: (key: string) => string;
+}) {
+  const rows = [
+    { labelKey: "integration.chapterGuidePurpose", textKey: guide.purposeKey },
+    { labelKey: "integration.chapterGuideCopy", textKey: guide.copyKey },
+    { labelKey: "integration.chapterGuideVerify", textKey: guide.verifyKey },
+    { labelKey: "integration.chapterGuideFailure", textKey: guide.failureKey },
+  ];
+
+  return (
+    <div className="rounded-lg border bg-muted/30 p-4 text-sm">
+      <dl className="space-y-3">
+        {rows.map((row) => (
+          <div key={row.labelKey}>
+            <dt className="font-medium text-foreground">{t(row.labelKey)}</dt>
+            <dd className="mt-0.5 text-muted-foreground">{t(row.textKey)}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+function IndustryExampleCard({
+  id,
+  t,
+}: {
+  id: CustomerDocIndustryId;
+  t: (key: string) => string;
+}) {
+  const prefix = `integration.industry.${id}`;
+  const rows = [
+    { labelKey: "integration.industryIntegrationLabel", textKey: `${prefix}.integration` },
+    { labelKey: "integration.industryVerifyLabel", textKey: `${prefix}.verify` },
+    { labelKey: "integration.industryFailureLabel", textKey: `${prefix}.failure` },
+  ];
+  const boundaryKey = `${prefix}.boundary`;
+  const boundary = t(boundaryKey);
+  const hasBoundary = boundary !== boundaryKey;
+
+  return (
+    <div className="rounded-lg border bg-background p-4">
+      <h3 className="text-sm font-semibold">{t(`${prefix}.title`)}</h3>
+      <p className="mt-1 text-sm text-muted-foreground">{t(`${prefix}.purpose`)}</p>
+      <p className="mt-2 text-xs text-muted-foreground">{t(`${prefix}.notManaged`)}</p>
+      {hasBoundary ? (
+        <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-400">
+          {boundary}
+        </p>
+      ) : null}
+      <dl className="mt-3 space-y-2 text-sm">
+        {rows.map((row) => (
+          <div key={row.labelKey}>
+            <dt className="font-medium text-foreground">{t(row.labelKey)}</dt>
+            <dd className="text-muted-foreground">{t(row.textKey)}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
 }
 
 function CopyFieldsTable({

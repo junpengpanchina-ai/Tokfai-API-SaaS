@@ -95,7 +95,7 @@ export function focusImagePlaygroundResultPanel(
   }
 }
 
-const IMAGE_API_DOCS_HREF = "/docs#image-generations";
+const IMAGE_API_DOCS_HREF = "/dashboard/docs#image-api";
 const INTEGRATION_DOCS_HREF = "/dashboard/docs";
 
 type ImagePlaygroundKeyOption = {

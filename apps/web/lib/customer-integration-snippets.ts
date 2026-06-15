@@ -4,6 +4,7 @@ import {
   TOKFAI_CLIENT_TEST_PROMPT,
   TOKFAI_RECOMMENDED_MODEL,
 } from "@/lib/tokfai-api";
+import { buildImageGenerationCurl } from "@/lib/image-api-curl";
 
 export const INTEGRATION_BASE_URL = TOKFAI_API_BASE_URL;
 export const INTEGRATION_KEY_PLACEHOLDER = TOKFAI_API_KEY_PLACEHOLDER;
@@ -138,3 +139,9 @@ export function batchPollCurl(
 
 export const BATCH_CHAT_CURL = batchChatCurl();
 export const BATCH_POLL_CURL = batchPollCurl();
+
+export const IMAGE_GENERATION_CURL = buildImageGenerationCurl({
+  model: "gpt-image-2",
+  prompt: "A product photo on a white background",
+  size: "1024x1024",
+});

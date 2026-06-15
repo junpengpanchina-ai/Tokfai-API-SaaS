@@ -1545,14 +1545,20 @@ export const messages = {
       navPositioning: "Product positioning",
       navDemoFlow: "Production onboarding",
       navQuickStart: "Quick start",
-      navCurl: "curl examples",
+      navApiKey: "API Key",
+      navChatApi: "Chat API",
+      navImageApi: "Image API",
+      navBatch: "Batch API",
+      navUsageCredits: "Usage / Credits",
+      navErrors: "Error codes",
       navOpenAiSdk: "OpenAI SDK",
       navCursor: "Cursor",
       navCherry: "Cherry Studio",
-      navModels: "Models guide",
-      navErrors: "Error codes",
-      navBilling: "Billing & Usage",
-      navBatch: "Batch API",
+      navIndustry: "Industry API examples",
+      chapterGuidePurpose: "What this chapter solves",
+      chapterGuideCopy: "What to copy",
+      chapterGuideVerify: "How to verify success",
+      chapterGuideFailure: "If it fails",
       ctaCreateKey: "Create API key",
       ctaDemoFlow: "Onboarding flow",
       positioningTitle: "Tokfai is an API gateway — not an agency",
@@ -1586,6 +1592,189 @@ export const messages = {
       demoFlowLinkCredits: "Credits",
       demoFlowReconcileNote:
         "This flow validates your integration — not Tokfai operating your business. Follow the steps on this page for a complete onboarding check.",
+      positioningChapterPurpose:
+        "Clarify Tokfai as an API gateway and model relay — not a managed operations vendor.",
+      positioningChapterCopy:
+        "Base URL https://api.tokfai.com/v1 and the Authorization header pattern on this page.",
+      positioningChapterVerify:
+        "You understand Tokfai provides API access; you keep your product, customers, and workflows.",
+      positioningChapterFailure:
+        "If you expected Tokfai to run your business, re-read this chapter — we only provide API Key access.",
+      onboardingChapterPurpose:
+        "Run one end-to-end onboarding path before production traffic.",
+      onboardingChapterCopy:
+        "API Key secret, one chat request, a small Batch job, and request_id values from responses.",
+      onboardingChapterVerify:
+        "Usage shows succeeded request_ids with credits; Credits debits match succeeded items only.",
+      onboardingChapterFailure:
+        "Search request_id in Usage; check error.code (invalid_token, insufficient_credits, batch_cancelled).",
+      quickStartChapterPurpose:
+        "Send your first successful API call in minutes.",
+      quickStartChapterCopy:
+        "Base URL, recommended model auto-fast, and Authorization: Bearer <your key>.",
+      quickStartChapterVerify:
+        "HTTP 200 response with request_id; Usage row appears for the call.",
+      quickStartChapterFailure:
+        "missing_token or invalid_token — fix the header; copy request_id into Usage if unsure.",
+      apiKeyTitle: "API Key",
+      apiKeyDesc: "Authenticate every Tokfai API call with your secret key.",
+      apiKeyBody:
+        "Create a key in API Keys. Copy the full sk-tokfai_… secret once — Tokfai cannot show it again. Never put keys in client-side code or public repos.",
+      apiKeyFormatLabel: "Key format",
+      apiKeyChapterPurpose: "Prove your backend can authenticate to Tokfai.",
+      apiKeyChapterCopy:
+        "Authorization: Bearer sk-tokfai_… on every request to /v1/*.",
+      apiKeyChapterVerify:
+        "A test call returns HTTP 200 instead of missing_token / invalid_token.",
+      apiKeyChapterFailure:
+        "invalid_token — key incomplete, revoked, or wrong format; fix in API Keys.",
+      chatApiTitle: "Chat API",
+      chatApiDesc:
+        "OpenAI-compatible chat completions — POST /v1/chat/completions and GET /v1/models.",
+      chatApiBody:
+        "Use auto-fast for production chat. The response model field shows which upstream model served the request.",
+      chatApiChapterPurpose:
+        "Integrate conversational AI into your app, script, or IDE client.",
+      chatApiChapterCopy:
+        "Chat curl below, model auto-fast (or auto-pro), and Authorization header.",
+      chatApiChapterVerify:
+        "HTTP 200, assistant text in choices, request_id in JSON; Usage shows tokens and credits_charged.",
+      chatApiChapterFailure:
+        "upstream_model_busy, model_not_available, upstream_timeout — retry or switch auto-*; check request_id in Usage.",
+      imageApiTitle: "Image API",
+      imageApiDesc:
+        "Text-to-image via POST /v1/images/generations — billed per successful generation.",
+      imageApiBody:
+        "Send prompt, model, and size from your backend. Successful generations debit credits; failed calls are usually not charged.",
+      imageApiChapterPurpose:
+        "Generate images from your product workflow — not via Tokfai-operated design services.",
+      imageApiChapterCopy:
+        "Image curl below (replace model/prompt/size as needed) and your API Key header.",
+      imageApiChapterVerify:
+        "HTTP 200 with image URL or base64; request_id in response; Usage shows image generation row.",
+      imageApiChapterFailure:
+        "insufficient_credits or model_not_available — check Credits and model id; search request_id in Usage.",
+      imagePlaygroundLink: "Open Image Playground",
+      batchChapterPurpose:
+        "Run many chat prompts in one job from your own backend.",
+      batchChapterCopy:
+        "POST /v1/batches/chat body and poll GET /v1/batches/{id} curl snippets.",
+      batchChapterVerify:
+        "Batch reaches completed; each succeeded item has request_id in Usage with credits.",
+      batchChapterFailure:
+        "batch_cancelled items are not charged; gateway_overloaded — retry with backoff; match request_id in Usage.",
+      usageChapterPurpose:
+        "Reconcile every API call against balance changes.",
+      usageChapterCopy:
+        "request_id from each API response — search it in Usage and Credits.",
+      usageChapterVerify:
+        "Usage row matches tokens/model/credits; Credits ledger debits align for succeeded calls.",
+      usageChapterFailure:
+        "No Usage row — wrong key or call never succeeded; compare error.code and request_id when present.",
+      errorsChapterPurpose:
+        "Decode API errors without internal runbooks.",
+      errorsChapterCopy:
+        "error.code from JSON responses (table below).",
+      errorsChapterVerify:
+        "You can map your error.code to an action and find the call via request_id in Usage.",
+      errorsChapterFailure:
+        "Unknown code — open Usage by request_id and contact support with that id.",
+      sdkChapterPurpose:
+        "Use the official OpenAI SDK pointed at Tokfai.",
+      sdkChapterCopy:
+        "baseURL / base_url = https://api.tokfai.com/v1 and apiKey = your sk-tokfai_… secret.",
+      sdkChapterVerify:
+        "SDK call returns completion with request_id; Usage shows the call.",
+      sdkChapterFailure:
+        "Same codes as Chat API — invalid_token, insufficient_credits; check request_id in Usage.",
+      cursorChapterPurpose:
+        "Use Tokfai models inside Cursor as OpenAI-compatible provider.",
+      cursorChapterCopy:
+        "Provider, Base URL, API Key, and Model fields below.",
+      cursorChapterVerify:
+        "Cursor chat completes; check Usage for the request_id if billing looks wrong.",
+      cursorChapterFailure:
+        "invalid_token in Cursor — re-paste full key; too_many_requests — slow down.",
+      cherryChapterPurpose:
+        "Use Tokfai in Cherry Studio as OpenAI compatible provider.",
+      cherryChapterCopy:
+        "Provider type, API Host, API Key, and Model fields below.",
+      cherryChapterVerify:
+        "Cherry Studio chat works; reconcile via Usage request_id if needed.",
+      cherryChapterFailure:
+        "invalid_token or model_not_available — verify host and model id.",
+      industryTitle: "Industry API integration examples",
+      industryDesc:
+        "Patterns for calling Tokfai from your systems — API integration examples, not managed operations.",
+      industryNotAgency:
+        "Tokfai does not operate hospitals, dealerships, stores, or support queues. You call the API from your own software.",
+      industryChapterPurpose:
+        "See how different industries wire Tokfai into their stack.",
+      industryChapterCopy:
+        "Endpoint, model alias, and request shape from each example card.",
+      industryChapterVerify:
+        "Your integration returns HTTP 200 and request_id; Usage shows your test calls.",
+      industryChapterFailure:
+        "Use error.code + request_id from the response; search Usage for the same request_id.",
+      industryIntegrationLabel: "API call pattern",
+      industryVerifyLabel: "Verify success",
+      industryFailureLabel: "If it fails",
+      industry: {
+        hospital: {
+          title: "Hospital / clinic — chart assist",
+          purpose:
+            "Your EMR or clinic app sends visit notes to POST /v1/chat/completions for structuring and summary drafts.",
+          notManaged:
+            "Tokfai does not operate the clinic or patient queue — your system calls the API with your API Key.",
+          boundary:
+            "Medical AI boundary: assists documentation and prompts only. Does not diagnose, prescribe, or replace physician judgment.",
+          integration:
+            "Backend POST /v1/chat/completions, model auto-pro, messages with de-identified note text; optional Batch for bulk chart prep.",
+          verify:
+            "HTTP 200, request_id in JSON; Usage shows tokens and credits for succeeded calls only.",
+          failure:
+            "upstream_timeout or insufficient_credits — check request_id in Usage; never use output as a diagnosis.",
+        },
+        automotive: {
+          title: "Automotive — owner manual Q&A",
+          purpose:
+            "Your vehicle app or dealer portal calls Chat API to answer manual questions from your content.",
+          notManaged:
+            "Tokfai does not run your dealership CRM — your app sends requests with your API Key.",
+          integration:
+            "POST /v1/chat/completions from your backend with auto-fast and manual snippets in the user message.",
+          verify:
+            "HTTP 200 with answer text and request_id; Usage row for each driver question.",
+          failure:
+            "model_not_available or gateway_overloaded — retry; search request_id in Usage.",
+        },
+        ecommerce: {
+          title: "E-commerce — bulk product copy",
+          purpose:
+            "Your catalog system submits many product attributes via Batch API for titles and descriptions.",
+          notManaged:
+            "Tokfai does not manage your storefront — your backend creates and polls batch jobs.",
+          integration:
+            "POST /v1/batches/chat with one item per SKU; poll GET /v1/batches/{id}; model auto-cheap or auto-fast.",
+          verify:
+            "Batch completed; each succeeded item has request_id in Usage with credits_charged.",
+          failure:
+            "batch_cancelled — no charge for cancelled items; insufficient_credits before large batches.",
+        },
+        support: {
+          title: "AI customer service — ticket triage",
+          purpose:
+            "Your helpdesk or CRM webhook handler calls Chat API to suggest tags, priority, or draft replies.",
+          notManaged:
+            "Tokfai does not answer tickets for you — your platform calls the API per ticket event.",
+          integration:
+            "POST /v1/chat/completions with ticket subject/body in messages; model auto-fast; stream optional.",
+          verify:
+            "Each ticket test returns request_id; Usage shows per-ticket credits when succeeded.",
+          failure:
+            "too_many_requests — rate limit per key; missing_token if webhook forgot Authorization header.",
+        },
+      },
       quickStartTitle: "Quick start",
       quickStartDesc:
         "Create a key, copy the secret once, then send your first chat request.",
@@ -1600,8 +1789,6 @@ export const messages = {
       baseUrlLabel: "Base URL",
       recommendedModelLabel: "Recommended model",
       authHeaderLabel: "Authorization header",
-      curlTitle: "curl examples",
-      curlDesc: "Replace sk-tokfai_xxx with your API key, then run in a terminal.",
       sdkTitle: "OpenAI SDK (Node.js & Python)",
       sdkDesc:
         "Use the official OpenAI SDK with baseURL / base_url = https://api.tokfai.com/v1.",
@@ -1617,9 +1804,6 @@ export const messages = {
       cherryApiHost: "API Host",
       cherryApiKey: "API Key",
       cherryModel: "Model",
-      modelsTitle: "Models guide",
-      modelsDesc:
-        "Use auto-* aliases for resilient routing. The response model field shows which model served your request.",
       modelAutoFast:
         "auto-fast — default for production and Playground (stable).",
       modelAutoPro:
@@ -3612,14 +3796,20 @@ export const messages = {
       navPositioning: "产品定位",
       navDemoFlow: "生产接入流程",
       navQuickStart: "快速开始",
-      navCurl: "curl 示例",
+      navApiKey: "API Key",
+      navChatApi: "Chat API",
+      navImageApi: "Image API",
+      navBatch: "Batch API",
+      navUsageCredits: "Usage / Credits",
+      navErrors: "错误码",
       navOpenAiSdk: "OpenAI SDK",
       navCursor: "Cursor",
       navCherry: "Cherry Studio",
-      navModels: "模型说明",
-      navErrors: "错误码",
-      navBilling: "计费与用量",
-      navBatch: "Batch API",
+      navIndustry: "行业 API 接入示例",
+      chapterGuidePurpose: "本章解决什么问题",
+      chapterGuideCopy: "需要复制什么",
+      chapterGuideVerify: "跑通后如何验证",
+      chapterGuideFailure: "失败时怎么看",
       ctaCreateKey: "创建 API Key",
       ctaDemoFlow: "接入流程",
       positioningTitle: "Tokfai 是 API 网关——不是代运营",
@@ -3653,6 +3843,189 @@ export const messages = {
       demoFlowLinkCredits: "Credits",
       demoFlowReconcileNote:
         "此流程用于验证你的 API 集成——不是 Tokfai 代运营。按本页步骤完成一次完整接入验证。",
+      positioningChapterPurpose:
+        "说明 Tokfai 是 API 网关与模型中转，不是托管运营服务商。",
+      positioningChapterCopy:
+        "本页的 Base URL（https://api.tokfai.com/v1）与 Authorization 请求头格式。",
+      positioningChapterVerify:
+        "你理解 Tokfai 只提供 API 接入；产品、客户与工单由你自己运营。",
+      positioningChapterFailure:
+        "若你期望 Tokfai 代运营业务，请重读本章——我们只提供 API Key 接入能力。",
+      onboardingChapterPurpose:
+        "上线前跑通一次端到端接入路径。",
+      onboardingChapterCopy:
+        "API Key secret、一条对话请求、一个小 Batch 任务，以及响应中的 request_id。",
+      onboardingChapterVerify:
+        "Usage 中成功 request_id 有扣费记录；Credits 仅与成功项一致。",
+      onboardingChapterFailure:
+        "在 Usage 搜索 request_id；查看 error.code（invalid_token、insufficient_credits、batch_cancelled）。",
+      quickStartChapterPurpose:
+        "几分钟内发出第一条成功 API 请求。",
+      quickStartChapterCopy:
+        "Base URL、推荐模型 auto-fast、Authorization: Bearer <你的密钥>。",
+      quickStartChapterVerify:
+        "HTTP 200 且响应含 request_id；Usage 出现对应记录。",
+      quickStartChapterFailure:
+        "missing_token 或 invalid_token — 检查请求头；不确定时在 Usage 搜 request_id。",
+      apiKeyTitle: "API Key",
+      apiKeyDesc: "用密钥为每次 Tokfai API 调用鉴权。",
+      apiKeyBody:
+        "在 API Keys 创建密钥，立即复制完整 sk-tokfai_… secret（无法再次查看）。勿将密钥放入前端或公开仓库。",
+      apiKeyFormatLabel: "密钥格式",
+      apiKeyChapterPurpose: "证明你的后端能向 Tokfai 完成鉴权。",
+      apiKeyChapterCopy:
+        "每次 /v1/* 请求携带 Authorization: Bearer sk-tokfai_…。",
+      apiKeyChapterVerify:
+        "测试请求返回 HTTP 200，而非 missing_token / invalid_token。",
+      apiKeyChapterFailure:
+        "invalid_token — 密钥不完整、已吊销或格式错误；在 API Keys 重新创建。",
+      chatApiTitle: "Chat API",
+      chatApiDesc:
+        "OpenAI 兼容对话 — POST /v1/chat/completions 与 GET /v1/models。",
+      chatApiBody:
+        "生产对话建议 auto-fast。响应 model 字段表示实际上游模型。",
+      chatApiChapterPurpose:
+        "把对话能力接入你的应用、脚本或 IDE。",
+      chatApiChapterCopy:
+        "下方 chat curl、模型 auto-fast（或 auto-pro）、Authorization 请求头。",
+      chatApiChapterVerify:
+        "HTTP 200、choices 中有回复、JSON 含 request_id；Usage 显示 tokens 与 credits_charged。",
+      chatApiChapterFailure:
+        "upstream_model_busy、model_not_available、upstream_timeout — 重试或换 auto-*；在 Usage 查 request_id。",
+      imageApiTitle: "Image API",
+      imageApiDesc:
+        "文生图 — POST /v1/images/generations，按成功生成扣费。",
+      imageApiBody:
+        "从你的后端提交 prompt、model、size。成功生成扣积分；失败通常不扣费。",
+      imageApiChapterPurpose:
+        "在你的产品流程里生成图像——不是 Tokfai 代做设计服务。",
+      imageApiChapterCopy:
+        "下方 image curl（按需改 model/prompt/size）与 API Key 请求头。",
+      imageApiChapterVerify:
+        "HTTP 200 含图片 URL 或 base64；响应有 request_id；Usage 有图像生成记录。",
+      imageApiChapterFailure:
+        "insufficient_credits 或 model_not_available — 查 Credits 与模型 id；在 Usage 搜 request_id。",
+      imagePlaygroundLink: "打开 Image Playground",
+      batchChapterPurpose:
+        "在你的后端一次提交多条对话任务。",
+      batchChapterCopy:
+        "POST /v1/batches/chat 与轮询 GET /v1/batches/{id} 的 curl 示例。",
+      batchChapterVerify:
+        "Batch 状态为 completed；每条成功 item 在 Usage 有 request_id 与扣费。",
+      batchChapterFailure:
+        "batch_cancelled 不扣费；gateway_overloaded 退避重试；用 Usage 对账 request_id。",
+      usageChapterPurpose:
+        "把每次 API 调用与余额变化对齐。",
+      usageChapterCopy:
+        "从每次 API 响应复制 request_id，在 Usage 与 Credits 中搜索。",
+      usageChapterVerify:
+        "Usage 行与 tokens/模型/扣费一致；Credits 账本与成功调用对齐。",
+      usageChapterFailure:
+        "Usage 无记录 — 密钥错误或调用未成功；对照 error.code 与 request_id。",
+      errorsChapterPurpose:
+        "读懂 API 错误，无需内部文档。",
+      errorsChapterCopy:
+        "JSON 中的 error.code（见下表）。",
+      errorsChapterVerify:
+        "能将 error.code 对应到处理动作，并在 Usage 用 request_id 定位调用。",
+      errorsChapterFailure:
+        "未知 code — 用 request_id 在 Usage 查找并联系支持。",
+      sdkChapterPurpose:
+        "用官方 OpenAI SDK 指向 Tokfai。",
+      sdkChapterCopy:
+        "baseURL / base_url = https://api.tokfai.com/v1，apiKey = 你的 sk-tokfai_… secret。",
+      sdkChapterVerify:
+        "SDK 调用成功并返回 request_id；Usage 有对应记录。",
+      sdkChapterFailure:
+        "与 Chat API 相同错误码 — invalid_token、insufficient_credits；查 Usage 的 request_id。",
+      cursorChapterPurpose:
+        "在 Cursor 中以 OpenAI 兼容方式使用 Tokfai。",
+      cursorChapterCopy:
+        "下方 Provider、Base URL、API Key、Model 字段。",
+      cursorChapterVerify:
+        "Cursor 对话可用；计费异常时在 Usage 查 request_id。",
+      cursorChapterFailure:
+        "Cursor 报 invalid_token — 重新粘贴完整密钥；too_many_requests 请降速。",
+      cherryChapterPurpose:
+        "在 Cherry Studio 以 OpenAI 兼容方式配置 Tokfai。",
+      cherryChapterCopy:
+        "下方 Provider type、API Host、API Key、Model 字段。",
+      cherryChapterVerify:
+        "Cherry Studio 对话可用；需要时在 Usage 用 request_id 对账。",
+      cherryChapterFailure:
+        "invalid_token 或 model_not_available — 检查 Host 与模型 id。",
+      industryTitle: "行业 API 接入示例",
+      industryDesc:
+        "展示如何从你的系统调用 Tokfai — 技术接入示例，不是托管运营服务。",
+      industryNotAgency:
+        "Tokfai 不运营医院、门店、车企客服或工单队列——由你的软件携带 API Key 调用。",
+      industryChapterPurpose:
+        "了解不同行业如何把 Tokfai 接入自有系统。",
+      industryChapterCopy:
+        "各示例卡片中的 endpoint、模型别名与请求结构。",
+      industryChapterVerify:
+        "集成返回 HTTP 200 与 request_id；Usage 可见你的测试调用。",
+      industryChapterFailure:
+        "用响应中的 error.code + request_id；在 Usage 搜索同一 request_id。",
+      industryIntegrationLabel: "API 调用方式",
+      industryVerifyLabel: "验证成功",
+      industryFailureLabel: "失败时",
+      industry: {
+        hospital: {
+          title: "医院 / 诊所 — 病历辅助整理",
+          purpose:
+            "你的 EMR 或诊所系统将就诊记录发往 POST /v1/chat/completions，做结构化与摘要草稿。",
+          notManaged:
+            "Tokfai 不运营诊所或患者队列——你的系统用 API Key 调用 API。",
+          boundary:
+            "医疗边界：AI 仅辅助整理与提示，不诊断、不开方、不替代医生判断。",
+          integration:
+            "后端 POST /v1/chat/completions，模型 auto-pro，messages 传入脱敏病历文本；大批量可用 Batch。",
+          verify:
+            "HTTP 200，JSON 含 request_id；Usage 显示 tokens 与扣费（仅成功调用）。",
+          failure:
+            "upstream_timeout 或 insufficient_credits — 在 Usage 查 request_id；勿将输出当作诊断。",
+        },
+        automotive: {
+          title: "车企 — 车主手册问答",
+          purpose:
+            "你的车机 App 或经销商门户用 Chat API 基于自有手册内容回答问题。",
+          notManaged:
+            "Tokfai 不运营经销商 CRM——你的应用携带 API Key 发起请求。",
+          integration:
+            "后端 POST /v1/chat/completions，auto-fast，user message 含手册片段。",
+          verify:
+            "HTTP 200 有回答与 request_id；Usage 记录每次车主提问。",
+          failure:
+            "model_not_available 或 gateway_overloaded — 重试；在 Usage 搜 request_id。",
+        },
+        ecommerce: {
+          title: "电商 — 批量商品文案",
+          purpose:
+            "你的商品系统通过 Batch API 批量提交 SKU 属性生成标题与描述。",
+          notManaged:
+            "Tokfai 不运营店铺——你的后端创建并轮询 batch 任务。",
+          integration:
+            "POST /v1/batches/chat，每个 SKU 一条 item；轮询 GET /v1/batches/{id}；模型 auto-cheap 或 auto-fast。",
+          verify:
+            "Batch 完成；每条成功 item 在 Usage 有 request_id 与 credits_charged。",
+          failure:
+            "batch_cancelled 不扣费；大批量前检查 insufficient_credits。",
+        },
+        support: {
+          title: "AI 客服 — 工单分流",
+          purpose:
+            "你的工单/CRM webhook 调用 Chat API 建议标签、优先级或回复草稿。",
+          notManaged:
+            "Tokfai 不替你回复工单——你的平台按工单事件调用 API。",
+          integration:
+            "POST /v1/chat/completions，messages 含工单标题与正文；模型 auto-fast；可选 stream。",
+          verify:
+            "每条测试工单返回 request_id；成功时 Usage 按工单计扣费。",
+          failure:
+            "too_many_requests — 密钥限速；webhook 未带 Authorization 会 missing_token。",
+        },
+      },
       quickStartTitle: "快速开始",
       quickStartDesc: "创建密钥、复制 secret，然后发送第一条对话请求。",
       quickStep1:
@@ -3666,8 +4039,6 @@ export const messages = {
       baseUrlLabel: "Base URL",
       recommendedModelLabel: "推荐模型",
       authHeaderLabel: "Authorization 请求头",
-      curlTitle: "curl 示例",
-      curlDesc: "将 sk-tokfai_xxx 替换为你的密钥后在终端运行。",
       sdkTitle: "OpenAI SDK（Node.js & Python）",
       sdkDesc:
         "使用官方 OpenAI SDK，baseURL / base_url 设为 https://api.tokfai.com/v1。",
@@ -3683,9 +4054,6 @@ export const messages = {
       cherryApiHost: "API Host",
       cherryApiKey: "API Key",
       cherryModel: "Model",
-      modelsTitle: "模型说明",
-      modelsDesc:
-        "对话建议使用 auto-* 别名。响应中的 model 字段表示实际提供服务的模型。",
       modelAutoFast:
         "auto-fast — 生产与 Playground 默认（稳定）。",
       modelAutoPro: "auto-pro — 质量优先，可能走高端模型。",
