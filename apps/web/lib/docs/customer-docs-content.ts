@@ -3,20 +3,27 @@
  * Static content for now; future Supabase CMS / admin editor can replace this source.
  */
 import {
-  BATCH_POLL_CURL,
-  BATCH_CHAT_CURL,
+  batchCreateCurlMultiline,
+  batchCreateCurlOneLine,
+  batchPollCurlMultiline,
+  batchPollCurlOneLine,
+  chatCurlMultiline,
+  chatCurlOneLine,
+  imageCurlMultiline,
+  imageCurlOneLine,
+  modelsCurlMultiline,
+  modelsCurlOneLine,
+} from "@/lib/customer-curl-oneline";
+import {
   CHERRY_STUDIO_CONFIG_SNIPPET,
   CUSTOMER_INTEGRATION_ERROR_CODES,
   CURSOR_CONFIG_SNIPPET,
-  IMAGE_GENERATION_CURL,
   INTEGRATION_BASE_URL,
   INTEGRATION_DEFAULT_MODEL,
   INTEGRATION_KEY_PLACEHOLDER,
   OPENAI_JS_SNIPPET,
   OPENAI_PYTHON_SNIPPET,
   OPENAI_SDK_CONFIG_SNIPPET,
-  chatCompletionsCurl,
-  modelsListCurl,
 } from "@/lib/customer-integration-snippets";
 
 export type CustomerDocSnippetKey =
@@ -31,18 +38,34 @@ export type CustomerDocSnippetKey =
   | "cursor-config"
   | "cherry-config";
 
-export const CUSTOMER_DOC_SNIPPETS: Record<CustomerDocSnippetKey, string> = {
-  "chat-curl": chatCompletionsCurl(),
-  "models-curl": modelsListCurl(),
-  "image-curl": IMAGE_GENERATION_CURL,
-  "batch-create-curl": BATCH_CHAT_CURL,
-  "batch-poll-curl": BATCH_POLL_CURL,
+export const CUSTOMER_DOC_SNIPPET_DISPLAY: Record<CustomerDocSnippetKey, string> = {
+  "chat-curl": chatCurlMultiline(),
+  "models-curl": modelsCurlMultiline(),
+  "image-curl": imageCurlMultiline(),
+  "batch-create-curl": batchCreateCurlMultiline(),
+  "batch-poll-curl": batchPollCurlMultiline(),
   "openai-sdk-config": OPENAI_SDK_CONFIG_SNIPPET,
   "openai-js": OPENAI_JS_SNIPPET,
   "openai-python": OPENAI_PYTHON_SNIPPET,
   "cursor-config": CURSOR_CONFIG_SNIPPET,
   "cherry-config": CHERRY_STUDIO_CONFIG_SNIPPET,
 };
+
+export const CUSTOMER_DOC_SNIPPET_COPY: Record<CustomerDocSnippetKey, string> = {
+  "chat-curl": chatCurlOneLine(),
+  "models-curl": modelsCurlOneLine(),
+  "image-curl": imageCurlOneLine(),
+  "batch-create-curl": batchCreateCurlOneLine(),
+  "batch-poll-curl": batchPollCurlOneLine(),
+  "openai-sdk-config": OPENAI_SDK_CONFIG_SNIPPET,
+  "openai-js": OPENAI_JS_SNIPPET,
+  "openai-python": OPENAI_PYTHON_SNIPPET,
+  "cursor-config": CURSOR_CONFIG_SNIPPET,
+  "cherry-config": CHERRY_STUDIO_CONFIG_SNIPPET,
+};
+
+/** Readable display snippets (multiline curl where applicable). */
+export const CUSTOMER_DOC_SNIPPETS = CUSTOMER_DOC_SNIPPET_DISPLAY;
 
 export type CustomerDocChapterGuide = {
   purposeKey: string;
@@ -75,6 +98,12 @@ export type CustomerDocDashboardLink = {
   hash?: string;
 };
 
+export type CustomerDocChapterNow = {
+  try?: CustomerDocDashboardLink;
+  copySnippetKey?: CustomerDocSnippetKey;
+  verify?: CustomerDocDashboardLink[];
+};
+
 export type CustomerDocSection = {
   id: string;
   navKey: string;
@@ -82,8 +111,14 @@ export type CustomerDocSection = {
   descriptionKey?: string;
   highlight?: boolean;
   chapterGuide: CustomerDocChapterGuide;
+  chapterNow: CustomerDocChapterNow;
   blocks: CustomerDocBlock[];
 };
+
+const VERIFY_USAGE_CREDITS: CustomerDocDashboardLink[] = [
+  { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+  { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+];
 
 export const CUSTOMER_DOC_ESSENTIAL_KEYS = [
   "integration.essentialBaseUrl",
@@ -230,59 +265,19 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       "integration.positioningChapterVerify",
       "integration.positioningChapterFailure"
     ),
+    chapterNow: {
+      try: {
+        id: "keys",
+        labelKey: "integration.ctaCreateKey",
+        href: "/dashboard/api-keys",
+      },
+      verify: VERIFY_USAGE_CREDITS,
+    },
     blocks: [
       { type: "paragraph", textKey: "integration.positioningGateway" },
       { type: "paragraph", textKey: "integration.positioningYourKey" },
       { type: "paragraph", textKey: "integration.positioningNotAgency" },
       { type: "paragraph", textKey: "integration.positioningYourStack" },
-    ],
-  },
-  {
-    id: "production-demo-flow",
-    navKey: "integration.navDemoFlow",
-    titleKey: "integration.demoFlowTitle",
-    descriptionKey: "integration.demoFlowDesc",
-    chapterGuide: chapter(
-      "integration.onboardingChapterPurpose",
-      "integration.onboardingChapterCopy",
-      "integration.onboardingChapterVerify",
-      "integration.onboardingChapterFailure"
-    ),
-    blocks: [
-      {
-        type: "ordered",
-        items: [
-          "integration.demoFlowStep1",
-          "integration.demoFlowStep2",
-          "integration.demoFlowStep3",
-          "integration.demoFlowStep4",
-          "integration.demoFlowStep5",
-        ],
-      },
-      {
-        type: "dashboard-links",
-        links: [
-          { id: "keys", labelKey: "integration.demoFlowLinkKeys", href: "/dashboard/api-keys" },
-          {
-            id: "playground",
-            labelKey: "integration.demoFlowLinkPlayground",
-            href: "/dashboard/playground",
-          },
-          {
-            id: "batch",
-            labelKey: "integration.demoFlowLinkBatch",
-            href: "/dashboard/docs",
-            hash: "batch-api",
-          },
-          { id: "usage", labelKey: "integration.demoFlowLinkUsage", href: "/dashboard/usage" },
-          {
-            id: "credits",
-            labelKey: "integration.demoFlowLinkCredits",
-            href: "/dashboard/credits",
-          },
-        ],
-      },
-      { type: "paragraph", textKey: "integration.demoFlowReconcileNote" },
     ],
   },
   {
@@ -296,6 +291,15 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       "integration.quickStartChapterVerify",
       "integration.quickStartChapterFailure"
     ),
+    chapterNow: {
+      try: {
+        id: "playground",
+        labelKey: "integration.demoFlowLinkPlayground",
+        href: "/dashboard/playground",
+      },
+      copySnippetKey: "chat-curl",
+      verify: VERIFY_USAGE_CREDITS,
+    },
     blocks: [
       {
         type: "ordered",
@@ -306,7 +310,14 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
           "integration.quickStep4",
         ],
       },
+      { type: "paragraph", textKey: "integration.placeholderKeyNote" },
       { type: "copy-fields", id: "quick-start", fields: CUSTOMER_DOC_QUICK_START_FIELDS },
+      {
+        type: "code",
+        id: "quick-start-chat-curl",
+        label: "chat (readable)",
+        snippetKey: "chat-curl",
+      },
     ],
   },
   {
@@ -320,8 +331,18 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       "integration.apiKeyChapterVerify",
       "integration.apiKeyChapterFailure"
     ),
+    chapterNow: {
+      try: {
+        id: "keys",
+        labelKey: "integration.ctaCreateKey",
+        href: "/dashboard/api-keys",
+      },
+      copySnippetKey: "models-curl",
+      verify: VERIFY_USAGE_CREDITS,
+    },
     blocks: [
       { type: "paragraph", textKey: "integration.apiKeyBody" },
+      { type: "paragraph", textKey: "integration.placeholderKeyNote" },
       { type: "copy-fields", id: "api-key", fields: CUSTOMER_DOC_API_KEY_FIELDS },
       {
         type: "dashboard-links",
@@ -342,19 +363,29 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       "integration.chatApiChapterVerify",
       "integration.chatApiChapterFailure"
     ),
+    chapterNow: {
+      try: {
+        id: "playground",
+        labelKey: "integration.demoFlowLinkPlayground",
+        href: "/dashboard/playground",
+      },
+      copySnippetKey: "chat-curl",
+      verify: VERIFY_USAGE_CREDITS,
+    },
     blocks: [
       { type: "model-list" },
       { type: "paragraph", textKey: "integration.modelsExplicitNote" },
+      { type: "paragraph", textKey: "integration.placeholderKeyNote" },
       {
         type: "code",
         id: "chat-curl",
-        label: "chat",
+        label: "chat (readable)",
         snippetKey: "chat-curl",
       },
       {
         type: "code",
         id: "models-curl",
-        label: "models",
+        label: "models (readable)",
         snippetKey: "models-curl",
       },
       {
@@ -381,12 +412,22 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       "integration.imageApiChapterVerify",
       "integration.imageApiChapterFailure"
     ),
+    chapterNow: {
+      try: {
+        id: "image-playground",
+        labelKey: "integration.imagePlaygroundLink",
+        href: "/dashboard/image-playground",
+      },
+      copySnippetKey: "image-curl",
+      verify: VERIFY_USAGE_CREDITS,
+    },
     blocks: [
       { type: "paragraph", textKey: "integration.imageApiBody" },
+      { type: "paragraph", textKey: "integration.placeholderKeyNote" },
       {
         type: "code",
         id: "image-curl",
-        label: "images",
+        label: "images (readable)",
         snippetKey: "image-curl",
       },
       {
@@ -412,6 +453,15 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       "integration.batchChapterVerify",
       "integration.batchChapterFailure"
     ),
+    chapterNow: {
+      try: {
+        id: "usage",
+        labelKey: "integration.linkUsage",
+        href: "/dashboard/usage",
+      },
+      copySnippetKey: "batch-create-curl",
+      verify: VERIFY_USAGE_CREDITS,
+    },
     blocks: [
       {
         type: "bullets",
@@ -423,16 +473,17 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       },
       { type: "paragraph", textKey: "integration.batchGatewayNote" },
       { type: "paragraph", textKey: "integration.batchNote" },
+      { type: "paragraph", textKey: "integration.placeholderKeyNote" },
       {
         type: "code",
         id: "batch-create",
-        label: "create batch",
+        label: "create batch (readable)",
         snippetKey: "batch-create-curl",
       },
       {
         type: "code",
         id: "batch-poll",
-        label: "poll batch",
+        label: "poll batch (readable)",
         snippetKey: "batch-poll-curl",
       },
     ],
@@ -448,6 +499,14 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       "integration.usageChapterVerify",
       "integration.usageChapterFailure"
     ),
+    chapterNow: {
+      try: {
+        id: "usage",
+        labelKey: "integration.linkUsage",
+        href: "/dashboard/usage",
+      },
+      verify: VERIFY_USAGE_CREDITS,
+    },
     blocks: [
       { type: "paragraph", textKey: "integration.billingSuccessNote" },
       { type: "paragraph", textKey: "integration.billingFailedNote" },
@@ -473,6 +532,14 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       "integration.errorsChapterVerify",
       "integration.errorsChapterFailure"
     ),
+    chapterNow: {
+      try: {
+        id: "usage",
+        labelKey: "integration.linkUsage",
+        href: "/dashboard/usage",
+      },
+      verify: VERIFY_USAGE_CREDITS,
+    },
     blocks: [{ type: "error-table" }],
   },
   {
@@ -486,7 +553,17 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       "integration.sdkChapterVerify",
       "integration.sdkChapterFailure"
     ),
+    chapterNow: {
+      try: {
+        id: "playground",
+        labelKey: "integration.demoFlowLinkPlayground",
+        href: "/dashboard/playground",
+      },
+      copySnippetKey: "openai-sdk-config",
+      verify: VERIFY_USAGE_CREDITS,
+    },
     blocks: [
+      { type: "paragraph", textKey: "integration.placeholderKeyNote" },
       {
         type: "code",
         id: "sdk-config",
@@ -518,7 +595,17 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       "integration.cursorChapterVerify",
       "integration.cursorChapterFailure"
     ),
+    chapterNow: {
+      try: {
+        id: "playground",
+        labelKey: "integration.demoFlowLinkPlayground",
+        href: "/dashboard/playground",
+      },
+      copySnippetKey: "cursor-config",
+      verify: VERIFY_USAGE_CREDITS,
+    },
     blocks: [
+      { type: "paragraph", textKey: "integration.placeholderKeyNote" },
       { type: "copy-fields", id: "cursor", fields: CUSTOMER_DOC_CURSOR_FIELDS },
       {
         type: "code",
@@ -539,7 +626,17 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       "integration.cherryChapterVerify",
       "integration.cherryChapterFailure"
     ),
+    chapterNow: {
+      try: {
+        id: "playground",
+        labelKey: "integration.demoFlowLinkPlayground",
+        href: "/dashboard/playground",
+      },
+      copySnippetKey: "cherry-config",
+      verify: VERIFY_USAGE_CREDITS,
+    },
     blocks: [
+      { type: "paragraph", textKey: "integration.placeholderKeyNote" },
       { type: "copy-fields", id: "cherry", fields: CUSTOMER_DOC_CHERRY_FIELDS },
       {
         type: "code",
@@ -560,6 +657,14 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       "integration.industryChapterVerify",
       "integration.industryChapterFailure"
     ),
+    chapterNow: {
+      try: {
+        id: "playground",
+        labelKey: "integration.demoFlowLinkPlayground",
+        href: "/dashboard/playground",
+      },
+      verify: VERIFY_USAGE_CREDITS,
+    },
     blocks: [
       { type: "paragraph", textKey: "integration.industryNotAgency" },
       { type: "industry-cards", ids: [...CUSTOMER_DOC_INDUSTRY_IDS] },

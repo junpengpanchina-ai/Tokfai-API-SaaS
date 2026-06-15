@@ -4,7 +4,18 @@ import {
   TOKFAI_CLIENT_TEST_PROMPT,
   TOKFAI_RECOMMENDED_MODEL,
 } from "@/lib/tokfai-api";
-import { buildImageGenerationCurl } from "@/lib/image-api-curl";
+import {
+  batchCreateCurlMultiline,
+  batchCreateCurlOneLine,
+  batchPollCurlMultiline,
+  batchPollCurlOneLine,
+  chatCurlMultiline,
+  chatCurlOneLine,
+  imageCurlMultiline,
+  imageCurlOneLine,
+  modelsCurlMultiline,
+  modelsCurlOneLine,
+} from "@/lib/customer-curl-oneline";
 
 export const INTEGRATION_BASE_URL = TOKFAI_API_BASE_URL;
 export const INTEGRATION_KEY_PLACEHOLDER = TOKFAI_API_KEY_PLACEHOLDER;
@@ -29,21 +40,11 @@ export function chatCompletionsCurl(
   apiKey = TOKFAI_API_KEY_PLACEHOLDER,
   model = TOKFAI_RECOMMENDED_MODEL
 ): string {
-  return `curl https://api.tokfai.com/v1/chat/completions \\
-  -H "Authorization: Bearer ${apiKey}" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "${model}",
-    "messages": [
-      { "role": "user", "content": "${TOKFAI_CLIENT_TEST_PROMPT}" }
-    ],
-    "stream": false
-  }'`;
+  return chatCurlMultiline(apiKey, model === TOKFAI_RECOMMENDED_MODEL ? "auto-fast" : model);
 }
 
 export function modelsListCurl(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
-  return `curl https://api.tokfai.com/v1/models \\
-  -H "Authorization: Bearer ${apiKey}"`;
+  return modelsCurlMultiline(apiKey);
 }
 
 export const OPENAI_JS_SNIPPET = `import OpenAI from "openai";
@@ -117,31 +118,30 @@ export function batchChatCurl(
   apiKey = TOKFAI_API_KEY_PLACEHOLDER,
   model = TOKFAI_RECOMMENDED_MODEL
 ): string {
-  return `curl https://api.tokfai.com/v1/batches/chat \\
-  -H "Authorization: Bearer ${apiKey}" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "${model}",
-    "items": [
-      { "messages": [{ "role": "user", "content": "Say ok only." }] },
-      { "messages": [{ "role": "user", "content": "Say hello only." }] }
-    ]
-  }'`;
+  return batchCreateCurlMultiline(apiKey, model);
 }
 
 export function batchPollCurl(
   apiKey = TOKFAI_API_KEY_PLACEHOLDER,
   batchId = "batch_xxx"
 ): string {
-  return `curl https://api.tokfai.com/v1/batches/${batchId} \\
-  -H "Authorization: Bearer ${apiKey}"`;
+  return batchPollCurlMultiline(apiKey, batchId);
 }
 
-export const BATCH_CHAT_CURL = batchChatCurl();
-export const BATCH_POLL_CURL = batchPollCurl();
+export const BATCH_CHAT_CURL = batchCreateCurlMultiline();
+export const BATCH_POLL_CURL = batchPollCurlMultiline();
 
-export const IMAGE_GENERATION_CURL = buildImageGenerationCurl({
-  model: "gpt-image-2",
-  prompt: "A product photo on a white background",
-  size: "1024x1024",
-});
+export const IMAGE_GENERATION_CURL = imageCurlMultiline();
+
+export {
+  chatCurlOneLine,
+  modelsCurlOneLine,
+  imageCurlOneLine,
+  batchCreateCurlOneLine,
+  batchPollCurlOneLine,
+  chatCurlMultiline,
+  modelsCurlMultiline,
+  imageCurlMultiline,
+  batchCreateCurlMultiline,
+  batchPollCurlMultiline,
+};

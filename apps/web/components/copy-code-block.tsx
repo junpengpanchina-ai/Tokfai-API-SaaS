@@ -65,6 +65,7 @@ export function CodeBlock({
   id,
   label,
   code,
+  copyValue,
   copied,
   onCopy,
   copyLabel,
@@ -73,11 +74,15 @@ export function CodeBlock({
   id: string;
   label: string;
   code: string;
+  /** When set, copy uses this value while `code` remains the readable display. */
+  copyValue?: string;
   copied: boolean;
   onCopy: (id: string, value: string) => void;
   copyLabel: string;
   copiedLabel: string;
 }) {
+  const valueToCopy = copyValue ?? code;
+
   return (
     <div className="overflow-hidden rounded-lg border bg-muted">
       <div className="flex items-center justify-between border-b bg-background/70 px-4 py-2">
@@ -86,7 +91,7 @@ export function CodeBlock({
         </span>
         <CopyButton
           copied={copied}
-          onCopy={() => onCopy(id, code)}
+          onCopy={() => onCopy(id, valueToCopy)}
           copyLabel={copyLabel}
           copiedLabel={copiedLabel}
         />

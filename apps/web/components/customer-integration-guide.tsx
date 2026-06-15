@@ -27,10 +27,12 @@ import {
   CUSTOMER_DOC_ESSENTIAL_KEYS,
   CUSTOMER_DOC_SECTIONS,
   CUSTOMER_DOC_MODEL_ROWS,
-  CUSTOMER_DOC_SNIPPETS,
+  CUSTOMER_DOC_SNIPPET_COPY,
+  CUSTOMER_DOC_SNIPPET_DISPLAY,
   CUSTOMER_INTEGRATION_ERROR_CODES,
   type CustomerDocBlock,
   type CustomerDocChapterGuide,
+  type CustomerDocChapterNow,
   type CustomerDocCopyField,
   type CustomerDocDashboardLink,
   CUSTOMER_DOC_INDUSTRY_SCENARIO_KEYS,
@@ -152,8 +154,8 @@ export function CustomerIntegrationGuide({
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
-              <GuideHashLink href={`${docsBase}#production-demo-flow`}>
-                {t("integration.ctaDemoFlow")}
+              <GuideHashLink href={`${docsBase}#quick-start`}>
+                {t("integration.ctaQuickStart")}
               </GuideHashLink>
             </Button>
           </div>
@@ -225,12 +227,20 @@ function DocSectionCard({
         ) : null}
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        <ChapterNowPanel
+          chapterNow={section.chapterNow}
+          sectionId={section.id}
+          t={t}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          linkHref={linkHref}
+        />
         <ChapterGuidePanel guide={section.chapterGuide} t={t} />
         {section.id === "openai-sdk" ? (
           <div className="flex flex-wrap gap-2">
             <CopyConfigAction
               id="sdk-copy-config"
-              value={CUSTOMER_DOC_SNIPPETS["openai-sdk-config"]}
+              value={CUSTOMER_DOC_SNIPPET_COPY["openai-sdk-config"]}
               copiedId={copiedId}
               onCopy={onCopy}
               label={t("integration.copyConfig")}
@@ -238,10 +248,10 @@ function DocSectionCard({
             />
             <CopyConfigAction
               id="sdk-copy-curl"
-              value={CUSTOMER_DOC_SNIPPETS["chat-curl"]}
+              value={CUSTOMER_DOC_SNIPPET_COPY["chat-curl"]}
               copiedId={copiedId}
               onCopy={onCopy}
-              label={t("integration.copyCurl")}
+              label={t("integration.copyOneLineCurl")}
               copiedLabel={t("integration.copied")}
             />
           </div>
@@ -250,7 +260,7 @@ function DocSectionCard({
           <div className="flex flex-wrap gap-2">
             <CopyConfigAction
               id="cursor-copy-config"
-              value={CUSTOMER_DOC_SNIPPETS["cursor-config"]}
+              value={CUSTOMER_DOC_SNIPPET_COPY["cursor-config"]}
               copiedId={copiedId}
               onCopy={onCopy}
               label={t("integration.copyConfig")}
@@ -262,7 +272,7 @@ function DocSectionCard({
           <div className="flex flex-wrap gap-2">
             <CopyConfigAction
               id="cherry-copy-config"
-              value={CUSTOMER_DOC_SNIPPETS["cherry-config"]}
+              value={CUSTOMER_DOC_SNIPPET_COPY["cherry-config"]}
               copiedId={copiedId}
               onCopy={onCopy}
               label={t("integration.copyConfig")}
@@ -320,18 +330,20 @@ function DocBlock({
         </ol>
       );
     case "code":
-      const code = CUSTOMER_DOC_SNIPPETS[block.snippetKey];
-      const copyLabel =
-        block.snippetKey.includes("curl") || block.id.includes("curl")
-          ? t("integration.copyCurl")
-          : block.snippetKey.includes("config")
-            ? t("integration.copyConfig")
-            : t("integration.copyCode");
+      const displayCode = CUSTOMER_DOC_SNIPPET_DISPLAY[block.snippetKey];
+      const copyValue = CUSTOMER_DOC_SNIPPET_COPY[block.snippetKey];
+      const isCurlSnippet = block.snippetKey.includes("curl");
+      const copyLabel = isCurlSnippet
+        ? t("integration.copyOneLineCurl")
+        : block.snippetKey.includes("config")
+          ? t("integration.copyConfig")
+          : t("integration.copyCode");
       return (
         <CodeBlock
           id={block.id}
           label={block.label}
-          code={code}
+          code={displayCode}
+          copyValue={isCurlSnippet ? copyValue : undefined}
           copied={copiedId === block.id}
           onCopy={onCopy}
           copyLabel={copyLabel}
@@ -387,6 +399,76 @@ function DocBlock({
     default:
       return null;
   }
+}
+
+function ChapterNowPanel({
+  chapterNow,
+  sectionId,
+  t,
+  copiedId,
+  onCopy,
+  linkHref,
+}: {
+  chapterNow: CustomerDocChapterNow;
+  sectionId: string;
+  t: (key: string) => string;
+  copiedId: string | null;
+  onCopy: (id: string, value: string) => void;
+  linkHref: (link: CustomerDocDashboardLink) => string;
+}) {
+  const copySnippetKey = chapterNow.copySnippetKey;
+  const copyId = `chapter-now-${sectionId}-${copySnippetKey ?? "none"}`;
+  const isCurlCopy =
+    copySnippetKey != null && copySnippetKey.includes("curl");
+
+  return (
+    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+      <p className="text-sm font-semibold text-foreground">
+        {t("integration.chapterNowTitle")}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {chapterNow.try ? (
+          <Button key={chapterNow.try.id} asChild size="sm" variant="outline">
+            {chapterNow.try.hash && chapterNow.try.href.endsWith("/docs") ? (
+              <GuideHashLink href={linkHref(chapterNow.try)}>
+                {t(chapterNow.try.labelKey)}
+              </GuideHashLink>
+            ) : (
+              <Link href={linkHref(chapterNow.try)}>{t(chapterNow.try.labelKey)}</Link>
+            )}
+          </Button>
+        ) : null}
+        {copySnippetKey ? (
+          <CopyConfigAction
+            id={copyId}
+            value={CUSTOMER_DOC_SNIPPET_COPY[copySnippetKey]}
+            copiedId={copiedId}
+            onCopy={onCopy}
+            label={
+              isCurlCopy
+                ? t("integration.copyOneLineCurl")
+                : t("integration.copyConfig")
+            }
+            copiedLabel={t("integration.copied")}
+          />
+        ) : null}
+        {chapterNow.verify?.map((link) => (
+          <Button key={link.id} asChild size="sm" variant="outline">
+            {link.hash && link.href.endsWith("/docs") ? (
+              <GuideHashLink href={linkHref(link)}>{t(link.labelKey)}</GuideHashLink>
+            ) : (
+              <Link href={linkHref(link)}>{t(link.labelKey)}</Link>
+            )}
+          </Button>
+        ))}
+      </div>
+      {isCurlCopy ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {t("integration.placeholderKeyNote")}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function ChapterGuidePanel({

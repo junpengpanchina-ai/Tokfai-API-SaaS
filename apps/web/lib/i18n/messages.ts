@@ -576,7 +576,7 @@ export const messages = {
           "Legacy keys that cannot be revealed: create a new key to copy the full secret.",
         securityTitle: "Keep your keys secure",
         securityDesc:
-          "Treat API keys like passwords. Never expose them in client-side code or public repos.",
+          "Treat API keys like passwords. Never expose them in client-side code or public source code.",
         securityItem1:
           "Store keys on your server only — never embed them in mobile apps, browsers, or public frontends.",
         securityItem2:
@@ -584,16 +584,26 @@ export const messages = {
         securityItem3:
           "The full secret is shown once at creation. After that, use Copy key on active keys to copy the full secret again.",
         viewApiDocs: "View API docs",
+        quickStartDocs: "Quick start guide",
         tryChatPlayground: "Try Chat Playground",
         tryImagePlayground: "Try Image Playground",
+        viewChatApiDocs: "View Chat API docs",
+        viewImageApiDocs: "View Image API docs",
+        viewBatchApiDocs: "View Batch API docs",
+        verifyUsage: "Verify in Usage",
+        verifyCredits: "Verify in Credits",
         cursorGuide: "Cursor guide",
         cherryStudioGuide: "Cherry Studio guide",
         baseUrlLabel: "Base URL",
         recommendedModelLabel: "Recommended model",
-        curlExampleLabel: "curl test (ready to run)",
+        curlOneLineLabel: "One-line chat curl (paste in zsh)",
+        modelsCurlOneLineLabel: "One-line models curl",
+        batchCurlOneLineLabel: "One-line batch create curl",
         copyBaseUrl: "Copy Base URL",
         copyAuthHeader: "Copy Authorization header",
-        copyCurl: "Copy curl test",
+        copyOneLineChatCurl: "Copy one-line Chat curl",
+        copyOneLineModelsCurl: "Copy one-line Models curl",
+        copyOneLineBatchCurl: "Copy one-line Batch curl",
         errorCode: "Code",
         errorRequestId: "request_id",
         errorHttpStatus: "HTTP status",
@@ -617,8 +627,10 @@ export const messages = {
           "Next: call Tokfai API from your stack — curl test, OpenAI SDK, Cursor, Cherry Studio, or Batch API.",
         nextStepsGatewayNote:
           "Tokfai is your API gateway. You operate your apps; we provide API access and metering.",
+        integrationLinksTitle: "Try and verify",
         nextStepsTitle: "Connect via Tokfai API",
-        nextStepCurl: "Run the curl chat test below (or copy Authorization header).",
+        nextStepCurl:
+          "Copy the one-line chat curl below and paste into zsh (Authorization header included).",
         nextStepSdk: "Copy OpenAI SDK config — only baseURL and apiKey change.",
         nextStepCursor: "Paste Cursor provider config or open the Cursor guide.",
         nextStepCherry: "Paste Cherry Studio config or open the Cherry guide.",
@@ -631,7 +643,8 @@ export const messages = {
         copyBatchCurl: "Copy batch curl",
         openAiSdkGuide: "OpenAI SDK guide",
         batchApiGuide: "Batch API guide",
-        productionDemoFlow: "Production demo flow",
+        placeholderKeyNote:
+          "sk-tokfai_xxx is a placeholder in the handbook. This card uses your real key in one-line curls — paste directly into zsh.",
         yourApiKey: "Your API key",
         authorizationHeader: "Authorization header",
         copyFullKey: "Copy full key",
@@ -1543,7 +1556,6 @@ export const messages = {
         "Copy request_id from responses and match it in Usage and Credits.",
       navTitle: "Handbook",
       navPositioning: "Product positioning",
-      navDemoFlow: "Production onboarding",
       navQuickStart: "Quick start",
       navApiKey: "API Key",
       navChatApi: "Chat API",
@@ -1559,8 +1571,12 @@ export const messages = {
       chapterGuideCopy: "What to copy",
       chapterGuideVerify: "How to verify success",
       chapterGuideFailure: "If it fails",
+      chapterNowTitle: "You can do this now",
+      copyOneLineCurl: "Copy one-line curl",
+      placeholderKeyNote:
+        "sk-tokfai_xxx is a placeholder in examples. After creating a key on API Keys, copy one-line curl with your real secret. Copy request_id from responses and search it in Usage / Credits.",
       ctaCreateKey: "Create API key",
-      ctaDemoFlow: "Onboarding flow",
+      ctaQuickStart: "Quick start",
       positioningTitle: "Tokfai is an API gateway — not an agency",
       positioningDesc:
         "Tokfai gives you API access. You run your product, customers, and workflows.",
@@ -1619,7 +1635,7 @@ export const messages = {
       apiKeyTitle: "API Key",
       apiKeyDesc: "Authenticate every Tokfai API call with your secret key.",
       apiKeyBody:
-        "Create a key in API Keys. Copy the full sk-tokfai_… secret once — Tokfai cannot show it again. Never put keys in client-side code or public repos.",
+        "Create a key in API Keys. Copy the full sk-tokfai_… secret once — Tokfai cannot show it again. Never put keys in client-side code or public source code.",
       apiKeyFormatLabel: "Key format",
       apiKeyChapterPurpose: "Prove your backend can authenticate to Tokfai.",
       apiKeyChapterCopy:
@@ -2894,7 +2910,7 @@ export const messages = {
           "无法揭示的旧密钥：请创建新密钥以复制完整 secret。",
         securityTitle: "保护你的密钥",
         securityDesc:
-          "请将 API Key 视为密码，不要暴露在客户端代码或公开仓库中。",
+          "请将 API Key 视为密码，不要暴露在客户端代码或公开源码中。",
         securityItem1:
           "API Key 只应保存在服务端——不要写入移动应用、浏览器或公开前端。",
         securityItem2:
@@ -2902,16 +2918,26 @@ export const messages = {
         securityItem3:
           "完整 secret 仅在创建时完整展示；之后可通过活跃密钥的「复制密钥」再次复制完整 secret。",
         viewApiDocs: "查看 API 文档",
+        quickStartDocs: "快速上手指南",
         tryChatPlayground: "打开 Chat Playground",
         tryImagePlayground: "体验 Image Playground",
+        viewChatApiDocs: "查看 Chat API 文档",
+        viewImageApiDocs: "查看 Image API 文档",
+        viewBatchApiDocs: "查看 Batch API 文档",
+        verifyUsage: "在 Usage 核对",
+        verifyCredits: "在 Credits 核对",
         cursorGuide: "Cursor 接入指南",
         cherryStudioGuide: "Cherry Studio 接入指南",
         baseUrlLabel: "Base URL",
         recommendedModelLabel: "推荐模型",
-        curlExampleLabel: "curl 测试（可直接运行）",
+        curlOneLineLabel: "单行 chat curl（可直接粘贴到 zsh）",
+        modelsCurlOneLineLabel: "单行 models curl",
+        batchCurlOneLineLabel: "单行 batch 创建 curl",
         copyBaseUrl: "复制 Base URL",
         copyAuthHeader: "复制 Authorization header",
-        copyCurl: "复制 curl 测试",
+        copyOneLineChatCurl: "复制单行 Chat curl",
+        copyOneLineModelsCurl: "复制单行 Models curl",
+        copyOneLineBatchCurl: "复制单行 Batch curl",
         errorCode: "错误码",
         errorRequestId: "request_id",
         errorHttpStatus: "HTTP 状态",
@@ -2933,8 +2959,10 @@ export const messages = {
           "下一步：从你的技术栈调用 Tokfai API——curl 测试、OpenAI SDK、Cursor、Cherry Studio 或 Batch API。",
         nextStepsGatewayNote:
           "Tokfai 是 API 网关。你运营自己的应用；我们提供 API 访问与计量。",
+        integrationLinksTitle: "体验与核对",
         nextStepsTitle: "通过 Tokfai API 接入",
-        nextStepCurl: "运行下方 curl 对话测试（或复制 Authorization header）。",
+        nextStepCurl:
+          "复制下方单行 chat curl，粘贴到 zsh 运行（已包含 Authorization 头）。",
         nextStepSdk: "复制 OpenAI SDK 配置——仅改 baseURL 与 apiKey。",
         nextStepCursor: "复制 Cursor 配置或打开 Cursor 指南。",
         nextStepCherry: "复制 Cherry Studio 配置或打开 Cherry 指南。",
@@ -2947,7 +2975,8 @@ export const messages = {
         copyBatchCurl: "复制 Batch curl",
         openAiSdkGuide: "OpenAI SDK 指南",
         batchApiGuide: "Batch API 指南",
-        productionDemoFlow: "生产验收流程",
+        placeholderKeyNote:
+          "文档中的 sk-tokfai_xxx 是占位符。本卡片中的单行 curl 已填入你的真实密钥，可直接粘贴到 zsh。",
         yourApiKey: "你的 API 密钥",
         authorizationHeader: "Authorization header",
         copyFullKey: "复制完整密钥",
@@ -3811,7 +3840,6 @@ export const messages = {
         "从响应中复制 request_id，在 Usage 与 Credits 中核对。",
       navTitle: "手册目录",
       navPositioning: "产品定位",
-      navDemoFlow: "生产接入流程",
       navQuickStart: "快速开始",
       navApiKey: "API Key",
       navChatApi: "Chat API",
@@ -3827,8 +3855,12 @@ export const messages = {
       chapterGuideCopy: "需要复制什么",
       chapterGuideVerify: "跑通后如何验证",
       chapterGuideFailure: "失败时怎么看",
+      chapterNowTitle: "你现在可以这样做",
+      copyOneLineCurl: "复制单行 curl",
+      placeholderKeyNote:
+        "示例中的 sk-tokfai_xxx 是占位符。在 API Keys 创建密钥后，可复制带真实密钥的单行 curl。从响应复制 request_id，在 Usage / Credits 中搜索核对。",
       ctaCreateKey: "创建 API Key",
-      ctaDemoFlow: "接入流程",
+      ctaQuickStart: "快速开始",
       positioningTitle: "Tokfai 是 API 网关——不是代运营",
       positioningDesc:
         "Tokfai 提供 API 接入能力。你的产品、客户与工单由你自己运营。",
@@ -3887,7 +3919,7 @@ export const messages = {
       apiKeyTitle: "API Key",
       apiKeyDesc: "用密钥为每次 Tokfai API 调用鉴权。",
       apiKeyBody:
-        "在 API Keys 创建密钥，立即复制完整 sk-tokfai_… secret（无法再次查看）。勿将密钥放入前端或公开仓库。",
+        "在 API Keys 创建密钥，立即复制完整 sk-tokfai_… secret（无法再次查看）。勿将密钥放入前端或公开源码。",
       apiKeyFormatLabel: "密钥格式",
       apiKeyChapterPurpose: "证明你的后端能向 Tokfai 完成鉴权。",
       apiKeyChapterCopy:

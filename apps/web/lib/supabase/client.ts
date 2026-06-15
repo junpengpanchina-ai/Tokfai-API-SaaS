@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 /**
  * Browser-side Supabase client. Uses the public anon key only.
  *
- * Never import service_role anywhere in this repo. See AGENTS.md.
+ * Never import service_role anywhere in apps/web. See AGENTS.md.
  */
 let browserClient: SupabaseClient | undefined;
 
