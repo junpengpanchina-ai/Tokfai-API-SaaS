@@ -50,24 +50,26 @@ import { formatMessage, type Locale } from "@/lib/i18n/messages";
 import { TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
 import { cn } from "@/lib/utils";
 
-/** Shared layout tokens for the Image Playground two-column toolbench. */
+/** Shared layout tokens for the Image Playground three-column toolbench. */
 export const IMAGE_PLAYGROUND_TOOLBENCH = {
+  shell: "mx-auto w-full min-w-0 max-w-[1600px] px-6",
   grid:
-    "grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-[minmax(560px,1fr)_minmax(360px,400px)] lg:items-start lg:gap-4",
-  card: "shadow-none overflow-hidden",
+    "grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(420px,1fr)_340px_minmax(420px,1fr)] lg:items-start xl:grid-cols-[1fr_360px_1fr]",
+  card: "shadow-none overflow-hidden border bg-card",
   cardHeader: "space-y-0.5 px-4 py-3",
   cardTitle: "text-sm font-medium leading-tight",
   cardDescription: "text-xs text-muted-foreground",
   cardContent: "px-4 pb-4 pt-0",
   control: "h-9",
   select:
-    "flex h-8 w-full rounded-md border border-input bg-muted/30 px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
-  stickyColumn:
-    "min-w-0 shrink-0 lg:col-start-2 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-1.75rem)] lg:overflow-y-auto lg:overflow-x-hidden",
-  resultCard: "min-h-[360px] border bg-card",
+    "flex h-9 w-full rounded-md border border-input bg-muted/30 px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
+  resultSticky: "lg:sticky lg:top-6 lg:self-start",
+  resultCard: "min-h-[560px] border bg-card",
   resultBody:
-    "flex min-h-[min(360px,42vh)] flex-1 flex-col rounded-lg border border-dashed bg-muted/25",
+    "flex min-h-[min(480px,52vh)] flex-1 flex-col rounded-lg border border-dashed bg-muted/25",
 } as const;
+
+const BATCH_API_DOCS_HREF = "/dashboard/docs#batch-api";
 
 /** Scroll result panel into view on mobile, or when off-screen on desktop. */
 export function focusImagePlaygroundResultPanel(
@@ -127,7 +129,29 @@ export interface ImagePlaygroundCompactKeyRowProps {
   onSelectedKeyChange: (id: string) => void;
   onApiKeyChange: (value: string) => void;
   onShowApiKeyChange: (show: boolean) => void;
+  embedded?: boolean;
   t: (key: string) => string;
+}
+
+export function ImagePlaygroundApiKeyCard(
+  props: ImagePlaygroundCompactKeyRowProps
+) {
+  const { t } = props;
+  return (
+    <Card className={IMAGE_PLAYGROUND_TOOLBENCH.card}>
+      <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
+        <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
+          {t("dashboard.imagePlayground.toolbenchApiKeyTitle")}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className={IMAGE_PLAYGROUND_TOOLBENCH.cardContent}>
+        <ImagePlaygroundCompactKeyRow {...props} embedded />
+        <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+          {t("dashboard.imagePlayground.toolbenchKeySecretHint")}
+        </p>
+      </CardContent>
+    </Card>
+  );
 }
 
 export function ImagePlaygroundCompactKeyRow({
@@ -147,14 +171,18 @@ export function ImagePlaygroundCompactKeyRow({
   onSelectedKeyChange,
   onApiKeyChange,
   onShowApiKeyChange,
+  embedded = false,
   t,
 }: ImagePlaygroundCompactKeyRowProps) {
   const { copiedId, copyText } = useCopyToClipboard();
   const secretCopied = copiedId === "image-playground-created-secret";
+  const shellClass = embedded
+    ? "flex flex-col gap-2"
+    : "flex flex-col gap-2 rounded-lg border bg-muted/30 px-3 py-2.5";
 
   if (keyPanelView === "paste") {
     return (
-      <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 px-3 py-2.5">
+      <div className={shellClass}>
         <div className="flex flex-wrap items-center gap-2">
           <KeyRound className="h-4 w-4 shrink-0 text-muted-foreground" />
           <span className="text-sm font-medium">{t("dashboard.playground.pasteKey")}</span>
@@ -187,7 +215,13 @@ export function ImagePlaygroundCompactKeyRow({
 
   if (keyPanelView === "empty" || localKeys.length === 0) {
     return (
-      <div className="flex flex-col gap-2 rounded-lg border border-dashed bg-muted/30 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+      <div
+        className={
+          embedded
+            ? "flex flex-col gap-2"
+            : "flex flex-col gap-2 rounded-lg border border-dashed bg-muted/30 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+        }
+      >
         <p className="text-sm text-muted-foreground">
           {t("dashboard.imagePlayground.toolbenchNoKey")}
         </p>
@@ -218,7 +252,7 @@ export function ImagePlaygroundCompactKeyRow({
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 px-3 py-2.5">
+    <div className={shellClass}>
       {createdSecret && createdBannerKeyId === selectedKeyId ? (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2 py-1.5 text-xs text-emerald-800 dark:text-emerald-200">
           <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
@@ -319,13 +353,11 @@ export function ImagePlaygroundSettingsSidebar({
     creditsLoaded &&
     estimatedCredits != null &&
     (creditsBalance ?? 0) < estimatedCredits;
-  const showTopUp = lowCredits || insufficientCredits;
-
   return (
-    <Card className={`${IMAGE_PLAYGROUND_TOOLBENCH.card} border-muted/60`}>
-      <CardHeader className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardHeader} pb-2`}>
-        <CardTitle className="text-xs font-medium text-muted-foreground">
-          {t("dashboard.imagePlayground.settings")}
+    <Card className={IMAGE_PLAYGROUND_TOOLBENCH.card}>
+      <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
+        <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
+          {t("dashboard.imagePlayground.toolbenchCreditsModelTitle")}
         </CardTitle>
       </CardHeader>
       <CardContent
@@ -338,7 +370,7 @@ export function ImagePlaygroundSettingsSidebar({
           <span className="font-mono tabular-nums text-foreground">{balanceDisplay}</span>
         </div>
         {estimatedCredits != null ? (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {formatMessage(t("dashboard.imagePlayground.estimatedCost"), {
               credits: formatImageCreditsAmount(estimatedCredits, locale),
             })}
@@ -354,16 +386,14 @@ export function ImagePlaygroundSettingsSidebar({
             {t("dashboard.shell.lowCredits")}
           </Badge>
         ) : null}
-        {showTopUp ? (
-          <Button asChild size="sm" variant="outline" className="h-8 w-full text-xs">
-            <Link href="/dashboard/credits">
-              <Wallet className="h-3.5 w-3.5" />
-              {t("dashboard.imagePlayground.topUp")}
-            </Link>
-          </Button>
-        ) : null}
+        <Button asChild size="sm" variant="outline" className={`w-full ${IMAGE_PLAYGROUND_TOOLBENCH.control}`}>
+          <Link href="/dashboard/credits">
+            <Wallet className="h-4 w-4" />
+            {t("dashboard.imagePlayground.topUp")}
+          </Link>
+        </Button>
 
-        <div className="grid grid-cols-1 gap-2 border-t pt-2.5 sm:grid-cols-2 lg:grid-cols-1">
+        <div className="flex flex-col gap-2 border-t pt-2.5">
           <div className="flex flex-col gap-1">
             <Label htmlFor="toolbench-model" className="text-[11px] text-muted-foreground">
               {t("dashboard.imagePlayground.toolbenchModelLabel")}
@@ -482,13 +512,37 @@ export function ImagePlaygroundGenerateActions({
 }
 
 export interface ImagePlaygroundServiceDocsPanelProps {
+  copyRequestStatus: "idle" | "copied";
+  loading: boolean;
+  hasUploadingImages: boolean;
+  onCopyApiRequest: () => void;
   t: (key: string) => string;
 }
 
 export function ImagePlaygroundServiceDocsPanel({
+  copyRequestStatus,
+  loading,
+  hasUploadingImages,
+  onCopyApiRequest,
   t,
 }: ImagePlaygroundServiceDocsPanelProps) {
-  const shortcuts = [
+  const shortcuts: Array<{
+    id: string;
+    label: string;
+    icon: typeof BookOpen;
+    href?: string;
+    onClick?: () => void;
+    copied?: boolean;
+    copiedLabel?: string;
+  }> = [
+    {
+      id: "copy",
+      label: t("dashboard.imagePlayground.copyApiRequest"),
+      icon: Copy,
+      onClick: onCopyApiRequest,
+      copied: copyRequestStatus === "copied",
+      copiedLabel: t("dashboard.apiKeys.copied"),
+    },
     {
       id: "image-docs",
       label: t("dashboard.imagePlayground.toolbenchViewImageApiDocs"),
@@ -508,6 +562,12 @@ export function ImagePlaygroundServiceDocsPanel({
       href: "/dashboard/credits",
     },
     {
+      id: "batch",
+      label: t("dashboard.imagePlayground.toolbenchViewBatchApi"),
+      icon: FileText,
+      href: BATCH_API_DOCS_HREF,
+    },
+    {
       id: "integration",
       label: t("dashboard.imagePlayground.toolbenchOpenIntegrationDocs"),
       icon: FileText,
@@ -516,9 +576,9 @@ export function ImagePlaygroundServiceDocsPanel({
   ];
 
   return (
-    <Card className={`${IMAGE_PLAYGROUND_TOOLBENCH.card} border-muted/60`}>
-      <CardHeader className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardHeader} pb-2`}>
-        <CardTitle className="text-xs font-medium text-muted-foreground">
+    <Card className={IMAGE_PLAYGROUND_TOOLBENCH.card}>
+      <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
+        <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
           {t("dashboard.imagePlayground.toolbenchServiceDocs")}
         </CardTitle>
       </CardHeader>
@@ -526,19 +586,42 @@ export function ImagePlaygroundServiceDocsPanel({
         <div className="flex flex-col gap-0.5">
           {shortcuts.map((item) => {
             const Icon = item.icon;
+            if (item.href) {
+              return (
+                <Button
+                  key={item.id}
+                  asChild
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 justify-start gap-2 px-2 text-xs font-normal text-muted-foreground hover:text-foreground"
+                >
+                  <Link href={item.href}>
+                    <Icon className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                </Button>
+              );
+            }
+
             return (
               <Button
                 key={item.id}
-                asChild
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-8 justify-start gap-2 px-2 text-xs font-normal text-muted-foreground hover:text-foreground"
+                disabled={loading || hasUploadingImages}
+                onClick={item.onClick}
+                className="h-9 justify-start gap-2 px-2 text-xs font-normal text-muted-foreground hover:text-foreground"
               >
-                <Link href={item.href}>
+                {item.copied ? (
+                  <Check className="h-3.5 w-3.5 shrink-0" />
+                ) : (
                   <Icon className="h-3.5 w-3.5 shrink-0 opacity-70" />
-                  <span className="truncate">{item.label}</span>
-                </Link>
+                )}
+                <span className="truncate">
+                  {item.copied ? item.copiedLabel : item.label}
+                </span>
               </Button>
             );
           })}
@@ -587,7 +670,7 @@ export function ImagePlaygroundResultArea({
   const title =
     state === "loading"
       ? t("dashboard.imagePlayground.toolbenchResultLoadingTitle")
-      : t("dashboard.imagePlayground.toolbenchGenerationResult");
+      : t("dashboard.imagePlayground.toolbenchResultPanelTitle");
 
   const cardClass = cn(
     IMAGE_PLAYGROUND_TOOLBENCH.card,

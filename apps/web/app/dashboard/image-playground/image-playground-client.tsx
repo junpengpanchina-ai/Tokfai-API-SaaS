@@ -13,7 +13,7 @@ import {
 import {
   IMAGE_PLAYGROUND_TOOLBENCH,
   focusImagePlaygroundResultPanel,
-  ImagePlaygroundCompactKeyRow,
+  ImagePlaygroundApiKeyCard,
   ImagePlaygroundGenerateActions,
   ImagePlaygroundResultArea,
   ImagePlaygroundServiceDocsPanel,
@@ -777,123 +777,142 @@ export function ImagePlaygroundClient({
         </Badge>
       </div>
 
-      <div className={IMAGE_PLAYGROUND_TOOLBENCH.grid}>
-        <div className="order-1 flex min-w-0 flex-col gap-3 lg:col-start-1">
-          <ImagePlaygroundCompactKeyRow
-            keyPanelView={keyPanelView}
-            localKeys={localKeys}
-            selectedKey={selectedKey}
-            selectedKeyId={selectedKeyId}
-            apiKey={apiKey}
-            showApiKey={showApiKey}
-            creatingKey={creatingKey}
-            createKeyError={createKeyError}
-            createdSecret={createdSecret}
-            createdBannerKeyId={createdBannerKeyId}
-            loading={loading}
-            onCreateTestKey={handleCreateTestKey}
-            onKeyPanelViewChange={setKeyPanelView}
-            onSelectedKeyChange={setSelectedKeyId}
-            onApiKeyChange={setApiKey}
-            onShowApiKeyChange={setShowApiKey}
-            t={t}
-          />
+      <div className={IMAGE_PLAYGROUND_TOOLBENCH.shell}>
+        <div className={IMAGE_PLAYGROUND_TOOLBENCH.grid}>
+          <div className="order-1 min-w-0 lg:col-start-2 lg:row-start-1">
+            <ImagePlaygroundApiKeyCard
+              keyPanelView={keyPanelView}
+              localKeys={localKeys}
+              selectedKey={selectedKey}
+              selectedKeyId={selectedKeyId}
+              apiKey={apiKey}
+              showApiKey={showApiKey}
+              creatingKey={creatingKey}
+              createKeyError={createKeyError}
+              createdSecret={createdSecret}
+              createdBannerKeyId={createdBannerKeyId}
+              loading={loading}
+              onCreateTestKey={handleCreateTestKey}
+              onKeyPanelViewChange={setKeyPanelView}
+              onSelectedKeyChange={setSelectedKeyId}
+              onApiKeyChange={setApiKey}
+              onShowApiKeyChange={setShowApiKey}
+              t={t}
+            />
+          </div>
 
-          <Card className={IMAGE_PLAYGROUND_TOOLBENCH.card}>
-            <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
-              <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
-                  {t("dashboard.imagePlayground.toolbenchPromptTitle")}
-                </CardTitle>
-                <Badge variant={isImageToImage ? "default" : "secondary"} className="text-[10px]">
-                  {isImageToImage
-                    ? t("dashboard.imagePlayground.imageToImage")
-                    : t("dashboard.imagePlayground.textToImage")}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent
-              className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex flex-col gap-3`}
-            >
-              <PromptPresets
-                loading={loading}
-                onSelect={(presetId) =>
-                  setPrompt(t(imagePlaygroundPresetPromptKey(presetId)))
-                }
-                t={t}
-              />
-              <textarea
-                ref={promptRef}
-                id="prompt"
-                rows={4}
-                required
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                disabled={loading}
-                placeholder={promptPlaceholder}
-                className="flex min-h-[5.5rem] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-              />
-
-              <ImageInputsPanel
-                embedded
-                toolbench
-                imageInputs={imageInputs}
-                imageUrlDraft={imageUrlDraft}
-                loading={loading}
-                fileInputRef={fileInputRef}
-                onImageUrlDraftChange={setImageUrlDraft}
-                onAddImageUrl={() => addImageUrl(imageUrlDraft)}
-                onRemoveImage={removeImageInput}
-                onPreviewError={markPreviewError}
-                onPreviewReady={markPreviewReady}
-                onUploadFiles={uploadFiles}
-                onDropInvalid={reportDropError}
-                onBrowseClick={() => fileInputRef.current?.click()}
-                onFileInputChange={(event) => {
-                  if (event.target.files) {
-                    void uploadFiles(event.target.files);
-                    event.target.value = "";
-                  }
-                }}
-                t={t}
-              />
-
-              {hasUploadingImages ? (
-                <p className="text-xs text-muted-foreground">
-                  {t("dashboard.imagePlayground.waitingForImages")}
-                </p>
-              ) : null}
-
-              <div className="hidden border-t pt-3 lg:block">
-                <ImagePlaygroundGenerateActions
+          <div className="order-2 min-w-0 lg:col-start-1 lg:row-start-1">
+            <Card className={IMAGE_PLAYGROUND_TOOLBENCH.card}>
+              <CardHeader className={IMAGE_PLAYGROUND_TOOLBENCH.cardHeader}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
+                    {t("dashboard.imagePlayground.toolbenchInputTitle")}
+                  </CardTitle>
+                  <Badge variant={isImageToImage ? "default" : "secondary"} className="text-[10px]">
+                    {isImageToImage
+                      ? t("dashboard.imagePlayground.imageToImage")
+                      : t("dashboard.imagePlayground.textToImage")}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent
+                className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex flex-col gap-3`}
+              >
+                <PromptPresets
                   loading={loading}
-                  hasUploadingImages={hasUploadingImages}
-                  isModelComingSoon={isModelComingSoon}
-                  copyRequestStatus={copyRequestStatus}
-                  onCopyApiRequest={() => void handleCopyApiRequest()}
+                  onSelect={(presetId) =>
+                    setPrompt(t(imagePlaygroundPresetPromptKey(presetId)))
+                  }
                   t={t}
                 />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                <textarea
+                  ref={promptRef}
+                  id="prompt"
+                  rows={4}
+                  required
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  disabled={loading}
+                  placeholder={promptPlaceholder}
+                  className="flex min-h-[5.5rem] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                />
 
-        <div className="order-2 min-w-0 lg:hidden">
-          <ImagePlaygroundGenerateActions
-            loading={loading}
-            hasUploadingImages={hasUploadingImages}
-            isModelComingSoon={isModelComingSoon}
-            copyRequestStatus={copyRequestStatus}
-            layout="stack"
-            onCopyApiRequest={() => void handleCopyApiRequest()}
-            t={t}
-          />
-        </div>
+                <ImageInputsPanel
+                  embedded
+                  toolbench
+                  imageInputs={imageInputs}
+                  imageUrlDraft={imageUrlDraft}
+                  loading={loading}
+                  fileInputRef={fileInputRef}
+                  onImageUrlDraftChange={setImageUrlDraft}
+                  onAddImageUrl={() => addImageUrl(imageUrlDraft)}
+                  onRemoveImage={removeImageInput}
+                  onPreviewError={markPreviewError}
+                  onPreviewReady={markPreviewReady}
+                  onUploadFiles={uploadFiles}
+                  onDropInvalid={reportDropError}
+                  onBrowseClick={() => fileInputRef.current?.click()}
+                  onFileInputChange={(event) => {
+                    if (event.target.files) {
+                      void uploadFiles(event.target.files);
+                      event.target.value = "";
+                    }
+                  }}
+                  t={t}
+                />
 
-        <div
-          className={`${IMAGE_PLAYGROUND_TOOLBENCH.stickyColumn} order-3 flex flex-col gap-3`}
-        >
-          <div ref={resultPanelRef} className="shrink-0">
+                {hasUploadingImages ? (
+                  <p className="text-xs text-muted-foreground">
+                    {t("dashboard.imagePlayground.waitingForImages")}
+                  </p>
+                ) : null}
+
+                <div className="hidden border-t pt-3 lg:block">
+                  <ImagePlaygroundGenerateActions
+                    loading={loading}
+                    hasUploadingImages={hasUploadingImages}
+                    isModelComingSoon={isModelComingSoon}
+                    copyRequestStatus={copyRequestStatus}
+                    onCopyApiRequest={() => void handleCopyApiRequest()}
+                    t={t}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="order-3 min-w-0 lg:col-start-2">
+            <ImagePlaygroundSettingsSidebar
+              model={model}
+              size={size}
+              loading={loading}
+              creditsBalance={initialCreditsBalance}
+              creditsLoaded={creditsLoaded}
+              estimatedCredits={selectedModelCredits}
+              isModelComingSoon={isModelComingSoon}
+              locale={locale}
+              onModelChange={setModel}
+              onSizeChange={setSize}
+              t={t}
+            />
+          </div>
+
+          <div className="order-4 min-w-0 lg:hidden">
+            <ImagePlaygroundGenerateActions
+              loading={loading}
+              hasUploadingImages={hasUploadingImages}
+              isModelComingSoon={isModelComingSoon}
+              copyRequestStatus={copyRequestStatus}
+              layout="stack"
+              onCopyApiRequest={() => void handleCopyApiRequest()}
+              t={t}
+            />
+          </div>
+
+          <div
+            ref={resultPanelRef}
+            className={`order-5 min-w-0 lg:col-start-3 lg:row-start-1 ${IMAGE_PLAYGROUND_TOOLBENCH.resultSticky}`}
+          >
             <ImagePlaygroundResultArea
               loading={loading}
               error={error}
@@ -907,20 +926,16 @@ export function ImagePlaygroundClient({
               t={t}
             />
           </div>
-          <ImagePlaygroundSettingsSidebar
-            model={model}
-            size={size}
-            loading={loading}
-            creditsBalance={initialCreditsBalance}
-            creditsLoaded={creditsLoaded}
-            estimatedCredits={selectedModelCredits}
-            isModelComingSoon={isModelComingSoon}
-            locale={locale}
-            onModelChange={setModel}
-            onSizeChange={setSize}
-            t={t}
-          />
-          <ImagePlaygroundServiceDocsPanel t={t} />
+
+          <div className="order-6 min-w-0 lg:col-start-2">
+            <ImagePlaygroundServiceDocsPanel
+              copyRequestStatus={copyRequestStatus}
+              loading={loading}
+              hasUploadingImages={hasUploadingImages}
+              onCopyApiRequest={() => void handleCopyApiRequest()}
+              t={t}
+            />
+          </div>
         </div>
       </div>
     </form>
