@@ -80,6 +80,7 @@ export type CustomerDocBlock =
   | { type: "ordered"; items: string[] }
   | { type: "code"; id: string; label: string; snippetKey: CustomerDocSnippetKey }
   | { type: "one-line-curl"; id: string; titleKey: string; snippetKey?: CustomerDocSnippetKey }
+  | { type: "chat-api-copy-panel"; id: string }
   | { type: "api-key-copy-panel"; id: string }
   | { type: "api-key-errors" }
   | { type: "copy-fields"; id: string; fields: CustomerDocCopyField[] }
@@ -416,20 +417,48 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       verify: VERIFY_USAGE_CREDITS,
     },
     blocks: [
-      { type: "model-list" },
-      { type: "paragraph", textKey: "integration.modelsExplicitNote" },
-      { type: "paragraph", textKey: "integration.placeholderKeyNote" },
+      { type: "paragraph", textKey: "integration.chatApiEndpoint" },
+      { type: "paragraph", textKey: "integration.chatApiOpenAiFormat" },
+      { type: "paragraph", textKey: "integration.chatApiAutoFastNote" },
+      { type: "paragraph", textKey: "integration.chatApiTerminalNote" },
+      { type: "chat-api-copy-panel", id: "chat-api-copy" },
+      { type: "paragraph", textKey: "integration.chatApiResponseTitle" },
       {
-        type: "code",
-        id: "chat-curl",
-        label: "chat (readable)",
-        snippetKey: "chat-curl",
+        type: "bullets",
+        items: [
+          "integration.chatApiFieldContent",
+          "integration.chatApiFieldRequestId",
+          "integration.chatApiFieldCreditsCharged",
+          "integration.chatApiFieldUsage",
+          "integration.chatApiFieldRequestedModel",
+          "integration.chatApiFieldResolvedModel",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.chatApiReconcileTitle" },
+      {
+        type: "ordered",
+        items: [
+          "integration.chatApiReconcileStep1",
+          "integration.chatApiReconcileStep2",
+          "integration.chatApiReconcileStep3",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.chatApiErrorsTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.chatApiErrorMissingToken",
+          "integration.chatApiErrorInvalidToken",
+          "integration.chatApiErrorInsufficientCredits",
+          "integration.chatApiErrorModelNotAvailable",
+          "integration.chatApiErrorUpstreamBusy",
+        ],
       },
       {
         type: "code",
-        id: "models-curl",
-        label: "models (readable)",
-        snippetKey: "models-curl",
+        id: "chat-curl-readable",
+        label: "readable multi-line",
+        snippetKey: "chat-curl",
       },
       {
         type: "dashboard-links",
@@ -439,6 +468,8 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
             labelKey: "integration.demoFlowLinkPlayground",
             href: "/dashboard/playground",
           },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
           { id: "models", labelKey: "integration.browseModels", href: "/dashboard/models" },
         ],
       },

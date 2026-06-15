@@ -9,6 +9,7 @@ import {
   useCopyToClipboard,
 } from "@/components/copy-code-block";
 import { ApiKeyChapterCopyPanel } from "@/components/api-key-chapter-copy";
+import { ChatApiChapterCopyPanel } from "@/components/chat-api-chapter-copy";
 import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
 import { Button } from "@/components/ui/button";
 import {
@@ -352,7 +353,8 @@ function DocBlock({
     case "code":
       const isCurlSnippet = block.snippetKey.includes("curl");
       const displayCode =
-        block.snippetKey === "chat-curl" && sectionId === "quick-start"
+        block.snippetKey === "chat-curl" &&
+        (sectionId === "quick-start" || sectionId === "chat-api")
           ? resolveDocChatCurlDisplay(quickStartApiKey)
           : block.snippetKey === "models-curl" && sectionId === "api-key"
             ? modelsVerifyCurlMultiline(
@@ -415,6 +417,22 @@ function DocBlock({
               onCopy={onCopy}
               label={t("integration.copyOneLineCurl")}
               copiedLabel={t("integration.copied")}
+            />
+          </div>
+        </div>
+      );
+    case "chat-api-copy-panel":
+      return (
+        <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
+          <p className="text-sm font-semibold text-foreground">
+            {t("integration.chatApiCopyNowTitle")}
+          </p>
+          <div className="mt-3">
+            <ChatApiChapterCopyPanel
+              apiKey={quickStartApiKey}
+              copiedId={copiedId}
+              onCopy={onCopy}
+              idPrefix={block.id}
             />
           </div>
         </div>

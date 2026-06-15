@@ -800,7 +800,9 @@ export const messages = {
         viewDocs: "View docs",
         successBalanceHint: "Recorded in",
         successReconcileHint:
-          "Copy request_id above to match this call in Usage / Credits.",
+          "Copy request_id and search it in Usage and Credits to reconcile this call.",
+        copyRequestId: "Copy request_id",
+        viewChatApiDocs: "Chat API docs",
         viewUsage: "View Usage",
         viewCredits: "View Credits",
         errors: {
@@ -1686,17 +1688,58 @@ export const messages = {
       copyOneLineChatCurl: "Copy one-line Chat curl",
       chatApiTitle: "Chat API",
       chatApiDesc:
-        "OpenAI-compatible chat completions — POST /v1/chat/completions and GET /v1/models.",
+        "OpenAI-compatible chat — POST https://api.tokfai.com/v1/chat/completions with model, messages, and stream.",
+      chatApiEndpoint:
+        "Endpoint: POST https://api.tokfai.com/v1/chat/completions — same path shape as OpenAI chat completions.",
+      chatApiOpenAiFormat:
+        "OpenAI-compatible JSON body. Core fields: model (string), messages (array of role + content), stream (boolean).",
+      chatApiAutoFastNote:
+        "Default production model: auto-fast — Tokfai routes to the first available fast upstream model.",
+      chatApiTerminalNote:
+        "Copy the one-line curl below and paste into any terminal (Mac, Windows PowerShell, or Linux). No project folder or cd required.",
+      chatApiCopyNowTitle: "You can copy now",
+      chatApiCopyNowLabel: "One-line chat curl",
+      chatApiLiveKeyNote:
+        "Your API key from this browser session is already filled in this curl.",
+      chatApiResponseTitle: "On HTTP 200, check these response fields:",
+      chatApiFieldContent:
+        "choices[0].message.content — assistant reply text.",
+      chatApiFieldRequestId:
+        "request_id — copy this to search in Usage and Credits.",
+      chatApiFieldCreditsCharged:
+        "credits_charged — credits debited for this call (when present).",
+      chatApiFieldUsage:
+        "usage — token counts (prompt_tokens, completion_tokens, total_tokens).",
+      chatApiFieldRequestedModel:
+        "tokfai.requested_model — the model id you sent (e.g. auto-fast).",
+      chatApiFieldResolvedModel:
+        "tokfai.resolved_model — the upstream model Tokfai actually used.",
+      chatApiReconcileTitle: "Reconcile with Usage / Credits:",
+      chatApiReconcileStep1: "Copy request_id from the JSON response.",
+      chatApiReconcileStep2: "Open Usage and search the request_id — confirm model, tokens, and credits_charged.",
+      chatApiReconcileStep3:
+        "Open Credits and verify the debit matches succeeded calls only.",
+      chatApiErrorsTitle: "Common Chat API errors:",
+      chatApiErrorMissingToken:
+        "missing_token — Authorization header was not sent. Use the one-line copy button; do not paste broken multi-line curl.",
+      chatApiErrorInvalidToken:
+        "invalid_token — key is wrong, incomplete, or revoked. Fix in API Keys or use Copy key.",
+      chatApiErrorInsufficientCredits:
+        "insufficient_credits — balance too low. Top up in Credits.",
+      chatApiErrorModelNotAvailable:
+        "model_not_available / model_not_found — model id unavailable or misspelled. Try auto-fast or browse Models.",
+      chatApiErrorUpstreamBusy:
+        "upstream_model_busy / upstream_timeout — upstream busy or slow. Retry or use auto-fast / auto-pro.",
       chatApiBody:
         "Use auto-fast for production chat. The response model field shows which upstream model served the request.",
       chatApiChapterPurpose:
-        "Integrate conversational AI into your app, script, or IDE client.",
+        "Send OpenAI-compatible chat requests from your app, script, or IDE.",
       chatApiChapterCopy:
-        "Chat curl below, model auto-fast (or auto-pro), and Authorization header.",
+        "One-line chat curl below (model auto-fast, messages, stream: false) and Authorization header.",
       chatApiChapterVerify:
-        "HTTP 200, assistant text in choices, request_id in JSON; Usage shows tokens and credits_charged.",
+        "HTTP 200 with content, request_id, credits_charged, usage; match request_id in Usage / Credits.",
       chatApiChapterFailure:
-        "upstream_model_busy, model_not_available, upstream_timeout — retry or switch auto-*; check request_id in Usage.",
+        "See common errors below — missing_token, invalid_token, insufficient_credits, or upstream busy/timeout.",
       imageApiTitle: "Image API",
       imageApiDesc:
         "Text-to-image via POST /v1/images/generations — billed per successful generation.",
@@ -3189,7 +3232,9 @@ export const messages = {
         viewDocs: "查看文档",
         successBalanceHint: "已记录至",
         successReconcileHint:
-          "可复制上方 request_id，在 Usage / Credits 中对账本次调用。",
+          "复制 request_id，在 Usage 与 Credits 中搜索以核对本次调用。",
+        copyRequestId: "复制 request_id",
+        viewChatApiDocs: "Chat API 文档",
         viewUsage: "查看 Usage",
         viewCredits: "查看 Credits",
         errors: {
@@ -4032,17 +4077,57 @@ export const messages = {
       copyOneLineChatCurl: "复制单行 Chat curl",
       chatApiTitle: "Chat API",
       chatApiDesc:
-        "OpenAI 兼容对话 — POST /v1/chat/completions 与 GET /v1/models。",
+        "OpenAI 兼容对话 — POST https://api.tokfai.com/v1/chat/completions，字段含 model、messages、stream。",
+      chatApiEndpoint:
+        "接口：POST https://api.tokfai.com/v1/chat/completions — 路径与 OpenAI chat completions 一致。",
+      chatApiOpenAiFormat:
+        "OpenAI 兼容 JSON 请求体。核心字段：model（字符串）、messages（role + content 数组）、stream（布尔）。",
+      chatApiAutoFastNote:
+        "生产默认模型：auto-fast — Tokfai 路由到当前可用的快速上游模型。",
+      chatApiTerminalNote:
+        "复制下方单行 curl，粘贴到任意终端（Mac、Windows PowerShell 或 Linux）。无需 cd 或打开任何工程目录。",
+      chatApiCopyNowTitle: "你现在就可以复制",
+      chatApiCopyNowLabel: "单行 chat curl",
+      chatApiLiveKeyNote: "本浏览器会话中的 API Key 已自动填入此 curl。",
+      chatApiResponseTitle: "HTTP 200 时查看这些响应字段：",
+      chatApiFieldContent: "choices[0].message.content — 助手回复文本。",
+      chatApiFieldRequestId:
+        "request_id — 复制后在 Usage 与 Credits 中搜索。",
+      chatApiFieldCreditsCharged:
+        "credits_charged — 本次调用扣减的积分（若返回）。",
+      chatApiFieldUsage:
+        "usage — token 计数（prompt_tokens、completion_tokens、total_tokens）。",
+      chatApiFieldRequestedModel:
+        "tokfai.requested_model — 你请求的 model id（如 auto-fast）。",
+      chatApiFieldResolvedModel:
+        "tokfai.resolved_model — Tokfai 实际上游使用的模型。",
+      chatApiReconcileTitle: "在 Usage / Credits 对账：",
+      chatApiReconcileStep1: "从 JSON 响应复制 request_id。",
+      chatApiReconcileStep2:
+        "打开 Usage 搜索 request_id — 核对 model、tokens、credits_charged。",
+      chatApiReconcileStep3:
+        "打开 Credits 核对扣费，仅成功调用应产生扣费记录。",
+      chatApiErrorsTitle: "常见 Chat API 错误：",
+      chatApiErrorMissingToken:
+        "missing_token — 未发送 Authorization。请用单行复制按钮；勿粘贴断裂的多行 curl。",
+      chatApiErrorInvalidToken:
+        "invalid_token — 密钥错误、不完整或已吊销。在 API Keys 修正或使用「复制密钥」。",
+      chatApiErrorInsufficientCredits:
+        "insufficient_credits — 余额不足。请在 Credits 充值。",
+      chatApiErrorModelNotAvailable:
+        "model_not_available / model_not_found — 模型不可用或名称错误。尝试 auto-fast 或浏览 Models。",
+      chatApiErrorUpstreamBusy:
+        "upstream_model_busy / upstream_timeout — 上游繁忙或超时。重试或使用 auto-fast / auto-pro。",
       chatApiBody:
         "生产对话建议 auto-fast。响应 model 字段表示实际上游模型。",
       chatApiChapterPurpose:
-        "把对话能力接入你的应用、脚本或 IDE。",
+        "从你的应用、脚本或 IDE 发送 OpenAI 兼容对话请求。",
       chatApiChapterCopy:
-        "下方 chat curl、模型 auto-fast（或 auto-pro）、Authorization 请求头。",
+        "下方单行 chat curl（model auto-fast、messages、stream: false）与 Authorization 头。",
       chatApiChapterVerify:
-        "HTTP 200、choices 中有回复、JSON 含 request_id；Usage 显示 tokens 与 credits_charged。",
+        "HTTP 200 含 content、request_id、credits_charged、usage；在 Usage / Credits 按 request_id 核对。",
       chatApiChapterFailure:
-        "upstream_model_busy、model_not_available、upstream_timeout — 重试或换 auto-*；在 Usage 查 request_id。",
+        "见下方常见错误 — missing_token、invalid_token、insufficient_credits 或上游繁忙/超时。",
       imageApiTitle: "Image API",
       imageApiDesc:
         "文生图 — POST /v1/images/generations，按成功生成扣费。",

@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 
 import { CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
+import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
+import { setQuickStartApiKeySecret } from "@/lib/customer-quick-start-key-session";
 import { PlaygroundErrorPanel } from "@/components/playground-error-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -233,6 +235,7 @@ export function PlaygroundClient({
         ...prev,
         [listItem.id]: result.secret,
       }));
+      setQuickStartApiKeySecret(result.secret);
       setLocalKeys((prev) => {
         const without = prev.filter((row) => row.id !== listItem.id);
         return [listItem, ...without];
@@ -934,9 +937,26 @@ function ResponsePanel({
             </p>
           </div>
           {requestId ? (
-            <p className="pl-6 text-muted-foreground">
-              {t("dashboard.playground.successReconcileHint")}
-            </p>
+            <div className="flex flex-col gap-2 pl-6">
+              <p className="text-muted-foreground">
+                {t("dashboard.playground.successReconcileHint")}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <CopyConfigAction
+                  id="playground-success-copy-request-id"
+                  value={requestId}
+                  copiedId={copiedId}
+                  onCopy={onCopyRequestId}
+                  label={t("dashboard.playground.copyRequestId")}
+                  copiedLabel={t("dashboard.usage.copiedRequestId")}
+                />
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/dashboard/docs#chat-api">
+                    {t("dashboard.playground.viewChatApiDocs")}
+                  </Link>
+                </Button>
+              </div>
+            </div>
           ) : null}
         </div>
       </div>
@@ -1095,6 +1115,10 @@ function UsageDetails({
 
 function PlaygroundFooter({ t }: { t: (key: string) => string }) {
   const links = [
+    {
+      href: "/dashboard/docs#chat-api",
+      label: t("dashboard.playground.viewChatApiDocs"),
+    },
     { href: "/dashboard/models", label: t("dashboard.playground.viewModels") },
     { href: "/dashboard/docs", label: t("dashboard.playground.viewDocs") },
     { href: "/dashboard/usage", label: t("dashboard.playground.viewUsage") },
