@@ -1661,7 +1661,8 @@ export const messages = {
       batchGatewayNote:
         "Batch is not a managed operations service — it is how you integrate bulk jobs into your own systems.",
       footerHint: "Need image API or extended reference?",
-      footerDocsLink: "Extended API reference",
+      footerImageLink: "Image API playground",
+      footerDocsLink: "Models & pricing",
       copy: "Copy",
       copied: "Copied",
       copyConfig: "Copy config",
@@ -3724,7 +3725,8 @@ export const messages = {
       batchGatewayNote:
         "Batch 不是托管运营服务，而是你把批量任务接入自己系统的方式。",
       footerHint: "需要图像 API 或扩展参考？",
-      footerDocsLink: "扩展 API 参考",
+      footerImageLink: "Image Playground",
+      footerDocsLink: "模型与定价",
       copy: "复制",
       copied: "已复制",
       copyConfig: "复制配置",

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, type ReactNode } from "react";
 
 import {
   CodeBlock,
@@ -52,6 +53,18 @@ const SECTION_NAV_KEYS: Record<string, string> = {
   "batch-api": "integration.navBatch",
 };
 
+/** Offset for dashboard mobile sticky header when scrolling to in-page anchors. */
+const DOC_SECTION_SCROLL_MARGIN = "scroll-mt-24 md:scroll-mt-20 lg:scroll-mt-6";
+
+function scrollToDocSection(hash: string, behavior: ScrollBehavior = "smooth") {
+  if (!hash) return;
+  const id = hash.replace(/^#/, "");
+  const el = document.getElementById(id);
+  if (el) {
+    el.scrollIntoView({ behavior, block: "start" });
+  }
+}
+
 export function CustomerIntegrationGuide({
   showDashboardLinks = true,
 }: {
@@ -69,6 +82,20 @@ export function CustomerIntegrationGuide({
 
   const docsBase = showDashboardLinks || isLoggedIn ? "/dashboard/docs" : "/docs";
 
+  useEffect(() => {
+    const scrollFromHash = () => {
+      if (window.location.hash) {
+        window.requestAnimationFrame(() => {
+          scrollToDocSection(window.location.hash, "auto");
+        });
+      }
+    };
+
+    scrollFromHash();
+    window.addEventListener("hashchange", scrollFromHash);
+    return () => window.removeEventListener("hashchange", scrollFromHash);
+  }, []);
+
   function linkHref(link: CustomerDocDashboardLink): string {
     const base = link.href.startsWith("/dashboard")
       ? dashHref(link.href)
@@ -81,20 +108,25 @@ export function CustomerIntegrationGuide({
   }
 
   return (
-    <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-8">
+    <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
       <nav
-        className="lg:sticky lg:top-6 lg:z-10 lg:max-h-[calc(100vh-3rem)] lg:w-44 shrink-0 overflow-y-auto rounded-lg border bg-muted/30 p-3 lg:self-start"
+        className="relative z-0 w-full shrink-0 rounded-lg border bg-muted/30 p-3 lg:sticky lg:top-6 lg:z-10 lg:max-h-[calc(100vh-3rem)] lg:w-44 lg:self-start lg:overflow-y-auto"
         aria-label={t("integration.navTitle")}
       >
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:mb-3">
           {t("integration.navTitle")}
         </p>
-        <ul className="flex flex-col gap-1 text-sm">
+        <ul className="-mx-1 flex gap-1 overflow-x-auto pb-1 lg:mx-0 lg:flex-col lg:gap-1 lg:overflow-visible lg:pb-0">
           {CUSTOMER_DOC_SECTIONS.map((section) => (
-            <li key={section.id}>
+            <li key={section.id} className="shrink-0 lg:shrink">
               <a
                 href={`#${section.id}`}
-                className="block rounded-md px-2 py-1.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                onClick={(e) => {
+                  e.preventDefault();
+                  scrollToDocSection(`#${section.id}`);
+                  window.history.replaceState(null, "", `#${section.id}`);
+                }}
+                className="block whitespace-nowrap rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-background hover:text-foreground lg:whitespace-normal"
               >
                 {t(SECTION_NAV_KEYS[section.id])}
               </a>
@@ -132,9 +164,9 @@ export function CustomerIntegrationGuide({
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
-              <Link href={`${docsBase}#production-demo-flow`}>
+              <GuideHashLink href={`${docsBase}#production-demo-flow`}>
                 {t("integration.ctaDemoFlow")}
-              </Link>
+              </GuideHashLink>
             </Button>
           </div>
         </div>
@@ -154,7 +186,17 @@ export function CustomerIntegrationGuide({
 
         <p className="text-xs text-muted-foreground">
           {t("integration.footerHint")}{" "}
-          <Link href={docsBase} className="underline underline-offset-2">
+          <Link
+            href={dashHref("/dashboard/image-playground")}
+            className="underline underline-offset-2"
+          >
+            {t("integration.footerImageLink")}
+          </Link>
+          {" · "}
+          <Link
+            href={dashHref("/dashboard/models")}
+            className="underline underline-offset-2"
+          >
             {t("integration.footerDocsLink")}
           </Link>
         </p>
@@ -184,7 +226,7 @@ function DocSectionCard({
     <Card
       id={section.id}
       className={cn(
-        "scroll-mt-6",
+        DOC_SECTION_SCROLL_MARGIN,
         section.highlight && "border-primary/20 bg-primary/5"
       )}
     >
@@ -343,7 +385,11 @@ function DocBlock({
         <div className="flex flex-wrap gap-2">
           {block.links.map((link) => (
             <Button key={link.id} asChild size="sm" variant="outline">
-              <Link href={linkHref(link)}>{t(link.labelKey)}</Link>
+              {link.hash && link.href.endsWith("/docs") ? (
+                <GuideHashLink href={linkHref(link)}>{t(link.labelKey)}</GuideHashLink>
+              ) : (
+                <Link href={linkHref(link)}>{t(link.labelKey)}</Link>
+              )}
             </Button>
           ))}
         </div>
@@ -421,5 +467,33 @@ function ErrorTable({ t }: { t: (key: string) => string }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+function GuideHashLink({
+  href,
+  children,
+  className,
+}: {
+  href: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  const hashIndex = href.indexOf("#");
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+
+  return (
+    <a
+      href={href}
+      className={className}
+      onClick={(e) => {
+        if (!hash) return;
+        e.preventDefault();
+        scrollToDocSection(hash);
+        window.history.replaceState(null, "", href);
+      }}
+    >
+      {children}
+    </a>
   );
 }
