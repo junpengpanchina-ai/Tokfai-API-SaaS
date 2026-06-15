@@ -722,29 +722,44 @@ export function ImagePlaygroundResultArea({
 
                   <div className="flex flex-col gap-2 text-sm">
                     {requestId ? (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <code className="max-w-full truncate rounded bg-muted px-2 py-0.5 font-mono text-xs">
-                          {requestId}
-                        </code>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className={`h-8 ${IMAGE_PLAYGROUND_TOOLBENCH.control}`}
-                          onClick={() => copyText(requestCopyId, requestId)}
-                        >
-                          {copiedId === requestCopyId ? (
-                            <>
-                              <Check className="h-3.5 w-3.5" />
-                              {t("dashboard.imagePlayground.copiedRequestId")}
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-3.5 w-3.5" />
-                              {t("dashboard.imagePlayground.copyRequestId")}
-                            </>
-                          )}
-                        </Button>
+                      <div className="flex flex-col gap-2">
+                        <p className="text-xs text-muted-foreground">
+                          {t("dashboard.imagePlayground.successReconcileHint")}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <code className="max-w-full truncate rounded bg-muted px-2 py-0.5 font-mono text-xs">
+                            {requestId}
+                          </code>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className={`h-8 ${IMAGE_PLAYGROUND_TOOLBENCH.control}`}
+                            onClick={() => copyText(requestCopyId, requestId)}
+                          >
+                            {copiedId === requestCopyId ? (
+                              <>
+                                <Check className="h-3.5 w-3.5" />
+                                {t("dashboard.imagePlayground.copiedRequestId")}
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-3.5 w-3.5" />
+                                {t("dashboard.imagePlayground.copyRequestId")}
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            asChild
+                            size="sm"
+                            variant="outline"
+                            className={IMAGE_PLAYGROUND_TOOLBENCH.control}
+                          >
+                            <Link href={IMAGE_API_DOCS_HREF}>
+                              {t("dashboard.imagePlayground.viewImageApiDocs")}
+                            </Link>
+                          </Button>
+                        </div>
                       </div>
                     ) : null}
                     {creditsCharged != null ? (

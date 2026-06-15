@@ -1,3 +1,8 @@
+import {
+  buildImageApiCurlMultiline,
+  buildImageApiCurlOneLine,
+  type ImageApiCurlParams,
+} from "@/lib/customer-image-api-chapter";
 import { TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
 
 export interface ImageGenerationCurlParams {
@@ -9,26 +14,27 @@ export interface ImageGenerationCurlParams {
   image_urls?: string[];
 }
 
-/** Build a copyable curl for POST /v1/images/generations. Never embeds a real API key. */
-export function buildImageGenerationCurl(
-  params: ImageGenerationCurlParams
-): string {
-  const body: Record<string, unknown> = {
+function toChapterParams(params: ImageGenerationCurlParams): ImageApiCurlParams {
+  return {
     model: params.model,
     prompt: params.prompt,
     size: params.size,
-    n: params.n ?? 1,
-    response_format: params.response_format ?? "url",
+    n: params.n,
+    response_format: params.response_format,
+    image_urls: params.image_urls,
   };
+}
 
-  if (params.image_urls && params.image_urls.length > 0) {
-    body.image_urls = params.image_urls;
-  }
+/** Readable multiline curl for display. Never embeds a real API key unless provided. */
+export function buildImageGenerationCurl(params: ImageGenerationCurlParams): string {
+  return buildImageApiCurlMultiline(TOKFAI_API_KEY_PLACEHOLDER, toChapterParams(params));
+}
 
-  const json = JSON.stringify(body, null, 2);
-
-  return `curl https://api.tokfai.com/v1/images/generations \\
-  -H "Authorization: Bearer ${TOKFAI_API_KEY_PLACEHOLDER}" \\
-  -H "Content-Type: application/json" \\
-  -d '${json}'`;
+/** One-line curl for terminal paste — optional real API key when provided. */
+export function buildImageGenerationCurlOneLine(
+  params: ImageGenerationCurlParams,
+  apiKey?: string
+): string {
+  const key = apiKey?.trim() || TOKFAI_API_KEY_PLACEHOLDER;
+  return buildImageApiCurlOneLine(key, toChapterParams(params));
 }

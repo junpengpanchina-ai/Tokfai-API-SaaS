@@ -56,7 +56,8 @@ import {
   TOKFAI_API_KEY_PLACEHOLDER,
   TOKFAI_IMAGES_GENERATIONS_ENDPOINT,
 } from "@/lib/tokfai-api";
-import { buildImageGenerationCurl } from "@/lib/image-api-curl";
+import { buildImageGenerationCurlOneLine } from "@/lib/image-api-curl";
+import { setQuickStartApiKeySecret } from "@/lib/customer-quick-start-key-session";
 import {
   isValidImageUrl,
   MAX_PLAYGROUND_INPUT_IMAGES,
@@ -539,6 +540,7 @@ export function ImagePlaygroundClient({
         ...prev,
         [listItem.id]: keyResult.secret,
       }));
+      setQuickStartApiKeySecret(keyResult.secret);
       setLocalKeys((prev) => {
         const without = prev.filter((row) => row.id !== listItem.id);
         return [listItem, ...without];
@@ -558,16 +560,33 @@ export function ImagePlaygroundClient({
     }
   }
 
+  function resolveApiKeyForCopy(): string | undefined {
+    if (keyPanelView === "paste") {
+      const trimmed = apiKey.trim();
+      return isFullTokfaiApiKey(trimmed) ? trimmed : undefined;
+    }
+    if (selectedKey) {
+      const sessionSecret = sessionSecrets[selectedKey.id];
+      if (sessionSecret && isFullTokfaiApiKey(sessionSecret)) {
+        return sessionSecret;
+      }
+    }
+    return undefined;
+  }
+
   async function handleCopyApiRequest() {
     const trimmedPrompt = prompt.trim() || IMAGE_PLAYGROUND_DEFAULT_PROMPT;
-    const curl = buildImageGenerationCurl({
-      model,
-      prompt: trimmedPrompt,
-      size,
-      n: 1,
-      response_format: "url",
-      image_urls: readyImageUrls.length > 0 ? readyImageUrls : undefined,
-    });
+    const curl = buildImageGenerationCurlOneLine(
+      {
+        model,
+        prompt: trimmedPrompt,
+        size,
+        n: 1,
+        response_format: "url",
+        image_urls: readyImageUrls.length > 0 ? readyImageUrls : undefined,
+      },
+      resolveApiKeyForCopy()
+    );
 
     try {
       await navigator.clipboard.writeText(curl);

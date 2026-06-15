@@ -15,6 +15,10 @@ import {
   modelsCurlOneLine,
 } from "@/lib/customer-curl-oneline";
 import {
+  buildImageApiReferenceCurlMultiline,
+  buildImageApiReferenceCurlOneLine,
+} from "@/lib/customer-image-api-chapter";
+import {
   CHERRY_STUDIO_CONFIG_SNIPPET,
   CUSTOMER_INTEGRATION_ERROR_CODES,
   CURSOR_CONFIG_SNIPPET,
@@ -30,6 +34,7 @@ export type CustomerDocSnippetKey =
   | "chat-curl"
   | "models-curl"
   | "image-curl"
+  | "image-curl-reference"
   | "batch-create-curl"
   | "batch-poll-curl"
   | "openai-sdk-config"
@@ -42,6 +47,7 @@ export const CUSTOMER_DOC_SNIPPET_DISPLAY: Record<CustomerDocSnippetKey, string>
   "chat-curl": chatCurlMultiline(),
   "models-curl": modelsCurlMultiline(),
   "image-curl": imageCurlMultiline(),
+  "image-curl-reference": buildImageApiReferenceCurlMultiline(),
   "batch-create-curl": batchCreateCurlMultiline(),
   "batch-poll-curl": batchPollCurlMultiline(),
   "openai-sdk-config": OPENAI_SDK_CONFIG_SNIPPET,
@@ -55,6 +61,7 @@ export const CUSTOMER_DOC_SNIPPET_COPY: Record<CustomerDocSnippetKey, string> = 
   "chat-curl": chatCurlOneLine(),
   "models-curl": modelsCurlOneLine(),
   "image-curl": imageCurlOneLine(),
+  "image-curl-reference": buildImageApiReferenceCurlOneLine(),
   "batch-create-curl": batchCreateCurlOneLine(),
   "batch-poll-curl": batchPollCurlOneLine(),
   "openai-sdk-config": OPENAI_SDK_CONFIG_SNIPPET,
@@ -81,6 +88,7 @@ export type CustomerDocBlock =
   | { type: "code"; id: string; label: string; snippetKey: CustomerDocSnippetKey }
   | { type: "one-line-curl"; id: string; titleKey: string; snippetKey?: CustomerDocSnippetKey }
   | { type: "chat-api-copy-panel"; id: string }
+  | { type: "image-api-copy-panel"; id: string; showReference?: boolean }
   | { type: "api-key-copy-panel"; id: string }
   | { type: "api-key-errors" }
   | { type: "copy-fields"; id: string; fields: CustomerDocCopyField[] }
@@ -496,12 +504,59 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       verify: VERIFY_USAGE_CREDITS,
     },
     blocks: [
-      { type: "paragraph", textKey: "integration.imageApiBody" },
-      { type: "paragraph", textKey: "integration.placeholderKeyNote" },
+      { type: "paragraph", textKey: "integration.imageApiEndpoint" },
+      { type: "paragraph", textKey: "integration.imageApiSameKeyNote" },
+      { type: "paragraph", textKey: "integration.imageApiTerminalNote" },
+      { type: "image-api-copy-panel", id: "image-api-copy", showReference: true },
+      { type: "paragraph", textKey: "integration.imageApiBillingTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.imageApiBillingSuccessOnly",
+          "integration.imageApiBillingFailures",
+          "integration.imageApiBillingInsufficient",
+          "integration.imageApiBillingMoreExpensive",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.imageApiResponseTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.imageApiFieldImageUrl",
+          "integration.imageApiFieldRequestId",
+          "integration.imageApiFieldCreditsCharged",
+          "integration.imageApiFieldModel",
+          "integration.imageApiFieldInputImages",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.imageApiReconcileTitle" },
+      {
+        type: "ordered",
+        items: [
+          "integration.imageApiReconcileStep1",
+          "integration.imageApiReconcileStep2",
+          "integration.imageApiReconcileStep3",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.imageApiErrorsTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.imageApiErrorMissingToken",
+          "integration.imageApiErrorInvalidToken",
+          "integration.imageApiErrorInsufficientCredits",
+          "integration.imageApiErrorInvalidPrompt",
+          "integration.imageApiErrorModelNotFound",
+          "integration.imageApiErrorInvalidImageUrl",
+          "integration.imageApiErrorUpstreamTimeout",
+          "integration.imageApiErrorRequestTooLarge",
+          "integration.imageApiErrorUpstreamError",
+        ],
+      },
       {
         type: "code",
-        id: "image-curl",
-        label: "images (readable)",
+        id: "image-curl-readable",
+        label: "readable multi-line",
         snippetKey: "image-curl",
       },
       {
@@ -512,6 +567,9 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
             labelKey: "integration.imagePlaygroundLink",
             href: "/dashboard/image-playground",
           },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+          { id: "models", labelKey: "integration.browseModels", href: "/dashboard/models" },
         ],
       },
     ],

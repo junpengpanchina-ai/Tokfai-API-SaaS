@@ -7,6 +7,11 @@ import {
   modelsCurlOneLine,
 } from "@/lib/customer-curl-oneline";
 import {
+  buildImageApiCurlMultiline,
+  buildImageApiReferenceCurlMultiline,
+  buildImageApiReferenceCurlOneLine,
+} from "@/lib/customer-image-api-chapter";
+import {
   CUSTOMER_DOC_SNIPPET_COPY,
   type CustomerDocSnippetKey,
 } from "@/lib/docs/customer-docs-content";
@@ -45,6 +50,8 @@ export function resolveDocCurlSnippetCopy(
       return modelsCurlOneLine(key);
     case "image-curl":
       return imageCurlOneLine(key);
+    case "image-curl-reference":
+      return buildImageApiReferenceCurlOneLine(key);
     case "batch-create-curl":
       return batchCreateCurlOneLine(key);
     case "batch-poll-curl":
@@ -56,4 +63,14 @@ export function resolveDocCurlSnippetCopy(
 
 export function resolveDocChatCurlDisplay(explicitKey?: string | null): string {
   return chatCurlMultiline(resolveQuickStartApiKey(explicitKey));
+}
+
+export function resolveDocImageCurlDisplay(explicitKey?: string | null): string {
+  return buildImageApiCurlMultiline(resolveQuickStartApiKey(explicitKey));
+}
+
+export function resolveDocImageReferenceCurlDisplay(
+  explicitKey?: string | null
+): string {
+  return buildImageApiReferenceCurlMultiline(resolveQuickStartApiKey(explicitKey));
 }

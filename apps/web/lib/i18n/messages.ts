@@ -965,6 +965,9 @@ export const messages = {
         copiedRequestId: "Copied",
         viewUsage: "View Usage",
         viewCredits: "View Credits",
+        viewImageApiDocs: "Image API docs",
+        successReconcileHint:
+          "Copy request_id and search it in Usage and Credits to reconcile this generation.",
         viewModels: "View Models",
         footerActions: "Next steps",
         errors: {
@@ -1686,6 +1689,7 @@ export const messages = {
       copyAuthHeader: "Copy Authorization header",
       copyOneLineModelsCurl: "Copy one-line Models curl",
       copyOneLineChatCurl: "Copy one-line Chat curl",
+      copyOneLineImageCurl: "Copy one-line Image curl",
       chatApiTitle: "Chat API",
       chatApiDesc:
         "OpenAI-compatible chat — POST https://api.tokfai.com/v1/chat/completions with model, messages, and stream.",
@@ -1742,17 +1746,76 @@ export const messages = {
         "See common errors below — missing_token, invalid_token, insufficient_credits, or upstream busy/timeout.",
       imageApiTitle: "Image API",
       imageApiDesc:
-        "Text-to-image via POST /v1/images/generations — billed per successful generation.",
+        "Text-to-image via POST https://api.tokfai.com/v1/images/generations — billed per successful generation.",
+      imageApiEndpoint:
+        "Endpoint: POST https://api.tokfai.com/v1/images/generations — OpenAI-compatible image generation.",
+      imageApiSameKeyNote:
+        "Use the same Tokfai API Key as Chat: Authorization: Bearer sk-tokfai_xxx (create or copy in API Keys).",
+      imageApiTerminalNote:
+        "Copy the one-line curl below and paste into any terminal (Mac, Windows PowerShell, or Linux). No project folder or cd required.",
+      imageApiCopyNowTitle: "You can copy now",
+      imageApiCopyNowLabel: "One-line image curl",
+      imageApiLiveKeyNote:
+        "Your API key from this browser session is already filled in this curl.",
+      imageApiReferenceTitle: "Optional: image reference / image URL",
+      imageApiReferenceDesc:
+        "Add image_urls (up to 4 public http/https image URLs) alongside your prompt for reference-based generation. Replace the example URL with your own direct image link.",
+      imageApiReferenceCopyLabel: "One-line curl with image_urls",
+      imageApiBillingTitle: "Billing:",
+      imageApiBillingSuccessOnly:
+        "Credits are charged only after a successful generation (HTTP 200 with image URL).",
+      imageApiBillingFailures:
+        "Failed requests are usually not charged — check Usage for the official record.",
+      imageApiBillingInsufficient:
+        "insufficient_credits when balance is too low — top up in Credits before generating.",
+      imageApiBillingMoreExpensive:
+        "Image models cost more per request than Chat — confirm your balance on Models and Credits before bulk runs.",
+      imageApiResponseTitle: "On HTTP 200, check these response fields:",
+      imageApiFieldImageUrl:
+        "data[0].url — generated image URL (response_format must be url).",
+      imageApiFieldRequestId:
+        "request_id — copy this to search in Usage and Credits.",
+      imageApiFieldCreditsCharged:
+        "credits_charged — credits debited for this generation.",
+      imageApiFieldModel:
+        "model — the image model id that served the request (e.g. gpt-image-2).",
+      imageApiFieldInputImages:
+        "input_images_count — how many image_urls you sent (when present).",
+      imageApiReconcileTitle: "Reconcile with Usage / Credits:",
+      imageApiReconcileStep1: "Copy request_id from the JSON response.",
+      imageApiReconcileStep2:
+        "Open Usage and search the request_id — confirm model and credits_charged.",
+      imageApiReconcileStep3:
+        "Open Credits and verify the debit matches succeeded generations only.",
+      imageApiErrorsTitle: "Common Image API errors:",
+      imageApiErrorMissingToken:
+        "missing_token — Authorization header was not sent. Use the one-line copy button.",
+      imageApiErrorInvalidToken:
+        "invalid_token — key is wrong, incomplete, or revoked. Fix in API Keys.",
+      imageApiErrorInsufficientCredits:
+        "insufficient_credits — balance too low. Top up in Credits.",
+      imageApiErrorInvalidPrompt:
+        "invalid_prompt — prompt is required and cannot be empty.",
+      imageApiErrorModelNotFound:
+        "model_not_found — image model id unavailable or misspelled. Try gpt-image-2 or browse Models.",
+      imageApiErrorInvalidImageUrl:
+        "invalid_image_url — image_urls entry is missing, blocked, or not a valid http/https URL.",
+      imageApiErrorUpstreamTimeout:
+        "upstream_timeout — upstream image provider timed out. Retry later or switch models.",
+      imageApiErrorRequestTooLarge:
+        "request_body_too_large — JSON body exceeds the gateway limit. Reduce payload size.",
+      imageApiErrorUpstreamError:
+        "upstream_error / upstream_rate_limited — upstream provider failed or rate-limited. Retry with backoff.",
       imageApiBody:
         "Send prompt, model, and size from your backend. Successful generations debit credits; failed calls are usually not charged.",
       imageApiChapterPurpose:
         "Generate images from your product workflow — not via Tokfai-operated design services.",
       imageApiChapterCopy:
-        "Image curl below (replace model/prompt/size as needed) and your API Key header.",
+        "One-line image curl below (gpt-image-2, 1024x1024, response_format url) and Authorization header.",
       imageApiChapterVerify:
-        "HTTP 200 with image URL or base64; request_id in response; Usage shows image generation row.",
+        "HTTP 200 with data[0].url, request_id, credits_charged; match request_id in Usage / Credits.",
       imageApiChapterFailure:
-        "insufficient_credits or model_not_available — check Credits and model id; search request_id in Usage.",
+        "See common errors below — missing_token, invalid_token, insufficient_credits, or upstream timeout.",
       imagePlaygroundLink: "Open Image Playground",
       batchChapterPurpose:
         "Run many chat prompts in one job from your own backend.",
@@ -3382,6 +3445,9 @@ export const messages = {
         copiedRequestId: "已复制",
         viewUsage: "查看 Usage",
         viewCredits: "查看 Credits",
+        viewImageApiDocs: "Image API 文档",
+        successReconcileHint:
+          "复制 request_id，在 Usage 与 Credits 中搜索以核对本次生成。",
         viewModels: "查看 Models",
         footerActions: "下一步",
         errors: {
@@ -4075,6 +4141,7 @@ export const messages = {
       copyAuthHeader: "复制 Authorization header",
       copyOneLineModelsCurl: "复制单行 Models curl",
       copyOneLineChatCurl: "复制单行 Chat curl",
+      copyOneLineImageCurl: "复制单行 Image curl",
       chatApiTitle: "Chat API",
       chatApiDesc:
         "OpenAI 兼容对话 — POST https://api.tokfai.com/v1/chat/completions，字段含 model、messages、stream。",
@@ -4130,17 +4197,74 @@ export const messages = {
         "见下方常见错误 — missing_token、invalid_token、insufficient_credits 或上游繁忙/超时。",
       imageApiTitle: "Image API",
       imageApiDesc:
-        "文生图 — POST /v1/images/generations，按成功生成扣费。",
+        "文生图 — POST https://api.tokfai.com/v1/images/generations，按成功生成扣费。",
+      imageApiEndpoint:
+        "接口：POST https://api.tokfai.com/v1/images/generations — OpenAI 兼容图像生成。",
+      imageApiSameKeyNote:
+        "与 Chat 使用同一 Tokfai API Key：Authorization: Bearer sk-tokfai_xxx（在 API Keys 创建或复制）。",
+      imageApiTerminalNote:
+        "复制下方单行 curl，粘贴到任意终端（Mac、Windows PowerShell 或 Linux）。无需 cd 或打开任何工程目录。",
+      imageApiCopyNowTitle: "你现在就可以复制",
+      imageApiCopyNowLabel: "单行 image curl",
+      imageApiLiveKeyNote: "本浏览器会话中的 API Key 已自动填入此 curl。",
+      imageApiReferenceTitle: "可选：参考图 / 图片 URL",
+      imageApiReferenceDesc:
+        "在 prompt 之外添加 image_urls（最多 4 个公网 http/https 图片 URL）进行参考图生成。请将示例 URL 替换为你自己的直链图片地址。",
+      imageApiReferenceCopyLabel: "带 image_urls 的单行 curl",
+      imageApiBillingTitle: "计费说明：",
+      imageApiBillingSuccessOnly:
+        "仅在成功生成后扣积分（HTTP 200 且返回图片 URL）。",
+      imageApiBillingFailures:
+        "失败请求通常不扣费 — 以 Usage 中的官方记录为准。",
+      imageApiBillingInsufficient:
+        "余额不足时返回 insufficient_credits — 生成前请在 Credits 充值。",
+      imageApiBillingMoreExpensive:
+        "图像模型单次费用通常高于 Chat — 批量生成前请在 Models 与 Credits 确认余额。",
+      imageApiResponseTitle: "HTTP 200 时查看这些响应字段：",
+      imageApiFieldImageUrl:
+        "data[0].url — 生成图片 URL（response_format 须为 url）。",
+      imageApiFieldRequestId:
+        "request_id — 复制后在 Usage 与 Credits 中搜索。",
+      imageApiFieldCreditsCharged: "credits_charged — 本次生成扣减的积分。",
+      imageApiFieldModel:
+        "model — 实际服务的图像模型 id（如 gpt-image-2）。",
+      imageApiFieldInputImages:
+        "input_images_count — 你发送的 image_urls 数量（若返回）。",
+      imageApiReconcileTitle: "在 Usage / Credits 对账：",
+      imageApiReconcileStep1: "从 JSON 响应复制 request_id。",
+      imageApiReconcileStep2:
+        "打开 Usage 搜索 request_id — 核对 model 与 credits_charged。",
+      imageApiReconcileStep3:
+        "打开 Credits 核对扣费，仅成功生成应产生扣费记录。",
+      imageApiErrorsTitle: "常见 Image API 错误：",
+      imageApiErrorMissingToken:
+        "missing_token — 未发送 Authorization。请使用单行复制按钮。",
+      imageApiErrorInvalidToken:
+        "invalid_token — 密钥错误、不完整或已吊销。在 API Keys 修正。",
+      imageApiErrorInsufficientCredits:
+        "insufficient_credits — 余额不足。请在 Credits 充值。",
+      imageApiErrorInvalidPrompt:
+        "invalid_prompt — prompt 必填且不能为空。",
+      imageApiErrorModelNotFound:
+        "model_not_found — 图像模型不可用或 id 错误。可试 gpt-image-2 或浏览 Models。",
+      imageApiErrorInvalidImageUrl:
+        "invalid_image_url — image_urls 条目缺失、被拦截或不是有效的 http/https URL。",
+      imageApiErrorUpstreamTimeout:
+        "upstream_timeout — 上游图像服务超时。请稍后重试或换模型。",
+      imageApiErrorRequestTooLarge:
+        "request_body_too_large — JSON 请求体超过网关限制。请减小 payload。",
+      imageApiErrorUpstreamError:
+        "upstream_error / upstream_rate_limited — 上游失败或限流。请退避重试。",
       imageApiBody:
         "从你的后端提交 prompt、model、size。成功生成扣积分；失败通常不扣费。",
       imageApiChapterPurpose:
         "在你的产品流程里生成图像——不是 Tokfai 代做设计服务。",
       imageApiChapterCopy:
-        "下方 image curl（按需改 model/prompt/size）与 API Key 请求头。",
+        "下方单行 image curl（gpt-image-2、1024x1024、response_format url）与 Authorization 头。",
       imageApiChapterVerify:
-        "HTTP 200 含图片 URL 或 base64；响应有 request_id；Usage 有图像生成记录。",
+        "HTTP 200 含 data[0].url、request_id、credits_charged；在 Usage / Credits 按 request_id 核对。",
       imageApiChapterFailure:
-        "insufficient_credits 或 model_not_available — 查 Credits 与模型 id；在 Usage 搜 request_id。",
+        "见下方常见错误 — missing_token、invalid_token、insufficient_credits 或上游超时。",
       imagePlaygroundLink: "打开 Image Playground",
       batchChapterPurpose:
         "在你的后端一次提交多条对话任务。",

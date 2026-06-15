@@ -10,6 +10,7 @@ import {
 } from "@/components/copy-code-block";
 import { ApiKeyChapterCopyPanel } from "@/components/api-key-chapter-copy";
 import { ChatApiChapterCopyPanel } from "@/components/chat-api-chapter-copy";
+import { ImageApiChapterCopyPanel } from "@/components/image-api-chapter-copy";
 import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +47,7 @@ import {
   quickStartChatCurlOneLine,
   resolveDocChatCurlDisplay,
   resolveDocCurlSnippetCopy,
+  resolveDocImageCurlDisplay,
 } from "@/lib/customer-quick-start-snippets";
 import { modelsVerifyCurlMultiline } from "@/lib/customer-api-key-chapter";
 import { useQuickStartApiKey } from "@/lib/use-quick-start-api-key";
@@ -356,7 +358,9 @@ function DocBlock({
         block.snippetKey === "chat-curl" &&
         (sectionId === "quick-start" || sectionId === "chat-api")
           ? resolveDocChatCurlDisplay(quickStartApiKey)
-          : block.snippetKey === "models-curl" && sectionId === "api-key"
+          : block.snippetKey === "image-curl" && sectionId === "image-api"
+            ? resolveDocImageCurlDisplay(quickStartApiKey)
+            : block.snippetKey === "models-curl" && sectionId === "api-key"
             ? modelsVerifyCurlMultiline(
                 isQuickStartKeyPlaceholder(quickStartApiKey)
                   ? undefined
@@ -433,6 +437,23 @@ function DocBlock({
               copiedId={copiedId}
               onCopy={onCopy}
               idPrefix={block.id}
+            />
+          </div>
+        </div>
+      );
+    case "image-api-copy-panel":
+      return (
+        <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
+          <p className="text-sm font-semibold text-foreground">
+            {t("integration.imageApiCopyNowTitle")}
+          </p>
+          <div className="mt-3">
+            <ImageApiChapterCopyPanel
+              apiKey={quickStartApiKey}
+              copiedId={copiedId}
+              onCopy={onCopy}
+              idPrefix={block.id}
+              showReference={block.showReference ?? false}
             />
           </div>
         </div>

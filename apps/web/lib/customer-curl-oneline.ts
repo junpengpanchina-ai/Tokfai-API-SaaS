@@ -1,4 +1,8 @@
 import {
+  buildImageApiCurlMultiline,
+  buildImageApiCurlOneLine,
+} from "@/lib/customer-image-api-chapter";
+import {
   TOKFAI_API_KEY_PLACEHOLDER,
   TOKFAI_RECOMMENDED_MODEL,
 } from "@/lib/tokfai-api";
@@ -26,14 +30,7 @@ export function modelsCurlOneLine(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
 }
 
 export function imageCurlOneLine(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
-  const body = shellSingleQuotedJson({
-    model: "gpt-image-2",
-    prompt: "A product photo on a white background",
-    size: "1024x1024",
-    n: 1,
-    response_format: "url",
-  });
-  return `curl -sS ${API_ROOT}/images/generations -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d '${body}'`;
+  return buildImageApiCurlOneLine(apiKey);
 }
 
 export function batchCreateCurlOneLine(
@@ -81,21 +78,7 @@ export function modelsCurlMultiline(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string
 }
 
 export function imageCurlMultiline(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
-  const body = JSON.stringify(
-    {
-      model: "gpt-image-2",
-      prompt: "A product photo on a white background",
-      size: "1024x1024",
-      n: 1,
-      response_format: "url",
-    },
-    null,
-    2
-  );
-  return `curl https://api.tokfai.com/v1/images/generations \\
-  -H "Authorization: Bearer ${apiKey}" \\
-  -H "Content-Type: application/json" \\
-  -d '${body}'`;
+  return buildImageApiCurlMultiline(apiKey);
 }
 
 export function batchCreateCurlMultiline(
