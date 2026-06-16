@@ -21,20 +21,12 @@ export const INTEGRATION_BASE_URL = TOKFAI_API_BASE_URL;
 export const INTEGRATION_KEY_PLACEHOLDER = TOKFAI_API_KEY_PLACEHOLDER;
 export const INTEGRATION_DEFAULT_MODEL = TOKFAI_RECOMMENDED_MODEL;
 
-export const CUSTOMER_INTEGRATION_ERROR_CODES = [
-  "missing_token",
-  "invalid_token",
-  "insufficient_credits",
-  "upstream_model_busy",
-  "model_not_available",
-  "upstream_timeout",
-  "too_many_requests",
-  "gateway_overloaded",
-  "batch_cancelled",
-] as const;
+import {
+  CUSTOMER_INTEGRATION_ERROR_CODES,
+  type CustomerIntegrationErrorCode,
+} from "@/lib/customer-error-codes-chapter";
 
-export type CustomerIntegrationErrorCode =
-  (typeof CUSTOMER_INTEGRATION_ERROR_CODES)[number];
+export { CUSTOMER_INTEGRATION_ERROR_CODES, type CustomerIntegrationErrorCode };
 
 export function chatCompletionsCurl(
   apiKey = TOKFAI_API_KEY_PLACEHOLDER,

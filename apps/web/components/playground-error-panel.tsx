@@ -64,6 +64,23 @@ export function PlaygroundErrorPanel({
         <p className="text-sm text-muted-foreground">{t(hintKey)}</p>
       ) : null}
 
+      <div className="flex flex-wrap gap-2">
+        {error.code ? (
+          <Button asChild size="sm" variant="outline" className="w-fit">
+            <Link href="/dashboard/docs#error-codes">
+              {t("dashboard.playground.viewErrorCodesDocs")}
+            </Link>
+          </Button>
+        ) : null}
+        {error.requestId ? (
+          <Button asChild size="sm" variant="outline" className="w-fit">
+            <Link href="/dashboard/usage">
+              {t("dashboard.playground.viewUsage")}
+            </Link>
+          </Button>
+        ) : null}
+      </div>
+
       {kind === "credits" ? (
         <div className="flex flex-wrap gap-2">
           <Button asChild size="sm" className="w-fit">

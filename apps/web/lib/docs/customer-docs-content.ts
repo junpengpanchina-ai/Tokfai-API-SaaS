@@ -29,6 +29,9 @@ import {
   OPENAI_PYTHON_SNIPPET,
   OPENAI_SDK_CONFIG_SNIPPET,
 } from "@/lib/customer-integration-snippets";
+import {
+  CUSTOMER_DOC_ERROR_CODES,
+} from "@/lib/customer-error-codes-chapter";
 
 export type CustomerDocSnippetKey =
   | "chat-curl"
@@ -94,6 +97,7 @@ export type CustomerDocBlock =
   | { type: "api-key-errors" }
   | { type: "copy-fields"; id: string; fields: CustomerDocCopyField[] }
   | { type: "error-table" }
+  | { type: "error-examples-panel"; id: string }
   | { type: "model-list" }
   | { type: "dashboard-links"; links: CustomerDocDashboardLink[] }
   | { type: "industry-cards"; ids: CustomerDocIndustryId[] };
@@ -487,6 +491,12 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
             hash: "usage-credits",
           },
           {
+            id: "error-codes-docs",
+            labelKey: "integration.linkErrorCodesGuide",
+            href: "/dashboard/docs",
+            hash: "error-codes",
+          },
+          {
             id: "batch-api",
             labelKey: "integration.demoFlowLinkBatch",
             href: "/dashboard/docs",
@@ -588,6 +598,12 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
             labelKey: "integration.linkUsageCreditsGuide",
             href: "/dashboard/docs",
             hash: "usage-credits",
+          },
+          {
+            id: "error-codes-docs",
+            labelKey: "integration.linkErrorCodesGuide",
+            href: "/dashboard/docs",
+            hash: "error-codes",
           },
           {
             id: "batch-api",
@@ -745,6 +761,12 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
             href: "/dashboard/docs",
             hash: "usage-credits",
           },
+          {
+            id: "error-codes-docs",
+            labelKey: "integration.linkErrorCodesGuide",
+            href: "/dashboard/docs",
+            hash: "error-codes",
+          },
         ],
       },
     ],
@@ -873,6 +895,12 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
             labelKey: "integration.linkTopUp",
             href: "/pricing",
           },
+          {
+            id: "error-codes-docs",
+            labelKey: "integration.linkErrorCodesGuide",
+            href: "/dashboard/docs",
+            hash: "error-codes",
+          },
         ],
       },
     ],
@@ -896,7 +924,79 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       },
       verify: VERIFY_USAGE_CREDITS,
     },
-    blocks: [{ type: "error-table" }],
+    blocks: [
+      { type: "paragraph", textKey: "integration.errorsIntroCode" },
+      { type: "paragraph", textKey: "integration.errorsIntroRequestId" },
+      { type: "paragraph", textKey: "integration.errorsIntroTrio" },
+      { type: "paragraph", textKey: "integration.errorsChargedTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.errorsChargedSuccess",
+          "integration.errorsChargedFailed",
+          "integration.errorsChargedVerify",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.errorsRequestIdTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.errorsRequestIdHas",
+          "integration.errorsRequestIdMissing",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.errorsFlowKeyTitle" },
+      {
+        type: "ordered",
+        items: [
+          "integration.errorsFlowKeyStep1",
+          "integration.errorsFlowKeyStep2",
+          "integration.errorsFlowKeyStep3",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.errorsFlowCreditsTitle" },
+      {
+        type: "ordered",
+        items: [
+          "integration.errorsFlowCreditsStep1",
+          "integration.errorsFlowCreditsStep2",
+          "integration.errorsFlowCreditsStep3",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.errorsFlowUpstreamTitle" },
+      {
+        type: "ordered",
+        items: [
+          "integration.errorsFlowUpstreamStep1",
+          "integration.errorsFlowUpstreamStep2",
+          "integration.errorsFlowUpstreamStep3",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.errorsTableTitle" },
+      { type: "error-table" },
+      { type: "paragraph", textKey: "integration.errorsExamplesTitle" },
+      { type: "error-examples-panel", id: "error-examples" },
+      {
+        type: "dashboard-links",
+        links: [
+          { id: "keys", labelKey: "integration.demoFlowLinkKeys", href: "/dashboard/api-keys" },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+          {
+            id: "usage-credits-docs",
+            labelKey: "integration.linkUsageCreditsGuide",
+            href: "/dashboard/docs",
+            hash: "usage-credits",
+          },
+          {
+            id: "error-codes-docs",
+            labelKey: "integration.linkErrorCodesGuide",
+            href: "/dashboard/docs",
+            hash: "error-codes",
+          },
+        ],
+      },
+    ],
   },
   {
     id: "openai-sdk",
@@ -1034,4 +1134,4 @@ export const CUSTOMER_DOC_MODEL_ROWS = [
   { id: "auto-cheap", labelKey: "integration.modelAutoCheap" },
 ] as const;
 
-export { CUSTOMER_INTEGRATION_ERROR_CODES };
+export { CUSTOMER_INTEGRATION_ERROR_CODES, CUSTOMER_DOC_ERROR_CODES };

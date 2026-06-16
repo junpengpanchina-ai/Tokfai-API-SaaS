@@ -10,6 +10,7 @@ import {
 } from "@/components/copy-code-block";
 import { ApiKeyChapterCopyPanel } from "@/components/api-key-chapter-copy";
 import { BatchApiChapterCopyPanel } from "@/components/batch-api-chapter-copy";
+import { ErrorCodesChapterPanel } from "@/components/error-codes-chapter-panel";
 import { ChatApiChapterCopyPanel } from "@/components/chat-api-chapter-copy";
 import { ImageApiChapterCopyPanel } from "@/components/image-api-chapter-copy";
 import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
@@ -27,13 +28,14 @@ import {
   INTEGRATION_BASE_URL,
   INTEGRATION_DEFAULT_MODEL,
 } from "@/lib/customer-integration-snippets";
+import { CUSTOMER_ERROR_CODE_HTTP } from "@/lib/customer-error-codes-chapter";
 import {
   CUSTOMER_DOC_ESSENTIAL_KEYS,
   CUSTOMER_DOC_SECTIONS,
+  CUSTOMER_DOC_ERROR_CODES,
   CUSTOMER_DOC_MODEL_ROWS,
   CUSTOMER_DOC_SNIPPET_COPY,
   CUSTOMER_DOC_SNIPPET_DISPLAY,
-  CUSTOMER_INTEGRATION_ERROR_CODES,
   type CustomerDocBlock,
   type CustomerDocChapterGuide,
   type CustomerDocChapterNow,
@@ -518,6 +520,14 @@ function DocBlock({
       );
     case "error-table":
       return <ErrorTable t={t} />;
+    case "error-examples-panel":
+      return (
+        <ErrorCodesChapterPanel
+          copiedId={copiedId}
+          onCopy={onCopy}
+          idPrefix={block.id}
+        />
+      );
     case "model-list":
       return (
         <ul className="space-y-3 text-sm text-muted-foreground">
@@ -757,19 +767,39 @@ function CopyFieldsTable({
 function ErrorTable({ t }: { t: (key: string) => string }) {
   return (
     <div className="overflow-x-auto rounded-lg border">
-      <table className="w-full text-sm">
+      <table className="w-full min-w-[960px] text-sm">
         <thead>
           <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-            <th className="py-2 pl-4 pr-4 font-medium">{t("integration.codeColumn")}</th>
-            <th className="py-2 pr-4 font-medium">{t("integration.meaningColumn")}</th>
+            <th className="py-2 pl-4 pr-3 font-medium">{t("integration.errorsColCode")}</th>
+            <th className="py-2 pr-3 font-medium">{t("integration.errorsColHttp")}</th>
+            <th className="py-2 pr-3 font-medium">{t("integration.errorsColMeaning")}</th>
+            <th className="py-2 pr-3 font-medium">{t("integration.errorsColCause")}</th>
+            <th className="py-2 pr-3 font-medium">{t("integration.errorsColAction")}</th>
+            <th className="py-2 pr-3 font-medium">{t("integration.errorsColCharged")}</th>
+            <th className="py-2 pr-4 font-medium">{t("integration.errorsColWhere")}</th>
           </tr>
         </thead>
         <tbody>
-          {CUSTOMER_INTEGRATION_ERROR_CODES.map((code) => (
-            <tr key={code} className="border-b last:border-0">
-              <td className="py-3 pl-4 pr-4 font-mono text-xs">{code}</td>
+          {CUSTOMER_DOC_ERROR_CODES.map((code) => (
+            <tr key={code} className="border-b last:border-0 align-top">
+              <td className="py-3 pl-4 pr-3 font-mono text-xs">{code}</td>
+              <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">
+                {CUSTOMER_ERROR_CODE_HTTP[code]}
+              </td>
+              <td className="py-3 pr-3 text-muted-foreground">
+                {t(`integration.errorRow.${code}.meaning`)}
+              </td>
+              <td className="py-3 pr-3 text-muted-foreground">
+                {t(`integration.errorRow.${code}.cause`)}
+              </td>
+              <td className="py-3 pr-3 text-muted-foreground">
+                {t(`integration.errorRow.${code}.action`)}
+              </td>
+              <td className="py-3 pr-3 text-muted-foreground whitespace-nowrap">
+                {t(`integration.errorRow.${code}.charged`)}
+              </td>
               <td className="py-3 pr-4 text-muted-foreground">
-                {t(`integration.error.${code}`)}
+                {t(`integration.errorRow.${code}.where`)}
               </td>
             </tr>
           ))}

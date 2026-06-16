@@ -804,6 +804,7 @@ export const messages = {
           "Copy request_id and search it in Usage and Credits to reconcile this call.",
         copyRequestId: "Copy request_id",
         viewChatApiDocs: "Chat API docs",
+        viewErrorCodesDocs: "Error codes docs",
         viewUsage: "View Usage",
         viewCredits: "View Credits",
         errors: {
@@ -1837,13 +1838,57 @@ export const messages = {
       usageChapterFailure:
         "No Usage row — wrong key or call never reached Tokfai; check error.code and request_id when present.",
       errorsChapterPurpose:
-        "Decode API errors using stable error.code values.",
+        "Self-serve API errors using error.code, HTTP status, and request_id.",
       errorsChapterCopy:
-        "error.code from JSON responses (table below).",
+        "Error code table below plus copyable JSON examples (placeholder keys only).",
       errorsChapterVerify:
-        "You can map your error.code to an action and find the call via request_id in Usage.",
+        "You can map error.code to an action and find the call via request_id in Usage.",
       errorsChapterFailure:
-        "Unknown code — open Usage by request_id and contact support with that id.",
+        "Unknown code — search Usage by request_id when present; see Error codes table.",
+      errorsIntroCode:
+        "Start with error.code in the JSON body — it tells you what went wrong.",
+      errorsIntroRequestId:
+        "request_id links the error to Usage and Credits — copy it whenever it appears.",
+      errorsIntroTrio:
+        "Read HTTP status + error.code + request_id together — status shows the class, code shows the fix, request_id finds the row in Usage.",
+      errorsChargedTitle: "Charged or not charged:",
+      errorsChargedSuccess:
+        "HTTP 200/202 with a successful result usually debits credits (check credits_charged in the response).",
+      errorsChargedFailed:
+        "Auth, validation, upstream, rate-limit, and cancelled errors are usually not charged.",
+      errorsChargedVerify:
+        "Usage and Credits are the official record — failed rows typically show credits_charged 0 or empty.",
+      errorsRequestIdTitle: "Using request_id:",
+      errorsRequestIdHas:
+        "request_id present — copy it and search in Usage; match debits in Credits when charged.",
+      errorsRequestIdMissing:
+        "No request_id — request may not have entered processing; check Authorization header and JSON format first.",
+      errorsFlowKeyTitle: "A. Key errors (missing_token / invalid_token):",
+      errorsFlowKeyStep1: "Open API Keys — confirm the key is active and not revoked.",
+      errorsFlowKeyStep2: "Copy the full sk-tokfai_… secret (not just the prefix).",
+      errorsFlowKeyStep3: "Paste into Authorization: Bearer sk-tokfai_xxx and retry.",
+      errorsFlowCreditsTitle: "B. Balance errors (insufficient_credits):",
+      errorsFlowCreditsStep1: "Open Credits — check current balance.",
+      errorsFlowCreditsStep2: "Top up on Pricing / Credits.",
+      errorsFlowCreditsStep3: "Retry the same API call after balance updates.",
+      errorsFlowUpstreamTitle:
+        "C. Model / upstream errors (model_not_available / upstream_model_busy / upstream_timeout):",
+      errorsFlowUpstreamStep1: "Switch model to auto-fast or auto-pro in your request.",
+      errorsFlowUpstreamStep2: "Retry after a short delay if the model is busy or timed out.",
+      errorsFlowUpstreamStep3: "Search request_id in Usage when returned — confirm status failed and not charged.",
+      errorsTableTitle: "Error code reference:",
+      errorsColCode: "Code",
+      errorsColHttp: "HTTP",
+      errorsColMeaning: "Meaning",
+      errorsColCause: "Common cause",
+      errorsColAction: "What to do",
+      errorsColCharged: "Charged?",
+      errorsColWhere: "Where to check",
+      errorsExamplesTitle: "Copyable error response examples (no real keys):",
+      errorExampleMissingToken: "missing_token response",
+      errorExampleInvalidToken: "invalid_token response",
+      errorExampleInsufficientCredits: "insufficient_credits response",
+      errorExampleUpstreamBusy: "upstream_model_busy response (may include request_id)",
       sdkChapterPurpose:
         "Use the official OpenAI SDK pointed at Tokfai.",
       sdkChapterCopy:
@@ -2020,7 +2065,7 @@ export const messages = {
       browseModels: "Browse all models",
       errorsTitle: "Error codes",
       errorsDesc:
-        "Stable error.code values in JSON responses. Use request_id from the response or Usage when troubleshooting.",
+        "Stable error.code values, HTTP status, and request_id — self-serve troubleshooting before contacting support.",
       codeColumn: "Code",
       meaningColumn: "What to do",
       billingTitle: "Usage & Credits",
@@ -2038,6 +2083,7 @@ export const messages = {
       linkCredits: "Open Credits",
       linkTopUp: "Top up credits",
       linkUsageCreditsGuide: "Usage & Credits guide",
+      linkErrorCodesGuide: "Error codes guide",
       usageCreditsDifferenceTitle: "Usage vs Credits:",
       usageWhatIs:
         "Usage — per-request API call log. One row per request. Search by request_id to see model, status, tokens, and credits_charged.",
@@ -2237,6 +2283,120 @@ export const messages = {
       copyConfig: "Copy config",
       copyCurl: "Copy curl",
       copyCode: "Copy code",
+      errorRow: {
+        missing_token: {
+          meaning: "No API key was sent.",
+          cause: "Authorization header missing or empty.",
+          action: "Add Authorization: Bearer sk-tokfai_xxx on every request.",
+          charged: "Usually not charged",
+          where: "API Keys — copy full secret",
+        },
+        invalid_token: {
+          meaning: "API key rejected.",
+          cause: "Key incomplete, wrong, revoked, or expired.",
+          action: "Copy the full key from API Keys or create a new key.",
+          charged: "Usually not charged",
+          where: "API Keys",
+        },
+        insufficient_credits: {
+          meaning: "Balance too low.",
+          cause: "Account credits cannot cover this request.",
+          action: "Open Credits or Pricing — top up, then retry.",
+          charged: "Usually not charged",
+          where: "Credits / Pricing",
+        },
+        invalid_request_error: {
+          meaning: "Request body invalid.",
+          cause: "Malformed JSON or missing required fields.",
+          action: "Fix JSON; for Batch ensure each item has messages.",
+          charged: "Usually not charged",
+          where: "Chat / Image / Batch API docs",
+        },
+        invalid_prompt: {
+          meaning: "Prompt missing or empty.",
+          cause: "Image API requires a non-empty prompt.",
+          action: "Send a non-empty prompt string.",
+          charged: "Usually not charged",
+          where: "Image API docs",
+        },
+        invalid_image_url: {
+          meaning: "Reference image URL invalid.",
+          cause: "URL blocked, not http/https, or unreachable.",
+          action: "Use a direct public image URL or Image Playground upload.",
+          charged: "Usually not charged",
+          where: "Image API docs / Usage",
+        },
+        model_not_found: {
+          meaning: "Model id does not exist.",
+          cause: "Typo or model not enabled.",
+          action: "Use auto-fast or browse Models.",
+          charged: "Usually not charged",
+          where: "Models",
+        },
+        model_not_available: {
+          meaning: "Model temporarily unavailable.",
+          cause: "Upstream model busy or disabled.",
+          action: "Switch to auto-fast or auto-pro; retry later.",
+          charged: "Usually not charged",
+          where: "Models",
+        },
+        upstream_model_busy: {
+          meaning: "Upstream model overloaded.",
+          cause: "High load on the requested model.",
+          action: "Retry with backoff or use auto-fast / auto-pro.",
+          charged: "Usually not charged",
+          where: "Usage (if request_id) / Models",
+        },
+        upstream_timeout: {
+          meaning: "Upstream timed out.",
+          cause: "Provider slow or request too heavy.",
+          action: "Retry later, shorten prompt, or use auto-fast.",
+          charged: "Usually not charged",
+          where: "Usage",
+        },
+        upstream_error: {
+          meaning: "Upstream provider failed.",
+          cause: "External API error or bad upstream response.",
+          action: "Retry with backoff; switch to auto-fast if persistent.",
+          charged: "Usually not charged",
+          where: "Usage (request_id) / support",
+        },
+        request_body_too_large: {
+          meaning: "Request body too large.",
+          cause: "JSON, prompt, or image_urls exceed limit.",
+          action: "Shrink prompt, fewer images, or smaller payload.",
+          charged: "Usually not charged",
+          where: "Reduce request size",
+        },
+        too_many_requests: {
+          meaning: "Rate limit exceeded.",
+          cause: "Too many requests per minute for this key.",
+          action: "Slow down — batch calls or add delay.",
+          charged: "Usually not charged",
+          where: "Usage if logged",
+        },
+        too_many_concurrent_requests: {
+          meaning: "Concurrency limit exceeded.",
+          cause: "Too many parallel in-flight requests.",
+          action: "Lower concurrent workers or queue requests.",
+          charged: "Usually not charged",
+          where: "Usage if logged",
+        },
+        gateway_overloaded: {
+          meaning: "Gateway temporarily overloaded.",
+          cause: "High platform load.",
+          action: "Retry later with exponential backoff.",
+          charged: "Usually not charged",
+          where: "Usage (request_id may appear)",
+        },
+        batch_cancelled: {
+          meaning: "Batch or item cancelled.",
+          cause: "User cancelled or batch timed out.",
+          action: "Submit a new batch if still needed.",
+          charged: "Not charged for cancelled items",
+          where: "Batch API docs / Usage per item",
+        },
+      },
       error: {
         missing_token: "Send Authorization: Bearer sk-tokfai_… on every request.",
         invalid_token: "Check the key is complete, active, and not revoked.",
@@ -3482,6 +3642,7 @@ export const messages = {
           "复制 request_id，在 Usage 与 Credits 中搜索以核对本次调用。",
         copyRequestId: "复制 request_id",
         viewChatApiDocs: "Chat API 文档",
+        viewErrorCodesDocs: "错误码文档",
         viewUsage: "查看 Usage",
         viewCredits: "查看 Credits",
         errors: {
@@ -4469,13 +4630,56 @@ export const messages = {
       usageChapterFailure:
         "Usage 无记录 — 密钥错误或请求未到达 Tokfai；对照 error.code 与 request_id。",
       errorsChapterPurpose:
-        "读懂 API 错误，无需内部文档。",
+        "用 error.code、HTTP status 与 request_id 自助排查 API 错误。",
       errorsChapterCopy:
-        "JSON 中的 error.code（见下表）。",
+        "下方错误码表与可复制 JSON 示例（仅占位密钥）。",
       errorsChapterVerify:
         "能将 error.code 对应到处理动作，并在 Usage 用 request_id 定位调用。",
       errorsChapterFailure:
-        "未知 code — 用 request_id 在 Usage 查找并联系支持。",
+        "未知 code — 若有 request_id 则在 Usage 搜索；见错误码表。",
+      errorsIntroCode: "先看 JSON 中的 error.code — 说明失败原因。",
+      errorsIntroRequestId:
+        "request_id 连接错误与 Usage / Credits — 出现即复制。",
+      errorsIntroTrio:
+        "同时看 HTTP status + error.code + request_id — status 表类别，code 表修复，request_id 在 Usage 找行。",
+      errorsChargedTitle: "是否扣费：",
+      errorsChargedSuccess:
+        "HTTP 200/202 且成功结果通常扣 credits（看响应 credits_charged）。",
+      errorsChargedFailed:
+        "鉴权、校验、上游、限流、取消类错误通常不扣费。",
+      errorsChargedVerify:
+        "以 Usage / Credits 为准 — 失败行通常 credits_charged 为 0 或空。",
+      errorsRequestIdTitle: "request_id 用法：",
+      errorsRequestIdHas:
+        "有 request_id — 复制后在 Usage 搜索；扣费时与 Credits 核对。",
+      errorsRequestIdMissing:
+        "无 request_id — 可能未进入处理链路；先检查 Authorization 与 JSON 格式。",
+      errorsFlowKeyTitle: "A. Key 错误（missing_token / invalid_token）：",
+      errorsFlowKeyStep1: "打开 API Keys — 确认 Key 有效且未吊销。",
+      errorsFlowKeyStep2: "复制完整 sk-tokfai_… secret（不仅是前缀）。",
+      errorsFlowKeyStep3: "填入 Authorization: Bearer sk-tokfai_xxx 后重试。",
+      errorsFlowCreditsTitle: "B. 余额错误（insufficient_credits）：",
+      errorsFlowCreditsStep1: "打开 Credits — 查看当前余额。",
+      errorsFlowCreditsStep2: "在 Pricing / Credits 充值。",
+      errorsFlowCreditsStep3: "余额更新后重试同一 API 调用。",
+      errorsFlowUpstreamTitle:
+        "C. 模型/上游错误（model_not_available / upstream_model_busy / upstream_timeout）：",
+      errorsFlowUpstreamStep1: "请求中改用 auto-fast 或 auto-pro。",
+      errorsFlowUpstreamStep2: "模型繁忙或超时时稍后重试。",
+      errorsFlowUpstreamStep3: "若有 request_id 在 Usage 搜索 — 确认 failed 且未扣费。",
+      errorsTableTitle: "错误码参考表：",
+      errorsColCode: "Code",
+      errorsColHttp: "HTTP",
+      errorsColMeaning: "含义",
+      errorsColCause: "常见原因",
+      errorsColAction: "客户操作",
+      errorsColCharged: "扣费？",
+      errorsColWhere: "去哪查",
+      errorsExamplesTitle: "可复制错误响应示例（无真实密钥）：",
+      errorExampleMissingToken: "missing_token 响应",
+      errorExampleInvalidToken: "invalid_token 响应",
+      errorExampleInsufficientCredits: "insufficient_credits 响应",
+      errorExampleUpstreamBusy: "upstream_model_busy 响应（可能含 request_id）",
       sdkChapterPurpose:
         "用官方 OpenAI SDK 指向 Tokfai。",
       sdkChapterCopy:
@@ -4649,7 +4853,7 @@ export const messages = {
       browseModels: "浏览全部模型",
       errorsTitle: "错误码",
       errorsDesc:
-        "JSON 响应中的稳定 error.code。请结合 request_id 或在 Usage 中排查。",
+        "稳定的 error.code、HTTP status 与 request_id — 自助排查后再联系支持。",
       codeColumn: "错误码",
       meaningColumn: "处理建议",
       billingTitle: "Usage 与 Credits",
@@ -4667,6 +4871,7 @@ export const messages = {
       linkCredits: "打开 Credits",
       linkTopUp: "充值 credits",
       linkUsageCreditsGuide: "Usage / Credits 指南",
+      linkErrorCodesGuide: "错误码指南",
       usageCreditsDifferenceTitle: "Usage 与 Credits 的区别：",
       usageWhatIs:
         "Usage — 每次 API 调用的请求级明细。按 request_id 搜索可查看 model、status、tokens、credits_charged。",
@@ -4846,6 +5051,120 @@ export const messages = {
       copyConfig: "复制配置",
       copyCurl: "复制 curl",
       copyCode: "复制代码",
+      errorRow: {
+        missing_token: {
+          meaning: "未发送 API Key。",
+          cause: "缺少或空的 Authorization 头。",
+          action: "每次请求添加 Authorization: Bearer sk-tokfai_xxx。",
+          charged: "通常不扣费",
+          where: "API Keys — 复制完整 secret",
+        },
+        invalid_token: {
+          meaning: "API Key 被拒绝。",
+          cause: "密钥不完整、错误、已吊销或过期。",
+          action: "在 API Keys 复制完整密钥或新建 Key。",
+          charged: "通常不扣费",
+          where: "API Keys",
+        },
+        insufficient_credits: {
+          meaning: "余额不足。",
+          cause: "账户 credits 无法覆盖本次请求。",
+          action: "打开 Credits 或 Pricing 充值后重试。",
+          charged: "通常不扣费",
+          where: "Credits / Pricing",
+        },
+        invalid_request_error: {
+          meaning: "请求体无效。",
+          cause: "JSON 格式错误或缺少必填字段。",
+          action: "修正 JSON；Batch 确保每项有 messages。",
+          charged: "通常不扣费",
+          where: "Chat / Image / Batch API 文档",
+        },
+        invalid_prompt: {
+          meaning: "prompt 缺失或为空。",
+          cause: "Image API 要求非空 prompt。",
+          action: "发送非空 prompt 字符串。",
+          charged: "通常不扣费",
+          where: "Image API 文档",
+        },
+        invalid_image_url: {
+          meaning: "参考图 URL 无效。",
+          cause: "URL 被拦截、非 http/https 或无法访问。",
+          action: "使用公网直链图片或 Image Playground 上传。",
+          charged: "通常不扣费",
+          where: "Image API 文档 / Usage",
+        },
+        model_not_found: {
+          meaning: "模型 id 不存在。",
+          cause: "拼写错误或模型未开放。",
+          action: "使用 auto-fast 或浏览 Models。",
+          charged: "通常不扣费",
+          where: "Models",
+        },
+        model_not_available: {
+          meaning: "模型暂时不可用。",
+          cause: "上游繁忙或模型未启用。",
+          action: "改用 auto-fast 或 auto-pro；稍后重试。",
+          charged: "通常不扣费",
+          where: "Models",
+        },
+        upstream_model_busy: {
+          meaning: "上游模型负载高。",
+          cause: "请求模型负载过高。",
+          action: "退避重试或改用 auto-fast / auto-pro。",
+          charged: "通常不扣费",
+          where: "Usage（若有 request_id）/ Models",
+        },
+        upstream_timeout: {
+          meaning: "上游超时。",
+          cause: "提供商慢或请求过重。",
+          action: "稍后重试、缩短 prompt 或改用 auto-fast。",
+          charged: "通常不扣费",
+          where: "Usage",
+        },
+        upstream_error: {
+          meaning: "上游服务失败。",
+          cause: "外部 API 错误或上游响应异常。",
+          action: "退避重试；持续失败则改用 auto-fast。",
+          charged: "通常不扣费",
+          where: "Usage（request_id）/ 支持",
+        },
+        request_body_too_large: {
+          meaning: "请求体过大。",
+          cause: "JSON、prompt 或 image_urls 超限。",
+          action: "缩小 prompt、减少图片或减小 payload。",
+          charged: "通常不扣费",
+          where: "减小请求体积",
+        },
+        too_many_requests: {
+          meaning: "超过速率限制。",
+          cause: "该 Key 每分钟请求过多。",
+          action: "降速 — 分批调用或加间隔。",
+          charged: "通常不扣费",
+          where: "Usage（若已记录）",
+        },
+        too_many_concurrent_requests: {
+          meaning: "超过并发限制。",
+          cause: "并行 in-flight 请求过多。",
+          action: "降低并发 worker 或排队请求。",
+          charged: "通常不扣费",
+          where: "Usage（若已记录）",
+        },
+        gateway_overloaded: {
+          meaning: "网关暂时过载。",
+          cause: "平台负载较高。",
+          action: "稍后指数退避重试。",
+          charged: "通常不扣费",
+          where: "Usage（可能出现 request_id）",
+        },
+        batch_cancelled: {
+          meaning: "Batch 或 item 已取消。",
+          cause: "用户取消或 batch 超时。",
+          action: "如仍需要可提交新 batch。",
+          charged: "取消项不扣费",
+          where: "Batch API 文档 / 各 item Usage",
+        },
+      },
       error: {
         missing_token: "每次请求需携带 Authorization: Bearer sk-tokfai_…。",
         invalid_token: "检查密钥是否完整、未吊销且格式正确。",
