@@ -3,6 +3,7 @@
 import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
 import {
   batchCreateCurlOneLine,
+  batchItemsCurlOneLine,
   batchPollCurlOneLine,
   chatCurlOneLine,
   chatCurlPowerShellOneLine,
@@ -17,8 +18,11 @@ import {
   buildPythonChatSdkRunnableFile,
   buildPythonSdkConfigSnippet,
   buildPythonSdkRunCommand,
+  NODE_SDK_INIT_COMMAND,
   NODE_SDK_INSTALL_COMMAND,
   PYTHON_SDK_INSTALL_COMMAND,
+  PYTHON_VENV_ACTIVATE_BASH,
+  PYTHON_VENV_CREATE_COMMAND,
 } from "@/lib/customer-openai-sdk-chapter";
 import { isQuickStartKeyPlaceholder } from "@/lib/customer-quick-start-snippets";
 import { useI18n } from "@/lib/i18n/i18n-provider";
@@ -50,6 +54,7 @@ export function ClientSoftwareAcceptanceCopyPanel({
   const imageCurl = imageCurlOneLine(apiKey);
   const batchCreate = batchCreateCurlOneLine(apiKey);
   const batchPoll = batchPollCurlOneLine(apiKey);
+  const batchItems = batchItemsCurlOneLine(apiKey);
   const keyIsPlaceholder = isQuickStartKeyPlaceholder(apiKey);
 
   return (
@@ -89,6 +94,14 @@ export function ClientSoftwareAcceptanceCopyPanel({
       />
       <div className="flex flex-wrap gap-2">
         <CopyConfigAction
+          id={`${idPrefix}-node-init`}
+          value={NODE_SDK_INIT_COMMAND}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          label={t("integration.clientSoftwareNodeInitAction")}
+          copiedLabel={t("integration.copied")}
+        />
+        <CopyConfigAction
           id={`${idPrefix}-node-install`}
           value={NODE_SDK_INSTALL_COMMAND}
           copiedId={copiedId}
@@ -124,6 +137,22 @@ export function ClientSoftwareAcceptanceCopyPanel({
         className="[&_code]:max-h-48 [&_code]:whitespace-pre-wrap [&_code]:break-all"
       />
       <div className="flex flex-wrap gap-2">
+        <CopyConfigAction
+          id={`${idPrefix}-python-venv`}
+          value={PYTHON_VENV_CREATE_COMMAND}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          label={t("integration.clientSoftwarePythonVenvAction")}
+          copiedLabel={t("integration.copied")}
+        />
+        <CopyConfigAction
+          id={`${idPrefix}-python-activate`}
+          value={PYTHON_VENV_ACTIVATE_BASH}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          label={t("integration.clientSoftwarePythonActivateAction")}
+          copiedLabel={t("integration.copied")}
+        />
         <CopyConfigAction
           id={`${idPrefix}-python-install`}
           value={PYTHON_SDK_INSTALL_COMMAND}
@@ -196,6 +225,14 @@ export function ClientSoftwareAcceptanceCopyPanel({
           copiedId={copiedId}
           onCopy={onCopy}
           label={t("integration.copyOneLineBatchPollCurl")}
+          copiedLabel={t("integration.copied")}
+        />
+        <CopyConfigAction
+          id={`${idPrefix}-batch-items`}
+          value={batchItems}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          label={t("integration.copyOneLineBatchItemsCurl")}
           copiedLabel={t("integration.copied")}
         />
       </div>

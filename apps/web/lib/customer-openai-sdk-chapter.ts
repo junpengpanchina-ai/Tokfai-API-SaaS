@@ -32,22 +32,25 @@ api_key: os.environ.get("TOKFAI_API_KEY", "${apiKey}")
 model: "${model}"`;
 }
 
+export const NODE_SDK_INIT_COMMAND = "npm init -y";
 export const NODE_SDK_INSTALL_COMMAND = "npm install openai";
 
 export function buildNodeSdkRunCommand(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
-  return `TOKFAI_API_KEY=${apiKey} node tokfai-chat.mjs`;
+  return `TOKFAI_API_KEY=${apiKey} node tokfai-test.mjs`;
 }
 
+export const PYTHON_VENV_CREATE_COMMAND = "python3 -m venv .venv";
+export const PYTHON_VENV_ACTIVATE_BASH = "source .venv/bin/activate";
 export const PYTHON_SDK_INSTALL_COMMAND = "pip install openai";
 
 export function buildPythonSdkRunCommand(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
-  return `TOKFAI_API_KEY=${apiKey} python tokfai_chat.py`;
+  return `TOKFAI_API_KEY=${apiKey} python tokfai_test.py`;
 }
 
 export function buildNodeChatSdkRunnableFile(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
-  return `// Save as tokfai-chat.mjs in any folder — no Tokfai project required
-// 1) npm install openai
-// 2) TOKFAI_API_KEY=sk-tokfai_... node tokfai-chat.mjs
+  return `// Save as tokfai-test.mjs in any folder — no Tokfai project required
+// 1) npm init -y && npm install openai
+// 2) TOKFAI_API_KEY=sk-tokfai_... node tokfai-test.mjs
 import OpenAI from "openai";
 
 const client = new OpenAI({
@@ -66,10 +69,19 @@ console.log(completion.choices[0]?.message?.content);
 const tokfai = completion as typeof completion & {
   request_id?: string;
   credits_charged?: number;
-  tokfai?: { resolved_model?: string; request_id?: string; credits_charged?: number };
+  tokfai?: {
+    request_id?: string;
+    credits_charged?: number;
+    requested_model?: string;
+    resolved_model?: string;
+  };
 };
 console.log("request_id:", tokfai.request_id ?? tokfai.tokfai?.request_id);
 console.log("credits_charged:", tokfai.credits_charged ?? tokfai.tokfai?.credits_charged);
+console.log(
+  "requested_model:",
+  tokfai.tokfai?.requested_model ?? "${OPENAI_SDK_DEFAULT_MODEL}"
+);
 console.log(
   "resolved_model:",
   tokfai.tokfai?.resolved_model ?? completion.model
@@ -77,9 +89,10 @@ console.log(
 }
 
 export function buildPythonChatSdkRunnableFile(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
-  return `# Save as tokfai_chat.py in any folder — no Tokfai project required
-# 1) pip install openai
-# 2) TOKFAI_API_KEY=sk-tokfai_... python tokfai_chat.py
+  return `# Save as tokfai_test.py in any folder — no Tokfai project required
+# 1) python3 -m venv .venv && source .venv/bin/activate
+# 2) pip install openai
+# 3) TOKFAI_API_KEY=sk-tokfai_... python tokfai_test.py
 import os
 from openai import OpenAI
 
@@ -100,6 +113,7 @@ payload = completion.model_dump() if hasattr(completion, "model_dump") else {}
 tokfai = payload.get("tokfai") or {}
 print("request_id:", payload.get("request_id") or tokfai.get("request_id"))
 print("credits_charged:", payload.get("credits_charged") or tokfai.get("credits_charged"))
+print("requested_model:", tokfai.get("requested_model") or "${OPENAI_SDK_DEFAULT_MODEL}")
 print("resolved_model:", tokfai.get("resolved_model") or completion.model)`;
 }
 

@@ -1,6 +1,7 @@
 import {
   buildBatchCreateCurlMultiline,
   buildBatchCreateCurlOneLine,
+  buildBatchItemsCurlOneLine,
   buildBatchPollCurlMultiline,
   buildBatchPollCurlOneLine,
 } from "@/lib/customer-batch-api-chapter";
@@ -68,6 +69,13 @@ export function batchPollCurlOneLine(
   batchId = "batch_xxx"
 ): string {
   return buildBatchPollCurlOneLine(apiKey, batchId);
+}
+
+export function batchItemsCurlOneLine(
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
+  batchId = "batch_xxx"
+): string {
+  return buildBatchItemsCurlOneLine(apiKey, batchId);
 }
 
 /** Readable multi-line chat curl (display only — copy one-line helper for terminal). */

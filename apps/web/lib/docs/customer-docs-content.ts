@@ -1907,6 +1907,7 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
           "integration.cursorVerifyCurl",
           "integration.cursorVerifyResponseContent",
           "integration.cursorVerifyResponseRequestId",
+          "integration.cursorVerifyResponseRequestedModel",
           "integration.cursorVerifyResponseCredits",
           "integration.cursorVerifyResponseResolvedModel",
         ],
@@ -1940,6 +1941,17 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
           "integration.cursorErrorUpstreamBusy",
           "integration.cursorErrorTimeout",
           "integration.cursorErrorRateLimit",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.cursorTroubleshootTitle" },
+      {
+        type: "ordered",
+        items: [
+          "integration.cursorTroubleshootStep1",
+          "integration.cursorTroubleshootStep2",
+          "integration.cursorTroubleshootStep3",
+          "integration.cursorTroubleshootStep4",
+          "integration.cursorTroubleshootStep5",
         ],
       },
       {

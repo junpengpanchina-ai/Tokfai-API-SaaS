@@ -15,8 +15,11 @@ import {
   buildPythonSdkRunCommand,
   buildPythonChatSdkExample,
   buildNodeChatSdkExample,
+  NODE_SDK_INIT_COMMAND,
   NODE_SDK_INSTALL_COMMAND,
   PYTHON_SDK_INSTALL_COMMAND,
+  PYTHON_VENV_CREATE_COMMAND,
+  PYTHON_VENV_ACTIVATE_BASH,
 } from "@/lib/customer-openai-sdk-chapter";
 import { chatCurlOneLine } from "@/lib/customer-curl-oneline";
 import { isQuickStartKeyPlaceholder } from "@/lib/customer-quick-start-snippets";
@@ -91,6 +94,14 @@ export function OpenAiSdkChapterCopyPanel({
       />
       <div className="flex flex-wrap gap-2">
         <CopyConfigAction
+          id={`${idPrefix}-node-init`}
+          value={NODE_SDK_INIT_COMMAND}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          label={t("integration.clientSoftwareNodeInitAction")}
+          copiedLabel={t("integration.copied")}
+        />
+        <CopyConfigAction
           id={`${idPrefix}-node-install`}
           value={NODE_SDK_INSTALL_COMMAND}
           copiedId={copiedId}
@@ -136,6 +147,22 @@ export function OpenAiSdkChapterCopyPanel({
         className="[&_code]:max-h-48 [&_code]:whitespace-pre-wrap [&_code]:break-all"
       />
       <div className="flex flex-wrap gap-2">
+        <CopyConfigAction
+          id={`${idPrefix}-python-venv`}
+          value={PYTHON_VENV_CREATE_COMMAND}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          label={t("integration.clientSoftwarePythonVenvAction")}
+          copiedLabel={t("integration.copied")}
+        />
+        <CopyConfigAction
+          id={`${idPrefix}-python-activate`}
+          value={PYTHON_VENV_ACTIVATE_BASH}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          label={t("integration.clientSoftwarePythonActivateAction")}
+          copiedLabel={t("integration.copied")}
+        />
         <CopyConfigAction
           id={`${idPrefix}-python-install`}
           value={PYTHON_SDK_INSTALL_COMMAND}

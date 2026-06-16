@@ -1,7 +1,7 @@
 import { authorizationHeader } from "@/lib/customer-integration-snippets";
 import { TOKFAI_API_BASE_URL, TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
 
-export const CURSOR_PROVIDER_TYPE = "OpenAI compatible / OpenAI-style";
+export const CURSOR_PROVIDER_TYPE = "OpenAI compatible / Custom OpenAI";
 export const CURSOR_DEFAULT_MODEL = "auto-fast";
 
 export type CursorCopyField = {

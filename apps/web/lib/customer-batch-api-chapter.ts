@@ -40,6 +40,14 @@ export function buildBatchPollCurlOneLine(
   return `curl -sS ${API_ROOT}/batches/${batchId} -H "Authorization: Bearer ${apiKey}"`;
 }
 
+/** One-line curl for GET /v1/batches/{id}/items. */
+export function buildBatchItemsCurlOneLine(
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
+  batchId = BATCH_POLL_PLACEHOLDER_ID
+): string {
+  return `curl -sS ${API_ROOT}/batches/${batchId}/items -H "Authorization: Bearer ${apiKey}"`;
+}
+
 /** Readable multiline create curl (display only). */
 export function buildBatchCreateCurlMultiline(
   apiKey = TOKFAI_API_KEY_PLACEHOLDER,

@@ -2,8 +2,7 @@ import { authorizationHeader } from "@/lib/customer-integration-snippets";
 import { TOKFAI_API_BASE_URL, TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
 
 export const CHERRY_PROVIDER_NAME = "Tokfai";
-export const CHERRY_PROVIDER_TYPE =
-  "OpenAI compatible / OpenAI-style / Custom OpenAI";
+export const CHERRY_PROVIDER_TYPE = "OpenAI compatible / Custom OpenAI";
 export const CHERRY_DEFAULT_MODEL = "auto-fast";
 export const CHERRY_STREAM_FIELD_VALUE =
   "Client default; disable stream if the test fails";
