@@ -464,6 +464,11 @@ function OneTimeSecretCard({
               </Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#usage-credits">
+                {t("dashboard.apiKeys.viewUsageCreditsDocs")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/usage">
                 {t("dashboard.apiKeys.verifyUsage")}
               </Link>

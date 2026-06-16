@@ -141,7 +141,7 @@ export function CreditsContentClient({
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
-            <Link href="/dashboard/docs">
+            <Link href="/dashboard/docs#usage-credits">
               <BookOpen className="mr-1.5 h-4 w-4" />
               {t("dashboard.credits.actionDocs")}
             </Link>

@@ -481,6 +481,12 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
           { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
           { id: "models", labelKey: "integration.browseModels", href: "/dashboard/models" },
           {
+            id: "usage-credits-docs",
+            labelKey: "integration.linkUsageCreditsGuide",
+            href: "/dashboard/docs",
+            hash: "usage-credits",
+          },
+          {
             id: "batch-api",
             labelKey: "integration.demoFlowLinkBatch",
             href: "/dashboard/docs",
@@ -577,6 +583,12 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
           { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
           { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
           { id: "models", labelKey: "integration.browseModels", href: "/dashboard/models" },
+          {
+            id: "usage-credits-docs",
+            labelKey: "integration.linkUsageCreditsGuide",
+            href: "/dashboard/docs",
+            hash: "usage-credits",
+          },
           {
             id: "batch-api",
             labelKey: "integration.demoFlowLinkBatch",
@@ -727,6 +739,12 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
           },
           { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
           { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+          {
+            id: "usage-credits-docs",
+            labelKey: "integration.linkUsageCreditsGuide",
+            href: "/dashboard/docs",
+            hash: "usage-credits",
+          },
         ],
       },
     ],
@@ -751,15 +769,110 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       verify: VERIFY_USAGE_CREDITS,
     },
     blocks: [
-      { type: "paragraph", textKey: "integration.billingSuccessNote" },
-      { type: "paragraph", textKey: "integration.billingFailedNote" },
-      { type: "paragraph", textKey: "integration.billingRequestIdNote" },
-      { type: "paragraph", textKey: "integration.billingLedgerNote" },
+      { type: "paragraph", textKey: "integration.usageCreditsDifferenceTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.usageWhatIs",
+          "integration.creditsWhatIs",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.requestIdCoreNote" },
+      { type: "paragraph", textKey: "integration.usageCreditsWhatChargesTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.usageCreditsChatCharge",
+          "integration.usageCreditsImageCharge",
+          "integration.usageCreditsBatchCharge",
+          "integration.usageCreditsFailedNote",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.usageCreditsCustomerPathTitle" },
+      {
+        type: "ordered",
+        items: [
+          "integration.usageCreditsPathStep1",
+          "integration.usageCreditsPathStep2",
+          "integration.usageCreditsPathStep3",
+          "integration.usageCreditsPathStep4",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.usagePageFieldsTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.usageFieldRequestId",
+          "integration.usageFieldModel",
+          "integration.usageFieldStatus",
+          "integration.usageFieldPromptTokens",
+          "integration.usageFieldCompletionTokens",
+          "integration.usageFieldTotalTokens",
+          "integration.usageFieldCreditsCharged",
+          "integration.usageFieldCreatedAt",
+          "integration.usageFieldErrorCode",
+          "integration.usageFieldErrorMessage",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.creditsPageFieldsTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.creditsFieldBalance",
+          "integration.creditsFieldLedgerEntry",
+          "integration.creditsFieldAmount",
+          "integration.creditsFieldBalanceAfter",
+          "integration.creditsFieldReason",
+          "integration.creditsFieldReference",
+          "integration.creditsFieldCreatedAt",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.failedRequestTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.failedRequestStep1",
+          "integration.failedRequestStep2",
+          "integration.failedRequestStep3",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.insufficientCreditsTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.insufficientCreditsStep1",
+          "integration.insufficientCreditsStep2",
+          "integration.insufficientCreditsStep3",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.batchReconcileDocsTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.batchReconcileDocsSum",
+          "integration.batchReconcileDocsFailed",
+          "integration.batchReconcileDocsRequestId",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.reconcileExampleTitle" },
+      {
+        type: "ordered",
+        items: [
+          "integration.reconcileExampleStep1",
+          "integration.reconcileExampleStep2",
+          "integration.reconcileExampleStep3",
+        ],
+      },
       {
         type: "dashboard-links",
         links: [
           { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
           { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+          {
+            id: "pricing",
+            labelKey: "integration.linkTopUp",
+            href: "/pricing",
+          },
         ],
       },
     ],

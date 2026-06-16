@@ -598,6 +598,7 @@ export const messages = {
         viewChatApiDocs: "View Chat API docs",
         viewImageApiDocs: "View Image API docs",
         viewBatchApiDocs: "View Batch API docs",
+        viewUsageCreditsDocs: "Usage & Credits guide",
         verifyUsage: "Verify in Usage",
         verifyCredits: "Verify in Credits",
         cursorGuide: "Cursor guide",
@@ -1828,13 +1829,13 @@ export const messages = {
       batchChapterFailure:
         "See common errors below — batch_cancelled items not charged; match request_id in Usage / Credits.",
       usageChapterPurpose:
-        "Reconcile every API call against balance changes.",
+        "Understand Usage vs Credits and reconcile every API call by request_id.",
       usageChapterCopy:
-        "request_id from each API response — search it in Usage and Credits.",
+        "request_id from each API response — search Usage, then match debits in Credits.",
       usageChapterVerify:
-        "Usage row matches tokens/model/credits; Credits ledger debits align for succeeded calls.",
+        "Usage row matches model, status, tokens, credits_charged; Credits ledger reference matches the same request_id.",
       usageChapterFailure:
-        "No Usage row — wrong key or call never succeeded; compare error.code and request_id when present.",
+        "No Usage row — wrong key or call never reached Tokfai; check error.code and request_id when present.",
       errorsChapterPurpose:
         "Decode API errors using stable error.code values.",
       errorsChapterCopy:
@@ -2022,9 +2023,9 @@ export const messages = {
         "Stable error.code values in JSON responses. Use request_id from the response or Usage when troubleshooting.",
       codeColumn: "Code",
       meaningColumn: "What to do",
-      billingTitle: "Billing & Usage",
+      billingTitle: "Usage & Credits",
       billingDesc:
-        "Track balance and per-request usage in Usage and Credits.",
+        "Usage is per-request API history; Credits is your balance ledger. Reconcile with request_id.",
       billingSuccessNote:
         "Successful API requests debit credits according to model pricing and token usage.",
       billingFailedNote:
@@ -2035,6 +2036,93 @@ export const messages = {
         "Credits shows your balance changes — use it with Usage to reconcile each request_id.",
       linkUsage: "Open Usage",
       linkCredits: "Open Credits",
+      linkTopUp: "Top up credits",
+      linkUsageCreditsGuide: "Usage & Credits guide",
+      usageCreditsDifferenceTitle: "Usage vs Credits:",
+      usageWhatIs:
+        "Usage — per-request API call log. One row per request. Search by request_id to see model, status, tokens, and credits_charged.",
+      creditsWhatIs:
+        "Credits — balance ledger. Shows top-ups, bonuses, and usage debits with balance_after after each change.",
+      requestIdCoreNote:
+        "request_id is the reconciliation key. Copy it from any API response (Chat, Image, or each Batch item) and search it in Usage and Credits.",
+      usageCreditsWhatChargesTitle: "What creates Usage and debits Credits:",
+      usageCreditsChatCharge:
+        "Chat — successful POST /v1/chat/completions adds a Usage row and debits credits.",
+      usageCreditsImageCharge:
+        "Image — successful POST /v1/images/generations adds a Usage row and debits credits.",
+      usageCreditsBatchCharge:
+        "Batch — each succeeded item has its own request_id, Usage row, and credit debit.",
+      usageCreditsFailedNote:
+        "failed, cancelled, and invalid requests are usually logged without charging credits (credits_charged empty or 0).",
+      usageCreditsCustomerPathTitle: "Customer reconciliation path:",
+      usageCreditsPathStep1:
+        "API call succeeds — copy request_id from the JSON response (or from each Batch item).",
+      usageCreditsPathStep2:
+        "Open Usage — search or find the row with the same request_id.",
+      usageCreditsPathStep3:
+        "Confirm status succeeded, model, tokens (chat), and credits_charged.",
+      usageCreditsPathStep4:
+        "Open Credits — find the ledger debit with the same reference / request_id and matching amount.",
+      usagePageFieldsTitle: "On the Usage page, check:",
+      usageFieldRequestId:
+        "request_id — copy and search; matches the API response id.",
+      usageFieldModel: "model — model id used for the request.",
+      usageFieldStatus:
+        "status — succeeded, failed, pending, etc.",
+      usageFieldPromptTokens:
+        "prompt_tokens (input) — chat input tokens (image rows may show image generation).",
+      usageFieldCompletionTokens:
+        "completion_tokens (output) — chat output tokens.",
+      usageFieldTotalTokens: "total_tokens — sum when applicable.",
+      usageFieldCreditsCharged:
+        "credits_charged — credits debited for this request (0 or empty when not charged).",
+      usageFieldCreatedAt: "created_at (When column) — request timestamp.",
+      usageFieldErrorCode:
+        "error_code — when status is failed, the machine-readable error code.",
+      usageFieldErrorMessage:
+        "error_message — read from the API JSON error body when the HTTP status is not 200/202.",
+      creditsPageFieldsTitle: "On the Credits page, check:",
+      creditsFieldBalance:
+        "Current balance — your available credits at the top of the page.",
+      creditsFieldLedgerEntry:
+        "Ledger entry — each row in Credit ledger (top-up, usage debit, bonus, etc.).",
+      creditsFieldAmount:
+        "amount — positive for top-ups, negative for usage debits.",
+      creditsFieldBalanceAfter:
+        "balance_after — balance immediately after this ledger entry.",
+      creditsFieldReason:
+        "reason — e.g. Chat API usage, Image generation, Stripe top-up.",
+      creditsFieldReference:
+        "reference — often the same request_id as Usage (copy to cross-check).",
+      creditsFieldCreatedAt: "created_at — when the ledger entry was recorded.",
+      failedRequestTitle: "When a request fails:",
+      failedRequestStep1:
+        "If HTTP is not 200/202, read error.code in the JSON body first.",
+      failedRequestStep2:
+        "If the response includes request_id, search it in Usage — failed rows are usually not charged.",
+      failedRequestStep3:
+        "If credits_charged is missing or 0, the request was typically not billed.",
+      insufficientCreditsTitle: "When you see insufficient_credits:",
+      insufficientCreditsStep1:
+        "Your balance is too low for the next request.",
+      insufficientCreditsStep2:
+        "Open Credits or Pricing — top up credits.",
+      insufficientCreditsStep3:
+        "After top-up completes, retry the API call with the same key.",
+      batchReconcileDocsTitle: "Batch reconciliation:",
+      batchReconcileDocsSum:
+        "Batch credits_charged (summary) should equal the sum of succeeded item credits_charged values.",
+      batchReconcileDocsFailed:
+        "failed and cancelled items should not add to your balance debit.",
+      batchReconcileDocsRequestId:
+        "Each succeeded item has its own request_id — reconcile each one in Usage and Credits.",
+      reconcileExampleTitle: "Example (placeholder ids only):",
+      reconcileExampleStep1:
+        "Chat returns request_id req_abc123xyz and credits_charged 0.0012 in the JSON.",
+      reconcileExampleStep2:
+        "Usage row for req_abc123xyz shows status succeeded, model auto-fast, credits_charged 0.0012.",
+      reconcileExampleStep3:
+        "Credits ledger shows a usage debit with reference req_abc123xyz and the same amount; balance_after updates accordingly.",
       batchTitle: "Batch API",
       batchDesc:
         "Bulk chat jobs via POST https://api.tokfai.com/v1/batches/chat — poll GET https://api.tokfai.com/v1/batches/{id}. Same API Key as Chat.",
@@ -3196,6 +3284,7 @@ export const messages = {
         viewChatApiDocs: "查看 Chat API 文档",
         viewImageApiDocs: "查看 Image API 文档",
         viewBatchApiDocs: "查看 Batch API 文档",
+        viewUsageCreditsDocs: "Usage / Credits 指南",
         verifyUsage: "在 Usage 核对",
         verifyCredits: "在 Credits 核对",
         cursorGuide: "Cursor 接入指南",
@@ -4372,13 +4461,13 @@ export const messages = {
       batchChapterFailure:
         "见下方常见错误 — batch_cancelled 不扣费；在 Usage / Credits 按 request_id 对账。",
       usageChapterPurpose:
-        "把每次 API 调用与余额变化对齐。",
+        "理解 Usage 与 Credits 的区别，并用 request_id 对账每次 API 调用。",
       usageChapterCopy:
-        "从每次 API 响应复制 request_id，在 Usage 与 Credits 中搜索。",
+        "从 API 响应复制 request_id — 在 Usage 搜索，再在 Credits 核对扣费。",
       usageChapterVerify:
-        "Usage 行与 tokens/模型/扣费一致；Credits 账本与成功调用对齐。",
+        "Usage 行与 model、status、tokens、credits_charged 一致；Credits 账本 reference 与同一 request_id 匹配。",
       usageChapterFailure:
-        "Usage 无记录 — 密钥错误或调用未成功；对照 error.code 与 request_id。",
+        "Usage 无记录 — 密钥错误或请求未到达 Tokfai；对照 error.code 与 request_id。",
       errorsChapterPurpose:
         "读懂 API 错误，无需内部文档。",
       errorsChapterCopy:
@@ -4563,8 +4652,9 @@ export const messages = {
         "JSON 响应中的稳定 error.code。请结合 request_id 或在 Usage 中排查。",
       codeColumn: "错误码",
       meaningColumn: "处理建议",
-      billingTitle: "计费与用量",
-      billingDesc: "在 Usage 与 Credits 查看余额与每次请求用量。",
+      billingTitle: "Usage 与 Credits",
+      billingDesc:
+        "Usage 是每次 API 调用明细；Credits 是余额账本。用 request_id 对账。",
       billingSuccessNote:
         "成功的 API 请求按模型定价与 token 用量扣除积分。",
       billingFailedNote:
@@ -4575,6 +4665,83 @@ export const messages = {
         "Credits 显示余额变化记录 — 与 Usage 配合按 request_id 对账。",
       linkUsage: "打开 Usage",
       linkCredits: "打开 Credits",
+      linkTopUp: "充值 credits",
+      linkUsageCreditsGuide: "Usage / Credits 指南",
+      usageCreditsDifferenceTitle: "Usage 与 Credits 的区别：",
+      usageWhatIs:
+        "Usage — 每次 API 调用的请求级明细。按 request_id 搜索可查看 model、status、tokens、credits_charged。",
+      creditsWhatIs:
+        "Credits — 余额账本。记录充值、赠送与用量扣减，每条显示 balance_after。",
+      requestIdCoreNote:
+        "request_id 是对账核心。从 API 响应（Chat、Image 或每个 Batch item）复制，在 Usage 与 Credits 中搜索。",
+      usageCreditsWhatChargesTitle: "什么会产生 Usage 并扣 Credits：",
+      usageCreditsChatCharge:
+        "Chat — 成功的 POST /v1/chat/completions 产生 Usage 行并扣 credits。",
+      usageCreditsImageCharge:
+        "Image — 成功的 POST /v1/images/generations 产生 Usage 行并扣 credits。",
+      usageCreditsBatchCharge:
+        "Batch — 每个成功的 item 有独立 request_id、Usage 行与扣费。",
+      usageCreditsFailedNote:
+        "failed、cancelled 与 invalid 请求通常有记录但不扣费（credits_charged 为空或 0）。",
+      usageCreditsCustomerPathTitle: "客户对账路径：",
+      usageCreditsPathStep1:
+        "API 调用成功 — 从 JSON 响应复制 request_id（或每个 Batch item 的 request_id）。",
+      usageCreditsPathStep2: "打开 Usage — 搜索相同 request_id。",
+      usageCreditsPathStep3:
+        "核对 status succeeded、model、tokens（对话）与 credits_charged。",
+      usageCreditsPathStep4:
+        "打开 Credits — 找到相同 reference / request_id 的账本扣费与金额。",
+      usagePageFieldsTitle: "Usage 页面字段：",
+      usageFieldRequestId: "request_id — 复制搜索；与 API 响应 id 一致。",
+      usageFieldModel: "model — 本次请求使用的模型 id。",
+      usageFieldStatus: "status — succeeded、failed、pending 等。",
+      usageFieldPromptTokens:
+        "prompt_tokens（输入）— 对话输入 tokens（图像行可能显示 image generation）。",
+      usageFieldCompletionTokens: "completion_tokens（输出）— 对话输出 tokens。",
+      usageFieldTotalTokens: "total_tokens — 合计（如适用）。",
+      usageFieldCreditsCharged:
+        "credits_charged — 本次扣费（未扣费时为空或 0）。",
+      usageFieldCreatedAt: "created_at（When 列）— 请求时间。",
+      usageFieldErrorCode:
+        "error_code — status 为 failed 时的机器可读错误码。",
+      usageFieldErrorMessage:
+        "error_message — HTTP 非 200/202 时从 API JSON 错误体读取。",
+      creditsPageFieldsTitle: "Credits 页面字段：",
+      creditsFieldBalance: "Current balance — 页面顶部当前可用 credits。",
+      creditsFieldLedgerEntry:
+        "Ledger entry — Credit ledger 中每一行（充值、扣费、赠送等）。",
+      creditsFieldAmount: "amount — 充值为正，用量扣减为负。",
+      creditsFieldBalanceAfter: "balance_after — 该条账本记录后的余额。",
+      creditsFieldReason:
+        "reason — 如 Chat API usage、Image generation、Stripe top-up。",
+      creditsFieldReference:
+        "reference — 通常与 Usage 的 request_id 相同（可复制交叉核对）。",
+      creditsFieldCreatedAt: "created_at — 账本记录时间。",
+      failedRequestTitle: "请求失败时：",
+      failedRequestStep1:
+        "若 HTTP 非 200/202，先读 JSON 中的 error.code。",
+      failedRequestStep2:
+        "若响应含 request_id，在 Usage 搜索 — 失败行通常不扣费。",
+      failedRequestStep3:
+        "若 credits_charged 缺失或为 0，通常未计费。",
+      insufficientCreditsTitle: "出现 insufficient_credits 时：",
+      insufficientCreditsStep1: "余额不足以完成下一次请求。",
+      insufficientCreditsStep2: "打开 Credits 或 Pricing — 充值 credits。",
+      insufficientCreditsStep3: "充值完成后，用同一 Key 重试 API 调用。",
+      batchReconcileDocsTitle: "Batch 对账：",
+      batchReconcileDocsSum:
+        "Batch 汇总的 credits_charged 应等于所有成功 item 的 credits_charged 之和。",
+      batchReconcileDocsFailed:
+        "failed 与 cancelled 的 item 不应计入余额扣减。",
+      batchReconcileDocsRequestId:
+        "每个成功 item 有独立 request_id — 在 Usage 与 Credits 分别对账。",
+      reconcileExampleTitle: "对账示例（仅占位 id）：",
+      reconcileExampleStep1:
+        "Chat 返回 request_id req_abc123xyz，JSON 中 credits_charged 0.0012。",
+      reconcileExampleStep2:
+        "Usage 中 req_abc123xyz 行显示 status succeeded、model auto-fast、credits_charged 0.0012。",
+      reconcileExampleStep3:
+        "Credits 账本显示 reference req_abc123xyz 的用量扣费，金额相同，balance_after 相应更新。",
       batchTitle: "Batch API",
       batchDesc:
         "批量对话任务 — POST https://api.tokfai.com/v1/batches/chat，轮询 GET https://api.tokfai.com/v1/batches/{id}。与 Chat 共用 API Key。",
