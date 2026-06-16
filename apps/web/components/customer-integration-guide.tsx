@@ -13,6 +13,7 @@ import { BatchApiChapterCopyPanel } from "@/components/batch-api-chapter-copy";
 import { ErrorCodesChapterPanel } from "@/components/error-codes-chapter-panel";
 import { ChatApiChapterCopyPanel } from "@/components/chat-api-chapter-copy";
 import { ImageApiChapterCopyPanel } from "@/components/image-api-chapter-copy";
+import { OpenAiSdkChapterCopyPanel } from "@/components/openai-sdk-chapter-copy";
 import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,6 +54,10 @@ import {
   resolveDocImageCurlDisplay,
   resolveDocBatchCreateCurlDisplay,
   resolveDocBatchPollCurlDisplay,
+  resolveDocOpenAiJsDisplay,
+  resolveDocOpenAiNodeBatchDisplay,
+  resolveDocOpenAiPythonBatchDisplay,
+  resolveDocOpenAiPythonDisplay,
 } from "@/lib/customer-quick-start-snippets";
 import { modelsVerifyCurlMultiline } from "@/lib/customer-api-key-chapter";
 import { useQuickStartApiKey } from "@/lib/use-quick-start-api-key";
@@ -258,26 +263,6 @@ function DocSectionCard({
           quickStartApiKey={quickStartApiKey}
         />
         <ChapterGuidePanel guide={section.chapterGuide} t={t} />
-        {section.id === "openai-sdk" ? (
-          <div className="flex flex-wrap gap-2">
-            <CopyConfigAction
-              id="sdk-copy-config"
-              value={CUSTOMER_DOC_SNIPPET_COPY["openai-sdk-config"]}
-              copiedId={copiedId}
-              onCopy={onCopy}
-              label={t("integration.copyConfig")}
-              copiedLabel={t("integration.copied")}
-            />
-            <CopyConfigAction
-              id="sdk-copy-curl"
-              value={resolveDocCurlSnippetCopy("chat-curl", quickStartApiKey)}
-              copiedId={copiedId}
-              onCopy={onCopy}
-              label={t("integration.copyOneLineCurl")}
-              copiedLabel={t("integration.copied")}
-            />
-          </div>
-        ) : null}
         {section.id === "cursor-integration" ? (
           <div className="flex flex-wrap gap-2">
             <CopyConfigAction
@@ -359,6 +344,7 @@ function DocBlock({
       );
     case "code":
       const isCurlSnippet = block.snippetKey.includes("curl");
+      const isOpenAiSnippet = block.snippetKey.startsWith("openai-");
       const displayCode =
         block.snippetKey === "chat-curl" &&
         (sectionId === "quick-start" || sectionId === "chat-api")
@@ -375,10 +361,19 @@ function DocBlock({
                   ? undefined
                   : quickStartApiKey
               )
-            : CUSTOMER_DOC_SNIPPET_DISPLAY[block.snippetKey];
-      const copyValue = isCurlSnippet
-        ? resolveDocCurlSnippetCopy(block.snippetKey, quickStartApiKey)
-        : CUSTOMER_DOC_SNIPPET_COPY[block.snippetKey];
+            : block.snippetKey === "openai-js" && sectionId === "openai-sdk"
+              ? resolveDocOpenAiJsDisplay(quickStartApiKey)
+              : block.snippetKey === "openai-python" && sectionId === "openai-sdk"
+                ? resolveDocOpenAiPythonDisplay(quickStartApiKey)
+                : block.snippetKey === "openai-node-batch" && sectionId === "openai-sdk"
+                  ? resolveDocOpenAiNodeBatchDisplay(quickStartApiKey)
+                  : block.snippetKey === "openai-python-batch" && sectionId === "openai-sdk"
+                    ? resolveDocOpenAiPythonBatchDisplay(quickStartApiKey)
+                    : CUSTOMER_DOC_SNIPPET_DISPLAY[block.snippetKey];
+      const copyValue =
+        isCurlSnippet || isOpenAiSnippet
+          ? resolveDocCurlSnippetCopy(block.snippetKey, quickStartApiKey)
+          : CUSTOMER_DOC_SNIPPET_COPY[block.snippetKey];
       const copyLabel = isCurlSnippet
         ? t("integration.copyOneLineCurl")
         : block.snippetKey.includes("config")
@@ -389,7 +384,7 @@ function DocBlock({
           id={block.id}
           label={block.label}
           code={displayCode}
-          copyValue={isCurlSnippet ? copyValue : undefined}
+          copyValue={isCurlSnippet || isOpenAiSnippet ? copyValue : undefined}
           copied={copiedId === block.id}
           onCopy={onCopy}
           copyLabel={copyLabel}
@@ -481,6 +476,17 @@ function DocBlock({
               idPrefix={block.id}
             />
           </div>
+        </div>
+      );
+    case "openai-sdk-copy-panel":
+      return (
+        <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
+          <OpenAiSdkChapterCopyPanel
+            apiKey={quickStartApiKey}
+            copiedId={copiedId}
+            onCopy={onCopy}
+            idPrefix={block.id}
+          />
         </div>
       );
     case "api-key-copy-panel":
@@ -609,10 +615,7 @@ function ChapterNowPanel({
         {copySnippetKey ? (
           <CopyConfigAction
             id={copyId}
-            value={resolveDocCurlSnippetCopy(
-              copySnippetKey,
-              isCurlCopy ? quickStartApiKey : undefined
-            )}
+            value={resolveDocCurlSnippetCopy(copySnippetKey, quickStartApiKey)}
             copiedId={copiedId}
             onCopy={onCopy}
             label={
@@ -633,9 +636,15 @@ function ChapterNowPanel({
           </Button>
         ))}
       </div>
-      {isCurlCopy ? (
+      {isCurlCopy || copySnippetKey === "openai-sdk-config" ? (
         <p className="mt-2 text-xs text-muted-foreground">
-          {t("integration.placeholderKeyNote")}
+          {isQuickStartKeyPlaceholder(quickStartApiKey)
+            ? t("integration.placeholderKeyNote")
+            : t(
+                copySnippetKey === "openai-sdk-config"
+                  ? "integration.sdkLiveKeyNote"
+                  : "integration.apiKeyLiveKeyNote"
+              )}
         </p>
       ) : null}
     </div>

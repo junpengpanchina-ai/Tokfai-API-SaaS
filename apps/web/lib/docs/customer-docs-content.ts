@@ -30,8 +30,10 @@ import {
   OPENAI_SDK_CONFIG_SNIPPET,
 } from "@/lib/customer-integration-snippets";
 import {
-  CUSTOMER_DOC_ERROR_CODES,
-} from "@/lib/customer-error-codes-chapter";
+  buildNodeBatchFetchExample,
+  buildPythonBatchRequestsExample,
+} from "@/lib/customer-openai-sdk-chapter";
+import { CUSTOMER_DOC_ERROR_CODES } from "@/lib/customer-error-codes-chapter";
 
 export type CustomerDocSnippetKey =
   | "chat-curl"
@@ -43,6 +45,8 @@ export type CustomerDocSnippetKey =
   | "openai-sdk-config"
   | "openai-js"
   | "openai-python"
+  | "openai-node-batch"
+  | "openai-python-batch"
   | "cursor-config"
   | "cherry-config";
 
@@ -56,6 +60,8 @@ export const CUSTOMER_DOC_SNIPPET_DISPLAY: Record<CustomerDocSnippetKey, string>
   "openai-sdk-config": OPENAI_SDK_CONFIG_SNIPPET,
   "openai-js": OPENAI_JS_SNIPPET,
   "openai-python": OPENAI_PYTHON_SNIPPET,
+  "openai-node-batch": buildNodeBatchFetchExample(),
+  "openai-python-batch": buildPythonBatchRequestsExample(),
   "cursor-config": CURSOR_CONFIG_SNIPPET,
   "cherry-config": CHERRY_STUDIO_CONFIG_SNIPPET,
 };
@@ -70,6 +76,8 @@ export const CUSTOMER_DOC_SNIPPET_COPY: Record<CustomerDocSnippetKey, string> = 
   "openai-sdk-config": OPENAI_SDK_CONFIG_SNIPPET,
   "openai-js": OPENAI_JS_SNIPPET,
   "openai-python": OPENAI_PYTHON_SNIPPET,
+  "openai-node-batch": buildNodeBatchFetchExample(),
+  "openai-python-batch": buildPythonBatchRequestsExample(),
   "cursor-config": CURSOR_CONFIG_SNIPPET,
   "cherry-config": CHERRY_STUDIO_CONFIG_SNIPPET,
 };
@@ -96,6 +104,7 @@ export type CustomerDocBlock =
   | { type: "api-key-copy-panel"; id: string }
   | { type: "api-key-errors" }
   | { type: "copy-fields"; id: string; fields: CustomerDocCopyField[] }
+  | { type: "openai-sdk-copy-panel"; id: string }
   | { type: "error-table" }
   | { type: "error-examples-panel"; id: string }
   | { type: "model-list" }
@@ -1019,24 +1028,100 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       verify: VERIFY_USAGE_CREDITS,
     },
     blocks: [
-      { type: "paragraph", textKey: "integration.placeholderKeyNote" },
-      {
-        type: "code",
-        id: "sdk-config",
-        label: "config",
-        snippetKey: "openai-sdk-config",
-      },
+      { type: "paragraph", textKey: "integration.sdkGatewayNote" },
+      { type: "paragraph", textKey: "integration.sdkYourProjectNote" },
+      { type: "openai-sdk-copy-panel", id: "openai-sdk-copy" },
+      { type: "paragraph", textKey: "integration.sdkNodeTitle" },
       {
         type: "code",
         id: "openai-js",
-        label: "javascript",
+        label: "Node.js / TypeScript",
         snippetKey: "openai-js",
       },
+      { type: "paragraph", textKey: "integration.sdkPythonTitle" },
       {
         type: "code",
         id: "openai-python",
-        label: "python",
+        label: "Python",
         snippetKey: "openai-python",
+      },
+      { type: "paragraph", textKey: "integration.sdkImageTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.sdkImageSdkNote",
+          "integration.sdkImageCurlNote",
+          "integration.sdkImageResponseNote",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.sdkBatchTitle" },
+      { type: "paragraph", textKey: "integration.sdkBatchExtensionNote" },
+      {
+        type: "code",
+        id: "openai-node-batch",
+        label: "Node fetch batch",
+        snippetKey: "openai-node-batch",
+      },
+      {
+        type: "code",
+        id: "openai-python-batch",
+        label: "Python requests batch",
+        snippetKey: "openai-python-batch",
+      },
+      { type: "paragraph", textKey: "integration.sdkReconcileTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.sdkReconcileRequestId",
+          "integration.sdkReconcileCredits",
+          "integration.sdkReconcileResolvedModel",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.sdkBillingTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.sdkBillingSuccess",
+          "integration.sdkBillingFailed",
+          "integration.sdkBillingVerify",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.sdkErrorsTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.sdkErrorAuth",
+          "integration.sdkErrorCredits",
+          "integration.sdkErrorModel",
+          "integration.sdkErrorUpstreamBusy",
+          "integration.sdkErrorTimeout",
+          "integration.sdkErrorRateLimit",
+        ],
+      },
+      {
+        type: "dashboard-links",
+        links: [
+          { id: "keys", labelKey: "integration.demoFlowLinkKeys", href: "/dashboard/api-keys" },
+          {
+            id: "playground",
+            labelKey: "integration.demoFlowLinkPlayground",
+            href: "/dashboard/playground",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+          {
+            id: "error-codes-docs",
+            labelKey: "integration.linkErrorCodesGuide",
+            href: "/dashboard/docs",
+            hash: "error-codes",
+          },
+          {
+            id: "usage-credits-docs",
+            labelKey: "integration.linkUsageCreditsGuide",
+            href: "/dashboard/docs",
+            hash: "usage-credits",
+          },
+        ],
       },
     ],
   },

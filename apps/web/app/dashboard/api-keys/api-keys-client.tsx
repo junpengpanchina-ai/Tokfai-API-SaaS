@@ -39,7 +39,8 @@ import {
   type CreateApiKeyResponse,
   type MeApiKeyMetadata,
 } from "@/lib/dmit/client";
-import { isFullTokfaiApiKey } from "@/lib/tokfai-api";
+import { buildOpenAiSdkConfigSnippet } from "@/lib/customer-openai-sdk-chapter";
+import { isFullTokfaiApiKey, TOKFAI_API_BASE_URL, TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
 import {
   userMessageForDashboardError,
   userMessageForDmitError,
@@ -54,10 +55,6 @@ import {
   setQuickStartApiKeySecret,
   clearQuickStartApiKeySecret,
 } from "@/lib/customer-quick-start-key-session";
-import {
-  TOKFAI_API_BASE_URL,
-  TOKFAI_API_KEY_PLACEHOLDER,
-} from "@/lib/tokfai-api";
 
 export interface ApiKeyListItem {
   id: string;
@@ -464,6 +461,11 @@ function OneTimeSecretCard({
               </Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#openai-sdk">
+                {t("dashboard.apiKeys.openAiSdkGuide")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/docs#usage-credits">
                 {t("dashboard.apiKeys.viewUsageCreditsDocs")}
               </Link>
@@ -531,6 +533,19 @@ function OneTimeSecretCard({
                 {t("dashboard.apiKeys.copyFullKey")}
               </>
             )}
+          </Button>
+          <CopyConfigAction
+            id="one-time-secret-copy-sdk-config"
+            value={buildOpenAiSdkConfigSnippet(secret)}
+            copiedId={snippetCopiedId}
+            onCopy={handleSnippetCopy}
+            label={t("dashboard.apiKeys.copySdkConfig")}
+            copiedLabel={t("dashboard.apiKeys.copied")}
+          />
+          <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
+            <Link href="/dashboard/docs#openai-sdk">
+              {t("dashboard.apiKeys.openAiSdkGuide")}
+            </Link>
           </Button>
           <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
             <Link href="/dashboard/docs#api-key">

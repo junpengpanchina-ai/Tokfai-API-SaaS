@@ -7,6 +7,13 @@ import {
   modelsCurlOneLine,
 } from "@/lib/customer-curl-oneline";
 import {
+  buildNodeBatchFetchExample,
+  buildNodeChatSdkExample,
+  buildOpenAiSdkConfigSnippet,
+  buildPythonBatchRequestsExample,
+  buildPythonChatSdkExample,
+} from "@/lib/customer-openai-sdk-chapter";
+import {
   buildBatchCreateCurlMultiline,
   buildBatchPollCurlMultiline,
 } from "@/lib/customer-batch-api-chapter";
@@ -60,6 +67,16 @@ export function resolveDocCurlSnippetCopy(
       return batchCreateCurlOneLine(key);
     case "batch-poll-curl":
       return batchPollCurlOneLine(key);
+    case "openai-sdk-config":
+      return buildOpenAiSdkConfigSnippet(key);
+    case "openai-js":
+      return buildNodeChatSdkExample(key);
+    case "openai-python":
+      return buildPythonChatSdkExample(key);
+    case "openai-node-batch":
+      return buildNodeBatchFetchExample(key);
+    case "openai-python-batch":
+      return buildPythonBatchRequestsExample(key);
     default:
       return CUSTOMER_DOC_SNIPPET_COPY[snippetKey];
   }
@@ -85,4 +102,20 @@ export function resolveDocBatchCreateCurlDisplay(explicitKey?: string | null): s
 
 export function resolveDocBatchPollCurlDisplay(explicitKey?: string | null): string {
   return buildBatchPollCurlMultiline(resolveQuickStartApiKey(explicitKey));
+}
+
+export function resolveDocOpenAiJsDisplay(explicitKey?: string | null): string {
+  return buildNodeChatSdkExample(resolveQuickStartApiKey(explicitKey));
+}
+
+export function resolveDocOpenAiPythonDisplay(explicitKey?: string | null): string {
+  return buildPythonChatSdkExample(resolveQuickStartApiKey(explicitKey));
+}
+
+export function resolveDocOpenAiNodeBatchDisplay(explicitKey?: string | null): string {
+  return buildNodeBatchFetchExample(resolveQuickStartApiKey(explicitKey));
+}
+
+export function resolveDocOpenAiPythonBatchDisplay(explicitKey?: string | null): string {
+  return buildPythonBatchRequestsExample(resolveQuickStartApiKey(explicitKey));
 }

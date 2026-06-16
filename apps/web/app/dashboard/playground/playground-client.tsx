@@ -951,6 +951,11 @@ function ResponsePanel({
                   copiedLabel={t("dashboard.usage.copiedRequestId")}
                 />
                 <Button asChild variant="outline" size="sm">
+                  <Link href="/dashboard/docs#openai-sdk">
+                    {t("dashboard.playground.viewOpenAiSdkDocs")}
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="sm">
                   <Link href="/dashboard/docs#chat-api">
                     {t("dashboard.playground.viewChatApiDocs")}
                   </Link>
@@ -1115,6 +1120,10 @@ function UsageDetails({
 
 function PlaygroundFooter({ t }: { t: (key: string) => string }) {
   const links = [
+    {
+      href: "/dashboard/docs#openai-sdk",
+      label: t("dashboard.playground.viewOpenAiSdkDocs"),
+    },
     {
       href: "/dashboard/docs#chat-api",
       label: t("dashboard.playground.viewChatApiDocs"),

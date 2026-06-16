@@ -596,6 +596,7 @@ export const messages = {
         tryChatPlayground: "Try Chat Playground",
         tryImagePlayground: "Try Image Playground",
         viewChatApiDocs: "View Chat API docs",
+        viewOpenAiSdkDocs: "View OpenAI SDK docs",
         viewImageApiDocs: "View Image API docs",
         viewBatchApiDocs: "View Batch API docs",
         viewUsageCreditsDocs: "Usage & Credits guide",
@@ -804,6 +805,7 @@ export const messages = {
           "Copy request_id and search it in Usage and Credits to reconcile this call.",
         copyRequestId: "Copy request_id",
         viewChatApiDocs: "Chat API docs",
+        viewOpenAiSdkDocs: "OpenAI SDK docs",
         viewErrorCodesDocs: "Error codes docs",
         viewUsage: "View Usage",
         viewCredits: "View Credits",
@@ -1897,6 +1899,60 @@ export const messages = {
         "SDK call returns completion with request_id; Usage shows the call.",
       sdkChapterFailure:
         "Same codes as Chat API — invalid_token, insufficient_credits; check request_id in Usage.",
+      sdkGatewayNote:
+        "Tokfai uses OpenAI-compatible request format. Base URL is https://api.tokfai.com/v1. API Key format is sk-tokfai_xxx. Recommended model: auto-fast. The same key works for Chat, Image, and Batch.",
+      sdkYourProjectNote:
+        "Run these examples from your own project, terminal, server, script, or IDE — no Tokfai repository or special setup required.",
+      sdkCopyNowTitle: "You can copy now",
+      sdkCopyConfigLabel: "OpenAI SDK config (Base URL + API Key + model)",
+      sdkCopyNodeChatLabel: "Node.js chat example",
+      sdkCopyPythonChatLabel: "Python chat example",
+      sdkCopyNodeBatchLabel: "Node fetch batch example",
+      sdkCopyPythonBatchLabel: "Python requests batch example",
+      sdkCopyImageCurlLabel: "Image API one-line curl",
+      sdkCopyNodeChatAction: "Copy Node chat example",
+      sdkCopyPythonChatAction: "Copy Python chat example",
+      sdkCopyNodeBatchAction: "Copy Node batch example",
+      sdkCopyPythonBatchAction: "Copy Python batch example",
+      sdkLiveKeyNote:
+        "Your API key from this session is already filled in these examples.",
+      sdkNodeTitle: "Node.js / TypeScript — install with npm install openai",
+      sdkPythonTitle: "Python — install with pip install openai",
+      sdkImageTitle: "Image generation",
+      sdkImageSdkNote:
+        "OpenAI SDK support for the image endpoint varies by SDK version — verify against your installed package.",
+      sdkImageCurlNote:
+        "We recommend curl or fetch for POST /v1/images/generations so the body matches Tokfai's schema.",
+      sdkImageResponseNote:
+        "On success with response_format: url — check data[0].url, request_id, and credits_charged.",
+      sdkBatchTitle: "Batch create / poll",
+      sdkBatchExtensionNote:
+        "Batch is a Tokfai extension — not an OpenAI official SDK method. Use fetch or requests: POST /v1/batches/chat, GET /v1/batches/{id}, GET /v1/batches/{id}/items.",
+      sdkReconcileTitle: "Reconcile with Usage / Credits",
+      sdkReconcileRequestId:
+        "request_id — copy from the SDK response (top-level or tokfai.request_id) and search in Usage.",
+      sdkReconcileCredits:
+        "credits_charged — credits debited for this call when present.",
+      sdkReconcileResolvedModel:
+        "tokfai.resolved_model — upstream model Tokfai routed to (may differ from the model you sent).",
+      sdkBillingTitle: "Credits and billing",
+      sdkBillingSuccess:
+        "HTTP 200 / 202 with a successful result usually debits credits.",
+      sdkBillingFailed:
+        "Failed responses, auth errors, and cancellations are usually not charged.",
+      sdkBillingVerify:
+        "Use Usage and Credits pages as the source of truth for reconciliation.",
+      sdkErrorsTitle: "Error handling",
+      sdkErrorAuth:
+        "401 missing_token / invalid_token — check Authorization header and API Key. See Error codes chapter.",
+      sdkErrorCredits: "402 insufficient_credits — top up in Credits.",
+      sdkErrorModel:
+        "400 model_not_available / model_not_found — try auto-fast or browse Models.",
+      sdkErrorUpstreamBusy:
+        "503 upstream_model_busy — retry later or use auto-fast.",
+      sdkErrorTimeout: "504 upstream_timeout — retry after a short wait.",
+      sdkErrorRateLimit:
+        "429 too_many_requests / too_many_concurrent_requests — reduce rate or concurrency.",
       cursorChapterPurpose:
         "Use Tokfai models inside Cursor as OpenAI-compatible provider.",
       cursorChapterCopy:
@@ -3442,6 +3498,7 @@ export const messages = {
         tryChatPlayground: "打开 Chat Playground",
         tryImagePlayground: "体验 Image Playground",
         viewChatApiDocs: "查看 Chat API 文档",
+        viewOpenAiSdkDocs: "查看 OpenAI SDK 文档",
         viewImageApiDocs: "查看 Image API 文档",
         viewBatchApiDocs: "查看 Batch API 文档",
         viewUsageCreditsDocs: "Usage / Credits 指南",
@@ -3642,6 +3699,7 @@ export const messages = {
           "复制 request_id，在 Usage 与 Credits 中搜索以核对本次调用。",
         copyRequestId: "复制 request_id",
         viewChatApiDocs: "Chat API 文档",
+        viewOpenAiSdkDocs: "OpenAI SDK 文档",
         viewErrorCodesDocs: "错误码文档",
         viewUsage: "查看 Usage",
         viewCredits: "查看 Credits",
@@ -4688,6 +4746,54 @@ export const messages = {
         "SDK 调用成功并返回 request_id；Usage 有对应记录。",
       sdkChapterFailure:
         "与 Chat API 相同错误码 — invalid_token、insufficient_credits；查 Usage 的 request_id。",
+      sdkGatewayNote:
+        "Tokfai 使用 OpenAI 兼容请求格式。Base URL 为 https://api.tokfai.com/v1。API Key 格式为 sk-tokfai_xxx。推荐模型 auto-fast。同一 Key 可调用 Chat、Image、Batch。",
+      sdkYourProjectNote:
+        "在你自己的项目、终端、服务器、脚本或 IDE 中运行示例 — 无需 Tokfai 仓库或特殊目录。",
+      sdkCopyNowTitle: "你现在就可以复制",
+      sdkCopyConfigLabel: "OpenAI SDK 配置（Base URL + API Key + model）",
+      sdkCopyNodeChatLabel: "Node.js 对话示例",
+      sdkCopyPythonChatLabel: "Python 对话示例",
+      sdkCopyNodeBatchLabel: "Node fetch 批量示例",
+      sdkCopyPythonBatchLabel: "Python requests 批量示例",
+      sdkCopyImageCurlLabel: "Image API 单行 curl",
+      sdkCopyNodeChatAction: "复制 Node 对话示例",
+      sdkCopyPythonChatAction: "复制 Python 对话示例",
+      sdkCopyNodeBatchAction: "复制 Node 批量示例",
+      sdkCopyPythonBatchAction: "复制 Python 批量示例",
+      sdkLiveKeyNote: "当前会话中的 API Key 已填入以下示例。",
+      sdkNodeTitle: "Node.js / TypeScript — 使用 npm install openai 安装",
+      sdkPythonTitle: "Python — 使用 pip install openai 安装",
+      sdkImageTitle: "图像生成",
+      sdkImageSdkNote:
+        "OpenAI SDK 对 image 端点的支持因 SDK 版本而异 — 请对照你安装的包版本。",
+      sdkImageCurlNote:
+        "推荐用 curl 或 fetch 调用 POST /v1/images/generations，确保 body 与 Tokfai schema 一致。",
+      sdkImageResponseNote:
+        "response_format: url 成功时 — 检查 data[0].url、request_id、credits_charged。",
+      sdkBatchTitle: "Batch 创建 / 轮询",
+      sdkBatchExtensionNote:
+        "Batch 为 Tokfai 扩展接口 — 非 OpenAI 官方 SDK 方法。使用 fetch 或 requests：POST /v1/batches/chat、GET /v1/batches/{id}、GET /v1/batches/{id}/items。",
+      sdkReconcileTitle: "与 Usage / Credits 对账",
+      sdkReconcileRequestId:
+        "request_id — 从 SDK 响应复制（顶层或 tokfai.request_id），在 Usage 中搜索。",
+      sdkReconcileCredits: "credits_charged — 本次调用扣减的 credits（如有）。",
+      sdkReconcileResolvedModel:
+        "tokfai.resolved_model — Tokfai 实际路由的上游模型（可能与发送的 model 不同）。",
+      sdkBillingTitle: "扣费说明",
+      sdkBillingSuccess: "HTTP 200 / 202 且成功结果通常扣 credits。",
+      sdkBillingFailed: "失败、鉴权错误、取消通常不扣费。",
+      sdkBillingVerify: "以 Usage 与 Credits 页面为准进行对账。",
+      sdkErrorsTitle: "错误处理",
+      sdkErrorAuth:
+        "401 missing_token / invalid_token — 检查 Authorization 与 API Key。见错误码章节。",
+      sdkErrorCredits: "402 insufficient_credits — 在 Credits 充值。",
+      sdkErrorModel:
+        "400 model_not_available / model_not_found — 换 auto-fast 或浏览 Models。",
+      sdkErrorUpstreamBusy: "503 upstream_model_busy — 稍后重试或换 auto-fast。",
+      sdkErrorTimeout: "504 upstream_timeout — 稍后重试。",
+      sdkErrorRateLimit:
+        "429 too_many_requests / too_many_concurrent_requests — 降低频率或并发。",
       cursorChapterPurpose:
         "在 Cursor 中以 OpenAI 兼容方式使用 Tokfai。",
       cursorChapterCopy:

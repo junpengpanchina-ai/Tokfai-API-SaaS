@@ -22,6 +22,11 @@ export const INTEGRATION_KEY_PLACEHOLDER = TOKFAI_API_KEY_PLACEHOLDER;
 export const INTEGRATION_DEFAULT_MODEL = TOKFAI_RECOMMENDED_MODEL;
 
 import {
+  buildNodeChatSdkExample,
+  buildOpenAiSdkConfigSnippet,
+  buildPythonChatSdkExample,
+} from "@/lib/customer-openai-sdk-chapter";
+import {
   CUSTOMER_INTEGRATION_ERROR_CODES,
   type CustomerIntegrationErrorCode,
 } from "@/lib/customer-error-codes-chapter";
@@ -39,44 +44,15 @@ export function modelsListCurl(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
   return modelsCurlMultiline(apiKey);
 }
 
-export const OPENAI_JS_SNIPPET = `import OpenAI from "openai";
+export const OPENAI_JS_SNIPPET = buildNodeChatSdkExample();
 
-const client = new OpenAI({
-  apiKey: "sk-tokfai_xxx",
-  baseURL: "https://api.tokfai.com/v1",
-});
-
-const completion = await client.chat.completions.create({
-  model: "${TOKFAI_RECOMMENDED_MODEL}",
-  messages: [{ role: "user", content: "${TOKFAI_CLIENT_TEST_PROMPT}" }],
-});
-
-console.log(completion.choices[0]?.message?.content);
-console.log("resolved model:", completion.model);`;
-
-export const OPENAI_PYTHON_SNIPPET = `from openai import OpenAI
-
-client = OpenAI(
-    api_key="sk-tokfai_xxx",
-    base_url="https://api.tokfai.com/v1",
-)
-
-completion = client.chat.completions.create(
-    model="${TOKFAI_RECOMMENDED_MODEL}",
-    messages=[{"role": "user", "content": "${TOKFAI_CLIENT_TEST_PROMPT}"}],
-)
-
-print(completion.choices[0].message.content)
-print("resolved model:", completion.model)`;
+export const OPENAI_PYTHON_SNIPPET = buildPythonChatSdkExample();
 
 export function openaiSdkConfigSnippet(
   apiKey = TOKFAI_API_KEY_PLACEHOLDER,
-  model = TOKFAI_RECOMMENDED_MODEL
+  model = "auto-fast"
 ): string {
-  return `Base URL: https://api.tokfai.com/v1
-API Key: ${apiKey}
-Model: ${model}
-Authorization header: Bearer ${apiKey}`;
+  return buildOpenAiSdkConfigSnippet(apiKey, model);
 }
 
 export function cursorConfigSnippet(
