@@ -13,6 +13,7 @@ import {
   buildPythonBatchRequestsExample,
   buildPythonChatSdkExample,
 } from "@/lib/customer-openai-sdk-chapter";
+import { buildCursorConfigSnippet } from "@/lib/customer-cursor-chapter";
 import {
   buildBatchCreateCurlMultiline,
   buildBatchPollCurlMultiline,
@@ -77,6 +78,8 @@ export function resolveDocCurlSnippetCopy(
       return buildNodeBatchFetchExample(key);
     case "openai-python-batch":
       return buildPythonBatchRequestsExample(key);
+    case "cursor-config":
+      return buildCursorConfigSnippet(key);
     default:
       return CUSTOMER_DOC_SNIPPET_COPY[snippetKey];
   }
@@ -118,4 +121,8 @@ export function resolveDocOpenAiNodeBatchDisplay(explicitKey?: string | null): s
 
 export function resolveDocOpenAiPythonBatchDisplay(explicitKey?: string | null): string {
   return buildPythonBatchRequestsExample(resolveQuickStartApiKey(explicitKey));
+}
+
+export function resolveDocCursorConfigDisplay(explicitKey?: string | null): string {
+  return buildCursorConfigSnippet(resolveQuickStartApiKey(explicitKey));
 }

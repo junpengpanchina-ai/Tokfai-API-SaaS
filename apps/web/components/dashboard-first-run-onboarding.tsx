@@ -172,7 +172,7 @@ export function DashboardFirstRunOnboardingCard({
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
-            <Link href="/dashboard/docs#cursor-integration">
+            <Link href="/dashboard/docs#cursor">
               <BookOpen className="h-4 w-4" />
               {t("dashboard.firstRun.cursorGuide")}
             </Link>

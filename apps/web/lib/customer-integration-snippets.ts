@@ -26,6 +26,7 @@ import {
   buildOpenAiSdkConfigSnippet,
   buildPythonChatSdkExample,
 } from "@/lib/customer-openai-sdk-chapter";
+import { buildCursorConfigSnippet } from "@/lib/customer-cursor-chapter";
 import {
   CUSTOMER_INTEGRATION_ERROR_CODES,
   type CustomerIntegrationErrorCode,
@@ -58,10 +59,7 @@ export function openaiSdkConfigSnippet(
 export function cursorConfigSnippet(
   apiKey = TOKFAI_API_KEY_PLACEHOLDER
 ): string {
-  return `Provider: OpenAI-compatible
-Base URL: https://api.tokfai.com/v1
-API Key: ${apiKey}
-Model: auto-fast / auto-pro`;
+  return buildCursorConfigSnippet(apiKey);
 }
 
 export function cherryStudioConfigSnippet(

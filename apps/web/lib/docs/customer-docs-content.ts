@@ -105,6 +105,7 @@ export type CustomerDocBlock =
   | { type: "api-key-errors" }
   | { type: "copy-fields"; id: string; fields: CustomerDocCopyField[] }
   | { type: "openai-sdk-copy-panel"; id: string }
+  | { type: "cursor-copy-panel"; id: string }
   | { type: "error-table" }
   | { type: "error-examples-panel"; id: string }
   | { type: "model-list" }
@@ -188,8 +189,8 @@ export const CUSTOMER_DOC_API_KEY_FIELDS: CustomerDocCopyField[] = [
 export const CUSTOMER_DOC_CURSOR_FIELDS: CustomerDocCopyField[] = [
   {
     id: "provider",
-    labelKey: "integration.cursorProviderLabel",
-    value: "OpenAI-compatible",
+    labelKey: "integration.cursorProviderTypeLabel",
+    value: "OpenAI compatible / OpenAI-style",
   },
   {
     id: "base",
@@ -204,7 +205,12 @@ export const CUSTOMER_DOC_CURSOR_FIELDS: CustomerDocCopyField[] = [
   {
     id: "model",
     labelKey: "integration.cursorModelLabel",
-    value: "auto-fast / auto-pro",
+    value: "auto-fast",
+  },
+  {
+    id: "auth",
+    labelKey: "integration.cursorAuthorizationLabel",
+    value: `Authorization: Bearer ${INTEGRATION_KEY_PLACEHOLDER}`,
   },
 ];
 
@@ -1126,7 +1132,7 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
     ],
   },
   {
-    id: "cursor-integration",
+    id: "cursor",
     navKey: "integration.navCursor",
     titleKey: "integration.cursorTitle",
     descriptionKey: "integration.cursorDesc",
@@ -1138,21 +1144,112 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
     ),
     chapterNow: {
       try: {
-        id: "playground",
-        labelKey: "integration.demoFlowLinkPlayground",
-        href: "/dashboard/playground",
+        id: "keys",
+        labelKey: "integration.ctaCreateKey",
+        href: "/dashboard/api-keys",
       },
       copySnippetKey: "cursor-config",
       verify: VERIFY_USAGE_CREDITS,
     },
     blocks: [
-      { type: "paragraph", textKey: "integration.placeholderKeyNote" },
-      { type: "copy-fields", id: "cursor", fields: CUSTOMER_DOC_CURSOR_FIELDS },
+      { type: "paragraph", textKey: "integration.cursorGatewayNote" },
+      { type: "paragraph", textKey: "integration.cursorNotAgencyNote" },
+      { type: "paragraph", textKey: "integration.cursorUiVersionNote" },
+      { type: "cursor-copy-panel", id: "cursor-copy" },
+      { type: "paragraph", textKey: "integration.cursorPathTitle" },
+      {
+        type: "ordered",
+        items: [
+          "integration.cursorPathStep1",
+          "integration.cursorPathStep2",
+          "integration.cursorPathStep3",
+          "integration.cursorPathStep4",
+          "integration.cursorPathStep5",
+          "integration.cursorPathStep6",
+          "integration.cursorPathStep7",
+          "integration.cursorPathStep8",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.cursorVerifyTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.cursorVerifyInCursor",
+          "integration.cursorVerifyCurl",
+          "integration.cursorVerifyResponseContent",
+          "integration.cursorVerifyResponseRequestId",
+          "integration.cursorVerifyResponseCredits",
+          "integration.cursorVerifyResponseResolvedModel",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.cursorReconcileTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.cursorReconcileRequestId",
+          "integration.cursorReconcileCredits",
+          "integration.cursorReconcileResolvedModel",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.cursorBillingTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.cursorBillingSuccess",
+          "integration.cursorBillingFailed",
+          "integration.cursorBillingVerify",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.cursorErrorsTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.cursorErrorMissingToken",
+          "integration.cursorErrorInvalidToken",
+          "integration.cursorErrorInsufficientCredits",
+          "integration.cursorErrorModel",
+          "integration.cursorErrorUpstreamBusy",
+          "integration.cursorErrorTimeout",
+          "integration.cursorErrorRateLimit",
+        ],
+      },
       {
         type: "code",
         id: "cursor-config",
-        label: "config",
+        label: "Cursor config",
         snippetKey: "cursor-config",
+      },
+      {
+        type: "dashboard-links",
+        links: [
+          { id: "keys", labelKey: "integration.ctaCreateKey", href: "/dashboard/api-keys" },
+          {
+            id: "playground",
+            labelKey: "integration.demoFlowLinkPlayground",
+            href: "/dashboard/playground",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+          { id: "pricing", labelKey: "integration.linkTopUp", href: "/pricing" },
+          {
+            id: "error-codes-docs",
+            labelKey: "integration.linkErrorCodesGuide",
+            href: "/dashboard/docs",
+            hash: "error-codes",
+          },
+          {
+            id: "usage-credits-docs",
+            labelKey: "integration.linkUsageCreditsGuide",
+            href: "/dashboard/docs",
+            hash: "usage-credits",
+          },
+          {
+            id: "openai-sdk-docs",
+            labelKey: "integration.navOpenAiSdk",
+            href: "/dashboard/docs",
+            hash: "openai-sdk",
+          },
+        ],
       },
     ],
   },

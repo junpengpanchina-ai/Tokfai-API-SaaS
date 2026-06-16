@@ -40,6 +40,7 @@ import {
   type MeApiKeyMetadata,
 } from "@/lib/dmit/client";
 import { buildOpenAiSdkConfigSnippet } from "@/lib/customer-openai-sdk-chapter";
+import { buildCursorConfigSnippet } from "@/lib/customer-cursor-chapter";
 import { isFullTokfaiApiKey, TOKFAI_API_BASE_URL, TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
 import {
   userMessageForDashboardError,
@@ -461,6 +462,11 @@ function OneTimeSecretCard({
               </Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#cursor">
+                {t("dashboard.apiKeys.cursorGuide")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/docs#openai-sdk">
                 {t("dashboard.apiKeys.openAiSdkGuide")}
               </Link>
@@ -535,6 +541,14 @@ function OneTimeSecretCard({
             )}
           </Button>
           <CopyConfigAction
+            id="one-time-secret-copy-cursor-config"
+            value={buildCursorConfigSnippet(secret)}
+            copiedId={snippetCopiedId}
+            onCopy={handleSnippetCopy}
+            label={t("dashboard.apiKeys.copyCursorConfig")}
+            copiedLabel={t("dashboard.apiKeys.copied")}
+          />
+          <CopyConfigAction
             id="one-time-secret-copy-sdk-config"
             value={buildOpenAiSdkConfigSnippet(secret)}
             copiedId={snippetCopiedId}
@@ -542,6 +556,11 @@ function OneTimeSecretCard({
             label={t("dashboard.apiKeys.copySdkConfig")}
             copiedLabel={t("dashboard.apiKeys.copied")}
           />
+          <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
+            <Link href="/dashboard/docs#cursor">
+              {t("dashboard.apiKeys.cursorGuide")}
+            </Link>
+          </Button>
           <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
             <Link href="/dashboard/docs#openai-sdk">
               {t("dashboard.apiKeys.openAiSdkGuide")}

@@ -1961,6 +1961,70 @@ export const messages = {
         "Cursor chat completes; check Usage for the request_id if billing looks wrong.",
       cursorChapterFailure:
         "invalid_token in Cursor — re-paste full key; too_many_requests — slow down.",
+      cursorGatewayNote:
+        "Cursor connects to Tokfai via an OpenAI-compatible provider. Base URL: https://api.tokfai.com/v1. API Key: sk-tokfai_xxx. Recommended model: auto-fast. One key works for Chat, Image, and Batch APIs — Cursor is mainly used for chat workflows.",
+      cursorNotAgencyNote:
+        "Tokfai is an API gateway / model relay / API Key provider — not a managed operations vendor. You run your own Cursor, IDE, and backend; Tokfai provides API access and metering.",
+      cursorUiVersionNote:
+        "Cursor UI labels vary by version. If you can set OpenAI-compatible Base URL, API Key, and Model, map the fields below — no Tokfai repository or cd into any directory required.",
+      cursorCopyNowTitle: "You can copy now",
+      cursorCopyConfigLabel: "Cursor config (all fields)",
+      cursorProviderTypeLabel: "Provider type",
+      cursorAuthorizationLabel: "Authorization",
+      cursorPathTitle: "Recommended setup path",
+      cursorPathStep1: "Create an API Key on Tokfai Dashboard → API Keys.",
+      cursorPathStep2: "Copy the full sk-tokfai_… secret immediately (shown once at creation).",
+      cursorPathStep3: "Open Cursor Settings → Models / Model provider (or equivalent).",
+      cursorPathStep4: "Add a new OpenAI-compatible / custom provider.",
+      cursorPathStep5: "Paste Base URL, API Key, and model auto-fast from the table above.",
+      cursorPathStep6: "Send a short test prompt in Cursor chat.",
+      cursorPathStep7: "Open Tokfai Usage — search request_id or check recent requests.",
+      cursorPathStep8: "Open Credits — verify debit reference, amount, and balance_after.",
+      cursorVerifyTitle: "How to verify success",
+      cursorVerifyInCursor:
+        "Primary: send a test prompt in Cursor — chat should complete without auth errors.",
+      cursorVerifyCurl:
+        "Fallback: copy one-line chat curl and paste into any terminal (Mac, Windows PowerShell, or Linux).",
+      cursorVerifyResponseContent:
+        "On HTTP 200 — choices[0].message.content shows the assistant reply.",
+      cursorVerifyResponseRequestId:
+        "request_id — copy to search in Usage and Credits.",
+      cursorVerifyResponseCredits:
+        "credits_charged — credits debited when present.",
+      cursorVerifyResponseResolvedModel:
+        "tokfai.resolved_model — upstream model Tokfai routed to.",
+      cursorReconcileTitle: "Reconcile with Usage / Credits",
+      cursorReconcileRequestId:
+        "Copy request_id from the response or Cursor logs → search in Usage.",
+      cursorReconcileCredits:
+        "Match credits_charged on the Usage row with Credits ledger amount.",
+      cursorReconcileResolvedModel:
+        "tokfai.resolved_model shows which upstream model served the request.",
+      cursorBillingTitle: "Credits and billing",
+      cursorBillingSuccess: "Successful requests debit credits.",
+      cursorBillingFailed:
+        "Failed responses, auth errors, and upstream failures are usually not charged.",
+      cursorBillingVerify: "Use Usage and Credits pages as the source of truth.",
+      cursorErrorsTitle: "Error handling",
+      cursorErrorMissingToken:
+        "missing_token — API Key / Authorization not sent. Re-paste Base URL and full key in Cursor settings.",
+      cursorErrorInvalidToken:
+        "invalid_token — key wrong, revoked, or incomplete. Create a new key or use Copy key on API Keys.",
+      cursorErrorInsufficientCredits:
+        "insufficient_credits — balance too low. Top up in Credits or Pricing.",
+      cursorErrorModel:
+        "model_not_available / model_not_found — model name wrong. Start with auto-fast.",
+      cursorErrorUpstreamBusy:
+        "upstream_model_busy — upstream busy. Retry or use auto-fast.",
+      cursorErrorTimeout: "upstream_timeout — upstream slow. Retry after a short wait.",
+      cursorErrorRateLimit:
+        "too_many_requests / too_many_concurrent_requests — reduce rate or concurrency.",
+      cursorLiveKeyNote:
+        "Your API key from this session is already filled in these fields.",
+      cursorCopyCursorConfigAction: "Copy Cursor config",
+      cursorCopyBaseUrlAction: "Copy Base URL",
+      cursorCopyAuthAction: "Copy Authorization header",
+      cursorCopyModelAction: "Copy model",
       cherryChapterPurpose:
         "Use Tokfai in Cherry Studio as OpenAI compatible provider.",
       cherryChapterCopy:
@@ -2099,7 +2163,8 @@ export const messages = {
       sdkDesc:
         "Use the official OpenAI SDK with baseURL / base_url = https://api.tokfai.com/v1.",
       cursorTitle: "Cursor",
-      cursorDesc: "Add Tokfai as an OpenAI-compatible provider. Copy these fields:",
+      cursorDesc:
+        "Add Tokfai as an OpenAI-compatible provider in Cursor. Copy Base URL, API Key, and model below.",
       cursorProviderLabel: "Provider",
       cursorBaseUrlLabel: "Base URL",
       cursorApiKeyLabel: "API Key",
@@ -4802,6 +4867,58 @@ export const messages = {
         "Cursor 对话可用；计费异常时在 Usage 查 request_id。",
       cursorChapterFailure:
         "Cursor 报 invalid_token — 重新粘贴完整密钥；too_many_requests 请降速。",
+      cursorGatewayNote:
+        "Cursor 通过 OpenAI 兼容 Provider 接入 Tokfai。Base URL：https://api.tokfai.com/v1。API Key：sk-tokfai_xxx。推荐模型 auto-fast。同一 Key 可用于 Chat、Image、Batch API；Cursor 主要用于对话类工作流。",
+      cursorNotAgencyNote:
+        "Tokfai 是 API gateway / model relay / API Key 提供方 — 不是代运营。你在自己的 Cursor、IDE、后端中调用 Tokfai；我们提供 API 接入与计量。",
+      cursorUiVersionNote:
+        "Cursor 界面因版本不同字段名可能略有差异。只要能填 OpenAI 兼容的 Base URL、API Key、Model，按下方字段对应填写 — 无需 Tokfai 仓库或 cd 到任何目录。",
+      cursorCopyNowTitle: "你现在就可以复制",
+      cursorCopyConfigLabel: "Cursor 配置（全部字段）",
+      cursorProviderTypeLabel: "Provider type",
+      cursorAuthorizationLabel: "Authorization",
+      cursorPathTitle: "推荐配置路径",
+      cursorPathStep1: "在 Tokfai Dashboard → API Keys 创建 API Key。",
+      cursorPathStep2: "立即复制完整 sk-tokfai_… secret（创建时仅显示一次）。",
+      cursorPathStep3: "打开 Cursor Settings → Models / Model provider（或同类入口）。",
+      cursorPathStep4: "新增 OpenAI 兼容 / Custom provider。",
+      cursorPathStep5: "粘贴上方表格中的 Base URL、API Key、model auto-fast。",
+      cursorPathStep6: "在 Cursor 对话中发送一句测试 prompt。",
+      cursorPathStep7: "打开 Tokfai Usage — 搜索 request_id 或查看最近请求。",
+      cursorPathStep8: "打开 Credits — 核对 reference、amount、balance_after。",
+      cursorVerifyTitle: "如何验证成功",
+      cursorVerifyInCursor: "首选：在 Cursor 内发测试 prompt — 对话应正常完成且无鉴权错误。",
+      cursorVerifyCurl:
+        "备选：复制单行 chat curl，粘贴到任意终端（Mac、Windows PowerShell 或 Linux）。",
+      cursorVerifyResponseContent: "HTTP 200 时 — choices[0].message.content 为助手回复。",
+      cursorVerifyResponseRequestId: "request_id — 复制后在 Usage 与 Credits 中搜索。",
+      cursorVerifyResponseCredits: "credits_charged — 如有则表示本次扣减 credits。",
+      cursorVerifyResponseResolvedModel: "tokfai.resolved_model — Tokfai 实际路由的上游模型。",
+      cursorReconcileTitle: "与 Usage / Credits 对账",
+      cursorReconcileRequestId: "从响应或 Cursor 日志复制 request_id → 在 Usage 搜索。",
+      cursorReconcileCredits: "核对 Usage 行 credits_charged 与 Credits 账本金额。",
+      cursorReconcileResolvedModel: "tokfai.resolved_model 显示实际上游模型。",
+      cursorBillingTitle: "扣费说明",
+      cursorBillingSuccess: "成功请求会扣 credits。",
+      cursorBillingFailed: "失败、鉴权错误、上游失败通常不扣费。",
+      cursorBillingVerify: "以 Usage 与 Credits 页面为准。",
+      cursorErrorsTitle: "错误处理",
+      cursorErrorMissingToken:
+        "missing_token — 未发送 API Key / Authorization。在 Cursor 设置中重新粘贴 Base URL 与完整 Key。",
+      cursorErrorInvalidToken:
+        "invalid_token — Key 错误、已 revoke 或不完整。在 API Keys 创建新 Key 或使用 Copy key。",
+      cursorErrorInsufficientCredits: "insufficient_credits — 余额不足。在 Credits 或 Pricing 充值。",
+      cursorErrorModel:
+        "model_not_available / model_not_found — 模型名错误。先用 auto-fast。",
+      cursorErrorUpstreamBusy: "upstream_model_busy — 上游繁忙。重试或换 auto-fast。",
+      cursorErrorTimeout: "upstream_timeout — 上游超时。稍后重试。",
+      cursorErrorRateLimit:
+        "too_many_requests / too_many_concurrent_requests — 降低频率或并发。",
+      cursorLiveKeyNote: "当前会话中的 API Key 已填入以下字段。",
+      cursorCopyCursorConfigAction: "复制 Cursor 配置",
+      cursorCopyBaseUrlAction: "复制 Base URL",
+      cursorCopyAuthAction: "复制 Authorization 请求头",
+      cursorCopyModelAction: "复制 model",
       cherryChapterPurpose:
         "在 Cherry Studio 以 OpenAI 兼容方式配置 Tokfai。",
       cherryChapterCopy:
@@ -4938,7 +5055,8 @@ export const messages = {
       sdkDesc:
         "使用官方 OpenAI SDK，baseURL / base_url 设为 https://api.tokfai.com/v1。",
       cursorTitle: "Cursor",
-      cursorDesc: "将 Tokfai 添加为 OpenAI 兼容 Provider。复制以下配置：",
+      cursorDesc:
+        "在 Cursor 中将 Tokfai 添加为 OpenAI 兼容 Provider。复制下方 Base URL、API Key 与 model。",
       cursorProviderLabel: "Provider",
       cursorBaseUrlLabel: "Base URL",
       cursorApiKeyLabel: "API Key",
