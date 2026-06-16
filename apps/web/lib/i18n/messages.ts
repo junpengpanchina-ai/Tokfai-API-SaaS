@@ -2303,6 +2303,8 @@ export const messages = {
         "Copy request_id from the response. Search it in Usage and Credits to reconcile tokens and debits.",
       quickStartTerminalNote:
         "Tokfai is a cloud API. Run curl from any folder on your computer — no clone, no cd, no local Tokfai codebase required.",
+      shellCompatNote:
+        "Shell compatibility: one-line curls use single-quoted JSON bodies. Paste as-is in Mac Terminal (zsh/bash) and Linux shells. On Windows PowerShell, use curl.exe (not the Invoke-WebRequest alias) or Git Bash — paste the copied one-line command unchanged.",
       quickStartCopyNowTitle: "You can copy now",
       quickStartCopyNowLabel: "One-line chat curl",
       quickStartKeyHintLive:
@@ -2310,7 +2312,9 @@ export const messages = {
       quickStartKeyHintPlaceholder:
         "Showing placeholder sk-tokfai_xxx — create a key on API Keys, then copy curl from the success card or refresh this page.",
       quickStartExpectedResponse:
-        "A successful response includes choices[0].message.content, request_id, and credits_charged. If you see missing_token, the Authorization header was not sent — use the one-line copy button above.",
+        "Success: choices[0].message.content, request_id, credits_charged, and tokfai.resolved_model. If you see missing_token, the Authorization header was not sent — use the one-line copy button above.",
+      quickStartFailureResponse:
+        "Failure: check error.code and request_id (if present). See the Error codes chapter or search request_id in Usage.",
       quickStartReconcileNote:
         "Open Usage, search request_id, confirm model, tokens, and credits_charged. Open Credits to match the debit for succeeded calls only.",
       quickStep1:
@@ -5331,13 +5335,17 @@ export const messages = {
         "从响应复制 request_id，在 Usage 与 Credits 中搜索核对 tokens 与扣费。",
       quickStartTerminalNote:
         "Tokfai 是云端 API。在电脑任意目录运行 curl 即可——无需 clone、无需 cd、无需本地 Tokfai 代码库。",
+      shellCompatNote:
+        "Shell 兼容：单行 curl 使用单引号包裹 JSON。在 Mac Terminal（zsh/bash）与 Linux 中可直接粘贴运行。Windows PowerShell 请使用 curl.exe（不要用 Invoke-WebRequest 别名）或 Git Bash——粘贴复制的单行命令即可。",
       quickStartCopyNowTitle: "你现在就可以复制",
       quickStartCopyNowLabel: "单行 chat curl",
       quickStartKeyHintLive: "已自动填入本浏览器会话中创建的 API Key。",
       quickStartKeyHintPlaceholder:
         "当前为占位符 sk-tokfai_xxx——请在 API Keys 创建密钥，从成功卡片复制 curl 或刷新本页。",
       quickStartExpectedResponse:
-        "成功响应包含 choices[0].message.content、request_id 与 credits_charged。若出现 missing_token，说明未带上 Authorization——请用上方单行复制按钮。",
+        "成功：choices[0].message.content、request_id、credits_charged、tokfai.resolved_model。若出现 missing_token，说明未带上 Authorization——请用上方单行复制按钮。",
+      quickStartFailureResponse:
+        "失败：查看 error.code 与 request_id（如有）。见 Error codes 章节或在 Usage 搜索 request_id。",
       quickStartReconcileNote:
         "打开 Usage 搜索 request_id，核对 model、tokens、credits_charged。打开 Credits 核对成功调用的扣费记录。",
       quickStep1:

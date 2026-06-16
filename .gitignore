@@ -22,5 +22,6 @@ apps/dmit-api/es
 # local acceptance / load-test artifacts (scripts write latest.json)
 batch-test-results/
 p776-smoke-results/
+p778-live-smoke-results/
 model-health-results/
 load-test-results/

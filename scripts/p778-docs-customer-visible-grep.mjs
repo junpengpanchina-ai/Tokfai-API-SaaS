@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * P778.12 — scan customer-visible web source for internal engineering terms.
+ * P778 — scan customer-visible web source for internal engineering terms.
  * Usage: node scripts/p778-docs-customer-visible-grep.mjs
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -13,12 +13,20 @@ const SCAN_DIRS = [
   join(ROOT, "apps/web/lib"),
 ];
 
-const IGNORE_PATH_PARTS = ["/admin/", "/node_modules/", ".test.", ".spec."];
+const IGNORE_PATH_PARTS = [
+  "/admin/",
+  "/node_modules/",
+  ".test.",
+  ".spec.",
+  "/lib/dmit/",
+  "/app/admin/",
+];
 
 const RULES = [
   { label: "/Users path", pattern: /\/Users(?:\/[A-Za-z0-9._-]+)?/ },
   { label: "/opt/tokfai", pattern: /\/opt\/tokfai/ },
   { label: "P77 ticket", pattern: /\bP77[\d.]*\b/ },
+  { label: "P778 ticket", pattern: /\bP778[\d.]*\b/ },
   { label: "artifact", pattern: /\bartifact\b/i },
   { label: "internal runbook", pattern: /internal runbook/i },
   { label: "production acceptance", pattern: /production acceptance/i },
@@ -28,6 +36,9 @@ const RULES = [
   { label: "帮你运营", pattern: /帮你运营/ },
   { label: "替你经营", pattern: /替你经营/ },
   { label: "托管运营", pattern: /托管运营/ },
+  { label: "服务器部署", pattern: /服务器部署/ },
+  { label: "node scripts", pattern: /node\s+scripts\b/i },
+  { label: "DMIT", pattern: /\bDMIT\b/i },
   { label: "repo (word)", pattern: /\brepo\b/i },
   { label: "commit (word)", pattern: /\bcommit\b/i },
   {
@@ -48,11 +59,17 @@ const ALLOW_SUBSTRINGS = [
   "不是代运营",
   "不代运营",
   "cd 到任何目录",
+  "无需进入任何 Tokfai 工程目录",
 ];
 
 function shouldIgnorePath(path) {
   const rel = relative(ROOT, path);
   return IGNORE_PATH_PARTS.some((part) => rel.includes(part.replace(/^\//, "")));
+}
+
+function isCommentLine(line) {
+  const trimmed = line.trim();
+  return trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/**");
 }
 
 function walk(dir, files = []) {
@@ -70,23 +87,37 @@ function isAllowed(line) {
   return ALLOW_SUBSTRINGS.some((snippet) => line.includes(snippet));
 }
 
+function isCustomerMessagesLine(line) {
+  if (line.includes("admin.")) return false;
+  if (line.includes("integration.")) return true;
+  if (line.includes("dashboard.apiKeys")) return true;
+  if (line.includes("apiKeys:") && line.includes("copy")) return true;
+  return false;
+}
+
 const hits = [];
 
 for (const dir of SCAN_DIRS) {
   for (const file of walk(dir)) {
+    const rel = relative(ROOT, file);
     const lines = readFileSync(file, "utf8").split("\n");
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
+      if (isCommentLine(line)) continue;
       if (isAllowed(line)) continue;
+      if (rel === "apps/web/lib/i18n/messages.ts" && !isCustomerMessagesLine(line)) continue;
 
       for (const rule of RULES) {
         if (!rule.pattern.test(line)) continue;
         if (rule.label === "/Users path" && /\/admin\/users/.test(line)) continue;
         if (rule.label === "repo (word)" && /\breport\b/i.test(line)) continue;
         if (rule.label === "commit (word)" && /nextUrl\.clone/.test(line)) continue;
+        if (rule.label === "DMIT" && /import\s.*dmit/i.test(line)) continue;
+        if (rule.label === "DMIT" && /from\s+["']@\/lib\/dmit/i.test(line)) continue;
+        if (rule.label === "DMIT" && /DmitApi/i.test(line)) continue;
 
         hits.push({
-          file: relative(ROOT, file),
+          file: rel,
           line: i + 1,
           rule: rule.label,
           text: line.trim().slice(0, 240),

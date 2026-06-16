@@ -471,6 +471,9 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       verify: VERIFY_USAGE_CREDITS,
     },
     blocks: [
+      { type: "one-line-curl", id: "quick-start-live-curl", titleKey: "integration.quickStartCopyNowTitle" },
+      { type: "paragraph", textKey: "integration.quickStartTerminalNote" },
+      { type: "paragraph", textKey: "integration.shellCompatNote" },
       {
         type: "ordered",
         items: [
@@ -482,9 +485,8 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
           "integration.quickStartStep6",
         ],
       },
-      { type: "paragraph", textKey: "integration.quickStartTerminalNote" },
-      { type: "one-line-curl", id: "quick-start-live-curl", titleKey: "integration.quickStartCopyNowTitle" },
       { type: "paragraph", textKey: "integration.quickStartExpectedResponse" },
+      { type: "paragraph", textKey: "integration.quickStartFailureResponse" },
       { type: "paragraph", textKey: "integration.quickStartReconcileNote" },
       { type: "paragraph", textKey: "integration.placeholderKeyNote" },
       { type: "copy-fields", id: "quick-start", fields: CUSTOMER_DOC_QUICK_START_FIELDS },

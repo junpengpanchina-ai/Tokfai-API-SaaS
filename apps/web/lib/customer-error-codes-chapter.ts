@@ -1,4 +1,4 @@
-/** Customer-facing error codes for /dashboard/docs#error-codes — aligned with DMIT API envelopes. */
+/** Customer-facing error codes for /dashboard/docs#error-codes — aligned with Tokfai API envelopes. */
 
 export const CUSTOMER_DOC_ERROR_CODES = [
   "missing_token",
