@@ -1,11 +1,16 @@
 "use client";
 
 import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
+import { OneLineCurlCopyFields } from "@/components/one-line-curl-copy-fields";
 import {
   API_KEY_CHAPTER_COPY_IDS,
   buildApiKeyChapterSnippets,
   type ApiKeyChapterSnippets,
 } from "@/lib/customer-api-key-chapter";
+import {
+  chatCurlPowerShellOneLine,
+  modelsCurlPowerShellOneLine,
+} from "@/lib/customer-curl-oneline";
 import { isQuickStartKeyPlaceholder } from "@/lib/customer-quick-start-snippets";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 
@@ -33,13 +38,29 @@ export function ApiKeyChapterCopyPanel({
     variant === "success-card"
       ? "[&_code]:border-emerald-200 [&_code]:bg-white dark:[&_code]:border-emerald-800 dark:[&_code]:bg-background"
       : undefined;
-  const curlFieldClass =
-    variant === "success-card"
-      ? "[&_code]:max-h-32 [&_code]:whitespace-pre-wrap [&_code]:break-all [&_code]:border-emerald-200 [&_code]:bg-white dark:[&_code]:border-emerald-800 dark:[&_code]:bg-background"
-      : "[&_code]:max-h-32 [&_code]:whitespace-pre-wrap [&_code]:break-all";
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
+      <OneLineCurlCopyFields
+        apiKey={apiKey}
+        bashLabel={t("integration.apiKeyChatCurlLabel")}
+        bashCurl={snippets.chatVerifyCurl}
+        powershellCurl={chatCurlPowerShellOneLine(apiKey)}
+        copiedId={copiedId}
+        onCopy={onCopy}
+        idPrefix={`${idPrefix}-chat`}
+        liveKeyNoteKey="integration.apiKeyLiveKeyNote"
+      />
+      <OneLineCurlCopyFields
+        apiKey={apiKey}
+        bashLabel={t("integration.apiKeyVerifyCurlLabel")}
+        bashCurl={snippets.modelsVerifyCurl}
+        powershellCurl={modelsCurlPowerShellOneLine(apiKey)}
+        copiedId={copiedId}
+        onCopy={onCopy}
+        idPrefix={`${idPrefix}-models`}
+        showKeyNote={false}
+      />
       <CopyableSnippetField
         label={t("integration.authHeaderLabel")}
         value={snippets.authHeader}
@@ -62,31 +83,14 @@ export function ApiKeyChapterCopyPanel({
           className={fieldClass}
         />
       ) : null}
-      <CopyableSnippetField
-        label={t("integration.apiKeyVerifyCurlLabel")}
-        value={snippets.modelsVerifyCurl}
-        copyId={`${idPrefix}-${API_KEY_CHAPTER_COPY_IDS.modelsVerify}`}
-        copiedId={copiedId}
-        onCopy={onCopy}
-        copyLabel={t("integration.copyOneLineCurl")}
-        copiedLabel={t("integration.copied")}
-        className={curlFieldClass}
-      />
-      <CopyableSnippetField
-        label={t("integration.apiKeyChatCurlLabel")}
-        value={snippets.chatVerifyCurl}
-        copyId={`${idPrefix}-${API_KEY_CHAPTER_COPY_IDS.chatVerify}`}
-        copiedId={copiedId}
-        onCopy={onCopy}
-        copyLabel={t("integration.copyOneLineCurl")}
-        copiedLabel={t("integration.copied")}
-        className={curlFieldClass}
-      />
       {keyIsPlaceholder ? (
         <p className="text-xs text-muted-foreground">{t("integration.placeholderKeyNote")}</p>
       ) : (
         <p className="text-xs text-muted-foreground">{t("integration.apiKeyLiveKeyNote")}</p>
       )}
+      <p className="text-xs text-muted-foreground">{t("integration.oneLineCurlPasteNote")}</p>
+      <p className="text-xs text-muted-foreground">{t("integration.oneLineCurlSuccessFields")}</p>
+      <p className="text-xs text-muted-foreground">{t("integration.oneLineCurlReconcileNote")}</p>
       <div className="flex flex-wrap gap-2">
         <CopyConfigAction
           id={`${idPrefix}-copy-auth-action`}
@@ -94,22 +98,6 @@ export function ApiKeyChapterCopyPanel({
           copiedId={copiedId}
           onCopy={onCopy}
           label={t("integration.copyAuthHeader")}
-          copiedLabel={t("integration.copied")}
-        />
-        <CopyConfigAction
-          id={`${idPrefix}-copy-models-action`}
-          value={snippets.modelsVerifyCurl}
-          copiedId={copiedId}
-          onCopy={onCopy}
-          label={t("integration.copyOneLineModelsCurl")}
-          copiedLabel={t("integration.copied")}
-        />
-        <CopyConfigAction
-          id={`${idPrefix}-copy-chat-action`}
-          value={snippets.chatVerifyCurl}
-          copiedId={copiedId}
-          onCopy={onCopy}
-          label={t("integration.copyOneLineChatCurl")}
           copiedLabel={t("integration.copied")}
         />
       </div>

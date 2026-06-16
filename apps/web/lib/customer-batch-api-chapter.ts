@@ -14,7 +14,7 @@ function shellSingleQuotedJson(value: unknown): string {
   return JSON.stringify(value).replace(/'/g, "'\\''");
 }
 
-function batchCreateBody(model = BATCH_API_DEFAULT_MODEL) {
+export function batchCreateBody(model = BATCH_API_DEFAULT_MODEL) {
   return {
     model,
     items: BATCH_EXAMPLE_ITEMS.map((item) => ({
@@ -46,6 +46,32 @@ export function buildBatchItemsCurlOneLine(
   batchId = BATCH_POLL_PLACEHOLDER_ID
 ): string {
   return `curl -sS ${API_ROOT}/batches/${batchId}/items -H "Authorization: Bearer ${apiKey}"`;
+}
+
+function powershellJsonBody(value: unknown): string {
+  return JSON.stringify(value).replace(/"/g, '\\"');
+}
+
+export function buildBatchCreateCurlPowerShellOneLine(
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
+  model = BATCH_API_DEFAULT_MODEL
+): string {
+  const body = powershellJsonBody(batchCreateBody(model));
+  return `curl.exe -sS "${API_ROOT}/batches/chat" -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d "${body}"`;
+}
+
+export function buildBatchPollCurlPowerShellOneLine(
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
+  batchId = BATCH_POLL_PLACEHOLDER_ID
+): string {
+  return `curl.exe -sS "${API_ROOT}/batches/${batchId}" -H "Authorization: Bearer ${apiKey}"`;
+}
+
+export function buildBatchItemsCurlPowerShellOneLine(
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
+  batchId = BATCH_POLL_PLACEHOLDER_ID
+): string {
+  return `curl.exe -sS "${API_ROOT}/batches/${batchId}/items" -H "Authorization: Bearer ${apiKey}"`;
 }
 
 /** Readable multiline create curl (display only). */

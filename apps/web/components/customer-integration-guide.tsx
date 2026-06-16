@@ -329,6 +329,8 @@ function DocBlock({
         </ol>
       );
     case "code":
+      const isReadableOnly = block.readableOnly === true;
+      const codeLabel = block.labelKey ? t(block.labelKey) : block.label ?? "";
       const isCurlSnippet = block.snippetKey.includes("curl");
       const isOpenAiSnippet = block.snippetKey.startsWith("openai-");
       const displayCode =
@@ -362,7 +364,7 @@ function DocBlock({
                         : CUSTOMER_DOC_SNIPPET_DISPLAY[block.snippetKey];
       const isCursorSnippet = block.snippetKey === "cursor-config";
       const isCherrySnippet = block.snippetKey === "cherry-config";
-      const copyValue =
+      const snippetCopyValue =
         isCurlSnippet || isOpenAiSnippet || isCursorSnippet || isCherrySnippet
           ? resolveDocCurlSnippetCopy(block.snippetKey, quickStartApiKey)
           : CUSTOMER_DOC_SNIPPET_COPY[block.snippetKey];
@@ -374,17 +376,20 @@ function DocBlock({
       return (
         <CodeBlock
           id={block.id}
-          label={block.label}
+          label={codeLabel}
           code={displayCode}
           copyValue={
-            isCurlSnippet || isOpenAiSnippet || isCursorSnippet || isCherrySnippet
-              ? copyValue
-              : undefined
+            isReadableOnly
+              ? undefined
+              : isCurlSnippet || isOpenAiSnippet || isCursorSnippet || isCherrySnippet
+                ? snippetCopyValue
+                : undefined
           }
           copied={copiedId === block.id}
           onCopy={onCopy}
           copyLabel={copyLabel}
           copiedLabel={t("integration.copied")}
+          allowCopy={!isReadableOnly}
         />
       );
     case "one-line-curl":
@@ -414,16 +419,27 @@ function DocBlock({
             className="mt-3 [&_code]:max-h-32 [&_code]:whitespace-pre-wrap [&_code]:break-all"
           />
           {oneLineSnippetKey === "chat-curl" ? (
-            <CopyableSnippetField
-              label={t("integration.clientSoftwarePowerShellCurlLabel")}
-              value={chatCurlPowerShellOneLine(quickStartApiKey)}
-              copyId={`${block.id}-powershell`}
-              copiedId={copiedId}
-              onCopy={onCopy}
-              copyLabel={t("integration.copyPowerShellCurl")}
-              copiedLabel={t("integration.copied")}
-              className="mt-3 [&_code]:max-h-32 [&_code]:whitespace-pre-wrap [&_code]:break-all"
-            />
+            <>
+              <CopyableSnippetField
+                label={t("integration.clientSoftwarePowerShellCurlLabel")}
+                value={chatCurlPowerShellOneLine(quickStartApiKey)}
+                copyId={`${block.id}-powershell`}
+                copiedId={copiedId}
+                onCopy={onCopy}
+                copyLabel={t("integration.copyPowerShellCurl")}
+                copiedLabel={t("integration.copied")}
+                className="mt-3 [&_code]:max-h-32 [&_code]:whitespace-pre-wrap [&_code]:break-all"
+              />
+              <p className="mt-3 text-xs text-muted-foreground">
+                {t("integration.oneLineCurlPasteNote")}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {t("integration.oneLineCurlSuccessFields")}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {t("integration.oneLineCurlReconcileNote")}
+              </p>
+            </>
           ) : null}
           <div className="mt-2 flex flex-wrap gap-2">
             <CopyConfigAction

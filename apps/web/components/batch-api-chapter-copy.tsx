@@ -1,9 +1,11 @@
 "use client";
 
-import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
+import { OneLineCurlCopyFields } from "@/components/one-line-curl-copy-fields";
 import {
   buildBatchCreateCurlOneLine,
+  buildBatchCreateCurlPowerShellOneLine,
   buildBatchPollCurlOneLine,
+  buildBatchPollCurlPowerShellOneLine,
   BATCH_POLL_PLACEHOLDER_ID,
 } from "@/lib/customer-batch-api-chapter";
 import { isQuickStartKeyPlaceholder } from "@/lib/customer-quick-start-snippets";
@@ -32,56 +34,37 @@ export function BatchApiChapterCopyPanel({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3">
-        <CopyableSnippetField
-          label={t("integration.batchApiCreateCopyLabel")}
-          value={createCurl}
-          copyId={`${idPrefix}-${BATCH_CREATE_COPY_ID}`}
-          copiedId={copiedId}
-          onCopy={onCopy}
-          copyLabel={t("integration.copyOneLineCurl")}
-          copiedLabel={t("integration.copied")}
-          className="[&_code]:max-h-32 [&_code]:whitespace-pre-wrap [&_code]:break-all"
-        />
-        <CopyConfigAction
-          id={`${idPrefix}-copy-create-action`}
-          value={createCurl}
-          copiedId={copiedId}
-          onCopy={onCopy}
-          label={t("integration.copyOneLineBatchCreateCurl")}
-          copiedLabel={t("integration.copied")}
-        />
-      </div>
-
+      <OneLineCurlCopyFields
+        apiKey={apiKey}
+        bashLabel={t("integration.batchApiCreateCopyLabel")}
+        bashCurl={createCurl}
+        powershellCurl={buildBatchCreateCurlPowerShellOneLine(apiKey)}
+        copiedId={copiedId}
+        onCopy={onCopy}
+        idPrefix={`${idPrefix}-create`}
+        showKeyNote={false}
+      />
       <div className="flex flex-col gap-3 border-t pt-3">
-        <p className="text-xs text-muted-foreground">
-          {t("integration.batchApiPollHint")}
-        </p>
-        <CopyableSnippetField
-          label={t("integration.batchApiPollCopyLabel")}
-          value={pollCurl}
-          copyId={`${idPrefix}-${BATCH_POLL_COPY_ID}`}
+        <p className="text-xs text-muted-foreground">{t("integration.batchApiPollHint")}</p>
+        <OneLineCurlCopyFields
+          apiKey={apiKey}
+          bashLabel={t("integration.batchApiPollCopyLabel")}
+          bashCurl={pollCurl}
+          powershellCurl={buildBatchPollCurlPowerShellOneLine(apiKey)}
           copiedId={copiedId}
           onCopy={onCopy}
-          copyLabel={t("integration.copyOneLineCurl")}
-          copiedLabel={t("integration.copied")}
-          className="[&_code]:max-h-32 [&_code]:whitespace-pre-wrap [&_code]:break-all"
-        />
-        <CopyConfigAction
-          id={`${idPrefix}-copy-poll-action`}
-          value={pollCurl}
-          copiedId={copiedId}
-          onCopy={onCopy}
-          label={t("integration.copyOneLineBatchPollCurl")}
-          copiedLabel={t("integration.copied")}
+          idPrefix={`${idPrefix}-poll`}
+          showKeyNote={false}
         />
       </div>
-
       {keyIsPlaceholder ? (
         <p className="text-xs text-muted-foreground">{t("integration.placeholderKeyNote")}</p>
       ) : (
         <p className="text-xs text-muted-foreground">{t("integration.batchApiLiveKeyNote")}</p>
       )}
+      <p className="text-xs text-muted-foreground">{t("integration.oneLineCurlPasteNote")}</p>
+      <p className="text-xs text-muted-foreground">{t("integration.oneLineCurlBatchSuccessFields")}</p>
+      <p className="text-xs text-muted-foreground">{t("integration.oneLineCurlReconcileNote")}</p>
     </div>
   );
 }

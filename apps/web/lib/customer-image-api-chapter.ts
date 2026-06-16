@@ -22,7 +22,7 @@ function shellSingleQuotedJson(value: unknown): string {
   return JSON.stringify(value).replace(/'/g, "'\\''");
 }
 
-function imageApiCurlBody(params?: ImageApiCurlParams): Record<string, unknown> {
+export function imageApiCurlBody(params?: ImageApiCurlParams): Record<string, unknown> {
   const body: Record<string, unknown> = {
     model: params?.model ?? IMAGE_API_DEFAULT_MODEL,
     prompt: params?.prompt ?? IMAGE_API_DEFAULT_PROMPT,
@@ -55,6 +55,19 @@ export function buildImageApiReferenceCurlOneLine(
   return buildImageApiCurlOneLine(apiKey, {
     image_urls: [imageUrl],
   });
+}
+
+function powershellJsonBody(value: unknown): string {
+  return JSON.stringify(value).replace(/"/g, '\\"');
+}
+
+/** PowerShell curl.exe one-line for POST /v1/images/generations. */
+export function buildImageApiCurlPowerShellOneLine(
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
+  params?: ImageApiCurlParams
+): string {
+  const body = powershellJsonBody(imageApiCurlBody(params));
+  return `curl.exe -sS "${API_ROOT}/images/generations" -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d "${body}"`;
 }
 
 /** Readable multiline curl for docs display (copy uses one-line helper). */

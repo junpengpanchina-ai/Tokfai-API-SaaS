@@ -35,26 +35,26 @@ model: "${model}"`;
 export const NODE_SDK_INIT_COMMAND = "npm init -y";
 export const NODE_SDK_INSTALL_COMMAND = "npm install openai";
 
-export function buildNodeSdkRunCommand(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
-  return `TOKFAI_API_KEY=${apiKey} node tokfai-test.mjs`;
+export function buildNodeSdkRunCommand(): string {
+  return "node tokfai-test.mjs";
 }
 
 export const PYTHON_VENV_CREATE_COMMAND = "python3 -m venv .venv";
 export const PYTHON_VENV_ACTIVATE_BASH = "source .venv/bin/activate";
 export const PYTHON_SDK_INSTALL_COMMAND = "pip install openai";
 
-export function buildPythonSdkRunCommand(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
-  return `TOKFAI_API_KEY=${apiKey} python tokfai_test.py`;
+export function buildPythonSdkRunCommand(): string {
+  return "python tokfai_test.py";
 }
 
 export function buildNodeChatSdkRunnableFile(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
   return `// Save as tokfai-test.mjs in any folder — no Tokfai project required
 // 1) npm init -y && npm install openai
-// 2) TOKFAI_API_KEY=sk-tokfai_... node tokfai-test.mjs
+// 2) node tokfai-test.mjs
 import OpenAI from "openai";
 
 const client = new OpenAI({
-  apiKey: process.env.TOKFAI_API_KEY ?? "${apiKey}",
+  apiKey: "${apiKey}",
   baseURL: "${TOKFAI_API_BASE_URL}",
 });
 
@@ -92,12 +92,11 @@ export function buildPythonChatSdkRunnableFile(apiKey = TOKFAI_API_KEY_PLACEHOLD
   return `# Save as tokfai_test.py in any folder — no Tokfai project required
 # 1) python3 -m venv .venv && source .venv/bin/activate
 # 2) pip install openai
-# 3) TOKFAI_API_KEY=sk-tokfai_... python tokfai_test.py
-import os
+# 3) python tokfai_test.py
 from openai import OpenAI
 
 client = OpenAI(
-    api_key=os.environ.get("TOKFAI_API_KEY", "${apiKey}"),
+    api_key="${apiKey}",
     base_url="${TOKFAI_API_BASE_URL}",
 )
 

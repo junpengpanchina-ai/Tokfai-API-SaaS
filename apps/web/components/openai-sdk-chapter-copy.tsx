@@ -111,7 +111,7 @@ export function OpenAiSdkChapterCopyPanel({
         />
         <CopyConfigAction
           id={`${idPrefix}-node-run`}
-          value={buildNodeSdkRunCommand(apiKey)}
+          value={buildNodeSdkRunCommand()}
           copiedId={copiedId}
           onCopy={onCopy}
           label={t("integration.clientSoftwareNodeRunAction")}
@@ -173,7 +173,7 @@ export function OpenAiSdkChapterCopyPanel({
         />
         <CopyConfigAction
           id={`${idPrefix}-python-run`}
-          value={buildPythonSdkRunCommand(apiKey)}
+          value={buildPythonSdkRunCommand()}
           copiedId={copiedId}
           onCopy={onCopy}
           label={t("integration.clientSoftwarePythonRunAction")}

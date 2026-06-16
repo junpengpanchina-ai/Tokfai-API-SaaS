@@ -633,6 +633,7 @@ export const messages = {
         copyBaseUrl: "Copy Base URL",
         copyAuthHeader: "Copy Authorization header",
         copyOneLineChatCurl: "Copy one-line Chat curl",
+        copyPowerShellChatCurl: "Copy PowerShell Chat curl",
         copyOneLineModelsCurl: "Copy one-line Models curl",
         copyOneLineBatchCurl: "Copy one-line Batch curl",
         errorCode: "Code",
@@ -1630,6 +1631,20 @@ export const messages = {
       chapterGuideFailure: "If it fails",
       chapterNowTitle: "You can do this now",
       copyOneLineCurl: "Copy one-line curl",
+      readableCurlLabel: "Readable example (display only — copy one-line curl above)",
+      readableCurlHint: "Multi-line curl is for reading only. Use Copy one-line curl — paste in any directory.",
+      oneLineCurlPasteNote:
+        "Paste in any terminal from any directory — no cd, no repository, no install required for curl.",
+      oneLineCurlSuccessFields:
+        "On HTTP 200, check choices[0].message.content, request_id, credits_charged, tokfai.requested_model, tokfai.resolved_model.",
+      oneLineCurlImageSuccessFields:
+        "On HTTP 200, check data[0].url, request_id, credits_charged, model.",
+      oneLineCurlBatchSuccessFields:
+        "Batch: id, status, total_items, succeeded_items, credits_charged. Items: request_id, status, credits_charged.",
+      oneLineCurlReconcileNote:
+        "Copy request_id → Dashboard → Usage (search request_id) → Dashboard → Credits (search reference_id or request_id).",
+      cursorCurlFirstLabel: "Verify API Key first — one-line Chat curl",
+      cherryCurlFirstLabel: "Verify API Key first — one-line Chat curl",
       placeholderKeyNote:
         "sk-tokfai_xxx is a placeholder in examples. After creating a key on API Keys, copy one-line curl with your real secret. Copy request_id from responses and search it in Usage / Credits.",
       ctaCreateKey: "Create API key",
@@ -1886,15 +1901,14 @@ export const messages = {
         "Success: HTTP 200 with request_id, credits_charged, tokfai.requested_model, tokfai.resolved_model.",
       clientSoftwareNodeTitle: "4. OpenAI SDK — Node.js",
       clientSoftwareNodeStep1: "In any empty folder: npm init -y && npm install openai",
-      clientSoftwareNodeStep2:
-        "Save tokfai-test.mjs from above; TOKFAI_API_KEY=sk-tokfai_... node tokfai-test.mjs",
+      clientSoftwareNodeStep2: "Save tokfai-test.mjs from above; run node tokfai-test.mjs",
       clientSoftwareNodeStep3: "baseURL https://api.tokfai.com/v1, model auto-fast.",
       clientSoftwareNodeSuccess:
         "Prints content, request_id, credits_charged, requested_model, tokfai.resolved_model.",
       clientSoftwarePythonTitle: "5. OpenAI SDK — Python",
       clientSoftwarePythonStep1:
         "python3 -m venv .venv && source .venv/bin/activate && pip install openai",
-      clientSoftwarePythonStep2: "Save tokfai_test.py; TOKFAI_API_KEY=... python tokfai_test.py",
+      clientSoftwarePythonStep2: "Save tokfai_test.py; run python tokfai_test.py",
       clientSoftwarePythonStep3: "base_url https://api.tokfai.com/v1, model auto-fast.",
       clientSoftwarePythonSuccess:
         "Prints content, request_id, credits_charged, requested_model, tokfai.resolved_model.",
@@ -2647,11 +2661,11 @@ export const messages = {
       quickStartKeyHintPlaceholder:
         "Showing placeholder sk-tokfai_xxx — create a key on API Keys, then copy curl from the success card or refresh this page.",
       quickStartExpectedResponse:
-        "Success: choices[0].message.content, request_id, credits_charged, and tokfai.resolved_model. If you see missing_token, the Authorization header was not sent — use the one-line copy button above.",
+        "Success: choices[0].message.content, request_id, credits_charged, tokfai.requested_model, tokfai.resolved_model. If you see missing_token, the Authorization header was not sent — use Copy one-line curl above.",
       quickStartFailureResponse:
         "Failure: check error.code and request_id (if present). See the Error codes chapter or search request_id in Usage.",
       quickStartReconcileNote:
-        "Open Dashboard → Usage, search request_id, confirm model, tokens, and credits_charged. Open Dashboard → Credits and match the debit reference / amount for succeeded calls only.",
+        "Copy request_id → Dashboard → Usage (search request_id) → Dashboard → Credits (search reference_id or request_id).",
       quickStep1:
         "Sign in → API Keys → Create API key. Copy the full sk-tokfai_… secret immediately.",
       quickStep2:
@@ -4101,6 +4115,7 @@ export const messages = {
         copyBaseUrl: "复制 Base URL",
         copyAuthHeader: "复制 Authorization header",
         copyOneLineChatCurl: "复制单行 Chat curl",
+        copyPowerShellChatCurl: "复制 PowerShell Chat curl",
         copyOneLineModelsCurl: "复制单行 Models curl",
         copyOneLineBatchCurl: "复制单行 Batch curl",
         errorCode: "错误码",
@@ -5048,6 +5063,20 @@ export const messages = {
       chapterGuideFailure: "失败时怎么看",
       chapterNowTitle: "你现在可以这样做",
       copyOneLineCurl: "复制单行 curl",
+      readableCurlLabel: "可读示例（仅展示 — 请复制上方单行 curl）",
+      readableCurlHint: "多行 curl 仅供阅读。请使用「复制单行 curl」— 任意目录粘贴即可。",
+      oneLineCurlPasteNote:
+        "在任意终端、任意目录粘贴运行 — 无需 cd、无需仓库、curl 无需安装。",
+      oneLineCurlSuccessFields:
+        "HTTP 200 时检查 choices[0].message.content、request_id、credits_charged、tokfai.requested_model、tokfai.resolved_model。",
+      oneLineCurlImageSuccessFields:
+        "HTTP 200 时检查 data[0].url、request_id、credits_charged、model。",
+      oneLineCurlBatchSuccessFields:
+        "Batch：id、status、total_items、succeeded_items、credits_charged。Item：request_id、status、credits_charged。",
+      oneLineCurlReconcileNote:
+        "复制 request_id → Dashboard → Usage（搜 request_id）→ Dashboard → Credits（搜 reference_id 或 request_id）。",
+      cursorCurlFirstLabel: "先验证 API Key — 单行 Chat curl",
+      cherryCurlFirstLabel: "先验证 API Key — 单行 Chat curl",
       placeholderKeyNote:
         "示例中的 sk-tokfai_xxx 是占位符。在 API Keys 创建密钥后，可复制带真实密钥的单行 curl。从响应复制 request_id，在 Usage / Credits 中搜索核对。",
       ctaCreateKey: "创建 API Key",
@@ -5289,14 +5318,14 @@ export const messages = {
       clientSoftwareNodeTitle: "4. OpenAI SDK — Node.js",
       clientSoftwareNodeStep1: "任意空目录：npm init -y && npm install openai",
       clientSoftwareNodeStep2:
-        "保存上方 tokfai-test.mjs；TOKFAI_API_KEY=sk-tokfai_... node tokfai-test.mjs",
+        "保存上方 tokfai-test.mjs；运行 node tokfai-test.mjs",
       clientSoftwareNodeStep3: "baseURL https://api.tokfai.com/v1，model auto-fast。",
       clientSoftwareNodeSuccess:
         "输出 content、request_id、credits_charged、requested_model、tokfai.resolved_model。",
       clientSoftwarePythonTitle: "5. OpenAI SDK — Python",
       clientSoftwarePythonStep1:
         "python3 -m venv .venv && source .venv/bin/activate && pip install openai",
-      clientSoftwarePythonStep2: "保存 tokfai_test.py；TOKFAI_API_KEY=... python tokfai_test.py",
+      clientSoftwarePythonStep2: "保存 tokfai_test.py；运行 python tokfai_test.py",
       clientSoftwarePythonStep3: "base_url https://api.tokfai.com/v1，model auto-fast。",
       clientSoftwarePythonSuccess:
         "输出 content、request_id、credits_charged、requested_model、tokfai.resolved_model。",
@@ -5993,11 +6022,11 @@ export const messages = {
       quickStartKeyHintPlaceholder:
         "当前为占位符 sk-tokfai_xxx——请在 API Keys 创建密钥，从成功卡片复制 curl 或刷新本页。",
       quickStartExpectedResponse:
-        "成功：choices[0].message.content、request_id、credits_charged、tokfai.resolved_model。若出现 missing_token，说明未带上 Authorization——请用上方单行复制按钮。",
+        "成功：choices[0].message.content、request_id、credits_charged、tokfai.requested_model、tokfai.resolved_model。若出现 missing_token，说明未带上 Authorization——请用上方「复制单行 curl」。",
       quickStartFailureResponse:
         "失败：查看 error.code 与 request_id（如有）。见 Error codes 章节或在 Usage 搜索 request_id。",
       quickStartReconcileNote:
-        "打开 Dashboard → Usage，搜索 request_id，核对 model、tokens、credits_charged。打开 Dashboard → Credits，核对成功调用的 reference / amount。",
+        "复制 request_id → Dashboard → Usage（搜 request_id）→ Dashboard → Credits（搜 reference_id 或 request_id）。",
       quickStep1:
         "登录 → API Keys → 创建密钥。立即复制完整 sk-tokfai_… secret。",
       quickStep2:

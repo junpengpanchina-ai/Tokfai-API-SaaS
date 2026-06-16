@@ -47,8 +47,8 @@ export function ClientSoftwareAcceptanceCopyPanel({
   const pythonFile = buildPythonChatSdkRunnableFile(apiKey);
   const nodeConfig = buildNodeSdkConfigSnippet(apiKey);
   const pythonConfig = buildPythonSdkConfigSnippet(apiKey);
-  const nodeRun = buildNodeSdkRunCommand(apiKey);
-  const pythonRun = buildPythonSdkRunCommand(apiKey);
+  const nodeRun = buildNodeSdkRunCommand();
+  const pythonRun = buildPythonSdkRunCommand();
   const cursorConfig = buildCursorConfigSnippet(apiKey);
   const cherryConfig = buildCherryConfigSnippet(apiKey);
   const imageCurl = imageCurlOneLine(apiKey);

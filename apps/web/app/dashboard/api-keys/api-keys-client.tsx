@@ -46,6 +46,7 @@ import { authorizationHeader } from "@/lib/customer-integration-snippets";
 import {
   batchCreateCurlOneLine,
   chatCurlOneLine,
+  chatCurlPowerShellOneLine,
   modelsCurlOneLine,
 } from "@/lib/customer-curl-oneline";
 import { isFullTokfaiApiKey, TOKFAI_API_BASE_URL, TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
@@ -567,6 +568,14 @@ function OneTimeSecretCard({
             copiedId={snippetCopiedId}
             onCopy={handleSnippetCopy}
             label={t("dashboard.apiKeys.copyOneLineChatCurl")}
+            copiedLabel={t("dashboard.apiKeys.copied")}
+          />
+          <CopyConfigAction
+            id="one-time-secret-copy-chat-curl-ps"
+            value={chatCurlPowerShellOneLine(secret)}
+            copiedId={snippetCopiedId}
+            onCopy={handleSnippetCopy}
+            label={t("dashboard.apiKeys.copyPowerShellChatCurl")}
             copiedLabel={t("dashboard.apiKeys.copied")}
           />
           <CopyConfigAction

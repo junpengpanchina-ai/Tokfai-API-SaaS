@@ -70,6 +70,7 @@ export function CodeBlock({
   onCopy,
   copyLabel,
   copiedLabel,
+  allowCopy = true,
 }: {
   id: string;
   label: string;
@@ -80,6 +81,8 @@ export function CodeBlock({
   onCopy: (id: string, value: string) => void;
   copyLabel: string;
   copiedLabel: string;
+  /** Readable-only blocks hide copy — use one-line copy panels above. */
+  allowCopy?: boolean;
 }) {
   const valueToCopy = copyValue ?? code;
 
@@ -89,12 +92,14 @@ export function CodeBlock({
         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {label}
         </span>
-        <CopyButton
-          copied={copied}
-          onCopy={() => onCopy(id, valueToCopy)}
-          copyLabel={copyLabel}
-          copiedLabel={copiedLabel}
-        />
+        {allowCopy ? (
+          <CopyButton
+            copied={copied}
+            onCopy={() => onCopy(id, valueToCopy)}
+            copyLabel={copyLabel}
+            copiedLabel={copiedLabel}
+          />
+        ) : null}
       </div>
       <pre className="overflow-x-auto p-4 text-sm leading-relaxed">
         <code>{code}</code>

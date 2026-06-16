@@ -101,7 +101,14 @@ export type CustomerDocBlock =
   | { type: "paragraph"; textKey: string }
   | { type: "bullets"; items: string[] }
   | { type: "ordered"; items: string[] }
-  | { type: "code"; id: string; label: string; snippetKey: CustomerDocSnippetKey }
+  | {
+      type: "code";
+      id: string;
+      label?: string;
+      labelKey?: string;
+      snippetKey: CustomerDocSnippetKey;
+      readableOnly?: boolean;
+    }
   | { type: "one-line-curl"; id: string; titleKey: string; snippetKey?: CustomerDocSnippetKey }
   | { type: "chat-api-copy-panel"; id: string }
   | { type: "image-api-copy-panel"; id: string; showReference?: boolean }
@@ -514,8 +521,9 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       {
         type: "code",
         id: "quick-start-chat-curl-readable",
-        label: "readable multi-line",
+        labelKey: "integration.readableCurlLabel",
         snippetKey: "chat-curl",
+        readableOnly: true,
       },
       {
         type: "dashboard-links",
@@ -829,8 +837,9 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       {
         type: "code",
         id: "api-key-models-readable",
-        label: "models (readable)",
+        labelKey: "integration.readableCurlLabel",
         snippetKey: "models-curl",
+        readableOnly: true,
       },
       {
         type: "dashboard-links",
@@ -909,8 +918,9 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       {
         type: "code",
         id: "chat-curl-readable",
-        label: "readable multi-line",
+        labelKey: "integration.readableCurlLabel",
         snippetKey: "chat-curl",
+        readableOnly: true,
       },
       {
         type: "dashboard-links",
@@ -1018,8 +1028,9 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       {
         type: "code",
         id: "image-curl-readable",
-        label: "readable multi-line",
+        labelKey: "integration.readableCurlLabel",
         snippetKey: "image-curl",
+        readableOnly: true,
       },
       {
         type: "dashboard-links",
@@ -1174,14 +1185,16 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       {
         type: "code",
         id: "batch-create-readable",
-        label: "create batch (readable)",
+        labelKey: "integration.readableCurlLabel",
         snippetKey: "batch-create-curl",
+        readableOnly: true,
       },
       {
         type: "code",
         id: "batch-poll-readable",
-        label: "poll batch (readable)",
+        labelKey: "integration.readableCurlLabel",
         snippetKey: "batch-poll-curl",
+        readableOnly: true,
       },
       {
         type: "dashboard-links",

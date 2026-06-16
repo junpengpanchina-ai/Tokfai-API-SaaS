@@ -2,7 +2,11 @@
 
 import { CopyButton } from "@/components/copy-code-block";
 import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
-import { chatCurlOneLine } from "@/lib/customer-curl-oneline";
+import { OneLineCurlCopyFields } from "@/components/one-line-curl-copy-fields";
+import {
+  chatCurlOneLine,
+  chatCurlPowerShellOneLine,
+} from "@/lib/customer-curl-oneline";
 import {
   buildCursorConfigSnippet,
   buildCursorCopyFields,
@@ -17,7 +21,6 @@ export const CURSOR_CONFIG_COPY_ID = "cursor-config";
 export const CURSOR_BASE_URL_COPY_ID = "cursor-base-url";
 export const CURSOR_AUTH_COPY_ID = "cursor-auth";
 export const CURSOR_MODEL_COPY_ID = "cursor-model";
-export const CURSOR_CHAT_CURL_COPY_ID = "cursor-chat-curl";
 
 type CursorChapterCopyPanelProps = {
   apiKey: string;
@@ -38,6 +41,7 @@ export function CursorChapterCopyPanel({
   const baseUrl = TOKFAI_API_BASE_URL;
   const authHeader = authorizationHeader(apiKey);
   const chatCurl = chatCurlOneLine(apiKey);
+  const psCurl = chatCurlPowerShellOneLine(apiKey);
   const keyIsPlaceholder = isQuickStartKeyPlaceholder(apiKey);
 
   return (
@@ -45,6 +49,18 @@ export function CursorChapterCopyPanel({
       <p className="text-sm font-semibold text-foreground">
         {t("integration.cursorCopyNowTitle")}
       </p>
+      <OneLineCurlCopyFields
+        apiKey={apiKey}
+        bashLabel={t("integration.cursorCurlFirstLabel")}
+        bashCurl={chatCurl}
+        powershellCurl={psCurl}
+        copiedId={copiedId}
+        onCopy={onCopy}
+        idPrefix={`${idPrefix}-verify-curl`}
+        liveKeyNoteKey="integration.cursorLiveKeyNote"
+      />
+      <p className="text-xs text-muted-foreground">{t("integration.oneLineCurlSuccessFields")}</p>
+      <p className="text-xs text-muted-foreground">{t("integration.oneLineCurlReconcileNote")}</p>
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full text-sm">
           <tbody>
@@ -120,14 +136,6 @@ export function CursorChapterCopyPanel({
           copiedId={copiedId}
           onCopy={onCopy}
           label={t("integration.cursorCopyModelAction")}
-          copiedLabel={t("integration.copied")}
-        />
-        <CopyConfigAction
-          id={`${idPrefix}-${CURSOR_CHAT_CURL_COPY_ID}-action`}
-          value={chatCurl}
-          copiedId={copiedId}
-          onCopy={onCopy}
-          label={t("integration.copyOneLineChatCurl")}
           copiedLabel={t("integration.copied")}
         />
       </div>

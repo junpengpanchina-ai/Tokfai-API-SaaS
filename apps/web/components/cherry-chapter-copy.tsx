@@ -2,7 +2,13 @@
 
 import { CopyButton } from "@/components/copy-code-block";
 import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
-import { chatCurlOneLine, modelsCurlOneLine } from "@/lib/customer-curl-oneline";
+import { OneLineCurlCopyFields } from "@/components/one-line-curl-copy-fields";
+import {
+  chatCurlOneLine,
+  chatCurlPowerShellOneLine,
+  modelsCurlOneLine,
+  modelsCurlPowerShellOneLine,
+} from "@/lib/customer-curl-oneline";
 import {
   buildCherryConfigSnippet,
   buildCherryCopyFields,
@@ -39,7 +45,9 @@ export function CherryChapterCopyPanel({
   const baseUrl = TOKFAI_API_BASE_URL;
   const authHeader = authorizationHeader(apiKey);
   const chatCurl = chatCurlOneLine(apiKey);
+  const psCurl = chatCurlPowerShellOneLine(apiKey);
   const modelsCurl = modelsCurlOneLine(apiKey);
+  const modelsPsCurl = modelsCurlPowerShellOneLine(apiKey);
   const keyIsPlaceholder = isQuickStartKeyPlaceholder(apiKey);
 
   return (
@@ -47,6 +55,28 @@ export function CherryChapterCopyPanel({
       <p className="text-sm font-semibold text-foreground">
         {t("integration.cherryCopyNowTitle")}
       </p>
+      <OneLineCurlCopyFields
+        apiKey={apiKey}
+        bashLabel={t("integration.cherryCurlFirstLabel")}
+        bashCurl={chatCurl}
+        powershellCurl={psCurl}
+        copiedId={copiedId}
+        onCopy={onCopy}
+        idPrefix={`${idPrefix}-verify-curl`}
+        liveKeyNoteKey="integration.cherryLiveKeyNote"
+      />
+      <OneLineCurlCopyFields
+        apiKey={apiKey}
+        bashLabel={t("integration.apiKeyVerifyCurlLabel")}
+        bashCurl={modelsCurl}
+        powershellCurl={modelsPsCurl}
+        copiedId={copiedId}
+        onCopy={onCopy}
+        idPrefix={`${idPrefix}-models-curl`}
+        showKeyNote={false}
+      />
+      <p className="text-xs text-muted-foreground">{t("integration.oneLineCurlSuccessFields")}</p>
+      <p className="text-xs text-muted-foreground">{t("integration.oneLineCurlReconcileNote")}</p>
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full text-sm">
           <tbody>
@@ -122,22 +152,6 @@ export function CherryChapterCopyPanel({
           copiedId={copiedId}
           onCopy={onCopy}
           label={t("integration.cherryCopyModelAction")}
-          copiedLabel={t("integration.copied")}
-        />
-        <CopyConfigAction
-          id={`${idPrefix}-${CHERRY_CHAT_CURL_COPY_ID}-action`}
-          value={chatCurl}
-          copiedId={copiedId}
-          onCopy={onCopy}
-          label={t("integration.copyOneLineChatCurl")}
-          copiedLabel={t("integration.copied")}
-        />
-        <CopyConfigAction
-          id={`${idPrefix}-${CHERRY_MODELS_CURL_COPY_ID}-action`}
-          value={modelsCurl}
-          copiedId={copiedId}
-          onCopy={onCopy}
-          label={t("integration.copyOneLineModelsCurl")}
           copiedLabel={t("integration.copied")}
         />
       </div>
