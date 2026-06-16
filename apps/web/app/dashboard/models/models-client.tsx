@@ -140,6 +140,21 @@ export function ModelsClient({
         </CardContent>
       </Card>
 
+      <Card className="border-primary/15 bg-primary/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">{t("dashboard.models.productionGuidanceTitle")}</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2 text-sm text-muted-foreground">
+          <ul className="list-disc space-y-1.5 pl-5">
+            <li>{t("dashboard.models.productionGuidanceAutoFast")}</li>
+            <li>{t("dashboard.models.productionGuidanceAutoPro")}</li>
+            <li>{t("dashboard.models.productionGuidanceAutoCheap")}</li>
+            <li>{t("dashboard.models.productionGuidanceExplicit")}</li>
+            <li>{t("dashboard.models.productionGuidanceBatchNote")}</li>
+          </ul>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <OverviewStat
           label={t("dashboard.models.overviewTotal")}
@@ -356,6 +371,18 @@ export function ModelsClient({
             <Link href="/dashboard/docs#quick-start">
               <Terminal className="mr-1.5 h-4 w-4" />
               {t("dashboard.models.footerQuickStart")}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/docs#production-use">
+              <BookOpen className="mr-1.5 h-4 w-4" />
+              {t("dashboard.models.footerProductionUse")}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/docs#rate-limits-large-volume">
+              <Terminal className="mr-1.5 h-4 w-4" />
+              {t("dashboard.models.footerRateLimits")}
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline">

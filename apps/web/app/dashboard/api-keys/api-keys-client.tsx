@@ -521,6 +521,33 @@ function OneTimeSecretCard({
         </div>
         <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">
           <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
+            {t("dashboard.apiKeys.productionHandoffTitle")}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#production-use">
+                {t("dashboard.apiKeys.productionUseGuide")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#rate-limits-large-volume">
+                {t("dashboard.apiKeys.rateLimitsGuide")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#commercial-faq">
+                {t("dashboard.apiKeys.commercialFaqGuide")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#usage-credits">
+                {t("dashboard.apiKeys.viewUsageCreditsDocs")}
+              </Link>
+            </Button>
+          </div>
+        </div>
+        <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
             {t("dashboard.apiKeys.nextStepsTitle")}
           </p>
           <ol className="mt-2 list-decimal space-y-1 pl-4 text-sm text-muted-foreground">

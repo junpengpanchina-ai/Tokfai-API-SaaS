@@ -1171,6 +1171,294 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
     ],
   },
   {
+    id: "production-use",
+    navKey: "integration.navProductionUse",
+    titleKey: "integration.productionUseTitle",
+    descriptionKey: "integration.productionUseDesc",
+    highlight: true,
+    chapterGuide: chapter(
+      "integration.productionUseChapterPurpose",
+      "integration.productionUseChapterCopy",
+      "integration.productionUseChapterVerify",
+      "integration.productionUseChapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "keys",
+        labelKey: "integration.ctaCreateKey",
+        href: "/dashboard/api-keys",
+      },
+      copySnippetKey: "chat-curl",
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "paragraph", textKey: "integration.productionUseGatewayNote" },
+      { type: "paragraph", textKey: "integration.productionUseKeysTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.productionUseKeyTest",
+          "integration.productionUseKeyProd",
+          "integration.productionUseKeyRevoke",
+          "integration.productionUseKeyPerSystem",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.productionUsePathTitle" },
+      {
+        type: "ordered",
+        items: [
+          "integration.productionUsePathStep1",
+          "integration.productionUsePathStep2",
+          "integration.productionUsePathStep3",
+          "integration.productionUsePathStep4",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.productionUseServerTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.productionUseServerEnv",
+          "integration.productionUseServerNoClient",
+          "integration.productionUseServerLeak",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.productionUseModelsTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.productionUseModelAutoFast",
+          "integration.productionUseModelAutoPro",
+          "integration.productionUseModelAutoCheap",
+          "integration.productionUseModelExplicit",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.productionUseBillingTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.productionUseBillingSuccess",
+          "integration.productionUseBillingFailed",
+          "integration.productionUseBillingSource",
+        ],
+      },
+      {
+        type: "dashboard-links",
+        links: [
+          { id: "keys", labelKey: "integration.ctaCreateKey", href: "/dashboard/api-keys" },
+          {
+            id: "quick-start",
+            labelKey: "integration.navQuickStart",
+            href: "/dashboard/docs",
+            hash: "quick-start",
+          },
+          {
+            id: "client-connector",
+            labelKey: "integration.navClientConnector",
+            href: "/dashboard/docs",
+            hash: "client-connector-flow",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+          {
+            id: "rate-limits-docs",
+            labelKey: "integration.navRateLimits",
+            href: "/dashboard/docs",
+            hash: "rate-limits-large-volume",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "rate-limits-large-volume",
+    navKey: "integration.navRateLimits",
+    titleKey: "integration.rateLimitsTitle",
+    descriptionKey: "integration.rateLimitsDesc",
+    chapterGuide: chapter(
+      "integration.rateLimitsChapterPurpose",
+      "integration.rateLimitsChapterCopy",
+      "integration.rateLimitsChapterVerify",
+      "integration.rateLimitsChapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "batch-docs",
+        labelKey: "integration.navBatch",
+        href: "/dashboard/docs",
+        hash: "batch-api",
+      },
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "paragraph", textKey: "integration.rateLimitsWhyTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.rateLimitsWhyBalance",
+          "integration.rateLimitsWhyUpstream",
+          "integration.rateLimitsWhyGateway",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.rateLimitsRampTitle" },
+      {
+        type: "ordered",
+        items: [
+          "integration.rateLimitsRampStep1",
+          "integration.rateLimitsRampStep2",
+          "integration.rateLimitsRampStep3",
+          "integration.rateLimitsRampStep4",
+          "integration.rateLimitsRampStep5",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.rateLimitsBatchTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.rateLimitsBatchPrefer",
+          "integration.rateLimitsBatchRequestId",
+          "integration.rateLimitsBatchSucceeded",
+          "integration.rateLimitsBatchFailed",
+          "integration.rateLimitsBatchItemsEndpoint",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.rateLimitsConcurrencyTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.rateLimitsRetryBackoff",
+          "integration.rateLimitsTooManyRequests",
+          "integration.rateLimitsUpstreamTimeout",
+          "integration.rateLimitsGatewayOverloaded",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.rateLimitsCustomerNote" },
+      {
+        type: "dashboard-links",
+        links: [
+          {
+            id: "batch-api",
+            labelKey: "integration.navBatch",
+            href: "/dashboard/docs",
+            hash: "batch-api",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+          {
+            id: "production-use-docs",
+            labelKey: "integration.navProductionUse",
+            href: "/dashboard/docs",
+            hash: "production-use",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "commercial-faq",
+    navKey: "integration.navCommercialFaq",
+    titleKey: "integration.commercialFaqTitle",
+    descriptionKey: "integration.commercialFaqDesc",
+    highlight: true,
+    chapterGuide: chapter(
+      "integration.commercialFaqChapterPurpose",
+      "integration.commercialFaqChapterCopy",
+      "integration.commercialFaqChapterVerify",
+      "integration.commercialFaqChapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "keys",
+        labelKey: "integration.ctaCreateKey",
+        href: "/dashboard/api-keys",
+      },
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "paragraph", textKey: "integration.commercialFaqWhatTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.commercialFaqWhatApiKey",
+          "integration.commercialFaqWhatGateway",
+          "integration.commercialFaqWhatRouting",
+          "integration.commercialFaqWhatMetering",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.commercialFaqAgencyTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.commercialFaqAgencyNot",
+          "integration.commercialFaqAgencyCustomer",
+          "integration.commercialFaqAgencyTokfaiOnly",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.commercialFaqHospitalTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.commercialFaqHospitalUse",
+          "integration.commercialFaqHospitalBoundary",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.commercialFaqAutomotiveTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.commercialFaqAutomotiveUse",
+          "integration.commercialFaqAutomotiveBoundary",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.commercialFaqEcommerceTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.commercialFaqEcommerceUse",
+          "integration.commercialFaqEcommerceBoundary",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.commercialFaqAiSupportTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.commercialFaqAiSupportYes",
+          "integration.commercialFaqAiSupportCrm",
+          "integration.commercialFaqAiSupportTokfaiOnly",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.commercialFaqReconcileTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.commercialFaqReconcileRequestId",
+          "integration.commercialFaqReconcileUsage",
+          "integration.commercialFaqReconcileCredits",
+          "integration.commercialFaqReconcileBatch",
+        ],
+      },
+      {
+        type: "dashboard-links",
+        links: [
+          { id: "keys", labelKey: "integration.ctaCreateKey", href: "/dashboard/api-keys" },
+          {
+            id: "production-use-docs",
+            labelKey: "integration.navProductionUse",
+            href: "/dashboard/docs",
+            hash: "production-use",
+          },
+          {
+            id: "usage-credits-docs",
+            labelKey: "integration.linkUsageCreditsGuide",
+            href: "/dashboard/docs",
+            hash: "usage-credits",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+        ],
+      },
+    ],
+  },
+  {
     id: "error-codes",
     navKey: "integration.navErrors",
     titleKey: "integration.errorsTitle",

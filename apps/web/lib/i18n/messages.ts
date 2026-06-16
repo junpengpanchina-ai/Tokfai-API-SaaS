@@ -387,6 +387,19 @@ export const messages = {
         },
         smartRoutingRealModelNote:
           "You can still pass a real model ID (e.g. gpt-5.4). Tokfai will not auto-fallback for explicit IDs — you get upstream_model_busy if that model is hot.",
+        productionGuidanceTitle: "Production model strategy",
+        productionGuidanceAutoFast:
+          "auto-fast — default recommendation for go-live smoke tests and general traffic.",
+        productionGuidanceAutoPro:
+          "auto-pro — higher-quality tasks when you need stronger reasoning.",
+        productionGuidanceAutoCheap:
+          "auto-cheap — low-cost batch-style workloads.",
+        productionGuidanceExplicit:
+          "Explicit model IDs — for advanced customers who understand upstream trade-offs.",
+        productionGuidanceBatchNote:
+          "Large volume jobs: prefer Batch API and reconcile each request_id in Usage / Credits.",
+        footerProductionUse: "Production use",
+        footerRateLimits: "Rate limits",
         howToEstimateTitle: "How to estimate call cost?",
         howToEstimateItem1:
           "Chat models bill input tokens and output tokens separately.",
@@ -661,6 +674,10 @@ export const messages = {
         copyBatchCurl: "Copy batch curl",
         openAiSdkGuide: "OpenAI SDK guide",
         clientConnectorGuide: "Verify curl first",
+        productionUseGuide: "Production use",
+        rateLimitsGuide: "Rate limits & volume",
+        commercialFaqGuide: "Commercial FAQ",
+        productionHandoffTitle: "Production handoff",
         batchApiGuide: "Batch API guide",
         placeholderKeyNote:
           "sk-tokfai_xxx is a placeholder in the handbook. This card uses your real key in one-line curls — paste directly into zsh.",
@@ -1601,6 +1618,9 @@ export const messages = {
       navCursor: "Cursor",
       navCherry: "Cherry Studio",
       navIndustry: "Industry API examples",
+      navProductionUse: "Production use",
+      navRateLimits: "Rate limits & large volume",
+      navCommercialFaq: "Commercial FAQ",
       chapterGuidePurpose: "What this chapter solves",
       chapterGuideCopy: "What to copy",
       chapterGuideVerify: "How to verify success",
@@ -1668,6 +1688,152 @@ export const messages = {
       clientConnectorNoCd: "No cd into any folder required — paste curl from any directory.",
       clientConnectorReconcileNote:
         "Usage shows request details; Credits shows balance ledger. Successful calls debit credits; failures are usually not charged.",
+      productionUseTitle: "Production use",
+      productionUseDesc:
+        "How to go live with API Keys, model choice, server-side secrets, and Usage / Credits reconciliation.",
+      productionUseChapterPurpose:
+        "Move from integration testing to a stable production API setup.",
+      productionUseChapterCopy:
+        "Separate test and production keys, server-side API Key storage, and auto-* model aliases.",
+      productionUseChapterVerify:
+        "Production key works in curl and your backend; Usage / Credits match request_id.",
+      productionUseChapterFailure:
+        "If charges look wrong, search request_id in Usage before changing client code.",
+      productionUseGatewayNote:
+        "Tokfai is an API gateway / model relay / API Key metering system — not a managed operations vendor. You operate your product; Tokfai provides API access, routing, and Usage / Credits tracking.",
+      productionUseKeysTitle: "Test keys vs production keys",
+      productionUseKeyTest:
+        "During integration, create a test key (name it clearly, e.g. integration-test).",
+      productionUseKeyProd:
+        "Before go-live, create a production key for each environment or business system.",
+      productionUseKeyRevoke:
+        "Revoke keys you no longer use — leaked or retired keys should not stay active.",
+      productionUseKeyPerSystem:
+        "One key per backend or product line makes Usage filtering and incident response easier.",
+      productionUsePathTitle: "Customer go-live path",
+      productionUsePathStep1: "Dashboard → API Keys → create API Key.",
+      productionUsePathStep2:
+        "Copy one-line Chat curl, run in any terminal, confirm HTTP 200 and request_id.",
+      productionUsePathStep3:
+        "Wire the same Base URL and API Key into OpenAI SDK, Cursor, Cherry, or your backend.",
+      productionUsePathStep4:
+        "After launch, copy request_id from responses → Usage (request detail) and Credits (ledger).",
+      productionUseServerTitle: "Server-side API Key rules",
+      productionUseServerEnv:
+        "Store API Keys in server environment variables or a secrets manager — not in source bundles shipped to users.",
+      productionUseServerNoClient:
+        "Do not embed API Keys in mobile apps, browser frontends, or public source code.",
+      productionUseServerLeak:
+        "If you suspect a leak, revoke the key immediately and create a replacement on API Keys.",
+      productionUseModelsTitle: "Recommended model strategy",
+      productionUseModelAutoFast:
+        "auto-fast — default for production smoke tests and general business traffic.",
+      productionUseModelAutoPro:
+        "auto-pro — quality-first tasks (analysis, complex reasoning).",
+      productionUseModelAutoCheap:
+        "auto-cheap — low-cost batch-style workloads.",
+      productionUseModelExplicit:
+        "Explicit model IDs — only when you understand upstream differences and accept no auto-fallback.",
+      productionUseBillingTitle: "Success, failure, and charges",
+      productionUseBillingSuccess:
+        "HTTP 200 / 202 with a successful result usually debits credits.",
+      productionUseBillingFailed:
+        "invalid_token, missing_token, model_not_available, upstream_timeout, and most other errors are usually not charged.",
+      productionUseBillingSource:
+        "Usage and Credits pages are the source of truth — reconcile by request_id.",
+      rateLimitsTitle: "Rate limits & large volume",
+      rateLimitsDesc:
+        "How to scale call volume safely with Batch API, staged load tests, and retries.",
+      rateLimitsChapterPurpose:
+        "Run large workloads without exhausting balance or upstream capacity.",
+      rateLimitsChapterCopy:
+        "Staged volume tests (10 → 100 → 1,000) and Batch API for bulk text jobs.",
+      rateLimitsChapterVerify:
+        "Usage shows per-request_id charges; failed items do not inflate Credits debits.",
+      rateLimitsChapterFailure:
+        "too_many_requests or gateway_overloaded — slow down, batch, or retry with backoff.",
+      rateLimitsWhyTitle: "Why rate limits exist",
+      rateLimitsWhyBalance: "Protect your credit balance from accidental runaway traffic.",
+      rateLimitsWhyUpstream: "Protect upstream model stability during peak demand.",
+      rateLimitsWhyGateway: "Prevent a single API Key from saturating the shared gateway.",
+      rateLimitsRampTitle: "Staged volume testing (recommended)",
+      rateLimitsRampStep1: "Start with 10 successful calls — confirm Usage and Credits.",
+      rateLimitsRampStep2: "Scale to 100 calls — watch error rates and credits_charged.",
+      rateLimitsRampStep3: "Scale to 1,000 calls — use Batch API where possible.",
+      rateLimitsRampStep4: "Plan 10k batches in chunks — do not launch full concurrency on day one.",
+      rateLimitsRampStep5:
+        "For 100k+ workloads, split into batches and monitor Usage / Credits per batch.",
+      rateLimitsBatchTitle: "Batch API for large text jobs",
+      rateLimitsBatchPrefer:
+        "Prefer POST /v1/batches/chat for large text workloads instead of thousands of parallel chat calls.",
+      rateLimitsBatchRequestId: "Each batch item has its own request_id.",
+      rateLimitsBatchSucceeded: "Succeeded items debit credits.",
+      rateLimitsBatchFailed: "Failed or cancelled items are usually not charged.",
+      rateLimitsBatchItemsEndpoint:
+        "Reconcile with GET /v1/batches/{id}/items — match request_id in Usage and Credits.",
+      rateLimitsConcurrencyTitle: "Concurrency and retries",
+      rateLimitsRetryBackoff: "Implement retries with backoff in your client or worker.",
+      rateLimitsTooManyRequests:
+        "too_many_requests — reduce concurrency and request rate.",
+      rateLimitsUpstreamTimeout:
+        "upstream_timeout — wait and retry, or switch to auto-fast.",
+      rateLimitsGatewayOverloaded:
+        "gateway_overloaded — split work into smaller batches and retry later.",
+      rateLimitsCustomerNote:
+        "Tokfai supports high-volume API usage, but large jobs should be staged and load-tested. We do not guarantee any upstream model is never busy. Tokfai provides smart routing, fallback aliases, request_id, and Usage / Credits reconciliation.",
+      commercialFaqTitle: "Commercial FAQ",
+      commercialFaqDesc:
+        "What Tokfai sells, what we do not operate, and how industries can adopt the API.",
+      commercialFaqChapterPurpose:
+        "Answer procurement and technical stakeholder questions before contract sign-off.",
+      commercialFaqChapterCopy:
+        "API Key access, OpenAI-compatible gateway, model routing, Usage / Credits metering.",
+      commercialFaqChapterVerify:
+        "Stakeholders understand Tokfai is API infrastructure — not business operations outsourcing.",
+      commercialFaqChapterFailure:
+        "If expectations include Tokfai running your customers or tickets, re-read the not-agency section.",
+      commercialFaqWhatTitle: "What does Tokfai sell?",
+      commercialFaqWhatApiKey: "API Keys — credentials for https://api.tokfai.com/v1.",
+      commercialFaqWhatGateway:
+        "OpenAI-compatible API gateway — Chat, Image, and Batch endpoints.",
+      commercialFaqWhatRouting: "Model routing — auto-fast / auto-pro / auto-cheap aliases and explicit model IDs.",
+      commercialFaqWhatMetering:
+        "Usage & Credits tracking — request_id per call, ledger debits for reconciliation.",
+      commercialFaqAgencyTitle: "Is Tokfai a managed operations vendor?",
+      commercialFaqAgencyNot:
+        "No. Tokfai does not operate your business, customers, tickets, clinics, or orders.",
+      commercialFaqAgencyCustomer:
+        "Your team owns product UX, customer communication, and business commitments.",
+      commercialFaqAgencyTokfaiOnly:
+        "Tokfai provides API access, metering, and routing — you integrate and operate.",
+      commercialFaqHospitalTitle: "Can hospitals use Tokfai?",
+      commercialFaqHospitalUse:
+        "Yes — for patient service drafts, record summarization helpers, imaging prompt assistance, and internal workflow automation.",
+      commercialFaqHospitalBoundary:
+        "Medical boundary: assistive drafting only — not a diagnosis, not treatment promises, not a substitute for licensed clinical judgment.",
+      commercialFaqAutomotiveTitle: "Can automotive companies use Tokfai?",
+      commercialFaqAutomotiveUse:
+        "Yes — owner manual Q&A, service ticket classification, damage photo descriptions, internal knowledge search.",
+      commercialFaqAutomotiveBoundary:
+        "Final customer-facing answers should be confirmed by your systems and staff.",
+      commercialFaqEcommerceTitle: "Can e-commerce use Tokfai?",
+      commercialFaqEcommerceUse:
+        "Yes — product copy, bulk titles, support reply drafts, image generation prompts.",
+      commercialFaqEcommerceBoundary:
+        "Review generated content before publishing — Tokfai does not publish on your storefront.",
+      commercialFaqAiSupportTitle: "Can AI customer support use Tokfai?",
+      commercialFaqAiSupportYes:
+        "Yes — connect your CRM or ticket system to Tokfai API for model responses.",
+      commercialFaqAiSupportCrm:
+        "Recommended: your CRM / helpdesk calls Tokfai; you control routing, escalation, and send actions.",
+      commercialFaqAiSupportTokfaiOnly:
+        "Tokfai does not host your tickets — it returns model output for your system to review and send.",
+      commercialFaqReconcileTitle: "How do customers reconcile usage?",
+      commercialFaqReconcileRequestId: "Copy request_id from every successful API response.",
+      commercialFaqReconcileUsage: "Usage — search request_id for model, tokens, status, credits_charged.",
+      commercialFaqReconcileCredits: "Credits — match ledger reference_id / amount to Usage rows.",
+      commercialFaqReconcileBatch:
+        "Batch — each succeeded item has its own request_id; reconcile items individually.",
       positioningChapterPurpose:
         "Clarify Tokfai as an API gateway and model relay — not a managed operations vendor.",
       positioningChapterCopy:
@@ -3610,6 +3776,15 @@ export const messages = {
         },
         smartRoutingRealModelNote:
           "仍可传入真实 model ID（如 gpt-5.4）。明确指定时 Tokfai 不会自动 fallback — 若该模型繁忙将返回 upstream_model_busy。",
+        productionGuidanceTitle: "生产模型策略",
+        productionGuidanceAutoFast: "auto-fast — 默认推荐，适合上线冒烟与普通业务。",
+        productionGuidanceAutoPro: "auto-pro — 高质量任务。",
+        productionGuidanceAutoCheap: "auto-cheap — 批量低成本任务。",
+        productionGuidanceExplicit: "真实模型 ID — 高级客户按需选择。",
+        productionGuidanceBatchNote:
+          "大批量调用建议结合 Batch API，并在 Usage / Credits 按 request_id 对账。",
+        footerProductionUse: "生产上线",
+        footerRateLimits: "限流与大批量",
         howToEstimateTitle: "如何估算调用成本？",
         howToEstimateItem1: "对话模型按 input tokens 与 output tokens 分别计费。",
         howToEstimateItem2: "图片模型通常按「每张图」计费。",
@@ -3867,6 +4042,10 @@ export const messages = {
         copyBatchCurl: "复制 Batch curl",
         openAiSdkGuide: "OpenAI SDK 指南",
         clientConnectorGuide: "先 curl 验证",
+        productionUseGuide: "生产上线",
+        rateLimitsGuide: "限流与大批量",
+        commercialFaqGuide: "商业 FAQ",
+        productionHandoffTitle: "生产交付",
         batchApiGuide: "Batch API 指南",
         placeholderKeyNote:
           "文档中的 sk-tokfai_xxx 是占位符。本卡片中的单行 curl 已填入你的真实密钥，可直接粘贴到 zsh。",
@@ -4759,6 +4938,9 @@ export const messages = {
       navCursor: "Cursor",
       navCherry: "Cherry Studio",
       navIndustry: "行业 API 接入示例",
+      navProductionUse: "生产上线",
+      navRateLimits: "限流与大批量调用",
+      navCommercialFaq: "商业与采购 FAQ",
       chapterGuidePurpose: "本章解决什么问题",
       chapterGuideCopy: "需要复制什么",
       chapterGuideVerify: "跑通后如何验证",
@@ -4823,6 +5005,140 @@ export const messages = {
       clientConnectorNoCd: "无需 cd 到任何目录——任意目录粘贴 curl 即可。",
       clientConnectorReconcileNote:
         "Usage 看请求明细；Credits 看余额账本。成功扣费，失败通常不扣费。",
+      productionUseTitle: "生产上线",
+      productionUseDesc:
+        "如何用 API Key、模型策略、服务端密钥与 Usage / Credits 完成生产上线。",
+      productionUseChapterPurpose: "从联调测试过渡到稳定的生产 API 配置。",
+      productionUseChapterCopy:
+        "区分测试与生产密钥、服务端存放 API Key、auto-* 模型别名。",
+      productionUseChapterVerify:
+        "生产密钥在 curl 与后端可用；Usage / Credits 可按 request_id 核对。",
+      productionUseChapterFailure:
+        "若扣费异常，先在 Usage 搜索 request_id，再改客户端代码。",
+      productionUseGatewayNote:
+        "Tokfai 是 API 网关 / 模型中转 / API Key 计量系统——不是代运营。你运营自己的产品；Tokfai 提供 API 接入、路由与 Usage / Credits 计量。",
+      productionUseKeysTitle: "测试 Key 与生产 Key",
+      productionUseKeyTest: "联调阶段可创建测试 Key（命名清晰，如 integration-test）。",
+      productionUseKeyProd: "上线前为每个环境或业务系统创建生产 Key。",
+      productionUseKeyRevoke: "不再使用的 Key 应 revoke；泄露或废弃的 Key 不要保持活跃。",
+      productionUseKeyPerSystem:
+        "每个后端或产品线单独 Key，便于 Usage 筛选与事故处理。",
+      productionUsePathTitle: "客户上线路径",
+      productionUsePathStep1: "Dashboard → API Keys → 创建 API Key。",
+      productionUsePathStep2:
+        "复制单行 Chat curl，任意终端运行，确认 HTTP 200 与 request_id。",
+      productionUsePathStep3:
+        "将同一 Base URL 与 API Key 接入 OpenAI SDK、Cursor、Cherry 或自有后端。",
+      productionUsePathStep4:
+        "上线后从响应复制 request_id → Usage（请求明细）与 Credits（账本）。",
+      productionUseServerTitle: "服务端 API Key 规范",
+      productionUseServerEnv:
+        "API Key 放在服务端环境变量或密钥管理服务中——不要打进发给用户的安装包。",
+      productionUseServerNoClient:
+        "不要写入移动 App、浏览器前端或公开源代码。",
+      productionUseServerLeak:
+        "若怀疑泄露，立即 revoke 并在 API Keys 创建替换密钥。",
+      productionUseModelsTitle: "推荐模型策略",
+      productionUseModelAutoFast: "auto-fast — 生产冒烟与普通业务默认。",
+      productionUseModelAutoPro: "auto-pro — 高质量任务（分析、复杂推理）。",
+      productionUseModelAutoCheap: "auto-cheap — 低成本批量类任务。",
+      productionUseModelExplicit:
+        "指定真实模型 ID — 仅当你了解上游差异并接受无自动容错时使用。",
+      productionUseBillingTitle: "成功、失败与扣费",
+      productionUseBillingSuccess: "HTTP 200 / 202 且成功结果通常扣 credits。",
+      productionUseBillingFailed:
+        "invalid_token、missing_token、model_not_available、upstream_timeout 等失败通常不扣费。",
+      productionUseBillingSource:
+        "以 Usage 与 Credits 页面为准——用 request_id 对账。",
+      rateLimitsTitle: "限流与大批量调用",
+      rateLimitsDesc:
+        "如何用 Batch API、分阶段压测与重试安全扩大调用量。",
+      rateLimitsChapterPurpose: "大批量调用时不耗尽余额或上游容量。",
+      rateLimitsChapterCopy: "分阶段放量（10 → 100 → 1,000）与 Batch 批量文本任务。",
+      rateLimitsChapterVerify:
+        "Usage 按 request_id 显示扣费；失败项不应增加 Credits 扣款。",
+      rateLimitsChapterFailure:
+        "too_many_requests 或 gateway_overloaded — 降速、分批或退避重试。",
+      rateLimitsWhyTitle: "为什么有限流",
+      rateLimitsWhyBalance: "防止意外流量耗尽积分余额。",
+      rateLimitsWhyUpstream: "保护上游模型在高峰期的稳定性。",
+      rateLimitsWhyGateway: "防止单个 API Key 打满共享网关。",
+      rateLimitsRampTitle: "分阶段放量（推荐）",
+      rateLimitsRampStep1: "先跑 10 条成功调用 — 确认 Usage 与 Credits。",
+      rateLimitsRampStep2: "扩到 100 条 — 观察错误率与 credits_charged。",
+      rateLimitsRampStep3: "扩到 1,000 条 — 尽量使用 Batch API。",
+      rateLimitsRampStep4: "10k 规模分批执行 — 不要首日全量并发打满。",
+      rateLimitsRampStep5:
+        "100k+  workloads 拆成多批，按批监控 Usage / Credits。",
+      rateLimitsBatchTitle: "大批量文本用 Batch API",
+      rateLimitsBatchPrefer:
+        "大批量文本优先 POST /v1/batches/chat，而非数千路并行 chat。",
+      rateLimitsBatchRequestId: "每个 batch item 有独立 request_id。",
+      rateLimitsBatchSucceeded: "成功 item 扣费。",
+      rateLimitsBatchFailed: "失败或取消的 item 通常不扣费。",
+      rateLimitsBatchItemsEndpoint:
+        "用 GET /v1/batches/{id}/items 对账 — 在 Usage / Credits 搜 request_id。",
+      rateLimitsConcurrencyTitle: "并发与重试",
+      rateLimitsRetryBackoff: "客户端或 worker 应实现带退避的重试。",
+      rateLimitsTooManyRequests: "too_many_requests — 降低并发与请求频率。",
+      rateLimitsUpstreamTimeout: "upstream_timeout — 稍后重试或换 auto-fast。",
+      rateLimitsGatewayOverloaded:
+        "gateway_overloaded — 拆小批次，稍后重试。",
+      rateLimitsCustomerNote:
+        "Tokfai 支持大批量 API 调用，但应分阶段压测。不承诺任何上游模型永远不忙。Tokfai 提供智能路由、容错别名、request_id 与 Usage / Credits 对账。",
+      commercialFaqTitle: "商业与采购 FAQ",
+      commercialFaqDesc:
+        "Tokfai 卖什么、不代运营什么，以及各行业如何接入。",
+      commercialFaqChapterPurpose: "签约前回答采购与技术负责人常见问题。",
+      commercialFaqChapterCopy:
+        "API Key 接入、OpenAI 兼容网关、模型路由、Usage / Credits 计量。",
+      commercialFaqChapterVerify:
+        "相关方理解 Tokfai 是 API 基础设施——不是业务代运营。",
+      commercialFaqChapterFailure:
+        "若期望 Tokfai 代运营客户或工单，请重读「非代运营」说明。",
+      commercialFaqWhatTitle: "Tokfai 卖的是什么？",
+      commercialFaqWhatApiKey: "API Key — 调用 https://api.tokfai.com/v1 的凭证。",
+      commercialFaqWhatGateway: "OpenAI 兼容 API 网关 — Chat、Image、Batch。",
+      commercialFaqWhatRouting:
+        "模型路由 — auto-fast / auto-pro / auto-cheap 别名与显式模型 ID。",
+      commercialFaqWhatMetering:
+        "Usage & Credits 计量 — 每次调用 request_id，账本扣费可核对。",
+      commercialFaqAgencyTitle: "Tokfai 是不是代运营？",
+      commercialFaqAgencyNot:
+        "不是。Tokfai 不运营你的业务、客户、工单、诊疗或订单。",
+      commercialFaqAgencyCustomer:
+        "你的产品体验、客户沟通与业务承诺由你的团队负责。",
+      commercialFaqAgencyTokfaiOnly:
+        "Tokfai 提供 API 接入、计量与路由——你集成并运营。",
+      commercialFaqHospitalTitle: "医院能不能用？",
+      commercialFaqHospitalUse:
+        "可以 — 客服草稿、病历摘要辅助、影像提示词辅助、内部流程自动化。",
+      commercialFaqHospitalBoundary:
+        "医疗边界：仅辅助整理——不替代医生诊断，不直接生成治疗承诺。",
+      commercialFaqAutomotiveTitle: "车企能不能用？",
+      commercialFaqAutomotiveUse:
+        "可以 — 车主手册问答、售后工单分类、车损图片描述、内部知识库问答。",
+      commercialFaqAutomotiveBoundary:
+        "对外结论应由企业系统与人员确认。",
+      commercialFaqEcommerceTitle: "电商能不能用？",
+      commercialFaqEcommerceUse:
+        "可以 — 商品文案、批量标题、客服回复草稿、图片生成提示词。",
+      commercialFaqEcommerceBoundary:
+        "发布前建议人工审核——Tokfai 不会在你的店铺直接发布内容。",
+      commercialFaqAiSupportTitle: "AI 客服能不能用？",
+      commercialFaqAiSupportYes: "可以 — 让你的 CRM 或工单系统调用 Tokfai API。",
+      commercialFaqAiSupportCrm:
+        "推荐：CRM / 工单系统调 Tokfai；你控制路由、升级与发送动作。",
+      commercialFaqAiSupportTokfaiOnly:
+        "Tokfai 不托管你的工单——只返回模型结果供你的系统审核发送。",
+      commercialFaqReconcileTitle: "客户如何对账？",
+      commercialFaqReconcileRequestId: "每次成功响应复制 request_id。",
+      commercialFaqReconcileUsage:
+        "Usage — 搜索 request_id，看 model、tokens、status、credits_charged。",
+      commercialFaqReconcileCredits:
+        "Credits — 核对 ledger reference_id 与 amount。",
+      commercialFaqReconcileBatch:
+        "Batch — 每个成功 item 有独立 request_id，逐项核对。",
       positioningChapterPurpose:
         "说明 Tokfai 是 API 网关与模型中转，不是代运营服务商。",
       positioningChapterCopy:
