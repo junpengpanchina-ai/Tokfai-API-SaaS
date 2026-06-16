@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * P778.14 — Real API Key end-to-end customer acceptance (internal only).
+ * Internal operator smoke only — not customer documentation.
+ * Uses TOKFAI_SUPABASE_JWT for key management API — customers only use sk-tokfai API Keys.
  *
- * Flow: create key → one-line curls (UI-identical) → verify fields → Usage/Credits → revoke → recreate.
+ * P778.14 — operator E2E: create key → curls → Usage/Credits API reconcile → revoke.
  *
  * Usage:
  *   TOKFAI_SUPABASE_JWT=<access_token> node scripts/p778-14-real-key-e2e-acceptance.mjs

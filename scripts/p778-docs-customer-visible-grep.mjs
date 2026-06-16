@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 /**
+ * Internal operator smoke only — not customer documentation.
+ * Customers use API Key + one-line curl from Dashboard; they never run this script.
+ *
  * P778 — scan customer-visible web source for internal engineering terms.
  * Usage: node scripts/p778-docs-customer-visible-grep.mjs
  */
@@ -29,7 +32,13 @@ const RULES = [
   { label: "P778 ticket", pattern: /\bP778[\d.]*\b/ },
   { label: "artifact", pattern: /\bartifact\b/i },
   { label: "internal runbook", pattern: /internal runbook/i },
-  { label: "production acceptance", pattern: /production acceptance/i },
+  { label: "TOKFAI_SUPABASE_JWT", pattern: /TOKFAI_SUPABASE_JWT/ },
+  { label: "SUPABASE_ACCESS_TOKEN", pattern: /SUPABASE_ACCESS_TOKEN/ },
+  { label: "internal smoke", pattern: /internal\s+smoke/i },
+  { label: "operator smoke", pattern: /operator\s+smoke/i },
+  { label: "production smoke", pattern: /production\s+smoke/i },
+  { label: "acceptance artifact", pattern: /acceptance\s+artifact/i },
+  { label: "local repo", pattern: /local\s+repo/i },
   { label: "checklist", pattern: /\bchecklist\b/i },
   { label: "本地仓库", pattern: /本地仓库/ },
   { label: "工程路径", pattern: /工程路径/ },
@@ -60,6 +69,9 @@ const ALLOW_SUBSTRINGS = [
   "不代运营",
   "cd 到任何目录",
   "无需进入任何 Tokfai 工程目录",
+  "no operator command-line",
+  "无需运行仓库里的命令行",
+  "no repository checkout",
 ];
 
 function shouldIgnorePath(path) {

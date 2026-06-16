@@ -1,7 +1,8 @@
-# P778.13 — Customer Live One-line Curl Production Acceptance
+# P778.13 — One-line curl regression (internal operator)
 
-> 从真实客户视角验证 `/dashboard/docs` 与 `/dashboard/api-keys` 的 one-line curl「一贴就跑」。  
-> 客户路径：登录 → 创建 Key → 复制 one-line curl → 任意终端粘贴 → HTTP 200 → request_id → Usage/Credits 对账。
+> **Internal operator smoke** — not customer docs.  
+> Customers copy one-line curl from Dashboard only.  
+> Customer checklist: [P778.15 customer live smoke](./p778-15-customer-live-smoke.md).
 
 ---
 

@@ -1,8 +1,9 @@
-# P778.12 — Customer Docs Full Handbook Final Acceptance
+# P778.12 — Handbook static acceptance (internal operator record)
 
-> 客户视角静态验收 `/dashboard/docs` 整本接入手册。  
-> 范围：章节顺序、Chapter guide、Copy、one-line curl、跳转、request_id / Usage / Credits 贯穿、内部词清理。  
-> 未改：billing、Stripe、Supabase 表结构、DMIT、`record_usage_and_debit`、Chat/Image/Batch 后端逻辑。
+> **Internal project record** — static review of `/dashboard/docs` structure.  
+> **Not** shown to customers. Customer validation: [P778.15 customer live smoke](./p778-15-customer-live-smoke.md).
+
+客户视角静态验收 `/dashboard/docs` 整本接入手册（源码结构，非客户操作步骤）。
 
 验收方式：源码结构审查 + `node scripts/p778-docs-customer-visible-grep.mjs` + `npm run typecheck` + `npm run build`（`apps/web`）。
 

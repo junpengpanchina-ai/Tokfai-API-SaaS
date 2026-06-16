@@ -474,6 +474,7 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       { type: "one-line-curl", id: "quick-start-live-curl", titleKey: "integration.quickStartCopyNowTitle" },
       { type: "paragraph", textKey: "integration.quickStartTerminalNote" },
       { type: "paragraph", textKey: "integration.shellCompatNote" },
+      { type: "paragraph", textKey: "integration.quickStartCustomerOnlyNote" },
       {
         type: "ordered",
         items: [

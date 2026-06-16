@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * P778.13 — Internal one-line curl regression (not for customers).
+ * Internal operator smoke only — not customer documentation.
+ * Customers copy one-line curl from Dashboard; they never run this script.
  *
- * Mirrors apps/web/lib/customer-curl-oneline.ts builders and live API checks.
+ * P778.13 — one-line curl regression (mirrors UI curl builders).
  *
  * Usage:
  *   node scripts/p778-13-one-line-curl-regression.mjs

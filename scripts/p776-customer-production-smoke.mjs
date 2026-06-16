@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 /**
- * P776 — Customer production integration smoke (API Key auth paths).
+ * Internal operator smoke only — not customer documentation.
+ * Customers validate with API Key + Dashboard Usage/Credits; they never run this script.
+ *
+ * P776 — production integration smoke (API Key auth paths).
  *
  * Usage:
  *   node scripts/p776-customer-production-smoke.mjs
