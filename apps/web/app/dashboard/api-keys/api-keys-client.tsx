@@ -39,13 +39,9 @@ import {
   type CreateApiKeyResponse,
   type MeApiKeyMetadata,
 } from "@/lib/dmit/client";
-import { buildOpenAiSdkConfigSnippet } from "@/lib/customer-openai-sdk-chapter";
+import { buildNodeSdkConfigSnippet, buildPythonSdkConfigSnippet } from "@/lib/customer-openai-sdk-chapter";
 import { buildCherryConfigSnippet } from "@/lib/customer-cherry-chapter";
 import { buildCursorConfigSnippet } from "@/lib/customer-cursor-chapter";
-import {
-  buildEcommerceBatchCopyCurlOneLine,
-  buildHospitalCaseSummaryChatCurlOneLine,
-} from "@/lib/customer-industry-chapter";
 import { authorizationHeader } from "@/lib/customer-integration-snippets";
 import {
   batchCreateCurlOneLine,
@@ -458,48 +454,8 @@ function OneTimeSecretCard({
               </Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#openai-sdk">
-                {t("dashboard.apiKeys.openAiSdkGuide")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#cursor">
-                {t("dashboard.apiKeys.cursorGuide")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#cherry-studio">
-                {t("dashboard.apiKeys.cherryStudioGuide")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/docs#chat-api">
                 {t("dashboard.apiKeys.viewChatApiDocs")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/usage">
-                {t("dashboard.apiKeys.verifyUsage")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/credits">
-                {t("dashboard.apiKeys.verifyCredits")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#client-connector-flow">
-                {t("dashboard.apiKeys.clientConnectorGuide")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/playground">
-                {t("dashboard.apiKeys.tryChatPlayground")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/image-playground">
-                {t("dashboard.apiKeys.tryImagePlayground")}
               </Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
@@ -513,8 +469,28 @@ function OneTimeSecretCard({
               </Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#usage-credits">
-                {t("dashboard.apiKeys.viewUsageCreditsDocs")}
+              <Link href="/dashboard/docs#cursor">
+                {t("dashboard.apiKeys.cursorGuide")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#cherry-studio">
+                {t("dashboard.apiKeys.cherryStudioGuide")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/usage">
+                {t("dashboard.apiKeys.verifyUsage")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/credits">
+                {t("dashboard.apiKeys.verifyCredits")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#client-software-acceptance">
+                {t("dashboard.apiKeys.clientSoftwareGuide")}
               </Link>
             </Button>
           </div>
@@ -585,27 +561,6 @@ function OneTimeSecretCard({
           </div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <Button type="button" className="w-full sm:w-auto" onClick={onCopy}>
-            {copyStatus === "copied" ? (
-              <>
-                <Check className="h-4 w-4" />
-                {t("dashboard.apiKeys.copied")}
-              </>
-            ) : (
-              <>
-                <Copy className="h-4 w-4" />
-                {t("dashboard.apiKeys.copyFullKey")}
-              </>
-            )}
-          </Button>
-          <CopyConfigAction
-            id="one-time-secret-copy-auth-header"
-            value={authorizationHeader(secret)}
-            copiedId={snippetCopiedId}
-            onCopy={handleSnippetCopy}
-            label={t("dashboard.apiKeys.copyAuthHeader")}
-            copiedLabel={t("dashboard.apiKeys.copied")}
-          />
           <CopyConfigAction
             id="one-time-secret-copy-chat-curl"
             value={chatCurlOneLine(secret)}
@@ -623,11 +578,19 @@ function OneTimeSecretCard({
             copiedLabel={t("dashboard.apiKeys.copied")}
           />
           <CopyConfigAction
-            id="one-time-secret-copy-sdk-config"
-            value={buildOpenAiSdkConfigSnippet(secret)}
+            id="one-time-secret-copy-node-sdk-config"
+            value={buildNodeSdkConfigSnippet(secret)}
             copiedId={snippetCopiedId}
             onCopy={handleSnippetCopy}
-            label={t("dashboard.apiKeys.copySdkConfig")}
+            label={t("dashboard.apiKeys.copyNodeSdkConfig")}
+            copiedLabel={t("dashboard.apiKeys.copied")}
+          />
+          <CopyConfigAction
+            id="one-time-secret-copy-python-sdk-config"
+            value={buildPythonSdkConfigSnippet(secret)}
+            copiedId={snippetCopiedId}
+            onCopy={handleSnippetCopy}
+            label={t("dashboard.apiKeys.copyPythonSdkConfig")}
             copiedLabel={t("dashboard.apiKeys.copied")}
           />
           <CopyConfigAction
@@ -655,46 +618,13 @@ function OneTimeSecretCard({
             copiedLabel={t("dashboard.apiKeys.copied")}
           />
           <CopyConfigAction
-            id="one-time-secret-copy-hospital-curl"
-            value={buildHospitalCaseSummaryChatCurlOneLine(secret)}
+            id="one-time-secret-copy-auth-header"
+            value={authorizationHeader(secret)}
             copiedId={snippetCopiedId}
             onCopy={handleSnippetCopy}
-            label={t("dashboard.apiKeys.copyHospitalCaseCurl")}
+            label={t("dashboard.apiKeys.copyAuthHeader")}
             copiedLabel={t("dashboard.apiKeys.copied")}
           />
-          <CopyConfigAction
-            id="one-time-secret-copy-ecommerce-batch-curl"
-            value={buildEcommerceBatchCopyCurlOneLine(secret)}
-            copiedId={snippetCopiedId}
-            onCopy={handleSnippetCopy}
-            label={t("dashboard.apiKeys.copyEcommerceBatchCurl")}
-            copiedLabel={t("dashboard.apiKeys.copied")}
-          />
-          <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
-            <Link href="/dashboard/docs#industry-examples">
-              {t("dashboard.apiKeys.industryExamplesGuide")}
-            </Link>
-          </Button>
-          <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
-            <Link href="/dashboard/docs#cherry-studio">
-              {t("dashboard.apiKeys.cherryStudioGuide")}
-            </Link>
-          </Button>
-          <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
-            <Link href="/dashboard/docs#cursor">
-              {t("dashboard.apiKeys.cursorGuide")}
-            </Link>
-          </Button>
-          <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
-            <Link href="/dashboard/docs#openai-sdk">
-              {t("dashboard.apiKeys.openAiSdkGuide")}
-            </Link>
-          </Button>
-          <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
-            <Link href="/dashboard/docs#api-key">
-              {t("dashboard.apiKeys.viewApiKeyDocs")}
-            </Link>
-          </Button>
           <Button
             type="button"
             variant="outline"
@@ -702,6 +632,19 @@ function OneTimeSecretCard({
             onClick={onDismiss}
           >
             {t("dashboard.apiKeys.savedMyKey")}
+          </Button>
+          <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={onCopy}>
+            {copyStatus === "copied" ? (
+              <>
+                <Check className="h-4 w-4" />
+                {t("dashboard.apiKeys.copied")}
+              </>
+            ) : (
+              <>
+                <Copy className="h-4 w-4" />
+                {t("dashboard.apiKeys.copyFullKey")}
+              </>
+            )}
           </Button>
         </div>
       </CardContent>

@@ -669,6 +669,9 @@ export const messages = {
         sdkConfigLabel: "OpenAI SDK config",
         batchCurlLabel: "Batch API curl (create batch)",
         copySdkConfig: "Copy SDK config",
+        copyNodeSdkConfig: "Copy Node.js SDK config",
+        copyPythonSdkConfig: "Copy Python SDK config",
+        clientSoftwareGuide: "Client software acceptance",
         copyCursorConfig: "Copy Cursor config",
         copyCherryConfig: "Copy Cherry config",
         copyBatchCurl: "Copy batch curl",
@@ -1834,6 +1837,87 @@ export const messages = {
       commercialFaqReconcileCredits: "Credits — match ledger reference_id / amount to Usage rows.",
       commercialFaqReconcileBatch:
         "Batch — each succeeded item has its own request_id; reconcile items individually.",
+      navClientSoftware: "Client software acceptance",
+      clientSoftwareTitle: "Client software acceptance",
+      clientSoftwareDesc:
+        "Copy-paste acceptance for Terminal, PowerShell, SDKs, Cursor, Cherry, Image, Batch, and Usage / Credits.",
+      clientSoftwareChapterPurpose:
+        "Verify each client tool with real copy blocks — not just “we support it”.",
+      clientSoftwareChapterCopy:
+        "Bash curl, PowerShell curl.exe, Node/Python runnable files, and client configs below.",
+      clientSoftwareChapterVerify:
+        "HTTP 200 / expected fields → search request_id in Usage and Credits.",
+      clientSoftwareChapterFailure:
+        "If one client fails, use the one-line curl here to isolate API Key vs client settings.",
+      clientSoftwareIntro:
+        "Run these from any folder. No Tokfai project install, no cd, no operator scripts — only your API Key and Base URL.",
+      clientSoftwareCopyTitle: "Copy blocks for all clients",
+      clientSoftwareBashCurlLabel: "macOS Terminal / Linux / Git Bash — one-line curl",
+      clientSoftwarePowerShellCurlLabel: "Windows PowerShell — curl.exe one-line",
+      copyPowerShellCurl: "Copy PowerShell curl",
+      clientSoftwareNodeFileLabel: "Node.js — save as tokfai-chat.mjs",
+      clientSoftwarePythonFileLabel: "Python — save as tokfai_chat.py",
+      clientSoftwareNodeInstallAction: "Copy npm install openai",
+      clientSoftwareNodeRunAction: "Copy Node run command",
+      clientSoftwareNodeConfigAction: "Copy Node SDK config",
+      clientSoftwarePythonInstallAction: "Copy pip install openai",
+      clientSoftwarePythonRunAction: "Copy Python run command",
+      clientSoftwarePythonConfigAction: "Copy Python SDK config",
+      clientSoftwareLiveKeyNote: "Your session API Key is filled in all blocks below.",
+      clientSoftwareMacTitle: "1. macOS Terminal / zsh",
+      clientSoftwareMacStep1: "Copy the bash one-line Chat curl above.",
+      clientSoftwareMacStep2: "Paste in Terminal from any directory.",
+      clientSoftwareMacStep3: "No cd, no clone, no npm install required for curl.",
+      clientSoftwareMacSuccess:
+        "Success: HTTP 200 with choices, request_id, credits_charged, tokfai.resolved_model.",
+      clientSoftwarePowerShellTitle: "2. Windows PowerShell",
+      clientSoftwarePowerShellStep1: "Copy the PowerShell curl.exe line above.",
+      clientSoftwarePowerShellStep2: "Use curl.exe — not the Invoke-WebRequest alias.",
+      clientSoftwarePowerShellStep3: "Paste as one line — headers and JSON stay intact.",
+      clientSoftwarePowerShellSuccess: "Success: same JSON fields as macOS/Linux.",
+      clientSoftwareLinuxTitle: "3. Linux shell / Git Bash",
+      clientSoftwareLinuxStep1: "Same bash one-line curl as macOS Terminal.",
+      clientSoftwareLinuxStep2: "Run from any directory.",
+      clientSoftwareLinuxSuccess: "Success: HTTP 200 with request_id and billing fields.",
+      clientSoftwareNodeTitle: "4. OpenAI SDK — Node.js",
+      clientSoftwareNodeStep1: "In any empty folder: npm install openai",
+      clientSoftwareNodeStep2:
+        "Save tokfai-chat.mjs from above; set TOKFAI_API_KEY; run node tokfai-chat.mjs",
+      clientSoftwareNodeStep3: "baseURL https://api.tokfai.com/v1, model auto-fast.",
+      clientSoftwareNodeSuccess:
+        "Prints content, request_id, credits_charged, tokfai.resolved_model.",
+      clientSoftwarePythonTitle: "5. OpenAI SDK — Python",
+      clientSoftwarePythonStep1: "pip install openai in any folder.",
+      clientSoftwarePythonStep2: "Save tokfai_chat.py; TOKFAI_API_KEY=... python tokfai_chat.py",
+      clientSoftwarePythonStep3: "base_url https://api.tokfai.com/v1, model auto-fast.",
+      clientSoftwarePythonSuccess:
+        "Prints content, request_id, credits_charged, tokfai.resolved_model.",
+      clientSoftwareCursorTitle: "6. Cursor",
+      clientSoftwareCursorStep1: "OpenAI-compatible provider; Base URL https://api.tokfai.com/v1.",
+      clientSoftwareCursorStep2: "Verify Key with bash or PowerShell curl first.",
+      clientSoftwareCursorStep3: "Model auto-fast (or auto-pro / auto-cheap).",
+      clientSoftwareCursorSuccess: "Reconcile via request_id in Usage / Credits.",
+      clientSoftwareCherryTitle: "7. Cherry Studio",
+      clientSoftwareCherryStep1: "Provider Tokfai; OpenAI compatible / Custom OpenAI.",
+      clientSoftwareCherryStep2: "If chat fails, disable stream or use auto-fast.",
+      clientSoftwareCherryStep3: "Test prompt: Say ok only.",
+      clientSoftwareCherrySuccess: "Reconcile via request_id in Usage / Credits.",
+      clientSoftwareImageTitle: "8. Image API",
+      clientSoftwareImageStep1: "Copy one-line Image curl (response_format: url).",
+      clientSoftwareImageStep2: "Run from any terminal.",
+      clientSoftwareImageSuccess: "Success: data[0].url, request_id, credits_charged.",
+      clientSoftwareBatchTitle: "9. Batch API",
+      clientSoftwareBatchStep1: "Copy batch create curl → HTTP 202 with batch id.",
+      clientSoftwareBatchStep2: "Poll with batch poll curl; check status completed.",
+      clientSoftwareBatchStep3: "GET /v1/batches/{id}/items for per-item request_id.",
+      clientSoftwareBatchSuccess:
+        "Succeeded items debit; failed / cancelled items usually do not.",
+      clientSoftwareUsageTitle: "10. Usage / Credits",
+      clientSoftwareUsageStep1: "Usage — filter by request_id.",
+      clientSoftwareUsageStep2: "Credits — filter by reference_id / request_id.",
+      clientSoftwareUsageStep3: "Chat, Image, and Batch items all reconcile here.",
+      sdkCopyNodeFileLabel: "Node.js runnable file (tokfai-chat.mjs)",
+      sdkCopyPythonFileLabel: "Python runnable file (tokfai_chat.py)",
       positioningChapterPurpose:
         "Clarify Tokfai as an API gateway and model relay — not a managed operations vendor.",
       positioningChapterCopy:
@@ -2521,14 +2605,10 @@ export const messages = {
       quickStartTitle: "Quick start",
       quickStartDesc:
         "Four steps: create API Key, copy one-line curl, paste and run, reconcile in Usage / Credits.",
-      quickStartStep1:
-        "API Keys → Create API key. Copy the full sk-tokfai_… secret (shown once at creation).",
-      quickStartStep2:
-        "Copy the one-line Chat curl below — or from the API Keys success card right after you create a key.",
-      quickStartStep3:
-        "Paste into any terminal (any folder) and run. Expect HTTP 200 with request_id in the JSON.",
-      quickStartStep4:
-        "Copy request_id from the response. Search it in Dashboard → Usage and Credits to reconcile.",
+      quickStartStep1: "Create an API Key.",
+      quickStartStep2: "Copy one-line curl.",
+      quickStartStep3: "Paste and run in any terminal.",
+      quickStartStep4: "Copy request_id and reconcile in Usage / Credits.",
       quickStartPasteAndRun:
         "No install. No repo. No cd. Paste and run — Mac Terminal, Linux shell, Git Bash, or Windows curl.exe.",
       quickStartTerminalNote:
@@ -4037,6 +4117,9 @@ export const messages = {
         sdkConfigLabel: "OpenAI SDK 配置",
         batchCurlLabel: "Batch API curl（创建 batch）",
         copySdkConfig: "复制 SDK 配置",
+        copyNodeSdkConfig: "复制 Node.js SDK 配置",
+        copyPythonSdkConfig: "复制 Python SDK 配置",
+        clientSoftwareGuide: "客户软件验收",
         copyCursorConfig: "复制 Cursor 配置",
         copyCherryConfig: "复制 Cherry 配置",
         copyBatchCurl: "复制 Batch curl",
@@ -5139,6 +5222,85 @@ export const messages = {
         "Credits — 核对 ledger reference_id 与 amount。",
       commercialFaqReconcileBatch:
         "Batch — 每个成功 item 有独立 request_id，逐项核对。",
+      navClientSoftware: "客户软件接入验收",
+      clientSoftwareTitle: "客户软件接入验收",
+      clientSoftwareDesc:
+        "Terminal、PowerShell、SDK、Cursor、Cherry、Image、Batch 与 Usage/Credits 的可复制验收步骤。",
+      clientSoftwareChapterPurpose: "用真实可复制命令验收每个客户端，而非口头“支持”。",
+      clientSoftwareChapterCopy:
+        "下方含 bash curl、PowerShell curl.exe、Node/Python 可运行文件与客户端配置。",
+      clientSoftwareChapterVerify:
+        "HTTP 200 / 预期字段 → 在 Usage 与 Credits 搜索 request_id。",
+      clientSoftwareChapterFailure:
+        "若某客户端失败，先用此处 one-line curl 区分 API Key 与客户端配置问题。",
+      clientSoftwareIntro:
+        "任意目录即可运行。无需安装 Tokfai 项目、无需 cd、无需运营脚本——只需 API Key 与 Base URL。",
+      clientSoftwareCopyTitle: "全客户端复制块",
+      clientSoftwareBashCurlLabel: "macOS Terminal / Linux / Git Bash — 单行 curl",
+      clientSoftwarePowerShellCurlLabel: "Windows PowerShell — curl.exe 单行",
+      copyPowerShellCurl: "复制 PowerShell curl",
+      clientSoftwareNodeFileLabel: "Node.js — 保存为 tokfai-chat.mjs",
+      clientSoftwarePythonFileLabel: "Python — 保存为 tokfai_chat.py",
+      clientSoftwareNodeInstallAction: "复制 npm install openai",
+      clientSoftwareNodeRunAction: "复制 Node 运行命令",
+      clientSoftwareNodeConfigAction: "复制 Node SDK 配置",
+      clientSoftwarePythonInstallAction: "复制 pip install openai",
+      clientSoftwarePythonRunAction: "复制 Python 运行命令",
+      clientSoftwarePythonConfigAction: "复制 Python SDK 配置",
+      clientSoftwareLiveKeyNote: "下方所有块已填入本会话 API Key。",
+      clientSoftwareMacTitle: "1. macOS Terminal / zsh",
+      clientSoftwareMacStep1: "复制上方 bash 单行 Chat curl。",
+      clientSoftwareMacStep2: "在 Terminal 任意目录粘贴运行。",
+      clientSoftwareMacStep3: "无需 cd、无需 clone、curl 无需 npm install。",
+      clientSoftwareMacSuccess:
+        "成功：HTTP 200，含 choices、request_id、credits_charged、tokfai.resolved_model。",
+      clientSoftwarePowerShellTitle: "2. Windows PowerShell",
+      clientSoftwarePowerShellStep1: "复制上方 PowerShell curl.exe 单行。",
+      clientSoftwarePowerShellStep2: "使用 curl.exe，不要用 Invoke-WebRequest 别名。",
+      clientSoftwarePowerShellStep3: "整行粘贴，-H / -d 不会被拆坏。",
+      clientSoftwarePowerShellSuccess: "成功：与 macOS/Linux 相同 JSON 字段。",
+      clientSoftwareLinuxTitle: "3. Linux shell / Git Bash",
+      clientSoftwareLinuxStep1: "与 macOS Terminal 相同的 bash 单行 curl。",
+      clientSoftwareLinuxStep2: "任意目录运行。",
+      clientSoftwareLinuxSuccess: "成功：HTTP 200，含 request_id 与计费字段。",
+      clientSoftwareNodeTitle: "4. OpenAI SDK — Node.js",
+      clientSoftwareNodeStep1: "任意空目录：npm install openai",
+      clientSoftwareNodeStep2:
+        "保存上方 tokfai-chat.mjs；设置 TOKFAI_API_KEY；运行 node tokfai-chat.mjs",
+      clientSoftwareNodeStep3: "baseURL https://api.tokfai.com/v1，model auto-fast。",
+      clientSoftwareNodeSuccess:
+        "输出 content、request_id、credits_charged、tokfai.resolved_model。",
+      clientSoftwarePythonTitle: "5. OpenAI SDK — Python",
+      clientSoftwarePythonStep1: "任意目录 pip install openai。",
+      clientSoftwarePythonStep2: "保存 tokfai_chat.py；TOKFAI_API_KEY=... python tokfai_chat.py",
+      clientSoftwarePythonStep3: "base_url https://api.tokfai.com/v1，model auto-fast。",
+      clientSoftwarePythonSuccess:
+        "输出 content、request_id、credits_charged、tokfai.resolved_model。",
+      clientSoftwareCursorTitle: "6. Cursor",
+      clientSoftwareCursorStep1: "OpenAI 兼容 Provider；Base URL https://api.tokfai.com/v1。",
+      clientSoftwareCursorStep2: "先用 bash 或 PowerShell curl 验证 Key。",
+      clientSoftwareCursorStep3: "Model auto-fast（或 auto-pro / auto-cheap）。",
+      clientSoftwareCursorSuccess: "用 request_id 在 Usage / Credits 对账。",
+      clientSoftwareCherryTitle: "7. Cherry Studio",
+      clientSoftwareCherryStep1: "Provider Tokfai；OpenAI compatible / Custom OpenAI。",
+      clientSoftwareCherryStep2: "失败时关闭 stream 或换 auto-fast。",
+      clientSoftwareCherryStep3: "测试：Say ok only.",
+      clientSoftwareCherrySuccess: "用 request_id 在 Usage / Credits 对账。",
+      clientSoftwareImageTitle: "8. Image API",
+      clientSoftwareImageStep1: "复制单行 Image curl（response_format: url）。",
+      clientSoftwareImageStep2: "任意终端运行。",
+      clientSoftwareImageSuccess: "成功：data[0].url、request_id、credits_charged。",
+      clientSoftwareBatchTitle: "9. Batch API",
+      clientSoftwareBatchStep1: "复制 batch create curl → HTTP 202 得 batch id。",
+      clientSoftwareBatchStep2: "用 poll curl 查状态 completed。",
+      clientSoftwareBatchStep3: "GET /v1/batches/{id}/items 查每项 request_id。",
+      clientSoftwareBatchSuccess: "成功 item 扣费；失败/取消通常不扣费。",
+      clientSoftwareUsageTitle: "10. Usage / Credits",
+      clientSoftwareUsageStep1: "Usage — 按 request_id 搜索。",
+      clientSoftwareUsageStep2: "Credits — 按 reference_id / request_id 搜索。",
+      clientSoftwareUsageStep3: "Chat、Image、Batch 均可在此对账。",
+      sdkCopyNodeFileLabel: "Node.js 可运行文件（tokfai-chat.mjs）",
+      sdkCopyPythonFileLabel: "Python 可运行文件（tokfai_chat.py）",
       positioningChapterPurpose:
         "说明 Tokfai 是 API 网关与模型中转，不是代运营服务商。",
       positioningChapterCopy:
@@ -5771,14 +5933,10 @@ export const messages = {
       quickStartTitle: "快速开始",
       quickStartDesc:
         "四步完成：创建 API Key → 复制单行 curl → 粘贴运行 → 在 Usage / Credits 对账。",
-      quickStartStep1:
-        "API Keys → 创建密钥。立即复制完整 sk-tokfai_… secret（仅创建时展示一次）。",
-      quickStartStep2:
-        "复制下方单行 Chat curl——或在创建密钥后的 API Keys 成功卡片中复制。",
-      quickStartStep3:
-        "粘贴到任意终端（任意目录）并运行。应得到 HTTP 200，JSON 中含 request_id。",
-      quickStartStep4:
-        "从响应复制 request_id，在 Dashboard → Usage 与 Credits 中搜索核对。",
+      quickStartStep1: "创建 API 密钥。",
+      quickStartStep2: "复制单行 curl。",
+      quickStartStep3: "粘贴到任意终端运行。",
+      quickStartStep4: "复制 request_id，在 Usage / Credits 对账。",
       quickStartPasteAndRun:
         "不用安装、不用仓库、不用进入项目目录，复制即跑——Mac Terminal、Linux shell、Git Bash 或 Windows curl.exe。",
       quickStartTerminalNote:

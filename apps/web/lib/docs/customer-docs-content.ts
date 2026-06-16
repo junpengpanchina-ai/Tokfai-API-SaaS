@@ -112,6 +112,7 @@ export type CustomerDocBlock =
   | { type: "openai-sdk-copy-panel"; id: string }
   | { type: "cursor-copy-panel"; id: string }
   | { type: "cherry-copy-panel"; id: string }
+  | { type: "client-software-copy-panel"; id: string }
   | { type: "industry-copy-panel"; id: string }
   | { type: "industry-overview-table" }
   | { type: "error-table" }
@@ -609,6 +610,179 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
             hash: "quick-start",
           },
           ...INTEGRATION_TOOL_DOC_LINKS,
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "client-software-acceptance",
+    navKey: "integration.navClientSoftware",
+    titleKey: "integration.clientSoftwareTitle",
+    descriptionKey: "integration.clientSoftwareDesc",
+    highlight: true,
+    chapterGuide: chapter(
+      "integration.clientSoftwareChapterPurpose",
+      "integration.clientSoftwareChapterCopy",
+      "integration.clientSoftwareChapterVerify",
+      "integration.clientSoftwareChapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "keys",
+        labelKey: "integration.ctaCreateKey",
+        href: "/dashboard/api-keys",
+      },
+      copySnippetKey: "chat-curl",
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "paragraph", textKey: "integration.clientSoftwareIntro" },
+      { type: "client-software-copy-panel", id: "client-software-copy" },
+      { type: "paragraph", textKey: "integration.clientSoftwareMacTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.clientSoftwareMacStep1",
+          "integration.clientSoftwareMacStep2",
+          "integration.clientSoftwareMacStep3",
+          "integration.clientSoftwareMacSuccess",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.clientSoftwarePowerShellTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.clientSoftwarePowerShellStep1",
+          "integration.clientSoftwarePowerShellStep2",
+          "integration.clientSoftwarePowerShellStep3",
+          "integration.clientSoftwarePowerShellSuccess",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.clientSoftwareLinuxTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.clientSoftwareLinuxStep1",
+          "integration.clientSoftwareLinuxStep2",
+          "integration.clientSoftwareLinuxSuccess",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.clientSoftwareNodeTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.clientSoftwareNodeStep1",
+          "integration.clientSoftwareNodeStep2",
+          "integration.clientSoftwareNodeStep3",
+          "integration.clientSoftwareNodeSuccess",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.clientSoftwarePythonTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.clientSoftwarePythonStep1",
+          "integration.clientSoftwarePythonStep2",
+          "integration.clientSoftwarePythonStep3",
+          "integration.clientSoftwarePythonSuccess",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.clientSoftwareCursorTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.clientSoftwareCursorStep1",
+          "integration.clientSoftwareCursorStep2",
+          "integration.clientSoftwareCursorStep3",
+          "integration.clientSoftwareCursorSuccess",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.clientSoftwareCherryTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.clientSoftwareCherryStep1",
+          "integration.clientSoftwareCherryStep2",
+          "integration.clientSoftwareCherryStep3",
+          "integration.clientSoftwareCherrySuccess",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.clientSoftwareImageTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.clientSoftwareImageStep1",
+          "integration.clientSoftwareImageStep2",
+          "integration.clientSoftwareImageSuccess",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.clientSoftwareBatchTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.clientSoftwareBatchStep1",
+          "integration.clientSoftwareBatchStep2",
+          "integration.clientSoftwareBatchStep3",
+          "integration.clientSoftwareBatchSuccess",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.clientSoftwareUsageTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.clientSoftwareUsageStep1",
+          "integration.clientSoftwareUsageStep2",
+          "integration.clientSoftwareUsageStep3",
+        ],
+      },
+      {
+        type: "dashboard-links",
+        links: [
+          { id: "keys", labelKey: "integration.ctaCreateKey", href: "/dashboard/api-keys" },
+          {
+            id: "quick-start",
+            labelKey: "integration.navQuickStart",
+            href: "/dashboard/docs",
+            hash: "quick-start",
+          },
+          {
+            id: "openai-sdk-docs",
+            labelKey: "integration.navOpenAiSdk",
+            href: "/dashboard/docs",
+            hash: "openai-sdk",
+          },
+          {
+            id: "cursor-docs",
+            labelKey: "integration.navCursor",
+            href: "/dashboard/docs",
+            hash: "cursor",
+          },
+          {
+            id: "cherry-docs",
+            labelKey: "integration.navCherry",
+            href: "/dashboard/docs",
+            hash: "cherry-studio",
+          },
+          {
+            id: "image-api-docs",
+            labelKey: "integration.navImageApi",
+            href: "/dashboard/docs",
+            hash: "image-api",
+          },
+          {
+            id: "batch-api-docs",
+            labelKey: "integration.navBatch",
+            href: "/dashboard/docs",
+            hash: "batch-api",
+          },
+          {
+            id: "usage-credits-docs",
+            labelKey: "integration.linkUsageCreditsGuide",
+            href: "/dashboard/docs",
+            hash: "usage-credits",
+          },
           { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
           { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
         ],

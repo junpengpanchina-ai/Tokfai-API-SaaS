@@ -4,11 +4,19 @@ import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-sn
 import {
   buildNodeBatchFetchExample,
   buildNodeChatFetchExample,
-  buildNodeChatSdkExample,
+  buildNodeChatSdkRunnableFile,
+  buildNodeSdkConfigSnippet,
+  buildNodeSdkRunCommand,
   buildOpenAiSdkConfigSnippet,
   buildOpenAiSdkImageCurlExample,
   buildPythonBatchRequestsExample,
+  buildPythonChatSdkRunnableFile,
+  buildPythonSdkConfigSnippet,
+  buildPythonSdkRunCommand,
   buildPythonChatSdkExample,
+  buildNodeChatSdkExample,
+  NODE_SDK_INSTALL_COMMAND,
+  PYTHON_SDK_INSTALL_COMMAND,
 } from "@/lib/customer-openai-sdk-chapter";
 import { chatCurlOneLine } from "@/lib/customer-curl-oneline";
 import { isQuickStartKeyPlaceholder } from "@/lib/customer-quick-start-snippets";
@@ -72,6 +80,42 @@ export function OpenAiSdkChapterCopyPanel({
         className="[&_code]:max-h-48 [&_code]:whitespace-pre-wrap [&_code]:break-all"
       />
       <CopyableSnippetField
+        label={t("integration.sdkCopyNodeFileLabel")}
+        value={buildNodeChatSdkRunnableFile(apiKey)}
+        copyId={`${idPrefix}-${OPENAI_SDK_NODE_CHAT_COPY_ID}-file`}
+        copiedId={copiedId}
+        onCopy={onCopy}
+        copyLabel={t("integration.copyCode")}
+        copiedLabel={t("integration.copied")}
+        className="[&_code]:max-h-48 [&_code]:whitespace-pre-wrap [&_code]:break-all"
+      />
+      <div className="flex flex-wrap gap-2">
+        <CopyConfigAction
+          id={`${idPrefix}-node-install`}
+          value={NODE_SDK_INSTALL_COMMAND}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          label={t("integration.clientSoftwareNodeInstallAction")}
+          copiedLabel={t("integration.copied")}
+        />
+        <CopyConfigAction
+          id={`${idPrefix}-node-run`}
+          value={buildNodeSdkRunCommand(apiKey)}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          label={t("integration.clientSoftwareNodeRunAction")}
+          copiedLabel={t("integration.copied")}
+        />
+        <CopyConfigAction
+          id={`${idPrefix}-node-config`}
+          value={buildNodeSdkConfigSnippet(apiKey)}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          label={t("integration.clientSoftwareNodeConfigAction")}
+          copiedLabel={t("integration.copied")}
+        />
+      </div>
+      <CopyableSnippetField
         label={t("integration.sdkCopyNodeChatLabel")}
         value={nodeChat}
         copyId={`${idPrefix}-${OPENAI_SDK_NODE_CHAT_COPY_ID}`}
@@ -81,6 +125,42 @@ export function OpenAiSdkChapterCopyPanel({
         copiedLabel={t("integration.copied")}
         className="[&_code]:max-h-48 [&_code]:whitespace-pre-wrap [&_code]:break-all"
       />
+      <CopyableSnippetField
+        label={t("integration.sdkCopyPythonFileLabel")}
+        value={buildPythonChatSdkRunnableFile(apiKey)}
+        copyId={`${idPrefix}-${OPENAI_SDK_PYTHON_CHAT_COPY_ID}-file`}
+        copiedId={copiedId}
+        onCopy={onCopy}
+        copyLabel={t("integration.copyCode")}
+        copiedLabel={t("integration.copied")}
+        className="[&_code]:max-h-48 [&_code]:whitespace-pre-wrap [&_code]:break-all"
+      />
+      <div className="flex flex-wrap gap-2">
+        <CopyConfigAction
+          id={`${idPrefix}-python-install`}
+          value={PYTHON_SDK_INSTALL_COMMAND}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          label={t("integration.clientSoftwarePythonInstallAction")}
+          copiedLabel={t("integration.copied")}
+        />
+        <CopyConfigAction
+          id={`${idPrefix}-python-run`}
+          value={buildPythonSdkRunCommand(apiKey)}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          label={t("integration.clientSoftwarePythonRunAction")}
+          copiedLabel={t("integration.copied")}
+        />
+        <CopyConfigAction
+          id={`${idPrefix}-python-config`}
+          value={buildPythonSdkConfigSnippet(apiKey)}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          label={t("integration.clientSoftwarePythonConfigAction")}
+          copiedLabel={t("integration.copied")}
+        />
+      </div>
       <CopyableSnippetField
         label={t("integration.sdkCopyPythonChatLabel")}
         value={pythonChat}

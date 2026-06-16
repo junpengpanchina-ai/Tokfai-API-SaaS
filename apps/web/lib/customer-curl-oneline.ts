@@ -21,12 +21,30 @@ function shellSingleQuotedJson(value: unknown): string {
   return JSON.stringify(value).replace(/'/g, "'\\''");
 }
 
-export function chatCurlOneLine(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
-  const body = shellSingleQuotedJson({
-    model: CHAT_SMOKE_MODEL,
+function chatCompletionBody(model = CHAT_SMOKE_MODEL) {
+  return {
+    model,
     messages: [{ role: "user", content: CHAT_SMOKE_PROMPT }],
     stream: false,
-  });
+  };
+}
+
+/** PowerShell curl.exe — double-quoted JSON for one-paste on Windows. */
+function powershellJsonBody(value: unknown): string {
+  return JSON.stringify(value).replace(/"/g, '\\"');
+}
+
+export function chatCurlPowerShellOneLine(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
+  const body = powershellJsonBody(chatCompletionBody());
+  return `curl.exe -sS "${API_ROOT}/chat/completions" -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d "${body}"`;
+}
+
+export function modelsCurlPowerShellOneLine(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
+  return `curl.exe -sS "${API_ROOT}/models" -H "Authorization: Bearer ${apiKey}"`;
+}
+
+export function chatCurlOneLine(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
+  const body = shellSingleQuotedJson(chatCompletionBody());
   return `curl -sS ${API_ROOT}/chat/completions -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d '${body}'`;
 }
 

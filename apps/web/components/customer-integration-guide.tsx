@@ -13,6 +13,7 @@ import { BatchApiChapterCopyPanel } from "@/components/batch-api-chapter-copy";
 import { ErrorCodesChapterPanel } from "@/components/error-codes-chapter-panel";
 import { ChatApiChapterCopyPanel } from "@/components/chat-api-chapter-copy";
 import { ImageApiChapterCopyPanel } from "@/components/image-api-chapter-copy";
+import { ClientSoftwareAcceptanceCopyPanel } from "@/components/client-software-acceptance-copy";
 import { CherryChapterCopyPanel } from "@/components/cherry-chapter-copy";
 import { CursorChapterCopyPanel } from "@/components/cursor-chapter-copy";
 import { IndustryChapterCopyPanel, IndustryOverviewTable } from "@/components/industry-chapter-copy";
@@ -26,8 +27,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { dashboardCtaHref } from "@/lib/auth/public-cta";
+import {
+  chatCurlPowerShellOneLine,
+} from "@/lib/customer-curl-oneline";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { dashboardCtaHref } from "@/lib/auth/public-cta";
 import {
   INTEGRATION_BASE_URL,
   INTEGRATION_DEFAULT_MODEL,
@@ -409,6 +413,18 @@ function DocBlock({
             copiedLabel={t("integration.copied")}
             className="mt-3 [&_code]:max-h-32 [&_code]:whitespace-pre-wrap [&_code]:break-all"
           />
+          {oneLineSnippetKey === "chat-curl" ? (
+            <CopyableSnippetField
+              label={t("integration.clientSoftwarePowerShellCurlLabel")}
+              value={chatCurlPowerShellOneLine(quickStartApiKey)}
+              copyId={`${block.id}-powershell`}
+              copiedId={copiedId}
+              onCopy={onCopy}
+              copyLabel={t("integration.copyPowerShellCurl")}
+              copiedLabel={t("integration.copied")}
+              className="mt-3 [&_code]:max-h-32 [&_code]:whitespace-pre-wrap [&_code]:break-all"
+            />
+          ) : null}
           <div className="mt-2 flex flex-wrap gap-2">
             <CopyConfigAction
               id={`${block.id}-action`}
@@ -474,6 +490,17 @@ function DocBlock({
       return (
         <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
           <OpenAiSdkChapterCopyPanel
+            apiKey={quickStartApiKey}
+            copiedId={copiedId}
+            onCopy={onCopy}
+            idPrefix={block.id}
+          />
+        </div>
+      );
+    case "client-software-copy-panel":
+      return (
+        <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
+          <ClientSoftwareAcceptanceCopyPanel
             apiKey={quickStartApiKey}
             copiedId={copiedId}
             onCopy={onCopy}

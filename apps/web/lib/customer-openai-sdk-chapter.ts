@@ -14,6 +14,95 @@ Model: ${model}
 Authorization: Bearer ${apiKey}`;
 }
 
+export function buildNodeSdkConfigSnippet(
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
+  model = OPENAI_SDK_DEFAULT_MODEL
+): string {
+  return `baseURL: "${TOKFAI_API_BASE_URL}"
+apiKey: process.env.TOKFAI_API_KEY ?? "${apiKey}"
+model: "${model}"`;
+}
+
+export function buildPythonSdkConfigSnippet(
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
+  model = OPENAI_SDK_DEFAULT_MODEL
+): string {
+  return `base_url: "${TOKFAI_API_BASE_URL}"
+api_key: os.environ.get("TOKFAI_API_KEY", "${apiKey}")
+model: "${model}"`;
+}
+
+export const NODE_SDK_INSTALL_COMMAND = "npm install openai";
+
+export function buildNodeSdkRunCommand(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
+  return `TOKFAI_API_KEY=${apiKey} node tokfai-chat.mjs`;
+}
+
+export const PYTHON_SDK_INSTALL_COMMAND = "pip install openai";
+
+export function buildPythonSdkRunCommand(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
+  return `TOKFAI_API_KEY=${apiKey} python tokfai_chat.py`;
+}
+
+export function buildNodeChatSdkRunnableFile(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
+  return `// Save as tokfai-chat.mjs in any folder — no Tokfai project required
+// 1) npm install openai
+// 2) TOKFAI_API_KEY=sk-tokfai_... node tokfai-chat.mjs
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: process.env.TOKFAI_API_KEY ?? "${apiKey}",
+  baseURL: "${TOKFAI_API_BASE_URL}",
+});
+
+const completion = await client.chat.completions.create({
+  model: "${OPENAI_SDK_DEFAULT_MODEL}",
+  messages: [{ role: "user", content: "${CHAT_SMOKE_PROMPT}" }],
+  stream: false,
+});
+
+console.log(completion.choices[0]?.message?.content);
+
+const tokfai = completion as typeof completion & {
+  request_id?: string;
+  credits_charged?: number;
+  tokfai?: { resolved_model?: string; request_id?: string; credits_charged?: number };
+};
+console.log("request_id:", tokfai.request_id ?? tokfai.tokfai?.request_id);
+console.log("credits_charged:", tokfai.credits_charged ?? tokfai.tokfai?.credits_charged);
+console.log(
+  "resolved_model:",
+  tokfai.tokfai?.resolved_model ?? completion.model
+);`;
+}
+
+export function buildPythonChatSdkRunnableFile(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
+  return `# Save as tokfai_chat.py in any folder — no Tokfai project required
+# 1) pip install openai
+# 2) TOKFAI_API_KEY=sk-tokfai_... python tokfai_chat.py
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ.get("TOKFAI_API_KEY", "${apiKey}"),
+    base_url="${TOKFAI_API_BASE_URL}",
+)
+
+completion = client.chat.completions.create(
+    model="${OPENAI_SDK_DEFAULT_MODEL}",
+    messages=[{"role": "user", "content": "${CHAT_SMOKE_PROMPT}"}],
+    stream=False,
+)
+
+print(completion.choices[0].message.content)
+
+payload = completion.model_dump() if hasattr(completion, "model_dump") else {}
+tokfai = payload.get("tokfai") or {}
+print("request_id:", payload.get("request_id") or tokfai.get("request_id"))
+print("credits_charged:", payload.get("credits_charged") or tokfai.get("credits_charged"))
+print("resolved_model:", tokfai.get("resolved_model") or completion.model)`;
+}
+
 export function buildNodeChatFetchExample(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
   return `// Node fetch — chat completion (no OpenAI SDK required)
 const apiKey = process.env.TOKFAI_API_KEY ?? "${apiKey}";
