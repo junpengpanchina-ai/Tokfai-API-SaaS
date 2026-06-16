@@ -1576,6 +1576,7 @@ export const messages = {
         "Copy request_id from responses and match it in Usage and Credits.",
       navTitle: "Handbook",
       navPositioning: "Product positioning",
+      navProductionFlow: "Production integration flow",
       navQuickStart: "Quick start",
       navApiKey: "API Key",
       navChatApi: "Chat API",
@@ -1608,7 +1609,7 @@ export const messages = {
         "Tokfai does not operate your business, handle your customers, or run tickets for you.",
       positioningYourStack:
         "Industry examples in this handbook show how to wire Tokfai into your systems — copy the patterns into your stack.",
-      demoFlowTitle: "Production onboarding flow",
+      demoFlowTitle: "Production integration flow",
       demoFlowDesc:
         "Run this once to verify a full integration: key → chat → batch → Usage → Credits.",
       demoFlowStep1:
@@ -4658,6 +4659,7 @@ export const messages = {
         "从响应中复制 request_id，在 Usage 与 Credits 中核对。",
       navTitle: "手册目录",
       navPositioning: "产品定位",
+      navProductionFlow: "生产对接流程",
       navQuickStart: "快速开始",
       navApiKey: "API Key",
       navChatApi: "Chat API",
@@ -4690,7 +4692,7 @@ export const messages = {
         "Tokfai 不代运营你的业务，不处理你的客户，也不替你跑工单。",
       positioningYourStack:
         "本手册中的行业示例展示如何把 Tokfai 接入业务系统——可复制到你的技术栈。",
-      demoFlowTitle: "生产接入演示流程",
+      demoFlowTitle: "生产对接流程",
       demoFlowDesc:
         "按顺序跑通一次完整接入：创建密钥 → 对话 → Batch → Usage → Credits。",
       demoFlowStep1:
@@ -4711,7 +4713,7 @@ export const messages = {
       demoFlowReconcileNote:
         "此流程用于验证你的 API 集成——不是 Tokfai 代运营。按本页步骤完成一次完整接入验证。",
       positioningChapterPurpose:
-        "说明 Tokfai 是 API 网关与模型中转，不是托管运营服务商。",
+        "说明 Tokfai 是 API 网关与模型中转，不是代运营服务商。",
       positioningChapterCopy:
         "本页的 Base URL（https://api.tokfai.com/v1）与 Authorization 请求头格式。",
       positioningChapterVerify:
@@ -4905,7 +4907,7 @@ export const messages = {
         "见下方常见错误 — missing_token、invalid_token、insufficient_credits 或上游超时。",
       imagePlaygroundLink: "打开 Image Playground",
       batchChapterPurpose:
-        "在你的后端一次提交多条对话任务——不是托管运营服务。",
+        "在你的后端一次提交多条对话任务——不是代运营服务。",
       batchChapterCopy:
         "下方单行创建 curl（POST /v1/batches/chat）与轮询 curl（GET /v1/batches/{id}）。",
       batchChapterVerify:
@@ -5476,7 +5478,7 @@ export const messages = {
       batchSameKeyNote:
         "Batch 与 Chat、Image 使用同一 Tokfai API Key：Authorization: Bearer sk-tokfai_xxx。",
       batchNotManagedNote:
-        "Batch 是后端 API 集成模式——不是托管运营，不是 Tokfai 代跑你的业务。",
+        "Batch 是后端 API 集成模式——不是代运营，不是 Tokfai 代跑你的业务。",
       batchEndpoints:
         "创建：POST https://api.tokfai.com/v1/batches/chat（返回 HTTP 202）。轮询：GET https://api.tokfai.com/v1/batches/{id}。Item 详情：GET https://api.tokfai.com/v1/batches/{id}/items。",
       batchTerminalNote:
@@ -5565,7 +5567,7 @@ export const messages = {
       batchNote:
         "POST /v1/batches/chat 立即返回 202。轮询 GET /v1/batches/{id} 直至完成。每条成功 item 单独扣费。",
       batchGatewayNote:
-        "Batch 不是托管运营服务，而是你把批量任务接入自己系统的方式。",
+        "Batch 不是代运营服务，而是你把批量任务接入自己系统的方式。",
       footerHint: "需要图像 API 或扩展参考？",
       footerImageLink: "Image Playground",
       footerDocsLink: "模型与定价",

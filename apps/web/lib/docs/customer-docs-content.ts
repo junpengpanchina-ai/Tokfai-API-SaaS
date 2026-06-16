@@ -150,6 +150,33 @@ const VERIFY_USAGE_CREDITS: CustomerDocDashboardLink[] = [
   { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
 ];
 
+const INTEGRATION_TOOL_DOC_LINKS: CustomerDocDashboardLink[] = [
+  {
+    id: "openai-sdk-docs",
+    labelKey: "integration.navOpenAiSdk",
+    href: "/dashboard/docs",
+    hash: "openai-sdk",
+  },
+  {
+    id: "cursor-docs",
+    labelKey: "integration.navCursor",
+    href: "/dashboard/docs",
+    hash: "cursor",
+  },
+  {
+    id: "cherry-docs",
+    labelKey: "integration.navCherry",
+    href: "/dashboard/docs",
+    hash: "cherry-studio",
+  },
+  {
+    id: "industry-docs",
+    labelKey: "integration.navIndustry",
+    href: "/dashboard/docs",
+    hash: "industry-examples",
+  },
+];
+
 export const CUSTOMER_DOC_ESSENTIAL_KEYS = [
   "integration.essentialBaseUrl",
   "integration.essentialModel",
@@ -336,6 +363,91 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       { type: "paragraph", textKey: "integration.positioningYourKey" },
       { type: "paragraph", textKey: "integration.positioningNotAgency" },
       { type: "paragraph", textKey: "integration.positioningYourStack" },
+      {
+        type: "dashboard-links",
+        links: [
+          { id: "keys", labelKey: "integration.ctaCreateKey", href: "/dashboard/api-keys" },
+          {
+            id: "production-flow",
+            labelKey: "integration.navProductionFlow",
+            href: "/dashboard/docs",
+            hash: "production-integration-flow",
+          },
+          {
+            id: "quick-start",
+            labelKey: "integration.navQuickStart",
+            href: "/dashboard/docs",
+            hash: "quick-start",
+          },
+          ...INTEGRATION_TOOL_DOC_LINKS,
+        ],
+      },
+    ],
+  },
+  {
+    id: "production-integration-flow",
+    navKey: "integration.navProductionFlow",
+    titleKey: "integration.demoFlowTitle",
+    descriptionKey: "integration.demoFlowDesc",
+    highlight: true,
+    chapterGuide: chapter(
+      "integration.onboardingChapterPurpose",
+      "integration.onboardingChapterCopy",
+      "integration.onboardingChapterVerify",
+      "integration.onboardingChapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "keys",
+        labelKey: "integration.demoFlowLinkKeys",
+        href: "/dashboard/api-keys",
+      },
+      copySnippetKey: "chat-curl",
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      {
+        type: "ordered",
+        items: [
+          "integration.demoFlowStep1",
+          "integration.demoFlowStep2",
+          "integration.demoFlowStep3",
+          "integration.demoFlowStep4",
+          "integration.demoFlowStep5",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.demoFlowReconcileNote" },
+      {
+        type: "dashboard-links",
+        links: [
+          { id: "keys", labelKey: "integration.demoFlowLinkKeys", href: "/dashboard/api-keys" },
+          {
+            id: "playground",
+            labelKey: "integration.demoFlowLinkPlayground",
+            href: "/dashboard/playground",
+          },
+          {
+            id: "batch-docs",
+            labelKey: "integration.demoFlowLinkBatch",
+            href: "/dashboard/docs",
+            hash: "batch-api",
+          },
+          { id: "usage", labelKey: "integration.demoFlowLinkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.demoFlowLinkCredits", href: "/dashboard/credits" },
+          {
+            id: "usage-credits-docs",
+            labelKey: "integration.linkUsageCreditsGuide",
+            href: "/dashboard/docs",
+            hash: "usage-credits",
+          },
+          {
+            id: "quick-start",
+            labelKey: "integration.navQuickStart",
+            href: "/dashboard/docs",
+            hash: "quick-start",
+          },
+        ],
+      },
     ],
   },
   {
@@ -386,6 +498,36 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
         type: "dashboard-links",
         links: [
           { id: "keys", labelKey: "integration.ctaCreateKey", href: "/dashboard/api-keys" },
+          {
+            id: "api-key-docs",
+            labelKey: "integration.navApiKey",
+            href: "/dashboard/docs",
+            hash: "api-key",
+          },
+          {
+            id: "chat-api-docs",
+            labelKey: "integration.navChatApi",
+            href: "/dashboard/docs",
+            hash: "chat-api",
+          },
+          {
+            id: "production-flow",
+            labelKey: "integration.navProductionFlow",
+            href: "/dashboard/docs",
+            hash: "production-integration-flow",
+          },
+          {
+            id: "usage-credits-docs",
+            labelKey: "integration.linkUsageCreditsGuide",
+            href: "/dashboard/docs",
+            hash: "usage-credits",
+          },
+          {
+            id: "error-codes-docs",
+            labelKey: "integration.linkErrorCodesGuide",
+            href: "/dashboard/docs",
+            hash: "error-codes",
+          },
           { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
           { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
         ],
@@ -1153,6 +1295,7 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
             href: "/dashboard/docs",
             hash: "usage-credits",
           },
+          ...INTEGRATION_TOOL_DOC_LINKS,
         ],
       },
     ],
@@ -1274,6 +1417,18 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
             labelKey: "integration.navOpenAiSdk",
             href: "/dashboard/docs",
             hash: "openai-sdk",
+          },
+          {
+            id: "cherry-docs",
+            labelKey: "integration.navCherry",
+            href: "/dashboard/docs",
+            hash: "cherry-studio",
+          },
+          {
+            id: "industry-docs",
+            labelKey: "integration.navIndustry",
+            href: "/dashboard/docs",
+            hash: "industry-examples",
           },
         ],
       },
@@ -1403,6 +1558,12 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
             href: "/dashboard/docs",
             hash: "cursor",
           },
+          {
+            id: "industry-docs",
+            labelKey: "integration.navIndustry",
+            href: "/dashboard/docs",
+            hash: "industry-examples",
+          },
         ],
       },
     ],
@@ -1490,6 +1651,7 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
           },
           { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
           { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+          ...INTEGRATION_TOOL_DOC_LINKS,
         ],
       },
     ],
