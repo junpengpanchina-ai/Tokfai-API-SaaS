@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo, useState } from "react";
 import {
   AlertCircle,
   ArrowDownRight,
@@ -17,6 +18,8 @@ import { CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
 import { ResponsiveTableScroll } from "@/components/responsive-table-scroll";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -51,6 +54,12 @@ export function CreditsContentClient({
 }) {
   const { t } = useI18n();
   const { balance, ledger, orders, error } = creditsState;
+  const [referenceFilter, setReferenceFilter] = useState("");
+  const filteredLedger = useMemo(() => {
+    const q = referenceFilter.trim();
+    if (!q) return ledger;
+    return ledger.filter((entry) => entry.reference_id?.includes(q));
+  }, [ledger, referenceFilter]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -155,8 +164,23 @@ export function CreditsContentClient({
           <CardDescription>{t("dashboard.credits.recentLedgerDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 max-w-md space-y-2">
+            <Label htmlFor="credits-reference-filter">
+              {t("dashboard.credits.referenceFilterOptional")}
+            </Label>
+            <Input
+              id="credits-reference-filter"
+              value={referenceFilter}
+              onChange={(event) => setReferenceFilter(event.target.value)}
+              placeholder="req_..."
+            />
+          </div>
           {ledger.length === 0 ? (
             <EmptyLedgerState t={t} />
+          ) : filteredLedger.length === 0 ? (
+            <p className="rounded-md border border-dashed py-10 text-center text-sm text-muted-foreground">
+              {t("dashboard.credits.noLedgerForReference")}
+            </p>
           ) : (
             <ResponsiveTableScroll>
               <table className="w-full min-w-[720px] text-sm">
@@ -183,7 +207,7 @@ export function CreditsContentClient({
                   </tr>
                 </thead>
                 <tbody>
-                  {ledger.map((entry) => (
+                  {filteredLedger.map((entry) => (
                     <LedgerRow key={entry.id} entry={entry} t={t} />
                   ))}
                 </tbody>

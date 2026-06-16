@@ -476,6 +476,15 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       { type: "paragraph", textKey: "integration.shellCompatNote" },
       { type: "paragraph", textKey: "integration.quickStartCustomerOnlyNote" },
       {
+        type: "bullets",
+        items: [
+          "integration.quickStartNoInstall",
+          "integration.quickStartNoRepo",
+          "integration.quickStartNoCd",
+          "integration.quickStartAnyTerminal",
+        ],
+      },
+      {
         type: "ordered",
         items: [
           "integration.quickStartStep1",
@@ -572,6 +581,7 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       },
       { type: "api-key-copy-panel", id: "api-key-copy" },
       { type: "paragraph", textKey: "integration.apiKeyVerifyNote" },
+      { type: "paragraph", textKey: "integration.apiKeyModelsCatalogNote" },
       { type: "api-key-errors" },
       {
         type: "code",

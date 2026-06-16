@@ -179,7 +179,7 @@ export const messages = {
         stateNeedsApiKeyAction: "Create API key",
         stateNeedsFirstCallTitle: "Run your first API test",
         stateNeedsFirstCallBody:
-          "Your key is ready. Read the integration guide for base URL and model setup, then send a test in Playground.",
+          "Copy the one-line chat curl from API Keys or Docs Quick Start, run it in any terminal, then reconcile request_id in Usage and Credits.",
         stateNeedsFirstCallQuickstart: "View integration docs",
         stateNeedsFirstCallPlayground: "Chat Playground",
         onboardingTitle: "Getting started",
@@ -197,7 +197,7 @@ export const messages = {
           "Generate an sk-tokfai_ key. The full secret is shown once at creation.",
         onboardingStep3Title: "Integration guide",
         onboardingStep3Body:
-          "Base URL, API key, and model auto-fast — plus Cursor, Cherry Studio, and SDK examples.",
+          "Copy one-line curl from Quick Start — Base URL, API key, model auto-fast. No install or repository required.",
         onboardingStep4Title: "Chat Playground test",
         onboardingStep4Body:
           "Send one test chat request to verify your key and balance.",
@@ -253,20 +253,22 @@ export const messages = {
       firstRun: {
         title: "Get started in about 3 minutes",
         desc:
-          "Create a key, test in Playground, read the integration guide, then confirm usage and credits.",
+          "Create API Key → copy one-line curl → paste in any terminal → reconcile in Usage and Credits.",
         highlightBaseUrl: "Base URL: {baseUrl}",
         highlightModel: "Recommended model: {model}",
         highlightOneKey:
-          "One API key can route multiple upstream models.",
+          "One API key routes Chat, Image, and Batch.",
         highlightRequestId:
-          "Use request_id to trace Usage and Credits in the dashboard.",
-        flowStep1: "Create an API key and copy the full sk-tokfai_… secret.",
-        flowStep2: "Send a test chat in Playground with model auto-fast.",
+          "Copy request_id from responses → Dashboard → Usage / Credits.",
+        flowStep1: "Create an API Key and copy the full sk-tokfai_… secret.",
+        flowStep2:
+          "Copy the one-line chat curl from API Keys or Docs Quick Start.",
         flowStep3:
-          "Read the integration guide (Cursor or Cherry Studio sections).",
+          "Paste into any terminal (any folder). Expect HTTP 200 with request_id.",
         flowStep4:
-          "Open Usage to verify request_id, tokens, and credits_charged.",
+          "Open Dashboard → Usage and Credits to search request_id and reconcile.",
         createApiKey: "Create API key",
+        quickStart: "Quick Start curl",
         tryPlayground: "Try Chat Playground",
         cursorGuide: "View Cursor guide",
         cherryGuide: "View Cherry Studio guide",
@@ -1034,6 +1036,9 @@ export const messages = {
         lastUpdated: "Last updated:",
         recentLedger: "Credit ledger",
         recentLedgerDesc: "Last 50 entries, newest first.",
+        referenceFilterOptional: "Reference / request_id (optional)",
+        noLedgerForReference:
+          "No ledger rows match this reference in the loaded entries. Widen your search or confirm the API call succeeded.",
         recentOrders: "Recharge orders",
         recentOrdersDesc:
           "Last 10 Stripe Checkout orders. Pending orders older than 24 hours show as expired.",
@@ -1631,7 +1636,7 @@ export const messages = {
       demoFlowLinkUsage: "Usage",
       demoFlowLinkCredits: "Credits",
       demoFlowReconcileNote:
-        "This flow validates your integration — not Tokfai operating your business. Follow the steps on this page for a complete onboarding check.",
+        "This flow validates your integration — not Tokfai operating your business. Follow the steps on this page for a complete integration check.",
       positioningChapterPurpose:
         "Clarify Tokfai as an API gateway and model relay — not a managed operations vendor.",
       positioningChapterCopy:
@@ -1678,7 +1683,9 @@ export const messages = {
       apiKeyVerifyCurlLabel: "One-line models curl (verify auth)",
       apiKeyChatCurlLabel: "One-line chat curl (full test)",
       apiKeyVerifyNote:
-        "Paste the one-line models curl into any terminal (Mac, Windows PowerShell, or Linux). HTTP 200 means your key is valid. No Tokfai project folder required.",
+        "Paste the one-line models curl into any terminal (Mac, Windows PowerShell, or Linux). HTTP 200 means your key is valid. No install, no repository, and no cd required.",
+      apiKeyModelsCatalogNote:
+        "GET /v1/models lists available models. The public catalog may respond without a key; the one-line curl below still uses Authorization: Bearer for the same pattern as Chat, Image, and Batch.",
       apiKeyLiveKeyNote:
         "Your API key from this session is already filled in these curls.",
       apiKeyErrorsTitle: "Common auth errors",
@@ -2310,6 +2317,11 @@ export const messages = {
         "Shell compatibility: one-line curls use single-quoted JSON bodies. Paste as-is in Mac Terminal (zsh/bash) and Linux shells. On Windows PowerShell, use curl.exe (not the Invoke-WebRequest alias) or Git Bash — paste the copied one-line command unchanged.",
       quickStartCustomerOnlyNote:
         "You only need your API Key. No Tokfai project install, no repository checkout, and no operator command-line tools — copy one-line curl from this page or API Keys and paste into any terminal.",
+      quickStartNoInstall: "No install required — Tokfai is a cloud API.",
+      quickStartNoRepo: "No repository or project checkout required.",
+      quickStartNoCd: "No cd into any folder required.",
+      quickStartAnyTerminal:
+        "Paste the copied one-line curl in Mac Terminal, Linux shell, Git Bash, or Windows curl.exe.",
       quickStartCopyNowTitle: "You can copy now",
       quickStartCopyNowLabel: "One-line chat curl",
       quickStartKeyHintLive:
@@ -3347,8 +3359,8 @@ export const messages = {
         stateNeedsApiKeyAction: "创建 API Key",
         stateNeedsFirstCallTitle: "发起第一次 API 测试",
         stateNeedsFirstCallBody:
-          "密钥已就绪。阅读接入指南了解 Base URL 与 model 配置，然后在 Playground 发送测试请求。",
-        stateNeedsFirstCallQuickstart: "查看接入文档",
+          "从 API Keys 或 Docs Quick Start 复制单行 chat curl，在任意终端运行，再用 Usage / Credits 按 request_id 对账。",
+        stateNeedsFirstCallQuickstart: "查看 Quick Start",
         stateNeedsFirstCallPlayground: "Chat Playground",
         onboardingTitle: "新手五步",
         onboardingDesc: "从注册到完成第一次对话与图像 API 调用。",
@@ -3362,7 +3374,7 @@ export const messages = {
           "生成 sk-tokfai_ 密钥。完整 secret 仅在创建时展示一次。",
         onboardingStep3Title: "接入指南",
         onboardingStep3Body:
-          "Base URL、API Key 与 model auto-fast，以及 Cursor、Cherry Studio 与 SDK 示例。",
+          "从 Quick Start 复制单行 curl——Base URL、API Key、model auto-fast。无需安装或 clone 仓库。",
         onboardingStep4Title: "Chat Playground 测试",
         onboardingStep4Body:
           "发送一次对话测试，验证密钥与余额是否正常。",
@@ -3413,18 +3425,20 @@ export const messages = {
       firstRun: {
         title: "约 3 分钟完成首次接入",
         desc:
-          "创建密钥 → Playground 测试 → 阅读接入指南 → 在 Usage 核对用量与积分。",
+          "创建 API Key → 复制单行 curl → 任意终端粘贴运行 → 在 Usage / Credits 对账。",
         highlightBaseUrl: "Base URL：{baseUrl}",
         highlightModel: "推荐模型：{model}",
-        highlightOneKey: "一把 API Key 可路由多个上游模型。",
+        highlightOneKey: "一把 API Key 可用于 Chat、Image、Batch。",
         highlightRequestId:
-          "使用 request_id 在控制台追溯 Usage 与 Credits。",
+          "从响应复制 request_id → Dashboard → Usage / Credits。",
         flowStep1: "创建 API Key 并复制完整 sk-tokfai_… secret。",
-        flowStep2: "在 Playground 用 auto-fast 发送一次对话测试。",
-        flowStep3: "阅读接入指南（Cursor 或 Cherry Studio 章节）。",
+        flowStep2: "从 API Keys 或 Docs Quick Start 复制单行 chat curl。",
+        flowStep3:
+          "粘贴到任意终端（任意目录）。应得到 HTTP 200 与 request_id。",
         flowStep4:
-          "打开 Usage 核对 request_id、tokens 与 credits_charged。",
+          "打开 Dashboard → Usage 与 Credits，搜索 request_id 并核对。",
         createApiKey: "创建 API Key",
+        quickStart: "Quick Start curl",
         tryPlayground: "打开 Chat Playground",
         cursorGuide: "查看 Cursor 指南",
         cherryGuide: "查看 Cherry Studio 指南",
@@ -4147,6 +4161,9 @@ export const messages = {
         lastUpdated: "最近更新：",
         recentLedger: "积分流水",
         recentLedgerDesc: "最近 50 条，按时间倒序。",
+        referenceFilterOptional: "Reference / request_id（可选）",
+        noLedgerForReference:
+          "已加载条目中无匹配的 reference。请确认 API 已成功，或核对 request_id 是否完整。",
         recentOrders: "充值订单摘要",
         recentOrdersDesc:
           "最近 10 条 Stripe Checkout 订单。超过 24 小时未支付的 pending 显示为「未完成」。",
@@ -4770,7 +4787,9 @@ export const messages = {
       apiKeyVerifyCurlLabel: "单行 models curl（验证鉴权）",
       apiKeyChatCurlLabel: "单行 chat curl（完整测试）",
       apiKeyVerifyNote:
-        "将单行 models curl 粘贴到任意终端（Mac Terminal、Windows PowerShell 或 Linux shell）。HTTP 200 表示密钥有效。无需进入 Tokfai 工程目录。",
+        "将单行 models curl 粘贴到任意终端（Mac、Windows PowerShell 或 Linux）。HTTP 200 表示密钥有效。无需安装、无需 clone 仓库、无需 cd。",
+      apiKeyModelsCatalogNote:
+        "GET /v1/models 列出可用模型。公开目录可能无需密钥即可访问；下方单行 curl 仍使用 Authorization: Bearer，与 Chat、Image、Batch 配置方式一致。",
       apiKeyLiveKeyNote: "本浏览器会话中的 API Key 已自动填入下方 curl。",
       apiKeyErrorsTitle: "常见鉴权错误",
       apiKeyErrorMissingToken:
@@ -5347,6 +5366,11 @@ export const messages = {
         "Shell 兼容：单行 curl 使用单引号包裹 JSON。在 Mac Terminal（zsh/bash）与 Linux 中可直接粘贴运行。Windows PowerShell 请使用 curl.exe（不要用 Invoke-WebRequest 别名）或 Git Bash——粘贴复制的单行命令即可。",
       quickStartCustomerOnlyNote:
         "你只需要 API Key。无需安装 Tokfai 项目、无需 clone 仓库、无需运行仓库里的命令行工具——从本页或 API Keys 复制单行 curl，粘贴到任意终端即可。",
+      quickStartNoInstall: "无需安装——Tokfai 是云端 API。",
+      quickStartNoRepo: "无需 clone 仓库或进入任何项目目录。",
+      quickStartNoCd: "无需 cd 到任何文件夹。",
+      quickStartAnyTerminal:
+        "将复制的单行 curl 粘贴到 Mac Terminal、Linux shell、Git Bash 或 Windows curl.exe。",
       quickStartCopyNowTitle: "你现在就可以复制",
       quickStartCopyNowLabel: "单行 chat curl",
       quickStartKeyHintLive: "已自动填入本浏览器会话中创建的 API Key。",

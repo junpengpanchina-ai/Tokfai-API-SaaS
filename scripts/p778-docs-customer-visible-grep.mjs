@@ -3,7 +3,7 @@
  * Internal operator smoke only — not customer documentation.
  * Customers use API Key + one-line curl from Dashboard; they never run this script.
  *
- * P778 — scan customer-visible web source for internal engineering terms.
+ * P779 — scan customer-visible web source for internal engineering terms.
  * Usage: node scripts/p778-docs-customer-visible-grep.mjs
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -28,10 +28,11 @@ const IGNORE_PATH_PARTS = [
 const RULES = [
   { label: "/Users path", pattern: /\/Users(?:\/[A-Za-z0-9._-]+)?/ },
   { label: "/opt/tokfai", pattern: /\/opt\/tokfai/ },
-  { label: "P77 ticket", pattern: /\bP77[\d.]*\b/ },
-  { label: "P778 ticket", pattern: /\bP778[\d.]*\b/ },
+  { label: "P77 ticket", pattern: /\bP7[78]\d*[\d.]*\b/ },
   { label: "artifact", pattern: /\bartifact\b/i },
-  { label: "internal runbook", pattern: /internal runbook/i },
+  { label: "internal runbook", pattern: /internal\s+runbook/i },
+  { label: "runbook", pattern: /\brunbook\b/i },
+  { label: "production acceptance", pattern: /production\s+acceptance/i },
   { label: "TOKFAI_SUPABASE_JWT", pattern: /TOKFAI_SUPABASE_JWT/ },
   { label: "SUPABASE_ACCESS_TOKEN", pattern: /SUPABASE_ACCESS_TOKEN/ },
   { label: "internal smoke", pattern: /internal\s+smoke/i },
@@ -72,6 +73,9 @@ const ALLOW_SUBSTRINGS = [
   "no operator command-line",
   "无需运行仓库里的命令行",
   "no repository checkout",
+  "No repository",
+  "无需 clone 仓库",
+  "无需 cd 到任何文件夹",
 ];
 
 function shouldIgnorePath(path) {
