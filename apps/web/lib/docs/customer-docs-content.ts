@@ -26,11 +26,13 @@ import {
   INTEGRATION_DEFAULT_MODEL,
   INTEGRATION_KEY_PLACEHOLDER,
   OPENAI_JS_SNIPPET,
+  OPENAI_NODE_FETCH_SNIPPET,
   OPENAI_PYTHON_SNIPPET,
   OPENAI_SDK_CONFIG_SNIPPET,
 } from "@/lib/customer-integration-snippets";
 import {
   buildNodeBatchFetchExample,
+  buildNodeChatFetchExample,
   buildPythonBatchRequestsExample,
 } from "@/lib/customer-openai-sdk-chapter";
 import { CUSTOMER_DOC_ERROR_CODES } from "@/lib/customer-error-codes-chapter";
@@ -44,6 +46,7 @@ export type CustomerDocSnippetKey =
   | "batch-poll-curl"
   | "openai-sdk-config"
   | "openai-js"
+  | "openai-node-fetch"
   | "openai-python"
   | "openai-node-batch"
   | "openai-python-batch"
@@ -59,6 +62,7 @@ export const CUSTOMER_DOC_SNIPPET_DISPLAY: Record<CustomerDocSnippetKey, string>
   "batch-poll-curl": batchPollCurlMultiline(),
   "openai-sdk-config": OPENAI_SDK_CONFIG_SNIPPET,
   "openai-js": OPENAI_JS_SNIPPET,
+  "openai-node-fetch": OPENAI_NODE_FETCH_SNIPPET,
   "openai-python": OPENAI_PYTHON_SNIPPET,
   "openai-node-batch": buildNodeBatchFetchExample(),
   "openai-python-batch": buildPythonBatchRequestsExample(),
@@ -75,6 +79,7 @@ export const CUSTOMER_DOC_SNIPPET_COPY: Record<CustomerDocSnippetKey, string> = 
   "batch-poll-curl": batchPollCurlOneLine(),
   "openai-sdk-config": OPENAI_SDK_CONFIG_SNIPPET,
   "openai-js": OPENAI_JS_SNIPPET,
+  "openai-node-fetch": OPENAI_NODE_FETCH_SNIPPET,
   "openai-python": OPENAI_PYTHON_SNIPPET,
   "openai-node-batch": buildNodeBatchFetchExample(),
   "openai-python-batch": buildPythonBatchRequestsExample(),
@@ -368,6 +373,12 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
         links: [
           { id: "keys", labelKey: "integration.ctaCreateKey", href: "/dashboard/api-keys" },
           {
+            id: "client-connector",
+            labelKey: "integration.navClientConnector",
+            href: "/dashboard/docs",
+            hash: "client-connector-flow",
+          },
+          {
             id: "production-flow",
             labelKey: "integration.navProductionFlow",
             href: "/dashboard/docs",
@@ -539,6 +550,65 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
             href: "/dashboard/docs",
             hash: "error-codes",
           },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "client-connector-flow",
+    navKey: "integration.navClientConnector",
+    titleKey: "integration.clientConnectorTitle",
+    descriptionKey: "integration.clientConnectorDesc",
+    highlight: true,
+    chapterGuide: chapter(
+      "integration.clientConnectorChapterPurpose",
+      "integration.clientConnectorChapterCopy",
+      "integration.clientConnectorChapterVerify",
+      "integration.clientConnectorChapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "keys",
+        labelKey: "integration.ctaCreateKey",
+        href: "/dashboard/api-keys",
+      },
+      copySnippetKey: "chat-curl",
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "paragraph", textKey: "integration.clientConnectorIntro" },
+      {
+        type: "ordered",
+        items: [
+          "integration.clientConnectorStep1",
+          "integration.clientConnectorStep2",
+          "integration.clientConnectorStep3",
+          "integration.clientConnectorStep4",
+          "integration.clientConnectorStep5",
+        ],
+      },
+      {
+        type: "bullets",
+        items: [
+          "integration.clientConnectorNoInstall",
+          "integration.clientConnectorNoRepo",
+          "integration.clientConnectorNoCd",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.clientConnectorReconcileNote" },
+      {
+        type: "dashboard-links",
+        links: [
+          { id: "keys", labelKey: "integration.ctaCreateKey", href: "/dashboard/api-keys" },
+          {
+            id: "quick-start",
+            labelKey: "integration.navQuickStart",
+            href: "/dashboard/docs",
+            hash: "quick-start",
+          },
+          ...INTEGRATION_TOOL_DOC_LINKS,
           { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
           { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
         ],
@@ -1215,6 +1285,7 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
     },
     blocks: [
       { type: "paragraph", textKey: "integration.sdkGatewayNote" },
+      { type: "paragraph", textKey: "integration.sdkCompatibilityNote" },
       { type: "paragraph", textKey: "integration.sdkYourProjectNote" },
       { type: "openai-sdk-copy-panel", id: "openai-sdk-copy" },
       { type: "paragraph", textKey: "integration.sdkNodeTitle" },
@@ -1223,6 +1294,13 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
         id: "openai-js",
         label: "Node.js / TypeScript",
         snippetKey: "openai-js",
+      },
+      { type: "paragraph", textKey: "integration.sdkFetchTitle" },
+      {
+        type: "code",
+        id: "openai-node-fetch",
+        label: "Node fetch chat",
+        snippetKey: "openai-node-fetch",
       },
       { type: "paragraph", textKey: "integration.sdkPythonTitle" },
       {
@@ -1276,11 +1354,17 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       {
         type: "bullets",
         items: [
-          "integration.sdkErrorAuth",
+          "integration.sdkErrorInvalidToken",
           "integration.sdkErrorCredits",
           "integration.sdkErrorModel",
-          "integration.sdkErrorUpstreamBusy",
           "integration.sdkErrorTimeout",
+        ],
+      },
+      {
+        type: "bullets",
+        items: [
+          "integration.sdkErrorAuth",
+          "integration.sdkErrorUpstreamBusy",
           "integration.sdkErrorRateLimit",
         ],
       },
@@ -1334,8 +1418,10 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
     },
     blocks: [
       { type: "paragraph", textKey: "integration.cursorGatewayNote" },
+      { type: "paragraph", textKey: "integration.cursorCurlFirstNote" },
       { type: "paragraph", textKey: "integration.cursorNotAgencyNote" },
       { type: "paragraph", textKey: "integration.cursorUiVersionNote" },
+      { type: "paragraph", textKey: "integration.cursorModelAliasesNote" },
       { type: "cursor-copy-panel", id: "cursor-copy" },
       { type: "paragraph", textKey: "integration.cursorPathTitle" },
       {
@@ -1468,6 +1554,7 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
     },
     blocks: [
       { type: "paragraph", textKey: "integration.cherryGatewayNote" },
+      { type: "paragraph", textKey: "integration.cherryCurlFirstNote" },
       { type: "paragraph", textKey: "integration.cherryNotAgencyNote" },
       { type: "paragraph", textKey: "integration.cherryUiVersionNote" },
       { type: "paragraph", textKey: "integration.cherryModelsNote" },
@@ -1481,6 +1568,7 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
           "integration.cherryPathStep3",
           "integration.cherryPathStep4",
           "integration.cherryPathStep5",
+          "integration.cherryPathStepStream",
           "integration.cherryPathStep6",
           "integration.cherryPathStep7",
           "integration.cherryPathStep8",
@@ -1521,15 +1609,21 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
         ],
       },
       { type: "paragraph", textKey: "integration.cherryErrorsTitle" },
+      { type: "paragraph", textKey: "integration.cherryTroubleshootTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.cherryTroubleshootInvalidToken",
+          "integration.cherryTroubleshootModel",
+          "integration.cherryTroubleshootTimeout",
+          "integration.cherryTroubleshootCredits",
+        ],
+      },
       {
         type: "bullets",
         items: [
           "integration.cherryErrorMissingToken",
-          "integration.cherryErrorInvalidToken",
-          "integration.cherryErrorInsufficientCredits",
-          "integration.cherryErrorModel",
           "integration.cherryErrorUpstreamBusy",
-          "integration.cherryErrorTimeout",
           "integration.cherryErrorRateLimit",
           "integration.cherryErrorGatewayOverloaded",
         ],

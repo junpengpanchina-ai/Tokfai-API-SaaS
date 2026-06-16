@@ -458,6 +458,41 @@ function OneTimeSecretCard({
               </Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#openai-sdk">
+                {t("dashboard.apiKeys.openAiSdkGuide")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#cursor">
+                {t("dashboard.apiKeys.cursorGuide")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#cherry-studio">
+                {t("dashboard.apiKeys.cherryStudioGuide")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#chat-api">
+                {t("dashboard.apiKeys.viewChatApiDocs")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/usage">
+                {t("dashboard.apiKeys.verifyUsage")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/credits">
+                {t("dashboard.apiKeys.verifyCredits")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#client-connector-flow">
+                {t("dashboard.apiKeys.clientConnectorGuide")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/playground">
                 {t("dashboard.apiKeys.tryChatPlayground")}
               </Link>
@@ -465,11 +500,6 @@ function OneTimeSecretCard({
             <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/image-playground">
                 {t("dashboard.apiKeys.tryImagePlayground")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#chat-api">
-                {t("dashboard.apiKeys.viewChatApiDocs")}
               </Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
@@ -483,38 +513,8 @@ function OneTimeSecretCard({
               </Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#industry-examples">
-                {t("dashboard.apiKeys.industryExamplesGuide")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#cherry-studio">
-                {t("dashboard.apiKeys.cherryStudioGuide")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#cursor">
-                {t("dashboard.apiKeys.cursorGuide")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#openai-sdk">
-                {t("dashboard.apiKeys.openAiSdkGuide")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/docs#usage-credits">
                 {t("dashboard.apiKeys.viewUsageCreditsDocs")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/usage">
-                {t("dashboard.apiKeys.verifyUsage")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/credits">
-                {t("dashboard.apiKeys.verifyCredits")}
               </Link>
             </Button>
           </div>

@@ -660,6 +660,7 @@ export const messages = {
         copyCherryConfig: "Copy Cherry config",
         copyBatchCurl: "Copy batch curl",
         openAiSdkGuide: "OpenAI SDK guide",
+        clientConnectorGuide: "Verify curl first",
         batchApiGuide: "Batch API guide",
         placeholderKeyNote:
           "sk-tokfai_xxx is a placeholder in the handbook. This card uses your real key in one-line curls — paste directly into zsh.",
@@ -1588,6 +1589,7 @@ export const messages = {
       navTitle: "Handbook",
       navPositioning: "Product positioning",
       navProductionFlow: "Production integration flow",
+      navClientConnector: "Verify curl first, then connect",
       navQuickStart: "Quick start",
       navApiKey: "API Key",
       navChatApi: "Chat API",
@@ -1640,6 +1642,32 @@ export const messages = {
       demoFlowLinkCredits: "Credits",
       demoFlowReconcileNote:
         "This flow validates your integration — not Tokfai operating your business. Follow the steps on this page for a complete integration check.",
+      clientConnectorTitle: "Verify with curl first, then connect SDK / Cursor / Cherry",
+      clientConnectorDesc:
+        "Confirm your API Key with one-line curl before wiring OpenAI SDK, Cursor, or Cherry Studio.",
+      clientConnectorChapterPurpose:
+        "Separate API health from client configuration issues.",
+      clientConnectorChapterCopy:
+        "One-line Chat curl with the same Base URL and API Key you will paste into SDK / Cursor / Cherry.",
+      clientConnectorChapterVerify:
+        "curl HTTP 200 → client chat works → request_id matches Usage / Credits.",
+      clientConnectorChapterFailure:
+        "If curl fails, fix the key on API Keys before changing SDK or IDE settings.",
+      clientConnectorIntro:
+        "Tokfai is OpenAI-compatible, but the fastest path is: prove the API Key works in any terminal, then paste the same credentials into your client.",
+      clientConnectorStep1: "Create an API Key on Dashboard → API Keys.",
+      clientConnectorStep2: "Copy the one-line Chat curl (API Keys success card or Quick Start).",
+      clientConnectorStep3:
+        "Paste into any terminal (any folder) and confirm HTTP 200 with request_id.",
+      clientConnectorStep4:
+        "Paste the same API Key and Base URL https://api.tokfai.com/v1 into OpenAI SDK, Cursor, or Cherry Studio.",
+      clientConnectorStep5:
+        "Copy request_id from every successful response → search in Usage and Credits.",
+      clientConnectorNoInstall: "No Tokfai project install required.",
+      clientConnectorNoRepo: "No repository checkout required.",
+      clientConnectorNoCd: "No cd into any folder required — paste curl from any directory.",
+      clientConnectorReconcileNote:
+        "Usage shows request details; Credits shows balance ledger. Successful calls debit credits; failures are usually not charged.",
       positioningChapterPurpose:
         "Clarify Tokfai as an API gateway and model relay — not a managed operations vendor.",
       positioningChapterCopy:
@@ -1918,22 +1946,27 @@ export const messages = {
         "Same codes as Chat API — invalid_token, insufficient_credits; check request_id in Usage.",
       sdkGatewayNote:
         "Tokfai uses OpenAI-compatible request format. Base URL is https://api.tokfai.com/v1. API Key format is sk-tokfai_xxx. Recommended model: auto-fast. The same key works for Chat, Image, and Batch.",
+      sdkCompatibilityNote:
+        "Tokfai is OpenAI-compatible, but request_id, credits_charged, and tokfai.* are Tokfai billing and routing fields — read them from the JSON body and reconcile in Usage / Credits.",
       sdkYourProjectNote:
         "Run these examples from your own project, terminal, server, script, or IDE — no Tokfai repository or special setup required.",
       sdkCopyNowTitle: "You can copy now",
       sdkCopyConfigLabel: "OpenAI SDK config (Base URL + API Key + model)",
+      sdkCopyNodeFetchLabel: "Node fetch chat example",
       sdkCopyNodeChatLabel: "Node.js chat example",
       sdkCopyPythonChatLabel: "Python chat example",
       sdkCopyNodeBatchLabel: "Node fetch batch example",
       sdkCopyPythonBatchLabel: "Python requests batch example",
       sdkCopyImageCurlLabel: "Image API one-line curl",
       sdkCopyNodeChatAction: "Copy Node chat example",
+      sdkCopyNodeFetchAction: "Copy Node fetch example",
       sdkCopyPythonChatAction: "Copy Python chat example",
       sdkCopyNodeBatchAction: "Copy Node batch example",
       sdkCopyPythonBatchAction: "Copy Python batch example",
       sdkLiveKeyNote:
         "Your API key from this session is already filled in these examples.",
       sdkNodeTitle: "Node.js / TypeScript — install with npm install openai",
+      sdkFetchTitle: "Node fetch — chat completion without the OpenAI SDK",
       sdkPythonTitle: "Python — install with pip install openai",
       sdkImageTitle: "Image generation",
       sdkImageSdkNote:
@@ -1960,6 +1993,8 @@ export const messages = {
       sdkBillingVerify:
         "Use Usage and Credits pages as the source of truth for reconciliation.",
       sdkErrorsTitle: "Error handling",
+      sdkErrorInvalidToken:
+        "invalid_token — key wrong, revoked, or incomplete. Create a new key on API Keys.",
       sdkErrorAuth:
         "401 missing_token / invalid_token — check Authorization header and API Key. See Error codes chapter.",
       sdkErrorCredits: "402 insufficient_credits — top up in Credits.",
@@ -1980,10 +2015,14 @@ export const messages = {
         "invalid_token in Cursor — re-paste full key; too_many_requests — slow down.",
       cursorGatewayNote:
         "Cursor connects to Tokfai via an OpenAI-compatible provider. Base URL: https://api.tokfai.com/v1. API Key: sk-tokfai_xxx. Recommended model: auto-fast. One key works for Chat, Image, and Batch APIs — Cursor is mainly used for chat workflows.",
+      cursorCurlFirstNote:
+        "If Cursor chat fails, copy the one-line Chat curl below and run it in any terminal. HTTP 200 means your API Key and Base URL are valid — fix Cursor provider settings. If curl fails, fix the key on API Keys before retrying Cursor.",
       cursorNotAgencyNote:
         "Tokfai is an API gateway / model relay / API Key provider — not a managed operations vendor. You run your own Cursor, IDE, and backend; Tokfai provides API access and metering.",
       cursorUiVersionNote:
         "Cursor UI labels vary by version. If you can set OpenAI-compatible Base URL, API Key, and Model, map the fields below — no Tokfai repository or cd into any directory required.",
+      cursorModelAliasesNote:
+        "Start with auto-fast. For quality-first routing use auto-pro; for low-cost workloads use auto-cheap.",
       cursorCopyNowTitle: "You can copy now",
       cursorCopyConfigLabel: "Cursor config (all fields)",
       cursorProviderTypeLabel: "Provider type",
@@ -2052,6 +2091,8 @@ export const messages = {
         "invalid_token or model_not_available — verify host and model id.",
       cherryGatewayNote:
         "Cherry Studio connects to Tokfai via an OpenAI-compatible / OpenAI-style provider. Base URL: https://api.tokfai.com/v1. API Key: sk-tokfai_xxx. Recommended model: auto-fast. Use auto-pro for quality-first routing and auto-cheap for low-cost batch workloads. One Tokfai Key covers multiple models — no need to manage separate upstream vendors.",
+      cherryCurlFirstNote:
+        "If Cherry Studio fails, copy the one-line Chat curl below and run it in any terminal. HTTP 200 confirms the API Key — then fix Cherry provider settings.",
       cherryNotAgencyNote:
         "Tokfai is an API gateway / model relay / API Key provider — not a managed operations vendor. You run Cherry Studio on your machine; Tokfai provides API access and metering.",
       cherryUiVersionNote:
@@ -2071,6 +2112,8 @@ export const messages = {
       cherryPathStep3: "Copy the full sk-tokfai_… secret immediately.",
       cherryPathStep4: "Open Cherry Studio model / provider settings.",
       cherryPathStep5: "Add OpenAI-compatible / Custom OpenAI provider.",
+      cherryPathStepStream:
+        "If the test fails, turn off stream in Cherry Studio and retry with auto-fast.",
       cherryPathStep6: "Paste Base URL, API Key, and model auto-fast from the table above.",
       cherryPathStep7: 'Save and send a test prompt, e.g. "Say ok only."',
       cherryPathStep8: "Open Tokfai Usage — search request_id or check recent requests.",
@@ -2107,6 +2150,15 @@ export const messages = {
         "Auth failures, insufficient credits, model errors, and upstream failures are usually not charged.",
       cherryBillingVerify: "Use Usage and Credits pages as the source of truth.",
       cherryErrorsTitle: "Error handling",
+      cherryTroubleshootTitle: "Common fixes",
+      cherryTroubleshootInvalidToken:
+        "invalid_token — key wrong or revoked. Create a new key on API Keys and re-copy config.",
+      cherryTroubleshootModel:
+        "model_not_available — switch to auto-fast or browse Models.",
+      cherryTroubleshootTimeout:
+        "upstream_timeout — retry after a short wait or switch to auto-fast.",
+      cherryTroubleshootCredits:
+        "insufficient_credits — top up in Credits or Pricing, then retry.",
       cherryErrorMissingToken:
         "missing_token — API Key / Authorization not sent. Re-paste Base URL and full key in Cherry Studio.",
       cherryErrorInvalidToken:
@@ -3814,6 +3866,7 @@ export const messages = {
         copyCherryConfig: "复制 Cherry 配置",
         copyBatchCurl: "复制 Batch curl",
         openAiSdkGuide: "OpenAI SDK 指南",
+        clientConnectorGuide: "先 curl 验证",
         batchApiGuide: "Batch API 指南",
         placeholderKeyNote:
           "文档中的 sk-tokfai_xxx 是占位符。本卡片中的单行 curl 已填入你的真实密钥，可直接粘贴到 zsh。",
@@ -4694,6 +4747,7 @@ export const messages = {
       navTitle: "手册目录",
       navPositioning: "产品定位",
       navProductionFlow: "生产对接流程",
+      navClientConnector: "先 curl 验证，再接入客户端",
       navQuickStart: "快速开始",
       navApiKey: "API Key",
       navChatApi: "Chat API",
@@ -4746,6 +4800,29 @@ export const messages = {
       demoFlowLinkCredits: "Credits",
       demoFlowReconcileNote:
         "此流程用于验证你的 API 集成——不是 Tokfai 代运营。按本页步骤完成一次完整接入验证。",
+      clientConnectorTitle: "先用 curl 验证，再接入 SDK / Cursor / Cherry",
+      clientConnectorDesc:
+        "在配置 OpenAI SDK、Cursor 或 Cherry Studio 之前，先用单行 curl 确认 API Key 可用。",
+      clientConnectorChapterPurpose: "区分 API 本身问题与客户端配置问题。",
+      clientConnectorChapterCopy:
+        "单行 Chat curl，使用与 SDK / Cursor / Cherry 相同的 Base URL 与 API Key。",
+      clientConnectorChapterVerify:
+        "curl HTTP 200 → 客户端对话成功 → request_id 与 Usage / Credits 一致。",
+      clientConnectorChapterFailure:
+        "若 curl 失败，先在 API Keys 修正密钥，再改 SDK 或 IDE 设置。",
+      clientConnectorIntro:
+        "Tokfai 兼容 OpenAI，但最快路径是：先在任意终端证明 API Key 可用，再把同一套凭证填入客户端。",
+      clientConnectorStep1: "Dashboard → API Keys 创建 API Key。",
+      clientConnectorStep2: "复制单行 Chat curl（API Keys 成功卡或 Quick Start）。",
+      clientConnectorStep3: "粘贴到任意终端（任意目录），确认 HTTP 200 与 request_id。",
+      clientConnectorStep4:
+        "将同一 API Key 与 Base URL https://api.tokfai.com/v1 填入 OpenAI SDK、Cursor 或 Cherry Studio。",
+      clientConnectorStep5: "每次成功响应复制 request_id → 在 Usage 与 Credits 搜索核对。",
+      clientConnectorNoInstall: "无需安装 Tokfai 项目。",
+      clientConnectorNoRepo: "无需 clone 仓库。",
+      clientConnectorNoCd: "无需 cd 到任何目录——任意目录粘贴 curl 即可。",
+      clientConnectorReconcileNote:
+        "Usage 看请求明细；Credits 看余额账本。成功扣费，失败通常不扣费。",
       positioningChapterPurpose:
         "说明 Tokfai 是 API 网关与模型中转，不是代运营服务商。",
       positioningChapterCopy:
@@ -5019,21 +5096,26 @@ export const messages = {
         "与 Chat API 相同错误码 — invalid_token、insufficient_credits；查 Usage 的 request_id。",
       sdkGatewayNote:
         "Tokfai 使用 OpenAI 兼容请求格式。Base URL 为 https://api.tokfai.com/v1。API Key 格式为 sk-tokfai_xxx。推荐模型 auto-fast。同一 Key 可调用 Chat、Image、Batch。",
+      sdkCompatibilityNote:
+        "Tokfai 兼容 OpenAI，但 request_id、credits_charged、tokfai.* 是 Tokfai 计费与路由字段——从 JSON 响应读取并在 Usage / Credits 对账。",
       sdkYourProjectNote:
         "在你自己的项目、终端、服务器、脚本或 IDE 中运行示例 — 无需 Tokfai 仓库或特殊目录。",
       sdkCopyNowTitle: "你现在就可以复制",
       sdkCopyConfigLabel: "OpenAI SDK 配置（Base URL + API Key + model）",
+      sdkCopyNodeFetchLabel: "Node fetch 对话示例",
       sdkCopyNodeChatLabel: "Node.js 对话示例",
       sdkCopyPythonChatLabel: "Python 对话示例",
       sdkCopyNodeBatchLabel: "Node fetch 批量示例",
       sdkCopyPythonBatchLabel: "Python requests 批量示例",
       sdkCopyImageCurlLabel: "Image API 单行 curl",
       sdkCopyNodeChatAction: "复制 Node 对话示例",
+      sdkCopyNodeFetchAction: "复制 Node fetch 示例",
       sdkCopyPythonChatAction: "复制 Python 对话示例",
       sdkCopyNodeBatchAction: "复制 Node 批量示例",
       sdkCopyPythonBatchAction: "复制 Python 批量示例",
       sdkLiveKeyNote: "当前会话中的 API Key 已填入以下示例。",
       sdkNodeTitle: "Node.js / TypeScript — 使用 npm install openai 安装",
+      sdkFetchTitle: "Node fetch — 无需 OpenAI SDK 的对话示例",
       sdkPythonTitle: "Python — 使用 pip install openai 安装",
       sdkImageTitle: "图像生成",
       sdkImageSdkNote:
@@ -5056,6 +5138,8 @@ export const messages = {
       sdkBillingFailed: "失败、鉴权错误、取消通常不扣费。",
       sdkBillingVerify: "以 Usage 与 Credits 页面为准进行对账。",
       sdkErrorsTitle: "错误处理",
+      sdkErrorInvalidToken:
+        "invalid_token — 密钥错误、已吊销或不完整。在 API Keys 创建新密钥。",
       sdkErrorAuth:
         "401 missing_token / invalid_token — 检查 Authorization 与 API Key。见错误码章节。",
       sdkErrorCredits: "402 insufficient_credits — 在 Credits 充值。",
@@ -5075,10 +5159,14 @@ export const messages = {
         "Cursor 报 invalid_token — 重新粘贴完整密钥；too_many_requests 请降速。",
       cursorGatewayNote:
         "Cursor 通过 OpenAI 兼容 Provider 接入 Tokfai。Base URL：https://api.tokfai.com/v1。API Key：sk-tokfai_xxx。推荐模型 auto-fast。同一 Key 可用于 Chat、Image、Batch API；Cursor 主要用于对话类工作流。",
+      cursorCurlFirstNote:
+        "若 Cursor 对话失败，复制下方单行 Chat curl 在任意终端运行。HTTP 200 说明 API Key 与 Base URL 正确——再修正 Cursor 配置。若 curl 失败，先在 API Keys 修正密钥。",
       cursorNotAgencyNote:
         "Tokfai 是 API gateway / model relay / API Key 提供方 — 不是代运营。你在自己的 Cursor、IDE、后端中调用 Tokfai；我们提供 API 接入与计量。",
       cursorUiVersionNote:
         "Cursor 界面因版本不同字段名可能略有差异。只要能填 OpenAI 兼容的 Base URL、API Key、Model，按下方字段对应填写 — 无需 Tokfai 仓库或 cd 到任何目录。",
+      cursorModelAliasesNote:
+        "先用 auto-fast。质量优先用 auto-pro；低成本场景用 auto-cheap。",
       cursorCopyNowTitle: "你现在就可以复制",
       cursorCopyConfigLabel: "Cursor 配置（全部字段）",
       cursorProviderTypeLabel: "Provider type",
@@ -5135,6 +5223,8 @@ export const messages = {
         "invalid_token 或 model_not_available — 检查 Host 与模型 id。",
       cherryGatewayNote:
         "Cherry Studio 通过 OpenAI 兼容 / OpenAI-style Provider 接入 Tokfai。Base URL：https://api.tokfai.com/v1。API Key：sk-tokfai_xxx。推荐模型 auto-fast。高质量可用 auto-pro，批量低成本可用 auto-cheap。一个 Tokfai Key 可接入多个模型，无需管理多个上游供应商。",
+      cherryCurlFirstNote:
+        "若 Cherry Studio 失败，复制下方单行 Chat curl 在任意终端运行。HTTP 200 说明 API Key 正确——再修正 Cherry 配置。",
       cherryNotAgencyNote:
         "Tokfai 是 API gateway / model relay / API Key 提供方 — 不是代运营。你在本机运行 Cherry Studio；Tokfai 提供 API 接入与计量。",
       cherryUiVersionNote:
@@ -5154,6 +5244,8 @@ export const messages = {
       cherryPathStep3: "立即复制完整 sk-tokfai_… secret。",
       cherryPathStep4: "打开 Cherry Studio 模型 / 供应商设置。",
       cherryPathStep5: "新增 OpenAI 兼容 / Custom OpenAI Provider。",
+      cherryPathStepStream:
+        "若测试失败，先在 Cherry Studio 关闭 stream，再用 auto-fast 重试。",
       cherryPathStep6: "粘贴上方表格中的 Base URL、API Key、model auto-fast。",
       cherryPathStep7: "保存后发送测试 prompt，例如：Say ok only.",
       cherryPathStep8: "打开 Tokfai Usage — 搜索 request_id 或查看最近请求。",
@@ -5181,6 +5273,15 @@ export const messages = {
         "鉴权失败、余额不足、模型错误、上游失败通常不扣费。",
       cherryBillingVerify: "以 Usage 与 Credits 页面为准。",
       cherryErrorsTitle: "错误处理",
+      cherryTroubleshootTitle: "常见修复",
+      cherryTroubleshootInvalidToken:
+        "invalid_token — 密钥错误或已吊销。在 API Keys 创建新密钥并重新复制配置。",
+      cherryTroubleshootModel:
+        "model_not_available — 换 auto-fast 或浏览 Models。",
+      cherryTroubleshootTimeout:
+        "upstream_timeout — 稍后重试或换 auto-fast。",
+      cherryTroubleshootCredits:
+        "insufficient_credits — 在 Credits 或 Pricing 充值后重试。",
       cherryErrorMissingToken:
         "missing_token — 未填 API Key / Authorization。在 Cherry Studio 重新粘贴 Base URL 与完整 Key。",
       cherryErrorInvalidToken:

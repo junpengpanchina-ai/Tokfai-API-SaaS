@@ -3,6 +3,7 @@
 import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
 import {
   buildNodeBatchFetchExample,
+  buildNodeChatFetchExample,
   buildNodeChatSdkExample,
   buildOpenAiSdkConfigSnippet,
   buildOpenAiSdkImageCurlExample,
@@ -14,6 +15,7 @@ import { isQuickStartKeyPlaceholder } from "@/lib/customer-quick-start-snippets"
 import { useI18n } from "@/lib/i18n/i18n-provider";
 
 export const OPENAI_SDK_CONFIG_COPY_ID = "openai-sdk-config";
+export const OPENAI_SDK_NODE_FETCH_COPY_ID = "openai-sdk-node-fetch";
 export const OPENAI_SDK_NODE_CHAT_COPY_ID = "openai-sdk-node-chat";
 export const OPENAI_SDK_PYTHON_CHAT_COPY_ID = "openai-sdk-python-chat";
 export const OPENAI_SDK_NODE_BATCH_COPY_ID = "openai-sdk-node-batch";
@@ -35,6 +37,7 @@ export function OpenAiSdkChapterCopyPanel({
 }: OpenAiSdkChapterCopyPanelProps) {
   const { t } = useI18n();
   const config = buildOpenAiSdkConfigSnippet(apiKey);
+  const nodeFetch = buildNodeChatFetchExample(apiKey);
   const nodeChat = buildNodeChatSdkExample(apiKey);
   const pythonChat = buildPythonChatSdkExample(apiKey);
   const nodeBatch = buildNodeBatchFetchExample(apiKey);
@@ -57,6 +60,16 @@ export function OpenAiSdkChapterCopyPanel({
         copyLabel={t("integration.copyConfig")}
         copiedLabel={t("integration.copied")}
         className="[&_code]:max-h-24 [&_code]:whitespace-pre-wrap [&_code]:break-all"
+      />
+      <CopyableSnippetField
+        label={t("integration.sdkCopyNodeFetchLabel")}
+        value={nodeFetch}
+        copyId={`${idPrefix}-${OPENAI_SDK_NODE_FETCH_COPY_ID}`}
+        copiedId={copiedId}
+        onCopy={onCopy}
+        copyLabel={t("integration.copyCode")}
+        copiedLabel={t("integration.copied")}
+        className="[&_code]:max-h-48 [&_code]:whitespace-pre-wrap [&_code]:break-all"
       />
       <CopyableSnippetField
         label={t("integration.sdkCopyNodeChatLabel")}
@@ -114,6 +127,14 @@ export function OpenAiSdkChapterCopyPanel({
         <p className="text-xs text-muted-foreground">{t("integration.sdkLiveKeyNote")}</p>
       )}
       <div className="flex flex-wrap gap-2">
+        <CopyConfigAction
+          id={`${idPrefix}-copy-node-fetch`}
+          value={nodeFetch}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          label={t("integration.sdkCopyNodeFetchAction")}
+          copiedLabel={t("integration.copied")}
+        />
         <CopyConfigAction
           id={`${idPrefix}-copy-node-chat`}
           value={nodeChat}

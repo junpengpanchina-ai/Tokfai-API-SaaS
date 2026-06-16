@@ -22,6 +22,7 @@ export const INTEGRATION_KEY_PLACEHOLDER = TOKFAI_API_KEY_PLACEHOLDER;
 export const INTEGRATION_DEFAULT_MODEL = TOKFAI_RECOMMENDED_MODEL;
 
 import {
+  buildNodeChatFetchExample,
   buildNodeChatSdkExample,
   buildOpenAiSdkConfigSnippet,
   buildPythonChatSdkExample,
@@ -47,6 +48,8 @@ export function modelsListCurl(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
 }
 
 export const OPENAI_JS_SNIPPET = buildNodeChatSdkExample();
+
+export const OPENAI_NODE_FETCH_SNIPPET = buildNodeChatFetchExample();
 
 export const OPENAI_PYTHON_SNIPPET = buildPythonChatSdkExample();
 

@@ -14,6 +14,35 @@ Model: ${model}
 Authorization: Bearer ${apiKey}`;
 }
 
+export function buildNodeChatFetchExample(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
+  return `// Node fetch — chat completion (no OpenAI SDK required)
+const apiKey = process.env.TOKFAI_API_KEY ?? "${apiKey}";
+
+const res = await fetch("${TOKFAI_API_BASE_URL}/chat/completions", {
+  method: "POST",
+  headers: {
+    Authorization: \`Bearer \${apiKey}\`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    model: "${OPENAI_SDK_DEFAULT_MODEL}",
+    messages: [{ role: "user", content: "${CHAT_SMOKE_PROMPT}" }],
+    stream: false,
+  }),
+});
+
+const body = await res.json();
+if (!res.ok) {
+  console.error(body.error?.code, body.error?.message);
+  throw new Error(body.error?.code ?? "request_failed");
+}
+
+console.log(body.choices[0]?.message?.content);
+console.log("request_id:", body.request_id ?? body.tokfai?.request_id);
+console.log("credits_charged:", body.credits_charged ?? body.tokfai?.credits_charged);
+console.log("resolved_model:", body.tokfai?.resolved_model ?? body.model);`;
+}
+
 export function buildNodeChatSdkExample(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
   return `// npm install openai
 import OpenAI from "openai";
