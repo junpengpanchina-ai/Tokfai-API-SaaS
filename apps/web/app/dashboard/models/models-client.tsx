@@ -10,6 +10,7 @@ import {
   BookOpen,
   Info,
   Route,
+  Activity,
 } from "lucide-react";
 
 import { CodeBlock, CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
@@ -349,6 +350,18 @@ export function ModelsClient({
             <Link href="/dashboard/api-keys">
               <KeyRound className="mr-1.5 h-4 w-4" />
               {t("dashboard.models.footerApiKeys")}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/docs#quick-start">
+              <Terminal className="mr-1.5 h-4 w-4" />
+              {t("dashboard.models.footerQuickStart")}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/usage">
+              <Activity className="mr-1.5 h-4 w-4" />
+              {t("dashboard.models.footerUsage")}
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline">

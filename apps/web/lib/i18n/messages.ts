@@ -358,10 +358,13 @@ export const messages = {
           },
         },
         exampleTitle: "Minimal request",
-        exampleDesc: "Replace sk-tokfai_xxx with your API key.",
+        exampleDesc:
+          "For a real one-line curl with your key, copy from API Keys or Docs Quick Start. Example below uses a placeholder.",
         footerActions: "Next steps",
         footerApiKeys: "Create API key",
-        footerDocs: "View Quickstart",
+        footerQuickStart: "Quick Start curl",
+        footerUsage: "Check Usage",
+        footerDocs: "View integration docs",
         footerCredits: "Credits ledger",
         footerPlayground: "Open Playground",
         priceDisclaimerTitle: "Price estimate disclaimer",
@@ -2299,18 +2302,17 @@ export const messages = {
       },
       quickStartTitle: "Quick start",
       quickStartDesc:
-        "Six steps: sign in, create a key, copy one-line curl, run in any terminal, confirm HTTP 200, reconcile in Usage / Credits.",
-      quickStartStep1: "Sign in to the Tokfai Dashboard.",
+        "Four steps: create API Key, copy one-line curl, paste and run, reconcile in Usage / Credits.",
+      quickStartStep1:
+        "API Keys → Create API key. Copy the full sk-tokfai_… secret (shown once at creation).",
       quickStartStep2:
-        "Open API Keys → Create API key. Copy the full sk-tokfai_… secret (shown once at creation).",
+        "Copy the one-line Chat curl below — or from the API Keys success card right after you create a key.",
       quickStartStep3:
-        "Copy the one-line curl below — or from the API Keys success card right after you create a key.",
+        "Paste into any terminal (any folder) and run. Expect HTTP 200 with request_id in the JSON.",
       quickStartStep4:
-        "Paste into any terminal: Mac Terminal, Windows PowerShell, or Linux shell. You do not need to open any Tokfai project folder.",
-      quickStartStep5:
-        "Expect HTTP 200 JSON with assistant content in choices, plus request_id and credits_charged.",
-      quickStartStep6:
-        "Copy request_id from the response. Search it in Usage and Credits to reconcile tokens and debits.",
+        "Copy request_id from the response. Search it in Dashboard → Usage and Credits to reconcile.",
+      quickStartPasteAndRun:
+        "No install. No repo. No cd. Paste and run — Mac Terminal, Linux shell, Git Bash, or Windows curl.exe.",
       quickStartTerminalNote:
         "Tokfai is a cloud API. Run curl from any folder on your computer — no clone, no cd, no local Tokfai codebase required.",
       shellCompatNote:
@@ -3528,10 +3530,13 @@ export const messages = {
           },
         },
         exampleTitle: "最小请求示例",
-        exampleDesc: "将 sk-tokfai_xxx 替换为你的 API Key。",
+        exampleDesc:
+          "带真实密钥的单行 curl 请从 API Keys 或 Docs Quick Start 复制。下方示例使用占位符。",
         footerActions: "下一步",
         footerApiKeys: "创建 API Key",
-        footerDocs: "查看 Quickstart",
+        footerQuickStart: "Quick Start curl",
+        footerUsage: "查看 Usage",
+        footerDocs: "查看接入文档",
         footerCredits: "查看积分账本",
         footerPlayground: "打开 Playground",
         priceDisclaimerTitle: "价格估算说明",
@@ -5348,18 +5353,17 @@ export const messages = {
       },
       quickStartTitle: "快速开始",
       quickStartDesc:
-        "六步完成：登录 → 创建密钥 → 复制单行 curl → 任意终端运行 → 确认 HTTP 200 → 在 Usage / Credits 对账。",
-      quickStartStep1: "登录 Tokfai Dashboard。",
+        "四步完成：创建 API Key → 复制单行 curl → 粘贴运行 → 在 Usage / Credits 对账。",
+      quickStartStep1:
+        "API Keys → 创建密钥。立即复制完整 sk-tokfai_… secret（仅创建时展示一次）。",
       quickStartStep2:
-        "打开 API Keys → 创建密钥。立即复制完整 sk-tokfai_… secret（仅创建时展示一次）。",
+        "复制下方单行 Chat curl——或在创建密钥后的 API Keys 成功卡片中复制。",
       quickStartStep3:
-        "复制下方单行 curl——或在创建密钥后的 API Keys 成功卡片中复制。",
+        "粘贴到任意终端（任意目录）并运行。应得到 HTTP 200，JSON 中含 request_id。",
       quickStartStep4:
-        "粘贴到任意终端：Mac Terminal、Windows PowerShell 或 Linux shell。无需进入任何 Tokfai 工程目录。",
-      quickStartStep5:
-        "应得到 HTTP 200 JSON，含 choices 中的回复、request_id 与 credits_charged。",
-      quickStartStep6:
-        "从响应复制 request_id，在 Usage 与 Credits 中搜索核对 tokens 与扣费。",
+        "从响应复制 request_id，在 Dashboard → Usage 与 Credits 中搜索核对。",
+      quickStartPasteAndRun:
+        "不用安装、不用仓库、不用进入项目目录，复制即跑——Mac Terminal、Linux shell、Git Bash 或 Windows curl.exe。",
       quickStartTerminalNote:
         "Tokfai 是云端 API。在电脑任意目录运行 curl 即可——无需 clone、无需 cd、无需本地 Tokfai 代码库。",
       shellCompatNote:

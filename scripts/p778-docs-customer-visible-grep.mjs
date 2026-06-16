@@ -39,6 +39,7 @@ const RULES = [
   { label: "operator smoke", pattern: /operator\s+smoke/i },
   { label: "production smoke", pattern: /production\s+smoke/i },
   { label: "acceptance artifact", pattern: /acceptance\s+artifact/i },
+  { label: "checklist artifact", pattern: /checklist\s+artifact/i },
   { label: "local repo", pattern: /local\s+repo/i },
   { label: "checklist", pattern: /\bchecklist\b/i },
   { label: "本地仓库", pattern: /本地仓库/ },

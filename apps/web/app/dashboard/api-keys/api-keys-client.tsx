@@ -453,6 +453,11 @@ function OneTimeSecretCard({
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#quick-start">
+                {t("dashboard.apiKeys.quickStartDocs")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/playground">
                 {t("dashboard.apiKeys.tryChatPlayground")}
               </Link>

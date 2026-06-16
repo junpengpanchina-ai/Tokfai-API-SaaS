@@ -484,6 +484,7 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
           "integration.quickStartAnyTerminal",
         ],
       },
+      { type: "paragraph", textKey: "integration.quickStartPasteAndRun" },
       {
         type: "ordered",
         items: [
@@ -491,8 +492,6 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
           "integration.quickStartStep2",
           "integration.quickStartStep3",
           "integration.quickStartStep4",
-          "integration.quickStartStep5",
-          "integration.quickStartStep6",
         ],
       },
       { type: "paragraph", textKey: "integration.quickStartExpectedResponse" },
