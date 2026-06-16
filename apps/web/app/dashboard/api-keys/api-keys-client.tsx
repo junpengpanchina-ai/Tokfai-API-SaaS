@@ -65,7 +65,7 @@ import { ApiKeyChapterCopyPanel } from "@/components/api-key-chapter-copy";
 import { CopyConfigAction } from "@/components/copyable-snippet-field";
 import {
   setQuickStartApiKeySecret,
-  clearQuickStartApiKeySecret,
+  clearQuickStartApiKeyIfMatches,
 } from "@/lib/customer-quick-start-key-session";
 
 export interface ApiKeyListItem {
@@ -134,7 +134,7 @@ export function ApiKeysClient({
         { accessToken }
       );
       setOneTimeSecret(result.secret);
-      setQuickStartApiKeySecret(result.secret);
+      setQuickStartApiKeySecret(result.secret, result.api_key.id);
       setCreatedKey(result.api_key);
       setCopyFullKeyStatus("idle");
       applyCreateResult(result);
@@ -178,6 +178,12 @@ export function ApiKeysClient({
       setKeys((prev) =>
         prev.map((row) => (row.id === key.id ? updated : row))
       );
+      clearQuickStartApiKeyIfMatches(key.id);
+      if (oneTimeSecret && createdKey?.id === key.id) {
+        setOneTimeSecret(null);
+        setCreatedKey(null);
+        setCopyFullKeyStatus("idle");
+      }
     } catch (err) {
       setRevokeError(toRevokeActionError(err));
     } finally {
@@ -197,7 +203,6 @@ export function ApiKeysClient({
   }
 
   function dismissOneTimeSecret() {
-    clearQuickStartApiKeySecret();
     setOneTimeSecret(null);
     setCreatedKey(null);
     setCopyFullKeyStatus("idle");

@@ -235,7 +235,7 @@ export function PlaygroundClient({
         ...prev,
         [listItem.id]: result.secret,
       }));
-      setQuickStartApiKeySecret(result.secret);
+      setQuickStartApiKeySecret(result.secret, result.api_key.id);
       setLocalKeys((prev) => {
         const without = prev.filter((row) => row.id !== listItem.id);
         return [listItem, ...without];

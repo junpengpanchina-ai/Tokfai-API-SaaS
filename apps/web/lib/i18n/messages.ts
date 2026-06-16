@@ -1168,6 +1168,9 @@ export const messages = {
         endDate: "End date",
         apiKeyOptional: "API Key (optional)",
         modelOptional: "Model (optional)",
+        requestIdOptional: "request_id (optional)",
+        noUsageForRequestId:
+          "No rows match this request_id in the selected date range. Widen dates or confirm the curl returned HTTP 200.",
         status: "Status",
         allStatuses: "All",
         search: "Search",
@@ -4271,6 +4274,9 @@ export const messages = {
         endDate: "结束日期",
         apiKeyOptional: "API Key（可选）",
         modelOptional: "模型（可选）",
+        requestIdOptional: "request_id（可选）",
+        noUsageForRequestId:
+          "所选日期范围内没有匹配的 request_id。请扩大日期范围，或确认 curl 已返回 HTTP 200。",
         status: "状态",
         allStatuses: "全部",
         search: "查询",

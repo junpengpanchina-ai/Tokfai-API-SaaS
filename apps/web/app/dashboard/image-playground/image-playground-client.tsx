@@ -540,7 +540,7 @@ export function ImagePlaygroundClient({
         ...prev,
         [listItem.id]: keyResult.secret,
       }));
-      setQuickStartApiKeySecret(keyResult.secret);
+      setQuickStartApiKeySecret(keyResult.secret, keyResult.api_key.id);
       setLocalKeys((prev) => {
         const without = prev.filter((row) => row.id !== listItem.id);
         return [listItem, ...without];

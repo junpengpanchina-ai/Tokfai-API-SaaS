@@ -74,6 +74,7 @@ export function UsageQuerySection({
   const [endDate, setEndDate] = useState(defaults.endDate);
   const [apiKeyId, setApiKeyId] = useState("");
   const [model, setModel] = useState("");
+  const [requestId, setRequestId] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
   const [queryState, setQueryState] = useState<QueryState>({ status: "idle" });
 
@@ -105,6 +106,7 @@ export function UsageQuerySection({
     setEndDate(defaults.endDate);
     setApiKeyId("");
     setModel("");
+    setRequestId("");
     setStatusFilter("");
     setQueryState({ status: "idle" });
   };
@@ -171,6 +173,16 @@ export function UsageQuerySection({
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="usage-request-id">{t("dashboard.usage.requestIdOptional")}</Label>
+            <Input
+              id="usage-request-id"
+              value={requestId}
+              onChange={(event) => setRequestId(event.target.value)}
+              placeholder="req_..."
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="usage-status">{t("dashboard.usage.status")}</Label>
             <select
               id="usage-status"
@@ -220,7 +232,11 @@ export function UsageQuerySection({
         ) : null}
 
         {queryState.status === "ready" ? (
-          <QueryResults result={queryState.result} t={t} />
+          <QueryResults
+            result={queryState.result}
+            requestIdFilter={requestId.trim()}
+            t={t}
+          />
         ) : null}
       </CardContent>
     </Card>
@@ -229,12 +245,17 @@ export function UsageQuerySection({
 
 function QueryResults({
   result,
+  requestIdFilter,
   t,
 }: {
   result: MeUsageSummaryResponse;
+  requestIdFilter: string;
   t: (key: string) => string;
 }) {
   const { summary, data } = result;
+  const filteredData = requestIdFilter
+    ? data.filter((row) => row.request_id?.includes(requestIdFilter))
+    : data;
 
   return (
     <div className="flex flex-col gap-6">
@@ -268,11 +289,13 @@ function QueryResults({
         </p>
       </div>
 
-      {data.length > 0 ? (
-        <UsageQueryTable logs={data} t={t} />
+      {filteredData.length > 0 ? (
+        <UsageQueryTable logs={filteredData} t={t} />
       ) : (
         <p className="rounded-md border border-dashed py-10 text-center text-sm text-muted-foreground">
-          {t("dashboard.usage.noUsageFound")}
+          {requestIdFilter
+            ? t("dashboard.usage.noUsageForRequestId")
+            : t("dashboard.usage.noUsageFound")}
         </p>
       )}
     </div>
