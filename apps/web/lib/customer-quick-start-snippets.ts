@@ -14,6 +14,7 @@ import {
   buildPythonChatSdkExample,
 } from "@/lib/customer-openai-sdk-chapter";
 import { buildCursorConfigSnippet } from "@/lib/customer-cursor-chapter";
+import { buildCherryConfigSnippet } from "@/lib/customer-cherry-chapter";
 import {
   buildBatchCreateCurlMultiline,
   buildBatchPollCurlMultiline,
@@ -80,6 +81,8 @@ export function resolveDocCurlSnippetCopy(
       return buildPythonBatchRequestsExample(key);
     case "cursor-config":
       return buildCursorConfigSnippet(key);
+    case "cherry-config":
+      return buildCherryConfigSnippet(key);
     default:
       return CUSTOMER_DOC_SNIPPET_COPY[snippetKey];
   }
@@ -125,4 +128,8 @@ export function resolveDocOpenAiPythonBatchDisplay(explicitKey?: string | null):
 
 export function resolveDocCursorConfigDisplay(explicitKey?: string | null): string {
   return buildCursorConfigSnippet(resolveQuickStartApiKey(explicitKey));
+}
+
+export function resolveDocCherryConfigDisplay(explicitKey?: string | null): string {
+  return buildCherryConfigSnippet(resolveQuickStartApiKey(explicitKey));
 }

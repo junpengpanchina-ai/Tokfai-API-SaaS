@@ -12,6 +12,7 @@ import { ApiKeyChapterCopyPanel } from "@/components/api-key-chapter-copy";
 import { BatchApiChapterCopyPanel } from "@/components/batch-api-chapter-copy";
 import { ErrorCodesChapterPanel } from "@/components/error-codes-chapter-panel";
 import { ChatApiChapterCopyPanel } from "@/components/chat-api-chapter-copy";
+import { CherryChapterCopyPanel } from "@/components/cherry-chapter-copy";
 import { CursorChapterCopyPanel } from "@/components/cursor-chapter-copy";
 import { ImageApiChapterCopyPanel } from "@/components/image-api-chapter-copy";
 import { OpenAiSdkChapterCopyPanel } from "@/components/openai-sdk-chapter-copy";
@@ -60,6 +61,7 @@ import {
   resolveDocOpenAiPythonBatchDisplay,
   resolveDocOpenAiPythonDisplay,
   resolveDocCursorConfigDisplay,
+  resolveDocCherryConfigDisplay,
 } from "@/lib/customer-quick-start-snippets";
 import { modelsVerifyCurlMultiline } from "@/lib/customer-api-key-chapter";
 import { useQuickStartApiKey } from "@/lib/use-quick-start-api-key";
@@ -265,18 +267,6 @@ function DocSectionCard({
           quickStartApiKey={quickStartApiKey}
         />
         <ChapterGuidePanel guide={section.chapterGuide} t={t} />
-        {section.id === "cherry-studio" ? (
-          <div className="flex flex-wrap gap-2">
-            <CopyConfigAction
-              id="cherry-copy-config"
-              value={CUSTOMER_DOC_SNIPPET_COPY["cherry-config"]}
-              copiedId={copiedId}
-              onCopy={onCopy}
-              label={t("integration.copyConfig")}
-              copiedLabel={t("integration.copied")}
-            />
-          </div>
-        ) : null}
         {section.blocks.map((block, index) => (
           <DocBlock
             key={`${section.id}-${index}`}
@@ -361,10 +351,13 @@ function DocBlock({
                     ? resolveDocOpenAiPythonBatchDisplay(quickStartApiKey)
                     : block.snippetKey === "cursor-config" && sectionId === "cursor"
                       ? resolveDocCursorConfigDisplay(quickStartApiKey)
-                      : CUSTOMER_DOC_SNIPPET_DISPLAY[block.snippetKey];
+                      : block.snippetKey === "cherry-config" && sectionId === "cherry-studio"
+                        ? resolveDocCherryConfigDisplay(quickStartApiKey)
+                        : CUSTOMER_DOC_SNIPPET_DISPLAY[block.snippetKey];
       const isCursorSnippet = block.snippetKey === "cursor-config";
+      const isCherrySnippet = block.snippetKey === "cherry-config";
       const copyValue =
-        isCurlSnippet || isOpenAiSnippet || isCursorSnippet
+        isCurlSnippet || isOpenAiSnippet || isCursorSnippet || isCherrySnippet
           ? resolveDocCurlSnippetCopy(block.snippetKey, quickStartApiKey)
           : CUSTOMER_DOC_SNIPPET_COPY[block.snippetKey];
       const copyLabel = isCurlSnippet
@@ -377,7 +370,11 @@ function DocBlock({
           id={block.id}
           label={block.label}
           code={displayCode}
-          copyValue={isCurlSnippet || isOpenAiSnippet || isCursorSnippet ? copyValue : undefined}
+          copyValue={
+            isCurlSnippet || isOpenAiSnippet || isCursorSnippet || isCherrySnippet
+              ? copyValue
+              : undefined
+          }
           copied={copiedId === block.id}
           onCopy={onCopy}
           copyLabel={copyLabel}
@@ -486,6 +483,17 @@ function DocBlock({
       return (
         <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
           <CursorChapterCopyPanel
+            apiKey={quickStartApiKey}
+            copiedId={copiedId}
+            onCopy={onCopy}
+            idPrefix={block.id}
+          />
+        </div>
+      );
+    case "cherry-copy-panel":
+      return (
+        <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
+          <CherryChapterCopyPanel
             apiKey={quickStartApiKey}
             copiedId={copiedId}
             onCopy={onCopy}
@@ -642,7 +650,8 @@ function ChapterNowPanel({
       </div>
       {isCurlCopy ||
       copySnippetKey === "openai-sdk-config" ||
-      copySnippetKey === "cursor-config" ? (
+      copySnippetKey === "cursor-config" ||
+      copySnippetKey === "cherry-config" ? (
         <p className="mt-2 text-xs text-muted-foreground">
           {isQuickStartKeyPlaceholder(quickStartApiKey)
             ? t("integration.placeholderKeyNote")
@@ -651,7 +660,9 @@ function ChapterNowPanel({
                   ? "integration.sdkLiveKeyNote"
                   : copySnippetKey === "cursor-config"
                     ? "integration.cursorLiveKeyNote"
-                    : "integration.apiKeyLiveKeyNote"
+                    : copySnippetKey === "cherry-config"
+                      ? "integration.cherryLiveKeyNote"
+                      : "integration.apiKeyLiveKeyNote"
               )}
         </p>
       ) : null}

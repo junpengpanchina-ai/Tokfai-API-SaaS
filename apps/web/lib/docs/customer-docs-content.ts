@@ -106,6 +106,7 @@ export type CustomerDocBlock =
   | { type: "copy-fields"; id: string; fields: CustomerDocCopyField[] }
   | { type: "openai-sdk-copy-panel"; id: string }
   | { type: "cursor-copy-panel"; id: string }
+  | { type: "cherry-copy-panel"; id: string }
   | { type: "error-table" }
   | { type: "error-examples-panel"; id: string }
   | { type: "model-list" }
@@ -216,24 +217,39 @@ export const CUSTOMER_DOC_CURSOR_FIELDS: CustomerDocCopyField[] = [
 
 export const CUSTOMER_DOC_CHERRY_FIELDS: CustomerDocCopyField[] = [
   {
-    id: "provider",
-    labelKey: "integration.cherryProvider",
-    value: "OpenAI Compatible",
+    id: "name",
+    labelKey: "integration.cherryProviderNameLabel",
+    value: "Tokfai",
   },
   {
-    id: "host",
-    labelKey: "integration.cherryApiHost",
+    id: "type",
+    labelKey: "integration.cherryProviderTypeLabel",
+    value: "OpenAI compatible / OpenAI-style / Custom OpenAI",
+  },
+  {
+    id: "base",
+    labelKey: "integration.cherryBaseUrlLabel",
     value: INTEGRATION_BASE_URL,
   },
   {
     id: "key",
-    labelKey: "integration.cherryApiKey",
+    labelKey: "integration.cherryApiKeyLabel",
     value: INTEGRATION_KEY_PLACEHOLDER,
   },
   {
     id: "model",
-    labelKey: "integration.cherryModel",
-    value: INTEGRATION_DEFAULT_MODEL,
+    labelKey: "integration.cherryModelLabel",
+    value: "auto-fast",
+  },
+  {
+    id: "auth",
+    labelKey: "integration.cherryAuthorizationLabel",
+    value: `Authorization: Bearer ${INTEGRATION_KEY_PLACEHOLDER}`,
+  },
+  {
+    id: "stream",
+    labelKey: "integration.cherryStreamLabel",
+    value: "Client default; disable stream if the test fails",
   },
 ];
 
@@ -1266,21 +1282,118 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
     ),
     chapterNow: {
       try: {
-        id: "playground",
-        labelKey: "integration.demoFlowLinkPlayground",
-        href: "/dashboard/playground",
+        id: "keys",
+        labelKey: "integration.ctaCreateKey",
+        href: "/dashboard/api-keys",
       },
       copySnippetKey: "cherry-config",
       verify: VERIFY_USAGE_CREDITS,
     },
     blocks: [
-      { type: "paragraph", textKey: "integration.placeholderKeyNote" },
-      { type: "copy-fields", id: "cherry", fields: CUSTOMER_DOC_CHERRY_FIELDS },
+      { type: "paragraph", textKey: "integration.cherryGatewayNote" },
+      { type: "paragraph", textKey: "integration.cherryNotAgencyNote" },
+      { type: "paragraph", textKey: "integration.cherryUiVersionNote" },
+      { type: "paragraph", textKey: "integration.cherryModelsNote" },
+      { type: "cherry-copy-panel", id: "cherry-copy" },
+      { type: "paragraph", textKey: "integration.cherryPathTitle" },
+      {
+        type: "ordered",
+        items: [
+          "integration.cherryPathStep1",
+          "integration.cherryPathStep2",
+          "integration.cherryPathStep3",
+          "integration.cherryPathStep4",
+          "integration.cherryPathStep5",
+          "integration.cherryPathStep6",
+          "integration.cherryPathStep7",
+          "integration.cherryPathStep8",
+          "integration.cherryPathStep9",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.cherryVerifyTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.cherryVerifyInClient",
+          "integration.cherryVerifyCurl",
+          "integration.cherryVerifyResponseContent",
+          "integration.cherryVerifyResponseRequestId",
+          "integration.cherryVerifyResponseCredits",
+          "integration.cherryVerifyResponseUsage",
+          "integration.cherryVerifyResponseRequestedModel",
+          "integration.cherryVerifyResponseResolvedModel",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.cherryReconcileTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.cherryReconcileUiNote",
+          "integration.cherryReconcileRequestId",
+          "integration.cherryReconcileRecentUsage",
+          "integration.cherryReconcileCredits",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.cherryBillingTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.cherryBillingSuccess",
+          "integration.cherryBillingFailed",
+          "integration.cherryBillingVerify",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.cherryErrorsTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.cherryErrorMissingToken",
+          "integration.cherryErrorInvalidToken",
+          "integration.cherryErrorInsufficientCredits",
+          "integration.cherryErrorModel",
+          "integration.cherryErrorUpstreamBusy",
+          "integration.cherryErrorTimeout",
+          "integration.cherryErrorRateLimit",
+          "integration.cherryErrorGatewayOverloaded",
+        ],
+      },
       {
         type: "code",
         id: "cherry-config",
-        label: "config",
+        label: "Cherry Studio config",
         snippetKey: "cherry-config",
+      },
+      {
+        type: "dashboard-links",
+        links: [
+          { id: "keys", labelKey: "integration.ctaCreateKey", href: "/dashboard/api-keys" },
+          {
+            id: "playground",
+            labelKey: "integration.demoFlowLinkPlayground",
+            href: "/dashboard/playground",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+          { id: "pricing", labelKey: "integration.linkTopUp", href: "/pricing" },
+          {
+            id: "error-codes-docs",
+            labelKey: "integration.linkErrorCodesGuide",
+            href: "/dashboard/docs",
+            hash: "error-codes",
+          },
+          {
+            id: "usage-credits-docs",
+            labelKey: "integration.linkUsageCreditsGuide",
+            href: "/dashboard/docs",
+            hash: "usage-credits",
+          },
+          {
+            id: "cursor-docs",
+            labelKey: "integration.navCursor",
+            href: "/dashboard/docs",
+            hash: "cursor",
+          },
+        ],
       },
     ],
   },

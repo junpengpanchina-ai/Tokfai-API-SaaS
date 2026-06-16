@@ -40,7 +40,9 @@ import {
   type MeApiKeyMetadata,
 } from "@/lib/dmit/client";
 import { buildOpenAiSdkConfigSnippet } from "@/lib/customer-openai-sdk-chapter";
+import { buildCherryConfigSnippet } from "@/lib/customer-cherry-chapter";
 import { buildCursorConfigSnippet } from "@/lib/customer-cursor-chapter";
+import { chatCurlOneLine, modelsCurlOneLine } from "@/lib/customer-curl-oneline";
 import { isFullTokfaiApiKey, TOKFAI_API_BASE_URL, TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
 import {
   userMessageForDashboardError,
@@ -462,6 +464,11 @@ function OneTimeSecretCard({
               </Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#cherry-studio">
+                {t("dashboard.apiKeys.cherryStudioGuide")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/docs#cursor">
                 {t("dashboard.apiKeys.cursorGuide")}
               </Link>
@@ -541,6 +548,30 @@ function OneTimeSecretCard({
             )}
           </Button>
           <CopyConfigAction
+            id="one-time-secret-copy-cherry-config"
+            value={buildCherryConfigSnippet(secret)}
+            copiedId={snippetCopiedId}
+            onCopy={handleSnippetCopy}
+            label={t("dashboard.apiKeys.copyCherryConfig")}
+            copiedLabel={t("dashboard.apiKeys.copied")}
+          />
+          <CopyConfigAction
+            id="one-time-secret-copy-cherry-chat-curl"
+            value={chatCurlOneLine(secret)}
+            copiedId={snippetCopiedId}
+            onCopy={handleSnippetCopy}
+            label={t("dashboard.apiKeys.copyOneLineChatCurl")}
+            copiedLabel={t("dashboard.apiKeys.copied")}
+          />
+          <CopyConfigAction
+            id="one-time-secret-copy-cherry-models-curl"
+            value={modelsCurlOneLine(secret)}
+            copiedId={snippetCopiedId}
+            onCopy={handleSnippetCopy}
+            label={t("dashboard.apiKeys.copyOneLineModelsCurl")}
+            copiedLabel={t("dashboard.apiKeys.copied")}
+          />
+          <CopyConfigAction
             id="one-time-secret-copy-cursor-config"
             value={buildCursorConfigSnippet(secret)}
             copiedId={snippetCopiedId}
@@ -556,6 +587,11 @@ function OneTimeSecretCard({
             label={t("dashboard.apiKeys.copySdkConfig")}
             copiedLabel={t("dashboard.apiKeys.copied")}
           />
+          <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
+            <Link href="/dashboard/docs#cherry-studio">
+              {t("dashboard.apiKeys.cherryStudioGuide")}
+            </Link>
+          </Button>
           <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
             <Link href="/dashboard/docs#cursor">
               {t("dashboard.apiKeys.cursorGuide")}

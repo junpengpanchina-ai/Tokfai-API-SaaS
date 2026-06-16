@@ -2033,6 +2033,83 @@ export const messages = {
         "Cherry Studio chat works; reconcile via Usage request_id if needed.",
       cherryChapterFailure:
         "invalid_token or model_not_available — verify host and model id.",
+      cherryGatewayNote:
+        "Cherry Studio connects to Tokfai via an OpenAI-compatible / OpenAI-style provider. Base URL: https://api.tokfai.com/v1. API Key: sk-tokfai_xxx. Recommended model: auto-fast. Use auto-pro for quality-first routing and auto-cheap for low-cost batch workloads. One Tokfai Key covers multiple models — no need to manage separate upstream vendors.",
+      cherryNotAgencyNote:
+        "Tokfai is an API gateway / model relay / API Key provider — not a managed operations vendor. You run Cherry Studio on your machine; Tokfai provides API access and metering.",
+      cherryUiVersionNote:
+        "Cherry Studio menu labels vary by version — Provider, Model Provider, API Provider, or Custom OpenAI. If you can fill Base URL, API Key, and Model, map the fields below. No Tokfai repository or project folder required.",
+      cherryModelsNote:
+        "Model aliases: auto-fast (default), auto-pro (quality-first), auto-cheap (low-cost batch). You can switch models in Cherry Studio without creating a new API Key.",
+      cherryCopyNowTitle: "You can copy now",
+      cherryCopyConfigLabel: "Cherry Studio config (all fields)",
+      cherryProviderNameLabel: "Provider name",
+      cherryProviderTypeLabel: "Provider type",
+      cherryBaseUrlLabel: "Base URL",
+      cherryAuthorizationLabel: "Authorization",
+      cherryStreamLabel: "Stream",
+      cherryPathTitle: "Recommended setup path",
+      cherryPathStep1: "Sign in to Tokfai Dashboard.",
+      cherryPathStep2: "Create an API Key under API Keys.",
+      cherryPathStep3: "Copy the full sk-tokfai_… secret immediately.",
+      cherryPathStep4: "Open Cherry Studio model / provider settings.",
+      cherryPathStep5: "Add OpenAI-compatible / Custom OpenAI provider.",
+      cherryPathStep6: "Paste Base URL, API Key, and model auto-fast from the table above.",
+      cherryPathStep7: 'Save and send a test prompt, e.g. "Say ok only."',
+      cherryPathStep8: "Open Tokfai Usage — search request_id or check recent requests.",
+      cherryPathStep9: "Open Credits — verify reference, amount, and balance_after.",
+      cherryVerifyTitle: "How to verify success",
+      cherryVerifyInClient:
+        "Primary: send a test prompt in Cherry Studio — chat should complete without auth errors.",
+      cherryVerifyCurl:
+        "Fallback: copy one-line chat curl or models curl and paste into any terminal.",
+      cherryVerifyResponseContent:
+        "choices[0].message.content — assistant reply text.",
+      cherryVerifyResponseRequestId:
+        "request_id — copy to search in Usage and Credits.",
+      cherryVerifyResponseCredits:
+        "credits_charged — credits debited when present.",
+      cherryVerifyResponseUsage:
+        "usage.prompt_tokens / completion_tokens / total_tokens — token counts.",
+      cherryVerifyResponseRequestedModel:
+        "tokfai.requested_model — the model id you sent (e.g. auto-fast).",
+      cherryVerifyResponseResolvedModel:
+        "tokfai.resolved_model — upstream model Tokfai routed to.",
+      cherryReconcileTitle: "Reconcile with Usage / Credits",
+      cherryReconcileUiNote:
+        "Cherry Studio may not show the full API response — that is normal.",
+      cherryReconcileRequestId:
+        "If you see request_id in logs or response, copy it and search in Usage.",
+      cherryReconcileRecentUsage:
+        "If request_id is not visible, open Usage and check recent requests after your test.",
+      cherryReconcileCredits:
+        "Match Usage credits_charged with Credits ledger reference / amount / balance_after.",
+      cherryBillingTitle: "Credits and billing",
+      cherryBillingSuccess: "HTTP 200 successful responses debit credits.",
+      cherryBillingFailed:
+        "Auth failures, insufficient credits, model errors, and upstream failures are usually not charged.",
+      cherryBillingVerify: "Use Usage and Credits pages as the source of truth.",
+      cherryErrorsTitle: "Error handling",
+      cherryErrorMissingToken:
+        "missing_token — API Key / Authorization not sent. Re-paste Base URL and full key in Cherry Studio.",
+      cherryErrorInvalidToken:
+        "invalid_token — key wrong, revoked, or incomplete. Create a new key or use Copy key on API Keys.",
+      cherryErrorInsufficientCredits:
+        "insufficient_credits — balance too low. Top up in Credits or Pricing.",
+      cherryErrorModel:
+        "model_not_available / model_not_found — model name wrong. Start with auto-fast.",
+      cherryErrorUpstreamBusy:
+        "upstream_model_busy — upstream busy. Retry or switch to auto-fast.",
+      cherryErrorTimeout: "upstream_timeout — upstream slow. Retry after a short wait.",
+      cherryErrorRateLimit:
+        "too_many_requests / too_many_concurrent_requests — reduce rate or concurrency.",
+      cherryErrorGatewayOverloaded: "gateway_overloaded — retry after a short wait.",
+      cherryLiveKeyNote:
+        "Your API key from this session is already filled in these fields.",
+      cherryCopyCherryConfigAction: "Copy Cherry config",
+      cherryCopyBaseUrlAction: "Copy Base URL",
+      cherryCopyAuthAction: "Copy Authorization header",
+      cherryCopyModelAction: "Copy model",
       industryTitle: "Industry API integration examples",
       industryDesc:
         "Patterns for calling Tokfai from your systems — API integration examples, not managed operations.",
@@ -2170,7 +2247,8 @@ export const messages = {
       cursorApiKeyLabel: "API Key",
       cursorModelLabel: "Model",
       cherryTitle: "Cherry Studio",
-      cherryDesc: "Configure Cherry Studio as OpenAI compatible. Copy these fields:",
+      cherryDesc:
+        "Add Tokfai as an OpenAI-compatible provider in Cherry Studio. Copy Base URL, API Key, and model below.",
       cherryProvider: "Provider type",
       cherryApiHost: "API Host",
       cherryApiKey: "API Key",
@@ -4927,6 +5005,71 @@ export const messages = {
         "Cherry Studio 对话可用；需要时在 Usage 用 request_id 对账。",
       cherryChapterFailure:
         "invalid_token 或 model_not_available — 检查 Host 与模型 id。",
+      cherryGatewayNote:
+        "Cherry Studio 通过 OpenAI 兼容 / OpenAI-style Provider 接入 Tokfai。Base URL：https://api.tokfai.com/v1。API Key：sk-tokfai_xxx。推荐模型 auto-fast。高质量可用 auto-pro，批量低成本可用 auto-cheap。一个 Tokfai Key 可接入多个模型，无需管理多个上游供应商。",
+      cherryNotAgencyNote:
+        "Tokfai 是 API gateway / model relay / API Key 提供方 — 不是代运营。你在本机运行 Cherry Studio；Tokfai 提供 API 接入与计量。",
+      cherryUiVersionNote:
+        "Cherry Studio 菜单因版本不同可能叫 Provider、Model Provider、API Provider 或 Custom OpenAI。只要能填 Base URL、API Key、Model，按下方字段对应填写 — 无需 Tokfai 仓库或工程目录。",
+      cherryModelsNote:
+        "模型别名：auto-fast（默认）、auto-pro（质量优先）、auto-cheap（低成本批量）。在 Cherry Studio 切换模型无需新建 API Key。",
+      cherryCopyNowTitle: "你现在就可以复制",
+      cherryCopyConfigLabel: "Cherry Studio 配置（全部字段）",
+      cherryProviderNameLabel: "Provider name",
+      cherryProviderTypeLabel: "Provider type",
+      cherryBaseUrlLabel: "Base URL",
+      cherryAuthorizationLabel: "Authorization",
+      cherryStreamLabel: "Stream",
+      cherryPathTitle: "推荐配置路径",
+      cherryPathStep1: "登录 Tokfai Dashboard。",
+      cherryPathStep2: "在 API Keys 创建 API Key。",
+      cherryPathStep3: "立即复制完整 sk-tokfai_… secret。",
+      cherryPathStep4: "打开 Cherry Studio 模型 / 供应商设置。",
+      cherryPathStep5: "新增 OpenAI 兼容 / Custom OpenAI Provider。",
+      cherryPathStep6: "粘贴上方表格中的 Base URL、API Key、model auto-fast。",
+      cherryPathStep7: "保存后发送测试 prompt，例如：Say ok only.",
+      cherryPathStep8: "打开 Tokfai Usage — 搜索 request_id 或查看最近请求。",
+      cherryPathStep9: "打开 Credits — 核对 reference、amount、balance_after。",
+      cherryVerifyTitle: "如何验证成功",
+      cherryVerifyInClient: "首选：在 Cherry Studio 发测试 prompt — 对话应正常完成且无鉴权错误。",
+      cherryVerifyCurl: "备选：复制单行 chat curl 或 models curl，粘贴到任意终端。",
+      cherryVerifyResponseContent: "choices[0].message.content — 助手回复文本。",
+      cherryVerifyResponseRequestId: "request_id — 复制后在 Usage 与 Credits 中搜索。",
+      cherryVerifyResponseCredits: "credits_charged — 如有则表示本次扣减 credits。",
+      cherryVerifyResponseUsage:
+        "usage.prompt_tokens / completion_tokens / total_tokens — token 计数。",
+      cherryVerifyResponseRequestedModel:
+        "tokfai.requested_model — 你发送的 model id（如 auto-fast）。",
+      cherryVerifyResponseResolvedModel: "tokfai.resolved_model — Tokfai 路由的上游模型。",
+      cherryReconcileTitle: "与 Usage / Credits 对账",
+      cherryReconcileUiNote: "Cherry Studio 界面可能不展示完整 API 响应 — 属正常情况。",
+      cherryReconcileRequestId: "若日志或响应中有 request_id，复制后在 Usage 搜索。",
+      cherryReconcileRecentUsage: "若看不到 request_id，测试后到 Usage 查看最近请求。",
+      cherryReconcileCredits:
+        "核对 Usage 的 credits_charged 与 Credits 账本 reference / amount / balance_after。",
+      cherryBillingTitle: "扣费说明",
+      cherryBillingSuccess: "HTTP 200 成功响应才扣 credits。",
+      cherryBillingFailed:
+        "鉴权失败、余额不足、模型错误、上游失败通常不扣费。",
+      cherryBillingVerify: "以 Usage 与 Credits 页面为准。",
+      cherryErrorsTitle: "错误处理",
+      cherryErrorMissingToken:
+        "missing_token — 未填 API Key / Authorization。在 Cherry Studio 重新粘贴 Base URL 与完整 Key。",
+      cherryErrorInvalidToken:
+        "invalid_token — Key 错误、已 revoke 或不完整。在 API Keys 创建新 Key 或使用 Copy key。",
+      cherryErrorInsufficientCredits: "insufficient_credits — 余额不足。在 Credits 或 Pricing 充值。",
+      cherryErrorModel:
+        "model_not_available / model_not_found — 模型名错误。先用 auto-fast。",
+      cherryErrorUpstreamBusy: "upstream_model_busy — 上游繁忙。重试或换 auto-fast。",
+      cherryErrorTimeout: "upstream_timeout — 上游超时。稍后重试。",
+      cherryErrorRateLimit:
+        "too_many_requests / too_many_concurrent_requests — 降低频率或并发。",
+      cherryErrorGatewayOverloaded: "gateway_overloaded — 稍后重试。",
+      cherryLiveKeyNote: "当前会话中的 API Key 已填入以下字段。",
+      cherryCopyCherryConfigAction: "复制 Cherry 配置",
+      cherryCopyBaseUrlAction: "复制 Base URL",
+      cherryCopyAuthAction: "复制 Authorization 请求头",
+      cherryCopyModelAction: "复制 model",
       industryTitle: "行业 API 接入示例",
       industryDesc:
         "展示如何从你的系统调用 Tokfai — 技术接入示例，不是托管运营服务。",
@@ -5062,7 +5205,8 @@ export const messages = {
       cursorApiKeyLabel: "API Key",
       cursorModelLabel: "Model",
       cherryTitle: "Cherry Studio",
-      cherryDesc: "按 OpenAI 兼容方式配置。复制以下字段：",
+      cherryDesc:
+        "在 Cherry Studio 中将 Tokfai 添加为 OpenAI 兼容 Provider。复制下方 Base URL、API Key 与 model。",
       cherryProvider: "Provider type",
       cherryApiHost: "API Host",
       cherryApiKey: "API Key",

@@ -27,6 +27,7 @@ import {
   buildPythonChatSdkExample,
 } from "@/lib/customer-openai-sdk-chapter";
 import { buildCursorConfigSnippet } from "@/lib/customer-cursor-chapter";
+import { buildCherryConfigSnippet } from "@/lib/customer-cherry-chapter";
 import {
   CUSTOMER_INTEGRATION_ERROR_CODES,
   type CustomerIntegrationErrorCode,
@@ -63,13 +64,9 @@ export function cursorConfigSnippet(
 }
 
 export function cherryStudioConfigSnippet(
-  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
-  model = TOKFAI_RECOMMENDED_MODEL
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER
 ): string {
-  return `Provider: OpenAI Compatible
-API Host: https://api.tokfai.com/v1
-API Key: ${apiKey}
-Model: ${model}`;
+  return buildCherryConfigSnippet(apiKey);
 }
 
 export const OPENAI_SDK_CONFIG_SNIPPET = openaiSdkConfigSnippet();
