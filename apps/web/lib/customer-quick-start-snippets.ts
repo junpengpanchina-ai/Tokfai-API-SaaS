@@ -7,6 +7,10 @@ import {
   modelsCurlOneLine,
 } from "@/lib/customer-curl-oneline";
 import {
+  buildBatchCreateCurlMultiline,
+  buildBatchPollCurlMultiline,
+} from "@/lib/customer-batch-api-chapter";
+import {
   buildImageApiCurlMultiline,
   buildImageApiReferenceCurlMultiline,
   buildImageApiReferenceCurlOneLine,
@@ -73,4 +77,12 @@ export function resolveDocImageReferenceCurlDisplay(
   explicitKey?: string | null
 ): string {
   return buildImageApiReferenceCurlMultiline(resolveQuickStartApiKey(explicitKey));
+}
+
+export function resolveDocBatchCreateCurlDisplay(explicitKey?: string | null): string {
+  return buildBatchCreateCurlMultiline(resolveQuickStartApiKey(explicitKey));
+}
+
+export function resolveDocBatchPollCurlDisplay(explicitKey?: string | null): string {
+  return buildBatchPollCurlMultiline(resolveQuickStartApiKey(explicitKey));
 }

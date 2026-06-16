@@ -1,10 +1,15 @@
 import {
+  buildBatchCreateCurlMultiline,
+  buildBatchCreateCurlOneLine,
+  buildBatchPollCurlMultiline,
+  buildBatchPollCurlOneLine,
+} from "@/lib/customer-batch-api-chapter";
+import {
   buildImageApiCurlMultiline,
   buildImageApiCurlOneLine,
 } from "@/lib/customer-image-api-chapter";
 import {
   TOKFAI_API_KEY_PLACEHOLDER,
-  TOKFAI_RECOMMENDED_MODEL,
 } from "@/lib/tokfai-api";
 
 const API_ROOT = "https://api.tokfai.com/v1";
@@ -37,22 +42,14 @@ export function batchCreateCurlOneLine(
   apiKey = TOKFAI_API_KEY_PLACEHOLDER,
   model = CHAT_SMOKE_MODEL
 ): string {
-  const body = shellSingleQuotedJson({
-    model,
-    items: [
-      { messages: [{ role: "user", content: "Say ok only." }] },
-      { messages: [{ role: "user", content: "Say hello only." }] },
-      { messages: [{ role: "user", content: "Say hi only." }] },
-    ],
-  });
-  return `curl -sS ${API_ROOT}/batches/chat -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d '${body}'`;
+  return buildBatchCreateCurlOneLine(apiKey, model);
 }
 
 export function batchPollCurlOneLine(
   apiKey = TOKFAI_API_KEY_PLACEHOLDER,
   batchId = "batch_xxx"
 ): string {
-  return `curl -sS ${API_ROOT}/batches/${batchId} -H "Authorization: Bearer ${apiKey}"`;
+  return buildBatchPollCurlOneLine(apiKey, batchId);
 }
 
 /** Readable multi-line chat curl (display only — copy one-line helper for terminal). */
@@ -83,25 +80,14 @@ export function imageCurlMultiline(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string 
 
 export function batchCreateCurlMultiline(
   apiKey = TOKFAI_API_KEY_PLACEHOLDER,
-  model = TOKFAI_RECOMMENDED_MODEL
+  model = CHAT_SMOKE_MODEL
 ): string {
-  return `curl https://api.tokfai.com/v1/batches/chat \\
-  -H "Authorization: Bearer ${apiKey}" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "${model}",
-    "items": [
-      { "messages": [{ "role": "user", "content": "Say ok only." }] },
-      { "messages": [{ "role": "user", "content": "Say hello only." }] },
-      { "messages": [{ "role": "user", "content": "Say hi only." }] }
-    ]
-  }'`;
+  return buildBatchCreateCurlMultiline(apiKey, model);
 }
 
 export function batchPollCurlMultiline(
   apiKey = TOKFAI_API_KEY_PLACEHOLDER,
   batchId = "batch_xxx"
 ): string {
-  return `curl https://api.tokfai.com/v1/batches/${batchId} \\
-  -H "Authorization: Bearer ${apiKey}"`;
+  return buildBatchPollCurlMultiline(apiKey, batchId);
 }

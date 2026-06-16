@@ -9,6 +9,7 @@ import {
   useCopyToClipboard,
 } from "@/components/copy-code-block";
 import { ApiKeyChapterCopyPanel } from "@/components/api-key-chapter-copy";
+import { BatchApiChapterCopyPanel } from "@/components/batch-api-chapter-copy";
 import { ChatApiChapterCopyPanel } from "@/components/chat-api-chapter-copy";
 import { ImageApiChapterCopyPanel } from "@/components/image-api-chapter-copy";
 import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
@@ -48,6 +49,8 @@ import {
   resolveDocChatCurlDisplay,
   resolveDocCurlSnippetCopy,
   resolveDocImageCurlDisplay,
+  resolveDocBatchCreateCurlDisplay,
+  resolveDocBatchPollCurlDisplay,
 } from "@/lib/customer-quick-start-snippets";
 import { modelsVerifyCurlMultiline } from "@/lib/customer-api-key-chapter";
 import { useQuickStartApiKey } from "@/lib/use-quick-start-api-key";
@@ -360,7 +363,11 @@ function DocBlock({
           ? resolveDocChatCurlDisplay(quickStartApiKey)
           : block.snippetKey === "image-curl" && sectionId === "image-api"
             ? resolveDocImageCurlDisplay(quickStartApiKey)
-            : block.snippetKey === "models-curl" && sectionId === "api-key"
+            : block.snippetKey === "batch-create-curl" && sectionId === "batch-api"
+              ? resolveDocBatchCreateCurlDisplay(quickStartApiKey)
+              : block.snippetKey === "batch-poll-curl" && sectionId === "batch-api"
+                ? resolveDocBatchPollCurlDisplay(quickStartApiKey)
+                : block.snippetKey === "models-curl" && sectionId === "api-key"
             ? modelsVerifyCurlMultiline(
                 isQuickStartKeyPlaceholder(quickStartApiKey)
                   ? undefined
@@ -454,6 +461,22 @@ function DocBlock({
               onCopy={onCopy}
               idPrefix={block.id}
               showReference={block.showReference ?? false}
+            />
+          </div>
+        </div>
+      );
+    case "batch-api-copy-panel":
+      return (
+        <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
+          <p className="text-sm font-semibold text-foreground">
+            {t("integration.batchApiCopyNowTitle")}
+          </p>
+          <div className="mt-3">
+            <BatchApiChapterCopyPanel
+              apiKey={quickStartApiKey}
+              copiedId={copiedId}
+              onCopy={onCopy}
+              idPrefix={block.id}
             />
           </div>
         </div>

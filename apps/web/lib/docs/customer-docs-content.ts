@@ -89,6 +89,7 @@ export type CustomerDocBlock =
   | { type: "one-line-curl"; id: string; titleKey: string; snippetKey?: CustomerDocSnippetKey }
   | { type: "chat-api-copy-panel"; id: string }
   | { type: "image-api-copy-panel"; id: string; showReference?: boolean }
+  | { type: "batch-api-copy-panel"; id: string }
   | { type: "api-key-copy-panel"; id: string }
   | { type: "api-key-errors" }
   | { type: "copy-fields"; id: string; fields: CustomerDocCopyField[] }
@@ -479,6 +480,12 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
           { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
           { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
           { id: "models", labelKey: "integration.browseModels", href: "/dashboard/models" },
+          {
+            id: "batch-api",
+            labelKey: "integration.demoFlowLinkBatch",
+            href: "/dashboard/docs",
+            hash: "batch-api",
+          },
         ],
       },
     ],
@@ -570,6 +577,12 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
           { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
           { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
           { id: "models", labelKey: "integration.browseModels", href: "/dashboard/models" },
+          {
+            id: "batch-api",
+            labelKey: "integration.demoFlowLinkBatch",
+            href: "/dashboard/docs",
+            hash: "batch-api",
+          },
         ],
       },
     ],
@@ -595,28 +608,126 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       verify: VERIFY_USAGE_CREDITS,
     },
     blocks: [
+      { type: "paragraph", textKey: "integration.batchSameKeyNote" },
+      { type: "paragraph", textKey: "integration.batchNotManagedNote" },
+      { type: "paragraph", textKey: "integration.batchEndpoints" },
+      { type: "paragraph", textKey: "integration.batchTerminalNote" },
+      { type: "batch-api-copy-panel", id: "batch-api-copy" },
       {
         type: "bullets",
         items: [
           "integration.batchScenario1",
           "integration.batchScenario2",
           "integration.batchScenario3",
+          "integration.batchScenario4",
+          "integration.batchScenario5",
         ],
       },
-      { type: "paragraph", textKey: "integration.batchGatewayNote" },
-      { type: "paragraph", textKey: "integration.batchNote" },
-      { type: "paragraph", textKey: "integration.placeholderKeyNote" },
+      { type: "paragraph", textKey: "integration.batchCreateResponseTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.batchFieldId",
+          "integration.batchFieldStatus",
+          "integration.batchFieldRequestedModel",
+          "integration.batchFieldTotalItems",
+          "integration.batchFieldCreatedAt",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.batchPollResponseTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.batchPollStatusPending",
+          "integration.batchPollStatusRunning",
+          "integration.batchPollStatusCompleted",
+          "integration.batchPollStatusPartialFailed",
+          "integration.batchPollStatusFailed",
+          "integration.batchPollStatusCancelled",
+          "integration.batchPollFieldSucceededItems",
+          "integration.batchPollFieldFailedItems",
+          "integration.batchPollFieldCreditsCharged",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.batchItemsTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.batchItemFieldStatus",
+          "integration.batchItemFieldRequestId",
+          "integration.batchItemFieldCreditsCharged",
+          "integration.batchItemFieldErrorCode",
+          "integration.batchItemFieldErrorMessage",
+          "integration.batchItemsEndpointNote",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.batchBillingTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.batchBillingSuccessOnly",
+          "integration.batchBillingFailedCancelled",
+          "integration.batchBillingReconcile",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.batchReconcileTitle" },
+      {
+        type: "ordered",
+        items: [
+          "integration.batchReconcileStep1",
+          "integration.batchReconcileStep2",
+          "integration.batchReconcileStep3",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.batchErrorsTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.batchErrorMissingToken",
+          "integration.batchErrorInvalidToken",
+          "integration.batchErrorInsufficientCredits",
+          "integration.batchErrorInvalidPrompt",
+          "integration.batchErrorModelNotFound",
+          "integration.batchErrorUpstreamTimeout",
+          "integration.batchErrorBatchCancelled",
+          "integration.batchErrorRequestTooLarge",
+          "integration.batchErrorTooManyRequests",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.batchCustomerPathTitle" },
+      {
+        type: "ordered",
+        items: [
+          "integration.batchCustomerPathStep1",
+          "integration.batchCustomerPathStep2",
+          "integration.batchCustomerPathStep3",
+          "integration.batchCustomerPathStep4",
+        ],
+      },
       {
         type: "code",
-        id: "batch-create",
+        id: "batch-create-readable",
         label: "create batch (readable)",
         snippetKey: "batch-create-curl",
       },
       {
         type: "code",
-        id: "batch-poll",
+        id: "batch-poll-readable",
         label: "poll batch (readable)",
         snippetKey: "batch-poll-curl",
+      },
+      {
+        type: "dashboard-links",
+        links: [
+          { id: "keys", labelKey: "integration.demoFlowLinkKeys", href: "/dashboard/api-keys" },
+          {
+            id: "playground",
+            labelKey: "integration.demoFlowLinkPlayground",
+            href: "/dashboard/playground",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+        ],
       },
     ],
   },

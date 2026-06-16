@@ -1690,6 +1690,8 @@ export const messages = {
       copyOneLineModelsCurl: "Copy one-line Models curl",
       copyOneLineChatCurl: "Copy one-line Chat curl",
       copyOneLineImageCurl: "Copy one-line Image curl",
+      copyOneLineBatchCreateCurl: "Copy one-line batch create curl",
+      copyOneLineBatchPollCurl: "Copy one-line batch poll curl",
       chatApiTitle: "Chat API",
       chatApiDesc:
         "OpenAI-compatible chat — POST https://api.tokfai.com/v1/chat/completions with model, messages, and stream.",
@@ -1818,13 +1820,13 @@ export const messages = {
         "See common errors below — missing_token, invalid_token, insufficient_credits, or upstream timeout.",
       imagePlaygroundLink: "Open Image Playground",
       batchChapterPurpose:
-        "Run many chat prompts in one job from your own backend.",
+        "Submit many chat prompts in one job from your own backend — not a managed operations service.",
       batchChapterCopy:
-        "POST /v1/batches/chat body and poll GET /v1/batches/{id} curl snippets.",
+        "One-line create curl (POST /v1/batches/chat) and poll curl (GET /v1/batches/{id}) below.",
       batchChapterVerify:
-        "Batch reaches completed; each succeeded item has request_id in Usage with credits.",
+        "Batch reaches completed or partial_failed; each succeeded item has request_id in Usage with credits.",
       batchChapterFailure:
-        "batch_cancelled items are not charged; gateway_overloaded — retry with backoff; match request_id in Usage.",
+        "See common errors below — batch_cancelled items not charged; match request_id in Usage / Credits.",
       usageChapterPurpose:
         "Reconcile every API call against balance changes.",
       usageChapterCopy:
@@ -2035,13 +2037,106 @@ export const messages = {
       linkCredits: "Open Credits",
       batchTitle: "Batch API",
       batchDesc:
-        "Submit many chat prompts in one request, poll for results, and reconcile each item by request_id.",
+        "Bulk chat jobs via POST https://api.tokfai.com/v1/batches/chat — poll GET https://api.tokfai.com/v1/batches/{id}. Same API Key as Chat.",
+      batchSameKeyNote:
+        "Batch uses the same Tokfai API Key as Chat and Image: Authorization: Bearer sk-tokfai_xxx.",
+      batchNotManagedNote:
+        "Batch is an API integration pattern for your backend — not managed operations, not Tokfai running your business.",
+      batchEndpoints:
+        "Create: POST https://api.tokfai.com/v1/batches/chat (returns HTTP 202). Poll: GET https://api.tokfai.com/v1/batches/{id}. Item details: GET https://api.tokfai.com/v1/batches/{id}/items.",
+      batchTerminalNote:
+        "Copy the one-line curls below and paste into any terminal (Mac, Windows PowerShell, or Linux). No project folder, clone, or npm install required.",
+      batchApiCopyNowTitle: "You can copy now",
+      batchApiCreateCopyLabel: "One-line batch create curl",
+      batchApiPollCopyLabel: "One-line batch poll curl",
+      batchApiPollHint:
+        "Replace batch_xxx with the id from the create response before polling.",
+      batchApiLiveKeyNote:
+        "Your API key from this browser session is already filled in these curls.",
       batchScenario1:
-        "Customer support triage, chart summaries, image prompt batches, or bulk product copy.",
+        "AI customer support — batch Q&A over many tickets or chat logs.",
       batchScenario2:
-        "This is an API integration pattern — your backend submits, polls, and reads items.",
+        "Healthcare — batch organize or summarize clinical notes and chart text.",
       batchScenario3:
-        "Flow: create batch → poll batch → read items → reconcile in Usage.",
+        "Automotive after-sales — batch classify or route service work orders.",
+      batchScenario4:
+        "E-commerce — batch generate product titles, descriptions, or listing copy.",
+      batchScenario5:
+        "Internal knowledge base — batch summarize documents or FAQ entries.",
+      batchCreateResponseTitle: "On create (HTTP 202), check these fields:",
+      batchFieldId: "id — batch id (use in poll curl as batch_xxx).",
+      batchFieldStatus:
+        "status — usually pending or running immediately after create.",
+      batchFieldRequestedModel:
+        "requested_model — model id you sent (default example uses auto-fast).",
+      batchFieldTotalItems: "total_items — number of items in this batch.",
+      batchFieldCreatedAt: "created_at — batch creation timestamp.",
+      batchPollResponseTitle: "When polling GET /v1/batches/{id}:",
+      batchPollStatusPending: "pending — queued, not started yet.",
+      batchPollStatusRunning: "running — items are being processed.",
+      batchPollStatusCompleted: "completed — all items succeeded.",
+      batchPollStatusPartialFailed:
+        "partial_failed — some items succeeded, some failed or were cancelled.",
+      batchPollStatusFailed: "failed — all items failed.",
+      batchPollStatusCancelled: "cancelled — batch was cancelled before finishing.",
+      batchPollFieldSucceededItems: "succeeded_items — count of succeeded items.",
+      batchPollFieldFailedItems: "failed_items — count of failed or cancelled items.",
+      batchPollFieldCreditsCharged:
+        "credits_charged — total credits debited for succeeded items in this batch.",
+      batchItemsTitle: "Per-item results (GET /v1/batches/{id}/items):",
+      batchItemFieldStatus:
+        "status — pending, running, succeeded, failed, cancelled, or cancel_requested.",
+      batchItemFieldRequestId:
+        "request_id — copy to search in Usage and Credits for each item.",
+      batchItemFieldCreditsCharged:
+        "credits_charged — credits debited for this item (0 when failed or cancelled).",
+      batchItemFieldErrorCode: "error_code — machine-readable error when the item failed.",
+      batchItemFieldErrorMessage:
+        "error_message — short human-readable failure reason.",
+      batchItemsEndpointNote:
+        "Poll the batch until status is terminal, then list items to read each request_id and output.",
+      batchBillingTitle: "Billing:",
+      batchBillingSuccessOnly:
+        "Only succeeded items debit credits — each successful item is charged individually.",
+      batchBillingFailedCancelled:
+        "failed, cancelled, and batch_cancelled items should not debit credits.",
+      batchBillingReconcile:
+        "Copy each item request_id into Usage and Credits to reconcile tokens and debits.",
+      batchReconcileTitle: "Reconcile with Usage / Credits:",
+      batchReconcileStep1:
+        "After batch finishes, call GET /v1/batches/{id}/items and copy each succeeded item request_id.",
+      batchReconcileStep2:
+        "Open Usage — search each request_id; confirm model, tokens, and credits_charged.",
+      batchReconcileStep3:
+        "Open Credits — verify debits match succeeded items only.",
+      batchErrorsTitle: "Common Batch API errors:",
+      batchErrorMissingToken:
+        "missing_token — Authorization header was not sent.",
+      batchErrorInvalidToken:
+        "invalid_token — key is wrong, incomplete, or revoked.",
+      batchErrorInsufficientCredits:
+        "insufficient_credits — balance too low before or during processing.",
+      batchErrorInvalidPrompt:
+        "invalid_prompt / invalid_request_error — item messages missing or invalid.",
+      batchErrorModelNotFound:
+        "model_not_found / model_not_available — model id unavailable; try auto-fast.",
+      batchErrorUpstreamTimeout:
+        "upstream_timeout — upstream slow or timed out; item may retry once.",
+      batchErrorBatchCancelled:
+        "batch_cancelled — batch or item cancelled — no charge for cancelled items.",
+      batchErrorRequestTooLarge:
+        "request_body_too_large — JSON body exceeds gateway limit.",
+      batchErrorTooManyRequests:
+        "too_many_requests / too_many_concurrent_requests — slow down or reduce concurrency.",
+      batchCustomerPathTitle: "Recommended customer path:",
+      batchCustomerPathStep1:
+        "API Keys — create sk-tokfai_xxx and copy the full secret.",
+      batchCustomerPathStep2:
+        "Chat — one single chat test (Playground or Chat API curl) to confirm the key works.",
+      batchCustomerPathStep3:
+        "Batch — copy create curl here, poll until completed, then read items.",
+      batchCustomerPathStep4:
+        "Usage / Credits — reconcile each item request_id.",
       batchNote:
         "POST /v1/batches/chat returns 202 immediately. Poll GET /v1/batches/{id} until completed. Each successful item debits credits individually.",
       batchGatewayNote:
@@ -4142,6 +4237,8 @@ export const messages = {
       copyOneLineModelsCurl: "复制单行 Models curl",
       copyOneLineChatCurl: "复制单行 Chat curl",
       copyOneLineImageCurl: "复制单行 Image curl",
+      copyOneLineBatchCreateCurl: "复制单行 batch 创建 curl",
+      copyOneLineBatchPollCurl: "复制单行 batch 轮询 curl",
       chatApiTitle: "Chat API",
       chatApiDesc:
         "OpenAI 兼容对话 — POST https://api.tokfai.com/v1/chat/completions，字段含 model、messages、stream。",
@@ -4267,13 +4364,13 @@ export const messages = {
         "见下方常见错误 — missing_token、invalid_token、insufficient_credits 或上游超时。",
       imagePlaygroundLink: "打开 Image Playground",
       batchChapterPurpose:
-        "在你的后端一次提交多条对话任务。",
+        "在你的后端一次提交多条对话任务——不是托管运营服务。",
       batchChapterCopy:
-        "POST /v1/batches/chat 与轮询 GET /v1/batches/{id} 的 curl 示例。",
+        "下方单行创建 curl（POST /v1/batches/chat）与轮询 curl（GET /v1/batches/{id}）。",
       batchChapterVerify:
-        "Batch 状态为 completed；每条成功 item 在 Usage 有 request_id 与扣费。",
+        "Batch 达到 completed 或 partial_failed；每条成功 item 在 Usage 有 request_id 与扣费。",
       batchChapterFailure:
-        "batch_cancelled 不扣费；gateway_overloaded 退避重试；用 Usage 对账 request_id。",
+        "见下方常见错误 — batch_cancelled 不扣费；在 Usage / Credits 按 request_id 对账。",
       usageChapterPurpose:
         "把每次 API 调用与余额变化对齐。",
       usageChapterCopy:
@@ -4480,13 +4577,96 @@ export const messages = {
       linkCredits: "打开 Credits",
       batchTitle: "Batch API",
       batchDesc:
-        "一次提交多条对话，轮询结果，并按 request_id 核对每条 item。",
-      batchScenario1:
-        "客服分流、病例摘要、图像辅助提示词、电商批量文案等场景。",
-      batchScenario2:
-        "这是 API 集成示例——你的后端提交、轮询并读取 items。",
-      batchScenario3:
-        "流程：create batch → poll batch → read items → 在 Usage 对账。",
+        "批量对话任务 — POST https://api.tokfai.com/v1/batches/chat，轮询 GET https://api.tokfai.com/v1/batches/{id}。与 Chat 共用 API Key。",
+      batchSameKeyNote:
+        "Batch 与 Chat、Image 使用同一 Tokfai API Key：Authorization: Bearer sk-tokfai_xxx。",
+      batchNotManagedNote:
+        "Batch 是后端 API 集成模式——不是托管运营，不是 Tokfai 代跑你的业务。",
+      batchEndpoints:
+        "创建：POST https://api.tokfai.com/v1/batches/chat（返回 HTTP 202）。轮询：GET https://api.tokfai.com/v1/batches/{id}。Item 详情：GET https://api.tokfai.com/v1/batches/{id}/items。",
+      batchTerminalNote:
+        "复制下方单行 curl，粘贴到任意终端（Mac、Windows PowerShell 或 Linux）。无需 cd、clone 或 npm install。",
+      batchApiCopyNowTitle: "你现在就可以复制",
+      batchApiCreateCopyLabel: "单行 batch 创建 curl",
+      batchApiPollCopyLabel: "单行 batch 轮询 curl",
+      batchApiPollHint: "轮询前将 batch_xxx 替换为创建响应中的 id。",
+      batchApiLiveKeyNote: "本浏览器会话中的 API Key 已自动填入这些 curl。",
+      batchScenario1: "AI 客服 — 批量处理工单或对话记录的问答。",
+      batchScenario2: "医疗 — 批量整理或摘要病历、病例文本。",
+      batchScenario3: "车企售后 — 批量分类或路由服务工单。",
+      batchScenario4: "电商 — 批量生成商品标题、描述或 listing 文案。",
+      batchScenario5: "内部知识库 — 批量摘要文档或 FAQ 条目。",
+      batchCreateResponseTitle: "创建成功（HTTP 202）时查看这些字段：",
+      batchFieldId: "id — batch id（轮询 curl 中用作 batch_xxx）。",
+      batchFieldStatus: "status — 创建后通常为 pending 或 running。",
+      batchFieldRequestedModel:
+        "requested_model — 你发送的 model id（示例默认 auto-fast）。",
+      batchFieldTotalItems: "total_items — 本 batch 的 item 数量。",
+      batchFieldCreatedAt: "created_at — batch 创建时间。",
+      batchPollResponseTitle: "轮询 GET /v1/batches/{id} 时：",
+      batchPollStatusPending: "pending — 已排队，尚未开始。",
+      batchPollStatusRunning: "running — 正在处理 items。",
+      batchPollStatusCompleted: "completed — 全部 item 成功。",
+      batchPollStatusPartialFailed:
+        "partial_failed — 部分成功，部分失败或已取消。",
+      batchPollStatusFailed: "failed — 全部 item 失败。",
+      batchPollStatusCancelled: "cancelled — batch 在完成前被取消。",
+      batchPollFieldSucceededItems: "succeeded_items — 成功 item 数量。",
+      batchPollFieldFailedItems: "failed_items — 失败或取消 item 数量。",
+      batchPollFieldCreditsCharged:
+        "credits_charged — 本 batch 成功 item 累计扣费。",
+      batchItemsTitle: "每条 item 结果（GET /v1/batches/{id}/items）：",
+      batchItemFieldStatus:
+        "status — pending、running、succeeded、failed、cancelled 或 cancel_requested。",
+      batchItemFieldRequestId:
+        "request_id — 复制后在 Usage 与 Credits 中搜索该 item。",
+      batchItemFieldCreditsCharged:
+        "credits_charged — 该 item 扣费（失败或取消时为 0）。",
+      batchItemFieldErrorCode: "error_code — item 失败时的机器可读错误码。",
+      batchItemFieldErrorMessage: "error_message — 简短可读失败原因。",
+      batchItemsEndpointNote:
+        "轮询至 batch 状态终态后，列出 items 读取各 request_id 与 output。",
+      batchBillingTitle: "计费说明：",
+      batchBillingSuccessOnly:
+        "仅成功的 item 扣 credits — 每条成功 item 单独计费。",
+      batchBillingFailedCancelled:
+        "failed、cancelled 与 batch_cancelled 的 item 不应扣费。",
+      batchBillingReconcile:
+        "将各 item 的 request_id 复制到 Usage 与 Credits 对账 tokens 与扣费。",
+      batchReconcileTitle: "在 Usage / Credits 对账：",
+      batchReconcileStep1:
+        "batch 完成后调用 GET /v1/batches/{id}/items，复制各成功 item 的 request_id。",
+      batchReconcileStep2:
+        "打开 Usage — 搜索各 request_id，核对 model、tokens、credits_charged。",
+      batchReconcileStep3:
+        "打开 Credits — 核对扣费仅对应成功 item。",
+      batchErrorsTitle: "常见 Batch API 错误：",
+      batchErrorMissingToken: "missing_token — 未发送 Authorization。",
+      batchErrorInvalidToken:
+        "invalid_token — 密钥错误、不完整或已吊销。",
+      batchErrorInsufficientCredits:
+        "insufficient_credits — 处理前或处理中余额不足。",
+      batchErrorInvalidPrompt:
+        "invalid_prompt / invalid_request_error — item messages 缺失或无效。",
+      batchErrorModelNotFound:
+        "model_not_found / model_not_available — 模型不可用；可试 auto-fast。",
+      batchErrorUpstreamTimeout:
+        "upstream_timeout — 上游慢或超时；item 可能重试一次。",
+      batchErrorBatchCancelled:
+        "batch_cancelled — batch 或 item 已取消 — 取消项不扣费。",
+      batchErrorRequestTooLarge:
+        "request_body_too_large — JSON 请求体超过网关限制。",
+      batchErrorTooManyRequests:
+        "too_many_requests / too_many_concurrent_requests — 请降速或减少并发。",
+      batchCustomerPathTitle: "推荐客户路径：",
+      batchCustomerPathStep1:
+        "API Keys — 创建 sk-tokfai_xxx 并复制完整 secret。",
+      batchCustomerPathStep2:
+        "Chat — 先做单条对话测试（Playground 或 Chat API curl）确认 Key 可用。",
+      batchCustomerPathStep3:
+        "Batch — 在此复制创建 curl，轮询至 completed，再读取 items。",
+      batchCustomerPathStep4:
+        "Usage / Credits — 按各 item 的 request_id 对账。",
       batchNote:
         "POST /v1/batches/chat 立即返回 202。轮询 GET /v1/batches/{id} 直至完成。每条成功 item 单独扣费。",
       batchGatewayNote:
