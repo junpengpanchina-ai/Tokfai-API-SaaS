@@ -107,6 +107,8 @@ export type CustomerDocBlock =
   | { type: "openai-sdk-copy-panel"; id: string }
   | { type: "cursor-copy-panel"; id: string }
   | { type: "cherry-copy-panel"; id: string }
+  | { type: "industry-copy-panel"; id: string }
+  | { type: "industry-overview-table" }
   | { type: "error-table" }
   | { type: "error-examples-panel"; id: string }
   | { type: "model-list" }
@@ -270,21 +272,29 @@ export const CUSTOMER_DOC_INDUSTRY_SCENARIO_KEYS: Record<
     "integration.industry.hospital.scenario1",
     "integration.industry.hospital.scenario2",
     "integration.industry.hospital.scenario3",
+    "integration.industry.hospital.scenario4",
+    "integration.industry.hospital.scenario5",
   ],
   automotive: [
     "integration.industry.automotive.scenario1",
     "integration.industry.automotive.scenario2",
     "integration.industry.automotive.scenario3",
+    "integration.industry.automotive.scenario4",
+    "integration.industry.automotive.scenario5",
   ],
   ecommerce: [
     "integration.industry.ecommerce.scenario1",
     "integration.industry.ecommerce.scenario2",
     "integration.industry.ecommerce.scenario3",
+    "integration.industry.ecommerce.scenario4",
+    "integration.industry.ecommerce.scenario5",
   ],
   support: [
     "integration.industry.support.scenario1",
     "integration.industry.support.scenario2",
     "integration.industry.support.scenario3",
+    "integration.industry.support.scenario4",
+    "integration.industry.support.scenario5",
   ],
 };
 
@@ -1410,15 +1420,78 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
     ),
     chapterNow: {
       try: {
-        id: "playground",
-        labelKey: "integration.demoFlowLinkPlayground",
-        href: "/dashboard/playground",
+        id: "keys",
+        labelKey: "integration.ctaCreateKey",
+        href: "/dashboard/api-keys",
       },
       verify: VERIFY_USAGE_CREDITS,
     },
     blocks: [
+      { type: "paragraph", textKey: "integration.industryGatewayNote" },
       { type: "paragraph", textKey: "integration.industryNotAgency" },
       { type: "industry-cards", ids: [...CUSTOMER_DOC_INDUSTRY_IDS] },
+      { type: "paragraph", textKey: "integration.industryOverviewTitle" },
+      { type: "industry-overview-table" },
+      { type: "industry-copy-panel", id: "industry-copy" },
+      { type: "paragraph", textKey: "integration.industryTokfaiProvidesTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.industryTokfaiProvides1",
+          "integration.industryTokfaiProvides2",
+          "integration.industryTokfaiProvides3",
+          "integration.industryTokfaiProvides4",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.industryOnboardingTitle" },
+      {
+        type: "ordered",
+        items: [
+          "integration.industryOnboardingStep1",
+          "integration.industryOnboardingStep2",
+          "integration.industryOnboardingStep3",
+          "integration.industryOnboardingStep4",
+          "integration.industryOnboardingStep5",
+        ],
+      },
+      {
+        type: "dashboard-links",
+        links: [
+          { id: "keys", labelKey: "integration.ctaCreateKey", href: "/dashboard/api-keys" },
+          {
+            id: "chat-api",
+            labelKey: "integration.navChatApi",
+            href: "/dashboard/docs",
+            hash: "chat-api",
+          },
+          {
+            id: "image-api",
+            labelKey: "integration.navImageApi",
+            href: "/dashboard/docs",
+            hash: "image-api",
+          },
+          {
+            id: "batch-api",
+            labelKey: "integration.navBatch",
+            href: "/dashboard/docs",
+            hash: "batch-api",
+          },
+          {
+            id: "usage-credits-docs",
+            labelKey: "integration.linkUsageCreditsGuide",
+            href: "/dashboard/docs",
+            hash: "usage-credits",
+          },
+          {
+            id: "error-codes-docs",
+            labelKey: "integration.linkErrorCodesGuide",
+            href: "/dashboard/docs",
+            hash: "error-codes",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+        ],
+      },
     ],
   },
 ];

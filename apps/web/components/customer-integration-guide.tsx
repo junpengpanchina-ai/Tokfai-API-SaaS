@@ -12,9 +12,10 @@ import { ApiKeyChapterCopyPanel } from "@/components/api-key-chapter-copy";
 import { BatchApiChapterCopyPanel } from "@/components/batch-api-chapter-copy";
 import { ErrorCodesChapterPanel } from "@/components/error-codes-chapter-panel";
 import { ChatApiChapterCopyPanel } from "@/components/chat-api-chapter-copy";
+import { ImageApiChapterCopyPanel } from "@/components/image-api-chapter-copy";
 import { CherryChapterCopyPanel } from "@/components/cherry-chapter-copy";
 import { CursorChapterCopyPanel } from "@/components/cursor-chapter-copy";
-import { ImageApiChapterCopyPanel } from "@/components/image-api-chapter-copy";
+import { IndustryChapterCopyPanel, IndustryOverviewTable } from "@/components/industry-chapter-copy";
 import { OpenAiSdkChapterCopyPanel } from "@/components/openai-sdk-chapter-copy";
 import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,7 @@ import {
   resolveDocCherryConfigDisplay,
 } from "@/lib/customer-quick-start-snippets";
 import { modelsVerifyCurlMultiline } from "@/lib/customer-api-key-chapter";
+import { buildIndustryCurlOneLine } from "@/lib/customer-industry-chapter";
 import { useQuickStartApiKey } from "@/lib/use-quick-start-api-key";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
@@ -576,8 +578,28 @@ function DocBlock({
       return (
         <div className="flex flex-col gap-4">
           {block.ids.map((id) => (
-            <IndustryExampleCard key={id} id={id} t={t} />
+            <IndustryExampleCard
+              key={id}
+              id={id}
+              t={t}
+              apiKey={quickStartApiKey}
+              copiedId={copiedId}
+              onCopy={onCopy}
+            />
           ))}
+        </div>
+      );
+    case "industry-overview-table":
+      return <IndustryOverviewTable t={t} />;
+    case "industry-copy-panel":
+      return (
+        <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
+          <IndustryChapterCopyPanel
+            apiKey={quickStartApiKey}
+            copiedId={copiedId}
+            onCopy={onCopy}
+            idPrefix={block.id}
+          />
         </div>
       );
     default:
@@ -701,20 +723,30 @@ function ChapterGuidePanel({
 function IndustryExampleCard({
   id,
   t,
+  apiKey,
+  copiedId,
+  onCopy,
 }: {
   id: CustomerDocIndustryId;
   t: (key: string) => string;
+  apiKey: string;
+  copiedId: string | null;
+  onCopy: (id: string, value: string) => void;
 }) {
   const prefix = `integration.industry.${id}`;
-  const rows = [
-    { labelKey: "integration.industryIntegrationLabel", textKey: `${prefix}.integration` },
-    { labelKey: "integration.industryVerifyLabel", textKey: `${prefix}.verify` },
-    { labelKey: "integration.industryFailureLabel", textKey: `${prefix}.failure` },
+  const detailRows = [
+    { labelKey: "integration.industryApisLabel", textKey: `${prefix}.apis` },
+    { labelKey: "integration.industryModelsLabel", textKey: `${prefix}.models` },
+    { labelKey: "integration.industryTypicalInputLabel", textKey: `${prefix}.typicalInput` },
+    { labelKey: "integration.industryTypicalOutputLabel", textKey: `${prefix}.typicalOutput` },
+    { labelKey: "integration.industryReconcileLabel", textKey: `${prefix}.reconcile` },
   ];
   const boundaryKey = `${prefix}.boundary`;
   const boundary = t(boundaryKey);
   const hasBoundary = boundary !== boundaryKey;
   const scenarios = CUSTOMER_DOC_INDUSTRY_SCENARIO_KEYS[id];
+  const curlValue = buildIndustryCurlOneLine(id, apiKey);
+  const copyId = `industry-card-${id}-curl`;
 
   return (
     <div className="rounded-lg border bg-background p-4">
@@ -728,20 +760,30 @@ function IndustryExampleCard({
           <li key={key}>{t(key)}</li>
         ))}
       </ul>
-      <p className="mt-2 text-xs text-muted-foreground">{t(`${prefix}.notManaged`)}</p>
-      {hasBoundary ? (
-        <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-400">
-          {boundary}
-        </p>
-      ) : null}
       <dl className="mt-3 space-y-2 text-sm">
-        {rows.map((row) => (
+        {detailRows.map((row) => (
           <div key={row.labelKey}>
             <dt className="font-medium text-foreground">{t(row.labelKey)}</dt>
             <dd className="text-muted-foreground">{t(row.textKey)}</dd>
           </div>
         ))}
       </dl>
+      {hasBoundary ? (
+        <p className="mt-3 text-xs font-medium text-amber-700 dark:text-amber-400">
+          {boundary}
+        </p>
+      ) : null}
+      <p className="mt-2 text-xs text-muted-foreground">{t(`${prefix}.notManaged`)}</p>
+      <div className="mt-3">
+        <CopyConfigAction
+          id={copyId}
+          value={curlValue}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          label={t("integration.industryCopyCurlAction")}
+          copiedLabel={t("integration.copied")}
+        />
+      </div>
     </div>
   );
 }

@@ -604,6 +604,9 @@ export const messages = {
         verifyCredits: "Verify in Credits",
         cursorGuide: "Cursor guide",
         cherryStudioGuide: "Cherry Studio guide",
+        industryExamplesGuide: "Industry examples",
+        copyHospitalCaseCurl: "Copy hospital case summary curl",
+        copyEcommerceBatchCurl: "Copy ecommerce batch curl",
         baseUrlLabel: "Base URL",
         recommendedModelLabel: "Recommended model",
         curlOneLineLabel: "One-line chat curl (paste in zsh)",
@@ -2112,91 +2115,175 @@ export const messages = {
       cherryCopyModelAction: "Copy model",
       industryTitle: "Industry API integration examples",
       industryDesc:
-        "Patterns for calling Tokfai from your systems — API integration examples, not managed operations.",
+        "Wire your Tokfai API Key into your business systems. Examples show API call patterns only — Tokfai does not operate your business.",
+      industryGatewayNote:
+        "Tokfai is an OpenAI-compatible API gateway / model relay / API Key provider. Your CRM, hospital system, dealer portal, or helpdesk calls Tokfai — Tokfai does not run your business workflows.",
       industryNotAgency:
-        "Tokfai does not operate hospitals, dealerships, stores, or support queues. You call the API from your own software.",
+        "These examples show how your systems call Tokfai APIs. Tokfai provides API Key access, model routing, metering, and ledger records — your team owns business process, user data, review, compliance, and final outcomes.",
       industryChapterPurpose:
-        "See how different industries wire Tokfai into their stack.",
+        "See how hospitals, automotive, e-commerce, and support stacks wire Tokfai into their own software.",
       industryChapterCopy:
-        "Endpoint, model alias, and request shape from each example card.",
+        "One-line curl per industry below; copy Base URL, API Key, and model into your backend.",
       industryChapterVerify:
-        "Your integration returns HTTP 200 and request_id; Usage shows your test calls.",
+        "HTTP 200 with request_id; search Usage and Credits for each succeeded call.",
       industryChapterFailure:
-        "Use error.code + request_id from the response; search Usage for the same request_id.",
-      industryScenariosLabel: "Example API use cases",
+        "Use error.code + request_id; see Error codes chapter; search Usage for the same request_id.",
+      industryScenariosLabel: "Typical use cases",
+      industryApisLabel: "Tokfai APIs",
+      industryModelsLabel: "Recommended models",
+      industryTypicalInputLabel: "Typical input",
+      industryTypicalOutputLabel: "Typical output",
+      industryReconcileLabel: "Reconcile",
+      industryCopyCurlAction: "Copy one-line example curl",
+      industryOverviewTitle: "Integration pattern overview",
+      industryOverviewColScenario: "Scenario",
+      industryOverviewColSystem: "Customer system",
+      industryOverviewColApi: "Tokfai API",
+      industryOverviewColModel: "Model",
+      industryOverviewColFields: "Response fields",
+      industryOverviewColReconcile: "Reconcile",
+      industryCopyNowTitle: "Industry call examples you can copy",
+      industryCopyHospitalLabel: "Hospital case summary (Chat API one-line curl)",
+      industryCopyAutoLabel: "Automotive service ticket (Chat API one-line curl)",
+      industryCopyEcommerceBatchLabel: "E-commerce SKU batch copy (Batch API one-line curl)",
+      industryCopySupportLabel: "AI customer service QA (Chat API one-line curl)",
+      industryCopyHospitalAction: "Copy hospital case summary curl",
+      industryCopyEcommerceBatchAction: "Copy ecommerce batch curl",
+      industryLiveKeyNote:
+        "Your API key from this session is already filled in these curls.",
+      industryBatchReconcileNote:
+        "Batch: each succeeded item has its own request_id. After completion, GET /v1/batches/{id}/items and reconcile each item request_id in Usage / Credits.",
+      industryTokfaiProvidesTitle: "What Tokfai provides vs your system",
+      industryTokfaiProvides1:
+        "Tokfai does not store your business database — your systems send API requests.",
+      industryTokfaiProvides2:
+        "Tokfai does not contact your customers — your app or helpdesk sends and reviews messages.",
+      industryTokfaiProvides3:
+        "Tokfai does not perform final approval — your staff reviews AI output before publishing or replying.",
+      industryTokfaiProvides4:
+        "Tokfai provides API access, model routing, usage records, and credit ledger entries.",
+      industryOnboardingTitle: "From examples to production integration (5 steps)",
+      industryOnboardingStep1: "Create a test API Key on API Keys.",
+      industryOnboardingStep2:
+        "Verify with one-line curls from Chat / Image / Batch chapters or the copy panel above.",
+      industryOnboardingStep3:
+        "Store Base URL https://api.tokfai.com/v1, API Key, and model in your backend environment variables.",
+      industryOnboardingStep4: "Log request_id from every API response in your application.",
+      industryOnboardingStep5:
+        "Reconcile each request_id in Usage / Credits before scaling traffic.",
+      industryOverview: {
+        hospital: {
+          scenario: "Hospital CS / chart prep",
+          system: "Hospital CS or EMR integration",
+          api: "Chat API",
+          model: "auto-fast / auto-pro",
+          fields: "content, request_id, credits_charged",
+          reconcile: "Usage → Credits",
+        },
+        automotive: {
+          scenario: "Dealer after-sales",
+          system: "Dealer CRM / service desk",
+          api: "Chat API / Batch API",
+          model: "auto-pro",
+          fields: "content, request_id, tokfai.resolved_model",
+          reconcile: "Usage → Credits",
+        },
+        ecommerce: {
+          scenario: "SKU copy at scale",
+          system: "E-commerce PIM / listing tool",
+          api: "Batch API / Image API",
+          model: "auto-cheap / gpt-image-2",
+          fields: "request_id, credits_charged, data[0].url (image)",
+          reconcile: "Usage → Credits",
+        },
+        support: {
+          scenario: "Helpdesk reply draft",
+          system: "AI CS / ticket platform",
+          api: "Chat API",
+          model: "auto-fast",
+          fields: "choices[0].message.content, request_id",
+          reconcile: "Usage → Credits",
+        },
+      },
       industryIntegrationLabel: "API call pattern",
       industryVerifyLabel: "Verify success",
       industryFailureLabel: "If it fails",
       industry: {
         hospital: {
-          title: "Hospital / clinic — API integration examples",
+          title: "Hospital / clinic",
           purpose:
-            "Your hospital systems call Tokfai APIs — Tokfai does not operate your clinic or patient queue.",
-          scenario1:
-            "AI customer-service replies from your clinic app or portal (your staff reviews outbound messages).",
-          scenario2:
-            "Case and chart summaries via POST /v1/chat/completions with de-identified clinical text.",
-          scenario3:
-            "Assist image workflow prompts via POST /v1/images/generations (your team controls clinical use).",
+            "Your hospital or clinic software calls Tokfai — Tokfai does not operate your clinic, scheduling, or patient queue.",
+          scenario1: "AI customer-service reply drafts (your staff reviews before sending).",
+          scenario2: "Medical record summaries from de-identified patient narratives.",
+          scenario3: "Lab / report summaries structured for clinician review.",
+          scenario4: "Clinician assistant prompts and documentation helpers.",
+          scenario5: "Image assist prompts for educational or workflow assets (not diagnostic images).",
+          apis: "Chat API — Q&A, summaries, structured prep. Image API — educational or assist visuals (not for diagnosis). Batch API — bulk chart or ticket prep.",
+          models: "auto-fast for CS and summaries; auto-pro for complex chart organization.",
+          typicalInput: "De-identified patient narrative, CS question, or assist prompt text.",
+          typicalOutput: "Structured summary, reply draft, or prompt text in choices[0].message.content.",
+          reconcile: "Copy request_id → search Usage → match credits_charged in Credits.",
           notManaged:
-            "Tokfai provides API access only — not hospital operations, scheduling, or patient care.",
+            "Tokfai does not store patient records, contact patients, or approve clinical messages.",
           boundary:
-            "Medical boundary: AI assists documentation and prompts only. Does not diagnose, prescribe, or replace physician judgment.",
-          integration:
-            "Chat API for summaries and patient-facing chat backends; Image API for assist prompts; optional Batch for bulk chart prep.",
-          verify:
-            "HTTP 200, request_id in JSON; Usage shows tokens or image credits for succeeded calls only.",
-          failure:
-            "upstream_timeout or insufficient_credits — check request_id in Usage; never treat model output as a diagnosis.",
+            "Assistive information only — no diagnosis, no treatment plans, no substitute for physician judgment.",
         },
         automotive: {
-          title: "Automotive — API integration examples",
+          title: "Automotive / repair / after-sales",
           purpose:
-            "Your vehicle or dealer software calls Tokfai — Tokfai does not run your dealership or service desk.",
-          scenario1: "Owner manual Q&A in your vehicle app or dealer portal.",
-          scenario2: "After-sales ticket classification from your CRM or service webhook.",
-          scenario3:
-            "Vehicle damage photo description from your claims backend (Chat or Image API).",
+            "Your dealer, OEM, or repair software calls Tokfai — Tokfai does not run your service desk or warranty queue.",
+          scenario1: "After-sales FAQ from owner manual knowledge base.",
+          scenario2: "Owner manual Q&A in vehicle app or dealer portal.",
+          scenario3: "Service ticket classification and routing labels.",
+          scenario4: "Repair record summaries for technician handoff.",
+          scenario5: "Vehicle damage description prompts (assist copy, not final assessment).",
+          apis: "Chat API — KB Q&A, ticket summaries. Image API — service explainers or marketing visuals (not damage adjudication). Batch API — bulk ticket processing.",
+          models: "auto-fast for CS Q&A; auto-pro for complex tickets and technical summaries.",
+          typicalInput: "Ticket text, FAQ question, or damage photo description request.",
+          typicalOutput: "Answer draft, ticket labels, or summary in message content plus request_id.",
+          reconcile: "request_id per call → Usage row → Credits debit reference.",
           notManaged:
-            "Tokfai does not answer drivers or agents — your backend sends API requests with your API Key.",
-          integration:
-            "POST /v1/chat/completions for manual Q&A and ticket labels; Image API or chat with image context for damage descriptions.",
-          verify:
-            "HTTP 200 with answer text and request_id; Usage row per API call.",
-          failure:
-            "model_not_available or gateway_overloaded — retry; search request_id in Usage.",
+            "Tokfai does not talk to vehicle owners or approve repair decisions — your agents confirm outcomes.",
+          boundary:
+            "Assists after-sales and engineering information — final judgment stays with your staff.",
         },
         ecommerce: {
-          title: "E-commerce — API integration examples",
+          title: "E-commerce studio",
           purpose:
-            "Your catalog and support stack calls Tokfai — Tokfai does not operate your store or CS team.",
-          scenario1: "Product descriptions and marketing copy from your PIM or CMS.",
-          scenario2: "Batch titles and bullet points for many SKUs via Batch API.",
-          scenario3: "Store customer-service Q&A from your helpdesk integration.",
+            "Your catalog, listing, or CS tools call Tokfai — Tokfai does not operate your store or reply to buyers.",
+          scenario1: "Product titles and bullet points.",
+          scenario2: "Product detail and marketing copy.",
+          scenario3: "Batch CS reply drafts for common SKU questions.",
+          scenario4: "Image generation prompts for product visuals.",
+          scenario5: "Batch SKU copy for hundreds of listings via Batch API.",
+          apis: "Chat API — single product copy. Image API — product and poster images. Batch API — bulk SKU titles, bullets, and short descriptions.",
+          models: "auto-fast for daily copy; auto-cheap for bulk SKU jobs; auto-pro for premium brand copy; gpt-image-2 for product images.",
+          typicalInput: "SKU attributes, product name, or buyer question.",
+          typicalOutput: "Title, bullets, short description text, or image URL in data[0].url.",
+          reconcile: "Each batch item request_id → Usage → Credits; image calls use request_id and credits_charged.",
           notManaged:
-            "Tokfai does not manage listings or reply to buyers — your systems submit API jobs.",
-          integration:
-            "Batch API for bulk copy; Chat API for real-time buyer Q&A; model auto-cheap or auto-fast.",
-          verify:
-            "Batch completed or chat HTTP 200; each succeeded call has request_id in Usage.",
-          failure:
-            "batch_cancelled — no charge for cancelled items; insufficient_credits before large batches.",
+            "Tokfai does not publish listings or guarantee platform compliance — you review before go-live.",
+          boundary:
+            "You own product truthfulness, marketplace rules, and final published content.",
         },
         support: {
-          title: "AI customer service — API integration examples",
+          title: "AI customer service / ticketing",
           purpose:
-            "Your helpdesk platform calls Tokfai per ticket — Tokfai does not sit in your support queue.",
-          scenario1: "Ticket classification, routing labels, and priority suggestions.",
-          scenario2: "FAQ answers grounded in snippets from your knowledge base.",
-          scenario3: "Conversation summaries for agent handoff and QA.",
+            "Your helpdesk or ticket platform calls Tokfai per ticket — Tokfai does not sit in your support queue.",
+          scenario1: "FAQ Q&A from your knowledge base snippets.",
+          scenario2: "Ticket classification and routing labels.",
+          scenario3: "Ticket and conversation summaries for agent handoff.",
+          scenario4: "Reply drafts for agents to review before send.",
+          scenario5: "Multi-turn CS assist in your existing chat UI.",
+          apis: "Chat API — real-time reply drafts. Batch API — bulk ticket classification or summarization.",
+          models: "auto-fast default; auto-pro for complex complaints or high-value accounts.",
+          typicalInput: "Ticket subject/body, FAQ context, or conversation transcript.",
+          typicalOutput: "Reply draft, labels, or summary in choices[0].message.content with request_id.",
+          reconcile: "request_id → Usage search → Credits reference / amount / balance_after.",
           notManaged:
-            "Tokfai does not answer tickets — your webhook or worker calls the API with your API Key.",
-          integration:
-            "POST /v1/chat/completions with ticket subject/body in messages; model auto-fast; stream optional.",
-          verify:
-            "Each ticket test returns request_id; Usage shows per-ticket credits when succeeded.",
-          failure:
-            "too_many_requests — rate limit per key; missing_token if webhook forgot Authorization header.",
+            "Tokfai does not send messages to customers or make refund or policy commitments.",
+          boundary:
+            "Tokfai outputs suggested drafts — your system reviews, approves, and sends replies.",
         },
       },
       quickStartTitle: "Quick start",
@@ -3649,6 +3736,9 @@ export const messages = {
         verifyCredits: "在 Credits 核对",
         cursorGuide: "Cursor 接入指南",
         cherryStudioGuide: "Cherry Studio 接入指南",
+        industryExamplesGuide: "行业 API 示例",
+        copyHospitalCaseCurl: "复制医院病历摘要 curl",
+        copyEcommerceBatchCurl: "复制电商 Batch curl",
         baseUrlLabel: "Base URL",
         recommendedModelLabel: "推荐模型",
         curlOneLineLabel: "单行 chat curl（可直接粘贴到 zsh）",
@@ -5072,90 +5162,155 @@ export const messages = {
       cherryCopyModelAction: "复制 model",
       industryTitle: "行业 API 接入示例",
       industryDesc:
-        "展示如何从你的系统调用 Tokfai — 技术接入示例，不是托管运营服务。",
+        "把 Tokfai API Key 接到你的业务系统里。以下示例只展示调用模式，Tokfai 不代运营你的业务。",
+      industryGatewayNote:
+        "Tokfai 是 OpenAI 兼容 API gateway / model relay / API Key 提供方。你的 CRM、医院系统、经销商门户或工单平台调用 Tokfai — Tokfai 不运行你的业务流程。",
       industryNotAgency:
-        "Tokfai 不运营医院、门店、车企客服或工单队列——由你的软件携带 API Key 调用。",
-      industryChapterPurpose:
-        "了解不同行业如何把 Tokfai 接入自有系统。",
-      industryChapterCopy:
-        "各示例卡片中的 endpoint、模型别名与请求结构。",
-      industryChapterVerify:
-        "集成返回 HTTP 200 与 request_id；Usage 可见你的测试调用。",
+        "以下示例展示你的系统如何调用 Tokfai API。Tokfai 提供 API Key、模型路由、计量与账本 — 业务流程、用户数据、审核、合规与最终结果由你的团队负责。",
+      industryChapterPurpose: "了解医院、车企、电商、客服系统如何把 Tokfai 接入自有软件。",
+      industryChapterCopy: "每行业一条 one-line curl；将 Base URL、API Key、model 写入你的后端。",
+      industryChapterVerify: "HTTP 200 且含 request_id；在 Usage / Credits 核对每次成功调用。",
       industryChapterFailure:
-        "用响应中的 error.code + request_id；在 Usage 搜索同一 request_id。",
+        "使用 error.code + request_id；见错误码章节；在 Usage 搜索同一 request_id。",
+      industryScenariosLabel: "典型场景",
+      industryApisLabel: "Tokfai API",
+      industryModelsLabel: "推荐模型",
+      industryTypicalInputLabel: "典型输入",
+      industryTypicalOutputLabel: "典型输出",
+      industryReconcileLabel: "对账方式",
+      industryCopyCurlAction: "复制 one-line 示例 curl",
+      industryOverviewTitle: "接入模式总览",
+      industryOverviewColScenario: "场景",
+      industryOverviewColSystem: "客户系统",
+      industryOverviewColApi: "Tokfai API",
+      industryOverviewColModel: "模型",
+      industryOverviewColFields: "返回字段",
+      industryOverviewColReconcile: "对账",
+      industryCopyNowTitle: "可复制的行业调用示例",
+      industryCopyHospitalLabel: "医院病历摘要（Chat API 单行 curl）",
+      industryCopyAutoLabel: "车企售后工单（Chat API 单行 curl）",
+      industryCopyEcommerceBatchLabel: "电商 SKU 批量文案（Batch API 单行 curl）",
+      industryCopySupportLabel: "AI 客服问答（Chat API 单行 curl）",
+      industryCopyHospitalAction: "复制医院病历摘要 curl",
+      industryCopyEcommerceBatchAction: "复制电商 Batch curl",
+      industryLiveKeyNote: "当前会话中的 API Key 已填入以下 curl。",
+      industryBatchReconcileNote:
+        "Batch：每个成功 item 有独立 request_id。完成后 GET /v1/batches/{id}/items，用各 item 的 request_id 在 Usage / Credits 对账。",
+      industryTokfaiProvidesTitle: "Tokfai 提供什么 vs 你的系统负责什么",
+      industryTokfaiProvides1: "Tokfai 不保存你的业务数据库 — 由你的系统发起 API 请求。",
+      industryTokfaiProvides2: "Tokfai 不联系你的客户 — 由你的应用或工单系统发送并审核消息。",
+      industryTokfaiProvides3: "Tokfai 不做最终审核 — 由你的员工审核 AI 输出后再发布或回复。",
+      industryTokfaiProvides4: "Tokfai 提供 API 接入、模型调用、用量记录与 credits 账本。",
+      industryOnboardingTitle: "从行业示例到正式接入（5 步）",
+      industryOnboardingStep1: "在 API Keys 创建测试 Key。",
+      industryOnboardingStep2: "用 Chat / Image / Batch 章节或上方复制面板的 one-line curl 验证。",
+      industryOnboardingStep3:
+        "将 Base URL https://api.tokfai.com/v1、API Key、model 写入后端环境变量。",
+      industryOnboardingStep4: "在应用中记录每次 API 响应的 request_id。",
+      industryOnboardingStep5: "在 Usage / Credits 按 request_id 对账后再逐步放量。",
+      industryOverview: {
+        hospital: {
+          scenario: "医院客服 / 病历整理",
+          system: "医院客服或 EMR 集成",
+          api: "Chat API",
+          model: "auto-fast / auto-pro",
+          fields: "content, request_id, credits_charged",
+          reconcile: "Usage → Credits",
+        },
+        automotive: {
+          scenario: "车企售后",
+          system: "经销商 CRM / 售后系统",
+          api: "Chat API / Batch API",
+          model: "auto-pro",
+          fields: "content, request_id, tokfai.resolved_model",
+          reconcile: "Usage → Credits",
+        },
+        ecommerce: {
+          scenario: "SKU 批量文案",
+          system: "电商 PIM / 上架工具",
+          api: "Batch API / Image API",
+          model: "auto-cheap / gpt-image-2",
+          fields: "request_id, credits_charged, data[0].url（图像）",
+          reconcile: "Usage → Credits",
+        },
+        support: {
+          scenario: "工单回复草稿",
+          system: "AI 客服 / 工单平台",
+          api: "Chat API",
+          model: "auto-fast",
+          fields: "choices[0].message.content, request_id",
+          reconcile: "Usage → Credits",
+        },
+      },
       industryIntegrationLabel: "API 调用方式",
-      industryScenariosLabel: "API 接入示例场景",
       industryVerifyLabel: "验证成功",
       industryFailureLabel: "失败时",
       industry: {
         hospital: {
-          title: "医院 / 诊所 — API 接入示例",
+          title: "医院 / 诊所",
           purpose:
-            "你的医院系统调用 Tokfai API——Tokfai 不运营诊所或患者队列。",
-          scenario1:
-            "诊所 App 或门户的 AI 客服回复（由你的工作人员审核外发内容）。",
-          scenario2:
-            "通过 POST /v1/chat/completions 对脱敏病历做病例摘要与结构化。",
-          scenario3:
-            "通过 POST /v1/images/generations 辅助图像工作流提示词（临床用途由你的团队把控）。",
-          notManaged:
-            "Tokfai 仅提供 API 接入——不运营医院业务、排班或诊疗。",
-          boundary:
-            "医疗边界：AI 仅辅助整理与提示，不诊断、不开方、不替代医生判断。",
-          integration:
-            "Chat API 用于摘要与患者侧对话后端；Image API 用于辅助提示词；大批量可用 Batch。",
-          verify:
-            "HTTP 200，JSON 含 request_id；Usage 显示 tokens 或图像扣费（仅成功调用）。",
-          failure:
-            "upstream_timeout 或 insufficient_credits — 在 Usage 查 request_id；勿将模型输出当作诊断。",
+            "你的医院或诊所软件调用 Tokfai — Tokfai 不运营诊所、排班或患者队列。",
+          scenario1: "AI 客服回复草稿（由工作人员审核后发送）。",
+          scenario2: "对脱敏患者自述做病历摘要与结构化整理。",
+          scenario3: "检查报告摘要，供医生审阅。",
+          scenario4: "医生助理提示词与文档辅助。",
+          scenario5: "图像辅助描述 prompt（科普或工作流素材，非诊断用途）。",
+          apis: "Chat API：问答、摘要、结构化整理。Image API：科普或辅助素材图（非诊断）。Batch API：批量整理问诊或客服工单。",
+          models: "auto-fast：客服与摘要；auto-pro：复杂病历整理。",
+          typicalInput: "脱敏患者自述、客服问题或辅助 prompt 文本。",
+          typicalOutput: "结构化摘要、回复草稿或 prompt 文本（choices[0].message.content）。",
+          reconcile: "复制 request_id → Usage 搜索 → Credits 核对 credits_charged。",
+          notManaged: "Tokfai 不保存病历、不联系患者、不审核临床外发内容。",
+          boundary: "仅辅助信息整理 — 不诊断、不给治疗方案、不替代医生判断。",
         },
         automotive: {
-          title: "车企 — API 接入示例",
+          title: "车企 / 汽修 / 售后",
           purpose:
-            "你的车机或经销商软件调用 Tokfai——Tokfai 不运营经销商或售后坐席。",
-          scenario1: "车机 App 或经销商门户的车主手册问答。",
-          scenario2: "CRM 或服务 webhook 的售后工单分类。",
-          scenario3: "理赔后端对车损照片生成描述（Chat 或 Image API）。",
-          notManaged:
-            "Tokfai 不直接回答车主或坐席——你的后端携带 API Key 发起请求。",
-          integration:
-            "POST /v1/chat/completions 做手册问答与工单标签；车损场景可用 Image API 或带图像上下文的 Chat。",
-          verify:
-            "HTTP 200 有回答与 request_id；Usage 记录每次 API 调用。",
-          failure:
-            "model_not_available 或 gateway_overloaded — 重试；在 Usage 搜 request_id。",
+            "你的经销商、主机厂或维修软件调用 Tokfai — Tokfai 不运营售后坐席或质保队列。",
+          scenario1: "售后 FAQ（车主手册知识库）。",
+          scenario2: "车机 App 或经销商门户车主手册问答。",
+          scenario3: "工单分类与路由标签。",
+          scenario4: "维修记录摘要，供技师交接。",
+          scenario5: "车损图片描述 prompt（辅助文案，非最终定损）。",
+          apis: "Chat API：知识库问答、工单摘要。Image API：售后说明图或营销图（非定损）。Batch API：批量工单处理。",
+          models: "auto-fast：客服问答；auto-pro：复杂工单与技术说明。",
+          typicalInput: "工单文本、FAQ 问题或车损描述请求。",
+          typicalOutput: "回答草稿、标签或摘要文本 + request_id。",
+          reconcile: "每次 request_id → Usage 行 → Credits 扣费 reference。",
+          notManaged: "Tokfai 不与车主沟通、不确认维修结论 — 由你的坐席最终确认。",
+          boundary: "辅助售后与工程信息整理 — 最终判断由企业人员确认。",
         },
         ecommerce: {
-          title: "电商 — API 接入示例",
-          purpose:
-            "你的商品与客服系统调用 Tokfai——Tokfai 不运营店铺或客服团队。",
-          scenario1: "PIM 或 CMS 的商品描述与营销文案生成。",
-          scenario2: "通过 Batch API 批量生成多 SKU 标题与卖点。",
-          scenario3: "帮助台集成中的店铺客服问答。",
-          notManaged:
-            "Tokfai 不管理商品或回复买家——你的系统提交 API 任务。",
-          integration:
-            "Batch API 做批量文案；Chat API 做实时买家问答；模型 auto-cheap 或 auto-fast。",
-          verify:
-            "Batch 完成或 Chat 返回 HTTP 200；每次成功调用在 Usage 有 request_id。",
-          failure:
-            "batch_cancelled 不扣费；大批量前检查 insufficient_credits。",
+          title: "电商工作室",
+          purpose: "你的商品、上架或客服工具调用 Tokfai — Tokfai 不运营店铺或回复买家。",
+          scenario1: "商品标题与卖点。",
+          scenario2: "商品详情与营销文案。",
+          scenario3: "批量客服回复草稿。",
+          scenario4: "商品图生成 prompt。",
+          scenario5: "Batch API 批量 SKU 标题 / 卖点 / 短详情。",
+          apis: "Chat API：单条商品文案。Image API：商品图与海报。Batch API：批量 SKU 文案。",
+          models: "auto-fast：日常文案；auto-cheap：批量 SKU；auto-pro：高质量品牌文案；gpt-image-2：商品图。",
+          typicalInput: "SKU 属性、商品名或买家问题。",
+          typicalOutput: "标题、卖点、短详情文本，或图像 URL（data[0].url）。",
+          reconcile: "每个 batch item 的 request_id → Usage → Credits；图像调用看 request_id 与 credits_charged。",
+          notManaged: "Tokfai 不上架商品、不保证平台合规 — 由你审核后发布。",
+          boundary: "你负责商品真实性、平台规则与最终发布内容。",
         },
         support: {
-          title: "AI 客服 — API 接入示例",
-          purpose:
-            "你的工单平台按事件调用 Tokfai——Tokfai 不坐在你的客服队列里。",
-          scenario1: "工单分类、路由标签与优先级建议。",
-          scenario2: "基于知识库片段的 FAQ 回答。",
-          scenario3: "对话摘要，供坐席交接与质检。",
-          notManaged:
-            "Tokfai 不回复工单——你的 webhook 或 worker 用 API Key 调用 API。",
-          integration:
-            "POST /v1/chat/completions，messages 含工单标题与正文；模型 auto-fast；可选 stream。",
-          verify:
-            "每条测试工单返回 request_id；成功时 Usage 按工单计扣费。",
-          failure:
-            "too_many_requests — 密钥限速；webhook 未带 Authorization 会 missing_token。",
+          title: "AI 客服 / 工单系统",
+          purpose: "你的工单平台按事件调用 Tokfai — Tokfai 不坐在你的客服队列里。",
+          scenario1: "基于知识库片段的 FAQ 问答。",
+          scenario2: "工单分类与路由标签。",
+          scenario3: "工单与对话摘要，供坐席交接。",
+          scenario4: "回复草稿，供坐席审核后发送。",
+          scenario5: "多轮客服辅助（在你现有对话 UI 中）。",
+          apis: "Chat API：实时回复草稿。Batch API：批量工单分类或摘要。",
+          models: "auto-fast 默认；auto-pro：复杂投诉或高价值客户。",
+          typicalInput: "工单标题/正文、FAQ 上下文或对话记录。",
+          typicalOutput: "回复草稿、标签或摘要（choices[0].message.content + request_id）。",
+          reconcile: "request_id → Usage 搜索 → Credits reference / amount / balance_after。",
+          notManaged: "Tokfai 不向客户发送消息，不承诺退款或政策条款。",
+          boundary: "Tokfai 输出建议草稿 — 你的系统负责审核、发送与业务承诺。",
         },
       },
       quickStartTitle: "快速开始",
