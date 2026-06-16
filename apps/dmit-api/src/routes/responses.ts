@@ -18,21 +18,26 @@ import {
 import { respondExecuteChatCompletionFailure } from "../lib/handleExecuteChatCompletionResult.js";
 import { parseIdempotencyKey } from "../lib/idempotency.js";
 import { readJsonBodyWithLimit } from "../lib/readJsonBodyWithLimit.js";
+import {
+  chatCompletionResponseToResponses,
+  isResponsesFormatResponse,
+  ResponsesRequestSchema,
+  responsesBodyToChatBody,
+} from "../lib/responsesTransform.js";
 import { logGatewayRejection } from "./chatGatewayLogs.js";
 
 /**
- * /v1/chat/completions — OpenAI-compatible chat completions, customer-facing.
+ * /v1/responses — OpenAI Responses API compatibility for client software.
  *
- * Auth is handled by requireApiKeyOrSupabaseJwt (sk-tokfai_ or Supabase JWT).
- * The route proxies non-streaming
- * OpenAI-compatible requests to GRSAI and records usage after completion.
+ * Converts Responses `input` to chat `messages` and reuses executeChatCompletion
+ * for auth, billing, routing, and upstream handling.
  */
-export const chatRoutes = new Hono();
+export const responsesRoutes = new Hono();
 
-chatRoutes.use("/v1/chat/completions", requireApiKeyOrSupabaseJwt);
-chatRoutes.use("/v1/chat/completions", chatGatewayMiddleware);
+responsesRoutes.use("/v1/responses", requireApiKeyOrSupabaseJwt);
+responsesRoutes.use("/v1/responses", chatGatewayMiddleware);
 
-chatRoutes.post("/v1/chat/completions", async (c) => {
+responsesRoutes.post("/v1/responses", async (c) => {
   const caller = getChatCaller(c);
   const requestId = c.get("requestId" as never) as string;
   const limitKey = gatewayLimitKey(caller.apiKeyId, caller.userId);
@@ -54,10 +59,19 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     throw err;
   }
 
-  const parsed = ChatCompletionRequestSchema.safeParse(body);
+  const parsed = ResponsesRequestSchema.safeParse(body);
   if (!parsed.success) {
     throw ApiError.badRequest(
-      "Invalid chat completion request.",
+      "Invalid responses request.",
+      "invalid_request_error"
+    );
+  }
+
+  const chatBody = responsesBodyToChatBody(parsed.data);
+  const chatParsed = ChatCompletionRequestSchema.safeParse(chatBody);
+  if (!chatParsed.success) {
+    throw ApiError.badRequest(
+      "Invalid responses request.",
       "invalid_request_error"
     );
   }
@@ -75,14 +89,19 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
   const result = await executeChatCompletion({
     caller,
     requestId,
-    body: parsed.data,
+    body: chatParsed.data,
     limitKey,
     idempotencyKey,
+    route: "/v1/responses",
   });
 
   if (!result.ok) {
     return respondExecuteChatCompletionFailure(c, result);
   }
 
-  return c.json(result.response);
+  const response = isResponsesFormatResponse(result.response)
+    ? result.response
+    : chatCompletionResponseToResponses(result.response, result.requestId);
+
+  return c.json(response);
 });
