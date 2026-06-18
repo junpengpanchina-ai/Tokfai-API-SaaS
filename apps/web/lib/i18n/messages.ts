@@ -362,6 +362,7 @@ export const messages = {
           "For a real one-line curl with your key, copy from API Keys or Docs Quick Start. Example below uses a placeholder.",
         footerActions: "Next steps",
         footerApiKeys: "Create API key",
+        footerStartIntegration: "Start integration",
         footerQuickStart: "Quick Start curl",
         footerUsage: "Check Usage",
         footerDocs: "View integration docs",
@@ -611,6 +612,10 @@ export const messages = {
         viewApiKeyDocs: "API Key docs",
         viewApiDocs: "View API docs",
         quickStartDocs: "Quick start guide",
+        startIntegration: "Start integration",
+        integrationWorkbench: "Integration workbench",
+        sessionKeyDocsNote:
+          "After you save your key, this browser session still fills Docs examples. Refreshing clears it — copy your key or one-line curl again if you see a placeholder.",
         tryChatPlayground: "Try Chat Playground",
         tryImagePlayground: "Try Image Playground",
         viewChatApiDocs: "View Chat API docs",
@@ -1616,6 +1621,68 @@ export const messages = {
       navProductionFlow: "Production integration flow",
       navClientConnector: "Verify curl first, then connect",
       navQuickStart: "Quick start",
+      navIntegrationWorkbench: "Integration workbench",
+      workbenchTitle: "Integration workbench",
+      workbenchDesc:
+        "Verify your API Key, connect software, reconcile Usage and Credits, and troubleshoot — all from one place. No install, no clone, no project checkout.",
+      workbenchChapterPurpose:
+        "Ship customer integration while you copy one-line curls from Dashboard and reconcile every request_id.",
+      workbenchChapterCopy:
+        "Copy one-line Chat and Models curl, then connect Cursor, Cherry Studio, or OpenAI SDK after curl succeeds.",
+      workbenchChapterVerify:
+        "HTTP 200 with choices[0].message.content or output_text, request_id, credits_charged, tokfai.requested_model, tokfai.resolved_model.",
+      workbenchChapterFailure:
+        "Read error.code and HTTP status. Match request_id in Usage and Credits when calls succeed.",
+      workbench: {
+        verifyKeyTitle: "A. Verify API Key",
+        verifyKeyNote:
+          "Paste in any terminal from any directory — no cd, no clone, no install required.",
+        verifyChatCurlLabel: "One-line Chat curl",
+        verifyModelsCurlLabel: "One-line Models curl",
+        sessionKeyNote:
+          "Examples use your API Key from this browser session. Refresh clears it — copy curl again from API Keys if you see a placeholder.",
+        connectTitle: "B. Connect software",
+        connectCurlFirst:
+          "Verify with one-line curl first, then connect your IDE or SDK — Tokfai is an API gateway; you run your apps.",
+        reconcileTitle: "C. Reconcile usage",
+        reconcileStep1: "Copy request_id from the API response JSON.",
+        reconcileStep2: "Dashboard → Usage — search request_id.",
+        reconcileStep3:
+          "Dashboard → Credits — search reference_id or request_id for the debit line.",
+        troubleshootTitle: "D. Troubleshoot",
+        troubleshoot: {
+          missing_token:
+            "Add Authorization: Bearer sk-tokfai_… — copy the full key from API Keys.",
+          invalid_token:
+            "Key wrong, revoked, or copied incompletely — create a new key and copy one-line curl again.",
+          insufficient_credits:
+            "Balance too low — recharge Credits, then retry the same curl.",
+          route_not_found:
+            "Path not available yet or URL typo — confirm /v1/chat/completions or /v1/models; see Error codes chapter.",
+          stream_not_supported:
+            "Set stream: false in JSON for curl verification, or use a client that supports streaming.",
+          upstream_timeout:
+            "Upstream or gateway slow — retry after a minute or switch model to auto-fast.",
+        },
+        industryTitle: "E. Industry templates",
+        industryGatewayNote:
+          "Tokfai is an API gateway — you operate your hospital, dealer, store, or helpdesk systems. Copy these one-line examples into your stack.",
+        industryCurlLabel: "One-line example curl",
+        serviceUnavailableTitle: "Service unavailable?",
+        serviceUnavailableIntro:
+          "If curl fails, check HTTP status and error.code before changing your integration.",
+        serviceUnavailableStatus: "Read HTTP status and error.code from the JSON body.",
+        serviceUnavailableRoute:
+          "404 route_not_found — endpoint may not be deployed yet or the path is wrong.",
+        serviceUnavailableInvalid:
+          "401 invalid_token — wrong key, revoked key, or incomplete copy.",
+        serviceUnavailableCredits:
+          "402 insufficient_credits — recharge and retry the same request.",
+        serviceUnavailableUpstream:
+          "503/504 — gateway or upstream temporarily unavailable; retry later or try auto-fast.",
+        serviceUnavailableSafe:
+          "API service may be temporarily unavailable. Your key and credits are not changed by failed requests.",
+      },
       navApiKey: "API Key",
       navChatApi: "Chat API",
       navImageApi: "Image API",
@@ -3905,6 +3972,7 @@ export const messages = {
           "带真实密钥的单行 curl 请从 API Keys 或 Docs Quick Start 复制。下方示例使用占位符。",
         footerActions: "下一步",
         footerApiKeys: "创建 API Key",
+        footerStartIntegration: "开始接入",
         footerQuickStart: "Quick Start curl",
         footerUsage: "查看 Usage",
         footerDocs: "查看接入文档",
@@ -4134,6 +4202,10 @@ export const messages = {
         viewApiKeyDocs: "API Key 文档",
         viewApiDocs: "查看 API 文档",
         quickStartDocs: "快速上手指南",
+        startIntegration: "开始接入",
+        integrationWorkbench: "接入工作台",
+        sessionKeyDocsNote:
+          "点击「我已保存密钥」后，本浏览器会话仍会自动填充 Docs 示例。刷新页面会清空 — 若出现占位符请重新复制密钥或单行 curl。",
         tryChatPlayground: "打开 Chat Playground",
         tryImagePlayground: "体验 Image Playground",
         viewChatApiDocs: "查看 Chat API 文档",
@@ -5089,6 +5161,57 @@ export const messages = {
       navProductionFlow: "生产对接流程",
       navClientConnector: "先 curl 验证，再接入客户端",
       navQuickStart: "快速开始",
+      navIntegrationWorkbench: "接入工作台",
+      workbenchTitle: "接入工作台",
+      workbenchDesc:
+        "验证 API Key、接入软件、核对 Usage/Credits、排错 — 一页完成。无需安装、无需 clone、无需进入工程目录。",
+      workbenchChapterPurpose:
+        "从 Dashboard 复制单行 curl，跑通后按 request_id 对账，推进客户接入。",
+      workbenchChapterCopy:
+        "先复制单行 Chat / Models curl，curl 成功后再接 Cursor、Cherry Studio 或 OpenAI SDK。",
+      workbenchChapterVerify:
+        "HTTP 200 且含 choices[0].message.content 或 output_text、request_id、credits_charged、tokfai.requested_model、tokfai.resolved_model。",
+      workbenchChapterFailure:
+        "查看 error.code 与 HTTP 状态；成功请求用 request_id 在 Usage / Credits 核对。",
+      workbench: {
+        verifyKeyTitle: "A. 验证 API Key",
+        verifyKeyNote: "任意目录终端粘贴即可 — 无需 cd、无需 clone、无需安装项目。",
+        verifyChatCurlLabel: "单行 Chat curl",
+        verifyModelsCurlLabel: "单行 Models curl",
+        sessionKeyNote:
+          "示例使用本浏览器会话中的 API Key。刷新会清空 — 若看到占位符请回到 API Keys 重新复制 curl。",
+        connectTitle: "B. 接入软件",
+        connectCurlFirst:
+          "先用单行 curl 验证，再接入 IDE 或 SDK — Tokfai 是 API 网关，业务由您自行运营。",
+        reconcileTitle: "C. 核对用量",
+        reconcileStep1: "从响应 JSON 复制 request_id。",
+        reconcileStep2: "Dashboard → Usage — 搜索 request_id。",
+        reconcileStep3: "Dashboard → Credits — 搜索 reference_id 或 request_id。",
+        troubleshootTitle: "D. 排错",
+        troubleshoot: {
+          missing_token: "补上 Authorization: Bearer sk-tokfai_… — 从 API Keys 复制完整密钥。",
+          invalid_token: "密钥错误、已吊销或复制不完整 — 新建密钥并重新复制单行 curl。",
+          insufficient_credits: "余额不足 — 充值后重试同一条 curl。",
+          route_not_found: "路径未开放或 URL 错误 — 确认 /v1/chat/completions 或 /v1/models；见错误码章节。",
+          stream_not_supported: "curl 验证请设 stream: false，或使用支持流式的客户端。",
+          upstream_timeout: "上游或网关超时 — 稍后重试或改用 auto-fast。",
+        },
+        industryTitle: "E. 行业模板",
+        industryGatewayNote:
+          "Tokfai 是 API 网关 — 医院、车企、电商、客服系统由您运营。将下列单行示例复制到您的系统中。",
+        industryCurlLabel: "单行示例 curl",
+        serviceUnavailableTitle: "服务不可用？",
+        serviceUnavailableIntro: "curl 失败时先看 HTTP 状态与 error.code，再调整接入方式。",
+        serviceUnavailableStatus: "读取 HTTP 状态与 JSON 中的 error.code。",
+        serviceUnavailableRoute:
+          "404 route_not_found — 接口可能尚未部署或路径错误。",
+        serviceUnavailableInvalid: "401 invalid_token — 密钥错误、已吊销或复制不完整。",
+        serviceUnavailableCredits: "402 insufficient_credits — 充值后重试同一请求。",
+        serviceUnavailableUpstream:
+          "503/504 — 网关或上游暂时不可用；稍后重试或换 auto-fast。",
+        serviceUnavailableSafe:
+          "API 服务可能暂时不可用。失败的请求不会改变您的密钥与积分余额。",
+      },
       navApiKey: "API Key",
       navChatApi: "Chat API",
       navImageApi: "Image API",

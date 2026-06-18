@@ -122,6 +122,7 @@ export type CustomerDocBlock =
   | { type: "cherry-copy-panel"; id: string }
   | { type: "client-software-copy-panel"; id: string }
   | { type: "industry-copy-panel"; id: string }
+  | { type: "integration-workbench-panel"; id: string }
   | { type: "industry-overview-table" }
   | { type: "error-table" }
   | { type: "error-examples-panel"; id: string }
@@ -565,6 +566,51 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
           },
           { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
           { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "integration-workbench",
+    navKey: "integration.navIntegrationWorkbench",
+    titleKey: "integration.workbenchTitle",
+    descriptionKey: "integration.workbenchDesc",
+    highlight: true,
+    chapterGuide: chapter(
+      "integration.workbenchChapterPurpose",
+      "integration.workbenchChapterCopy",
+      "integration.workbenchChapterVerify",
+      "integration.workbenchChapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "keys",
+        labelKey: "integration.ctaCreateKey",
+        href: "/dashboard/api-keys",
+      },
+      copySnippetKey: "chat-curl",
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "integration-workbench-panel", id: "workbench" },
+      {
+        type: "dashboard-links",
+        links: [
+          { id: "keys", labelKey: "integration.ctaCreateKey", href: "/dashboard/api-keys" },
+          {
+            id: "quick-start",
+            labelKey: "integration.navQuickStart",
+            href: "/dashboard/docs",
+            hash: "quick-start",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+          {
+            id: "error-codes",
+            labelKey: "integration.navErrors",
+            href: "/dashboard/docs",
+            hash: "error-codes",
+          },
         ],
       },
     ],

@@ -40,6 +40,8 @@ const RULES = [
   { label: "SUPABASE_ACCESS_TOKEN", pattern: /SUPABASE_ACCESS_TOKEN/ },
   { label: "internal smoke", pattern: /internal\s+smoke/i },
   { label: "operator smoke", pattern: /operator\s+smoke/i },
+  { label: "operator (word)", pattern: /\boperator\b/i },
+  { label: "scripts/p prefix", pattern: /scripts\/p\d/i },
   { label: "production smoke", pattern: /production\s+smoke/i },
   { label: "acceptance artifact", pattern: /acceptance\s+artifact/i },
   { label: "checklist artifact", pattern: /checklist\s+artifact/i },
@@ -81,6 +83,9 @@ const ALLOW_SUBSTRINGS = [
   "No repository",
   "无需 clone 仓库",
   "无需 cd 到任何文件夹",
+  "业务由您自行运营",
+  "you run your apps",
+  "you operate your",
 ];
 
 function shouldIgnorePath(path) {
@@ -138,6 +143,9 @@ for (const dir of SCAN_DIRS) {
         if (rule.label === "DMIT" && /DmitApi/i.test(line)) continue;
 
         if (rule.label === "git push" && /push\s+back/i.test(line)) continue;
+        if (rule.label === "operator (word)" && /operate your/i.test(line)) continue;
+        if (rule.label === "operator (word)" && /自行运营/i.test(line)) continue;
+        if (rule.label === "operator (word)" && /代运营/i.test(line)) continue;
 
         hits.push({
           file: rel,

@@ -362,6 +362,12 @@ export function ModelsClient({
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           <Button asChild size="sm">
+            <Link href="/dashboard/docs#integration-workbench">
+              <Terminal className="mr-1.5 h-4 w-4" />
+              {t("dashboard.models.footerStartIntegration")}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
             <Link href="/dashboard/api-keys">
               <KeyRound className="mr-1.5 h-4 w-4" />
               {t("dashboard.models.footerApiKeys")}

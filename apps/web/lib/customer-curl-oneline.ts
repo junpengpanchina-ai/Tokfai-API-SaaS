@@ -44,6 +44,20 @@ export function modelsCurlPowerShellOneLine(apiKey = TOKFAI_API_KEY_PLACEHOLDER)
   return `curl.exe -sS "${API_ROOT}/models" -H "Authorization: Bearer ${apiKey}"`;
 }
 
+function responsesBody(model = CHAT_SMOKE_MODEL) {
+  return { model, input: CHAT_SMOKE_PROMPT };
+}
+
+export function responsesCurlPowerShellOneLine(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
+  const body = powershellJsonBody(responsesBody());
+  return `curl.exe -sS "${API_ROOT}/responses" -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d "${body}"`;
+}
+
+export function responsesCurlOneLine(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
+  const body = shellSingleQuotedJson(responsesBody());
+  return `curl -sS ${API_ROOT}/responses -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d '${body}'`;
+}
+
 export function chatCurlOneLine(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
   const body = shellSingleQuotedJson(chatCompletionBody());
   return `curl -sS ${API_ROOT}/chat/completions -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d '${body}'`;

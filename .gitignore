@@ -24,6 +24,7 @@ batch-test-results/
 p776-smoke-results/
 p778-live-smoke-results/
 p786-offline-results/
+p789-integration-workbench-results/
 p787-live-smoke-results/
 p788-recovery-gate-results/
 model-health-results/

@@ -17,6 +17,7 @@ import { ClientSoftwareAcceptanceCopyPanel } from "@/components/client-software-
 import { CherryChapterCopyPanel } from "@/components/cherry-chapter-copy";
 import { CursorChapterCopyPanel } from "@/components/cursor-chapter-copy";
 import { IndustryChapterCopyPanel, IndustryOverviewTable } from "@/components/industry-chapter-copy";
+import { IntegrationWorkbenchPanel } from "@/components/integration-workbench-panel";
 import { OpenAiSdkChapterCopyPanel } from "@/components/openai-sdk-chapter-copy";
 import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
 import { Button } from "@/components/ui/button";
@@ -644,6 +645,15 @@ function DocBlock({
             idPrefix={block.id}
           />
         </div>
+      );
+    case "integration-workbench-panel":
+      return (
+        <IntegrationWorkbenchPanel
+          apiKey={quickStartApiKey}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          idPrefix={block.id}
+        />
       );
     default:
       return null;
