@@ -15,6 +15,7 @@ import {
   Wrench,
 } from "lucide-react";
 
+import { SafeRetryCopyPanel } from "@/components/safe-retry-copy-panel";
 import { CustomerApiPathPanel } from "@/components/customer-api-path-panel";
 import { CapacityReadinessPanel } from "@/components/capacity-model-panel";
 import { CopyableSnippetField } from "@/components/copyable-snippet-field";
@@ -175,6 +176,22 @@ export function IntegrationWorkbenchPanel({
         <Button asChild size="sm" variant="outline">
           <Link href="/dashboard/docs#error-codes">{t("integration.navErrors")}</Link>
         </Button>
+      </WorkbenchCard>
+
+      <WorkbenchCard icon={Terminal} title={t("integration.safeRetry.workbenchTitle")}>
+        <SafeRetryCopyPanel
+          apiKey={apiKey}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          idPrefix={`${idPrefix}-safe-retry`}
+          showTitle={false}
+          snippetIds={[
+            "bash-safe-retry",
+            "powershell-safe-retry",
+            "node-safe-retry",
+            "python-safe-retry",
+          ]}
+        />
       </WorkbenchCard>
 
       <WorkbenchCard icon={Terminal} title={t("integration.apiPath.chooseTitle")}>

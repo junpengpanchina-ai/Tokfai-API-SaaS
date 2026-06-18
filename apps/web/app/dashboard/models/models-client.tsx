@@ -167,6 +167,8 @@ export function ModelsClient({
             <li>{t("dashboard.models.highTrafficImageConcurrency")}</li>
             <li>{t("dashboard.models.highTrafficBatchItems")}</li>
             <li>{t("dashboard.models.highTrafficReconcile")}</li>
+            <li>{t("dashboard.models.highTrafficNoInfiniteRetry")}</li>
+            <li>{t("dashboard.models.highTrafficUseBatch")}</li>
           </ul>
           <div className="mt-2 flex flex-wrap gap-2">
             <Button asChild size="sm" variant="outline">

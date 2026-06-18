@@ -14,6 +14,7 @@ import { ErrorCodesChapterPanel } from "@/components/error-codes-chapter-panel";
 import { ChatApiChapterCopyPanel } from "@/components/chat-api-chapter-copy";
 import { ImageApiChapterCopyPanel } from "@/components/image-api-chapter-copy";
 import { ClientSoftwareAcceptanceCopyPanel } from "@/components/client-software-acceptance-copy";
+import { SafeRetryCopyPanel } from "@/components/safe-retry-copy-panel";
 import { CustomerApiPathPanel } from "@/components/customer-api-path-panel";
 import { CapacityModelPanel } from "@/components/capacity-model-panel";
 import { CherryChapterCopyPanel } from "@/components/cherry-chapter-copy";
@@ -648,6 +649,16 @@ function DocBlock({
             idPrefix={block.id}
           />
         </div>
+      );
+    case "safe-retry-copy-panel":
+      return (
+        <SafeRetryCopyPanel
+          apiKey={quickStartApiKey}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          idPrefix={block.id}
+          snippetIds={block.snippetIds}
+        />
       );
     case "customer-api-path-panel":
       return (

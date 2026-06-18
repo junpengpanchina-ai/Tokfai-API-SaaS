@@ -57,6 +57,9 @@ import {
 } from "@/lib/customer-curl-oneline";
 import { BATCH_POLL_PLACEHOLDER_ID } from "@/lib/customer-batch-api-chapter";
 import { buildTemplateCurlOneLine } from "@/lib/customer-industry-templates";
+import {
+  buildSafeClientSnippet,
+} from "@/lib/customer-safe-client-snippets";
 import { isFullTokfaiApiKey, TOKFAI_API_BASE_URL, TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
 import {
   userMessageForDashboardError,
@@ -534,6 +537,11 @@ function OneTimeSecretCard({
               </Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#retry-and-backoff">
+                {t("dashboard.apiKeys.retryBackoffGuide")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/docs#rate-limits-large-volume">
                 {t("dashboard.apiKeys.retryRateLimitGuide")}
               </Link>
@@ -625,6 +633,45 @@ function OneTimeSecretCard({
               label={t("dashboard.apiKeys.copyCustomerServiceExample")}
               copiedLabel={t("dashboard.apiKeys.copied")}
             />
+          </div>
+        </div>
+        <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
+            {t("dashboard.apiKeys.safeRetryTitle")}
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {t("dashboard.apiKeys.safeRetryNote")}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <CopyConfigAction
+              id="one-time-secret-copy-bash-safe-retry"
+              value={buildSafeClientSnippet("bash-safe-retry", secret)}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copySafeRetryChatCurl")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <CopyConfigAction
+              id="one-time-secret-copy-node-safe-retry"
+              value={buildSafeClientSnippet("node-safe-retry", secret)}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copySafeNodeClient")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <CopyConfigAction
+              id="one-time-secret-copy-python-safe-retry"
+              value={buildSafeClientSnippet("python-safe-retry", secret)}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copySafePythonClient")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#retry-and-backoff">
+                {t("dashboard.apiKeys.retryBackoffGuide")}
+              </Link>
+            </Button>
           </div>
         </div>
         <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">

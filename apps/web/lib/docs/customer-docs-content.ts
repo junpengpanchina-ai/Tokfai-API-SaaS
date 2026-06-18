@@ -14,6 +14,7 @@ import {
   modelsCurlMultiline,
   modelsCurlOneLine,
 } from "@/lib/customer-curl-oneline";
+import type { SafeClientSnippetId } from "@/lib/customer-safe-client-snippets";
 import {
   buildImageApiReferenceCurlMultiline,
   buildImageApiReferenceCurlOneLine,
@@ -122,6 +123,7 @@ export type CustomerDocBlock =
   | { type: "cherry-copy-panel"; id: string }
   | { type: "client-software-copy-panel"; id: string }
   | { type: "industry-copy-panel"; id: string }
+  | { type: "safe-retry-copy-panel"; id: string; snippetIds?: SafeClientSnippetId[] }
   | { type: "customer-api-path-panel"; id: string }
   | { type: "integration-workbench-panel"; id: string }
   | { type: "industry-template-pack"; id: string }
@@ -1826,6 +1828,32 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       verify: VERIFY_USAGE_CREDITS,
     },
     blocks: [
+      { type: "paragraph", textKey: "integration.safeRetry.whyLimitsTitle" },
+      { type: "paragraph", textKey: "integration.safeRetry.whyLimitsBody" },
+      { type: "paragraph", textKey: "integration.safeRetry.retryableTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.safeRetry.retryable1",
+          "integration.safeRetry.retryable2",
+          "integration.safeRetry.retryable3",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.safeRetry.nonRetryableTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.safeRetry.nonRetryable1",
+          "integration.safeRetry.nonRetryable2",
+          "integration.safeRetry.nonRetryable3",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.safeRetry.chatTitle" },
+      { type: "paragraph", textKey: "integration.safeRetry.chatBody" },
+      { type: "paragraph", textKey: "integration.safeRetry.imageTitle" },
+      { type: "paragraph", textKey: "integration.safeRetry.imageBody" },
+      { type: "paragraph", textKey: "integration.safeRetry.batchPollTitle" },
+      { type: "paragraph", textKey: "integration.safeRetry.batchPollBody" },
       { type: "paragraph", textKey: "integration.retryBackoff.when429Title" },
       {
         type: "bullets",
@@ -1864,6 +1892,26 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
           "integration.retryBackoff.backoffStep2",
           "integration.retryBackoff.backoffStep3",
           "integration.retryBackoff.backoffStep4",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.safeRetry.reconcileTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.safeRetry.reconcile1",
+          "integration.safeRetry.reconcile2",
+          "integration.safeRetry.reconcile3",
+        ],
+      },
+      {
+        type: "safe-retry-copy-panel",
+        id: "retry-safe-clients",
+        snippetIds: [
+          "bash-safe-retry",
+          "powershell-safe-retry",
+          "node-safe-retry",
+          "python-safe-retry",
+          "node-safe-batch-poll",
         ],
       },
       {
