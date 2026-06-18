@@ -130,6 +130,7 @@ export type CustomerDocBlock =
       id: string;
       snippetIds?: TrafficGovernorSnippetId[];
     }
+  | { type: "capacity-planner-panel"; id: string }
   | { type: "customer-api-path-panel"; id: string }
   | { type: "integration-workbench-panel"; id: string }
   | { type: "industry-template-pack"; id: string }
@@ -2175,6 +2176,81 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
             href: "/dashboard/docs",
             hash: "500-online-readiness",
           },
+        ],
+      },
+    ],
+  },
+  {
+    id: "capacity-planner",
+    navKey: "integration.navCapacityPlanner",
+    titleKey: "integration.capacityPlanner.title",
+    descriptionKey: "integration.capacityPlanner.desc",
+    chapterGuide: chapter(
+      "integration.capacityPlanner.chapterPurpose",
+      "integration.capacityPlanner.chapterCopy",
+      "integration.capacityPlanner.chapterVerify",
+      "integration.capacityPlanner.chapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "keys",
+        labelKey: "integration.ctaCreateKey",
+        href: "/dashboard/api-keys",
+      },
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "paragraph", textKey: "integration.capacityPlanner.docsChooseWorkload" },
+      { type: "paragraph", textKey: "integration.capacityPlanner.docsEstimateUsers" },
+      { type: "paragraph", textKey: "integration.capacityPlanner.docsConcurrency" },
+      { type: "paragraph", textKey: "integration.capacityPlanner.docsModel" },
+      { type: "paragraph", textKey: "integration.capacityPlanner.docsSplitTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.capacityPlanner.docsSplitChat",
+          "integration.capacityPlanner.docsSplitImage",
+          "integration.capacityPlanner.docsSplitBatch",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.capacityPlanner.docsIndustryTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.industryWorkerPatterns.hospital",
+          "integration.industryWorkerPatterns.automotive",
+          "integration.industryWorkerPatterns.ecommerce",
+          "integration.industryWorkerPatterns.support",
+        ],
+      },
+      { type: "capacity-planner-panel", id: "docs-capacity-planner" },
+      { type: "paragraph", textKey: "integration.capacityPlanner.docsReconcile" },
+      { type: "paragraph", textKey: "integration.capacityPlanner.docsErrorsTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.trafficGovernor.troubleshoot4291",
+          "integration.trafficGovernor.troubleshoot5032",
+          "integration.trafficGovernor.troubleshoot5041",
+        ],
+      },
+      {
+        type: "dashboard-links",
+        links: [
+          {
+            id: "traffic-governor",
+            labelKey: "integration.navTrafficGovernor",
+            href: "/dashboard/docs",
+            hash: "traffic-governor",
+          },
+          {
+            id: "batch-worker",
+            labelKey: "integration.navBatchWorker",
+            href: "/dashboard/docs",
+            hash: "batch-worker",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
         ],
       },
     ],

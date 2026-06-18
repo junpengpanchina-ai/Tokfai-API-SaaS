@@ -158,6 +158,34 @@ export function ModelsClient({
       <Card className="border-primary/15 bg-primary/5">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">
+            {t("dashboard.models.scaleSafelyTitle")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2 text-sm text-muted-foreground">
+          <ul className="list-disc space-y-1.5 pl-5">
+            <li>{t("dashboard.models.highTrafficOnline500Note")}</li>
+            <li>{t("dashboard.models.highTrafficCapacityPlanner")}</li>
+            <li>{t("dashboard.models.highTrafficUseBatch")}</li>
+            <li>{t("dashboard.models.highTrafficReconcile")}</li>
+          </ul>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/docs#capacity-planner">
+                {t("dashboard.models.capacityPlannerLink")}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/docs#traffic-governor">
+                {t("integration.trafficGovernor.scaleSafelyTitle")}
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-primary/15 bg-primary/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">
             {t("dashboard.models.highTrafficIntegrationTitle")}
           </CardTitle>
         </CardHeader>
@@ -191,6 +219,11 @@ export function ModelsClient({
             <Button asChild size="sm" variant="outline">
               <Link href="/dashboard/docs#traffic-governor">
                 {t("integration.navTrafficGovernor")}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/docs#capacity-planner">
+                {t("integration.navCapacityPlanner")}
               </Link>
             </Button>
           </div>

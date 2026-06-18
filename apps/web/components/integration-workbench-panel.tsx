@@ -7,6 +7,7 @@ import {
   AlertCircle,
   Building2,
   Car,
+  Calculator,
   Headphones,
   KeyRound,
   Link2,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { SafeRetryCopyPanel } from "@/components/safe-retry-copy-panel";
+import { CapacityPlannerPanel } from "@/components/capacity-planner-panel";
 import { ScaleSafelyPanel } from "@/components/traffic-governor-copy-panel";
 import { CustomerApiPathPanel } from "@/components/customer-api-path-panel";
 import { CapacityReadinessPanel } from "@/components/capacity-model-panel";
@@ -177,6 +179,16 @@ export function IntegrationWorkbenchPanel({
         <Button asChild size="sm" variant="outline">
           <Link href="/dashboard/docs#error-codes">{t("integration.navErrors")}</Link>
         </Button>
+      </WorkbenchCard>
+
+      <WorkbenchCard icon={Calculator} title={t("integration.capacityPlanner.workbenchTitle")}>
+        <CapacityPlannerPanel
+          apiKey={apiKey}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          idPrefix={`${idPrefix}-capacity-planner`}
+          showTitle={false}
+        />
       </WorkbenchCard>
 
       <WorkbenchCard icon={Terminal} title={t("integration.safeRetry.workbenchTitle")}>

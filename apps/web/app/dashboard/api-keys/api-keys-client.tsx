@@ -729,6 +729,31 @@ function OneTimeSecretCard({
         </div>
         <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">
           <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
+            {t("dashboard.apiKeys.planIntegrationTitle")}
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {t("dashboard.apiKeys.planIntegrationNote")}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#capacity-planner">
+                {t("dashboard.apiKeys.planMyIntegration")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#capacity-planner">
+                {t("dashboard.apiKeys.capacityPlannerLink")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#traffic-governor">
+                {t("dashboard.apiKeys.scaleSafelyLink")}
+              </Link>
+            </Button>
+          </div>
+        </div>
+        <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
             {t("integration.apiKeyCopyNowTitle")}
           </p>
           <p className="mt-2 text-sm font-medium text-emerald-950 dark:text-emerald-50">
