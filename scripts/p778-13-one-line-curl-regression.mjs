@@ -22,7 +22,7 @@ import {
   resolveApiBaseUrl,
   printOfflineDefaultHint,
 } from "./lib/acceptance-config.mjs";
-import { ACCEPTANCE_CURL_HEADER_FLAGS } from "./lib/acceptance-http.mjs";
+import { acceptanceCurlHeaderFlags } from "./lib/acceptance-http.mjs";
 import { ensureMockGateway } from "./lib/ensure-mock-gateway.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -57,12 +57,12 @@ function chatCurlOneLine(apiKey = PLACEHOLDER, liveHeaders = false) {
     messages: [{ role: "user", content: "Say ok only." }],
     stream: false,
   });
-  const extra = liveHeaders ? ` ${ACCEPTANCE_CURL_HEADER_FLAGS}` : "";
+  const extra = liveHeaders ? ` ${acceptanceCurlHeaderFlags()}` : "";
   return `curl -sS ${BASE}/chat/completions -H "Authorization: Bearer ${apiKey}"${extra} -H "Content-Type: application/json" -d '${body}'`;
 }
 
 function modelsCurlOneLine(apiKey = PLACEHOLDER, liveHeaders = false) {
-  const extra = liveHeaders ? ` ${ACCEPTANCE_CURL_HEADER_FLAGS}` : "";
+  const extra = liveHeaders ? ` ${acceptanceCurlHeaderFlags()}` : "";
   return `curl -sS ${BASE}/models -H "Authorization: Bearer ${apiKey}"${extra}`;
 }
 
@@ -86,7 +86,7 @@ function batchCreateCurlOneLine(apiKey = PLACEHOLDER, liveHeaders = false) {
       { messages: [{ role: "user", content: "Say hi only." }] },
     ],
   });
-  const extra = liveHeaders ? ` ${ACCEPTANCE_CURL_HEADER_FLAGS}` : "";
+  const extra = liveHeaders ? ` ${acceptanceCurlHeaderFlags()}` : "";
   return `curl -sS ${BASE}/batches/chat -H "Authorization: Bearer ${apiKey}"${extra} -H "Content-Type: application/json" -d '${body}'`;
 }
 

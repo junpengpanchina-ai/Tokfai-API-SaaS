@@ -3,6 +3,11 @@ import { Hono } from "hono";
 import { describeProviders } from "../upstream/providers.js";
 import { env, grsaiUpstreamTarget, maskSecret } from "../env.js";
 import { getRedisHealthStatus } from "../redis/client.js";
+import { getUptimeSeconds } from "../lib/processUptime.js";
+import {
+  DMIT_API_PACKAGE_VERSION,
+  PUBLIC_SUPPORTED_ENDPOINTS,
+} from "../lib/publicApiSurface.js";
 
 export const healthRoutes = new Hono();
 
@@ -17,6 +22,23 @@ function healthCheckPayload() {
 
 /** Production load-balancer / uptime probe — no auth. */
 healthRoutes.get("/health", (c) => c.json(healthCheckPayload()));
+
+/**
+ * Public deployment visibility — no auth, no secrets, no upstream config.
+ * Operators use this to confirm git commit and supported routes before live smoke.
+ */
+healthRoutes.get("/v1/status", (c) =>
+  c.json({
+    ok: true,
+    service: "dmit-api",
+    environment: env.NODE_ENV || "unknown",
+    version: DMIT_API_PACKAGE_VERSION,
+    git_commit: process.env.COMMIT_SHA?.trim() || null,
+    uptime_seconds: getUptimeSeconds(),
+    timestamp: new Date().toISOString(),
+    supported_endpoints: [...PUBLIC_SUPPORTED_ENDPOINTS],
+  })
+);
 
 healthRoutes.get("/v1/health", (c) => {
   const chatTarget = grsaiUpstreamTarget(env.GRSAI_CHAT_COMPLETIONS_PATH);

@@ -258,6 +258,34 @@ export function startMockGateway(options = {}) {
     const path = url.pathname;
 
     try {
+      if (req.method === "GET" && path === "/health") {
+        return sendJson(res, 200, {
+          ok: true,
+          service: "dmit-api",
+          env: "mock",
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      if (req.method === "GET" && path === "/v1/status") {
+        return sendJson(res, 200, {
+          ok: true,
+          service: "dmit-api",
+          environment: "mock",
+          version: "0.1.0",
+          git_commit: "mock",
+          uptime_seconds: Math.floor(process.uptime()),
+          timestamp: new Date().toISOString(),
+          supported_endpoints: [
+            "GET /v1/models",
+            "POST /v1/chat/completions",
+            "POST /v1/responses",
+            "POST /v1/images/generations",
+            "POST /v1/batches/chat",
+          ],
+        });
+      }
+
       if (req.method === "GET" && path === "/v1/models") {
         const authErr = checkAuth(req, validKey);
         if (authErr) return sendJson(res, authErr.status, authErr.body);
