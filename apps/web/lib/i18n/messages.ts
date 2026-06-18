@@ -636,12 +636,16 @@ export const messages = {
         copyPowerShellChatCurl: "Copy PowerShell Chat curl",
         copyOneLineModelsCurl: "Copy one-line Models curl",
         copyOneLineBatchCurl: "Copy one-line Batch curl",
+        pasteTerminalNote:
+          "Paste and run in any terminal. No repo, no install, no cd.",
+        goToUsage: "Go to Usage",
+        goToCredits: "Go to Credits",
         errorCode: "Code",
         errorRequestId: "request_id",
         errorHttpStatus: "HTTP status",
         listUnavailableTitle: "Could not load your API keys",
         listUnavailableDesc:
-          "The key list failed to load. You can still create a new key below, or refresh after fixing auth or service configuration.",
+          "The key list could not load — the API may be temporarily unavailable. You can still create a new key below, or retry after a few minutes.",
         createApiKey: "Create API key",
         createApiKeyDesc:
           "Optional name for your reference. Leave blank to use the default name.",
@@ -1618,6 +1622,7 @@ export const messages = {
       navBatch: "Batch API",
       navUsageCredits: "Usage / Credits",
       navErrors: "Error codes",
+      navServiceUnavailable: "Service unavailable",
       navOpenAiSdk: "OpenAI SDK",
       navCursor: "Cursor",
       navCherry: "Cherry Studio",
@@ -1627,6 +1632,8 @@ export const messages = {
       navCommercialFaq: "Commercial FAQ",
       chapterGuidePurpose: "What this chapter solves",
       chapterGuideCopy: "What to copy",
+      chapterGuideRunAnywhere:
+        "Run anywhere — paste in Terminal (macOS, zsh, bash) or PowerShell with curl.exe. No install, no cd, no repository checkout.",
       chapterGuideVerify: "How to verify success",
       chapterGuideFailure: "If it fails",
       chapterNowTitle: "You can do this now",
@@ -2706,6 +2713,35 @@ export const messages = {
       errorsTitle: "Error codes",
       errorsDesc:
         "Stable error.code values, HTTP status, and request_id — self-serve troubleshooting before contacting support.",
+      serviceUnavailableTitle: "Service unavailable — what to check",
+      serviceUnavailableDesc:
+        "When the API is slow or returns errors, use your API Key and one-line curl before contacting support.",
+      serviceUnavailableChapterPurpose:
+        "Know whether the problem is your API Key, client endpoint, credits, or temporary service load — without running internal scripts.",
+      serviceUnavailableChapterCopy:
+        "Copy one-line Chat curl from API Keys or Quick Start. Paste in any terminal.",
+      serviceUnavailableChapterVerify:
+        "On HTTP 200, copy request_id and match it in Usage and Credits.",
+      serviceUnavailableChapterFailure:
+        "Use the error.code list below — fix auth first, then credits, then retry or switch to auto-fast.",
+      serviceUnavailableIntro:
+        "If Dashboard pages load but API calls fail, the API gateway may be temporarily unavailable or upstream models may be busy. You can still verify your API Key locally with one-line curl.",
+      serviceUnavailableStepKey:
+        "Step 1 — Confirm your API Key is complete (full sk-tokfai_… secret, not truncated).",
+      serviceUnavailableStepCurl:
+        "Step 2 — Copy one-line curl and paste in any terminal (zsh/bash on macOS, or PowerShell with curl.exe on Windows).",
+      serviceUnavailableMissingToken:
+        "missing_token — Authorization header missing. Re-copy one-line curl; do not type the key by hand.",
+      serviceUnavailableInvalidToken:
+        "invalid_token — Key is wrong, revoked, or incomplete. Create a new key on API Keys if needed.",
+      serviceUnavailableRouteNotFound:
+        "route_not_found — Your client calls an endpoint Tokfai does not expose yet (for example /v1/responses on an older deployment). Use /v1/chat/completions or update when the gateway is upgraded.",
+      serviceUnavailableUpstream:
+        "HTTP 502 / 503 / 504 or upstream_model_busy — Service or upstream is temporarily unavailable. Retry in a few minutes or switch model to auto-fast.",
+      serviceUnavailableCredits:
+        "insufficient_credits — Balance too low. Open Credits to top up, then retry.",
+      serviceUnavailableRetry:
+        "Do not run repository scripts or internal operator commands. If curl keeps failing with 502–504 after retries, wait and try again — Tokfai is an API gateway; your apps stay on your stack.",
       codeColumn: "Code",
       meaningColumn: "What to do",
       billingTitle: "Usage & Credits",
@@ -4118,12 +4154,16 @@ export const messages = {
         copyPowerShellChatCurl: "复制 PowerShell Chat curl",
         copyOneLineModelsCurl: "复制单行 Models curl",
         copyOneLineBatchCurl: "复制单行 Batch curl",
+        pasteTerminalNote:
+          "在任意终端粘贴运行。无需仓库、无需安装、无需 cd。",
+        goToUsage: "前往 Usage",
+        goToCredits: "前往 Credits",
         errorCode: "错误码",
         errorRequestId: "request_id",
         errorHttpStatus: "HTTP 状态",
         listUnavailableTitle: "无法加载 API 密钥列表",
         listUnavailableDesc:
-          "密钥列表加载失败。你仍可在下方创建新密钥，或在修复鉴权或服务配置后刷新页面。",
+          "密钥列表无法加载 — API 可能暂时不可用。你仍可在下方创建新密钥，或几分钟后重试。",
         createApiKey: "创建 API 密钥",
         createApiKeyDesc: "可选名称，便于区分。留空则使用默认名称。",
         keyName: "密钥名称",
@@ -5050,6 +5090,7 @@ export const messages = {
       navBatch: "Batch API",
       navUsageCredits: "Usage / Credits",
       navErrors: "错误码",
+      navServiceUnavailable: "服务不可用",
       navOpenAiSdk: "OpenAI SDK",
       navCursor: "Cursor",
       navCherry: "Cherry Studio",
@@ -5059,6 +5100,8 @@ export const messages = {
       navCommercialFaq: "商业与采购 FAQ",
       chapterGuidePurpose: "本章解决什么问题",
       chapterGuideCopy: "需要复制什么",
+      chapterGuideRunAnywhere:
+        "任意环境运行 — 在 Terminal（macOS、zsh、bash）或 PowerShell（curl.exe）粘贴。无需安装、无需 cd、无需 clone 仓库。",
       chapterGuideVerify: "跑通后如何验证",
       chapterGuideFailure: "失败时怎么看",
       chapterNowTitle: "你现在可以这样做",
@@ -6066,6 +6109,35 @@ export const messages = {
       errorsTitle: "错误码",
       errorsDesc:
         "稳定的 error.code、HTTP status 与 request_id — 自助排查后再联系支持。",
+      serviceUnavailableTitle: "服务不可用 — 如何自查",
+      serviceUnavailableDesc:
+        "当 API 变慢或报错时，先用 API Key 与单行 curl 自查，再联系支持。",
+      serviceUnavailableChapterPurpose:
+        "区分是 API Key、客户端 endpoint、credits 还是临时服务负载问题 — 无需运行内部脚本。",
+      serviceUnavailableChapterCopy:
+        "从 API Keys 或 Quick Start 复制单行 Chat curl，在任意终端粘贴。",
+      serviceUnavailableChapterVerify:
+        "HTTP 200 时复制 request_id，在 Usage 与 Credits 中核对。",
+      serviceUnavailableChapterFailure:
+        "对照下方 error.code — 先修鉴权，再查 credits，然后重试或改用 auto-fast。",
+      serviceUnavailableIntro:
+        "若 Dashboard 能打开但 API 调用失败，网关可能暂时不可用或上游模型繁忙。你仍可用单行 curl 本地验证 API Key。",
+      serviceUnavailableStepKey:
+        "步骤 1 — 确认 API Key 完整（完整 sk-tokfai_… secret，未截断）。",
+      serviceUnavailableStepCurl:
+        "步骤 2 — 复制单行 curl，在任意终端粘贴（macOS 用 zsh/bash，Windows 用 PowerShell + curl.exe）。",
+      serviceUnavailableMissingToken:
+        "missing_token — 未发送 Authorization。请重新复制单行 curl，不要手打密钥。",
+      serviceUnavailableInvalidToken:
+        "invalid_token — 密钥错误、已 revoke 或不完整。可在 API Keys 创建新密钥。",
+      serviceUnavailableRouteNotFound:
+        "route_not_found — 客户端调用了尚未开放的 endpoint（例如旧部署上的 /v1/responses）。请用 /v1/chat/completions 或待网关升级后重试。",
+      serviceUnavailableUpstream:
+        "HTTP 502 / 503 / 504 或 upstream_model_busy — 服务或上游暂时不可用。几分钟后重试或改用 auto-fast。",
+      serviceUnavailableCredits:
+        "insufficient_credits — 余额不足。打开 Credits 充值后重试。",
+      serviceUnavailableRetry:
+        "不要运行仓库脚本或内部运维命令。若 curl 持续 502–504，请稍后重试 — Tokfai 是 API 网关，你的应用仍在自己的技术栈上。",
       codeColumn: "错误码",
       meaningColumn: "处理建议",
       billingTitle: "Usage 与 Credits",

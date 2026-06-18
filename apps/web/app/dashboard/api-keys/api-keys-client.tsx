@@ -550,6 +550,49 @@ function OneTimeSecretCard({
           <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
             {t("integration.apiKeyCopyNowTitle")}
           </p>
+          <p className="mt-2 text-sm font-medium text-emerald-950 dark:text-emerald-50">
+            {t("dashboard.apiKeys.pasteTerminalNote")}
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <CopyConfigAction
+              id="one-time-secret-copy-chat-curl"
+              value={chatCurlOneLine(secret)}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyOneLineChatCurl")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <CopyConfigAction
+              id="one-time-secret-copy-models-curl"
+              value={modelsCurlOneLine(secret)}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyOneLineModelsCurl")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <CopyConfigAction
+              id="one-time-secret-copy-cursor-config"
+              value={buildCursorConfigSnippet(secret)}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyCursorConfig")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <CopyConfigAction
+              id="one-time-secret-copy-cherry-config"
+              value={buildCherryConfigSnippet(secret)}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyCherryConfig")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/usage">{t("dashboard.apiKeys.goToUsage")}</Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/credits">{t("dashboard.apiKeys.goToCredits")}</Link>
+            </Button>
+          </div>
           <div className="mt-3">
             <ApiKeyChapterCopyPanel
               apiKey={secret}
@@ -563,27 +606,11 @@ function OneTimeSecretCard({
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <CopyConfigAction
-            id="one-time-secret-copy-chat-curl"
-            value={chatCurlOneLine(secret)}
-            copiedId={snippetCopiedId}
-            onCopy={handleSnippetCopy}
-            label={t("dashboard.apiKeys.copyOneLineChatCurl")}
-            copiedLabel={t("dashboard.apiKeys.copied")}
-          />
-          <CopyConfigAction
             id="one-time-secret-copy-chat-curl-ps"
             value={chatCurlPowerShellOneLine(secret)}
             copiedId={snippetCopiedId}
             onCopy={handleSnippetCopy}
             label={t("dashboard.apiKeys.copyPowerShellChatCurl")}
-            copiedLabel={t("dashboard.apiKeys.copied")}
-          />
-          <CopyConfigAction
-            id="one-time-secret-copy-models-curl"
-            value={modelsCurlOneLine(secret)}
-            copiedId={snippetCopiedId}
-            onCopy={handleSnippetCopy}
-            label={t("dashboard.apiKeys.copyOneLineModelsCurl")}
             copiedLabel={t("dashboard.apiKeys.copied")}
           />
           <CopyConfigAction
@@ -600,22 +627,6 @@ function OneTimeSecretCard({
             copiedId={snippetCopiedId}
             onCopy={handleSnippetCopy}
             label={t("dashboard.apiKeys.copyPythonSdkConfig")}
-            copiedLabel={t("dashboard.apiKeys.copied")}
-          />
-          <CopyConfigAction
-            id="one-time-secret-copy-cursor-config"
-            value={buildCursorConfigSnippet(secret)}
-            copiedId={snippetCopiedId}
-            onCopy={handleSnippetCopy}
-            label={t("dashboard.apiKeys.copyCursorConfig")}
-            copiedLabel={t("dashboard.apiKeys.copied")}
-          />
-          <CopyConfigAction
-            id="one-time-secret-copy-cherry-config"
-            value={buildCherryConfigSnippet(secret)}
-            copiedId={snippetCopiedId}
-            onCopy={handleSnippetCopy}
-            label={t("dashboard.apiKeys.copyCherryConfig")}
             copiedLabel={t("dashboard.apiKeys.copied")}
           />
           <CopyConfigAction

@@ -23,5 +23,7 @@ apps/dmit-api/es
 batch-test-results/
 p776-smoke-results/
 p778-live-smoke-results/
+p786-offline-results/
 model-health-results/
 load-test-results/
+p780-live-walkthrough-results/

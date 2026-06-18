@@ -3,7 +3,7 @@
  * Internal operator smoke only — not customer documentation.
  * Customers use API Key + one-line curl from Dashboard; they never run this script.
  *
- * P779 — scan customer-visible web source for internal engineering terms.
+ * P778 / P786 — scan customer-visible web source for internal engineering terms.
  * Usage: node scripts/p778-docs-customer-visible-grep.mjs
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -14,6 +14,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SCAN_DIRS = [
   join(ROOT, "apps/web/components"),
   join(ROOT, "apps/web/lib"),
+  join(ROOT, "apps/web/app/dashboard"),
+  join(ROOT, "apps/web/app/docs"),
 ];
 
 const IGNORE_PATH_PARTS = [
@@ -23,6 +25,7 @@ const IGNORE_PATH_PARTS = [
   ".spec.",
   "/lib/dmit/",
   "/app/admin/",
+  "/dashboard/admin/",
 ];
 
 const RULES = [
@@ -52,6 +55,7 @@ const RULES = [
   { label: "DMIT", pattern: /\bDMIT\b/i },
   { label: "repo (word)", pattern: /\brepo\b/i },
   { label: "commit (word)", pattern: /\bcommit\b/i },
+  { label: "git push", pattern: /\bgit\s+push\b/i },
   {
     label: "cd into Tokfai project",
     pattern: /cd\s+(?:into\s+)?(?:the\s+)?Tokfai/i,
@@ -132,6 +136,8 @@ for (const dir of SCAN_DIRS) {
         if (rule.label === "DMIT" && /import\s.*dmit/i.test(line)) continue;
         if (rule.label === "DMIT" && /from\s+["']@\/lib\/dmit/i.test(line)) continue;
         if (rule.label === "DMIT" && /DmitApi/i.test(line)) continue;
+
+        if (rule.label === "git push" && /push\s+back/i.test(line)) continue;
 
         hits.push({
           file: rel,

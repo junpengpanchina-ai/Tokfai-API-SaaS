@@ -93,6 +93,7 @@ export const CUSTOMER_DOC_SNIPPETS = CUSTOMER_DOC_SNIPPET_DISPLAY;
 export type CustomerDocChapterGuide = {
   purposeKey: string;
   copyKey: string;
+  runAnywhereKey: string;
   verifyKey: string;
   failureKey: string;
 };
@@ -338,6 +339,8 @@ export const CUSTOMER_DOC_INDUSTRY_SCENARIO_KEYS: Record<
   ],
 };
 
+const CHAPTER_RUN_ANYWHERE = "integration.chapterGuideRunAnywhere";
+
 const chapter = (
   purposeKey: string,
   copyKey: string,
@@ -346,6 +349,7 @@ const chapter = (
 ): CustomerDocChapterGuide => ({
   purposeKey,
   copyKey,
+  runAnywhereKey: CHAPTER_RUN_ANYWHERE,
   verifyKey,
   failureKey,
 });
@@ -1641,6 +1645,58 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
           },
           { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
           { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "service-unavailable",
+    navKey: "integration.navServiceUnavailable",
+    titleKey: "integration.serviceUnavailableTitle",
+    descriptionKey: "integration.serviceUnavailableDesc",
+    chapterGuide: chapter(
+      "integration.serviceUnavailableChapterPurpose",
+      "integration.serviceUnavailableChapterCopy",
+      "integration.serviceUnavailableChapterVerify",
+      "integration.serviceUnavailableChapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "keys",
+        labelKey: "integration.demoFlowLinkKeys",
+        href: "/dashboard/api-keys",
+      },
+      copySnippetKey: "chat-curl",
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "paragraph", textKey: "integration.serviceUnavailableIntro" },
+      { type: "paragraph", textKey: "integration.serviceUnavailableStepKey" },
+      { type: "paragraph", textKey: "integration.serviceUnavailableStepCurl" },
+      {
+        type: "ordered",
+        items: [
+          "integration.serviceUnavailableMissingToken",
+          "integration.serviceUnavailableInvalidToken",
+          "integration.serviceUnavailableRouteNotFound",
+          "integration.serviceUnavailableUpstream",
+          "integration.serviceUnavailableCredits",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.serviceUnavailableRetry" },
+      { type: "one-line-curl", id: "service-chat", titleKey: "integration.copyOneLineChatCurl", snippetKey: "chat-curl" },
+      {
+        type: "dashboard-links",
+        links: [
+          { id: "keys", labelKey: "integration.demoFlowLinkKeys", href: "/dashboard/api-keys" },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+          {
+            id: "error-codes-docs",
+            labelKey: "integration.linkErrorCodesGuide",
+            href: "/dashboard/docs",
+            hash: "error-codes",
+          },
         ],
       },
     ],

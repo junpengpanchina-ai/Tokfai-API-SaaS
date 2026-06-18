@@ -745,6 +745,7 @@ function ChapterGuidePanel({
   const rows = [
     { labelKey: "integration.chapterGuidePurpose", textKey: guide.purposeKey },
     { labelKey: "integration.chapterGuideCopy", textKey: guide.copyKey },
+    { labelKey: "integration.chapterGuideRunAnywhere", textKey: guide.runAnywhereKey },
     { labelKey: "integration.chapterGuideVerify", textKey: guide.verifyKey },
     { labelKey: "integration.chapterGuideFailure", textKey: guide.failureKey },
   ];
