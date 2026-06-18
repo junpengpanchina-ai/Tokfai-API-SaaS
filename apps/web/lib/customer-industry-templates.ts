@@ -5,7 +5,8 @@ export type IndustryPackId = "hospital" | "automotive" | "ecommerce" | "support"
 export type IndustryTemplateId =
   | "hospital-chart-summary"
   | "hospital-batch-consult"
-  | "hospital-follow-up"
+  | "hospital-batch-follow-up"
+  | "hospital-image-assist"
   | "auto-ticket-summary"
   | "auto-damage-image"
   | "auto-batch-tickets"
@@ -60,6 +61,30 @@ const HOSPITAL_BATCH_ITEMS = [
     ],
   },
 ];
+
+const HOSPITAL_FOLLOW_UP_ITEMS = [
+  {
+    messages: [
+      {
+        role: "user",
+        content:
+          "生成复诊提醒短信草稿（不含诊断与治疗建议）。患者：上周因头痛就诊，医嘱为观察随访。",
+      },
+    ],
+  },
+  {
+    messages: [
+      {
+        role: "user",
+        content:
+          "生成复诊提醒短信草稿（不含诊断与治疗建议）。患者：高血压随访，需提醒测量血压并预约复诊。",
+      },
+    ],
+  },
+];
+
+const HOSPITAL_IMAGE_ASSIST_PROMPT =
+  "根据以下影像检查文字描述，整理为结构化要点（检查部位、所见描述、需医生确认项）。不要诊断，不要治疗方案。\n\n描述：头颅 CT 报告草稿：未见明显占位，建议结合临床。";
 
 const AUTO_TICKET_PROMPT =
   "请把以下售后工单整理为：问题类型、用户描述、可能涉及模块、需要人工确认的问题、建议回复草稿。\n\n工单：车辆怠速不稳，仪表盘偶尔亮起发动机故障灯。";
@@ -199,24 +224,37 @@ export const INDUSTRY_TEMPLATES: Record<IndustryTemplateId, IndustryTemplateDef>
     nextStepKey: "integration.industryTemplates.hospital.batchConsult.nextStep",
     curlLabelKey: "integration.industryTemplates.hospital.batchConsult.curlLabel",
   },
-  "hospital-follow-up": {
-    id: "hospital-follow-up",
+  "hospital-batch-follow-up": {
+    id: "hospital-batch-follow-up",
+    industryId: "hospital",
+    apiKind: "batch",
+    endpoint: "/v1/batches/chat",
+    model: "auto-fast",
+    body: batchBody("auto-fast", HOSPITAL_FOLLOW_UP_ITEMS),
+    useCaseKey: "integration.industryTemplates.hospital.batchFollowUp.useCase",
+    inputExampleKey: "integration.industryTemplates.hospital.batchFollowUp.input",
+    expectedResponseKey: "integration.industryTemplates.batchSuccessFields",
+    reconcileKey: "integration.industryTemplates.reconcileBatch",
+    billingKey: "integration.industryTemplates.billingBatch",
+    boundaryKey: "integration.industryTemplates.hospital.boundary",
+    nextStepKey: "integration.industryTemplates.hospital.batchFollowUp.nextStep",
+    curlLabelKey: "integration.industryTemplates.hospital.batchFollowUp.curlLabel",
+  },
+  "hospital-image-assist": {
+    id: "hospital-image-assist",
     industryId: "hospital",
     apiKind: "chat",
     endpoint: "/v1/chat/completions",
     model: "auto-fast",
-    body: chatBody(
-      "auto-fast",
-      "生成复诊提醒短信草稿（不含诊断与治疗建议）。患者：上周因头痛就诊，医嘱为观察随访。"
-    ),
-    useCaseKey: "integration.industryTemplates.hospital.followUp.useCase",
-    inputExampleKey: "integration.industryTemplates.hospital.followUp.input",
+    body: chatBody("auto-fast", HOSPITAL_IMAGE_ASSIST_PROMPT),
+    useCaseKey: "integration.industryTemplates.hospital.imageAssist.useCase",
+    inputExampleKey: "integration.industryTemplates.hospital.imageAssist.input",
     expectedResponseKey: "integration.industryTemplates.chatSuccessFields",
     reconcileKey: "integration.industryTemplates.reconcileChat",
     billingKey: "integration.industryTemplates.billingChat",
     boundaryKey: "integration.industryTemplates.hospital.boundary",
-    nextStepKey: "integration.industryTemplates.hospital.followUp.nextStep",
-    curlLabelKey: "integration.industryTemplates.hospital.followUp.curlLabel",
+    nextStepKey: "integration.industryTemplates.hospital.imageAssist.nextStep",
+    curlLabelKey: "integration.industryTemplates.hospital.imageAssist.curlLabel",
   },
   "auto-ticket-summary": {
     id: "auto-ticket-summary",
@@ -385,18 +423,19 @@ export const INDUSTRY_TEMPLATE_PACKS: {
     id: "hospital",
     titleKey: "integration.industry.hospital.title",
     templateIds: [
-      "hospital-chart-summary",
       "hospital-batch-consult",
-      "hospital-follow-up",
+      "hospital-batch-follow-up",
+      "hospital-chart-summary",
+      "hospital-image-assist",
     ],
   },
   {
     id: "automotive",
     titleKey: "integration.industry.automotive.title",
     templateIds: [
+      "auto-batch-tickets",
       "auto-ticket-summary",
       "auto-damage-image",
-      "auto-batch-tickets",
     ],
   },
   {
@@ -412,18 +451,18 @@ export const INDUSTRY_TEMPLATE_PACKS: {
     id: "support",
     titleKey: "integration.industry.support.title",
     templateIds: [
-      "support-ticket-classify",
       "support-batch-qa",
+      "support-ticket-classify",
       "support-summary-chat",
     ],
   },
 ];
 
 export const INDUSTRY_PRIMARY_TEMPLATE: Record<IndustryPackId, IndustryTemplateId> = {
-  hospital: "hospital-chart-summary",
-  automotive: "auto-ticket-summary",
+  hospital: "hospital-batch-consult",
+  automotive: "auto-batch-tickets",
   ecommerce: "ecommerce-batch-sku",
-  support: "support-ticket-classify",
+  support: "support-batch-qa",
 };
 
 export const HOSPITAL_TEMPLATE = INDUSTRY_TEMPLATES["hospital-chart-summary"];

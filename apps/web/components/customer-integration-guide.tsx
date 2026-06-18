@@ -14,6 +14,7 @@ import { ErrorCodesChapterPanel } from "@/components/error-codes-chapter-panel";
 import { ChatApiChapterCopyPanel } from "@/components/chat-api-chapter-copy";
 import { ImageApiChapterCopyPanel } from "@/components/image-api-chapter-copy";
 import { ClientSoftwareAcceptanceCopyPanel } from "@/components/client-software-acceptance-copy";
+import { CustomerApiPathPanel } from "@/components/customer-api-path-panel";
 import { CapacityModelPanel } from "@/components/capacity-model-panel";
 import { CherryChapterCopyPanel } from "@/components/cherry-chapter-copy";
 import { CursorChapterCopyPanel } from "@/components/cursor-chapter-copy";
@@ -647,6 +648,15 @@ function DocBlock({
             idPrefix={block.id}
           />
         </div>
+      );
+    case "customer-api-path-panel":
+      return (
+        <CustomerApiPathPanel
+          apiKey={quickStartApiKey}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          idPrefix={block.id}
+        />
       );
     case "integration-workbench-panel":
       return (

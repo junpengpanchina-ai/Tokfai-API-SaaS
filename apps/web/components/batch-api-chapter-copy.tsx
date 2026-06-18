@@ -4,6 +4,8 @@ import { OneLineCurlCopyFields } from "@/components/one-line-curl-copy-fields";
 import {
   buildBatchCreateCurlOneLine,
   buildBatchCreateCurlPowerShellOneLine,
+  buildBatchItemsCurlOneLine,
+  buildBatchItemsCurlPowerShellOneLine,
   buildBatchPollCurlOneLine,
   buildBatchPollCurlPowerShellOneLine,
   BATCH_POLL_PLACEHOLDER_ID,
@@ -30,6 +32,7 @@ export function BatchApiChapterCopyPanel({
   const { t } = useI18n();
   const createCurl = buildBatchCreateCurlOneLine(apiKey);
   const pollCurl = buildBatchPollCurlOneLine(apiKey, BATCH_POLL_PLACEHOLDER_ID);
+  const itemsCurl = buildBatchItemsCurlOneLine(apiKey, BATCH_POLL_PLACEHOLDER_ID);
   const keyIsPlaceholder = isQuickStartKeyPlaceholder(apiKey);
 
   return (
@@ -54,6 +57,19 @@ export function BatchApiChapterCopyPanel({
           copiedId={copiedId}
           onCopy={onCopy}
           idPrefix={`${idPrefix}-poll`}
+          showKeyNote={false}
+        />
+      </div>
+      <div className="flex flex-col gap-3 border-t pt-3">
+        <p className="text-xs text-muted-foreground">{t("integration.batchApiItemsHint")}</p>
+        <OneLineCurlCopyFields
+          apiKey={apiKey}
+          bashLabel={t("integration.batchApiItemsCopyLabel")}
+          bashCurl={itemsCurl}
+          powershellCurl={buildBatchItemsCurlPowerShellOneLine(apiKey, BATCH_POLL_PLACEHOLDER_ID)}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          idPrefix={`${idPrefix}-items`}
           showKeyNote={false}
         />
       </div>

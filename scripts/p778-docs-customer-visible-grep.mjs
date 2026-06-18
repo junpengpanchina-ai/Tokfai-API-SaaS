@@ -63,6 +63,7 @@ const RULES = [
     label: "cd into Tokfai project",
     pattern: /cd\s+(?:into\s+)?(?:the\s+)?Tokfai/i,
   },
+  { label: "mock gateway", pattern: /\bmock\s+gateway\b/i },
 ];
 
 const ALLOW_SUBSTRINGS = [

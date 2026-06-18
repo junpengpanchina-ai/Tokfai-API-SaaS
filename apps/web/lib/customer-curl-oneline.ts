@@ -1,9 +1,12 @@
 import {
   buildBatchCreateCurlMultiline,
   buildBatchCreateCurlOneLine,
+  buildBatchCreateCurlPowerShellOneLine,
   buildBatchItemsCurlOneLine,
   buildBatchPollCurlMultiline,
   buildBatchPollCurlOneLine,
+  buildBatchPollCurlPowerShellOneLine,
+  buildBatchItemsCurlPowerShellOneLine,
 } from "@/lib/customer-batch-api-chapter";
 import {
   buildImageApiCurlMultiline,
@@ -90,6 +93,27 @@ export function batchItemsCurlOneLine(
   batchId = "batch_xxx"
 ): string {
   return buildBatchItemsCurlOneLine(apiKey, batchId);
+}
+
+export function batchCreateCurlPowerShellOneLine(
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
+  model = CHAT_SMOKE_MODEL
+): string {
+  return buildBatchCreateCurlPowerShellOneLine(apiKey, model);
+}
+
+export function batchPollCurlPowerShellOneLine(
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
+  batchId = "batch_xxx"
+): string {
+  return buildBatchPollCurlPowerShellOneLine(apiKey, batchId);
+}
+
+export function batchItemsCurlPowerShellOneLine(
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
+  batchId = "batch_xxx"
+): string {
+  return buildBatchItemsCurlPowerShellOneLine(apiKey, batchId);
 }
 
 /** Readable multi-line chat curl (display only — copy one-line helper for terminal). */

@@ -15,6 +15,7 @@ import {
   Wrench,
 } from "lucide-react";
 
+import { CustomerApiPathPanel } from "@/components/customer-api-path-panel";
 import { CapacityReadinessPanel } from "@/components/capacity-model-panel";
 import { CopyableSnippetField } from "@/components/copyable-snippet-field";
 import { OneLineCurlCopyFields } from "@/components/one-line-curl-copy-fields";
@@ -174,6 +175,16 @@ export function IntegrationWorkbenchPanel({
         <Button asChild size="sm" variant="outline">
           <Link href="/dashboard/docs#error-codes">{t("integration.navErrors")}</Link>
         </Button>
+      </WorkbenchCard>
+
+      <WorkbenchCard icon={Terminal} title={t("integration.apiPath.chooseTitle")}>
+        <CustomerApiPathPanel
+          apiKey={apiKey}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          idPrefix={`${idPrefix}-api-path`}
+          showTitle={false}
+        />
       </WorkbenchCard>
 
       <WorkbenchCard icon={Building2} title={t("integration.workbench.industryTitle")}>

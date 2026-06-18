@@ -122,6 +122,7 @@ export type CustomerDocBlock =
   | { type: "cherry-copy-panel"; id: string }
   | { type: "client-software-copy-panel"; id: string }
   | { type: "industry-copy-panel"; id: string }
+  | { type: "customer-api-path-panel"; id: string }
   | { type: "integration-workbench-panel"; id: string }
   | { type: "industry-template-pack"; id: string }
   | { type: "capacity-model-panel"; id: string; showReadiness?: boolean }
@@ -1717,6 +1718,285 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
     ],
   },
   {
+    id: "large-volume-batch-queue",
+    navKey: "integration.navLargeVolumeBatch",
+    titleKey: "integration.largeVolumeBatch.title",
+    descriptionKey: "integration.largeVolumeBatch.desc",
+    highlight: true,
+    chapterGuide: chapter(
+      "integration.largeVolumeBatch.chapterPurpose",
+      "integration.largeVolumeBatch.chapterCopy",
+      "integration.largeVolumeBatch.chapterVerify",
+      "integration.largeVolumeBatch.chapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "batch-docs",
+        labelKey: "integration.navBatch",
+        href: "/dashboard/docs",
+        hash: "batch-api",
+      },
+      copySnippetKey: "batch-create-curl",
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "paragraph", textKey: "integration.largeVolumeBatch.whenChatTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.largeVolumeBatch.whenChat1",
+          "integration.largeVolumeBatch.whenChat2",
+          "integration.largeVolumeBatch.whenChat3",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.largeVolumeBatch.whenImageTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.largeVolumeBatch.whenImage1",
+          "integration.largeVolumeBatch.whenImage2",
+          "integration.largeVolumeBatch.whenImage3",
+          "integration.largeVolumeBatch.whenImage4",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.largeVolumeBatch.whenBatchTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.largeVolumeBatch.whenBatch1",
+          "integration.largeVolumeBatch.whenBatch2",
+          "integration.largeVolumeBatch.whenBatch3",
+          "integration.largeVolumeBatch.whenBatch4",
+          "integration.largeVolumeBatch.whenBatch5",
+          "integration.largeVolumeBatch.whenBatch6",
+        ],
+      },
+      { type: "customer-api-path-panel", id: "large-volume-path" },
+      { type: "batch-api-copy-panel", id: "large-volume-batch-copy" },
+      { type: "paragraph", textKey: "integration.largeVolumeBatch.billingTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.largeVolumeBatch.billing1",
+          "integration.largeVolumeBatch.billing2",
+          "integration.largeVolumeBatch.billing3",
+          "integration.largeVolumeBatch.billing4",
+          "integration.largeVolumeBatch.billing5",
+        ],
+      },
+      {
+        type: "dashboard-links",
+        links: [
+          {
+            id: "retry-docs",
+            labelKey: "integration.navRetryBackoff",
+            href: "/dashboard/docs",
+            hash: "retry-and-backoff",
+          },
+          {
+            id: "online-readiness",
+            labelKey: "integration.nav500OnlineReadiness",
+            href: "/dashboard/docs",
+            hash: "500-online-readiness",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "retry-and-backoff",
+    navKey: "integration.navRetryBackoff",
+    titleKey: "integration.retryBackoff.title",
+    descriptionKey: "integration.retryBackoff.desc",
+    chapterGuide: chapter(
+      "integration.retryBackoff.chapterPurpose",
+      "integration.retryBackoff.chapterCopy",
+      "integration.retryBackoff.chapterVerify",
+      "integration.retryBackoff.chapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "error-codes-docs",
+        labelKey: "integration.navErrors",
+        href: "/dashboard/docs",
+        hash: "error-codes",
+      },
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "paragraph", textKey: "integration.retryBackoff.when429Title" },
+      {
+        type: "bullets",
+        items: [
+          "integration.retryBackoff.when4291",
+          "integration.retryBackoff.when4292",
+          "integration.retryBackoff.when4293",
+          "integration.retryBackoff.when4294",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.retryBackoff.when503Title" },
+      {
+        type: "bullets",
+        items: [
+          "integration.retryBackoff.when5031",
+          "integration.retryBackoff.when5032",
+          "integration.retryBackoff.when5033",
+          "integration.retryBackoff.when5034",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.retryBackoff.when504Title" },
+      {
+        type: "bullets",
+        items: [
+          "integration.retryBackoff.when5041",
+          "integration.retryBackoff.when5042",
+          "integration.retryBackoff.when5043",
+          "integration.retryBackoff.when5044",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.retryBackoff.backoffTitle" },
+      {
+        type: "ordered",
+        items: [
+          "integration.retryBackoff.backoffStep1",
+          "integration.retryBackoff.backoffStep2",
+          "integration.retryBackoff.backoffStep3",
+          "integration.retryBackoff.backoffStep4",
+        ],
+      },
+      {
+        type: "dashboard-links",
+        links: [
+          {
+            id: "large-volume-batch",
+            labelKey: "integration.navLargeVolumeBatch",
+            href: "/dashboard/docs",
+            hash: "large-volume-batch-queue",
+          },
+          {
+            id: "batch-api",
+            labelKey: "integration.navBatch",
+            href: "/dashboard/docs",
+            hash: "batch-api",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "slow-upstream-behavior",
+    navKey: "integration.navSlowUpstream",
+    titleKey: "integration.slowUpstreamChapter.title",
+    descriptionKey: "integration.slowUpstreamChapter.desc",
+    chapterGuide: chapter(
+      "integration.slowUpstreamChapter.chapterPurpose",
+      "integration.slowUpstreamChapter.chapterCopy",
+      "integration.slowUpstreamChapter.chapterVerify",
+      "integration.slowUpstreamChapter.chapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "capacity-docs",
+        labelKey: "integration.navCapacity",
+        href: "/dashboard/docs",
+        hash: "capacity-and-rate-limits",
+      },
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "paragraph", textKey: "integration.slowUpstreamChapter.body" },
+      { type: "paragraph", textKey: "integration.slowUpstreamChapter.imageNote" },
+      { type: "paragraph", textKey: "integration.slowUpstreamChapter.queueNote" },
+      { type: "paragraph", textKey: "integration.slowUpstreamChapter.billingTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.slowUpstreamChapter.billing1",
+          "integration.slowUpstreamChapter.billing2",
+          "integration.slowUpstreamChapter.billing3",
+          "integration.slowUpstreamChapter.billing4",
+        ],
+      },
+      {
+        type: "dashboard-links",
+        links: [
+          {
+            id: "retry-docs",
+            labelKey: "integration.navRetryBackoff",
+            href: "/dashboard/docs",
+            hash: "retry-and-backoff",
+          },
+          {
+            id: "large-volume-batch",
+            labelKey: "integration.navLargeVolumeBatch",
+            href: "/dashboard/docs",
+            hash: "large-volume-batch-queue",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "500-online-readiness",
+    navKey: "integration.nav500OnlineReadiness",
+    titleKey: "integration.online500Readiness.title",
+    descriptionKey: "integration.online500Readiness.desc",
+    highlight: true,
+    chapterGuide: chapter(
+      "integration.online500Readiness.chapterPurpose",
+      "integration.online500Readiness.chapterCopy",
+      "integration.online500Readiness.chapterVerify",
+      "integration.online500Readiness.chapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "keys",
+        labelKey: "integration.ctaCreateKey",
+        href: "/dashboard/api-keys",
+      },
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "paragraph", textKey: "integration.online500Readiness.intro" },
+      {
+        type: "bullets",
+        items: [
+          "integration.capacity.readiness.item1",
+          "integration.capacity.readiness.item2",
+          "integration.capacity.readiness.item3",
+          "integration.capacity.readiness.item4",
+          "integration.capacity.readiness.item5",
+          "integration.capacity.readiness.item6",
+          "integration.capacity.readiness.item7",
+          "integration.capacity.readiness.item8",
+        ],
+      },
+      { type: "customer-api-path-panel", id: "online-500-path" },
+      { type: "capacity-model-panel", id: "online-500-capacity", showReadiness: true },
+      {
+        type: "dashboard-links",
+        links: [
+          {
+            id: "large-volume-batch",
+            labelKey: "integration.navLargeVolumeBatch",
+            href: "/dashboard/docs",
+            hash: "large-volume-batch-queue",
+          },
+          {
+            id: "workbench",
+            labelKey: "integration.navIntegrationWorkbench",
+            href: "/dashboard/docs",
+            hash: "integration-workbench",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+        ],
+      },
+    ],
+  },
+  {
     id: "commercial-faq",
     navKey: "integration.navCommercialFaq",
     titleKey: "integration.commercialFaqTitle",
@@ -2414,6 +2694,7 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
     blocks: [
       { type: "paragraph", textKey: "integration.industryGatewayNote" },
       { type: "paragraph", textKey: "integration.industryNotAgency" },
+      { type: "paragraph", textKey: "integration.industryTemplates.batchFirstNote" },
       { type: "paragraph", textKey: "integration.industryTemplates.packIntro" },
       { type: "industry-template-pack", id: "industry-templates" },
       { type: "paragraph", textKey: "integration.industryOverviewTitle" },

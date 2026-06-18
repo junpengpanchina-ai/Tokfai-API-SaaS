@@ -155,6 +155,39 @@ export function ModelsClient({
         </CardContent>
       </Card>
 
+      <Card className="border-primary/15 bg-primary/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">
+            {t("dashboard.models.highTrafficIntegrationTitle")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2 text-sm text-muted-foreground">
+          <ul className="list-disc space-y-1.5 pl-5">
+            <li>{t("dashboard.models.highTrafficChatConcurrency")}</li>
+            <li>{t("dashboard.models.highTrafficImageConcurrency")}</li>
+            <li>{t("dashboard.models.highTrafficBatchItems")}</li>
+            <li>{t("dashboard.models.highTrafficReconcile")}</li>
+          </ul>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/docs#large-volume-batch-queue">
+                {t("dashboard.models.footerHighTrafficBatch")}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/docs#500-online-readiness">
+                {t("integration.nav500OnlineReadiness")}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/docs#retry-and-backoff">
+                {t("integration.navRetryBackoff")}
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <OverviewStat
           label={t("dashboard.models.overviewTotal")}

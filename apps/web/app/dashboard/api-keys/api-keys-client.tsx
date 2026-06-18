@@ -46,10 +46,16 @@ import { buildCursorConfigSnippet } from "@/lib/customer-cursor-chapter";
 import { authorizationHeader } from "@/lib/customer-integration-snippets";
 import {
   batchCreateCurlOneLine,
+  batchCreateCurlPowerShellOneLine,
+  batchItemsCurlOneLine,
+  batchItemsCurlPowerShellOneLine,
+  batchPollCurlOneLine,
+  batchPollCurlPowerShellOneLine,
   chatCurlOneLine,
   chatCurlPowerShellOneLine,
   modelsCurlOneLine,
 } from "@/lib/customer-curl-oneline";
+import { BATCH_POLL_PLACEHOLDER_ID } from "@/lib/customer-batch-api-chapter";
 import { buildTemplateCurlOneLine } from "@/lib/customer-industry-templates";
 import { isFullTokfaiApiKey, TOKFAI_API_BASE_URL, TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
 import {
@@ -518,7 +524,12 @@ function OneTimeSecretCard({
               </Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#capacity-and-rate-limits">
+              <Link href="/dashboard/docs#large-volume-batch-queue">
+                {t("dashboard.apiKeys.largeVolumeBatchGuide")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#500-online-readiness">
                 {t("dashboard.apiKeys.online500Guide")}
               </Link>
             </Button>
@@ -710,6 +721,30 @@ function OneTimeSecretCard({
               copiedId={snippetCopiedId}
               onCopy={handleSnippetCopy}
               label={t("dashboard.apiKeys.copyOneLineBatchCurl")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <CopyConfigAction
+              id="one-time-secret-copy-batch-poll-curl"
+              value={batchPollCurlOneLine(secret, BATCH_POLL_PLACEHOLDER_ID)}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyOneLineBatchPollCurl")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <CopyConfigAction
+              id="one-time-secret-copy-batch-items-curl"
+              value={batchItemsCurlOneLine(secret, BATCH_POLL_PLACEHOLDER_ID)}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyOneLineBatchItemsCurl")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <CopyConfigAction
+              id="one-time-secret-copy-batch-create-curl-ps"
+              value={batchCreateCurlPowerShellOneLine(secret)}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyPowerShellBatchCurl")}
               copiedLabel={t("dashboard.apiKeys.copied")}
             />
             <CopyConfigAction
