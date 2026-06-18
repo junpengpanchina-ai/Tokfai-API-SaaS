@@ -366,6 +366,8 @@ export const messages = {
         footerIndustryTemplates: "Industry templates",
         footerCapacityGuide: "Capacity & rate limits",
         footerLargeVolumeNote: "For large-volume traffic, use Batch API and the capacity guide.",
+        highTrafficBatchNote: "High traffic? Use Batch API and the capacity guide for controlled concurrency.",
+        footerHighTrafficBatch: "High traffic — Batch & capacity",
         footerQuickStart: "Quick Start curl",
         footerUsage: "Check Usage",
         footerDocs: "View integration docs",
@@ -624,6 +626,8 @@ export const messages = {
         copyEcommerceBatchExample: "Ecommerce Batch example",
         copyCustomerServiceExample: "AI customer service example",
         capacityRateLimitsLink: "Capacity & rate limits",
+        online500Guide: "500 online users guide",
+        retryRateLimitGuide: "Retry & rate limit guide",
         largeVolumeIntegrationLink: "Large-volume integration",
         sessionKeyDocsNote:
           "After you save your key, this browser session still fills Docs examples. Refreshing clears it — copy your key or one-line curl again if you see a placeholder.",
@@ -1693,6 +1697,15 @@ export const messages = {
           "503/504 — gateway or upstream temporarily unavailable; retry later or try auto-fast.",
         serviceUnavailableSafe:
           "API service may be temporarily unavailable. Your key and credits are not changed by failed requests.",
+        slowUpstreamTitle: "Slow upstream readiness",
+        slowUpstreamNote:
+          "Chat and Image can take seconds under real load. Cap concurrency, expect 429 / 503 / 504, and reconcile successful request_id in Usage / Credits.",
+        retryGuideTitle: "Retry & rate limit guide",
+        retryGuideNote:
+          "On 429 — slow down and backoff. On 503 / 504 — wait and retry or switch to Batch API. Failed or limited calls are normally not charged.",
+        batchVolumeTitle: "Batch for large-volume traffic",
+        batchVolumeNote:
+          "For hundreds or thousands of generations, use Batch API instead of unbounded sync Chat — submit once, poll, fetch items, reconcile each request_id.",
       },
       navApiKey: "API Key",
       navChatApi: "Chat API",
@@ -1865,6 +1878,42 @@ export const messages = {
           "Tokfai queues or limits: slow Image generation, burst Chat traffic beyond your tier, and oversized sync batches. Beyond limits you get clear error.code values (for example too_many_requests, gateway_overloaded) — not an uncontrolled crash.",
         clientBehavior:
           "Recommended client behavior: cap in-app concurrency (25–50 sync Chat calls), send large copy jobs via Batch API, retry 429/503 with backoff, and log every request_id.",
+        slowUpstreamTitle: "Slow upstream behavior",
+        slowUpstreamBody:
+          "Real model and image generation can take seconds — Chat often 2–8 seconds, Image 8–30 seconds. Tokfai may queue slow work or return controlled 429 / 503 / 504 when concurrency is high. Successful responses include request_id and credits_charged; failed, rate-limited, or timed-out requests are normally not charged.",
+        whyRateLimitsProtectTitle: "Why rate limits protect your integration",
+        whyRateLimitsProtectBalance:
+          "Prevent accidental runaway traffic from draining credits during misconfigured loops or deploys.",
+        whyRateLimitsProtectUpstream:
+          "Keep upstream model providers stable when many customers send slow generation jobs.",
+        whyRateLimitsProtectGateway:
+          "Ensure one API Key cannot saturate the shared gateway for everyone.",
+        whenYouSee429Title: "What to do when you see 429",
+        whenYouSee429SlowDown:
+          "429 too_many_requests or too_many_concurrent_requests — reduce client concurrency and pause new requests.",
+        whenYouSee429Backoff:
+          "Retry with exponential backoff (for example 1s, 2s, 4s) and cap parallel in-flight calls.",
+        whenYouSee429Batch:
+          "Move bulk copy or classification to Batch API instead of thousands of sync Chat calls.",
+        whenYouSee503504Title: "What to do when you see 503 / 504",
+        whenYouSee503Retry:
+          "503 gateway_overloaded or upstream_model_busy — wait and retry; switch to auto-fast if latency persists.",
+        whenYouSee504Retry:
+          "504 upstream_timeout — upstream was slow; retry the same payload or reduce concurrent Image/Chat load.",
+        whenYouSee503504NotCharged:
+          "These controlled errors are normally not charged — reconcile Usage/Credits by request_id on successes only.",
+        whyImageLowerConcurrency:
+          "Image API should use lower concurrency than Chat: each job is slow (often 8–30 seconds) and holds gateway slots longer. Cap Image concurrency (for example 5–15) and backoff on 503.",
+        whyBatchForVolume:
+          "Batch API is recommended for large volume: submit hundreds or thousands of items once, poll status, fetch items, and reconcile each request_id — instead of firing unbounded sync Chat calls.",
+        customerRetryTitle: "Customer retry recommendation",
+        customerRetryStep1: "Log request_id on every API response — success or error.",
+        customerRetryStep2: "On 429 — slow down, reduce concurrency, backoff retry.",
+        customerRetryStep3: "On 503 / 504 — wait, retry with backoff, or switch to Batch API.",
+        customerRetryStep4: "Search Usage and Credits by request_id — only successful calls should debit.",
+        customerRetryStep5:
+          "For sustained high volume, use Batch API and staged ramp (10 → 100 → 1,000) before peak traffic.",
+        readinessChecklistTitle: "500 online readiness guide",
         higherLimitsTitle: "When to request higher limits",
         higherLimitsBody:
           "After integration acceptance and Usage/Credits reconciliation, contact Tokfai support with your peak concurrency, Batch volume, and industry scenario. Business keys can receive higher limits than free/testing keys.",
@@ -4219,6 +4268,8 @@ export const messages = {
         footerIndustryTemplates: "行业模板",
         footerCapacityGuide: "容量与限流",
         footerLargeVolumeNote: "大批量流量请使用 Batch API 并阅读容量指南。",
+        highTrafficBatchNote: "高流量？请用 Batch API 并阅读容量指南以控制并发。",
+        footerHighTrafficBatch: "高流量 — Batch 与容量",
         footerQuickStart: "Quick Start curl",
         footerUsage: "查看 Usage",
         footerDocs: "查看接入文档",
@@ -4457,6 +4508,8 @@ export const messages = {
         copyEcommerceBatchExample: "电商 Batch 示例",
         copyCustomerServiceExample: "AI 客服示例",
         capacityRateLimitsLink: "容量与限流",
+        online500Guide: "500 人在线指南",
+        retryRateLimitGuide: "重试与限流指南",
         largeVolumeIntegrationLink: "大批量接入",
         sessionKeyDocsNote:
           "点击「我已保存密钥」后，本浏览器会话仍会自动填充 Docs 示例。刷新页面会清空 — 若出现占位符请重新复制密钥或单行 curl。",
@@ -5465,6 +5518,15 @@ export const messages = {
           "503/504 — 网关或上游暂时不可用；稍后重试或换 auto-fast。",
         serviceUnavailableSafe:
           "API 服务可能暂时不可用。失败的请求不会改变您的密钥与积分余额。",
+        slowUpstreamTitle: "慢上游接入准备",
+        slowUpstreamNote:
+          "真实负载下 Chat 与 Image 可能需要数秒。控制并发、预期 429 / 503 / 504，并在 Usage / Credits 用成功请求的 request_id 对账。",
+        retryGuideTitle: "重试与限流指南",
+        retryGuideNote:
+          "429 — 降速并退避重试。503 / 504 — 等待重试或改用 Batch API。失败或被限流通常不扣费。",
+        batchVolumeTitle: "大批量流量用 Batch",
+        batchVolumeNote:
+          "数百或数千次生成请用 Batch API，而非无界同步 Chat — 一次提交、轮询、拉 items、逐条 request_id 对账。",
       },
       navApiKey: "API Key",
       navChatApi: "Chat API",
@@ -5626,6 +5688,35 @@ export const messages = {
           "Tokfai 排队或限流：慢速 Image、超出额度的 Chat 突发、过大同步批量。超限返回明确 error.code（如 too_many_requests、gateway_overloaded）— 而非系统失控。",
         clientBehavior:
           "推荐客户端：应用内并发控制在 25–50 路 Chat；大批量文案走 Batch；429/503 退避重试；记录 request_id。",
+        slowUpstreamTitle: "慢上游行为",
+        slowUpstreamBody:
+          "真实模型与图片生成可能需要数秒 — Chat 常见 2–8 秒，Image 8–30 秒。高并发时 Tokfai 可能排队或返回受控 429 / 503 / 504。成功响应含 request_id 与 credits_charged；失败、限流或超时通常不扣费。",
+        whyRateLimitsProtectTitle: "限流如何保护你的接入",
+        whyRateLimitsProtectBalance: "避免错误循环或部署失误在短时间内耗尽 credits。",
+        whyRateLimitsProtectUpstream: "在大量慢速生成任务时保持上游模型稳定。",
+        whyRateLimitsProtectGateway: "防止单个 API Key 占满共享网关影响其他客户。",
+        whenYouSee429Title: "看到 429 时怎么办",
+        whenYouSee429SlowDown:
+          "429 too_many_requests 或 too_many_concurrent_requests — 降低客户端并发并暂停新请求。",
+        whenYouSee429Backoff: "指数退避重试（如 1s、2s、4s），并限制并行在途请求数。",
+        whenYouSee429Batch: "大批量文案/分类改走 Batch API，而非成千上万次同步 Chat。",
+        whenYouSee503504Title: "看到 503 / 504 时怎么办",
+        whenYouSee503Retry:
+          "503 gateway_overloaded 或 upstream_model_busy — 等待后重试；持续慢可换 auto-fast。",
+        whenYouSee504Retry: "504 upstream_timeout — 上游慢；重试相同请求或降低 Image/Chat 并发。",
+        whenYouSee503504NotCharged:
+          "这些受控错误通常不扣费 — 仅在成功请求的 request_id 上核对 Usage/Credits。",
+        whyImageLowerConcurrency:
+          "Image API 并发应低于 Chat：单任务慢（常见 8–30 秒）且占用网关槽位更久。建议 Image 并发 5–15，503 时退避。",
+        whyBatchForVolume:
+          "大批量推荐 Batch API：一次提交数百/数千条，轮询状态、拉 items、逐条 request_id 对账 — 而非无界同步 Chat。",
+        customerRetryTitle: "客户侧重试建议",
+        customerRetryStep1: "每条 API 响应（成功或失败）都记录 request_id。",
+        customerRetryStep2: "429 — 降速、减并发、退避重试。",
+        customerRetryStep3: "503 / 504 — 等待、退避重试，或改用 Batch API。",
+        customerRetryStep4: "在 Usage / Credits 按 request_id 搜索 — 仅成功调用应扣费。",
+        customerRetryStep5: "持续高流量用 Batch API，峰值前分阶段加压（10 → 100 → 1,000）。",
+        readinessChecklistTitle: "500 人在线准备指南",
         higherLimitsTitle: "何时申请更高限额",
         higherLimitsBody:
           "完成接入验收与 Usage/Credits 对账后，向 Tokfai 提供峰值并发、Batch 规模与行业场景。商业 Key 可高于免费/测试 Key。",

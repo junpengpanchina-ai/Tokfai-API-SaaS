@@ -217,6 +217,29 @@ export function IntegrationWorkbenchPanel({
         </Button>
       </WorkbenchCard>
 
+      <WorkbenchCard icon={Activity} title={t("integration.workbench.slowUpstreamTitle")}>
+        <p className="text-sm text-muted-foreground">
+          {t("integration.workbench.slowUpstreamNote")}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/docs#capacity-and-rate-limits">
+              {t("integration.navCapacity")}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/docs#rate-limits-large-volume">
+              {t("integration.workbench.retryGuideTitle")}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/docs#batch-api">
+              {t("integration.workbench.batchVolumeTitle")}
+            </Link>
+          </Button>
+        </div>
+      </WorkbenchCard>
+
       <CapacityReadinessPanel idPrefix={`${idPrefix}-capacity-readiness`} />
 
       <div className="rounded-lg border border-amber-300/50 bg-amber-50/60 p-4 dark:border-amber-900/50 dark:bg-amber-950/30">

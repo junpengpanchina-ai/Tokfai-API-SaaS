@@ -386,6 +386,12 @@ export function ModelsClient({
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/docs#batch-api">
+              <BookOpen className="mr-1.5 h-4 w-4" />
+              {t("dashboard.models.footerHighTrafficBatch")}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
             <Link href="/dashboard/docs#capacity-and-rate-limits">
               <BookOpen className="mr-1.5 h-4 w-4" />
               {t("dashboard.models.footerCapacityGuide")}
@@ -431,7 +437,7 @@ export function ModelsClient({
       </Card>
 
       <p className="text-sm text-muted-foreground">
-        {t("dashboard.models.footerLargeVolumeNote")}
+        {t("dashboard.models.highTrafficBatchNote")}
       </p>
     </div>
   );
