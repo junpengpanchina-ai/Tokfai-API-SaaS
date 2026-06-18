@@ -1684,6 +1684,9 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
         ],
       },
       { type: "paragraph", textKey: "integration.serviceUnavailableRetry" },
+      { type: "paragraph", textKey: "integration.customerAcceptancePathTitle" },
+      { type: "paragraph", textKey: "integration.customerAcceptancePathSteps" },
+      { type: "paragraph", textKey: "integration.customerNeverOperatorScripts" },
       { type: "one-line-curl", id: "service-chat", titleKey: "integration.copyOneLineChatCurl", snippetKey: "chat-curl" },
       {
         type: "dashboard-links",

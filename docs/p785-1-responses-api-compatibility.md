@@ -138,14 +138,19 @@ Optional chat fields (`temperature`, `max_tokens`) are forwarded when present.
 - Failed requests do not debit credits.
 - `usage_logs.endpoint` is `/v1/responses` for this route.
 
-## Smoke tests
+## Smoke tests (operator — offline default)
 
 ```bash
+# Offline mock (no production traffic)
 node scripts/p785-1-responses-smoke.mjs
-TOKFAI_API_KEY=sk-tokfai_... node scripts/p785-1-responses-smoke.mjs
+
+# Live production (explicit opt-in, acceptance headers)
+LIVE=1 TOKFAI_API_KEY=sk-tokfai_... node scripts/p785-1-responses-smoke.mjs
 ```
 
-Manual curls (production):
+See `docs/p787-live-smoke-traffic-hygiene.md`.
+
+Manual curls (customer / operator spot-check on production):
 
 ```bash
 # 1. Missing token → 401 missing_token

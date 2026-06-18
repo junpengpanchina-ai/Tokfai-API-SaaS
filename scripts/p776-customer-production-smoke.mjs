@@ -23,11 +23,22 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const BASE = (process.env.TOKFAI_API_BASE ?? "https://api.tokfai.com/v1").replace(
-  /\/+$/,
-  ""
-);
-const API_KEY = process.env.TOKFAI_API_KEY ?? "";
+import {
+  DEFAULT_MOCK_KEY,
+  isLiveMode,
+  resolveApiBaseUrl,
+  printOfflineDefaultHint,
+} from "./lib/acceptance-config.mjs";
+import { acceptanceFetch } from "./lib/acceptance-http.mjs";
+import { ensureMockGateway } from "./lib/ensure-mock-gateway.mjs";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const SCRIPT = "scripts/p776-customer-production-smoke.mjs";
+const LIVE = isLiveMode();
+const BASE = resolveApiBaseUrl(LIVE);
+const API_KEY = LIVE
+  ? process.env.TOKFAI_API_KEY ?? ""
+  : process.env.TOKFAI_API_KEY ?? process.env.MOCK_API_KEY ?? DEFAULT_MOCK_KEY;
 const MODEL = (process.env.TOKFAI_MODEL ?? "auto-fast").trim();
 const BATCH_ITEM_COUNT = Math.max(
   1,
@@ -98,22 +109,12 @@ async function apiFetch(path, options = {}, timeoutMs = CHAT_TIMEOUT_MS) {
     headers["Content-Type"] = "application/json";
   }
 
-  const res = await fetch(`${BASE}${path}`, {
+  return acceptanceFetch(`${BASE}${path}`, {
     method: options.method ?? "GET",
     headers,
     body: options.body,
-    signal: AbortSignal.timeout(timeoutMs),
+    timeoutMs,
   });
-
-  const text = await res.text();
-  let body = {};
-  try {
-    body = text ? JSON.parse(text) : {};
-  } catch {
-    body = { parse_error: true, raw: truncate(text) };
-  }
-
-  return { res, body, text };
 }
 
 function buildBatchItems(count) {
@@ -123,8 +124,19 @@ function buildBatchItems(count) {
 }
 
 async function main() {
+  let mockChild = null;
+  if (!LIVE) {
+    printOfflineDefaultHint(SCRIPT);
+    console.log("");
+    const mock = await ensureMockGateway();
+    mockChild = mock.child;
+    console.log(`offline mock base: ${BASE}`);
+    console.log("");
+  }
+
   const report = {
     suite: "p776-customer-production-smoke",
+    mode: LIVE ? "live" : "offline-mock",
     timestamp: new Date().toISOString(),
     base: BASE,
     model: MODEL,
@@ -146,6 +158,7 @@ async function main() {
   }
 
   console.log("=== P776 customer production integration smoke ===");
+  console.log(`mode: ${LIVE ? "live" : "offline-mock"}`);
   console.log(`base: ${BASE}`);
   console.log(`model: ${MODEL}`);
   console.log(`api_key: ${maskKey(API_KEY) ?? "(not set — auth paths skipped)"}`);
@@ -202,15 +215,37 @@ async function main() {
   {
     const { res, body } = await apiFetch("/models", { auth: false });
     const count = Array.isArray(body?.data) ? body.data.length : 0;
-    const ok = res.status === 200 && count > 0;
+    const ok = LIVE
+      ? res.status === 200 && count > 0
+      : res.status === 401 && errorCode(body) === "missing_token";
     if (!ok) failures += 1;
-    step("models.public_catalog", ok, {
+    step(LIVE ? "models.public_catalog" : "models.offline_requires_auth", ok, {
       source: "GET /v1/models (no Authorization)",
-      expected: "HTTP 200, model list (public catalog)",
+      expected: LIVE
+        ? "HTTP 200, model list (public catalog)"
+        : "HTTP 401 missing_token on offline mock",
       http_status: res.status,
       model_count: count,
-      notes: "Tokfai exposes GET /v1/models without auth; handbook still uses Bearer for client parity.",
+      error_code: errorCode(body),
+      notes: LIVE
+        ? "Tokfai exposes GET /v1/models without auth on production."
+        : "Offline mock requires Bearer — production public catalog skipped.",
     });
+  }
+
+  if (!LIVE) {
+    step("auth_suite_offline_mock", true, {
+      source: "offline mock",
+      expected: "error probes on mock; set LIVE=1 for production auth suite",
+      notes: "Use LIVE=1 TOKFAI_API_KEY=... for full production suite.",
+    });
+
+    await mkdir(RESULTS_DIR, { recursive: true });
+    await writeFile(RESULTS_FILE, JSON.stringify(report, null, 2));
+    console.log(`Results: ${RESULTS_FILE}`);
+    console.log("PARTIAL PASS — offline error probes on mock; LIVE=1 for production suite");
+    if (mockChild) mockChild.kill();
+    process.exit(failures > 0 ? 1 : 0);
   }
 
   if (!API_KEY.startsWith("sk-tokfai_")) {

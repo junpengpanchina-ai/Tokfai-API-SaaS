@@ -2,16 +2,28 @@
 
 > Internal engineering note. Not for customer UI.
 
-## Operator smoke scripts
+## Customer path
 
-| Script | Purpose | Auth |
-|--------|---------|------|
-| `scripts/p776-customer-production-smoke.mjs` | API error probes + optional full auth suite | `TOKFAI_API_KEY` |
-| `scripts/p778-13-one-line-curl-regression.mjs` | One-line curl shell quoting + optional live | `TOKFAI_API_KEY` |
-| `scripts/p778-14-real-key-e2e-acceptance.mjs` | Create/revoke key + Usage/Credits API reconcile | `TOKFAI_SUPABASE_JWT` |
-| `scripts/p778-docs-customer-visible-grep.mjs` | Scan `apps/web` customer-visible strings | — |
+API Key → one-line curl → `request_id` → Dashboard Usage/Credits.  
+Documented in `/dashboard/docs` and API Keys success card only.
 
-All scripts write artifacts under `p776-smoke-results/` or `p778-live-smoke-results/` (gitignored).
+## Operator smoke scripts (P787 — offline default)
+
+| Script | Default | Live (`LIVE=1`) |
+|--------|---------|-----------------|
+| `scripts/p787-acceptance-runner.mjs` | P786 offline + grep | `p787-live-smoke.mjs` |
+| `scripts/p786-offline-customer-acceptance.mjs` | Mock gateway | — |
+| `scripts/p787-live-smoke.mjs` | Exits unless `LIVE=1` | One shot per endpoint |
+| `scripts/p776-customer-production-smoke.mjs` | Mock error probes | Full production suite |
+| `scripts/p778-13-one-line-curl-regression.mjs` | Mock shell probes | Live key + acceptance headers |
+| `scripts/p785-1-responses-smoke.mjs` | Mock | Production responses |
+| `scripts/p778-14-real-key-e2e-acceptance.mjs` | — | JWT E2E (live only) |
+| `scripts/p780-production-customer-live-walkthrough.mjs` | — | Live only |
+| `scripts/p778-docs-customer-visible-grep.mjs` | Static scan | — |
+
+See `docs/p787-live-smoke-traffic-hygiene.md` for headers and hygiene rules.
+
+Artifacts: `p776-smoke-results/`, `p778-live-smoke-results/`, `p787-live-smoke-results/`, `p786-offline-results/` (gitignored).
 
 ## Customer docs must not mention
 

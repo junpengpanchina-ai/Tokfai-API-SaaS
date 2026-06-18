@@ -1,21 +1,38 @@
 #!/usr/bin/env node
 /**
- * P785.1 — Responses API compatibility smoke tests.
+ * Internal operator smoke — not customer documentation.
+ *
+ * P785.1 / P787 — Responses API smoke (offline mock default).
  *
  * Usage:
  *   node scripts/p785-1-responses-smoke.mjs
- *   TOKFAI_API_KEY=sk-tokfai_... node scripts/p785-1-responses-smoke.mjs
- *
- * Optional:
- *   TOKFAI_API_BASE=https://api.tokfai.com
+ *   LIVE=1 TOKFAI_API_KEY=sk-tokfai_... node scripts/p785-1-responses-smoke.mjs
  */
 
-const BASE = (process.env.TOKFAI_API_BASE ?? "https://api.tokfai.com").replace(
-  /\/+$/,
-  ""
-);
-const API_KEY = process.env.TOKFAI_API_KEY ?? "";
+import {
+  DEFAULT_MOCK_KEY,
+  isLiveMode,
+  resolveApiBaseUrl,
+  printOfflineDefaultHint,
+} from "./lib/acceptance-config.mjs";
+import { acceptanceFetch } from "./lib/acceptance-http.mjs";
+import { ensureMockGateway } from "./lib/ensure-mock-gateway.mjs";
+
+const SCRIPT = "scripts/p785-1-responses-smoke.mjs";
+const LIVE = isLiveMode();
+let mockChild = null;
+
+if (!LIVE) {
+  const mock = await ensureMockGateway();
+  mockChild = mock.child;
+}
+
+const BASE = resolveApiBaseUrl(LIVE).replace(/\/v1$/, "");
 const RESPONSES_URL = `${BASE}/v1/responses`;
+const API_KEY = LIVE
+  ? process.env.TOKFAI_API_KEY ?? ""
+  : process.env.TOKFAI_API_KEY ?? process.env.MOCK_API_KEY ?? DEFAULT_MOCK_KEY;
+
 const CHAT_TIMEOUT_MS = Math.max(
   1000,
   parseInt(process.env.CHAT_TIMEOUT_MS ?? "120000", 10) || 120_000
@@ -29,27 +46,14 @@ async function postResponses({ auth, body }) {
   const headers = { "Content-Type": "application/json" };
   if (auth) headers.Authorization = `Bearer ${auth}`;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
+  const { res, body: json } = await acceptanceFetch(RESPONSES_URL, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    timeoutMs: CHAT_TIMEOUT_MS,
+  });
 
-  try {
-    const res = await fetch(RESPONSES_URL, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    const text = await res.text();
-    let json = null;
-    try {
-      json = text ? JSON.parse(text) : null;
-    } catch {
-      json = { _raw: text };
-    }
-    return { status: res.status, body: json };
-  } finally {
-    clearTimeout(timer);
-  }
+  return { status: res.status, body: json };
 }
 
 function pass(label) {
@@ -64,16 +68,21 @@ function fail(label, detail) {
 }
 
 async function run() {
+  if (!LIVE) {
+    printOfflineDefaultHint(SCRIPT);
+    console.log(`offline mock: ${RESPONSES_URL}`);
+    console.log("");
+  } else {
+    console.log(`live production: ${RESPONSES_URL}`);
+    console.log("");
+  }
+
   let ok = true;
 
-  // 1. Missing token
   const missing = await postResponses({
     body: { model: "auto-fast", input: "Say ok only." },
   });
-  if (
-    missing.status === 401 &&
-    errorCode(missing.body) === "missing_token"
-  ) {
+  if (missing.status === 401 && errorCode(missing.body) === "missing_token") {
     ok = pass("missing token → 401 missing_token") && ok;
   } else {
     ok =
@@ -83,15 +92,11 @@ async function run() {
       ) && ok;
   }
 
-  // 2. Invalid token
   const invalid = await postResponses({
     auth: "sk-tokfai_xxx",
     body: { model: "auto-fast", input: "Say ok only." },
   });
-  if (
-    invalid.status === 401 &&
-    errorCode(invalid.body) === "invalid_token"
-  ) {
+  if (invalid.status === 401 && errorCode(invalid.body) === "invalid_token") {
     ok = pass("invalid token → 401 invalid_token") && ok;
   } else {
     ok =
@@ -101,16 +106,15 @@ async function run() {
       ) && ok;
   }
 
-  if (!API_KEY) {
-    console.log(
-      "SKIP  real-key cases (set TOKFAI_API_KEY to run 3–5)"
-    );
+  if (!API_KEY.startsWith("sk-tokfai_")) {
+    console.log("SKIP  real-key cases (set TOKFAI_API_KEY or use offline MOCK_API_KEY)");
+    if (mockChild) mockChild.kill();
     process.exit(ok ? 0 : 1);
   }
 
   const realCases = [
     {
-      label: "real key string input → 200",
+      label: LIVE ? "live real key string input → 200" : "mock real key string input → 200",
       body: { model: "auto-fast", input: "Say ok only." },
     },
     {
@@ -155,6 +159,7 @@ async function run() {
     }
   }
 
+  if (mockChild) mockChild.kill();
   process.exit(ok ? 0 : 1);
 }
 

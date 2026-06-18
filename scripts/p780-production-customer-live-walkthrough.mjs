@@ -17,11 +17,12 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { exitUnlessLive, resolveApiBaseUrl } from "./lib/acceptance-config.mjs";
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const BASE = (process.env.TOKFAI_API_BASE ?? "https://api.tokfai.com/v1").replace(
-  /\/+$/,
-  ""
-);
+const SCRIPT = "scripts/p780-production-customer-live-walkthrough.mjs";
+exitUnlessLive(SCRIPT);
+const BASE = resolveApiBaseUrl(true);
 const JWT =
   process.env.TOKFAI_SUPABASE_JWT ?? process.env.SUPABASE_ACCESS_TOKEN ?? "";
 const MODEL = (process.env.TOKFAI_MODEL ?? "auto-fast").trim();

@@ -17,11 +17,25 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  isLiveMode,
+  resolveApiBaseUrl,
+  printOfflineDefaultHint,
+} from "./lib/acceptance-config.mjs";
+import { ACCEPTANCE_CURL_HEADER_FLAGS } from "./lib/acceptance-http.mjs";
+import { ensureMockGateway } from "./lib/ensure-mock-gateway.mjs";
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const BASE = (process.env.TOKFAI_API_BASE ?? "https://api.tokfai.com/v1").replace(
-  /\/+$/,
-  ""
-);
+const SCRIPT = "scripts/p778-13-one-line-curl-regression.mjs";
+const LIVE = isLiveMode();
+let mockChild = null;
+
+if (!LIVE) {
+  const mock = await ensureMockGateway();
+  mockChild = mock.child;
+}
+
+const BASE = resolveApiBaseUrl(LIVE);
 const API_KEY = process.env.TOKFAI_API_KEY ?? "";
 const PLACEHOLDER = "sk-tokfai_xxx";
 const MODEL = (process.env.TOKFAI_MODEL ?? "auto-fast").trim();
@@ -37,17 +51,19 @@ function shellSingleQuotedJson(value) {
   return JSON.stringify(value).replace(/'/g, "'\\''");
 }
 
-function chatCurlOneLine(apiKey = PLACEHOLDER) {
+function chatCurlOneLine(apiKey = PLACEHOLDER, liveHeaders = false) {
   const body = shellSingleQuotedJson({
     model: MODEL,
     messages: [{ role: "user", content: "Say ok only." }],
     stream: false,
   });
-  return `curl -sS ${BASE}/chat/completions -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d '${body}'`;
+  const extra = liveHeaders ? ` ${ACCEPTANCE_CURL_HEADER_FLAGS}` : "";
+  return `curl -sS ${BASE}/chat/completions -H "Authorization: Bearer ${apiKey}"${extra} -H "Content-Type: application/json" -d '${body}'`;
 }
 
-function modelsCurlOneLine(apiKey = PLACEHOLDER) {
-  return `curl -sS ${BASE}/models -H "Authorization: Bearer ${apiKey}"`;
+function modelsCurlOneLine(apiKey = PLACEHOLDER, liveHeaders = false) {
+  const extra = liveHeaders ? ` ${ACCEPTANCE_CURL_HEADER_FLAGS}` : "";
+  return `curl -sS ${BASE}/models -H "Authorization: Bearer ${apiKey}"${extra}`;
 }
 
 function imageCurlOneLine(apiKey = PLACEHOLDER) {
@@ -61,7 +77,7 @@ function imageCurlOneLine(apiKey = PLACEHOLDER) {
   return `curl -sS ${BASE}/images/generations -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d '${body}'`;
 }
 
-function batchCreateCurlOneLine(apiKey = PLACEHOLDER) {
+function batchCreateCurlOneLine(apiKey = PLACEHOLDER, liveHeaders = false) {
   const body = shellSingleQuotedJson({
     model: MODEL,
     items: [
@@ -70,7 +86,8 @@ function batchCreateCurlOneLine(apiKey = PLACEHOLDER) {
       { messages: [{ role: "user", content: "Say hi only." }] },
     ],
   });
-  return `curl -sS ${BASE}/batches/chat -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d '${body}'`;
+  const extra = liveHeaders ? ` ${ACCEPTANCE_CURL_HEADER_FLAGS}` : "";
+  return `curl -sS ${BASE}/batches/chat -H "Authorization: Bearer ${apiKey}"${extra} -H "Content-Type: application/json" -d '${body}'`;
 }
 
 function batchPollCurlOneLine(apiKey = PLACEHOLDER, batchId = "batch_xxx") {
@@ -180,6 +197,7 @@ function resolvedModel(body) {
 async function main() {
   const report = {
     suite: "p778-13-one-line-curl-regression",
+    mode: LIVE ? "live" : "offline-mock",
     timestamp: new Date().toISOString(),
     base: BASE,
     model: MODEL,
@@ -190,6 +208,10 @@ async function main() {
   };
 
   console.log("=== P778.13 one-line curl regression ===");
+  if (!LIVE) {
+    printOfflineDefaultHint(SCRIPT);
+  }
+  console.log(`mode: ${LIVE ? "live" : "offline-mock"}`);
   console.log(`base: ${BASE}`);
   console.log(`api_key: ${maskKey(API_KEY) ?? "(not set — live auth skipped)"}`);
   console.log("");
@@ -248,14 +270,14 @@ async function main() {
     report.curls.push(row);
   }
 
-  if (API_KEY.startsWith("sk-tokfai_")) {
+  if (LIVE && API_KEY.startsWith("sk-tokfai_")) {
     console.log("");
-    console.log("--- Live API (real key) ---");
+    console.log("--- Live API (real key, acceptance headers) ---");
 
     const liveCases = [
-      { id: "live-chat", label: "Chat curl", curl: chatCurlOneLine(API_KEY) },
-      { id: "live-models", label: "Models curl", curl: modelsCurlOneLine(API_KEY) },
-      { id: "live-batch-create", label: "Batch create curl", curl: batchCreateCurlOneLine(API_KEY) },
+      { id: "live-chat", label: "Chat curl", curl: chatCurlOneLine(API_KEY, true) },
+      { id: "live-models", label: "Models curl", curl: modelsCurlOneLine(API_KEY, true) },
+      { id: "live-batch-create", label: "Batch create curl", curl: batchCreateCurlOneLine(API_KEY, true) },
     ];
 
     for (const item of liveCases) {
@@ -298,10 +320,14 @@ async function main() {
         console.log(`[FAIL] ${item.id} — ${truncate(err.message)}`);
       }
     }
-  } else {
-    report.live_skipped = "Set TOKFAI_API_KEY for live HTTP 200 chat/models/batch checks.";
+  } else if (LIVE) {
+    report.live_skipped = "Set TOKFAI_API_KEY and LIVE=1 for live HTTP 200 chat/models/batch checks.";
     console.log("");
     console.log("Live auth suite skipped — set TOKFAI_API_KEY for HTTP 200 verification.");
+  } else {
+    report.live_skipped = "Offline mock shell probes only. LIVE=1 TOKFAI_API_KEY=... for production.";
+    console.log("");
+    console.log("Live suite skipped — offline mock mode (use LIVE=1 for production).");
   }
 
   await mkdir(RESULTS_DIR, { recursive: true });
@@ -309,6 +335,7 @@ async function main() {
 
   console.log("");
   console.log(`Results: ${RESULTS_FILE}`);
+  if (mockChild) mockChild.kill();
   if (failures > 0) {
     console.error(`FAILED (${failures} checks)`);
     process.exit(1);

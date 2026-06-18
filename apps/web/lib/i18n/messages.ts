@@ -2742,6 +2742,11 @@ export const messages = {
         "insufficient_credits — Balance too low. Open Credits to top up, then retry.",
       serviceUnavailableRetry:
         "Do not run repository scripts or internal operator commands. If curl keeps failing with 502–504 after retries, wait and try again — Tokfai is an API gateway; your apps stay on your stack.",
+      customerAcceptancePathTitle: "Your acceptance path (customer only)",
+      customerAcceptancePathSteps:
+        "Create API Key → copy one-line Chat curl from the success card → paste in any terminal → copy request_id from the JSON response → search it in Usage and Credits.",
+      customerNeverOperatorScripts:
+        "Tokfai engineering runs internal smoke scripts separately. Customers never need node scripts, repository checkout, or dashboard JWT in the terminal.",
       codeColumn: "Code",
       meaningColumn: "What to do",
       billingTitle: "Usage & Credits",
@@ -6138,6 +6143,11 @@ export const messages = {
         "insufficient_credits — 余额不足。打开 Credits 充值后重试。",
       serviceUnavailableRetry:
         "不要运行仓库脚本或内部运维命令。若 curl 持续 502–504，请稍后重试 — Tokfai 是 API 网关，你的应用仍在自己的技术栈上。",
+      customerAcceptancePathTitle: "你的验收路径（仅客户）",
+      customerAcceptancePathSteps:
+        "创建 API Key → 在成功卡复制单行 Chat curl → 在任意终端粘贴 → 从 JSON 复制 request_id → 在 Usage 与 Credits 中搜索核对。",
+      customerNeverOperatorScripts:
+        "Tokfai 工程团队单独运行内部 smoke 脚本。客户无需 node scripts、clone 仓库或在终端使用 Dashboard JWT。",
       codeColumn: "错误码",
       meaningColumn: "处理建议",
       billingTitle: "Usage 与 Credits",

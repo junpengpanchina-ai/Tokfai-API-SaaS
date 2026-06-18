@@ -3,18 +3,17 @@
  * P767.4 — Production UX smoke (API key auth, no dashboard JWT).
  *
  * Usage:
- *   TOKFAI_API_KEY=sk-tokfai_... node scripts/production-ux-smoke.mjs
+ *   LIVE=1 TOKFAI_API_KEY=sk-tokfai_... node scripts/production-ux-smoke.mjs
  *
- * Optional:
- *   TOKFAI_API_BASE=https://api.tokfai.com/v1
- *   MODEL=auto-fast
- *   TIMEOUT_MS=120000
+ * Offline default: node scripts/p786-offline-customer-acceptance.mjs
  */
 
-const BASE = (process.env.TOKFAI_API_BASE ?? "https://api.tokfai.com/v1").replace(
-  /\/+$/,
-  ""
-);
+import { exitUnlessLive, resolveApiBaseUrl } from "./lib/acceptance-config.mjs";
+import { acceptanceFetch } from "./lib/acceptance-http.mjs";
+
+const SCRIPT = "scripts/production-ux-smoke.mjs";
+exitUnlessLive(SCRIPT);
+const BASE = resolveApiBaseUrl(true);
 const API_KEY = process.env.TOKFAI_API_KEY ?? "";
 const MODEL = (process.env.MODEL ?? "auto-fast").trim();
 const TIMEOUT_MS = Math.max(
@@ -35,18 +34,13 @@ function truncate(text, max = 240) {
 
 async function fetchJson(path, init = {}) {
   const url = `${BASE}${path.startsWith("/") ? path : `/${path}`}`;
-  const res = await fetch(url, {
-    ...init,
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+  const { res, body, text } = await acceptanceFetch(url, {
+    method: init.method ?? "GET",
+    headers: init.headers,
+    body: init.body,
+    timeoutMs: TIMEOUT_MS,
   });
-  const text = await res.text();
-  let body = {};
-  try {
-    body = text ? JSON.parse(text) : {};
-  } catch {
-    body = { raw: truncate(text) };
-  }
-  return { url, res, body, text };
+  return { url, res, body, text: typeof text === "string" ? text : JSON.stringify(body) };
 }
 
 function printApiError(res, body) {

@@ -21,11 +21,13 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { exitUnlessLive, resolveApiBaseUrl } from "./lib/acceptance-config.mjs";
+import { acceptanceFetch } from "./lib/acceptance-http.mjs";
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const BASE = (process.env.TOKFAI_API_BASE ?? "https://api.tokfai.com/v1").replace(
-  /\/+$/,
-  ""
-);
+const SCRIPT = "scripts/p778-14-real-key-e2e-acceptance.mjs";
+exitUnlessLive(SCRIPT);
+const BASE = resolveApiBaseUrl(true);
 const JWT =
   process.env.TOKFAI_SUPABASE_JWT ?? process.env.SUPABASE_ACCESS_TOKEN ?? "";
 const MODEL = (process.env.TOKFAI_MODEL ?? "auto-fast").trim();
@@ -66,22 +68,16 @@ function sleep(ms) {
 
 async function jwtFetch(path, init = {}) {
   const url = `${BASE}${path.startsWith("/") ? path : `/${path}`}`;
-  const res = await fetch(url, {
-    ...init,
+  const { res, body } = await acceptanceFetch(url, {
+    method: init.method ?? "GET",
     headers: {
       Authorization: `Bearer ${JWT}`,
       "Content-Type": "application/json",
       ...(init.headers ?? {}),
     },
-    signal: AbortSignal.timeout(CHAT_TIMEOUT_MS),
+    body: init.body,
+    timeoutMs: CHAT_TIMEOUT_MS,
   });
-  const text = await res.text();
-  let body = {};
-  try {
-    body = text ? JSON.parse(text) : {};
-  } catch {
-    body = { raw: text.slice(0, 400) };
-  }
   return { res, body, url };
 }
 
