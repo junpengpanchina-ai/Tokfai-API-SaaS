@@ -57,6 +57,67 @@ function authFailure(code, message) {
   };
 }
 
+const MOCK_BACKPRESSURE = process.env.MOCK_BACKPRESSURE === "1";
+const CHAT_CONCURRENCY_LIMIT = parseInt(process.env.CHAT_CONCURRENCY_LIMIT ?? "0", 10);
+const IMAGE_CONCURRENCY_LIMIT = parseInt(process.env.IMAGE_CONCURRENCY_LIMIT ?? "0", 10);
+const BATCH_CONCURRENCY_LIMIT = parseInt(process.env.BATCH_CONCURRENCY_LIMIT ?? "0", 10);
+
+let chatInFlight = 0;
+let imageInFlight = 0;
+let batchInFlight = 0;
+
+function rateLimitedResponse(code) {
+  const requestId = makeRequestId();
+  const status = code === "too_many_requests" ? 429 : 503;
+  return {
+    status,
+    body: {
+      error: {
+        message:
+          code === "too_many_requests"
+            ? "Too many concurrent requests."
+            : "Gateway temporarily overloaded.",
+        code,
+        type: "rate_limit_error",
+      },
+      request_id: requestId,
+    },
+  };
+}
+
+function acquireConcurrencySlot(kind) {
+  if (!MOCK_BACKPRESSURE) return { ok: true };
+  const limits = {
+    chat: CHAT_CONCURRENCY_LIMIT,
+    image: IMAGE_CONCURRENCY_LIMIT,
+    batch: BATCH_CONCURRENCY_LIMIT,
+  };
+  const limit = limits[kind] ?? 0;
+  if (!limit) return { ok: true };
+
+  const counters = { chat: chatInFlight, image: imageInFlight, batch: batchInFlight };
+  if (counters[kind] >= limit) {
+    const code =
+      kind === "image" && imageInFlight >= limit
+        ? "gateway_overloaded"
+        : "too_many_requests";
+    return { ok: false, response: rateLimitedResponse(code) };
+  }
+
+  if (kind === "chat") chatInFlight += 1;
+  if (kind === "image") imageInFlight += 1;
+  if (kind === "batch") batchInFlight += 1;
+
+  return {
+    ok: true,
+    release: () => {
+      if (kind === "chat") chatInFlight = Math.max(0, chatInFlight - 1);
+      if (kind === "image") imageInFlight = Math.max(0, imageInFlight - 1);
+      if (kind === "batch") batchInFlight = Math.max(0, batchInFlight - 1);
+    },
+  };
+}
+
 function checkAuth(req, validKey = VALID_KEY) {
   const token = parseBearer(req);
   if (!token) {
@@ -298,29 +359,53 @@ export function startMockGateway(options = {}) {
       if (req.method === "POST" && path === "/v1/chat/completions") {
         const authErr = checkAuth(req, validKey);
         if (authErr) return sendJson(res, authErr.status, authErr.body);
-        const body = await readJsonBody(req);
-        return sendJson(res, 200, chatCompletionBody(body));
+        const slot = acquireConcurrencySlot("chat");
+        if (!slot.ok) return sendJson(res, slot.response.status, slot.response.body);
+        try {
+          const body = await readJsonBody(req);
+          return sendJson(res, 200, chatCompletionBody(body));
+        } finally {
+          slot.release?.();
+        }
       }
 
       if (req.method === "POST" && path === "/v1/responses") {
         const authErr = checkAuth(req, validKey);
         if (authErr) return sendJson(res, authErr.status, authErr.body);
-        const body = await readJsonBody(req);
-        return sendJson(res, 200, responsesBody(body));
+        const slot = acquireConcurrencySlot("chat");
+        if (!slot.ok) return sendJson(res, slot.response.status, slot.response.body);
+        try {
+          const body = await readJsonBody(req);
+          return sendJson(res, 200, responsesBody(body));
+        } finally {
+          slot.release?.();
+        }
       }
 
       if (req.method === "POST" && path === "/v1/images/generations") {
         const authErr = checkAuth(req, validKey);
         if (authErr) return sendJson(res, authErr.status, authErr.body);
-        const body = await readJsonBody(req);
-        return sendJson(res, 200, imageGenerationBody(body));
+        const slot = acquireConcurrencySlot("image");
+        if (!slot.ok) return sendJson(res, slot.response.status, slot.response.body);
+        try {
+          const body = await readJsonBody(req);
+          return sendJson(res, 200, imageGenerationBody(body));
+        } finally {
+          slot.release?.();
+        }
       }
 
       if (req.method === "POST" && path === "/v1/batches/chat") {
         const authErr = checkAuth(req, validKey);
         if (authErr) return sendJson(res, authErr.status, authErr.body);
-        const body = await readJsonBody(req);
-        return sendJson(res, 200, createBatch(body));
+        const slot = acquireConcurrencySlot("batch");
+        if (!slot.ok) return sendJson(res, slot.response.status, slot.response.body);
+        try {
+          const body = await readJsonBody(req);
+          return sendJson(res, 200, createBatch(body));
+        } finally {
+          slot.release?.();
+        }
       }
 
       const batchMatch = path.match(/^\/v1\/batches\/([^/]+)(\/items)?$/);

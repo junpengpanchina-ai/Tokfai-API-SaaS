@@ -124,6 +124,7 @@ export type CustomerDocBlock =
   | { type: "industry-copy-panel"; id: string }
   | { type: "integration-workbench-panel"; id: string }
   | { type: "industry-template-pack"; id: string }
+  | { type: "capacity-model-panel"; id: string; showReadiness?: boolean }
   | { type: "industry-overview-table" }
   | { type: "error-table" }
   | { type: "error-examples-panel"; id: string }
@@ -1498,10 +1499,78 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
           { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
           { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
           {
+            id: "capacity-docs",
+            labelKey: "integration.navCapacity",
+            href: "/dashboard/docs",
+            hash: "capacity-and-rate-limits",
+          },
+          {
             id: "rate-limits-docs",
             labelKey: "integration.navRateLimits",
             href: "/dashboard/docs",
             hash: "rate-limits-large-volume",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "capacity-and-rate-limits",
+    navKey: "integration.navCapacity",
+    titleKey: "integration.capacity.title",
+    descriptionKey: "integration.capacity.desc",
+    highlight: true,
+    chapterGuide: chapter(
+      "integration.capacity.chapterPurpose",
+      "integration.capacity.chapterCopy",
+      "integration.capacity.chapterVerify",
+      "integration.capacity.chapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "batch-docs",
+        labelKey: "integration.navBatch",
+        href: "/dashboard/docs",
+        hash: "batch-api",
+      },
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "paragraph", textKey: "integration.capacity.whatOnlineMeans" },
+      { type: "paragraph", textKey: "integration.capacity.immediateHandling" },
+      { type: "paragraph", textKey: "integration.capacity.queuedLimited" },
+      { type: "paragraph", textKey: "integration.capacity.clientBehavior" },
+      { type: "capacity-model-panel", id: "capacity-model", showReadiness: true },
+      { type: "paragraph", textKey: "integration.capacity.higherLimitsTitle" },
+      { type: "paragraph", textKey: "integration.capacity.higherLimitsBody" },
+      {
+        type: "dashboard-links",
+        links: [
+          {
+            id: "batch-api",
+            labelKey: "integration.navBatch",
+            href: "/dashboard/docs",
+            hash: "batch-api",
+          },
+          {
+            id: "rate-limits",
+            labelKey: "integration.navRateLimits",
+            href: "/dashboard/docs",
+            hash: "rate-limits-large-volume",
+          },
+          {
+            id: "industry-examples",
+            labelKey: "integration.navIndustry",
+            href: "/dashboard/docs",
+            hash: "industry-examples",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+          {
+            id: "service-unavailable",
+            labelKey: "integration.navServiceUnavailable",
+            href: "/dashboard/docs",
+            hash: "service-unavailable",
           },
         ],
       },

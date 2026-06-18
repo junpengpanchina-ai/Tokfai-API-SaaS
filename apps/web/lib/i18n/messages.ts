@@ -364,6 +364,8 @@ export const messages = {
         footerApiKeys: "Create API key",
         footerStartIntegration: "Start integration",
         footerIndustryTemplates: "Industry templates",
+        footerCapacityGuide: "Capacity & rate limits",
+        footerLargeVolumeNote: "For large-volume traffic, use Batch API and the capacity guide.",
         footerQuickStart: "Quick Start curl",
         footerUsage: "Check Usage",
         footerDocs: "View integration docs",
@@ -621,6 +623,8 @@ export const messages = {
         copyAutoServiceExample: "Auto service API example",
         copyEcommerceBatchExample: "Ecommerce Batch example",
         copyCustomerServiceExample: "AI customer service example",
+        capacityRateLimitsLink: "Capacity & rate limits",
+        largeVolumeIntegrationLink: "Large-volume integration",
         sessionKeyDocsNote:
           "After you save your key, this browser session still fills Docs examples. Refreshing clears it — copy your key or one-line curl again if you see a placeholder.",
         tryChatPlayground: "Try Chat Playground",
@@ -1703,6 +1707,7 @@ export const messages = {
       navIndustry: "Industry API examples",
       navProductionUse: "Production use",
       navRateLimits: "Rate limits & large volume",
+      navCapacity: "Capacity & rate limits",
       navCommercialFaq: "Commercial FAQ",
       chapterGuidePurpose: "What this chapter solves",
       chapterGuideCopy: "What to copy",
@@ -1840,6 +1845,122 @@ export const messages = {
         "invalid_token, missing_token, model_not_available, upstream_timeout, and most other errors are usually not charged.",
       productionUseBillingSource:
         "Usage and Credits pages are the source of truth — reconcile by request_id.",
+      capacity: {
+        title: "Capacity & rate limits (500 online users)",
+        desc:
+          "How Tokfai stays stable with many dashboard users online — without promising 500 simultaneous generation jobs upstream.",
+        chapterPurpose:
+          "Plan for ~500 online users while keeping API concurrency controlled and traceable.",
+        chapterCopy:
+          "Use Batch API for large generation volume, respect rate limits, and reconcile every request_id.",
+        chapterVerify:
+          "Successful requests return request_id and credits_charged; match them in Usage / Credits.",
+        chapterFailure:
+          "429 / 503 / upstream_timeout are controlled responses — retry with backoff or switch to Batch API.",
+        whatOnlineMeans:
+          "“500 online users” means many people can use the Dashboard, manage API Keys, and send API traffic at the same time — not 500 generation requests hitting upstream in one instant.",
+        immediateHandling:
+          "Tokfai handles immediately: Dashboard reads, API Key management, lightweight GET /v1/models, and interactive Chat requests within your concurrency tier.",
+        queuedLimited:
+          "Tokfai queues or limits: slow Image generation, burst Chat traffic beyond your tier, and oversized sync batches. Beyond limits you get clear error.code values (for example too_many_requests, gateway_overloaded) — not an uncontrolled crash.",
+        clientBehavior:
+          "Recommended client behavior: cap in-app concurrency (25–50 sync Chat calls), send large copy jobs via Batch API, retry 429/503 with backoff, and log every request_id.",
+        higherLimitsTitle: "When to request higher limits",
+        higherLimitsBody:
+          "After integration acceptance and Usage/Credits reconciliation, contact Tokfai support with your peak concurrency, Batch volume, and industry scenario. Business keys can receive higher limits than free/testing keys.",
+        summaryTitle: "Capacity summary",
+        summary:
+          "500 online users does not mean sending 500 generation requests upstream at the same moment. Tokfai separates traffic into interactive requests, slow generation requests, and batch jobs. Rate limits and concurrency guards keep the gateway stable, and request_id lets you reconcile Usage and Credits.",
+        targetOnlineUsers: "Online users target",
+        targetSyncConcurrency: "Recommended sync Chat concurrency (per key / app)",
+        targetBatchQueue: "Recommended Batch queue (items)",
+        targetImageConcurrency: "Recommended Image concurrency (lower than Chat)",
+        layersTitle: "Capacity layers",
+        layers: {
+          dashboard: {
+            title: "Web dashboard online users",
+            desc: "Dashboard, Docs, Usage, and Credits reads scale for many signed-in users.",
+          },
+          apiKeys: {
+            title: "Auth & API Key management",
+            desc: "Key create/reveal/revoke uses session auth — separate from generation API concurrency.",
+          },
+          chatSync: {
+            title: "Chat API (sync)",
+            desc: "Interactive Chat completions — keep concurrency modest; use auto-fast for routine traffic.",
+          },
+          imageSlow: {
+            desc: "Image generation is slower — lower concurrency than Chat; reconcile request_id per image.",
+            title: "Image API (slow requests)",
+          },
+          batchAsync: {
+            title: "Batch API (async queue)",
+            desc: "Large copy / classification jobs — submit once, poll status, fetch items, reconcile each request_id.",
+          },
+          usageCredits: {
+            title: "Usage / Credits reconciliation",
+            desc: "Every successful API call should log request_id; failed or limited calls are usually not charged.",
+          },
+        },
+        apiTableTitle: "Chat vs Image vs Batch",
+        apiColEndpoint: "API",
+        apiColConcurrency: "Concurrency guidance",
+        apiColBehavior: "Behavior",
+        api: {
+          chat: {
+            endpoint: "POST /v1/chat/completions",
+            concurrency: "25–50 concurrent sync requests per app (tier-dependent)",
+            behavior: "Immediate when under limit; 429 when over limit",
+            reconcile: "request_id → Usage → Credits",
+          },
+          image: {
+            endpoint: "POST /v1/images/generations",
+            concurrency: "5–15 concurrent (lower than Chat)",
+            behavior: "Slow generation; queue or 503 when saturated",
+            reconcile: "request_id, credits_charged, data[0].url",
+          },
+          batch: {
+            endpoint: "POST /v1/batches/chat",
+            concurrency: "Async — queue 500–1,000 items per job",
+            behavior: "Submit, poll GET /v1/batches/{id}, list items",
+            reconcile: "Batch credits_charged + per-item request_id",
+          },
+        },
+        errorsTitle: "429 / 503 / upstream_timeout",
+        errors: {
+          tooManyRequests:
+            "429 too_many_requests — slow down or reduce client concurrency; retry with backoff.",
+          gatewayOverloaded:
+            "503 gateway_overloaded — temporary saturation; retry later or use Batch API.",
+          upstreamTimeout:
+            "504 upstream_timeout — upstream slow; retry or switch model alias (for example auto-fast).",
+        },
+        industryTitle: "Industry traffic patterns",
+        industry: {
+          hospital:
+            "Hospital / clinic: prefer Batch for intake text batches; keep live Chat concurrency low; staff reviews all output.",
+          automotive:
+            "Auto service: mix Chat tickets with Batch classification; images for damage docs at low concurrency.",
+          ecommerce:
+            "E-commerce: Batch for SKU copy at scale; Image API for listing assets — not one sync call per SKU at peak.",
+          support:
+            "AI customer service: cap live reply concurrency; Batch for ticket classification; reconcile every request_id.",
+        },
+        readinessTitle: "500 online readiness guide",
+        readinessDesc:
+          "Before peak traffic: verify integration, set client concurrency caps, and confirm Usage/Credits reconciliation.",
+        readinessDocsLink: "Open capacity guide",
+        readiness: {
+          item1: "Copy one-line Chat curl from API Keys and confirm HTTP 200 + request_id.",
+          item2: "Set client Chat concurrency to 25–50; never fire unbounded parallel sync calls.",
+          item3: "Route large copy / classification jobs to Batch API instead of thousands of Chat calls.",
+          item4: "Cap Image API concurrency below Chat; queue or backoff on 503.",
+          item5: "Log request_id in your app; search Usage and Credits after each test batch.",
+          item6: "Handle 429 / 503 / upstream_timeout with retry — they protect stability.",
+          item7: "If API service is temporarily unavailable, your key and credits are not changed by failed requests.",
+          item8: "Request higher limits after acceptance with your peak concurrency and Batch volume.",
+        },
+      },
       rateLimitsTitle: "Rate limits & large volume",
       rateLimitsDesc:
         "How to scale call volume safely with Batch API, staged load tests, and retries.",
@@ -4096,6 +4217,8 @@ export const messages = {
         footerApiKeys: "创建 API Key",
         footerStartIntegration: "开始接入",
         footerIndustryTemplates: "行业模板",
+        footerCapacityGuide: "容量与限流",
+        footerLargeVolumeNote: "大批量流量请使用 Batch API 并阅读容量指南。",
         footerQuickStart: "Quick Start curl",
         footerUsage: "查看 Usage",
         footerDocs: "查看接入文档",
@@ -4333,6 +4456,8 @@ export const messages = {
         copyAutoServiceExample: "车企售后 API 示例",
         copyEcommerceBatchExample: "电商 Batch 示例",
         copyCustomerServiceExample: "AI 客服示例",
+        capacityRateLimitsLink: "容量与限流",
+        largeVolumeIntegrationLink: "大批量接入",
         sessionKeyDocsNote:
           "点击「我已保存密钥」后，本浏览器会话仍会自动填充 Docs 示例。刷新页面会清空 — 若出现占位符请重新复制密钥或单行 curl。",
         tryChatPlayground: "打开 Chat Playground",
@@ -5354,6 +5479,7 @@ export const messages = {
       navIndustry: "行业 API 接入示例",
       navProductionUse: "生产上线",
       navRateLimits: "限流与大批量调用",
+      navCapacity: "容量与限流",
       navCommercialFaq: "商业与采购 FAQ",
       chapterGuidePurpose: "本章解决什么问题",
       chapterGuideCopy: "需要复制什么",
@@ -5480,6 +5606,115 @@ export const messages = {
         "invalid_token、missing_token、model_not_available、upstream_timeout 等失败通常不扣费。",
       productionUseBillingSource:
         "以 Usage 与 Credits 页面为准——用 request_id 对账。",
+      capacity: {
+        title: "容量与限流（500 人在线）",
+        desc:
+          "多人在线使用 Dashboard 时如何保持稳定 — 不承诺 500 个生成任务同时打上游。",
+        chapterPurpose:
+          "在约 500 人在线场景下，控制 API 并发并可追踪 request_id。",
+        chapterCopy:
+          "大批量生成走 Batch API，遵守限流，并用 request_id 对账 Usage / Credits。",
+        chapterVerify:
+          "成功响应含 request_id 与 credits_charged — 在 Usage / Credits 核对。",
+        chapterFailure:
+          "429 / 503 / upstream_timeout 是受控响应 — 退避重试或改用 Batch API。",
+        whatOnlineMeans:
+          "「500 人在线」指多人可同时使用 Dashboard、管理 API Key 并发送 API 流量 — 不等于 500 个生成请求同一瞬间打上游。",
+        immediateHandling:
+          "Tokfai 即时处理：Dashboard 读取、API Key 管理、GET /v1/models，以及在并发额度内的交互式 Chat。",
+        queuedLimited:
+          "Tokfai 排队或限流：慢速 Image、超出额度的 Chat 突发、过大同步批量。超限返回明确 error.code（如 too_many_requests、gateway_overloaded）— 而非系统失控。",
+        clientBehavior:
+          "推荐客户端：应用内并发控制在 25–50 路 Chat；大批量文案走 Batch；429/503 退避重试；记录 request_id。",
+        higherLimitsTitle: "何时申请更高限额",
+        higherLimitsBody:
+          "完成接入验收与 Usage/Credits 对账后，向 Tokfai 提供峰值并发、Batch 规模与行业场景。商业 Key 可高于免费/测试 Key。",
+        summaryTitle: "容量摘要",
+        summary:
+          "500 人在线不等于 500 个生成任务同时冲上游。Tokfai 将流量分为即时请求、慢速生成与批量任务。限流与并发保护维持网关稳定，request_id 用于 Usage / Credits 对账。",
+        targetOnlineUsers: "在线用户目标",
+        targetSyncConcurrency: "推荐同步 Chat 并发（每应用）",
+        targetBatchQueue: "推荐 Batch 队列（条数）",
+        targetImageConcurrency: "推荐 Image 并发（低于 Chat）",
+        layersTitle: "容量分层",
+        layers: {
+          dashboard: {
+            title: "Web Dashboard 在线用户",
+            desc: "Dashboard、Docs、Usage、Credits 读取可支撑多用户同时在线。",
+          },
+          apiKeys: {
+            title: "鉴权与 API Key 管理",
+            desc: "创建/复制/吊销 Key 走会话鉴权 — 与生成 API 并发分开计量。",
+          },
+          chatSync: {
+            title: "Chat API（同步）",
+            desc: "交互式对话 — 控制并发；日常流量可用 auto-fast。",
+          },
+          imageSlow: {
+            title: "Image API（慢请求）",
+            desc: "图片生成更慢 — 并发应低于 Chat；每张图按 request_id 对账。",
+          },
+          batchAsync: {
+            title: "Batch API（异步队列）",
+            desc: "大批量文案/分类 — 一次提交、轮询状态、拉 items、逐个 request_id 对账。",
+          },
+          usageCredits: {
+            title: "Usage / Credits 对账",
+            desc: "成功 API 调用应记录 request_id；失败或被限流通常不扣费。",
+          },
+        },
+        apiTableTitle: "Chat / Image / Batch 对比",
+        apiColEndpoint: "API",
+        apiColConcurrency: "并发建议",
+        apiColBehavior: "行为",
+        api: {
+          chat: {
+            endpoint: "POST /v1/chat/completions",
+            concurrency: "每应用 25–50 路同步（随套餐变化）",
+            behavior: "限额内即时；超限 429",
+            reconcile: "request_id → Usage → Credits",
+          },
+          image: {
+            endpoint: "POST /v1/images/generations",
+            concurrency: "5–15 路（低于 Chat）",
+            behavior: "慢速生成；饱和时排队或 503",
+            reconcile: "request_id、credits_charged、data[0].url",
+          },
+          batch: {
+            endpoint: "POST /v1/batches/chat",
+            concurrency: "异步 — 单任务 500–1,000 条",
+            behavior: "提交后轮询 GET /v1/batches/{id} 与 items",
+            reconcile: "Batch credits_charged + 每条 item 的 request_id",
+          },
+        },
+        errorsTitle: "429 / 503 / upstream_timeout",
+        errors: {
+          tooManyRequests: "429 too_many_requests — 降速或减少客户端并发；退避重试。",
+          gatewayOverloaded: "503 gateway_overloaded — 暂时饱和；稍后重试或走 Batch API。",
+          upstreamTimeout: "504 upstream_timeout — 上游慢；重试或换 auto-fast 等别名。",
+        },
+        industryTitle: "行业流量模式",
+        industry: {
+          hospital: "医院/诊所：问诊批量走 Batch；在线 Chat 并发保持低位；人工审核输出。",
+          automotive: "车企售后：Chat 工单 + Batch 归类；车损图低并发。",
+          ecommerce: "电商：SKU 文案用 Batch；商品图用 Image — 峰值勿对每个 SKU 同步 Chat。",
+          support: "AI 客服：限制在线回复并发；工单分类走 Batch；逐个 request_id 对账。",
+        },
+        readinessTitle: "500 人在线准备指南",
+        readinessDesc:
+          "高峰前：完成接入验证、设置客户端并发上限、确认 Usage/Credits 对账流程。",
+        readinessDocsLink: "打开容量指南",
+        readiness: {
+          item1: "从 API Keys 复制单行 Chat curl，确认 HTTP 200 与 request_id。",
+          item2: "客户端 Chat 并发设为 25–50；禁止无界并行同步调用。",
+          item3: "大批量文案/分类走 Batch API，而非成千上万次 Chat。",
+          item4: "Image 并发低于 Chat；503 时排队或退避。",
+          item5: "应用内记录 request_id；每批测试后在 Usage / Credits 搜索。",
+          item6: "429 / 503 / upstream_timeout 应退避重试 — 它们保护稳定性。",
+          item7: "API 暂时不可用时，失败请求不会改变密钥与积分余额。",
+          item8: "验收通过后，凭峰值并发与 Batch 规模申请更高限额。",
+        },
+      },
       rateLimitsTitle: "限流与大批量调用",
       rateLimitsDesc:
         "如何用 Batch API、分阶段压测与重试安全扩大调用量。",

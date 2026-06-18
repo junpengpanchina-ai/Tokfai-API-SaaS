@@ -15,6 +15,7 @@ import {
   Wrench,
 } from "lucide-react";
 
+import { CapacityReadinessPanel } from "@/components/capacity-model-panel";
 import { CopyableSnippetField } from "@/components/copyable-snippet-field";
 import { OneLineCurlCopyFields } from "@/components/one-line-curl-copy-fields";
 import { Button } from "@/components/ui/button";
@@ -215,6 +216,8 @@ export function IntegrationWorkbenchPanel({
           </Link>
         </Button>
       </WorkbenchCard>
+
+      <CapacityReadinessPanel idPrefix={`${idPrefix}-capacity-readiness`} />
 
       <div className="rounded-lg border border-amber-300/50 bg-amber-50/60 p-4 dark:border-amber-900/50 dark:bg-amber-950/30">
         <p className="flex items-center gap-2 text-sm font-semibold text-foreground">

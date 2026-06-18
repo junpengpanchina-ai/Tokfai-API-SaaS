@@ -54,6 +54,7 @@ const RULES = [
   { label: "托管运营", pattern: /托管运营/ },
   { label: "服务器部署", pattern: /服务器部署/ },
   { label: "node scripts", pattern: /node\s+scripts\b/i },
+  { label: "scripts (word)", pattern: /\bscripts\b/i },
   { label: "DMIT", pattern: /\bDMIT\b/i },
   { label: "repo (word)", pattern: /\brepo\b/i },
   { label: "commit (word)", pattern: /\bcommit\b/i },
@@ -86,6 +87,8 @@ const ALLOW_SUBSTRINGS = [
   "业务由您自行运营",
   "you run your apps",
   "you operate your",
+  "no scripts",
+  "无需 scripts",
 ];
 
 function shouldIgnorePath(path) {
@@ -117,6 +120,8 @@ function isCustomerMessagesLine(line) {
   if (line.includes("admin.")) return false;
   if (line.includes("integration.")) return true;
   if (line.includes("dashboard.apiKeys")) return true;
+  if (line.includes("dashboard.models")) return true;
+  if (line.includes("integration.capacity")) return true;
   if (line.includes("apiKeys:") && line.includes("copy")) return true;
   return false;
 }
@@ -146,6 +151,7 @@ for (const dir of SCAN_DIRS) {
         if (rule.label === "operator (word)" && /operate your/i.test(line)) continue;
         if (rule.label === "operator (word)" && /自行运营/i.test(line)) continue;
         if (rule.label === "operator (word)" && /代运营/i.test(line)) continue;
+        if (rule.label === "scripts (word)" && /no scripts/i.test(line)) continue;
 
         hits.push({
           file: rel,

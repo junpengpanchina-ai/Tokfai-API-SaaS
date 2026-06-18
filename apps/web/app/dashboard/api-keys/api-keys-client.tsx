@@ -518,8 +518,13 @@ function OneTimeSecretCard({
               </Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#capacity-and-rate-limits">
+                {t("dashboard.apiKeys.capacityRateLimitsLink")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/docs#rate-limits-large-volume">
-                {t("dashboard.apiKeys.rateLimitsGuide")}
+                {t("dashboard.apiKeys.largeVolumeIntegrationLink")}
               </Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
