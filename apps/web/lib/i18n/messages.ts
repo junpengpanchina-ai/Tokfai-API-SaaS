@@ -363,6 +363,7 @@ export const messages = {
         footerActions: "Next steps",
         footerApiKeys: "Create API key",
         footerStartIntegration: "Start integration",
+        footerIndustryTemplates: "Industry templates",
         footerQuickStart: "Quick Start curl",
         footerUsage: "Check Usage",
         footerDocs: "View integration docs",
@@ -614,6 +615,12 @@ export const messages = {
         quickStartDocs: "Quick start guide",
         startIntegration: "Start integration",
         integrationWorkbench: "Integration workbench",
+        industryTemplatesTitle: "Industry templates",
+        industryTemplatesLink: "Industry templates",
+        copyHospitalExample: "Hospital API example",
+        copyAutoServiceExample: "Auto service API example",
+        copyEcommerceBatchExample: "Ecommerce Batch example",
+        copyCustomerServiceExample: "AI customer service example",
         sessionKeyDocsNote:
           "After you save your key, this browser session still fills Docs examples. Refreshing clears it — copy your key or one-line curl again if you see a placeholder.",
         tryChatPlayground: "Try Chat Playground",
@@ -2575,6 +2582,121 @@ export const messages = {
         "Your API key from this session is already filled in these curls.",
       industryBatchReconcileNote:
         "Batch: each succeeded item has its own request_id. After completion, GET /v1/batches/{id}/items and reconcile each item request_id in Usage / Credits.",
+      industryTemplates: {
+        packIntro:
+          "Copy one-line curls below — paste in any terminal. Tokfai is an API gateway; you operate your systems.",
+        useCaseLabel: "Use case",
+        inputLabel: "Input example",
+        expectedResponseLabel: "Expected response",
+        reconcileLabel: "Reconcile",
+        billingLabel: "Usage / Credits",
+        boundaryLabel: "Boundary",
+        nextStepLabel: "Next step",
+        viewHospitalPack: "Hospital templates",
+        chatSuccessFields:
+          "choices[0].message.content, request_id, credits_charged, tokfai.requested_model, tokfai.resolved_model",
+        batchSuccessFields:
+          "id, status, total_items, succeeded_items, credits_charged; each item has request_id",
+        imageSuccessFields: "data[0].url, request_id, credits_charged, model",
+        reconcileChat:
+          "Copy request_id → Dashboard → Usage (search request_id) → Credits (reference_id or request_id).",
+        reconcileBatch:
+          "After batch completes, GET /v1/batches/{id}/items — reconcile each item request_id in Usage / Credits.",
+        billingChat:
+          "Successful chat calls debit credits_charged; failed auth or validation errors are usually not charged.",
+        billingBatch:
+          "Batch debits credits_charged when items succeed; failed items are usually not charged.",
+        billingImage:
+          "Image generation debits credits_charged per successful image; failed calls are usually not charged.",
+        hospital: {
+          boundary:
+            "Information organization only — no diagnosis, no treatment plans, no replacing clinicians.",
+          chartSummary: {
+            useCase: "Medical record / patient narrative summary",
+            input: "Structured chat body with de-identified patient text and stream: false.",
+            nextStep: "Review output in your EMR workflow before clinician sign-off.",
+            curlLabel: "Hospital chart summary — one-line Chat curl",
+          },
+          batchConsult: {
+            useCase: "Batch organize consult / intake texts",
+            input: "Batch items with consult messages — one POST for multiple texts.",
+            nextStep: "Poll batch status, fetch items, reconcile each request_id.",
+            curlLabel: "Hospital batch consult — one-line Batch curl",
+          },
+          followUp: {
+            useCase: "Follow-up reminder copy draft",
+            input: "Short patient context — reminder only, no clinical advice.",
+            nextStep: "Staff reviews before SMS or app notification.",
+            curlLabel: "Hospital follow-up — one-line Chat curl",
+          },
+        },
+        automotive: {
+          boundary:
+            "Assist information sorting — final repair and safety decisions stay with your staff.",
+          ticketSummary: {
+            useCase: "After-sales ticket summary",
+            input: "Chat message with ticket text and stream: false.",
+            nextStep: "Attach summary to CRM ticket; technician confirms diagnosis.",
+            curlLabel: "Auto service ticket — one-line Chat curl",
+          },
+          damageImage: {
+            useCase: "Damage photo prompt / listing assist",
+            input: "Image API JSON with prompt and response_format url.",
+            nextStep: "Store image URL in your service record; reconcile request_id.",
+            curlLabel: "Auto damage image — one-line Image curl",
+          },
+          batchTickets: {
+            useCase: "Batch classify multiple service tickets",
+            input: "Batch items with ticket messages.",
+            nextStep: "Fetch batch items and reconcile each request_id.",
+            curlLabel: "Auto batch tickets — one-line Batch curl",
+          },
+        },
+        ecommerce: {
+          boundary:
+            "Copy and image generation only — you publish listings and handle customer promises.",
+          batchSku: {
+            useCase: "Batch SKU title and bullet copy",
+            input: "Batch items per SKU with product name in user message.",
+            nextStep: "Import batch outputs into your PIM; reconcile credits_charged.",
+            curlLabel: "Ecommerce batch SKU — one-line Batch curl",
+          },
+          productImage: {
+            useCase: "Product listing image",
+            input: "Image prompt for listing-style product photo.",
+            nextStep: "Download data[0].url into your asset library.",
+            curlLabel: "Ecommerce product image — one-line Image curl",
+          },
+          faqChat: {
+            useCase: "FAQ draft for customer service",
+            input: "Chat with product context — no shipping or refund promises.",
+            nextStep: "Editor reviews FAQ before publishing.",
+            curlLabel: "Ecommerce FAQ — one-line Chat curl",
+          },
+        },
+        support: {
+          boundary:
+            "Reply drafts and classification — your team sends final answers to customers.",
+          ticketClassify: {
+            useCase: "Ticket reply draft from FAQ + user question",
+            input: "Chat with FAQ context and user message.",
+            nextStep: "Agent edits draft before sending in helpdesk.",
+            curlLabel: "AI customer service — one-line Chat curl",
+          },
+          batchQa: {
+            useCase: "Batch classify ticket intents",
+            input: "Batch items with ticket snippets.",
+            nextStep: "Route tickets by batch output; reconcile each request_id.",
+            curlLabel: "AI customer service batch — one-line Batch curl",
+          },
+          summaryChat: {
+            useCase: "Conversation summary for QA",
+            input: "Chat with conversation text to summarize.",
+            nextStep: "QA team reviews summary flags.",
+            curlLabel: "Support summary — one-line Chat curl",
+          },
+        },
+      },
       industryTokfaiProvidesTitle: "What Tokfai provides vs your system",
       industryTokfaiProvides1:
         "Tokfai does not store your business database — your systems send API requests.",
@@ -3973,6 +4095,7 @@ export const messages = {
         footerActions: "下一步",
         footerApiKeys: "创建 API Key",
         footerStartIntegration: "开始接入",
+        footerIndustryTemplates: "行业模板",
         footerQuickStart: "Quick Start curl",
         footerUsage: "查看 Usage",
         footerDocs: "查看接入文档",
@@ -4204,6 +4327,12 @@ export const messages = {
         quickStartDocs: "快速上手指南",
         startIntegration: "开始接入",
         integrationWorkbench: "接入工作台",
+        industryTemplatesTitle: "行业模板",
+        industryTemplatesLink: "行业模板",
+        copyHospitalExample: "医院 API 示例",
+        copyAutoServiceExample: "车企售后 API 示例",
+        copyEcommerceBatchExample: "电商 Batch 示例",
+        copyCustomerServiceExample: "AI 客服示例",
         sessionKeyDocsNote:
           "点击「我已保存密钥」后，本浏览器会话仍会自动填充 Docs 示例。刷新页面会清空 — 若出现占位符请重新复制密钥或单行 curl。",
         tryChatPlayground: "打开 Chat Playground",
@@ -6050,6 +6179,114 @@ export const messages = {
       industryLiveKeyNote: "当前会话中的 API Key 已填入以下 curl。",
       industryBatchReconcileNote:
         "Batch：每个成功 item 有独立 request_id。完成后 GET /v1/batches/{id}/items，用各 item 的 request_id 在 Usage / Credits 对账。",
+      industryTemplates: {
+        packIntro:
+          "复制下方单行 curl — 任意终端粘贴即可。Tokfai 是 API 网关，业务系统由您运营。",
+        useCaseLabel: "使用场景",
+        inputLabel: "输入示例",
+        expectedResponseLabel: "成功响应",
+        reconcileLabel: "对账",
+        billingLabel: "Usage / Credits",
+        boundaryLabel: "边界",
+        nextStepLabel: "下一步",
+        viewHospitalPack: "医院模板",
+        chatSuccessFields:
+          "choices[0].message.content、request_id、credits_charged、tokfai.requested_model、tokfai.resolved_model",
+        batchSuccessFields:
+          "id、status、total_items、succeeded_items、credits_charged；每个 item 有 request_id",
+        imageSuccessFields: "data[0].url、request_id、credits_charged、model",
+        reconcileChat:
+          "复制 request_id → Dashboard → Usage（搜 request_id）→ Credits（reference_id 或 request_id）。",
+        reconcileBatch:
+          "Batch 完成后 GET /v1/batches/{id}/items — 对每个 item 的 request_id 在 Usage / Credits 对账。",
+        billingChat: "Chat 成功请求按 credits_charged 扣费；鉴权/校验失败通常不扣费。",
+        billingBatch: "Batch 按成功 item 扣 credits_charged；失败 item 通常不扣费。",
+        billingImage: "图片成功生成按 credits_charged 扣费；失败请求通常不扣费。",
+        hospital: {
+          boundary: "仅做信息整理 — 不诊断、不给治疗方案、不替代医生。",
+          chartSummary: {
+            useCase: "病历 / 患者自述摘要",
+            input: "结构化 Chat JSON，去标识化患者文本，stream: false。",
+            nextStep: "在 EMR 流程中由医护人员审核后再归档。",
+            curlLabel: "医院病历摘要 — 单行 Chat curl",
+          },
+          batchConsult: {
+            useCase: "批量整理问诊 / 咨询文本",
+            input: "Batch items 含问诊消息 — 一次提交多条。",
+            nextStep: "轮询 batch、拉取 items，逐个 request_id 对账。",
+            curlLabel: "医院批量问诊 — 单行 Batch curl",
+          },
+          followUp: {
+            useCase: "复诊提醒文案草稿",
+            input: "简短就诊背景 — 仅提醒，不含诊疗建议。",
+            nextStep: "人工审核后再发短信或 App 通知。",
+            curlLabel: "医院复诊提醒 — 单行 Chat curl",
+          },
+        },
+        automotive: {
+          boundary: "辅助信息整理 — 维修与安全判断由企业人员确认。",
+          ticketSummary: {
+            useCase: "售后工单摘要",
+            input: "Chat 消息含工单文本，stream: false。",
+            nextStep: "摘要写入 CRM；技师确认故障判断。",
+            curlLabel: "车企售后工单 — 单行 Chat curl",
+          },
+          damageImage: {
+            useCase: "车损图片描述 / 素材辅助",
+            input: "Image API JSON，含 prompt 与 response_format url。",
+            nextStep: "将 data[0].url 存入工单；按 request_id 对账。",
+            curlLabel: "车损图片 — 单行 Image curl",
+          },
+          batchTickets: {
+            useCase: "批量归类售后工单",
+            input: "Batch items 含多条工单消息。",
+            nextStep: "拉取 items，逐个 request_id 对账。",
+            curlLabel: "车企批量工单 — 单行 Batch curl",
+          },
+        },
+        ecommerce: {
+          boundary: "文案与图片生成 — 上架与对客户承诺由您负责。",
+          batchSku: {
+            useCase: "批量 SKU 标题与卖点",
+            input: "每个 SKU 一条 batch item，商品名在用户消息中。",
+            nextStep: "导入 PIM；按 credits_charged 对账。",
+            curlLabel: "电商批量 SKU — 单行 Batch curl",
+          },
+          productImage: {
+            useCase: "商品主图生成",
+            input: "电商风格商品图 prompt。",
+            nextStep: "下载 data[0].url 到素材库。",
+            curlLabel: "电商商品图 — 单行 Image curl",
+          },
+          faqChat: {
+            useCase: "客服 FAQ 草稿",
+            input: "含商品上下文的 Chat — 不承诺发货与赔偿。",
+            nextStep: "编辑审核后再发布 FAQ。",
+            curlLabel: "电商 FAQ — 单行 Chat curl",
+          },
+        },
+        support: {
+          boundary: "回复草稿与分类 — 最终对客户回复由您的团队发送。",
+          ticketClassify: {
+            useCase: "基于 FAQ 生成客服回复草稿",
+            input: "Chat 含 FAQ 与用户问题。",
+            nextStep: "客服编辑后再在工单系统发送。",
+            curlLabel: "AI 客服 — 单行 Chat curl",
+          },
+          batchQa: {
+            useCase: "批量工单意图分类",
+            input: "Batch items 含工单片段。",
+            nextStep: "按分类路由工单；逐个 request_id 对账。",
+            curlLabel: "AI 客服批量 — 单行 Batch curl",
+          },
+          summaryChat: {
+            useCase: "对话摘要（质检）",
+            input: "Chat 含待摘要的对话文本。",
+            nextStep: "质检团队复核摘要标注。",
+            curlLabel: "客服摘要 — 单行 Chat curl",
+          },
+        },
+      },
       industryTokfaiProvidesTitle: "Tokfai 提供什么 vs 你的系统负责什么",
       industryTokfaiProvides1: "Tokfai 不保存你的业务数据库 — 由你的系统发起 API 请求。",
       industryTokfaiProvides2: "Tokfai 不联系你的客户 — 由你的应用或工单系统发送并审核消息。",

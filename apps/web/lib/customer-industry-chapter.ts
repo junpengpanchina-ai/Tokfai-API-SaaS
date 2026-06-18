@@ -1,107 +1,54 @@
+import {
+  buildIndustryCurlOneLine as buildPackIndustryCurlOneLine,
+  buildIndustryPowerShellCurlOneLine,
+  buildTemplateCurlOneLine,
+  buildTemplatePowerShellCurlOneLine,
+  INDUSTRY_PRIMARY_TEMPLATE,
+  type IndustryPackId,
+  type IndustryTemplateId,
+} from "@/lib/customer-industry-templates";
 import { TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
 
-export type IndustryChapterId = "hospital" | "automotive" | "ecommerce" | "support";
-
-const API_ROOT = "https://api.tokfai.com/v1";
-
-function shellSingleQuotedJson(value: unknown): string {
-  return JSON.stringify(value).replace(/'/g, "'\\''");
-}
-
-const HOSPITAL_CASE_PROMPT =
-  "请把以下患者自述整理成结构化摘要，分为主诉、持续时间、伴随症状、需医生确认的问题。不要诊断，不要给治疗方案。\n\n患者自述：头痛三天，偶有恶心，无发热。";
-
-const AUTO_TICKET_PROMPT =
-  "请把以下售后工单整理为：问题类型、用户描述、可能涉及模块、需要人工确认的问题、建议回复草稿。\n\n工单：车辆怠速不稳，仪表盘偶尔亮起发动机故障灯。";
-
-const CUSTOMER_SERVICE_PROMPT =
-  "请基于以下 FAQ 和用户问题，生成客服回复草稿。不要承诺退款、赔偿、发货时间，涉及政策时提示人工确认。\n\nFAQ：退货需在签收7天内申请。用户问：我买了10天还能退吗？";
-
-const ECOMMERCE_BATCH_ITEMS = [
-  {
-    messages: [
-      {
-        role: "user",
-        content: "商品：无线蓝牙耳机。请生成标题、3条卖点、详情页短文案（80字内）。",
-      },
-    ],
-  },
-  {
-    messages: [
-      {
-        role: "user",
-        content: "商品：便携榨汁杯。请生成标题、3条卖点、详情页短文案（80字内）。",
-      },
-    ],
-  },
-  {
-    messages: [
-      {
-        role: "user",
-        content: "商品：瑜伽垫。请生成标题、3条卖点、详情页短文案（80字内）。",
-      },
-    ],
-  },
-];
+export type IndustryChapterId = IndustryPackId;
 
 export function buildHospitalCaseSummaryChatCurlOneLine(
   apiKey = TOKFAI_API_KEY_PLACEHOLDER
 ): string {
-  const body = shellSingleQuotedJson({
-    model: "auto-pro",
-    messages: [{ role: "user", content: HOSPITAL_CASE_PROMPT }],
-    stream: false,
-  });
-  return `curl -sS ${API_ROOT}/chat/completions -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d '${body}'`;
+  return buildTemplateCurlOneLine("hospital-chart-summary", apiKey);
 }
 
 export function buildAutoServiceTicketChatCurlOneLine(
   apiKey = TOKFAI_API_KEY_PLACEHOLDER
 ): string {
-  const body = shellSingleQuotedJson({
-    model: "auto-pro",
-    messages: [{ role: "user", content: AUTO_TICKET_PROMPT }],
-    stream: false,
-  });
-  return `curl -sS ${API_ROOT}/chat/completions -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d '${body}'`;
+  return buildTemplateCurlOneLine("auto-ticket-summary", apiKey);
 }
 
 export function buildCustomerServiceQaChatCurlOneLine(
   apiKey = TOKFAI_API_KEY_PLACEHOLDER
 ): string {
-  const body = shellSingleQuotedJson({
-    model: "auto-fast",
-    messages: [{ role: "user", content: CUSTOMER_SERVICE_PROMPT }],
-    stream: false,
-  });
-  return `curl -sS ${API_ROOT}/chat/completions -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d '${body}'`;
+  return buildTemplateCurlOneLine("support-ticket-classify", apiKey);
 }
 
 export function buildEcommerceBatchCopyCurlOneLine(
   apiKey = TOKFAI_API_KEY_PLACEHOLDER
 ): string {
-  const body = shellSingleQuotedJson({
-    model: "auto-cheap",
-    items: ECOMMERCE_BATCH_ITEMS,
-  });
-  return `curl -sS ${API_ROOT}/batches/chat -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d '${body}'`;
+  return buildTemplateCurlOneLine("ecommerce-batch-sku", apiKey);
 }
 
 export function buildIndustryCurlOneLine(
   id: IndustryChapterId,
   apiKey = TOKFAI_API_KEY_PLACEHOLDER
 ): string {
-  switch (id) {
-    case "hospital":
-      return buildHospitalCaseSummaryChatCurlOneLine(apiKey);
-    case "automotive":
-      return buildAutoServiceTicketChatCurlOneLine(apiKey);
-    case "ecommerce":
-      return buildEcommerceBatchCopyCurlOneLine(apiKey);
-    case "support":
-      return buildCustomerServiceQaChatCurlOneLine(apiKey);
-  }
+  return buildPackIndustryCurlOneLine(id, apiKey);
 }
+
+export {
+  buildIndustryPowerShellCurlOneLine,
+  buildTemplateCurlOneLine,
+  buildTemplatePowerShellCurlOneLine,
+  INDUSTRY_PRIMARY_TEMPLATE,
+  type IndustryTemplateId,
+};
 
 export type IndustryOverviewRow = {
   id: string;

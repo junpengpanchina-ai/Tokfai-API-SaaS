@@ -123,6 +123,7 @@ export type CustomerDocBlock =
   | { type: "client-software-copy-panel"; id: string }
   | { type: "industry-copy-panel"; id: string }
   | { type: "integration-workbench-panel"; id: string }
+  | { type: "industry-template-pack"; id: string }
   | { type: "industry-overview-table" }
   | { type: "error-table" }
   | { type: "error-examples-panel"; id: string }
@@ -2288,7 +2289,8 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
     blocks: [
       { type: "paragraph", textKey: "integration.industryGatewayNote" },
       { type: "paragraph", textKey: "integration.industryNotAgency" },
-      { type: "industry-cards", ids: [...CUSTOMER_DOC_INDUSTRY_IDS] },
+      { type: "paragraph", textKey: "integration.industryTemplates.packIntro" },
+      { type: "industry-template-pack", id: "industry-templates" },
       { type: "paragraph", textKey: "integration.industryOverviewTitle" },
       { type: "industry-overview-table" },
       { type: "industry-copy-panel", id: "industry-copy" },

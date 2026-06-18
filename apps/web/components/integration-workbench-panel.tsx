@@ -26,8 +26,8 @@ import {
 } from "@/lib/customer-curl-oneline";
 import {
   buildIndustryCurlOneLine,
-  type IndustryChapterId,
-} from "@/lib/customer-industry-chapter";
+  type IndustryPackId,
+} from "@/lib/customer-industry-templates";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 
 const WORKBENCH_TROUBLESHOOT_CODES = [
@@ -39,14 +39,14 @@ const WORKBENCH_TROUBLESHOOT_CODES = [
   "upstream_timeout",
 ] as const;
 
-const WORKBENCH_INDUSTRY_IDS: IndustryChapterId[] = [
+const WORKBENCH_INDUSTRY_IDS: IndustryPackId[] = [
   "hospital",
   "automotive",
   "ecommerce",
   "support",
 ];
 
-const INDUSTRY_ICONS: Record<IndustryChapterId, typeof Building2> = {
+const INDUSTRY_ICONS: Record<IndustryPackId, typeof Building2> = {
   hospital: Building2,
   automotive: Car,
   ecommerce: ShoppingBag,
@@ -205,8 +205,13 @@ export function IntegrationWorkbenchPanel({
           );
         })}
         <Button asChild size="sm" variant="outline">
-          <Link href="/dashboard/docs#industry-api-examples">
+          <Link href="/dashboard/docs#industry-examples">
             {t("integration.navIndustry")}
+          </Link>
+        </Button>
+        <Button asChild size="sm" variant="outline">
+          <Link href="/dashboard/docs#industry-pack-hospital">
+            {t("integration.industryTemplates.viewHospitalPack")}
           </Link>
         </Button>
       </WorkbenchCard>

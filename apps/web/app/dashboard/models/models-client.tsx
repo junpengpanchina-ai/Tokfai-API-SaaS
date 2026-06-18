@@ -380,6 +380,12 @@ export function ModelsClient({
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/docs#industry-examples">
+              <BookOpen className="mr-1.5 h-4 w-4" />
+              {t("dashboard.models.footerIndustryTemplates")}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
             <Link href="/dashboard/docs#production-use">
               <BookOpen className="mr-1.5 h-4 w-4" />
               {t("dashboard.models.footerProductionUse")}

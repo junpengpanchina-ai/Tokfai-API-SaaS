@@ -50,6 +50,7 @@ import {
   chatCurlPowerShellOneLine,
   modelsCurlOneLine,
 } from "@/lib/customer-curl-oneline";
+import { buildTemplateCurlOneLine } from "@/lib/customer-industry-templates";
 import { isFullTokfaiApiKey, TOKFAI_API_BASE_URL, TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
 import {
   userMessageForDashboardError,
@@ -555,6 +556,50 @@ function OneTimeSecretCard({
           >
             {secret}
           </code>
+        </div>
+        <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
+            {t("dashboard.apiKeys.industryTemplatesTitle")}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#industry-examples">
+                {t("dashboard.apiKeys.industryTemplatesLink")}
+              </Link>
+            </Button>
+            <CopyConfigAction
+              id="one-time-secret-copy-hospital-template"
+              value={buildTemplateCurlOneLine("hospital-chart-summary", secret)}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyHospitalExample")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <CopyConfigAction
+              id="one-time-secret-copy-auto-template"
+              value={buildTemplateCurlOneLine("auto-ticket-summary", secret)}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyAutoServiceExample")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <CopyConfigAction
+              id="one-time-secret-copy-ecommerce-template"
+              value={buildTemplateCurlOneLine("ecommerce-batch-sku", secret)}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyEcommerceBatchExample")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <CopyConfigAction
+              id="one-time-secret-copy-support-template"
+              value={buildTemplateCurlOneLine("support-ticket-classify", secret)}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyCustomerServiceExample")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+          </div>
         </div>
         <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">
           <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
