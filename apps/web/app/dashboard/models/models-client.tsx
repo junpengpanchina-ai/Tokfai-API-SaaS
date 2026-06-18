@@ -169,6 +169,8 @@ export function ModelsClient({
             <li>{t("dashboard.models.highTrafficReconcile")}</li>
             <li>{t("dashboard.models.highTrafficNoInfiniteRetry")}</li>
             <li>{t("dashboard.models.highTrafficUseBatch")}</li>
+            <li>{t("dashboard.models.highTrafficOnline500Note")}</li>
+            <li>{t("dashboard.models.highTrafficClientQueue")}</li>
           </ul>
           <div className="mt-2 flex flex-wrap gap-2">
             <Button asChild size="sm" variant="outline">
@@ -184,6 +186,11 @@ export function ModelsClient({
             <Button asChild size="sm" variant="outline">
               <Link href="/dashboard/docs#retry-and-backoff">
                 {t("integration.navRetryBackoff")}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/docs#traffic-governor">
+                {t("integration.navTrafficGovernor")}
               </Link>
             </Button>
           </div>

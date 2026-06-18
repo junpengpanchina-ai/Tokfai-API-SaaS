@@ -60,6 +60,7 @@ import { buildTemplateCurlOneLine } from "@/lib/customer-industry-templates";
 import {
   buildSafeClientSnippet,
 } from "@/lib/customer-safe-client-snippets";
+import { buildTrafficGovernorSnippet } from "@/lib/customer-traffic-governor-snippets";
 import { isFullTokfaiApiKey, TOKFAI_API_BASE_URL, TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
 import {
   userMessageForDashboardError,
@@ -670,6 +671,58 @@ function OneTimeSecretCard({
             <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/docs#retry-and-backoff">
                 {t("dashboard.apiKeys.retryBackoffGuide")}
+              </Link>
+            </Button>
+          </div>
+        </div>
+        <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
+            {t("dashboard.apiKeys.trafficGovernorTitle")}
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {t("dashboard.apiKeys.trafficGovernorNote")}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <CopyConfigAction
+              id="one-time-secret-copy-node-traffic-governor"
+              value={buildTrafficGovernorSnippet("node-traffic-governor", secret)}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyNodeTrafficGovernor")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <CopyConfigAction
+              id="one-time-secret-copy-python-traffic-governor"
+              value={buildTrafficGovernorSnippet("python-traffic-governor", secret)}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyPythonTrafficGovernor")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <CopyConfigAction
+              id="one-time-secret-copy-node-batch-worker"
+              value={buildTrafficGovernorSnippet("node-batch-worker", secret)}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyNodeBatchWorker")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <CopyConfigAction
+              id="one-time-secret-copy-python-batch-worker"
+              value={buildTrafficGovernorSnippet("python-batch-worker", secret)}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyPythonBatchWorker")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#traffic-governor">
+                {t("dashboard.apiKeys.trafficGovernorGuide")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#batch-worker">
+                {t("dashboard.apiKeys.batchWorkerGuide")}
               </Link>
             </Button>
           </div>

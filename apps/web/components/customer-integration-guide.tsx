@@ -15,6 +15,7 @@ import { ChatApiChapterCopyPanel } from "@/components/chat-api-chapter-copy";
 import { ImageApiChapterCopyPanel } from "@/components/image-api-chapter-copy";
 import { ClientSoftwareAcceptanceCopyPanel } from "@/components/client-software-acceptance-copy";
 import { SafeRetryCopyPanel } from "@/components/safe-retry-copy-panel";
+import { TrafficGovernorCopyPanel } from "@/components/traffic-governor-copy-panel";
 import { CustomerApiPathPanel } from "@/components/customer-api-path-panel";
 import { CapacityModelPanel } from "@/components/capacity-model-panel";
 import { CherryChapterCopyPanel } from "@/components/cherry-chapter-copy";
@@ -653,6 +654,16 @@ function DocBlock({
     case "safe-retry-copy-panel":
       return (
         <SafeRetryCopyPanel
+          apiKey={quickStartApiKey}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          idPrefix={block.id}
+          snippetIds={block.snippetIds}
+        />
+      );
+    case "traffic-governor-copy-panel":
+      return (
+        <TrafficGovernorCopyPanel
           apiKey={quickStartApiKey}
           copiedId={copiedId}
           onCopy={onCopy}

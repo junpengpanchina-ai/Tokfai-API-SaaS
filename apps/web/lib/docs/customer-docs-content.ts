@@ -15,6 +15,7 @@ import {
   modelsCurlOneLine,
 } from "@/lib/customer-curl-oneline";
 import type { SafeClientSnippetId } from "@/lib/customer-safe-client-snippets";
+import type { TrafficGovernorSnippetId } from "@/lib/customer-traffic-governor-snippets";
 import {
   buildImageApiReferenceCurlMultiline,
   buildImageApiReferenceCurlOneLine,
@@ -124,6 +125,11 @@ export type CustomerDocBlock =
   | { type: "client-software-copy-panel"; id: string }
   | { type: "industry-copy-panel"; id: string }
   | { type: "safe-retry-copy-panel"; id: string; snippetIds?: SafeClientSnippetId[] }
+  | {
+      type: "traffic-governor-copy-panel";
+      id: string;
+      snippetIds?: TrafficGovernorSnippetId[];
+    }
   | { type: "customer-api-path-panel"; id: string }
   | { type: "integration-workbench-panel"; id: string }
   | { type: "industry-template-pack"; id: string }
@@ -1934,6 +1940,246 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
     ],
   },
   {
+    id: "traffic-governor",
+    navKey: "integration.navTrafficGovernor",
+    titleKey: "integration.trafficGovernor.title",
+    descriptionKey: "integration.trafficGovernor.desc",
+    chapterGuide: chapter(
+      "integration.trafficGovernor.chapterPurpose",
+      "integration.trafficGovernor.chapterCopy",
+      "integration.trafficGovernor.chapterVerify",
+      "integration.trafficGovernor.chapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "keys",
+        labelKey: "integration.ctaCreateKey",
+        href: "/dashboard/api-keys",
+      },
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "paragraph", textKey: "integration.trafficGovernor.whyTitle" },
+      { type: "paragraph", textKey: "integration.trafficGovernor.whyBody" },
+      { type: "paragraph", textKey: "integration.trafficGovernor.concurrencyTableTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.trafficGovernor.tableChatRow",
+          "integration.trafficGovernor.tableResponsesRow",
+          "integration.trafficGovernor.tableImageRow",
+          "integration.trafficGovernor.tableBatchRow",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.trafficGovernor.nodeChatTitle" },
+      { type: "paragraph", textKey: "integration.trafficGovernor.nodeChatBody" },
+      { type: "paragraph", textKey: "integration.trafficGovernor.pythonChatTitle" },
+      { type: "paragraph", textKey: "integration.trafficGovernor.pythonChatBody" },
+      { type: "paragraph", textKey: "integration.trafficGovernor.imageLowTitle" },
+      { type: "paragraph", textKey: "integration.trafficGovernor.imageLowBody" },
+      { type: "paragraph", textKey: "integration.trafficGovernor.browserTitle" },
+      { type: "paragraph", textKey: "integration.trafficGovernor.browserBody" },
+      { type: "paragraph", textKey: "integration.trafficGovernor.reconcileTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.trafficGovernor.reconcile1",
+          "integration.trafficGovernor.reconcile2",
+          "integration.trafficGovernor.reconcile3",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.trafficGovernor.troubleshoot429Title" },
+      {
+        type: "bullets",
+        items: [
+          "integration.trafficGovernor.troubleshoot4291",
+          "integration.trafficGovernor.troubleshoot4292",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.trafficGovernor.troubleshoot503Title" },
+      {
+        type: "bullets",
+        items: [
+          "integration.trafficGovernor.troubleshoot5031",
+          "integration.trafficGovernor.troubleshoot5032",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.trafficGovernor.troubleshoot504Title" },
+      {
+        type: "bullets",
+        items: [
+          "integration.trafficGovernor.troubleshoot5041",
+          "integration.trafficGovernor.troubleshoot5042",
+        ],
+      },
+      {
+        type: "traffic-governor-copy-panel",
+        id: "traffic-governor-clients",
+        snippetIds: [
+          "node-traffic-governor",
+          "python-traffic-governor",
+          "node-image-governor",
+          "browser-key-caution",
+        ],
+      },
+      {
+        type: "dashboard-links",
+        links: [
+          {
+            id: "batch-worker-docs",
+            labelKey: "integration.navBatchWorker",
+            href: "/dashboard/docs",
+            hash: "batch-worker",
+          },
+          {
+            id: "retry-docs",
+            labelKey: "integration.navRetryBackoff",
+            href: "/dashboard/docs",
+            hash: "retry-and-backoff",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "batch-worker",
+    navKey: "integration.navBatchWorker",
+    titleKey: "integration.batchWorker.title",
+    descriptionKey: "integration.batchWorker.desc",
+    chapterGuide: chapter(
+      "integration.batchWorker.chapterPurpose",
+      "integration.batchWorker.chapterCopy",
+      "integration.batchWorker.chapterVerify",
+      "integration.batchWorker.chapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "batch-api",
+        labelKey: "integration.navBatch",
+        href: "/dashboard/docs",
+        hash: "batch-api",
+      },
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "paragraph", textKey: "integration.batchWorker.patternTitle" },
+      { type: "paragraph", textKey: "integration.batchWorker.patternBody" },
+      { type: "paragraph", textKey: "integration.batchWorker.pollTitle" },
+      {
+        type: "ordered",
+        items: [
+          "integration.batchWorker.pollStep1",
+          "integration.batchWorker.pollStep2",
+          "integration.batchWorker.pollStep3",
+          "integration.batchWorker.pollStep4",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.batchWorker.summaryTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.batchWorker.summary1",
+          "integration.batchWorker.summary2",
+          "integration.batchWorker.summary3",
+        ],
+      },
+      {
+        type: "traffic-governor-copy-panel",
+        id: "batch-worker-clients",
+        snippetIds: ["node-batch-worker", "python-batch-worker"],
+      },
+      {
+        type: "dashboard-links",
+        links: [
+          {
+            id: "large-volume-batch",
+            labelKey: "integration.navLargeVolumeBatch",
+            href: "/dashboard/docs",
+            hash: "large-volume-batch-queue",
+          },
+          {
+            id: "traffic-governor",
+            labelKey: "integration.navTrafficGovernor",
+            href: "/dashboard/docs",
+            hash: "traffic-governor",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "client-side-concurrency",
+    navKey: "integration.navClientConcurrency",
+    titleKey: "integration.clientConcurrency.title",
+    descriptionKey: "integration.clientConcurrency.desc",
+    chapterGuide: chapter(
+      "integration.clientConcurrency.chapterPurpose",
+      "integration.clientConcurrency.chapterCopy",
+      "integration.clientConcurrency.chapterVerify",
+      "integration.clientConcurrency.chapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "models",
+        labelKey: "integration.linkModels",
+        href: "/dashboard/models",
+      },
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "paragraph", textKey: "integration.clientConcurrency.whyTitle" },
+      { type: "paragraph", textKey: "integration.clientConcurrency.whyBody" },
+      { type: "paragraph", textKey: "integration.clientConcurrency.chatTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.clientConcurrency.chat1",
+          "integration.clientConcurrency.chat2",
+          "integration.clientConcurrency.chat3",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.clientConcurrency.imageTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.clientConcurrency.image1",
+          "integration.clientConcurrency.image2",
+          "integration.clientConcurrency.image3",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.clientConcurrency.batchTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.clientConcurrency.batch1",
+          "integration.clientConcurrency.batch2",
+          "integration.clientConcurrency.batch3",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.clientConcurrency.online500Title" },
+      { type: "paragraph", textKey: "integration.clientConcurrency.online500Body" },
+      {
+        type: "dashboard-links",
+        links: [
+          {
+            id: "traffic-governor",
+            labelKey: "integration.navTrafficGovernor",
+            href: "/dashboard/docs",
+            hash: "traffic-governor",
+          },
+          {
+            id: "500-online",
+            labelKey: "integration.nav500OnlineReadiness",
+            href: "/dashboard/docs",
+            hash: "500-online-readiness",
+          },
+        ],
+      },
+    ],
+  },
+  {
     id: "slow-upstream-behavior",
     navKey: "integration.navSlowUpstream",
     titleKey: "integration.slowUpstreamChapter.title",
@@ -2743,6 +2989,16 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       { type: "paragraph", textKey: "integration.industryGatewayNote" },
       { type: "paragraph", textKey: "integration.industryNotAgency" },
       { type: "paragraph", textKey: "integration.industryTemplates.batchFirstNote" },
+      { type: "paragraph", textKey: "integration.industryWorkerPatternsTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.industryWorkerPatterns.hospital",
+          "integration.industryWorkerPatterns.automotive",
+          "integration.industryWorkerPatterns.ecommerce",
+          "integration.industryWorkerPatterns.support",
+        ],
+      },
       { type: "paragraph", textKey: "integration.industryTemplates.packIntro" },
       { type: "industry-template-pack", id: "industry-templates" },
       { type: "paragraph", textKey: "integration.industryOverviewTitle" },

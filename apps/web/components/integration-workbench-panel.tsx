@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { SafeRetryCopyPanel } from "@/components/safe-retry-copy-panel";
+import { ScaleSafelyPanel } from "@/components/traffic-governor-copy-panel";
 import { CustomerApiPathPanel } from "@/components/customer-api-path-panel";
 import { CapacityReadinessPanel } from "@/components/capacity-model-panel";
 import { CopyableSnippetField } from "@/components/copyable-snippet-field";
@@ -191,6 +192,15 @@ export function IntegrationWorkbenchPanel({
             "node-safe-retry",
             "python-safe-retry",
           ]}
+        />
+      </WorkbenchCard>
+
+      <WorkbenchCard icon={Activity} title={t("integration.trafficGovernor.scaleSafelyTitle")}>
+        <ScaleSafelyPanel
+          apiKey={apiKey}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          idPrefix={`${idPrefix}-scale-safely`}
         />
       </WorkbenchCard>
 
