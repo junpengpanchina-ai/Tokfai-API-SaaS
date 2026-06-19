@@ -372,6 +372,55 @@ const chapter = (
 
 export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
   {
+    id: "live-verification-vs-preparation",
+    navKey: "integration.navLiveVerification",
+    titleKey: "integration.liveVerificationTitle",
+    descriptionKey: "integration.liveVerificationDesc",
+    highlight: true,
+    chapterGuide: chapter(
+      "integration.liveVerificationTitle",
+      "integration.liveVerificationIntro",
+      "integration.liveVerificationStep4",
+      "integration.liveVerificationStep5"
+    ),
+    chapterNow: {
+      try: {
+        id: "workbench-dashboard",
+        labelKey: "integration.navIntegrationWorkbench",
+        href: "/dashboard/integration-workbench",
+      },
+      copySnippetKey: "chat-curl",
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "paragraph", textKey: "integration.liveVerificationIntro" },
+      {
+        type: "ordered",
+        items: [
+          "integration.liveVerificationStep1",
+          "integration.liveVerificationStep2",
+          "integration.liveVerificationStep3",
+          "integration.liveVerificationStep4",
+          "integration.liveVerificationStep5",
+          "integration.liveVerificationStep6",
+        ],
+      },
+      {
+        type: "dashboard-links",
+        links: [
+          { id: "keys", labelKey: "integration.ctaCreateKey", href: "/dashboard/api-keys" },
+          {
+            id: "workbench-dashboard",
+            labelKey: "integration.navIntegrationWorkbench",
+            href: "/dashboard/integration-workbench",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+        ],
+      },
+    ],
+  },
+  {
     id: "customer-integration-path",
     navKey: "integration.navCustomerPath",
     titleKey: "integration.customerPathTitle",

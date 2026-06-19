@@ -393,6 +393,8 @@ export const messages = {
         recommendedStartingModel: "Recommended starting model: auto-fast",
         highTrafficBatchGovernor: "High traffic: use Batch API and traffic governor with safe retry.",
         startFromModelAutoFast: "auto-fast — first test",
+        verificationUnavailableNote:
+          "If live verification is temporarily unavailable, choose your model plan now and verify later from Integration Workbench.",
         startFromModelAutoPro: "auto-pro — quality workloads",
         startFromModelAutoCheap: "auto-cheap — high-volume ecommerce copy",
         openIntegrationWorkbench: "Open Integration Workbench",
@@ -2493,6 +2495,43 @@ export const messages = {
       oneLineCurlPasteAnywhere:
         "Paste in any terminal. No install. No project folder required.",
       navCustomerPath: "Start here",
+      navLiveVerification: "Live verification",
+      liveVerificationTitle: "Live verification vs preparation",
+      liveVerificationDesc:
+        "Verify your API Key when the service is available — or prepare integration and verify later.",
+      liveVerificationIntro:
+        "Tokfai is an API gateway. Start with a one-line curl to confirm your key. If live verification is temporarily unavailable, continue preparing in Integration Workbench.",
+      liveVerificationStep1: "Create API Key in Dashboard.",
+      liveVerificationStep2: "Copy one-line Chat curl (includes your key).",
+      liveVerificationStep3: "Paste in any terminal — no install or project folder required.",
+      liveVerificationStep4:
+        "If HTTP 200: copy request_id and reconcile in Usage / Credits.",
+      liveVerificationStep5:
+        "If live verification is temporarily unavailable: continue with Integration Workbench and retry later.",
+      liveVerificationStep6:
+        "Do not expose your API key in browser frontend — store it on your backend only.",
+      apiReadiness: {
+        title: "API service readiness",
+        checking: "Checking…",
+        availableTitle: "API verification is available.",
+        availableDescription:
+          "You can run a one-line curl and reconcile request_id in Usage/Credits.",
+        unavailableTitle: "Live verification may be temporarily unavailable.",
+        unavailableDescription:
+          "You can still create an API key, copy integration templates, prepare your handoff plan, and verify later.",
+        prepareNow: "Prepare integration now — templates and Workbench stay available.",
+        verifyLater: "Verify later when live checks succeed.",
+        copyCurl: "Copy one-line Chat curl",
+        openWorkbench: "Open Integration Workbench",
+        openUsageCredits: "Usage / Credits guide",
+        badgeReady: "Ready",
+        badgePrepare: "Prepare mode",
+        continuePreparing: "Continue preparing integration",
+        verifyFailsHint:
+          "If live verification fails, continue setup in Workbench and retry later.",
+        apiKeysHint:
+          "If live verification is unavailable, keep this key safe and continue with the Integration Workbench.",
+      },
       customerPathTitle: "Customer integration path",
       customerPathDesc: "Six steps from API Key to Usage / Credits reconciliation.",
       customerPathIntro:
@@ -5082,6 +5121,8 @@ export const messages = {
         recommendedStartingModel: "推荐起步模型：auto-fast",
         highTrafficBatchGovernor: "高流量：使用 Batch API、流量治理与安全重试。",
         startFromModelAutoFast: "auto-fast — 首次测试",
+        verificationUnavailableNote:
+          "若实时验证暂时不可用，可先选定模型方案，稍后在接入工作台完成验证。",
         startFromModelAutoPro: "auto-pro — 高质量任务",
         startFromModelAutoCheap: "auto-cheap — 电商大批量文案",
         openIntegrationWorkbench: "打开接入工作台",
@@ -7084,6 +7125,41 @@ export const messages = {
       oneLineCurlPasteAnywhere:
         "复制后粘贴到任意终端即可。不需要安装，不需要进入项目目录。",
       navCustomerPath: "从这里开始",
+      navLiveVerification: "实时验证",
+      liveVerificationTitle: "实时验证与接入准备",
+      liveVerificationDesc:
+        "服务可用时验证 API Key；暂时不可用时可先完成接入准备，稍后再验证。",
+      liveVerificationIntro:
+        "Tokfai 是 API 网关。先用单行 curl 确认密钥。若实时验证暂时不可用，可在接入工作台继续准备。",
+      liveVerificationStep1: "在 Dashboard 创建 API Key。",
+      liveVerificationStep2: "复制单行 Chat curl（含您的密钥）。",
+      liveVerificationStep3: "粘贴到任意终端 — 无需安装或进入项目目录。",
+      liveVerificationStep4: "若 HTTP 200：复制 request_id，在 Usage / Credits 对账。",
+      liveVerificationStep5:
+        "若实时验证暂时不可用：继续在接入工作台准备，稍后再试。",
+      liveVerificationStep6:
+        "切勿在浏览器前端暴露 API Key — 仅保存在您的后端。",
+      apiReadiness: {
+        title: "API 服务就绪状态",
+        checking: "检查中…",
+        availableTitle: "API 验证当前可用。",
+        availableDescription:
+          "你可以运行单行 curl，并用 request_id 在 Usage/Credits 对账。",
+        unavailableTitle: "实时验证可能暂时不可用。",
+        unavailableDescription:
+          "你仍然可以创建 API 密钥、复制接入模板、准备交付方案，稍后再完成验证。",
+        prepareNow: "现在即可准备接入 — 模板与工作台照常可用。",
+        verifyLater: "实时检查恢复后再完成验证。",
+        copyCurl: "复制单行 Chat curl",
+        openWorkbench: "打开接入工作台",
+        openUsageCredits: "Usage / Credits 指南",
+        badgeReady: "可验证",
+        badgePrepare: "准备模式",
+        continuePreparing: "继续准备接入",
+        verifyFailsHint: "若实时验证失败，请在工作台继续配置，稍后再试。",
+        apiKeysHint:
+          "若实时验证不可用，请妥善保存此密钥，并继续在接入工作台完成准备。",
+      },
       customerPathTitle: "客户接入路径",
       customerPathDesc: "从 API Key 到 Usage / Credits 对账的六步路径。",
       customerPathIntro:

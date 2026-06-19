@@ -32,6 +32,10 @@ const RULES = [
   { label: "/Users path", pattern: /\/Users(?:\/[A-Za-z0-9._-]+)?/ },
   { label: "/opt/tokfai", pattern: /\/opt\/tokfai/ },
   { label: "P77 ticket", pattern: /\bP7[789]\d*[\d.]*\b/ },
+  { label: "P80 ticket", pattern: /\bP80\d*[\d.]*\b/ },
+  { label: "server banned", pattern: /server\s+banned/i },
+  { label: "解封", pattern: /解封/ },
+  { label: "GitHub", pattern: /\bGitHub\b/i },
   { label: "artifact", pattern: /\bartifact\b/i },
   { label: "internal runbook", pattern: /internal\s+runbook/i },
   { label: "runbook", pattern: /\brunbook\b/i },
@@ -121,6 +125,8 @@ function isAllowed(line) {
 function isCustomerMessagesLine(line) {
   if (line.includes("admin.")) return false;
   if (line.includes("integration.")) return true;
+  if (line.includes("apiReadiness.")) return true;
+  if (line.includes("liveVerification")) return true;
   if (line.includes("dashboard.apiKeys")) return true;
   if (line.includes("dashboard.models")) return true;
   if (line.includes("integration.capacity")) return true;

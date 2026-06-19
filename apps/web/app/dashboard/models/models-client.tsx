@@ -13,6 +13,7 @@ import {
   Activity,
 } from "lucide-react";
 
+import { ApiServiceReadinessBanner } from "@/components/api-service-readiness-banner";
 import { CodeBlock, CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
 import { CopyConfigAction } from "@/components/copyable-snippet-field";
 import { ResponsiveTableScroll } from "@/components/responsive-table-scroll";
@@ -157,7 +158,9 @@ export function ModelsClient({
             <li>{t("dashboard.models.startFromModelAutoPro")}</li>
             <li>{t("dashboard.models.startFromModelAutoCheap")}</li>
             <li>{t("dashboard.models.highTrafficBatchGovernor")}</li>
+            <li>{t("dashboard.models.verificationUnavailableNote")}</li>
           </ul>
+          <ApiServiceReadinessBanner compact />
           <div className="flex flex-wrap gap-2">
             <CopyConfigAction
               id="models-curl-auto-fast"

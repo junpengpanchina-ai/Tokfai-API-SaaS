@@ -10,6 +10,7 @@ import {
   Terminal,
 } from "lucide-react";
 
+import { ApiServiceReadinessBanner } from "@/components/api-service-readiness-banner";
 import { CapacityPlannerPanel } from "@/components/capacity-planner-panel";
 import { CopyConfigAction } from "@/components/copyable-snippet-field";
 import { OneLineCurlCopyFields } from "@/components/one-line-curl-copy-fields";
@@ -181,6 +182,13 @@ export function IntegrationCommandCenter({
           </Button>
         </div>
       </div>
+
+      <ApiServiceReadinessBanner
+        curlOneLine={curlOneLine}
+        copiedId={copiedId}
+        onCopy={onCopy}
+        curlCopyId={`${idPrefix}-readiness-curl`}
+      />
 
       <div className="grid min-w-0 gap-6 lg:grid-cols-3">
         <div className="order-2 flex min-w-0 flex-col gap-4 lg:order-1 lg:col-span-2">

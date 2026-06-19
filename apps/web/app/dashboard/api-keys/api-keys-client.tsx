@@ -16,6 +16,7 @@ import {
   Terminal,
 } from "lucide-react";
 
+import { ApiReadinessMiniBadge } from "@/components/api-service-readiness-banner";
 import { ResponsiveTableScroll } from "@/components/responsive-table-scroll";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -589,11 +590,17 @@ function OneTimeSecretCard({
           </code>
         </div>
         <div className="rounded-lg border-2 border-primary/25 bg-primary/5 p-3">
-          <p className="text-sm font-medium text-foreground">
-            {t("dashboard.apiKeys.keyReadyMessage")}
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-medium text-foreground">
+              {t("dashboard.apiKeys.keyReadyMessage")}
+            </p>
+            <ApiReadinessMiniBadge />
+          </div>
           <p className="mt-2 text-xs text-muted-foreground">
             {t("dashboard.apiKeys.storeBackendSecurityNote")}
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {t("integration.apiReadiness.apiKeysHint")}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <CopyConfigAction
