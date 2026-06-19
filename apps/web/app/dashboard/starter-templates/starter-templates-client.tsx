@@ -37,6 +37,11 @@ export function StarterTemplatesPageClient() {
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/payload-builder">
+              {t("integration.payloadBuilder.buildPayload")}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
             <Link href={TEMPLATE_CONFIGURATOR_PATH}>
               {t("integration.templateConfigurator.buildTemplate")}
             </Link>

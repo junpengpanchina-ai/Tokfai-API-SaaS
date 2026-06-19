@@ -29,6 +29,7 @@ import {
 import type { CatalogModelPricingItem } from "@/lib/dmit/client";
 import { chatCurlOneLine } from "@/lib/customer-curl-oneline";
 import { buildConfiguratorHref } from "@/lib/customer-template-configurator";
+import { buildPayloadBuilderHref } from "@/lib/customer-payload-builder";
 import { useQuickStartApiKey } from "@/lib/use-quick-start-api-key";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
@@ -163,6 +164,42 @@ export function ModelsClient({
             <li>{t("dashboard.models.starterTemplateHint")}</li>
             <li>
               <Link
+                href={buildPayloadBuilderHref({ model: "auto-fast", api: "chat", industry: "general" })}
+                className="underline"
+              >
+                {t("dashboard.models.buildPayloadAutoFast")}
+              </Link>
+            </li>
+            <li>
+              <Link
+                href={buildPayloadBuilderHref({ model: "auto-pro", api: "chat", industry: "hospital" })}
+                className="underline"
+              >
+                {t("dashboard.models.buildPayloadAutoPro")}
+              </Link>
+            </li>
+            <li>
+              <Link
+                href={buildPayloadBuilderHref({
+                  model: "auto-cheap",
+                  api: "batch",
+                  industry: "ecommerce",
+                })}
+                className="underline"
+              >
+                {t("dashboard.models.buildPayloadAutoCheap")}
+              </Link>
+            </li>
+            <li>
+              <Link
+                href={buildPayloadBuilderHref({ model: "gpt-image-2", api: "image", industry: "ecommerce" })}
+                className="underline"
+              >
+                {t("dashboard.models.buildPayloadImage")}
+              </Link>
+            </li>
+            <li>
+              <Link
                 href={buildConfiguratorHref({ model: "auto-fast", api: "chat", industry: "general" })}
                 className="underline"
               >
@@ -234,6 +271,11 @@ export function ModelsClient({
               <Link href="/dashboard/integration-workbench">
                 <Terminal className="mr-1.5 h-4 w-4" />
                 {t("dashboard.models.openIntegrationWorkbench")}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href={buildPayloadBuilderHref()}>
+                {t("dashboard.models.buildPayloadWithModel")}
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">

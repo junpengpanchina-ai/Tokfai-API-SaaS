@@ -20,6 +20,11 @@ import {
   type ConfiguratorWorkloadSize,
   type TemplateConfiguratorInput,
 } from "@/lib/customer-template-configurator";
+import {
+  buildPayload,
+  buildPayloadBuilderHref,
+  sampleFieldsForIndustry,
+} from "@/lib/customer-payload-builder";
 import { isQuickStartKeyPlaceholder } from "@/lib/customer-quick-start-snippets";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 
@@ -109,6 +114,21 @@ export function StarterTemplateConfigurator({
   );
 
   const effectiveApi = resolveEffectiveConfiguratorApi(input);
+
+  const payloadPreview = useMemo(
+    () =>
+      buildPayload(
+        {
+          industry,
+          api: effectiveApi === "batch" ? "batch" : api,
+          model: api === "image" ? "gpt-image-2" : model,
+          fields: sampleFieldsForIndustry(industry),
+        },
+        apiKey,
+        t
+      ),
+    [industry, api, model, effectiveApi, apiKey, t]
+  );
   const isOneLine =
     language === "curl" || language === "powershell" || effectiveApi !== "batch";
   const keyIsPlaceholder = isQuickStartKeyPlaceholder(apiKey);
@@ -265,6 +285,25 @@ export function StarterTemplateConfigurator({
             copiedLabel={t("integration.copied")}
             primary
           />
+          <CopyConfigAction
+            id={`${idPrefix}-copy-request-json`}
+            value={payloadPreview.requestJson}
+            copiedId={copiedId}
+            onCopy={onCopy}
+            label={t("integration.payloadBuilder.copyRequestJson")}
+            copiedLabel={t("integration.copied")}
+          />
+          <Button asChild size="sm" variant="outline">
+            <Link
+              href={buildPayloadBuilderHref({
+                industry,
+                api: effectiveApi === "batch" ? "batch" : api,
+                model: api === "image" ? "gpt-image-2" : model,
+              })}
+            >
+              {t("integration.payloadBuilder.buildPayload")}
+            </Link>
+          </Button>
           <Button asChild size="sm" variant="outline">
             <Link href="/dashboard/usage">{t("integration.templateConfigurator.openUsage")}</Link>
           </Button>

@@ -8,6 +8,7 @@ import { CopyConfigAction } from "@/components/copyable-snippet-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { buildPayloadBuilderHref } from "@/lib/customer-payload-builder";
 import {
   filterStarterTemplates,
   getStarterTemplateCopyText,
@@ -136,6 +137,24 @@ function TemplateCard({
           copiedLabel={t("integration.copied")}
           primary={template.id === "one-line-chat-curl"}
         />
+        {template.industry && template.industry !== "general" ? (
+          <Button asChild size="sm" variant="outline">
+            <Link
+              href={buildPayloadBuilderHref({
+                industry: template.industry,
+                api: template.api,
+                model:
+                  template.model === "—" || template.model === "gpt-image-2"
+                    ? template.model === "gpt-image-2"
+                      ? "gpt-image-2"
+                      : "auto-fast"
+                    : (template.model as "auto-fast" | "auto-pro" | "auto-cheap"),
+              })}
+            >
+              {t("integration.payloadBuilder.buildPayload")}
+            </Link>
+          </Button>
+        ) : null}
         {template.relatedDocs.map((hash) => {
           const labelKey = STARTER_DOC_LABEL_KEYS[hash];
           if (!labelKey) return null;

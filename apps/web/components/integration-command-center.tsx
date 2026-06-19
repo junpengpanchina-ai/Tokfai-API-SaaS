@@ -46,6 +46,7 @@ import {
   type RecommendedModelId,
   type TrafficShape,
 } from "@/lib/customer-capacity-planner";
+import { PAYLOAD_BUILDER_PATH } from "@/lib/customer-payload-builder";
 import { TEMPLATE_CONFIGURATOR_PATH, buildConfiguratorHref } from "@/lib/customer-template-configurator";
 import { chatCurlOneLine, chatCurlPowerShellOneLine } from "@/lib/customer-curl-oneline";
 import { buildSafeClientSnippet } from "@/lib/customer-safe-client-snippets";
@@ -440,6 +441,11 @@ export function IntegrationCommandCenter({
                         {t("integration.starterTemplates.openLibrary")}
                       </Link>
                     </Button>
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={PAYLOAD_BUILDER_PATH}>
+                        {t("integration.payloadBuilder.buildPayload")}
+                      </Link>
+                    </Button>
                     <CopyConfigAction
                       id={`${idPrefix}-node-traffic`}
                       value={buildTrafficGovernorSnippet("node-traffic-governor", apiKey)}
@@ -617,6 +623,9 @@ export function IntegrationCommandCenter({
           <p className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
             {t("integration.commandCenter.generateTailoredTemplate")}
           </p>
+          <p className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            {t("integration.commandCenter.payloadBuilderHint")}
+          </p>
           <div className="rounded-md border border-amber-200/80 bg-amber-50/50 px-3 py-3 dark:border-amber-900/50 dark:bg-amber-950/20">
             <p className="text-xs font-semibold uppercase tracking-wide text-foreground">
               {t("integration.troubleshooting.havingTroubleTitle")}
@@ -633,6 +642,11 @@ export function IntegrationCommandCenter({
               <Button asChild size="sm" variant="outline" className="w-full">
                 <Link href="/dashboard/troubleshooting?code=invalid_token">
                   {t("integration.troubleshooting.searchErrorCode")}
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline" className="w-full">
+                <Link href={PAYLOAD_BUILDER_PATH}>
+                  {t("integration.payloadBuilder.buildPayload")}
                 </Link>
               </Button>
               <Button asChild size="sm" variant="outline" className="w-full">

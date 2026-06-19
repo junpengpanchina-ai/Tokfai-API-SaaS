@@ -16,6 +16,10 @@ import {
   starterTemplateMessagesZh,
 } from "@/lib/i18n/starter-template-messages";
 import {
+  payloadBuilderFieldMessagesEn,
+  payloadBuilderFieldMessagesZh,
+} from "@/lib/i18n/payload-builder-field-messages";
+import {
   troubleshootingCaseMessagesEn,
   troubleshootingCaseMessagesZh,
 } from "@/lib/i18n/troubleshooting-case-messages";
@@ -82,8 +86,16 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     (key: string) => {
       const flat =
         locale === "zh"
-          ? { ...troubleshootingCaseMessagesZh, ...starterTemplateMessagesZh }
-          : { ...troubleshootingCaseMessagesEn, ...starterTemplateMessagesEn };
+          ? {
+              ...troubleshootingCaseMessagesZh,
+              ...starterTemplateMessagesZh,
+              ...payloadBuilderFieldMessagesZh,
+            }
+          : {
+              ...troubleshootingCaseMessagesEn,
+              ...starterTemplateMessagesEn,
+              ...payloadBuilderFieldMessagesEn,
+            };
       if (flat[key]) return flat[key];
 
       const value = getNestedValue(

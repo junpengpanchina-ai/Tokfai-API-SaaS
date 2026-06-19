@@ -7,11 +7,11 @@ import {
   ImageIcon,
   KeyRound,
   LayoutDashboard,
+  Layers,
+  LifeBuoy,
   Megaphone,
   Terminal,
   Wrench,
-  Layers,
-  LifeBuoy,
 } from "lucide-react";
 
 export interface DashboardNavItem {
@@ -62,6 +62,12 @@ export const DASHBOARD_NAV_SECTIONS: DashboardNavSection[] = [
         href: "/dashboard/starter-templates",
         labelKey: "nav.starterTemplates",
         icon: Layers,
+        prefetch: true,
+      },
+      {
+        href: "/dashboard/payload-builder",
+        labelKey: "nav.payloadBuilder",
+        icon: Boxes,
         prefetch: true,
       },
       {

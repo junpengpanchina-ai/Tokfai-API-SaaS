@@ -139,6 +139,7 @@ export type CustomerDocBlock =
   | { type: "troubleshooting-center-panel"; id: string; compact?: boolean }
   | { type: "starter-template-library-panel"; id: string; compact?: boolean }
   | { type: "template-configurator-panel"; id: string; compact?: boolean }
+  | { type: "payload-builder-panel"; id: string; compact?: boolean }
   | { type: "industry-template-pack"; id: string }
   | { type: "capacity-model-panel"; id: string; showReadiness?: boolean }
   | { type: "industry-overview-table" }
@@ -2780,6 +2781,67 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
             href: "/dashboard/docs",
             hash: "error-codes",
           },
+        ],
+      },
+    ],
+  },
+  {
+    id: "payload-builder",
+    navKey: "integration.payloadBuilder.buildPayload",
+    titleKey: "integration.payloadBuilder.title",
+    descriptionKey: "integration.payloadBuilder.subtitle",
+    highlight: true,
+    chapterGuide: chapter(
+      "integration.payloadBuilder.title",
+      "integration.payloadBuilder.docs.what",
+      "integration.payloadBuilder.docs.reconcile",
+      "integration.payloadBuilder.docs.safetyBoundaries"
+    ),
+    chapterNow: {
+      try: {
+        id: "payload-builder-dashboard",
+        labelKey: "integration.payloadBuilder.buildPayload",
+        href: "/dashboard/payload-builder",
+      },
+      copySnippetKey: "chat-curl",
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "payload-builder-panel", id: "payload-builder-panel" },
+      { type: "paragraph", textKey: "integration.payloadBuilder.docs.what" },
+      { type: "paragraph", textKey: "integration.payloadBuilder.docs.chooseIndustry" },
+      { type: "paragraph", textKey: "integration.payloadBuilder.docs.chooseApi" },
+      { type: "paragraph", textKey: "integration.payloadBuilder.docs.fillFields" },
+      { type: "paragraph", textKey: "integration.payloadBuilder.docs.generateJson" },
+      { type: "paragraph", textKey: "integration.payloadBuilder.docs.generateCurl" },
+      { type: "paragraph", textKey: "integration.payloadBuilder.docs.generateNodePython" },
+      { type: "paragraph", textKey: "integration.payloadBuilder.docs.generateBatch" },
+      { type: "paragraph", textKey: "integration.payloadBuilder.reconcile" },
+      {
+        type: "bullets",
+        items: [
+          "integration.starterTemplates.reconcileStep1",
+          "integration.starterTemplates.reconcileStep2",
+          "integration.starterTemplates.reconcileStep3",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.payloadBuilder.docs.safetyBoundaries" },
+      { type: "paragraph", textKey: "integration.payloadBuilder.docs.noFrontendSecrets" },
+      {
+        type: "dashboard-links",
+        links: [
+          {
+            id: "payload-builder-dashboard",
+            labelKey: "integration.payloadBuilder.buildPayload",
+            href: "/dashboard/payload-builder",
+          },
+          {
+            id: "template-configurator-dashboard",
+            labelKey: "integration.templateConfigurator.buildTemplate",
+            href: "/dashboard/starter-templates#template-configurator",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
         ],
       },
     ],
