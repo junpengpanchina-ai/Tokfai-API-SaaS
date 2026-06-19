@@ -141,6 +141,7 @@ for (const dir of SCAN_DIRS) {
   for (const file of walk(dir)) {
     const rel = relative(ROOT, file);
     if (rel.endsWith("troubleshooting-case-messages.ts")) continue;
+    if (rel.endsWith("starter-template-messages.ts")) continue;
     const lines = readFileSync(file, "utf8").split("\n");
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];

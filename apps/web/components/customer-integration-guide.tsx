@@ -24,6 +24,7 @@ import { CherryChapterCopyPanel } from "@/components/cherry-chapter-copy";
 import { CursorChapterCopyPanel } from "@/components/cursor-chapter-copy";
 import { IndustryChapterCopyPanel, IndustryOverviewTable } from "@/components/industry-chapter-copy";
 import { IndustryTemplatePackPanel } from "@/components/industry-template-card";
+import { CustomerStarterTemplateLibrary } from "@/components/customer-starter-template-library";
 import { CustomerTroubleshootingCenter } from "@/components/customer-troubleshooting-center";
 import { IntegrationCommandCenter } from "@/components/integration-command-center";
 import { IntegrationWorkbenchPanel } from "@/components/integration-workbench-panel";
@@ -726,6 +727,16 @@ function DocBlock({
     case "troubleshooting-center-panel":
       return (
         <CustomerTroubleshootingCenter
+          apiKey={quickStartApiKey}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          idPrefix={block.id}
+          compact={block.compact}
+        />
+      );
+    case "starter-template-library-panel":
+      return (
+        <CustomerStarterTemplateLibrary
           apiKey={quickStartApiKey}
           copiedId={copiedId}
           onCopy={onCopy}

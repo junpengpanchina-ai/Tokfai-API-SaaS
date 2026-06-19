@@ -159,6 +159,27 @@ export function ModelsClient({
             <li>{t("dashboard.models.startFromModelAutoCheap")}</li>
             <li>{t("dashboard.models.highTrafficBatchGovernor")}</li>
             <li>{t("dashboard.models.verificationUnavailableNote")}</li>
+            <li>{t("dashboard.models.starterTemplateHint")}</li>
+            <li>
+              <Link href="/dashboard/starter-templates#one-line-chat-curl" className="underline">
+                {t("dashboard.models.starterTemplateAutoFast")}
+              </Link>
+            </li>
+            <li>
+              <Link href="/dashboard/starter-templates#hospital-chart-summary" className="underline">
+                {t("dashboard.models.starterTemplateAutoPro")}
+              </Link>
+            </li>
+            <li>
+              <Link href="/dashboard/starter-templates#ecommerce-sku-batch" className="underline">
+                {t("dashboard.models.starterTemplateAutoCheap")}
+              </Link>
+            </li>
+            <li>
+              <Link href="/dashboard/starter-templates#one-line-image-curl" className="underline">
+                {t("dashboard.models.starterTemplateImage")}
+              </Link>
+            </li>
           </ul>
           <ApiServiceReadinessBanner compact />
           <div className="flex flex-wrap gap-2">
@@ -175,6 +196,11 @@ export function ModelsClient({
               <Link href="/dashboard/integration-workbench">
                 <Terminal className="mr-1.5 h-4 w-4" />
                 {t("dashboard.models.openIntegrationWorkbench")}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/starter-templates">
+                {t("integration.starterTemplates.openLibrary")}
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">

@@ -60,6 +60,10 @@ import {
 import { BATCH_POLL_PLACEHOLDER_ID } from "@/lib/customer-batch-api-chapter";
 import { buildTemplateCurlOneLine } from "@/lib/customer-industry-templates";
 import {
+  getStarterTemplateCopyText,
+  starterTemplateById,
+} from "@/lib/customer-starter-templates";
+import {
   buildSafeClientSnippet,
 } from "@/lib/customer-safe-client-snippets";
 import { buildTrafficGovernorSnippet } from "@/lib/customer-traffic-governor-snippets";
@@ -613,6 +617,16 @@ function OneTimeSecretCard({
               copiedLabel={t("dashboard.apiKeys.copied")}
               primary
             />
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/integration-workbench">
+                {t("dashboard.apiKeys.startIntegrationWorkbench")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/starter-templates">
+                {t("dashboard.apiKeys.openStarterTemplates")}
+              </Link>
+            </Button>
             <Button type="button" variant="outline" size="sm" onClick={onCopy}>
               {copyStatus === "copied" ? (
                 <>
@@ -627,21 +641,44 @@ function OneTimeSecretCard({
               )}
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/integration-workbench">
-                {t("dashboard.apiKeys.startIntegrationWorkbench")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/integration-workbench#go-live-tracker">
-                {t("dashboard.apiKeys.startGoLiveTracker")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/usage">{t("dashboard.apiKeys.goToUsage")}</Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/credits">{t("dashboard.apiKeys.goToCredits")}</Link>
             </Button>
+            <CopyConfigAction
+              id="one-time-secret-copy-node-starter"
+              value={getStarterTemplateCopyText(
+                starterTemplateById("node-chat-fetch")!,
+                secret
+              )}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyNodeStarter")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <CopyConfigAction
+              id="one-time-secret-copy-python-starter"
+              value={getStarterTemplateCopyText(
+                starterTemplateById("python-chat-requests")!,
+                secret
+              )}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyPythonStarter")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <CopyConfigAction
+              id="one-time-secret-copy-batch-worker"
+              value={getStarterTemplateCopyText(
+                starterTemplateById("node-batch-worker")!,
+                secret
+              )}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyBatchWorker")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
             {t("integration.oneLineCurlPasteAnywhere")}

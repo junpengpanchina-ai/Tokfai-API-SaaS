@@ -145,6 +145,34 @@ console.log("credits_charged:", body.credits_charged ?? body.tokfai?.credits_cha
 console.log("resolved_model:", body.tokfai?.resolved_model ?? body.model);`;
 }
 
+export function buildPythonChatRequestsExample(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
+  return `# pip install requests
+# Python requests — chat completion (no OpenAI SDK required)
+import os
+import requests
+
+api_key = os.environ.get("TOKFAI_API_KEY", "${apiKey}")
+url = "${TOKFAI_API_BASE_URL}/chat/completions"
+headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+payload = {
+    "model": "${OPENAI_SDK_DEFAULT_MODEL}",
+    "messages": [{"role": "user", "content": "${CHAT_SMOKE_PROMPT}"}],
+    "stream": False,
+}
+
+res = requests.post(url, headers=headers, json=payload, timeout=60)
+body = res.json()
+if res.status_code != 200:
+    print(body.get("error", {}).get("code"), body.get("error", {}).get("message"))
+    raise SystemExit(1)
+
+print(body["choices"][0]["message"]["content"])
+tokfai = body.get("tokfai") or {}
+print("request_id:", body.get("request_id") or tokfai.get("request_id"))
+print("credits_charged:", body.get("credits_charged") or tokfai.get("credits_charged"))
+print("resolved_model:", tokfai.get("resolved_model") or body.get("model"))`;
+}
+
 export function buildNodeChatSdkExample(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
   return `// npm install openai
 import OpenAI from "openai";

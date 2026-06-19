@@ -137,6 +137,7 @@ export type CustomerDocBlock =
   | { type: "integration-workbench-panel"; id: string }
   | { type: "integration-command-center-panel"; id: string }
   | { type: "troubleshooting-center-panel"; id: string; compact?: boolean }
+  | { type: "starter-template-library-panel"; id: string; compact?: boolean }
   | { type: "industry-template-pack"; id: string }
   | { type: "capacity-model-panel"; id: string; showReadiness?: boolean }
   | { type: "industry-overview-table" }
@@ -2777,6 +2778,98 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
             labelKey: "integration.linkErrorCodesGuide",
             href: "/dashboard/docs",
             hash: "error-codes",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "starter-templates",
+    navKey: "integration.starterTemplates.openLibrary",
+    titleKey: "integration.starterTemplates.title",
+    descriptionKey: "integration.starterTemplates.subtitle",
+    highlight: true,
+    chapterGuide: chapter(
+      "integration.starterTemplates.title",
+      "integration.starterTemplates.docs.what",
+      "integration.starterTemplates.reconcileStep1",
+      "integration.starterTemplates.retryAdvice1"
+    ),
+    chapterNow: {
+      try: {
+        id: "starter-templates-dashboard",
+        labelKey: "integration.starterTemplates.openLibrary",
+        href: "/dashboard/starter-templates",
+      },
+      copySnippetKey: "chat-curl",
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "starter-template-library-panel", id: "starter-templates-panel" },
+      { type: "paragraph", textKey: "integration.starterTemplates.docs.what" },
+      { type: "paragraph", textKey: "integration.starterTemplates.docs.chooseLanguage" },
+      { type: "paragraph", textKey: "integration.starterTemplates.docs.chooseApi" },
+      { type: "paragraph", textKey: "integration.starterTemplates.docs.chooseIndustry" },
+      { type: "paragraph", textKey: "integration.starterTemplates.title" },
+      {
+        type: "bullets",
+        items: [
+          "integration.starterTemplates.template.one-line-chat-curl.title",
+          "integration.starterTemplates.template.one-line-responses-curl.title",
+          "integration.starterTemplates.template.one-line-image-curl.title",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.navBatch" },
+      {
+        type: "bullets",
+        items: [
+          "integration.starterTemplates.template.one-line-batch-create-curl.title",
+          "integration.starterTemplates.template.node-batch-worker.title",
+          "integration.starterTemplates.template.python-batch-worker.title",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.navRetryBackoff" },
+      {
+        type: "bullets",
+        items: [
+          "integration.starterTemplates.template.node-safe-retry.title",
+          "integration.starterTemplates.template.node-traffic-governor.title",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.navIndustry" },
+      {
+        type: "bullets",
+        items: [
+          "integration.starterTemplates.industry.hospitalChart.title",
+          "integration.starterTemplates.industry.autoTicket.title",
+          "integration.starterTemplates.industry.ecommerceSku.title",
+          "integration.starterTemplates.industry.supportClassify.title",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.starterTemplates.reconcile" },
+      {
+        type: "bullets",
+        items: [
+          "integration.starterTemplates.reconcileStep1",
+          "integration.starterTemplates.reconcileStep2",
+          "integration.starterTemplates.reconcileStep3",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.starterTemplates.docs.safetyBoundaries" },
+      {
+        type: "dashboard-links",
+        links: [
+          {
+            id: "starter-templates-dashboard",
+            labelKey: "integration.starterTemplates.openLibrary",
+            href: "/dashboard/starter-templates",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+          {
+            id: "workbench",
+            labelKey: "integration.navIntegrationWorkbench",
+            href: "/dashboard/integration-workbench",
           },
         ],
       },

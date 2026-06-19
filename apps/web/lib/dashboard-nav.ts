@@ -10,6 +10,7 @@ import {
   Megaphone,
   Terminal,
   Wrench,
+  Layers,
   LifeBuoy,
 } from "lucide-react";
 
@@ -55,6 +56,12 @@ export const DASHBOARD_NAV_SECTIONS: DashboardNavSection[] = [
         href: "/dashboard/troubleshooting",
         labelKey: "nav.troubleshooting",
         icon: LifeBuoy,
+        prefetch: true,
+      },
+      {
+        href: "/dashboard/starter-templates",
+        labelKey: "nav.starterTemplates",
+        icon: Layers,
         prefetch: true,
       },
       {

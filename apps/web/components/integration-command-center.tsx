@@ -429,6 +429,11 @@ export function IntegrationCommandCenter({
 
                 {activeStep.id === "copy-templates" ? (
                   <>
+                    <Button asChild size="sm">
+                      <Link href="/dashboard/starter-templates">
+                        {t("integration.starterTemplates.openLibrary")}
+                      </Link>
+                    </Button>
                     <CopyConfigAction
                       id={`${idPrefix}-node-traffic`}
                       value={buildTrafficGovernorSnippet("node-traffic-governor", apiKey)}
@@ -619,6 +624,11 @@ export function IntegrationCommandCenter({
               <Button asChild size="sm" variant="outline" className="w-full">
                 <Link href="/dashboard/troubleshooting?code=invalid_token">
                   {t("integration.troubleshooting.searchErrorCode")}
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline" className="w-full">
+                <Link href="/dashboard/starter-templates">
+                  {t("integration.starterTemplates.openLibrary")}
                 </Link>
               </Button>
               <Button asChild size="sm" variant="outline" className="w-full">

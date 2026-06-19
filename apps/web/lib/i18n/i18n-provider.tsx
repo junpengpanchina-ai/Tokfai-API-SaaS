@@ -12,6 +12,10 @@ import {
 
 import { messages, type Locale } from "@/lib/i18n/messages";
 import {
+  starterTemplateMessagesEn,
+  starterTemplateMessagesZh,
+} from "@/lib/i18n/starter-template-messages";
+import {
   troubleshootingCaseMessagesEn,
   troubleshootingCaseMessagesZh,
 } from "@/lib/i18n/troubleshooting-case-messages";
@@ -77,7 +81,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const t = useCallback(
     (key: string) => {
       const flat =
-        locale === "zh" ? troubleshootingCaseMessagesZh : troubleshootingCaseMessagesEn;
+        locale === "zh"
+          ? { ...troubleshootingCaseMessagesZh, ...starterTemplateMessagesZh }
+          : { ...troubleshootingCaseMessagesEn, ...starterTemplateMessagesEn };
       if (flat[key]) return flat[key];
 
       const value = getNestedValue(
