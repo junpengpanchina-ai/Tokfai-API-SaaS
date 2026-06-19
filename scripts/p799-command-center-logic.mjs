@@ -1,5 +1,5 @@
 /**
- * Mirror of apps/web/lib/customer-integration-command-center.ts for offline acceptance.
+ * Mirror step ids for offline acceptance.
  */
 
 export const COMMAND_CENTER_STEP_IDS = [
@@ -12,10 +12,6 @@ export const COMMAND_CENTER_STEP_IDS = [
   "go-live-tracker",
   "reconcile-usage-credits",
 ];
-
-export const INTEGRATION_COMMAND_CENTER_STEPS = COMMAND_CENTER_STEP_IDS.map((id) => ({
-  id,
-}));
 
 export const COMMAND_CENTER_STORAGE_KEY = "tokfai_integration_command_center_state";
 

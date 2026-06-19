@@ -31,6 +31,7 @@ import {
   INTEGRATION_COMMAND_CENTER_STEPS,
   buildPlannerInputFromCommandCenter,
   commandCenterSummary,
+  nextIncompleteStep,
   nextStepId,
   stepAnchorId,
   type CommandCenterPersistedState,
@@ -45,7 +46,7 @@ import {
   type TrafficShape,
 } from "@/lib/customer-capacity-planner";
 import { buildSafeClientSnippet } from "@/lib/customer-safe-client-snippets";
-import { chatCurlOneLine } from "@/lib/customer-curl-oneline";
+import { chatCurlOneLine, chatCurlPowerShellOneLine } from "@/lib/customer-curl-oneline";
 import { buildTrafficGovernorSnippet } from "@/lib/customer-traffic-governor-snippets";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
@@ -121,6 +122,8 @@ export function IntegrationCommandCenter({
   const activeStep =
     INTEGRATION_COMMAND_CENTER_STEPS.find((s) => s.id === state.activeStepId) ??
     INTEGRATION_COMMAND_CENTER_STEPS[0];
+  const nextOpenStep = nextIncompleteStep(state.completedStepIds);
+  const curlOneLine = chatCurlOneLine(apiKey, state.recommendedModel);
 
   const markComplete = (stepId: CommandCenterStepId) => {
     persist({
@@ -145,23 +148,31 @@ export function IntegrationCommandCenter({
   };
 
   return (
-    <div id="integration-workbench" className="flex flex-col gap-6">
-      <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-5">
-        <h2 className="text-xl font-semibold tracking-tight">
-          {t("integration.commandCenter.title")}
-        </h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {t("integration.commandCenter.subtitle")}
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <CopyConfigAction
-            id={`${idPrefix}-header-chat-curl`}
-            value={chatCurlOneLine(apiKey, state.recommendedModel)}
+    <div id="integration-workbench" className="min-w-0 flex flex-col gap-6">
+      <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 sm:p-5">
+        <p className="text-sm text-muted-foreground">{t("integration.commandCenter.gatewayHint")}</p>
+        <div className="mt-3 flex min-w-0 flex-col gap-3">
+          <OneLineCurlCopyFields
+            apiKey={apiKey}
+            bashLabel={t("integration.commandCenter.ctaCopyCurl")}
+            bashCurl={curlOneLine}
+            powershellCurl={chatCurlPowerShellOneLine(apiKey, state.recommendedModel)}
             copiedId={copiedId}
             onCopy={onCopy}
-            label={t("integration.commandCenter.ctaCopyCurl")}
-            copiedLabel={t("integration.copied")}
+            idPrefix={`${idPrefix}-header-curl`}
+            liveKeyNoteKey="integration.workbench.sessionKeyNote"
+            pasteNoteKey="integration.oneLineCurlPasteAnywhere"
+            primaryCopy={true}
+            compact={true}
           />
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button type="button" size="sm" variant="outline" asChild>
+            <Link href="/dashboard/api-keys#create-api-key">
+              <KeyRound className="mr-1.5 h-4 w-4" />
+              {t("integration.ctaCreateKey")}
+            </Link>
+          </Button>
           <Button type="button" size="sm" variant="outline" onClick={() => goToStep("plan-capacity")}>
             {t("integration.commandCenter.ctaPlanCapacity")}
           </Button>
@@ -171,11 +182,11 @@ export function IntegrationCommandCenter({
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="flex flex-col gap-4 lg:col-span-2">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-3">
+        <div className="order-2 flex min-w-0 flex-col gap-4 lg:order-1 lg:col-span-2">
           <nav
             aria-label={t("integration.commandCenter.progressLabel")}
-            className="flex flex-wrap gap-2"
+            className="-mx-1 flex flex-wrap gap-2 overflow-x-auto px-1 pb-1"
           >
             {INTEGRATION_COMMAND_CENTER_STEPS.map((step, index) => {
               const done = state.completedStepIds.includes(step.id);
@@ -206,55 +217,58 @@ export function IntegrationCommandCenter({
             })}
           </nav>
 
-          {INTEGRATION_COMMAND_CENTER_STEPS.map((step) => (
-            <div
-              key={step.id}
-              id={stepAnchorId(step.id)}
-              className={`rounded-lg border bg-card p-4 shadow-sm ${
-                state.activeStepId === step.id ? "ring-2 ring-primary/30" : ""
-              }`}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">
-                    {t(step.titleKey)}
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {t(step.goalKey)}
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="shrink-0"
-                  onClick={() => markComplete(step.id)}
-                >
-                  <CheckCircle2 className="mr-1.5 h-4 w-4" />
-                  {t("integration.commandCenter.markDone")}
-                </Button>
-              </div>
-
-              <p className="mt-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {t("integration.commandCenter.nextAction")}
-              </p>
-              <p className="mt-1 text-sm text-foreground">{t(step.nextActionKey)}</p>
-
-              <p className="mt-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {t("integration.commandCenter.expectedOutput")}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {t(step.expectedOutputKey)}
-              </p>
-
-              {step.reconcileHintKey ? (
-                <p className="mt-3 rounded-md border border-amber-300/40 bg-amber-50/60 px-3 py-2 text-sm text-muted-foreground dark:border-amber-900/40 dark:bg-amber-950/30">
-                  {t(step.reconcileHintKey)}
+          <div
+            id={stepAnchorId(activeStep.id)}
+            className="min-w-0 rounded-lg border bg-card p-4 shadow-sm ring-2 ring-primary/25"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {formatMessage(t("integration.commandCenter.stepLabel"), {
+                    current: COMMAND_CENTER_STEP_IDS.indexOf(activeStep.id) + 1,
+                    total: COMMAND_CENTER_STEP_IDS.length,
+                  })}
                 </p>
-              ) : null}
+                <p className="mt-1 text-base font-semibold text-foreground">
+                  {t(activeStep.titleKey)}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">{t(activeStep.goalKey)}</p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="shrink-0"
+                onClick={() => markComplete(activeStep.id)}
+              >
+                <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                {t("integration.commandCenter.markDone")}
+              </Button>
+            </div>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                {step.id === "create-api-key" ? (
+            <p className="mt-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {t("integration.commandCenter.expectedOutput")}
+            </p>
+            <p className="mt-1 text-sm text-foreground">{t(activeStep.expectedOutputKey)}</p>
+
+            {!activeStep.reconcileHintKey ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                {t(activeStep.nextActionKey)}
+              </p>
+            ) : null}
+
+            {activeStep.reconcileHintKey ? (
+              <details className="mt-3 rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                <summary className="cursor-pointer font-medium text-foreground">
+                  {t("integration.commandCenter.moreDetails")}
+                </summary>
+                <p className="mt-2">{t(activeStep.reconcileHintKey)}</p>
+                <p className="mt-2">{t(activeStep.nextActionKey)}</p>
+              </details>
+            ) : null}
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {activeStep.id === "create-api-key" ? (
                   <>
                     <Button asChild size="sm">
                       <Link href="/dashboard/api-keys#create-api-key">
@@ -270,16 +284,19 @@ export function IntegrationCommandCenter({
                   </>
                 ) : null}
 
-                {step.id === "verify-curl" ? (
+                {activeStep.id === "verify-curl" ? (
                   <>
                     <OneLineCurlCopyFields
                       apiKey={apiKey}
                       bashLabel={t("integration.copyOneLineCurl")}
-                      bashCurl={chatCurlOneLine(apiKey, state.recommendedModel)}
+                      bashCurl={curlOneLine}
+                      powershellCurl={chatCurlPowerShellOneLine(apiKey, state.recommendedModel)}
                       copiedId={copiedId}
                       onCopy={onCopy}
                       idPrefix={`${idPrefix}-step-curl`}
                       liveKeyNoteKey="integration.workbench.sessionKeyNote"
+                      pasteNoteKey="integration.oneLineCurlPasteAnywhere"
+                      primaryCopy={true}
                     />
                     <Button asChild size="sm" variant="outline">
                       <Link href="/dashboard/docs#chat-api">
@@ -289,7 +306,7 @@ export function IntegrationCommandCenter({
                   </>
                 ) : null}
 
-                {step.id === "choose-workload" ? (
+                {activeStep.id === "choose-workload" ? (
                   <div className="grid w-full gap-3 sm:grid-cols-2">
                     <div className="flex flex-col gap-2">
                       <Label>{t("integration.capacityPlanner.industryLabel")}</Label>
@@ -348,7 +365,7 @@ export function IntegrationCommandCenter({
                   </div>
                 ) : null}
 
-                {step.id === "plan-capacity" ? (
+                {activeStep.id === "plan-capacity" ? (
                   <>
                     <Button type="button" size="sm" onClick={scrollToPlanner}>
                       {t("integration.commandCenter.openCapacityPlanner")}
@@ -361,7 +378,7 @@ export function IntegrationCommandCenter({
                   </>
                 ) : null}
 
-                {step.id === "generate-plan" ? (
+                {activeStep.id === "generate-plan" ? (
                   <>
                     <CopyConfigAction
                       id={`${idPrefix}-plan-plain`}
@@ -395,7 +412,7 @@ export function IntegrationCommandCenter({
                   </>
                 ) : null}
 
-                {step.id === "copy-templates" ? (
+                {activeStep.id === "copy-templates" ? (
                   <>
                     <CopyConfigAction
                       id={`${idPrefix}-node-traffic`}
@@ -445,7 +462,7 @@ export function IntegrationCommandCenter({
                   </>
                 ) : null}
 
-                {step.id === "go-live-tracker" ? (
+                {activeStep.id === "go-live-tracker" ? (
                   <>
                     <Button type="button" size="sm" onClick={scrollToTracker}>
                       {t("integration.commandCenter.ctaGoLiveTracker")}
@@ -466,7 +483,7 @@ export function IntegrationCommandCenter({
                   </>
                 ) : null}
 
-                {step.id === "reconcile-usage-credits" ? (
+                {activeStep.id === "reconcile-usage-credits" ? (
                   <>
                     <Button asChild size="sm">
                       <Link href="/dashboard/usage">{t("integration.linkUsage")}</Link>
@@ -490,23 +507,22 @@ export function IntegrationCommandCenter({
                   </>
                 ) : null}
 
-                {nextStepId(step.id) ? (
+                {nextStepId(activeStep.id) ? (
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
-                    onClick={() => goToStep(nextStepId(step.id)!)}
+                    onClick={() => goToStep(nextStepId(activeStep.id)!)}
                   >
                     <ChevronRight className="mr-1 h-4 w-4" />
                     {t("integration.commandCenter.nextStep")}
                   </Button>
                 ) : null}
-              </div>
             </div>
-          ))}
+          </div>
         </div>
 
-        <aside className="flex flex-col gap-4 rounded-lg border bg-muted/30 p-4">
+        <aside className="order-1 flex min-w-0 flex-col gap-4 rounded-lg border bg-muted/30 p-4 lg:order-2">
           <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
             <ClipboardList className="h-4 w-4 text-primary" />
             {t("integration.commandCenter.summaryTitle")}
@@ -546,20 +562,48 @@ export function IntegrationCommandCenter({
               total: COMMAND_CENTER_STEP_IDS.length,
             })}
           </p>
+          {nextOpenStep ? (
+            <div className="rounded-md border bg-background/80 px-3 py-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {t("integration.commandCenter.summaryNextAction")}
+              </p>
+              <p className="mt-1 text-sm font-medium text-foreground">
+                {t(nextOpenStep.titleKey)}
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="link"
+                className="mt-1 h-auto p-0"
+                onClick={() => goToStep(nextOpenStep.id)}
+              >
+                {t("integration.commandCenter.continueStep")}
+              </Button>
+            </div>
+          ) : (
+            <p className="text-sm text-emerald-700 dark:text-emerald-300">
+              {t("integration.commandCenter.allStepsDone")}
+            </p>
+          )}
           <p className="rounded-md border bg-background/80 px-3 py-2 text-xs text-muted-foreground">
             {t("integration.commandCenter.reconcileHint")}
           </p>
-          <Button asChild size="sm" variant="outline" className="w-full">
-            <Link href="/dashboard/usage">
-              <Terminal className="mr-1.5 h-4 w-4" />
-              {t("integration.linkUsage")}
-            </Link>
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
+            <Button asChild size="sm" variant="outline" className="w-full">
+              <Link href="/dashboard/usage">
+                <Terminal className="mr-1.5 h-4 w-4" />
+                {t("integration.linkUsage")}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline" className="w-full">
+              <Link href="/dashboard/credits">{t("integration.linkCredits")}</Link>
+            </Button>
+          </div>
         </aside>
       </div>
 
       {showEmbeddedPlanner ? (
-        <div className="rounded-lg border-2 border-primary/15 p-4">
+        <div className="min-w-0 rounded-lg border-2 border-primary/15 p-4">
           <p className="text-sm font-semibold text-foreground">
             {t("integration.commandCenter.embeddedPlannerTitle")}
           </p>

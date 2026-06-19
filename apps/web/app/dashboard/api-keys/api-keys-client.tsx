@@ -474,21 +474,8 @@ function OneTimeSecretCard({
         <CardDescription className="text-sm text-emerald-900/90 dark:text-emerald-100/90">
           {t("dashboard.apiKeys.oneTimeSecretDesc")}
         </CardDescription>
-        <p className="text-sm text-emerald-900/80 dark:text-emerald-100/80">
-          {t("dashboard.apiKeys.nextStepsHint")}
-        </p>
-        <p className="text-xs text-emerald-900/70 dark:text-emerald-100/70">
-          {t("dashboard.apiKeys.placeholderKeyNote")}
-        </p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Button type="button" size="sm" asChild>
-            <Link href="/dashboard/integration-workbench">
-              {t("dashboard.apiKeys.startIntegration")}
-            </Link>
-          </Button>
-        </div>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="flex min-w-0 flex-col gap-4">
         <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">
           <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
             {t("dashboard.apiKeys.integrationLinksTitle")}
@@ -590,7 +577,7 @@ function OneTimeSecretCard({
             <li>{t("dashboard.apiKeys.nextStepBatch")}</li>
           </ol>
         </div>
-        <div className="flex flex-col gap-2">
+        <div className="flex min-w-0 flex-col gap-2">
           <Label className="text-xs uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
             {t("dashboard.apiKeys.yourApiKey")}
           </Label>
@@ -605,6 +592,9 @@ function OneTimeSecretCard({
           <p className="text-sm font-medium text-foreground">
             {t("dashboard.apiKeys.keyReadyMessage")}
           </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {t("dashboard.apiKeys.storeBackendSecurityNote")}
+          </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <CopyConfigAction
               id="one-time-secret-copy-chat-curl-primary"
@@ -613,34 +603,41 @@ function OneTimeSecretCard({
               onCopy={handleSnippetCopy}
               label={t("dashboard.apiKeys.copyOneLineChatCurl")}
               copiedLabel={t("dashboard.apiKeys.copied")}
+              primary
             />
-            <Button type="button" size="sm" asChild>
+            <Button type="button" variant="outline" size="sm" onClick={onCopy}>
+              {copyStatus === "copied" ? (
+                <>
+                  <Check className="mr-1.5 h-4 w-4" />
+                  {t("dashboard.apiKeys.copied")}
+                </>
+              ) : (
+                <>
+                  <Copy className="mr-1.5 h-4 w-4" />
+                  {t("dashboard.apiKeys.copyFullKey")}
+                </>
+              )}
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/integration-workbench">
                 {t("dashboard.apiKeys.startIntegrationWorkbench")}
               </Link>
             </Button>
-            <Button type="button" size="sm" variant="outline" asChild>
-              <Link href="/dashboard/integration-workbench#command-center-step-plan-capacity">
-                {t("dashboard.apiKeys.planMyIntegration")}
-              </Link>
-            </Button>
-            <Button type="button" size="sm" variant="outline" asChild>
-              <Link href="/dashboard/docs#integration-plan">
-                {t("dashboard.apiKeys.planHandoffPack")}
-              </Link>
-            </Button>
-            <Button type="button" size="sm" variant="outline" asChild>
+            <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/integration-workbench#go-live-tracker">
                 {t("dashboard.apiKeys.startGoLiveTracker")}
               </Link>
             </Button>
-            <Button type="button" size="sm" variant="outline" asChild>
+            <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/usage">{t("dashboard.apiKeys.goToUsage")}</Link>
             </Button>
-            <Button type="button" size="sm" variant="outline" asChild>
+            <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/credits">{t("dashboard.apiKeys.goToCredits")}</Link>
             </Button>
           </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            {t("integration.oneLineCurlPasteAnywhere")}
+          </p>
         </div>
         <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">
           <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
@@ -989,19 +986,6 @@ function OneTimeSecretCard({
             onClick={onDismiss}
           >
             {t("dashboard.apiKeys.savedMyKey")}
-          </Button>
-          <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={onCopy}>
-            {copyStatus === "copied" ? (
-              <>
-                <Check className="h-4 w-4" />
-                {t("dashboard.apiKeys.copied")}
-              </>
-            ) : (
-              <>
-                <Copy className="h-4 w-4" />
-                {t("dashboard.apiKeys.copyFullKey")}
-              </>
-            )}
           </Button>
         </div>
       </CardContent>

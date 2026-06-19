@@ -14,7 +14,10 @@ type OneLineCurlCopyFieldsProps = {
   idPrefix: string;
   showKeyNote?: boolean;
   liveKeyNoteKey?: string;
+  pasteNoteKey?: string;
   className?: string;
+  primaryCopy?: boolean;
+  compact?: boolean;
 };
 
 export function OneLineCurlCopyFields({
@@ -27,13 +30,38 @@ export function OneLineCurlCopyFields({
   idPrefix,
   showKeyNote = true,
   liveKeyNoteKey = "integration.apiKeyLiveKeyNote",
+  pasteNoteKey = "integration.oneLineCurlPasteAnywhere",
   className,
+  primaryCopy = false,
+  compact = false,
 }: OneLineCurlCopyFieldsProps) {
   const { t } = useI18n();
   const keyIsPlaceholder = apiKey === TOKFAI_API_KEY_PLACEHOLDER;
+  const codeClass =
+    "[&_code]:max-h-24 [&_code]:overflow-x-auto [&_code]:whitespace-nowrap [&_code]:break-normal [&_code]:text-xs sm:[&_code]:text-sm";
+
+  if (compact) {
+    return (
+      <div className={className ?? "flex min-w-0 flex-col gap-2"}>
+        <CopyConfigAction
+          id={`${idPrefix}-bash-action`}
+          value={bashCurl}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          label={bashLabel}
+          copiedLabel={t("integration.copied")}
+          primary={primaryCopy}
+        />
+        <p className="text-xs text-muted-foreground">{t(pasteNoteKey)}</p>
+        {showKeyNote && !keyIsPlaceholder ? (
+          <p className="text-xs text-muted-foreground">{t(liveKeyNoteKey)}</p>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
-    <div className={className ?? "flex flex-col gap-3"}>
+    <div className={className ?? "flex min-w-0 flex-col gap-3"}>
       <CopyableSnippetField
         label={bashLabel}
         value={bashCurl}
@@ -42,8 +70,9 @@ export function OneLineCurlCopyFields({
         onCopy={onCopy}
         copyLabel={t("integration.copyOneLineCurl")}
         copiedLabel={t("integration.copied")}
-        className="[&_code]:max-h-32 [&_code]:whitespace-pre-wrap [&_code]:break-all"
+        className={codeClass}
       />
+      <p className="text-xs text-muted-foreground">{t(pasteNoteKey)}</p>
       {powershellCurl ? (
         <CopyableSnippetField
           label={t("integration.clientSoftwarePowerShellCurlLabel")}
@@ -53,7 +82,7 @@ export function OneLineCurlCopyFields({
           onCopy={onCopy}
           copyLabel={t("integration.copyPowerShellCurl")}
           copiedLabel={t("integration.copied")}
-          className="[&_code]:max-h-32 [&_code]:whitespace-pre-wrap [&_code]:break-all"
+          className={codeClass}
         />
       ) : null}
       {showKeyNote ? (
@@ -71,6 +100,7 @@ export function OneLineCurlCopyFields({
           onCopy={onCopy}
           label={t("integration.copyOneLineCurl")}
           copiedLabel={t("integration.copied")}
+          primary={primaryCopy}
         />
         {powershellCurl ? (
           <CopyConfigAction

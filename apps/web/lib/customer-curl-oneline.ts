@@ -38,8 +38,11 @@ function powershellJsonBody(value: unknown): string {
   return JSON.stringify(value).replace(/"/g, '\\"');
 }
 
-export function chatCurlPowerShellOneLine(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
-  const body = powershellJsonBody(chatCompletionBody());
+export function chatCurlPowerShellOneLine(
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
+  model = CHAT_SMOKE_MODEL
+): string {
+  const body = powershellJsonBody(chatCompletionBody(model));
   return `curl.exe -sS "${API_ROOT}/chat/completions" -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d "${body}"`;
 }
 

@@ -60,6 +60,7 @@ export function CopyConfigAction({
   onCopy,
   label,
   copiedLabel,
+  primary = false,
 }: {
   id: string;
   value: string;
@@ -67,13 +68,18 @@ export function CopyConfigAction({
   onCopy: (id: string, value: string) => void;
   label: string;
   copiedLabel: string;
+  primary?: boolean;
 }) {
   const copied = copiedId === id;
   return (
     <button
       type="button"
       onClick={() => onCopy(id, value)}
-      className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-muted"
+      className={
+        primary
+          ? "inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+          : "inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-muted"
+      }
     >
       {copied ? (
         <>

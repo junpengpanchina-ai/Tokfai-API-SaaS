@@ -372,6 +372,62 @@ const chapter = (
 
 export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
   {
+    id: "customer-integration-path",
+    navKey: "integration.navCustomerPath",
+    titleKey: "integration.customerPathTitle",
+    descriptionKey: "integration.customerPathDesc",
+    highlight: true,
+    chapterGuide: chapter(
+      "integration.customerPathTitle",
+      "integration.customerPathIntro",
+      "integration.customerPathStep5",
+      "integration.quickStartChapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "workbench-dashboard",
+        labelKey: "integration.navIntegrationWorkbench",
+        href: "/dashboard/integration-workbench",
+      },
+      copySnippetKey: "chat-curl",
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "paragraph", textKey: "integration.customerPathIntro" },
+      {
+        type: "ordered",
+        items: [
+          "integration.customerPathStep1",
+          "integration.customerPathStep2",
+          "integration.customerPathStep3",
+          "integration.customerPathStep4",
+          "integration.customerPathStep5",
+          "integration.customerPathStep6",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.customerPathThenConnect" },
+      {
+        type: "dashboard-links",
+        links: [
+          { id: "keys", labelKey: "integration.ctaCreateKey", href: "/dashboard/api-keys" },
+          {
+            id: "workbench-dashboard",
+            labelKey: "integration.navIntegrationWorkbench",
+            href: "/dashboard/integration-workbench",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+          {
+            id: "quick-start",
+            labelKey: "integration.navQuickStart",
+            href: "/dashboard/docs",
+            hash: "quick-start",
+          },
+        ],
+      },
+    ],
+  },
+  {
     id: "product-positioning",
     navKey: "integration.navPositioning",
     titleKey: "integration.positioningTitle",

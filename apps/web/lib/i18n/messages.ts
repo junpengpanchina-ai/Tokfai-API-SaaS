@@ -390,6 +390,8 @@ export const messages = {
         goLiveAutoCheapEcommerce: "Use auto-cheap for high-volume ecommerce copy",
         goLiveOpenTracker: "Open go-live tracker",
         startFromModelTitle: "Start integration from this model",
+        recommendedStartingModel: "Recommended starting model: auto-fast",
+        highTrafficBatchGovernor: "High traffic: use Batch API and traffic governor with safe retry.",
         startFromModelAutoFast: "auto-fast — first test",
         startFromModelAutoPro: "auto-pro — quality workloads",
         startFromModelAutoCheap: "auto-cheap — high-volume ecommerce copy",
@@ -649,6 +651,8 @@ export const messages = {
         startIntegrationWorkbench: "Start Integration Workbench",
         keyReadyMessage:
           "Your key is ready. Verify one request first, then plan capacity and hand off integration.",
+        storeBackendSecurityNote:
+          "Store your API Key on your backend. Do not expose it in browser frontend.",
         integrationWorkbench: "Integration workbench",
         industryTemplatesTitle: "Industry templates",
         industryTemplatesLink: "Industry templates",
@@ -1706,11 +1710,18 @@ export const messages = {
         title: "Integration Workbench",
         subtitle:
           "Create a key, verify a request, plan capacity, and hand off production integration.",
+        gatewayHint:
+          "Tokfai is an API gateway — verify your key with one Chat request, then connect Cursor, Cherry, or your SDK. Large jobs use Batch; high traffic uses concurrency limits and safe retry.",
         progressLabel: "Integration steps",
         ctaCopyCurl: "Copy one-line Chat curl",
         ctaPlanCapacity: "Plan capacity",
         ctaGoLiveTracker: "Start go-live tracker",
         markDone: "Mark done",
+        stepLabel: "Step {current} of {total}",
+        moreDetails: "More details",
+        summaryNextAction: "Next step",
+        continueStep: "Continue this step",
+        allStepsDone: "All steps marked — export evidence and reconcile Usage / Credits.",
         nextAction: "Next action",
         expectedOutput: "Expected output",
         openDocs: "Open docs",
@@ -2479,6 +2490,21 @@ export const messages = {
       readableCurlHint: "Multi-line curl is for reading only. Use Copy one-line curl — paste in any directory.",
       oneLineCurlPasteNote:
         "Paste in any terminal from any directory — no cd, no repository, no install required for curl.",
+      oneLineCurlPasteAnywhere:
+        "Paste in any terminal. No install. No project folder required.",
+      navCustomerPath: "Start here",
+      customerPathTitle: "Customer integration path",
+      customerPathDesc: "Six steps from API Key to Usage / Credits reconciliation.",
+      customerPathIntro:
+        "Tokfai is an OpenAI-compatible API gateway. Your backend holds the API Key; Tokfai routes Chat, Image, and Batch to upstream models.",
+      customerPathStep1: "Create API Key in Dashboard.",
+      customerPathStep2: "Copy one-line Chat curl (includes your key).",
+      customerPathStep3: "Paste in any terminal — expect HTTP 200.",
+      customerPathStep4: "Copy request_id from the JSON response.",
+      customerPathStep5: "Reconcile in Usage (request_id) and Credits (reference_id).",
+      customerPathStep6: "Then connect OpenAI SDK, Cursor, Cherry Studio, or Batch for volume.",
+      customerPathThenConnect:
+        "After curl succeeds, use Integration Workbench to plan capacity, copy workers, and track go-live.",
       oneLineCurlSuccessFields:
         "On HTTP 200, check choices[0].message.content, request_id, credits_charged, tokfai.requested_model, tokfai.resolved_model.",
       oneLineCurlImageSuccessFields:
@@ -5053,6 +5079,8 @@ export const messages = {
         goLiveAutoCheapEcommerce: "电商大批量文案使用 auto-cheap",
         goLiveOpenTracker: "打开上线跟踪器",
         startFromModelTitle: "从此模型开始接入",
+        recommendedStartingModel: "推荐起步模型：auto-fast",
+        highTrafficBatchGovernor: "高流量：使用 Batch API、流量治理与安全重试。",
         startFromModelAutoFast: "auto-fast — 首次测试",
         startFromModelAutoPro: "auto-pro — 高质量任务",
         startFromModelAutoCheap: "auto-cheap — 电商大批量文案",
@@ -5292,6 +5320,8 @@ export const messages = {
         startIntegrationWorkbench: "打开接入工作台",
         keyReadyMessage:
           "密钥已就绪。请先验证一次请求，再规划容量并完成接入交接。",
+        storeBackendSecurityNote:
+          "请将 API Key 保存在后端。禁止在浏览器前端暴露。",
         integrationWorkbench: "接入工作台",
         industryTemplatesTitle: "行业模板",
         industryTemplatesLink: "行业模板",
@@ -6298,11 +6328,18 @@ export const messages = {
       commandCenter: {
         title: "接入工作台",
         subtitle: "创建密钥、验证请求、规划容量，完成生产接入交接。",
+        gatewayHint:
+          "Tokfai 是 API 网关 — 先用 Chat 验证密钥，再接入 Cursor、Cherry 或 SDK。大批量走 Batch；高流量需并发限制与安全重试。",
         progressLabel: "接入步骤",
         ctaCopyCurl: "复制单行 Chat curl",
         ctaPlanCapacity: "规划容量",
         ctaGoLiveTracker: "开始上线跟踪",
         markDone: "标记完成",
+        stepLabel: "步骤 {current} / {total}",
+        moreDetails: "更多说明",
+        summaryNextAction: "下一步",
+        continueStep: "继续此步骤",
+        allStepsDone: "步骤已完成 — 导出证据并在 Usage / Credits 对账。",
         nextAction: "下一步动作",
         expectedOutput: "预期产出",
         openDocs: "打开文档",
@@ -7044,6 +7081,21 @@ export const messages = {
       readableCurlHint: "多行 curl 仅供阅读。请使用「复制单行 curl」— 任意目录粘贴即可。",
       oneLineCurlPasteNote:
         "在任意终端、任意目录粘贴运行 — 无需 cd、无需仓库、curl 无需安装。",
+      oneLineCurlPasteAnywhere:
+        "复制后粘贴到任意终端即可。不需要安装，不需要进入项目目录。",
+      navCustomerPath: "从这里开始",
+      customerPathTitle: "客户接入路径",
+      customerPathDesc: "从 API Key 到 Usage / Credits 对账的六步路径。",
+      customerPathIntro:
+        "Tokfai 是 OpenAI 兼容 API 网关。API Key 保存在您的后端；Tokfai 路由 Chat、Image 与 Batch 到上游模型。",
+      customerPathStep1: "在 Dashboard 创建 API Key。",
+      customerPathStep2: "复制单行 Chat curl（含您的密钥）。",
+      customerPathStep3: "粘贴到任意终端 — 预期 HTTP 200。",
+      customerPathStep4: "从 JSON 响应复制 request_id。",
+      customerPathStep5: "在 Usage（request_id）与 Credits（reference_id）对账。",
+      customerPathStep6: "再接入 OpenAI SDK、Cursor、Cherry Studio 或 Batch 大批量。",
+      customerPathThenConnect:
+        "curl 成功后，用接入工作台规划容量、复制 worker 并跟踪上线。",
       oneLineCurlSuccessFields:
         "HTTP 200 时检查 choices[0].message.content、request_id、credits_charged、tokfai.requested_model、tokfai.resolved_model。",
       oneLineCurlImageSuccessFields:

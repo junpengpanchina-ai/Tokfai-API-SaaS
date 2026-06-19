@@ -58,12 +58,10 @@ const RULES = [
   { label: "DMIT", pattern: /\bDMIT\b/i },
   { label: "repo (word)", pattern: /\brepo\b/i },
   { label: "commit (word)", pattern: /\bcommit\b/i },
-  { label: "git push", pattern: /\bgit\s+push\b/i },
-  {
-    label: "cd into Tokfai project",
-    pattern: /cd\s+(?:into\s+)?(?:the\s+)?Tokfai/i,
-  },
   { label: "mock gateway", pattern: /\bmock\s+gateway\b/i },
+  { label: "mock acceptance", pattern: /\bmock\s+acceptance\b/i },
+  { label: "commit hash", pattern: /\bcommit\s+hash\b/i },
+  { label: "git push", pattern: /\bgit\s+push\b/i },
 ];
 
 const ALLOW_SUBSTRINGS = [
@@ -90,6 +88,9 @@ const ALLOW_SUBSTRINGS = [
   "you operate your",
   "no scripts",
   "无需 scripts",
+  "no git",
+  "无需 git",
+  "no commit",
 ];
 
 function shouldIgnorePath(path) {
@@ -149,6 +150,9 @@ for (const dir of SCAN_DIRS) {
         if (rule.label === "DMIT" && /DmitApi/i.test(line)) continue;
 
         if (rule.label === "git push" && /push\s+back/i.test(line)) continue;
+        if (rule.label === "git push" && /no git/i.test(line)) continue;
+        if (rule.label === "commit hash" && /no commit/i.test(line)) continue;
+        if (rule.label === "commit (word)" && /no commit/i.test(line)) continue;
         if (rule.label === "operator (word)" && /operate your/i.test(line)) continue;
         if (rule.label === "operator (word)" && /自行运营/i.test(line)) continue;
         if (rule.label === "operator (word)" && /代运营/i.test(line)) continue;

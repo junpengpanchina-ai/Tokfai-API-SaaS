@@ -149,20 +149,16 @@ export function ModelsClient({
           <CardTitle className="text-base">
             {t("dashboard.models.startFromModelTitle")}
           </CardTitle>
+          <CardDescription>{t("dashboard.models.recommendedStartingModel")}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground">
           <ul className="list-disc space-y-1.5 pl-5">
             <li>{t("dashboard.models.startFromModelAutoFast")}</li>
             <li>{t("dashboard.models.startFromModelAutoPro")}</li>
             <li>{t("dashboard.models.startFromModelAutoCheap")}</li>
+            <li>{t("dashboard.models.highTrafficBatchGovernor")}</li>
           </ul>
           <div className="flex flex-wrap gap-2">
-            <Button asChild size="sm">
-              <Link href="/dashboard/integration-workbench">
-                <Terminal className="mr-1.5 h-4 w-4" />
-                {t("dashboard.models.openIntegrationWorkbench")}
-              </Link>
-            </Button>
             <CopyConfigAction
               id="models-curl-auto-fast"
               value={chatCurlOneLine(apiKey, "auto-fast")}
@@ -170,7 +166,14 @@ export function ModelsClient({
               onCopy={copyText}
               label={t("dashboard.models.copyCurlWithModel")}
               copiedLabel={t("quickstart.copied")}
+              primary
             />
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/integration-workbench">
+                <Terminal className="mr-1.5 h-4 w-4" />
+                {t("dashboard.models.openIntegrationWorkbench")}
+              </Link>
+            </Button>
             <Button asChild size="sm" variant="outline">
               <Link href="/dashboard/docs#usage-credits">
                 {t("dashboard.models.openUsageCreditsGuide")}

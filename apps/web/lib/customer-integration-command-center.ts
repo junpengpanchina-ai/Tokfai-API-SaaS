@@ -155,6 +155,17 @@ export function nextStepId(current: CommandCenterStepId): CommandCenterStepId | 
   return COMMAND_CENTER_STEP_IDS[index + 1];
 }
 
+export function nextIncompleteStep(
+  completedStepIds: CommandCenterStepId[]
+): CommandCenterStep | null {
+  for (const id of COMMAND_CENTER_STEP_IDS) {
+    if (!completedStepIds.includes(id)) {
+      return INTEGRATION_COMMAND_CENTER_STEPS.find((s) => s.id === id) ?? null;
+    }
+  }
+  return null;
+}
+
 export function commandCenterSummary(planInput: CapacityPlannerInput) {
   const plan = planCapacity(planInput);
   return {
