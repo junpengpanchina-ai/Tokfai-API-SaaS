@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Megaphone,
   Terminal,
+  Wrench,
 } from "lucide-react";
 
 export interface DashboardNavItem {
@@ -42,6 +43,12 @@ export const DASHBOARD_NAV_SECTIONS: DashboardNavSection[] = [
         labelKey: "nav.apiKeys",
         icon: KeyRound,
         prefetch: false,
+      },
+      {
+        href: "/dashboard/integration-workbench",
+        labelKey: "nav.integrationWorkbench",
+        icon: Wrench,
+        prefetch: true,
       },
       {
         href: "/dashboard/playground",

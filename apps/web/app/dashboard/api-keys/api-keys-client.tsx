@@ -240,7 +240,7 @@ export function ApiKeysClient({
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button type="button" size="sm" asChild>
-            <Link href="/dashboard/docs#integration-workbench">
+            <Link href="/dashboard/integration-workbench">
               <Terminal className="mr-1.5 h-4 w-4" />
               {t("dashboard.apiKeys.startIntegration")}
             </Link>
@@ -406,7 +406,7 @@ function ApiKeyUnderstandingGuide({ t }: { t: (key: string) => string }) {
             </Link>
           </Button>
           <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/dashboard/docs#integration-workbench">
+            <Link href="/dashboard/integration-workbench">
               {t("dashboard.apiKeys.integrationWorkbench")}
             </Link>
           </Button>
@@ -482,7 +482,7 @@ function OneTimeSecretCard({
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
           <Button type="button" size="sm" asChild>
-            <Link href="/dashboard/docs#integration-workbench">
+            <Link href="/dashboard/integration-workbench">
               {t("dashboard.apiKeys.startIntegration")}
             </Link>
           </Button>
@@ -495,7 +495,7 @@ function OneTimeSecretCard({
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#integration-workbench">
+              <Link href="/dashboard/integration-workbench">
                 {t("dashboard.apiKeys.integrationWorkbench")}
               </Link>
             </Button>
@@ -600,6 +600,47 @@ function OneTimeSecretCard({
           >
             {secret}
           </code>
+        </div>
+        <div className="rounded-lg border-2 border-primary/25 bg-primary/5 p-3">
+          <p className="text-sm font-medium text-foreground">
+            {t("dashboard.apiKeys.keyReadyMessage")}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <CopyConfigAction
+              id="one-time-secret-copy-chat-curl-primary"
+              value={chatCurlOneLine(secret)}
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyOneLineChatCurl")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <Button type="button" size="sm" asChild>
+              <Link href="/dashboard/integration-workbench">
+                {t("dashboard.apiKeys.startIntegrationWorkbench")}
+              </Link>
+            </Button>
+            <Button type="button" size="sm" variant="outline" asChild>
+              <Link href="/dashboard/integration-workbench#command-center-step-plan-capacity">
+                {t("dashboard.apiKeys.planMyIntegration")}
+              </Link>
+            </Button>
+            <Button type="button" size="sm" variant="outline" asChild>
+              <Link href="/dashboard/docs#integration-plan">
+                {t("dashboard.apiKeys.planHandoffPack")}
+              </Link>
+            </Button>
+            <Button type="button" size="sm" variant="outline" asChild>
+              <Link href="/dashboard/integration-workbench#go-live-tracker">
+                {t("dashboard.apiKeys.startGoLiveTracker")}
+              </Link>
+            </Button>
+            <Button type="button" size="sm" variant="outline" asChild>
+              <Link href="/dashboard/usage">{t("dashboard.apiKeys.goToUsage")}</Link>
+            </Button>
+            <Button type="button" size="sm" variant="outline" asChild>
+              <Link href="/dashboard/credits">{t("dashboard.apiKeys.goToCredits")}</Link>
+            </Button>
+          </div>
         </div>
         <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">
           <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
@@ -849,7 +890,7 @@ function OneTimeSecretCard({
               <Link href="/dashboard/credits">{t("dashboard.apiKeys.goToCredits")}</Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#integration-workbench">
+              <Link href="/dashboard/integration-workbench">
                 {t("dashboard.apiKeys.integrationWorkbench")}
               </Link>
             </Button>

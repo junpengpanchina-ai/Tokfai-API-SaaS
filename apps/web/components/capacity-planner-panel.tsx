@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Activity, Calculator, Terminal } from "lucide-react";
 
 import { CopyableSnippetField } from "@/components/copyable-snippet-field";
@@ -34,6 +34,8 @@ type CapacityPlannerPanelProps = {
   onCopy: (id: string, value: string) => void;
   idPrefix?: string;
   showTitle?: boolean;
+  plannerInput?: CapacityPlannerInput;
+  onPlannerInputChange?: (input: CapacityPlannerInput) => void;
 };
 
 export function CapacityPlannerPanel({
@@ -42,9 +44,19 @@ export function CapacityPlannerPanel({
   onCopy,
   idPrefix = "capacity-planner",
   showTitle = true,
+  plannerInput,
+  onPlannerInputChange,
 }: CapacityPlannerPanelProps) {
   const { t } = useI18n();
-  const [input, setInput] = useState<CapacityPlannerInput>(DEFAULT_PLANNER_INPUT);
+  const [internalInput, setInternalInput] = useState<CapacityPlannerInput>(
+    plannerInput ?? DEFAULT_PLANNER_INPUT
+  );
+
+  useEffect(() => {
+    if (plannerInput) setInternalInput(plannerInput);
+  }, [plannerInput]);
+
+  const input = plannerInput ?? internalInput;
 
   const plan = useMemo(() => planCapacity(input), [input]);
   const configSnippet = useMemo(
@@ -53,7 +65,9 @@ export function CapacityPlannerPanel({
   );
 
   const update = <K extends keyof CapacityPlannerInput>(key: K, value: CapacityPlannerInput[K]) => {
-    setInput((prev) => ({ ...prev, [key]: value }));
+    const next = { ...input, [key]: value };
+    onPlannerInputChange?.(next);
+    if (!plannerInput) setInternalInput(next);
   };
 
   return (

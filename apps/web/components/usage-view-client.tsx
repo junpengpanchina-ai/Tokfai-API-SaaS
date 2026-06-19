@@ -83,6 +83,16 @@ export function UsageViewClient({ state }: { state: UsagePageState }) {
             <li>{t("dashboard.usage.howItWorksItem4")}</li>
             <li>{t("dashboard.usage.howItWorksItem5")}</li>
           </ul>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/integration-workbench">
+                {t("dashboard.usage.integrationWorkbenchLink")}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/credits">{t("integration.linkCredits")}</Link>
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

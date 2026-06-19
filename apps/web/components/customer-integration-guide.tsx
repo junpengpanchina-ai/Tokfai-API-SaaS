@@ -24,6 +24,7 @@ import { CherryChapterCopyPanel } from "@/components/cherry-chapter-copy";
 import { CursorChapterCopyPanel } from "@/components/cursor-chapter-copy";
 import { IndustryChapterCopyPanel, IndustryOverviewTable } from "@/components/industry-chapter-copy";
 import { IndustryTemplatePackPanel } from "@/components/industry-template-card";
+import { IntegrationCommandCenter } from "@/components/integration-command-center";
 import { IntegrationWorkbenchPanel } from "@/components/integration-workbench-panel";
 import { DEFAULT_PLANNER_INPUT } from "@/lib/customer-capacity-planner";
 import { OpenAiSdkChapterCopyPanel } from "@/components/openai-sdk-chapter-copy";
@@ -709,6 +710,16 @@ function DocBlock({
           copiedId={copiedId}
           onCopy={onCopy}
           idPrefix={block.id}
+        />
+      );
+    case "integration-command-center-panel":
+      return (
+        <IntegrationCommandCenter
+          apiKey={quickStartApiKey}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          idPrefix={block.id}
+          showEmbeddedPlanner={true}
         />
       );
     case "industry-template-pack":

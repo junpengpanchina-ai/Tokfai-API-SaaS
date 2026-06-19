@@ -166,6 +166,12 @@ export function DashboardFirstRunOnboardingCard({
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/integration-workbench">
+              <Terminal className="h-4 w-4" />
+              {t("dashboard.firstRun.integrationWorkbench")}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
             <Link href="/dashboard/docs#quick-start">
               <Terminal className="h-4 w-4" />
               {t("dashboard.firstRun.quickStart")}

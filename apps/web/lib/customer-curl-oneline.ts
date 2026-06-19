@@ -61,8 +61,11 @@ export function responsesCurlOneLine(apiKey = TOKFAI_API_KEY_PLACEHOLDER): strin
   return `curl -sS ${API_ROOT}/responses -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d '${body}'`;
 }
 
-export function chatCurlOneLine(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
-  const body = shellSingleQuotedJson(chatCompletionBody());
+export function chatCurlOneLine(
+  apiKey = TOKFAI_API_KEY_PLACEHOLDER,
+  model = CHAT_SMOKE_MODEL
+): string {
+  const body = shellSingleQuotedJson(chatCompletionBody(model));
   return `curl -sS ${API_ROOT}/chat/completions -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d '${body}'`;
 }
 

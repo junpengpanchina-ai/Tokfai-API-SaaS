@@ -155,6 +155,11 @@ export function CreditsContentClient({
               {t("dashboard.credits.actionDocs")}
             </Link>
           </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/integration-workbench">
+              {t("dashboard.credits.integrationWorkbenchLink")}
+            </Link>
+          </Button>
         </CardContent>
       </Card>
 

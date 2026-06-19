@@ -135,6 +135,7 @@ export type CustomerDocBlock =
   | { type: "integration-handoff-panel"; id: string }
   | { type: "customer-api-path-panel"; id: string }
   | { type: "integration-workbench-panel"; id: string }
+  | { type: "integration-command-center-panel"; id: string }
   | { type: "industry-template-pack"; id: string }
   | { type: "capacity-model-panel"; id: string; showReadiness?: boolean }
   | { type: "industry-overview-table" }
@@ -549,6 +550,11 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
         links: [
           { id: "keys", labelKey: "integration.ctaCreateKey", href: "/dashboard/api-keys" },
           {
+            id: "workbench-dashboard",
+            labelKey: "integration.navIntegrationWorkbench",
+            href: "/dashboard/integration-workbench",
+          },
+          {
             id: "api-key-docs",
             labelKey: "integration.navApiKey",
             href: "/dashboard/docs",
@@ -598,19 +604,45 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
     ),
     chapterNow: {
       try: {
-        id: "keys",
-        labelKey: "integration.ctaCreateKey",
-        href: "/dashboard/api-keys",
+        id: "workbench-dashboard",
+        labelKey: "integration.navIntegrationWorkbench",
+        href: "/dashboard/integration-workbench",
       },
       copySnippetKey: "chat-curl",
       verify: VERIFY_USAGE_CREDITS,
     },
     blocks: [
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.whatTitle" },
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.whatBody" },
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.step1Title" },
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.step1Body" },
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.step2Title" },
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.step2Body" },
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.step3Title" },
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.step3Body" },
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.step4Title" },
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.step4Body" },
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.step5Title" },
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.step5Body" },
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.step6Title" },
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.step6Body" },
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.step7Title" },
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.step7Body" },
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.step8Title" },
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.step8Body" },
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.exportTitle" },
+      { type: "paragraph", textKey: "integration.commandCenter.chapter.exportBody" },
+      { type: "integration-command-center-panel", id: "docs-command-center" },
       { type: "integration-workbench-panel", id: "workbench" },
       {
         type: "dashboard-links",
         links: [
           { id: "keys", labelKey: "integration.ctaCreateKey", href: "/dashboard/api-keys" },
+          {
+            id: "workbench-dashboard",
+            labelKey: "integration.navIntegrationWorkbench",
+            href: "/dashboard/integration-workbench",
+          },
           {
             id: "quick-start",
             labelKey: "integration.navQuickStart",

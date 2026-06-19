@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { CodeBlock, CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
+import { CopyConfigAction } from "@/components/copyable-snippet-field";
 import { ResponsiveTableScroll } from "@/components/responsive-table-scroll";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { CatalogModelPricingItem } from "@/lib/dmit/client";
+import { chatCurlOneLine } from "@/lib/customer-curl-oneline";
+import { useQuickStartApiKey } from "@/lib/use-quick-start-api-key";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
 import {
@@ -80,6 +83,7 @@ export function ModelsClient({
 }) {
   const { t, locale } = useI18n();
   const { copiedId, copyText } = useCopyToClipboard();
+  const apiKey = useQuickStartApiKey();
 
   const stats = summarizeModelsCatalog(DASHBOARD_CATALOG_MODELS);
   const rows = buildModelsTableRows(
@@ -137,6 +141,42 @@ export function ModelsClient({
             </div>
           ))}
           <p className="text-muted-foreground">{t("dashboard.models.smartRoutingRealModelNote")}</p>
+        </CardContent>
+      </Card>
+
+      <Card className="border-primary/25 bg-primary/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">
+            {t("dashboard.models.startFromModelTitle")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground">
+          <ul className="list-disc space-y-1.5 pl-5">
+            <li>{t("dashboard.models.startFromModelAutoFast")}</li>
+            <li>{t("dashboard.models.startFromModelAutoPro")}</li>
+            <li>{t("dashboard.models.startFromModelAutoCheap")}</li>
+          </ul>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild size="sm">
+              <Link href="/dashboard/integration-workbench">
+                <Terminal className="mr-1.5 h-4 w-4" />
+                {t("dashboard.models.openIntegrationWorkbench")}
+              </Link>
+            </Button>
+            <CopyConfigAction
+              id="models-curl-auto-fast"
+              value={chatCurlOneLine(apiKey, "auto-fast")}
+              copiedId={copiedId}
+              onCopy={copyText}
+              label={t("dashboard.models.copyCurlWithModel")}
+              copiedLabel={t("quickstart.copied")}
+            />
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/docs#usage-credits">
+                {t("dashboard.models.openUsageCreditsGuide")}
+              </Link>
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -465,7 +505,7 @@ export function ModelsClient({
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           <Button asChild size="sm">
-            <Link href="/dashboard/docs#integration-workbench">
+            <Link href="/dashboard/integration-workbench">
               <Terminal className="mr-1.5 h-4 w-4" />
               {t("dashboard.models.footerStartIntegration")}
             </Link>
