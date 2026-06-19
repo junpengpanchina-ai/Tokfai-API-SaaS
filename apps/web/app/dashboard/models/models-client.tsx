@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/card";
 import type { CatalogModelPricingItem } from "@/lib/dmit/client";
 import { chatCurlOneLine } from "@/lib/customer-curl-oneline";
+import { buildConfiguratorHref } from "@/lib/customer-template-configurator";
 import { useQuickStartApiKey } from "@/lib/use-quick-start-api-key";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
@@ -161,6 +162,43 @@ export function ModelsClient({
             <li>{t("dashboard.models.verificationUnavailableNote")}</li>
             <li>{t("dashboard.models.starterTemplateHint")}</li>
             <li>
+              <Link
+                href={buildConfiguratorHref({ model: "auto-fast", api: "chat", industry: "general" })}
+                className="underline"
+              >
+                {t("dashboard.models.buildTemplateAutoFast")}
+              </Link>
+            </li>
+            <li>
+              <Link
+                href={buildConfiguratorHref({ model: "auto-pro", api: "chat", industry: "hospital" })}
+                className="underline"
+              >
+                {t("dashboard.models.buildTemplateAutoPro")}
+              </Link>
+            </li>
+            <li>
+              <Link
+                href={buildConfiguratorHref({
+                  model: "auto-cheap",
+                  api: "batch",
+                  industry: "ecommerce",
+                  workloadSize: "small-batch",
+                })}
+                className="underline"
+              >
+                {t("dashboard.models.buildTemplateAutoCheap")}
+              </Link>
+            </li>
+            <li>
+              <Link
+                href={buildConfiguratorHref({ model: "gpt-image-2", api: "image", industry: "ecommerce" })}
+                className="underline"
+              >
+                {t("dashboard.models.buildTemplateImage")}
+              </Link>
+            </li>
+            <li>
               <Link href="/dashboard/starter-templates#one-line-chat-curl" className="underline">
                 {t("dashboard.models.starterTemplateAutoFast")}
               </Link>
@@ -196,6 +234,11 @@ export function ModelsClient({
               <Link href="/dashboard/integration-workbench">
                 <Terminal className="mr-1.5 h-4 w-4" />
                 {t("dashboard.models.openIntegrationWorkbench")}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href={buildConfiguratorHref()}>
+                {t("dashboard.models.buildTemplateWithModel")}
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">

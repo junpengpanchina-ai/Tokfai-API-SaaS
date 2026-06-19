@@ -618,6 +618,11 @@ function OneTimeSecretCard({
               primary
             />
             <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/starter-templates#template-configurator">
+                {t("dashboard.apiKeys.buildStarterTemplate")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/integration-workbench">
                 {t("dashboard.apiKeys.startIntegrationWorkbench")}
               </Link>

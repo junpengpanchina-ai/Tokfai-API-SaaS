@@ -46,8 +46,9 @@ import {
   type RecommendedModelId,
   type TrafficShape,
 } from "@/lib/customer-capacity-planner";
-import { buildSafeClientSnippet } from "@/lib/customer-safe-client-snippets";
+import { TEMPLATE_CONFIGURATOR_PATH, buildConfiguratorHref } from "@/lib/customer-template-configurator";
 import { chatCurlOneLine, chatCurlPowerShellOneLine } from "@/lib/customer-curl-oneline";
+import { buildSafeClientSnippet } from "@/lib/customer-safe-client-snippets";
 import { buildTrafficGovernorSnippet } from "@/lib/customer-traffic-governor-snippets";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
@@ -430,6 +431,11 @@ export function IntegrationCommandCenter({
                 {activeStep.id === "copy-templates" ? (
                   <>
                     <Button asChild size="sm">
+                      <Link href={TEMPLATE_CONFIGURATOR_PATH}>
+                        {t("integration.templateConfigurator.buildTemplate")}
+                      </Link>
+                    </Button>
+                    <Button asChild size="sm" variant="outline">
                       <Link href="/dashboard/starter-templates">
                         {t("integration.starterTemplates.openLibrary")}
                       </Link>
@@ -608,6 +614,9 @@ export function IntegrationCommandCenter({
           <p className="rounded-md border bg-background/80 px-3 py-2 text-xs text-muted-foreground">
             {t("integration.commandCenter.reconcileHint")}
           </p>
+          <p className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            {t("integration.commandCenter.generateTailoredTemplate")}
+          </p>
           <div className="rounded-md border border-amber-200/80 bg-amber-50/50 px-3 py-3 dark:border-amber-900/50 dark:bg-amber-950/20">
             <p className="text-xs font-semibold uppercase tracking-wide text-foreground">
               {t("integration.troubleshooting.havingTroubleTitle")}
@@ -624,6 +633,11 @@ export function IntegrationCommandCenter({
               <Button asChild size="sm" variant="outline" className="w-full">
                 <Link href="/dashboard/troubleshooting?code=invalid_token">
                   {t("integration.troubleshooting.searchErrorCode")}
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline" className="w-full">
+                <Link href={TEMPLATE_CONFIGURATOR_PATH}>
+                  {t("integration.templateConfigurator.buildTemplate")}
                 </Link>
               </Button>
               <Button asChild size="sm" variant="outline" className="w-full">

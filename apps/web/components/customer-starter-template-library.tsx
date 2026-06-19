@@ -19,6 +19,7 @@ import {
   type StarterTemplateIndustry,
   type StarterTemplateLanguage,
   type StarterTemplatePattern,
+  type StarterTemplateCategory,
 } from "@/lib/customer-starter-templates";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 
@@ -28,6 +29,13 @@ type CustomerStarterTemplateLibraryProps = {
   onCopy: (id: string, value: string) => void;
   idPrefix?: string;
   compact?: boolean;
+  hideHeader?: boolean;
+  hideFilters?: boolean;
+  sectionTitleKey?: string;
+  sectionDescriptionKey?: string;
+  presetCategories?: StarterTemplateCategory[];
+  presetFeaturedOnly?: boolean;
+  presetIndustry?: StarterTemplateIndustry;
 };
 
 function TemplateCard({
@@ -164,6 +172,13 @@ export function CustomerStarterTemplateLibrary({
   onCopy,
   idPrefix = "starter-templates",
   compact = false,
+  hideHeader = false,
+  hideFilters = false,
+  sectionTitleKey,
+  sectionDescriptionKey,
+  presetCategories,
+  presetFeaturedOnly = false,
+  presetIndustry,
 }: CustomerStarterTemplateLibraryProps) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
@@ -173,147 +188,185 @@ export function CustomerStarterTemplateLibrary({
   const [pattern, setPattern] = useState<StarterTemplatePattern | "all">("all");
 
   const filtered = useMemo(() => {
-    const list = filterStarterTemplates(
-      STARTER_TEMPLATES,
-      { query, language, api, industry, pattern },
+    let list = STARTER_TEMPLATES;
+    if (presetFeaturedOnly) {
+      list = list.filter((item) => item.featured);
+    }
+    if (presetCategories?.length) {
+      list = list.filter((item) => presetCategories.includes(item.category));
+    }
+    if (presetIndustry) {
+      list = list.filter((item) => item.industry === presetIndustry);
+    }
+    const result = filterStarterTemplates(
+      list,
+      { query, language, api, industry: presetIndustry ? "all" : industry, pattern },
       t
     );
-    return sortStarterTemplatesFeatured(list);
-  }, [query, language, api, industry, pattern, t]);
+    return sortStarterTemplatesFeatured(result);
+  }, [
+    query,
+    language,
+    api,
+    industry,
+    pattern,
+    presetCategories,
+    presetFeaturedOnly,
+    presetIndustry,
+    t,
+  ]);
+
+  const showHeader = !compact && !hideHeader;
+  const showFilters = !compact && !hideFilters;
 
   return (
     <div className="min-w-0 flex flex-col gap-4">
-      {!compact ? (
+      {showHeader ? (
         <div>
           <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
             <Layers className="h-5 w-5 text-primary" />
-            {t("integration.starterTemplates.title")}
+            {sectionTitleKey ? t(sectionTitleKey) : t("integration.starterTemplates.title")}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {t("integration.starterTemplates.subtitle")}
+            {sectionDescriptionKey
+              ? t(sectionDescriptionKey)
+              : t("integration.starterTemplates.subtitle")}
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
             {t("integration.starterTemplates.storeKeyBackend")}
           </p>
         </div>
+      ) : sectionTitleKey ? (
+        <div>
+          <h3 className="text-lg font-semibold tracking-tight">{t(sectionTitleKey)}</h3>
+          {sectionDescriptionKey ? (
+            <p className="mt-1 text-sm text-muted-foreground">{t(sectionDescriptionKey)}</p>
+          ) : null}
+        </div>
       ) : null}
 
-      <div className="relative min-w-0">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("integration.troubleshooting.searchPlaceholder")}
-          className="pl-9"
-        />
-      </div>
+      {showFilters ? (
+        <>
+          <div className="relative min-w-0">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("integration.troubleshooting.searchPlaceholder")}
+              className="pl-9"
+            />
+          </div>
 
-      <div className="flex min-w-0 flex-col gap-2">
-        <p className="text-xs font-medium text-muted-foreground">
-          {t("integration.starterTemplates.filterLanguage")}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              ["all", "filterAll"],
-              ["curl", "filterCurl"],
-              ["powershell", "filterPowerShell"],
-              ["node", "filterNode"],
-              ["python", "filterPython"],
-            ] as const
-          ).map(([value, label]) => (
-            <Button
-              key={value}
-              type="button"
-              size="sm"
-              variant={language === value ? "default" : "outline"}
-              onClick={() => setLanguage(value)}
-            >
-              {t(`integration.starterTemplates.${label}`)}
-            </Button>
-          ))}
-        </div>
-      </div>
+          <div className="flex min-w-0 flex-col gap-2">
+            <p className="text-xs font-medium text-muted-foreground">
+              {t("integration.starterTemplates.filterLanguage")}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["all", "filterAll"],
+                  ["curl", "filterCurl"],
+                  ["powershell", "filterPowerShell"],
+                  ["node", "filterNode"],
+                  ["python", "filterPython"],
+                ] as const
+              ).map(([value, label]) => (
+                <Button
+                  key={value}
+                  type="button"
+                  size="sm"
+                  variant={language === value ? "default" : "outline"}
+                  onClick={() => setLanguage(value)}
+                >
+                  {t(`integration.starterTemplates.${label}`)}
+                </Button>
+              ))}
+            </div>
+          </div>
 
-      <div className="flex min-w-0 flex-col gap-2">
-        <p className="text-xs font-medium text-muted-foreground">
-          {t("integration.starterTemplates.filterApi")}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              ["all", "filterAll"],
-              ["chat", "filterChat"],
-              ["responses", "filterResponses"],
-              ["image", "filterImage"],
-              ["batch", "filterBatch"],
-            ] as const
-          ).map(([value, label]) => (
-            <Button
-              key={value}
-              type="button"
-              size="sm"
-              variant={api === value ? "default" : "outline"}
-              onClick={() => setApi(value)}
-            >
-              {t(`integration.starterTemplates.${label}`)}
-            </Button>
-          ))}
-        </div>
-      </div>
+          <div className="flex min-w-0 flex-col gap-2">
+            <p className="text-xs font-medium text-muted-foreground">
+              {t("integration.starterTemplates.filterApi")}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["all", "filterAll"],
+                  ["chat", "filterChat"],
+                  ["responses", "filterResponses"],
+                  ["image", "filterImage"],
+                  ["batch", "filterBatch"],
+                ] as const
+              ).map(([value, label]) => (
+                <Button
+                  key={value}
+                  type="button"
+                  size="sm"
+                  variant={api === value ? "default" : "outline"}
+                  onClick={() => setApi(value)}
+                >
+                  {t(`integration.starterTemplates.${label}`)}
+                </Button>
+              ))}
+            </div>
+          </div>
 
-      <div className="flex min-w-0 flex-col gap-2">
-        <p className="text-xs font-medium text-muted-foreground">
-          {t("integration.starterTemplates.filterIndustry")}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              ["all", "filterAll"],
-              ["hospital", "filterHospital"],
-              ["auto", "filterAuto"],
-              ["ecommerce", "filterEcommerce"],
-              ["support", "filterSupport"],
-            ] as const
-          ).map(([value, label]) => (
-            <Button
-              key={value}
-              type="button"
-              size="sm"
-              variant={industry === value ? "default" : "outline"}
-              onClick={() => setIndustry(value)}
-            >
-              {t(`integration.starterTemplates.${label}`)}
-            </Button>
-          ))}
-        </div>
-      </div>
+          {!presetIndustry ? (
+            <div className="flex min-w-0 flex-col gap-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                {t("integration.starterTemplates.filterIndustry")}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    ["all", "filterAll"],
+                    ["hospital", "filterHospital"],
+                    ["auto", "filterAuto"],
+                    ["ecommerce", "filterEcommerce"],
+                    ["support", "filterSupport"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    size="sm"
+                    variant={industry === value ? "default" : "outline"}
+                    onClick={() => setIndustry(value)}
+                  >
+                    {t(`integration.starterTemplates.${label}`)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
-      <div className="flex min-w-0 flex-col gap-2">
-        <p className="text-xs font-medium text-muted-foreground">
-          {t("integration.starterTemplates.filterPattern")}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              ["all", "filterAll"],
-              ["retry", "filterRetry"],
-              ["batch", "filterBatch"],
-              ["traffic-governor", "filterTrafficGovernor"],
-            ] as const
-          ).map(([value, label]) => (
-            <Button
-              key={value}
-              type="button"
-              size="sm"
-              variant={pattern === value ? "default" : "outline"}
-              onClick={() => setPattern(value)}
-            >
-              {t(`integration.starterTemplates.${label}`)}
-            </Button>
-          ))}
-        </div>
-      </div>
+          <div className="flex min-w-0 flex-col gap-2">
+            <p className="text-xs font-medium text-muted-foreground">
+              {t("integration.starterTemplates.filterPattern")}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["all", "filterAll"],
+                  ["retry", "filterRetry"],
+                  ["batch", "filterBatch"],
+                  ["traffic-governor", "filterTrafficGovernor"],
+                ] as const
+              ).map(([value, label]) => (
+                <Button
+                  key={value}
+                  type="button"
+                  size="sm"
+                  variant={pattern === value ? "default" : "outline"}
+                  onClick={() => setPattern(value)}
+                >
+                  {t(`integration.starterTemplates.${label}`)}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : null}
 
       <div className="flex min-w-0 flex-col gap-4">
         {filtered.length === 0 ? (

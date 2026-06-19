@@ -138,6 +138,7 @@ export type CustomerDocBlock =
   | { type: "integration-command-center-panel"; id: string }
   | { type: "troubleshooting-center-panel"; id: string; compact?: boolean }
   | { type: "starter-template-library-panel"; id: string; compact?: boolean }
+  | { type: "template-configurator-panel"; id: string; compact?: boolean }
   | { type: "industry-template-pack"; id: string }
   | { type: "capacity-model-panel"; id: string; showReadiness?: boolean }
   | { type: "industry-overview-table" }
@@ -2779,6 +2780,65 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
             href: "/dashboard/docs",
             hash: "error-codes",
           },
+        ],
+      },
+    ],
+  },
+  {
+    id: "template-configurator",
+    navKey: "integration.templateConfigurator.buildTemplate",
+    titleKey: "integration.templateConfigurator.title",
+    descriptionKey: "integration.templateConfigurator.subtitle",
+    highlight: true,
+    chapterGuide: chapter(
+      "integration.templateConfigurator.title",
+      "integration.templateConfigurator.docs.what",
+      "integration.templateConfigurator.docs.reconcile",
+      "integration.templateConfigurator.docs.safetyBoundaries"
+    ),
+    chapterNow: {
+      try: {
+        id: "template-configurator-dashboard",
+        labelKey: "integration.templateConfigurator.buildTemplate",
+        href: "/dashboard/starter-templates#template-configurator",
+      },
+      copySnippetKey: "chat-curl",
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "template-configurator-panel", id: "template-configurator-panel" },
+      { type: "paragraph", textKey: "integration.templateConfigurator.docs.what" },
+      { type: "paragraph", textKey: "integration.templateConfigurator.docs.chooseIndustry" },
+      { type: "paragraph", textKey: "integration.templateConfigurator.docs.chooseApi" },
+      { type: "paragraph", textKey: "integration.templateConfigurator.docs.chooseLanguage" },
+      { type: "paragraph", textKey: "integration.templateConfigurator.docs.chooseWorkload" },
+      { type: "paragraph", textKey: "integration.templateConfigurator.docs.copyTemplate" },
+      { type: "paragraph", textKey: "integration.templateConfigurator.docs.verifyCurl" },
+      { type: "paragraph", textKey: "integration.templateConfigurator.reconcile" },
+      {
+        type: "bullets",
+        items: [
+          "integration.starterTemplates.reconcileStep1",
+          "integration.starterTemplates.reconcileStep2",
+          "integration.starterTemplates.reconcileStep3",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.templateConfigurator.docs.safetyBoundaries" },
+      {
+        type: "dashboard-links",
+        links: [
+          {
+            id: "template-configurator-dashboard",
+            labelKey: "integration.templateConfigurator.buildTemplate",
+            href: "/dashboard/starter-templates#template-configurator",
+          },
+          {
+            id: "starter-templates-dashboard",
+            labelKey: "integration.starterTemplates.openLibrary",
+            href: "/dashboard/starter-templates",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
         ],
       },
     ],
