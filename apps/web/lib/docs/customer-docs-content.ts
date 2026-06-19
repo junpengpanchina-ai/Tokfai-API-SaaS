@@ -131,6 +131,7 @@ export type CustomerDocBlock =
       snippetIds?: TrafficGovernorSnippetId[];
     }
   | { type: "capacity-planner-panel"; id: string }
+  | { type: "go-live-tracker-panel"; id: string }
   | { type: "integration-handoff-panel"; id: string }
   | { type: "customer-api-path-panel"; id: string }
   | { type: "integration-workbench-panel"; id: string }
@@ -2305,6 +2306,69 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
           },
           { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
           { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "go-live-tracker",
+    navKey: "integration.navGoLiveTracker",
+    titleKey: "integration.goLiveTrackerChapter.title",
+    descriptionKey: "integration.goLiveTrackerChapter.desc",
+    chapterGuide: chapter(
+      "integration.goLiveTrackerChapter.chapterPurpose",
+      "integration.goLiveTrackerChapter.chapterCopy",
+      "integration.goLiveTrackerChapter.chapterVerify",
+      "integration.goLiveTrackerChapter.chapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "integration-plan",
+        labelKey: "integration.navIntegrationPlan",
+        href: "/dashboard/docs",
+        hash: "integration-plan",
+      },
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "paragraph", textKey: "integration.goLiveTrackerChapter.whatTitle" },
+      { type: "paragraph", textKey: "integration.goLiveTrackerChapter.whatBody" },
+      { type: "paragraph", textKey: "integration.goLiveTrackerChapter.prepareTitle" },
+      { type: "paragraph", textKey: "integration.goLiveTrackerChapter.prepareBody" },
+      { type: "paragraph", textKey: "integration.goLiveTrackerChapter.connectTitle" },
+      { type: "paragraph", textKey: "integration.goLiveTrackerChapter.connectBody" },
+      { type: "paragraph", textKey: "integration.goLiveTrackerChapter.validateTitle" },
+      { type: "paragraph", textKey: "integration.goLiveTrackerChapter.validateBody" },
+      { type: "paragraph", textKey: "integration.goLiveTrackerChapter.scaleTitle" },
+      { type: "paragraph", textKey: "integration.goLiveTrackerChapter.scaleBody" },
+      { type: "paragraph", textKey: "integration.goLiveTrackerChapter.handoffTitle" },
+      { type: "paragraph", textKey: "integration.goLiveTrackerChapter.handoffBody" },
+      { type: "paragraph", textKey: "integration.goLiveTrackerChapter.evidenceTitle" },
+      { type: "paragraph", textKey: "integration.goLiveTrackerChapter.evidenceBody" },
+      { type: "paragraph", textKey: "integration.goLiveTrackerChapter.reconcileTitle" },
+      { type: "paragraph", textKey: "integration.goLiveTrackerChapter.reconcileBody" },
+      { type: "paragraph", textKey: "integration.goLiveTrackerChapter.finalReportTitle" },
+      { type: "paragraph", textKey: "integration.goLiveTrackerChapter.finalReportBody" },
+      { type: "go-live-tracker-panel", id: "docs-go-live-tracker" },
+      {
+        type: "dashboard-links",
+        links: [
+          {
+            id: "usage",
+            labelKey: "integration.linkUsage",
+            href: "/dashboard/usage",
+          },
+          {
+            id: "credits",
+            labelKey: "integration.linkCredits",
+            href: "/dashboard/credits",
+          },
+          {
+            id: "integration-workbench",
+            labelKey: "integration.navIntegrationWorkbench",
+            href: "/dashboard/docs",
+            hash: "integration-workbench",
+          },
         ],
       },
     ],

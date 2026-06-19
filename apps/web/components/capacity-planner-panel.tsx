@@ -21,6 +21,7 @@ import {
 } from "@/lib/customer-capacity-planner";
 import { buildTrafficGovernorSnippet } from "@/lib/customer-traffic-governor-snippets";
 import { IntegrationHandoffPanel } from "@/components/integration-handoff-panel";
+import { GoLiveTrackerPanel } from "@/components/go-live-tracker-panel";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
 
@@ -360,6 +361,14 @@ export function CapacityPlannerPanel({
         copiedId={copiedId}
         onCopy={onCopy}
         idPrefix={`${idPrefix}-handoff`}
+        showTitle={true}
+      />
+
+      <GoLiveTrackerPanel
+        input={input}
+        copiedId={copiedId}
+        onCopy={onCopy}
+        idPrefix={`${idPrefix}-tracker`}
         showTitle={true}
       />
     </div>

@@ -17,6 +17,7 @@ import { ClientSoftwareAcceptanceCopyPanel } from "@/components/client-software-
 import { SafeRetryCopyPanel } from "@/components/safe-retry-copy-panel";
 import { TrafficGovernorCopyPanel } from "@/components/traffic-governor-copy-panel";
 import { CapacityPlannerPanel } from "@/components/capacity-planner-panel";
+import { GoLiveTrackerPanel } from "@/components/go-live-tracker-panel";
 import { CustomerApiPathPanel } from "@/components/customer-api-path-panel";
 import { CapacityModelPanel } from "@/components/capacity-model-panel";
 import { CherryChapterCopyPanel } from "@/components/cherry-chapter-copy";
@@ -24,6 +25,7 @@ import { CursorChapterCopyPanel } from "@/components/cursor-chapter-copy";
 import { IndustryChapterCopyPanel, IndustryOverviewTable } from "@/components/industry-chapter-copy";
 import { IndustryTemplatePackPanel } from "@/components/industry-template-card";
 import { IntegrationWorkbenchPanel } from "@/components/integration-workbench-panel";
+import { DEFAULT_PLANNER_INPUT } from "@/lib/customer-capacity-planner";
 import { OpenAiSdkChapterCopyPanel } from "@/components/openai-sdk-chapter-copy";
 import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
 import { Button } from "@/components/ui/button";
@@ -679,6 +681,16 @@ function DocBlock({
           copiedId={copiedId}
           onCopy={onCopy}
           idPrefix={block.id}
+        />
+      );
+    case "go-live-tracker-panel":
+      return (
+        <GoLiveTrackerPanel
+          input={DEFAULT_PLANNER_INPUT}
+          copiedId={copiedId}
+          onCopy={onCopy}
+          idPrefix={block.id}
+          showTitle={false}
         />
       );
     case "customer-api-path-panel":

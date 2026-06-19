@@ -186,6 +186,34 @@ export function ModelsClient({
       <Card className="border-primary/15 bg-primary/5">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">
+            {t("dashboard.models.goLiveReadinessTitle")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2 text-sm text-muted-foreground">
+          <ul className="list-disc space-y-1.5 pl-5">
+            <li>{t("dashboard.models.goLiveChooseModelPlan")}</li>
+            <li>{t("dashboard.models.goLiveAutoFastFirst")}</li>
+            <li>{t("dashboard.models.goLiveAutoProQuality")}</li>
+            <li>{t("dashboard.models.goLiveAutoCheapEcommerce")}</li>
+          </ul>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/docs#go-live-tracker">
+                {t("dashboard.models.goLiveOpenTracker")}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/docs#capacity-planner">
+                {t("dashboard.models.capacityPlannerLink")}
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-primary/15 bg-primary/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">
             {t("dashboard.models.highTrafficIntegrationTitle")}
           </CardTitle>
         </CardHeader>

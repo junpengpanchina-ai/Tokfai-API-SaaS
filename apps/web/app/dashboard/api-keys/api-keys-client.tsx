@@ -67,6 +67,7 @@ import {
   buildIntegrationPlanMarkdown,
   buildIntegrationPlanPlainText,
 } from "@/lib/customer-integration-plan-copy";
+import { buildGoLiveTrackerCopies } from "@/lib/customer-go-live-copy";
 import { buildCustomerIntegrationPlan } from "@/lib/customer-integration-plan";
 import { DEFAULT_PLANNER_INPUT } from "@/lib/customer-capacity-planner";
 import { isFullTokfaiApiKey, TOKFAI_API_BASE_URL, TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
@@ -780,6 +781,31 @@ function OneTimeSecretCard({
               copiedId={snippetCopiedId}
               onCopy={handleSnippetCopy}
               label={t("dashboard.apiKeys.copyGoLiveAcceptance")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/docs#go-live-tracker">
+                {t("dashboard.apiKeys.startGoLiveTracker")}
+              </Link>
+            </Button>
+            <CopyConfigAction
+              id="one-time-secret-copy-acceptance-report"
+              value={
+                buildGoLiveTrackerCopies(DEFAULT_PLANNER_INPUT, {}).finalReport
+              }
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyAcceptanceReport")}
+              copiedLabel={t("dashboard.apiKeys.copied")}
+            />
+            <CopyConfigAction
+              id="one-time-secret-copy-technical-handoff"
+              value={
+                buildGoLiveTrackerCopies(DEFAULT_PLANNER_INPUT, {}).technicalHandoff
+              }
+              copiedId={snippetCopiedId}
+              onCopy={handleSnippetCopy}
+              label={t("dashboard.apiKeys.copyTechnicalHandoff")}
               copiedLabel={t("dashboard.apiKeys.copied")}
             />
           </div>
