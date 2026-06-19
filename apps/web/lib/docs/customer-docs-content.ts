@@ -131,6 +131,7 @@ export type CustomerDocBlock =
       snippetIds?: TrafficGovernorSnippetId[];
     }
   | { type: "capacity-planner-panel"; id: string }
+  | { type: "integration-handoff-panel"; id: string }
   | { type: "customer-api-path-panel"; id: string }
   | { type: "integration-workbench-panel"; id: string }
   | { type: "industry-template-pack"; id: string }
@@ -2242,6 +2243,59 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
             labelKey: "integration.navTrafficGovernor",
             href: "/dashboard/docs",
             hash: "traffic-governor",
+          },
+          {
+            id: "batch-worker",
+            labelKey: "integration.navBatchWorker",
+            href: "/dashboard/docs",
+            hash: "batch-worker",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "integration-plan",
+    navKey: "integration.navIntegrationPlan",
+    titleKey: "integration.integrationPlan.title",
+    descriptionKey: "integration.integrationPlan.desc",
+    chapterGuide: chapter(
+      "integration.integrationPlan.chapterPurpose",
+      "integration.integrationPlan.chapterCopy",
+      "integration.integrationPlan.chapterVerify",
+      "integration.integrationPlan.chapterFailure"
+    ),
+    chapterNow: {
+      try: {
+        id: "capacity-planner",
+        labelKey: "integration.navCapacityPlanner",
+        href: "/dashboard/docs",
+        hash: "capacity-planner",
+      },
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "paragraph", textKey: "integration.integrationPlan.whatTitle" },
+      { type: "paragraph", textKey: "integration.integrationPlan.whatBody" },
+      { type: "paragraph", textKey: "integration.integrationPlan.chooseTitle" },
+      { type: "paragraph", textKey: "integration.integrationPlan.architectureTitle" },
+      { type: "paragraph", textKey: "integration.integrationPlan.endpointTitle" },
+      { type: "paragraph", textKey: "integration.integrationPlan.concurrencyTitle" },
+      { type: "paragraph", textKey: "integration.integrationPlan.retryTitle" },
+      { type: "paragraph", textKey: "integration.integrationPlan.securityTitle" },
+      { type: "paragraph", textKey: "integration.integrationPlan.reconcileTitle" },
+      { type: "paragraph", textKey: "integration.integrationPlan.goLiveTitle" },
+      { type: "capacity-planner-panel", id: "docs-integration-plan-planner" },
+      {
+        type: "dashboard-links",
+        links: [
+          {
+            id: "retry-docs",
+            labelKey: "integration.navRetryBackoff",
+            href: "/dashboard/docs",
+            hash: "retry-and-backoff",
           },
           {
             id: "batch-worker",
