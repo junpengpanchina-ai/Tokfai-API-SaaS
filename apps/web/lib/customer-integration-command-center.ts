@@ -28,6 +28,7 @@ export type CommandCenterStep = {
   nextActionKey: string;
   expectedOutputKey: string;
   reconcileHintKey?: string;
+  troubleshootHintKey?: string;
 };
 
 export const INTEGRATION_COMMAND_CENTER_STEPS: CommandCenterStep[] = [
@@ -46,6 +47,7 @@ export const INTEGRATION_COMMAND_CENTER_STEPS: CommandCenterStep[] = [
     nextActionKey: "integration.commandCenter.step.verifyCurl.nextAction",
     expectedOutputKey: "integration.commandCenter.step.verifyCurl.expected",
     reconcileHintKey: "integration.commandCenter.step.verifyCurl.reconcile",
+    troubleshootHintKey: "integration.troubleshooting.verifyCurlTroubleshoot",
   },
   {
     id: "choose-workload",
@@ -90,6 +92,7 @@ export const INTEGRATION_COMMAND_CENTER_STEPS: CommandCenterStep[] = [
     nextActionKey: "integration.commandCenter.step.reconcile.nextAction",
     expectedOutputKey: "integration.commandCenter.step.reconcile.expected",
     reconcileHintKey: "integration.commandCenter.step.reconcile.reconcile",
+    troubleshootHintKey: "integration.troubleshooting.reconcileSearchUsage",
   },
 ];
 

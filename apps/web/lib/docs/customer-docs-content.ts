@@ -136,6 +136,7 @@ export type CustomerDocBlock =
   | { type: "customer-api-path-panel"; id: string }
   | { type: "integration-workbench-panel"; id: string }
   | { type: "integration-command-center-panel"; id: string }
+  | { type: "troubleshooting-center-panel"; id: string; compact?: boolean }
   | { type: "industry-template-pack"; id: string }
   | { type: "capacity-model-panel"; id: string; showReadiness?: boolean }
   | { type: "industry-overview-table" }
@@ -2776,6 +2777,128 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
             labelKey: "integration.linkErrorCodesGuide",
             href: "/dashboard/docs",
             hash: "error-codes",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "troubleshooting",
+    navKey: "integration.navTroubleshooting",
+    titleKey: "integration.troubleshooting.title",
+    descriptionKey: "integration.troubleshooting.subtitle",
+    highlight: true,
+    chapterGuide: chapter(
+      "integration.troubleshooting.title",
+      "integration.troubleshooting.docs.howToRead",
+      "integration.troubleshooting.docs.reconcileBody",
+      "integration.troubleshooting.verifyCurlTroubleshoot"
+    ),
+    chapterNow: {
+      try: {
+        id: "troubleshooting-dashboard",
+        labelKey: "integration.troubleshooting.openTroubleshooting",
+        href: "/dashboard/troubleshooting",
+      },
+      verify: VERIFY_USAGE_CREDITS,
+    },
+    blocks: [
+      { type: "troubleshooting-center-panel", id: "troubleshooting-panel" },
+      { type: "paragraph", textKey: "integration.troubleshooting.docs.howToRead" },
+      { type: "paragraph", textKey: "integration.troubleshooting.docs.httpStatusTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.errorsFlowKeyStep1",
+          "integration.errorsFlowCreditsStep1",
+          "integration.errorsFlowUpstreamStep1",
+          "integration.trafficGovernor.troubleshoot4291",
+          "integration.trafficGovernor.troubleshoot5031",
+          "integration.trafficGovernor.troubleshoot5041",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.troubleshooting.docs.errorCodeTitle" },
+      { type: "error-table" },
+      { type: "paragraph", textKey: "integration.troubleshooting.docs.apiKeyErrorsTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.apiKeyErrorMissingToken",
+          "integration.apiKeyErrorInvalidToken",
+          "integration.troubleshooting.case.insufficient_credits.title",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.troubleshooting.docs.requestFormatTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.troubleshooting.case.route_not_found.title",
+          "integration.troubleshooting.case.invalid_request_error.title",
+          "integration.troubleshooting.case.stream_not_supported.title",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.troubleshooting.docs.modelUpstreamTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.troubleshooting.case.model_not_found.title",
+          "integration.troubleshooting.case.upstream_model_busy.title",
+          "integration.troubleshooting.case.upstream_timeout.title",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.troubleshooting.docs.rateLimitTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.troubleshooting.case.too_many_requests.title",
+          "integration.troubleshooting.case.too_many_concurrent_requests.title",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.troubleshooting.docs.imageErrorsTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.troubleshooting.case.invalid_image_url.title",
+          "integration.troubleshooting.case.image_generation_failed.title",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.troubleshooting.docs.batchErrorsTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.troubleshooting.case.batch_cancelled.title",
+          "integration.troubleshooting.case.batch_item_failed.title",
+          "integration.troubleshooting.case.batch_pending_too_long.title",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.troubleshooting.docs.clientErrorsTitle" },
+      {
+        type: "bullets",
+        items: [
+          "integration.troubleshooting.case.powershell_line_break.title",
+          "integration.troubleshooting.case.cursor_connection_failed.title",
+          "integration.troubleshooting.case.cherry_connection_failed.title",
+          "integration.troubleshooting.case.sdk_base_url_wrong.title",
+          "integration.troubleshooting.case.sdk_streaming_enabled.title",
+        ],
+      },
+      { type: "paragraph", textKey: "integration.troubleshooting.docs.reconcileTitle" },
+      { type: "paragraph", textKey: "integration.troubleshooting.docs.reconcileBody" },
+      { type: "error-examples-panel", id: "troubleshooting-error-examples" },
+      {
+        type: "dashboard-links",
+        links: [
+          {
+            id: "troubleshooting-dashboard",
+            labelKey: "integration.troubleshooting.openTroubleshooting",
+            href: "/dashboard/troubleshooting",
+          },
+          { id: "usage", labelKey: "integration.linkUsage", href: "/dashboard/usage" },
+          { id: "credits", labelKey: "integration.linkCredits", href: "/dashboard/credits" },
+          {
+            id: "workbench",
+            labelKey: "integration.navIntegrationWorkbench",
+            href: "/dashboard/integration-workbench",
           },
         ],
       },

@@ -11,6 +11,10 @@ import {
 } from "react";
 
 import { messages, type Locale } from "@/lib/i18n/messages";
+import {
+  troubleshootingCaseMessagesEn,
+  troubleshootingCaseMessagesZh,
+} from "@/lib/i18n/troubleshooting-case-messages";
 
 const STORAGE_KEY = "tokfai-locale";
 
@@ -72,6 +76,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   const t = useCallback(
     (key: string) => {
+      const flat =
+        locale === "zh" ? troubleshootingCaseMessagesZh : troubleshootingCaseMessagesEn;
+      if (flat[key]) return flat[key];
+
       const value = getNestedValue(
         messages[locale] as unknown as Record<string, unknown>,
         key

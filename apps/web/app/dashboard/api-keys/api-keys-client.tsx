@@ -14,6 +14,7 @@ import {
   Plus,
   ShieldAlert,
   Terminal,
+  Wrench,
 } from "lucide-react";
 
 import { ApiReadinessMiniBadge } from "@/components/api-service-readiness-banner";
@@ -645,6 +646,34 @@ function OneTimeSecretCard({
           <p className="mt-3 text-xs text-muted-foreground">
             {t("integration.oneLineCurlPasteAnywhere")}
           </p>
+        </div>
+        <div className="rounded-lg border border-amber-200/80 bg-amber-50/40 p-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+          <p className="text-xs font-semibold uppercase tracking-wide text-foreground">
+            {t("integration.troubleshooting.curlFailsTitle")}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/troubleshooting?code=invalid_token">
+                {t("integration.troubleshooting.invalidTokenGuide")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/troubleshooting?code=missing_token">
+                {t("integration.troubleshooting.missingTokenGuide")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/troubleshooting?code=powershell_line_break">
+                {t("integration.troubleshooting.powershellGuide")}
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/dashboard/troubleshooting">
+                <Wrench className="mr-1.5 h-4 w-4" />
+                {t("integration.troubleshooting.openTroubleshooting")}
+              </Link>
+            </Button>
+          </div>
         </div>
         <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">
           <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">

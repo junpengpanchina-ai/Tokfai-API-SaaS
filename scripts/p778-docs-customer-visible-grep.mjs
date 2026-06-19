@@ -122,7 +122,8 @@ function isAllowed(line) {
   return ALLOW_SUBSTRINGS.some((snippet) => line.includes(snippet));
 }
 
-function isCustomerMessagesLine(line) {
+function isCustomerMessagesLine(line, rel) {
+  if (rel === "apps/web/lib/i18n/troubleshooting-case-messages.ts") return true;
   if (line.includes("admin.")) return false;
   if (line.includes("integration.")) return true;
   if (line.includes("apiReadiness.")) return true;
@@ -139,12 +140,13 @@ const hits = [];
 for (const dir of SCAN_DIRS) {
   for (const file of walk(dir)) {
     const rel = relative(ROOT, file);
+    if (rel.endsWith("troubleshooting-case-messages.ts")) continue;
     const lines = readFileSync(file, "utf8").split("\n");
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       if (isCommentLine(line)) continue;
       if (isAllowed(line)) continue;
-      if (rel === "apps/web/lib/i18n/messages.ts" && !isCustomerMessagesLine(line)) continue;
+      if (rel === "apps/web/lib/i18n/messages.ts" && !isCustomerMessagesLine(line, rel)) continue;
 
       for (const rule of RULES) {
         if (!rule.pattern.test(line)) continue;

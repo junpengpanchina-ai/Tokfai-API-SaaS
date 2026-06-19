@@ -1,10 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Copy } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  troubleshootingCaseByErrorCode,
+  TROUBLESHOOTING_DASHBOARD_PATH,
+} from "@/lib/customer-troubleshooting";
 import {
   classifyPlaygroundError,
   playgroundRiskHintKey,
@@ -28,6 +32,19 @@ export function PlaygroundErrorPanel({
 }) {
   const kind = classifyPlaygroundError(error.status, error.code);
   const hintKey = playgroundRiskHintKey(scope, kind, error.code);
+  const troubleshootHref = error.code
+    ? `${TROUBLESHOOTING_DASHBOARD_PATH}?code=${encodeURIComponent(error.code)}`
+    : TROUBLESHOOTING_DASHBOARD_PATH;
+  const matchedCase = error.code ? troubleshootingCaseByErrorCode(error.code) : undefined;
+
+  async function copyRequestId() {
+    if (!error.requestId) return;
+    try {
+      await navigator.clipboard.writeText(error.requestId);
+    } catch {
+      // ignore clipboard errors
+    }
+  }
 
   return (
     <div className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4">
@@ -63,8 +80,18 @@ export function PlaygroundErrorPanel({
       {hintKey ? (
         <p className="text-sm text-muted-foreground">{t(hintKey)}</p>
       ) : null}
+      {matchedCase ? (
+        <p className="text-sm text-muted-foreground">
+          {t(matchedCase.likelyCauseKey)}
+        </p>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
+        <Button asChild size="sm" variant="outline" className="w-fit">
+          <Link href={troubleshootHref}>
+            {t("dashboard.playground.openTroubleshootingGuide")}
+          </Link>
+        </Button>
         {error.code ? (
           <Button asChild size="sm" variant="outline" className="w-fit">
             <Link href="/dashboard/docs#error-codes">
@@ -73,11 +100,28 @@ export function PlaygroundErrorPanel({
           </Button>
         ) : null}
         {error.requestId ? (
-          <Button asChild size="sm" variant="outline" className="w-fit">
-            <Link href="/dashboard/usage">
-              {t("dashboard.playground.viewUsage")}
-            </Link>
-          </Button>
+          <>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="w-fit"
+              onClick={() => copyRequestId()}
+            >
+              <Copy className="mr-1.5 h-4 w-4" />
+              {t("dashboard.playground.copyRequestId")}
+            </Button>
+            <Button asChild size="sm" variant="outline" className="w-fit">
+              <Link href="/dashboard/usage">
+                {t("dashboard.playground.viewUsage")}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline" className="w-fit">
+              <Link href="/dashboard/credits">
+                {t("dashboard.playground.viewCredits")}
+              </Link>
+            </Button>
+          </>
         ) : null}
       </div>
 

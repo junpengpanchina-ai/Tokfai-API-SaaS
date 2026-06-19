@@ -272,7 +272,14 @@ export function IntegrationCommandCenter({
                 </summary>
                 <p className="mt-2">{t(activeStep.reconcileHintKey)}</p>
                 <p className="mt-2">{t(activeStep.nextActionKey)}</p>
+                {activeStep.troubleshootHintKey ? (
+                  <p className="mt-2">{t(activeStep.troubleshootHintKey)}</p>
+                ) : null}
               </details>
+            ) : activeStep.troubleshootHintKey ? (
+              <p className="mt-3 text-sm text-muted-foreground">
+                {t(activeStep.troubleshootHintKey)}
+              </p>
             ) : null}
 
             <div className="mt-4 flex flex-wrap gap-2">
@@ -596,6 +603,31 @@ export function IntegrationCommandCenter({
           <p className="rounded-md border bg-background/80 px-3 py-2 text-xs text-muted-foreground">
             {t("integration.commandCenter.reconcileHint")}
           </p>
+          <div className="rounded-md border border-amber-200/80 bg-amber-50/50 px-3 py-3 dark:border-amber-900/50 dark:bg-amber-950/20">
+            <p className="text-xs font-semibold uppercase tracking-wide text-foreground">
+              {t("integration.troubleshooting.havingTroubleTitle")}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t("integration.troubleshooting.havingTroubleDesc")}
+            </p>
+            <div className="mt-3 flex flex-col gap-2">
+              <Button asChild size="sm" variant="outline" className="w-full">
+                <Link href="/dashboard/troubleshooting">
+                  {t("integration.troubleshooting.openTroubleshooting")}
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline" className="w-full">
+                <Link href="/dashboard/troubleshooting?code=invalid_token">
+                  {t("integration.troubleshooting.searchErrorCode")}
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline" className="w-full">
+                <Link href="/dashboard/docs#usage-credits">
+                  {t("integration.troubleshooting.openUsageCredits")}
+                </Link>
+              </Button>
+            </div>
+          </div>
           <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
             <Button asChild size="sm" variant="outline" className="w-full">
               <Link href="/dashboard/usage">

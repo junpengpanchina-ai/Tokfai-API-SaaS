@@ -178,6 +178,11 @@ export function ModelsClient({
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/troubleshooting">
+                {t("integration.troubleshooting.openTroubleshooting")}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
               <Link href="/dashboard/docs#usage-credits">
                 {t("dashboard.models.openUsageCreditsGuide")}
               </Link>
