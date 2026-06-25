@@ -21,12 +21,20 @@ import {
   type MeUsageLogEntry,
   type MeUsageSummaryResponse,
 } from "@/lib/dmit/client";
-import { formatCreditsPrecise, formatDateTime, formatInt, toneForStatus } from "@/lib/format";
+import { formatInt } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/i18n-provider";
+import {
+  formatCreditsWithSuffix,
+  formatDate,
+  getModelLabel,
+  shortRequestId,
+} from "@/lib/usage-safe-display";
 import {
   formatUsageCredits,
   formatUsageTokenCell,
   getUsageKind,
+  usageStatusLabel,
+  usageStatusTone,
   type UsageKind,
 } from "@/lib/usage-display";
 
@@ -278,7 +286,7 @@ function QueryResults({
         />
         <AdminStatCard
           label={t("dashboard.usage.creditsCharged")}
-          value={formatCreditsPrecise(summary.total_credits_charged)}
+          value={formatCreditsWithSuffix(summary.total_credits_charged)}
         />
       </div>
 
@@ -372,16 +380,13 @@ function UsageQueryRow({
   kind: UsageKind;
   t: (key: string) => string;
 }) {
-  const tone = toneForStatus(row.status);
-  const statusLabel =
-    tone === "success"
-      ? t("dashboard.usage.statusSucceeded")
-      : t("dashboard.usage.statusFailed");
+  const tone = usageStatusTone(row.status);
+  const statusLabel = usageStatusLabel(row.status, t);
 
   return (
     <tr className="border-b last:border-0 align-top">
       <td className="py-2.5 pr-3 text-muted-foreground whitespace-nowrap">
-        {formatDateTime(row.created_at)}
+        {formatDate(row.created_at)}
       </td>
       <td className="py-2.5 pr-3">
         <Badge variant="outline" className="whitespace-nowrap">
@@ -391,7 +396,7 @@ function UsageQueryRow({
         </Badge>
       </td>
       <td className="max-w-[9rem] py-2.5 pr-3 font-mono text-xs break-all sm:max-w-none">
-        {row.model ?? "—"}
+        {getModelLabel(row.model)}
       </td>
       <td className="py-2.5 pr-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
         {row.prefix ?? "—"}
@@ -399,6 +404,8 @@ function UsageQueryRow({
       <td className="py-2.5 pr-3 whitespace-nowrap">
         {tone === "success" ? (
           <Badge variant="success">{statusLabel}</Badge>
+        ) : tone === "muted" ? (
+          <Badge variant="secondary">{statusLabel}</Badge>
         ) : (
           <Badge variant="destructive">{statusLabel}</Badge>
         )}
@@ -425,17 +432,11 @@ function UsageQueryRow({
         className="hidden max-w-[10rem] truncate py-2.5 pr-3 font-mono text-xs text-muted-foreground xl:table-cell"
         title={row.request_id ?? undefined}
       >
-        {truncateRequestId(row.request_id)}
+        {shortRequestId(row.request_id)}
       </td>
       <td className="hidden max-w-[8rem] truncate py-2.5 pr-0 font-mono text-xs text-muted-foreground lg:table-cell">
         {row.error_code ?? "—"}
       </td>
     </tr>
   );
-}
-
-function truncateRequestId(requestId: string | null | undefined) {
-  if (!requestId) return "—";
-  if (requestId.length <= 16) return requestId;
-  return `${requestId.slice(0, 8)}...${requestId.slice(-6)}`;
 }

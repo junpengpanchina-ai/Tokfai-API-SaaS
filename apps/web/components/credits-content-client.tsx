@@ -35,7 +35,13 @@ import {
 } from "@/lib/billing/credit-order-status";
 import { formatCny } from "@/lib/billing/recharge-plans";
 import type { CreditsPageData } from "@/lib/credits";
-import { formatCredits, formatDateTime } from "@/lib/format";
+import { formatCredits as formatCreditsBalance } from "@/lib/format";
+import {
+  formatCreditsWithSuffix,
+  formatDate,
+  safeNumber,
+  shortRequestId,
+} from "@/lib/usage-safe-display";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import type { CreditLedgerRow } from "@/lib/supabase/types";
 
@@ -86,7 +92,7 @@ export function CreditsContentClient({
         <CardHeader>
           <CardDescription>{t("dashboard.credits.currentBalance")}</CardDescription>
           <CardTitle className="text-4xl">
-            {error ? t("common.unavailable") : formatCredits(balance.balance)}
+            {error ? t("common.unavailable") : formatCreditsBalance(balance.balance)}
           </CardTitle>
           {balance.showNoLedgerHint && !error ? (
             <p className="text-sm text-muted-foreground">
@@ -99,17 +105,17 @@ export function CreditsContentClient({
             label={t("dashboard.credits.lastChange")}
             value={
               balance.lastChangeAt
-                ? formatDateTime(balance.lastChangeAt)
+                ? formatDate(balance.lastChangeAt)
                 : "—"
             }
           />
           <BalanceStat
             label={t("dashboard.credits.todayConsumed")}
-            value={formatCredits(balance.todayConsumed)}
+            value={formatCreditsBalance(balance.todayConsumed)}
           />
           <BalanceStat
             label={t("dashboard.credits.last7DaysConsumed")}
-            value={formatCredits(balance.last7DaysConsumed)}
+            value={formatCreditsBalance(balance.last7DaysConsumed)}
           />
         </CardContent>
       </Card>
@@ -271,7 +277,7 @@ export function CreditsContentClient({
                       }
                     >
                       <td className="py-2 pr-4 text-muted-foreground">
-                        {formatDateTime(order.created_at)}
+                        {formatDate(order.created_at)}
                       </td>
                       <td className="py-2 pr-4 text-right font-mono text-xs">
                         {formatOrderAmount(order)}
@@ -329,7 +335,7 @@ function LedgerRow({
   return (
     <tr className="border-b last:border-0">
       <td className="py-2 pr-4 text-muted-foreground">
-        {formatDateTime(entry.created_at)}
+        {formatDate(entry.created_at)}
       </td>
       <td className="py-2 pr-4">
         <LedgerTypeBadge type={entry.type} t={t} />
@@ -339,7 +345,7 @@ function LedgerRow({
       </td>
       <td className="py-2 pr-4 text-right font-mono text-xs">
         {entry.balance_after != null
-          ? formatCredits(entry.balance_after)
+          ? formatCreditsBalance(entry.balance_after)
           : "—"}
       </td>
       <td
@@ -355,7 +361,7 @@ function LedgerRow({
               className="max-w-[10rem] truncate font-mono text-xs text-muted-foreground"
               title={entry.reference_id}
             >
-              {truncateReferenceId(entry.reference_id)}
+              {shortRequestId(entry.reference_id)}
             </code>
             <CopyButton
               copied={copiedId === referenceCopyId}
@@ -482,12 +488,12 @@ function CheckoutStatusBanner({
   return null;
 }
 
-function AmountCell({ amount }: { amount: number | null }) {
-  if (amount == null) return <span>—</span>;
-  const isPositive = amount >= 0;
-  const label = isPositive
-    ? `+${formatCredits(amount)}`
-    : formatCredits(amount);
+function AmountCell({ amount }: { amount: number | string | null }) {
+  const formatted = formatCreditsWithSuffix(amount);
+  if (formatted === "—") return <span>—</span>;
+  const n = safeNumber(amount);
+  const isPositive = n != null && n >= 0;
+  const label = isPositive ? `+${formatted}` : formatted;
   return (
     <Badge
       variant={isPositive ? "success" : "destructive"}
@@ -608,11 +614,6 @@ function EmptyLedgerState({ t }: { t: (key: string) => string }) {
       </div>
     </div>
   );
-}
-
-function truncateReferenceId(referenceId: string) {
-  if (referenceId.length <= 16) return referenceId;
-  return `${referenceId.slice(0, 8)}...${referenceId.slice(-6)}`;
 }
 
 function formatOrderAmount(order: CreditsLoadState["orders"][number]): string {

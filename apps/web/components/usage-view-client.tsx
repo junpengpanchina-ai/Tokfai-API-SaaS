@@ -15,11 +15,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { formatInt } from "@/lib/format";
 import {
-  formatCreditsPrecise,
-  formatDateTime,
-  formatInt,
-} from "@/lib/format";
+  formatCreditsWithSuffix,
+  formatDate,
+  getModelLabel,
+  shortRequestId,
+} from "@/lib/usage-safe-display";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import type { UsagePageLog, UsagePageState } from "@/lib/usage-page";
 import {
@@ -63,7 +65,7 @@ export function UsageViewClient({ state }: { state: UsagePageState }) {
           />
           <AdminStatCard
             label={t("dashboard.usage.statCredits7d")}
-            value={formatCreditsPrecise(state.stats.creditsLast7Days)}
+            value={formatCreditsWithSuffix(state.stats.creditsLast7Days)}
           />
         </div>
       ) : null}
@@ -226,10 +228,10 @@ function UsageRow({
   return (
     <tr className="border-b last:border-0 align-top">
       <td className="py-2.5 pr-3 text-muted-foreground whitespace-nowrap">
-        {formatDateTime(row.created_at)}
+        {formatDate(row.created_at)}
       </td>
       <td className="max-w-[9rem] py-2.5 pr-3 font-mono text-xs break-all sm:max-w-none">
-        {row.model ?? "—"}
+        {getModelLabel(row.model)}
       </td>
       <td className="py-2.5 pr-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
         {resolveUsageRoute(row.model)}
@@ -262,7 +264,7 @@ function UsageRow({
               className="max-w-[10rem] truncate font-mono text-xs text-muted-foreground"
               title={row.request_id}
             >
-              {truncateRequestId(row.request_id)}
+              {shortRequestId(row.request_id)}
             </code>
             <CopyButton
               copied={copiedId === copyId}
@@ -284,7 +286,7 @@ function StatusBadge({
   status,
   t,
 }: {
-  status: string;
+  status: string | null;
   t: (key: string) => string;
 }) {
   const tone = usageStatusTone(status);
@@ -326,9 +328,4 @@ function EmptyState({ t }: { t: (key: string) => string }) {
       </div>
     </div>
   );
-}
-
-function truncateRequestId(requestId: string) {
-  if (requestId.length <= 16) return requestId;
-  return `${requestId.slice(0, 8)}...${requestId.slice(-6)}`;
 }

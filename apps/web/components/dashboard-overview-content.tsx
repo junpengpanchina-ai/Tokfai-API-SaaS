@@ -20,13 +20,13 @@ import { DashboardAnnouncementsOverview } from "@/components/dashboard-announcem
 import { DashboardFirstRunOnboardingCard } from "@/components/dashboard-first-run-onboarding";
 import type { PublicAnnouncement } from "@/lib/announcements";
 import type { DashboardOverviewData } from "@/lib/dashboard-overview";
+import { formatInt } from "@/lib/format";
 import {
-  formatCredits,
-  formatCreditsPrecise,
-  formatDateTime,
-  formatInt,
-  toneForStatus,
-} from "@/lib/format";
+  formatCreditsWithSuffix,
+  formatDate,
+  formatTokens,
+  getModelLabel,
+} from "@/lib/usage-safe-display";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { usageStatusLabel, usageStatusTone } from "@/lib/usage-display";
 
@@ -152,7 +152,7 @@ export function DashboardOverviewContent({
         : overview.creditsBalance <= 0
           ? "dashboard.overview.topUpToStart"
           : "dashboard.overview.creditsBalanceHint",
-      value: formatCredits(overview.creditsBalance),
+      value: formatCreditsWithSuffix(overview.creditsBalance),
       href: "/dashboard/credits",
       icon: CreditCard,
     },
@@ -182,7 +182,7 @@ export function DashboardOverviewContent({
         overview.creditsConsumedLast7Days > 0
           ? "dashboard.overview.creditsConsumedHint"
           : "dashboard.overview.noConsumptionYet",
-      value: formatCredits(overview.creditsConsumedLast7Days),
+      value: formatCreditsWithSuffix(overview.creditsConsumedLast7Days),
       href: "/dashboard/credits",
       icon: Coins,
     },
@@ -548,7 +548,7 @@ function RecentActivityCard({
   t: (key: string) => string;
 }) {
   const hasSuccessfulActivity = overview.recentActivity.some(
-    (row) => toneForStatus(row.status) === "success"
+    (row) => usageStatusTone(row.status) === "success"
   );
 
   return (
@@ -712,16 +712,16 @@ function RecentActivityTable({
           {rows.map((row) => (
             <tr key={row.id} className="border-b last:border-0">
               <td className="px-4 py-3 font-mono text-xs">
-                {formatDateTime(row.created_at)}
+                {formatDate(row.created_at)}
               </td>
               <td className="px-4 py-3 font-mono text-xs">
-                {row.model ?? "—"}
+                {getModelLabel(row.model)}
               </td>
               <td className="px-4 py-3">
                 <StatusBadge status={row.status} t={t} />
               </td>
               <td className="px-4 py-3 font-mono text-xs">
-                {row.total_tokens != null ? formatInt(row.total_tokens) : "—"}
+                {formatTokens(row.total_tokens)}
               </td>
               <td className="px-4 py-3 font-mono text-xs">
                 {formatActivityCredits(row)}
@@ -762,11 +762,5 @@ function StatusBadge({
 function formatActivityCredits(
   row: DashboardOverviewData["recentActivity"][number]
 ): string {
-  if (toneForStatus(row.status) !== "success") {
-    return "—";
-  }
-  if (row.credits_charged == null || row.credits_charged <= 0) {
-    return "—";
-  }
-  return formatCreditsPrecise(row.credits_charged);
+  return formatCreditsWithSuffix(row.credits_charged);
 }

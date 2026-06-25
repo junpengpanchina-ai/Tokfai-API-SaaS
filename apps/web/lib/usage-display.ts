@@ -1,12 +1,13 @@
-import {
-  formatCreditsPrecise,
-  formatInt,
-  type SemanticTone,
-} from "@/lib/format";
+import { formatInt, type SemanticTone } from "@/lib/format";
 import { isAvailableImageModel } from "@/lib/model-catalog";
+import {
+  formatCreditsWithSuffix,
+  formatTokens,
+  safeNumber,
+} from "@/lib/usage-safe-display";
 
 export interface UsageLogDisplayRow {
-  status: string;
+  status: string | null;
   model: string | null;
   prompt_tokens: number | null;
   completion_tokens: number | null;
@@ -28,12 +29,16 @@ const USAGE_ERROR_STATUSES = new Set([
   "error",
   "upstream_error",
   "rate_limited",
+  "upstream_timeout",
 ]);
 
 export function usageStatusLabel(
   status: string | null | undefined,
   t: (key: string) => string
 ): string {
+  if (!status || status.trim() === "") {
+    return "unknown";
+  }
   const tone = usageStatusTone(status);
   if (tone === "success") {
     return t("dashboard.usage.statusSucceeded");
@@ -47,14 +52,16 @@ export function usageStatusLabel(
 export function usageStatusTone(
   status: string | null | undefined
 ): SemanticTone {
-  if (!status) return "muted";
+  if (!status || status.trim() === "") return "muted";
   const normalized = status.toLowerCase();
   if (USAGE_SUCCESS_STATUSES.has(normalized)) return "success";
   if (USAGE_PENDING_STATUSES.has(normalized)) return "muted";
   if (
     USAGE_ERROR_STATUSES.has(normalized) ||
     normalized.includes("error") ||
-    normalized.includes("fail")
+    normalized.includes("fail") ||
+    normalized.includes("timeout") ||
+    normalized.includes("rate")
   ) {
     return "destructive";
   }
@@ -85,17 +92,11 @@ export function usageKindLabel(kind: UsageKind): string {
 
 export function formatUsageCredits(
   row: UsageLogDisplayRow,
-  kind: UsageKind
+  _kind: UsageKind
 ): string {
-  if (usageStatusTone(row.status) !== "success") return "—";
-
-  const value = row.credits_charged;
-  if (value == null || value === "") return "—";
-
-  const n = typeof value === "number" ? value : Number(value);
-  if (Number.isNaN(n)) return "—";
-
-  return formatCreditsPrecise(n);
+  const n = safeNumber(row.credits_charged);
+  if (n == null) return "—";
+  return formatCreditsWithSuffix(n);
 }
 
 export function formatUsageTokenCell(
@@ -108,6 +109,5 @@ export function formatUsageTokenCell(
     return "—";
   }
 
-  if (value == null) return "—";
-  return formatInt(value);
+  return formatTokens(value);
 }
