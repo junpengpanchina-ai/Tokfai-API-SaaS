@@ -225,6 +225,12 @@ function load(): Env {
         status: 500,
         code: "invalid_env",
         message: "Invalid DMIT environment configuration.",
+        issues: parsed.error.issues.map((issue) => ({
+          path: issue.path.join("."),
+          code: issue.code,
+          message: issue.message,
+          received: "received" in issue ? issue.received : undefined,
+        })),
       })}\n`
     );
     process.exit(1);
