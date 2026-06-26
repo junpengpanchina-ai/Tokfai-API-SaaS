@@ -19,20 +19,18 @@ import { formatInt } from "@/lib/format";
 import {
   formatCreditsWithSuffix,
   formatDate,
-  getModelLabel,
-  shortRequestId,
-} from "@/lib/usage-safe-display";
-import { useI18n } from "@/lib/i18n/i18n-provider";
-import type { UsagePageLog, UsagePageState } from "@/lib/usage-page";
-import {
   formatUsageCredits,
   formatUsageTokenCell,
+  getModelLabel,
   getUsageKind,
   resolveUsageRoute,
+  shortRequestId,
   usageStatusLabel,
   usageStatusTone,
   type UsageKind,
-} from "@/lib/usage-display";
+} from "@/lib/usage-safe-display";
+import { useI18n } from "@/lib/i18n/i18n-provider";
+import type { UsagePageLog, UsagePageState } from "@/lib/usage-page";
 
 export function UsageViewClient({ state }: { state: UsagePageState }) {
   const { t } = useI18n();

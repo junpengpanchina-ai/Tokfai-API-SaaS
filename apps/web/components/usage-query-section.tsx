@@ -26,17 +26,15 @@ import { useI18n } from "@/lib/i18n/i18n-provider";
 import {
   formatCreditsWithSuffix,
   formatDate,
-  getModelLabel,
-  shortRequestId,
-} from "@/lib/usage-safe-display";
-import {
   formatUsageCredits,
   formatUsageTokenCell,
+  getModelLabel,
   getUsageKind,
+  shortRequestId,
   usageStatusLabel,
   usageStatusTone,
   type UsageKind,
-} from "@/lib/usage-display";
+} from "@/lib/usage-safe-display";
 
 export type UsageApiKeyOption = {
   id: string;

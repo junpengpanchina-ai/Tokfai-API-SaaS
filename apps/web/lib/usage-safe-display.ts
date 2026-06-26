@@ -1,19 +1,56 @@
 /**
- * Null-safe formatting for Usage / Credits dashboard tables.
- * Top-level function declarations only — safe for client bundles.
+ * Null-safe Usage / Credits display helpers.
+ * Pure module — no React, no model-catalog, no circular imports.
  */
 
-import { DASHBOARD_CATALOG_MODELS } from "@/lib/model-catalog";
-import { formatInt } from "@/lib/format";
+import { formatInt, type SemanticTone } from "@/lib/format";
 
 const CREDITS_DECIMAL = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 0,
   maximumFractionDigits: 6,
 });
 
-const MODEL_DISPLAY_BY_ID = new Map(
-  DASHBOARD_CATALOG_MODELS.map((entry) => [entry.id, entry.displayName])
-);
+/** Image model ids seen in usage logs (subset of catalog — no catalog import). */
+const USAGE_IMAGE_MODEL_IDS = new Set([
+  "gpt-image-2",
+  "gpt-image-2-vip",
+  "nano-banana-fast",
+  "nano-banana",
+  "nano-banana-pro",
+  "nano-banana-2",
+  "nano-banana-pro-vt",
+  "nano-banana-2-cl",
+  "nano-banana-2-4k-cl",
+  "nano-banana-pro-cl",
+  "nano-banana-pro-vip",
+  "nano-banana-pro-4k-vip",
+]);
+
+const USAGE_SUCCESS_STATUSES = new Set(["succeeded", "success", "ok"]);
+const USAGE_PENDING_STATUSES = new Set([
+  "pending",
+  "unknown",
+  "in_progress",
+  "queued",
+]);
+const USAGE_ERROR_STATUSES = new Set([
+  "failed",
+  "error",
+  "upstream_error",
+  "rate_limited",
+  "upstream_timeout",
+]);
+
+export interface UsageLogDisplayRow {
+  status: string | null;
+  model: string | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  credits_charged: number | string | null;
+}
+
+export type UsageKind = "chat" | "image";
 
 export function safeText(
   value: string | null | undefined,
@@ -32,8 +69,7 @@ export function safeNumber(
   return Number.isFinite(n) ? n : null;
 }
 
-/** Decimal credits amount for table cells (no suffix). */
-export function formatCredits(
+function formatCreditsDecimal(
   value: number | string | null | undefined
 ): string {
   const n = safeNumber(value);
@@ -41,11 +77,18 @@ export function formatCredits(
   return CREDITS_DECIMAL.format(n);
 }
 
+/** Decimal credits amount for table cells (no suffix). */
+export function formatCredits(
+  value: number | string | null | undefined
+): string {
+  return formatCreditsDecimal(value);
+}
+
 /** Decimal credits with " credits" suffix for summaries. */
 export function formatCreditsWithSuffix(
   value: number | string | null | undefined
 ): string {
-  const amount = formatCredits(value);
+  const amount = formatCreditsDecimal(value);
   return amount === "—" ? "—" : `${amount} credits`;
 }
 
@@ -72,7 +115,7 @@ export function shortRequestId(requestId: string | null | undefined): string {
 export function getModelLabel(model: string | null | undefined): string {
   const raw = safeText(model, "");
   if (!raw) return "—";
-  return MODEL_DISPLAY_BY_ID.get(raw) ?? raw;
+  return raw;
 }
 
 export function formatTokens(value: number | null | undefined): string {
@@ -84,4 +127,91 @@ export function normalizeUsageStatus(
   status: string | null | undefined
 ): string {
   return safeText(status, "unknown");
+}
+
+export function isUsageImageModel(modelId: string): boolean {
+  if (USAGE_IMAGE_MODEL_IDS.has(modelId)) return true;
+  if (modelId.startsWith("nano-banana")) return true;
+  if (modelId.startsWith("gpt-image")) return true;
+  return false;
+}
+
+export function usageStatusTone(
+  status: string | null | undefined
+): SemanticTone {
+  if (!status || status.trim() === "") return "muted";
+  const normalized = status.toLowerCase();
+  if (USAGE_SUCCESS_STATUSES.has(normalized)) return "success";
+  if (USAGE_PENDING_STATUSES.has(normalized)) return "muted";
+  if (
+    USAGE_ERROR_STATUSES.has(normalized) ||
+    normalized.includes("error") ||
+    normalized.includes("fail") ||
+    normalized.includes("timeout") ||
+    normalized.includes("rate")
+  ) {
+    return "destructive";
+  }
+  return "destructive";
+}
+
+export function usageStatusLabel(
+  status: string | null | undefined,
+  t: (key: string) => string
+): string {
+  if (!status || status.trim() === "") {
+    return "unknown";
+  }
+  const tone = usageStatusTone(status);
+  if (tone === "success") {
+    return t("dashboard.usage.statusSucceeded");
+  }
+  if (tone === "muted") {
+    return t("dashboard.usage.statusPending");
+  }
+  return t("dashboard.usage.statusFailed");
+}
+
+export function resolveUsageRoute(
+  model: string | null | undefined
+): string {
+  if (model && isUsageImageModel(model)) {
+    return "/v1/images/generations";
+  }
+  return "/v1/chat/completions";
+}
+
+export function getUsageKind(
+  model: string | null | undefined
+): UsageKind {
+  if (model && isUsageImageModel(model)) {
+    return "image";
+  }
+  return "chat";
+}
+
+export function usageKindLabel(kind: UsageKind): string {
+  return kind === "image" ? "Image" : "Chat";
+}
+
+export function formatUsageCredits(
+  row: UsageLogDisplayRow,
+  _kind: UsageKind
+): string {
+  const n = safeNumber(row.credits_charged);
+  if (n == null) return "—";
+  return formatCreditsWithSuffix(n);
+}
+
+export function formatUsageTokenCell(
+  kind: UsageKind,
+  value: number | null | undefined,
+  field: "prompt" | "completion" | "total"
+): string {
+  if (kind === "image") {
+    if (field === "total") return "image generation";
+    return "—";
+  }
+
+  return formatTokens(value);
 }

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type { ProfileRow, UsageLogRow } from "@/lib/supabase/types";
-import { getUsageKind, usageStatusTone } from "@/lib/usage-display";
+import { getUsageKind, usageStatusTone } from "@/lib/usage-safe-display";
 
 const RECENT_ACTIVITY_LIMIT = 5;
 

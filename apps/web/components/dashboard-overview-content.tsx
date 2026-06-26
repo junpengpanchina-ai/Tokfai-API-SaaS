@@ -26,9 +26,10 @@ import {
   formatDate,
   formatTokens,
   getModelLabel,
+  usageStatusLabel,
+  usageStatusTone,
 } from "@/lib/usage-safe-display";
 import { useI18n } from "@/lib/i18n/i18n-provider";
-import { usageStatusLabel, usageStatusTone } from "@/lib/usage-display";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
