@@ -255,7 +255,7 @@ export function DashboardOverviewContent({
             ))}
           </ul>
           <Button asChild size="sm" variant="outline" className="mt-4">
-            <Link href="/dashboard/api-keys">
+            <Link href="/dashboard/api-keys" prefetch={false}>
               {t("dashboard.overview.manageApiKeys")}
             </Link>
           </Button>
@@ -360,24 +360,24 @@ function StatePriorityBanner({
         {phase === "needsFirstCall" ? (
           <>
             <Button asChild size="sm">
-              <Link href="/dashboard/docs">
+              <Link href="/dashboard/docs" prefetch={false}>
                 {t("dashboard.overview.stateNeedsFirstCallQuickstart")}
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
-              <Link href="/dashboard/playground">
+              <Link href="/dashboard/playground" prefetch={false}>
                 {t("dashboard.overview.stateNeedsFirstCallPlayground")}
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
-              <Link href="/dashboard/image-playground">
+              <Link href="/dashboard/image-playground" prefetch={false}>
                 {t("common.imagePlayground")}
               </Link>
             </Button>
           </>
         ) : config.href && config.actionKey ? (
           <Button asChild size="sm">
-            <Link href={config.href}>{t(config.actionKey)}</Link>
+            <Link href={config.href} prefetch={false}>{t(config.actionKey)}</Link>
           </Button>
         ) : null}
       </CardContent>
@@ -411,7 +411,7 @@ function ContinueCard({
                 variant="outline"
                 className="h-auto justify-start gap-2 px-4 py-3"
               >
-                <Link href={link.href}>
+                <Link href={link.href} prefetch={false}>
                   <Icon className="h-4 w-4 shrink-0" />
                   {t(link.labelKey)}
                 </Link>
@@ -443,7 +443,7 @@ function OnboardingSection({
             {t("dashboard.overview.onboardingAllComplete")}
           </p>
           <Button asChild size="sm" variant="outline">
-            <Link href="/dashboard/usage">
+            <Link href="/dashboard/usage" prefetch={false}>
               {t("dashboard.overview.recentActivityViewUsage")}
             </Link>
           </Button>
@@ -528,7 +528,7 @@ function StatCards({
                 size="sm"
                 className="mt-3 -ml-2 h-7 px-2 text-xs"
               >
-                <Link href={stat.href}>
+                <Link href={stat.href} prefetch={false}>
                   {t("common.open")}
                   <ArrowUpRight className="h-3 w-3" />
                 </Link>
@@ -566,19 +566,19 @@ function RecentActivityCard({
             <RecentActivityTable rows={overview.recentActivity} t={t} />
             <div className="flex flex-wrap justify-end gap-2">
               <Button asChild size="sm" variant="outline">
-                <Link href="/dashboard/usage">
+                <Link href="/dashboard/usage" prefetch={false}>
                   {t("dashboard.overview.recentActivityViewUsage")}
                 </Link>
               </Button>
               {hasSuccessfulActivity ? (
                 <Button asChild size="sm" variant="outline">
-                  <Link href="/dashboard/credits">
+                  <Link href="/dashboard/credits" prefetch={false}>
                     {t("dashboard.overview.recentActivityViewCredits")}
                   </Link>
                 </Button>
               ) : null}
               <Button asChild size="sm" variant="ghost">
-                <Link href="/dashboard/usage">
+                <Link href="/dashboard/usage" prefetch={false}>
                   {t("dashboard.overview.viewAllUsage")}
                 </Link>
               </Button>
@@ -591,10 +591,10 @@ function RecentActivityCard({
             </p>
             <div className="flex flex-wrap justify-center gap-2">
               <Button asChild size="sm">
-                <Link href="/dashboard/playground">{t("common.chatPlayground")}</Link>
+                <Link href="/dashboard/playground" prefetch={false}>{t("common.chatPlayground")}</Link>
               </Button>
               <Button asChild size="sm" variant="outline">
-                <Link href="/dashboard/image-playground">
+                <Link href="/dashboard/image-playground" prefetch={false}>
                   {t("common.imagePlayground")}
                 </Link>
               </Button>
@@ -673,7 +673,7 @@ function OnboardingStep({
           variant={status === "current" ? "default" : "outline"}
           className="w-full sm:w-auto"
         >
-          <Link href={item.href}>{t(item.buttonKey)}</Link>
+          <Link href={item.href} prefetch={false}>{t(item.buttonKey)}</Link>
         </Button>
       </div>
     </div>

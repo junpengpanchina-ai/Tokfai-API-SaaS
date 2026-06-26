@@ -37,7 +37,7 @@ export function DashboardAnnouncementsOverview({
           <CardDescription>{t("dashboard.announcements.subtitle")}</CardDescription>
         </div>
         <Button asChild variant="ghost" size="sm" className="shrink-0">
-          <Link href="/dashboard/announcements">
+          <Link href="/dashboard/announcements" prefetch={false}>
             {t("dashboard.announcements.viewAll")}
             <ArrowUpRight className="h-3 w-3" />
           </Link>
@@ -76,7 +76,7 @@ export function DashboardAnnouncementsOverview({
             }
 
             return (
-              <Link key={item.id} href={href} className="block">
+              <Link key={item.id} href={href} prefetch={false} className="block">
                 {inner}
               </Link>
             );

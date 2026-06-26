@@ -83,7 +83,7 @@ export function DashboardFirstRunOnboardingCard({
             {t("dashboard.firstRun.allComplete")}
           </p>
           <Button asChild size="sm" variant="outline">
-            <Link href="/dashboard/usage">
+            <Link href="/dashboard/usage" prefetch={false}>
               {t("dashboard.firstRun.checkUsage")}
             </Link>
           </Button>
@@ -160,49 +160,49 @@ export function DashboardFirstRunOnboardingCard({
 
         <div className="flex flex-wrap gap-2">
           <Button asChild size="sm">
-            <Link href="/dashboard/api-keys#create-api-key">
+            <Link href="/dashboard/api-keys#create-api-key" prefetch={false}>
               <KeyRound className="h-4 w-4" />
               {t("dashboard.firstRun.createApiKey")}
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
-            <Link href="/dashboard/integration-workbench">
+            <Link href="/dashboard/integration-workbench" prefetch={false}>
               <Terminal className="h-4 w-4" />
               {t("dashboard.firstRun.integrationWorkbench")}
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
-            <Link href="/dashboard/docs#quick-start">
+            <Link href="/dashboard/docs#quick-start" prefetch={false}>
               <Terminal className="h-4 w-4" />
               {t("dashboard.firstRun.quickStart")}
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
-            <Link href="/dashboard/playground">
+            <Link href="/dashboard/playground" prefetch={false}>
               <Terminal className="h-4 w-4" />
               {t("dashboard.firstRun.tryPlayground")}
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
-            <Link href="/dashboard/docs#cursor">
+            <Link href="/dashboard/docs#cursor" prefetch={false}>
               <BookOpen className="h-4 w-4" />
               {t("dashboard.firstRun.cursorGuide")}
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
-            <Link href="/dashboard/docs#cherry-studio">
+            <Link href="/dashboard/docs#cherry-studio" prefetch={false}>
               <Cherry className="h-4 w-4" />
               {t("dashboard.firstRun.cherryGuide")}
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
-            <Link href="/dashboard/usage">
+            <Link href="/dashboard/usage" prefetch={false}>
               <Activity className="h-4 w-4" />
               {t("dashboard.firstRun.checkUsage")}
             </Link>
           </Button>
           <Button asChild size="sm" variant="ghost">
-            <Link href="/dashboard/docs">
+            <Link href="/dashboard/docs" prefetch={false}>
               {t("dashboard.firstRun.viewIntegrationDocs")}
             </Link>
           </Button>

@@ -78,7 +78,7 @@ export function DashboardMobileShell({
               <Link
                 key={item.href}
                 href={item.href}
-                prefetch={item.prefetch}
+                prefetch={false}
                 className={cn(
                   "flex shrink-0 items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors",
                   active
@@ -174,7 +174,7 @@ function DashboardNavLink({
   return (
     <Link
       href={item.href}
-      prefetch={item.prefetch}
+      prefetch={false}
       className={cn(
         "flex h-9 items-center gap-2.5 rounded-md px-3 text-sm transition-colors",
         active

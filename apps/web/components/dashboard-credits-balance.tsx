@@ -51,7 +51,9 @@ export function DashboardSidebarCreditsSummary({
           size="sm"
           className="mt-2 h-8 w-full text-xs"
         >
-          <Link href="/dashboard/credits">{t("dashboard.shell.topUp")}</Link>
+          <Link href="/dashboard/credits" prefetch={false}>
+            {t("dashboard.shell.topUp")}
+          </Link>
         </Button>
       ) : null}
     </div>
