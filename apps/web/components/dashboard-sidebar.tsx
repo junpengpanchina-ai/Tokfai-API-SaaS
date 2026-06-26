@@ -1,4 +1,4 @@
 export {
   DashboardMobileShell,
   DashboardSidebar,
-} from "@/components/dashboard-nav";
+} from "@/components/dashboard-shell-nav";

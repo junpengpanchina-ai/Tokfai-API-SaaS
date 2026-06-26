@@ -9791,4 +9791,12 @@ export const messages = {
 
 export type MessageTree = (typeof messages)["en"];
 
-export { formatMessage } from "./format-message";
+export function formatMessage(
+  template: string,
+  vars: Record<string, string | number>
+): string {
+  return Object.entries(vars).reduce(
+    (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
+    template
+  );
+}

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { announcementTypeLabelKey } from "@/lib/announcements";
 import type { PublicAnnouncement } from "@/lib/announcements";
-import { formatDateTime } from "@/lib/format";
+import { dashboardFormatDateTime } from "@/lib/dashboard-display-helpers";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 
 export function DashboardAnnouncementDetail({
@@ -44,7 +44,7 @@ export function DashboardAnnouncementDetail({
           </p>
         ) : null}
         <p className="text-xs text-muted-foreground">
-          {formatDateTime(announcement.updated_at)}
+          {dashboardFormatDateTime(announcement.updated_at)}
         </p>
       </div>
 

@@ -1,14 +1,14 @@
 import { AuthSuccessToast } from "@/components/auth-success-toast";
-import { DashboardFooter } from "@/components/dashboard-footer";
 import {
-  DashboardMobileShell,
-  DashboardSidebar,
-} from "@/components/dashboard-shell-nav";
+  AdminDashboardMobileShell,
+  AdminDashboardSidebar,
+} from "@/components/admin-dashboard-shell-nav";
+import { DashboardFooter } from "@/components/dashboard-footer";
 import type { DashboardShellCredits } from "@/lib/dashboard-shell-credits";
 import { loadDashboardShellCredits } from "@/lib/load-dashboard-shell-credits";
 import { createClient } from "@/lib/supabase/server";
 
-export async function DashboardShell({
+export async function AdminDashboardShell({
   children,
 }: {
   children: React.ReactNode;
@@ -34,10 +34,10 @@ export async function DashboardShell({
       <aside
         className="fixed left-0 top-0 z-30 hidden h-svh w-60 border-r bg-muted/30 md:flex md:flex-col"
       >
-        <DashboardSidebar email={email} credits={credits} />
+        <AdminDashboardSidebar email={email} credits={credits} />
       </aside>
       <div className="flex min-w-0 flex-col md:pl-60">
-        <DashboardMobileShell email={email} credits={credits} />
+        <AdminDashboardMobileShell email={email} credits={credits} />
         <main className="min-h-svh min-w-0 flex-1 px-4 py-6 sm:px-6 md:py-8">
           <div className="mx-auto w-full max-w-6xl">{children}</div>
         </main>

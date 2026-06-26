@@ -5,8 +5,8 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  dashboardFormatCreditBalanceDisplay,
-} from "@/lib/dashboard-display-helpers";
+  dashboardShellFormatCreditBalance,
+} from "@/lib/dashboard-shell-format";
 import {
   isLowCreditsBalance,
   type DashboardShellCredits,
@@ -17,7 +17,7 @@ export function formatShellCreditsAmount(credits: DashboardShellCredits): string
   if (!credits.loaded) {
     return "—";
   }
-  return dashboardFormatCreditBalanceDisplay(credits.balance ?? 0);
+  return dashboardShellFormatCreditBalance(credits.balance ?? 0);
 }
 
 export function DashboardSidebarCreditsSummary({

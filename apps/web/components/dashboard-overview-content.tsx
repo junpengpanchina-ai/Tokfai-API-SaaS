@@ -19,7 +19,7 @@ import {
 import { DashboardAnnouncementsOverview } from "@/components/dashboard-announcements-overview";
 import { DashboardFirstRunOnboardingCard } from "@/components/dashboard-first-run-onboarding";
 import type { PublicAnnouncement } from "@/lib/announcements";
-import type { DashboardOverviewData } from "@/lib/dashboard-overview";
+import type { DashboardOverviewData } from "@/lib/dashboard-overview-types";
 import {
   dashboardFormatCreditsWithSuffix,
   dashboardFormatDate,
