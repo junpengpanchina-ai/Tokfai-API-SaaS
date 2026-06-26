@@ -3,13 +3,14 @@
 import { useSearchParams } from "next/navigation";
 
 import { useCopyToClipboard } from "@/components/copy-code-block";
-import { CustomerTroubleshootingCenter } from "@/components/customer-troubleshooting-center";
+import { useI18n } from "@/lib/i18n/i18n-provider";
+
+import { TroubleshootingCenterClient } from "./troubleshooting-center-client";
 import {
   troubleshootingCaseByErrorCode,
   type TroubleshootingCategory,
-} from "@/lib/customer-troubleshooting";
-import { useI18n } from "@/lib/i18n/i18n-provider";
-import { useQuickStartApiKey } from "@/lib/use-quick-start-api-key";
+} from "./troubleshooting-cases";
+import { useTroubleshootingApiKey } from "./use-troubleshooting-api-key";
 
 const CATEGORY_SET = new Set<string>([
   "api_key",
@@ -25,7 +26,7 @@ const CATEGORY_SET = new Set<string>([
 
 export function TroubleshootingPageClient() {
   const { t } = useI18n();
-  const apiKey = useQuickStartApiKey();
+  const apiKey = useTroubleshootingApiKey();
   const { copiedId, copyText } = useCopyToClipboard();
   const searchParams = useSearchParams();
   const codeParam = searchParams.get("code") ?? "";
@@ -45,7 +46,7 @@ export function TroubleshootingPageClient() {
           {t("integration.troubleshooting.subtitle")}
         </p>
       </div>
-      <CustomerTroubleshootingCenter
+      <TroubleshootingCenterClient
         apiKey={apiKey}
         copiedId={copiedId}
         onCopy={copyText}
