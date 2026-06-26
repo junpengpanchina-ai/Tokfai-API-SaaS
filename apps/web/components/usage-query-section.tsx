@@ -21,20 +21,20 @@ import {
   type MeUsageLogEntry,
   type MeUsageSummaryResponse,
 } from "@/lib/dmit/client";
-import { formatInt } from "@/lib/format";
-import { useI18n } from "@/lib/i18n/i18n-provider";
 import {
-  formatCreditsWithSuffix,
-  formatDate,
-  formatUsageCredits,
-  formatUsageTokenCell,
-  getModelLabel,
-  getUsageKind,
-  shortRequestId,
-  usageStatusLabel,
-  usageStatusTone,
-  type UsageKind,
-} from "@/lib/usage-safe-display";
+  dashboardFormatCreditsWithSuffix,
+  dashboardFormatDate,
+  dashboardFormatInt,
+  dashboardFormatUsageCredits,
+  dashboardFormatUsageTokenCell,
+  dashboardGetModelLabel,
+  dashboardGetUsageKind,
+  dashboardShortRequestId,
+  dashboardUsageStatusLabel,
+  dashboardUsageStatusTone,
+  type DashboardUsageKind,
+} from "@/lib/dashboard-display-helpers";
+import { useI18n } from "@/lib/i18n/i18n-provider";
 
 export type UsageApiKeyOption = {
   id: string;
@@ -268,23 +268,23 @@ function QueryResults({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <AdminStatCard
           label={t("dashboard.usage.totalRequests")}
-          value={formatInt(summary.total_requests)}
+          value={dashboardFormatInt(summary.total_requests)}
         />
         <AdminStatCard
           label={t("dashboard.usage.succeededRequests")}
-          value={formatInt(summary.succeeded_requests)}
+          value={dashboardFormatInt(summary.succeeded_requests)}
         />
         <AdminStatCard
           label={t("dashboard.usage.failedRequests")}
-          value={formatInt(summary.failed_requests)}
+          value={dashboardFormatInt(summary.failed_requests)}
         />
         <AdminStatCard
           label={t("dashboard.usage.totalTokens")}
-          value={formatInt(summary.total_tokens)}
+          value={dashboardFormatInt(summary.total_tokens)}
         />
         <AdminStatCard
           label={t("dashboard.usage.creditsCharged")}
-          value={formatCreditsWithSuffix(summary.total_credits_charged)}
+          value={dashboardFormatCreditsWithSuffix(summary.total_credits_charged)}
         />
       </div>
 
@@ -360,7 +360,7 @@ function UsageQueryTable({
         </thead>
         <tbody>
           {logs.map((row) => {
-            const kind = getUsageKind(row.model);
+            const kind = dashboardGetUsageKind(row.model);
             return <UsageQueryRow key={row.id} row={row} kind={kind} t={t} />;
           })}
         </tbody>
@@ -375,16 +375,16 @@ function UsageQueryRow({
   t,
 }: {
   row: MeUsageLogEntry;
-  kind: UsageKind;
+  kind: DashboardUsageKind;
   t: (key: string) => string;
 }) {
-  const tone = usageStatusTone(row.status);
-  const statusLabel = usageStatusLabel(row.status, t);
+  const tone = dashboardUsageStatusTone(row.status);
+  const statusLabel = dashboardUsageStatusLabel(row.status, t);
 
   return (
     <tr className="border-b last:border-0 align-top">
       <td className="py-2.5 pr-3 text-muted-foreground whitespace-nowrap">
-        {formatDate(row.created_at)}
+        {dashboardFormatDate(row.created_at)}
       </td>
       <td className="py-2.5 pr-3">
         <Badge variant="outline" className="whitespace-nowrap">
@@ -394,7 +394,7 @@ function UsageQueryRow({
         </Badge>
       </td>
       <td className="max-w-[9rem] py-2.5 pr-3 font-mono text-xs break-all sm:max-w-none">
-        {getModelLabel(row.model)}
+        {dashboardGetModelLabel(row.model)}
       </td>
       <td className="py-2.5 pr-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
         {row.prefix ?? "—"}
@@ -409,10 +409,10 @@ function UsageQueryRow({
         )}
       </td>
       <td className="hidden py-2.5 pr-3 text-right font-mono text-xs md:table-cell">
-        {formatUsageTokenCell(kind, row.prompt_tokens, "prompt")}
+        {dashboardFormatUsageTokenCell(kind, row.prompt_tokens, "prompt")}
       </td>
       <td className="hidden py-2.5 pr-3 text-right font-mono text-xs lg:table-cell">
-        {formatUsageTokenCell(kind, row.completion_tokens, "completion")}
+        {dashboardFormatUsageTokenCell(kind, row.completion_tokens, "completion")}
       </td>
       <td
         className={`hidden py-2.5 pr-3 text-right text-xs sm:table-cell ${
@@ -421,16 +421,16 @@ function UsageQueryRow({
       >
         {kind === "image" && row.total_tokens == null
           ? t("dashboard.usage.imageGeneration")
-          : formatUsageTokenCell(kind, row.total_tokens, "total")}
+          : dashboardFormatUsageTokenCell(kind, row.total_tokens, "total")}
       </td>
       <td className="py-2.5 pr-3 text-right text-xs whitespace-nowrap">
-        {formatUsageCredits(row, kind)}
+        {dashboardFormatUsageCredits(row, kind)}
       </td>
       <td
         className="hidden max-w-[10rem] truncate py-2.5 pr-3 font-mono text-xs text-muted-foreground xl:table-cell"
         title={row.request_id ?? undefined}
       >
-        {shortRequestId(row.request_id)}
+        {dashboardShortRequestId(row.request_id)}
       </td>
       <td className="hidden max-w-[8rem] truncate py-2.5 pr-0 font-mono text-xs text-muted-foreground lg:table-cell">
         {row.error_code ?? "—"}

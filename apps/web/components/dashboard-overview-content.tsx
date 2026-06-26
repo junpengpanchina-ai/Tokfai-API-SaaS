@@ -20,15 +20,15 @@ import { DashboardAnnouncementsOverview } from "@/components/dashboard-announcem
 import { DashboardFirstRunOnboardingCard } from "@/components/dashboard-first-run-onboarding";
 import type { PublicAnnouncement } from "@/lib/announcements";
 import type { DashboardOverviewData } from "@/lib/dashboard-overview";
-import { formatInt } from "@/lib/format";
 import {
-  formatCreditsWithSuffix,
-  formatDate,
-  formatTokens,
-  getModelLabel,
-  usageStatusLabel,
-  usageStatusTone,
-} from "@/lib/usage-safe-display";
+  dashboardFormatCreditsWithSuffix,
+  dashboardFormatDate,
+  dashboardFormatInt,
+  dashboardFormatTokens,
+  dashboardGetModelLabel,
+  dashboardUsageStatusLabel,
+  dashboardUsageStatusTone,
+} from "@/lib/dashboard-display-helpers";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 
 import { Badge } from "@/components/ui/badge";
@@ -153,7 +153,7 @@ export function DashboardOverviewContent({
         : overview.creditsBalance <= 0
           ? "dashboard.overview.topUpToStart"
           : "dashboard.overview.creditsBalanceHint",
-      value: formatCreditsWithSuffix(overview.creditsBalance),
+      value: dashboardFormatCreditsWithSuffix(overview.creditsBalance),
       href: "/dashboard/credits",
       icon: CreditCard,
     },
@@ -163,7 +163,7 @@ export function DashboardOverviewContent({
         overview.activeApiKeyCount > 0
           ? "dashboard.overview.keysReady"
           : "dashboard.overview.createFirstKey",
-      value: formatInt(overview.activeApiKeyCount),
+      value: dashboardFormatInt(overview.activeApiKeyCount),
       href: "/dashboard/api-keys",
       icon: KeyRound,
     },
@@ -173,7 +173,7 @@ export function DashboardOverviewContent({
         overview.requestsLast7Days > 0
           ? "dashboard.overview.recentTraffic"
           : "dashboard.overview.noTrafficYet",
-      value: formatInt(overview.requestsLast7Days),
+      value: dashboardFormatInt(overview.requestsLast7Days),
       href: "/dashboard/usage",
       icon: Activity,
     },
@@ -183,7 +183,7 @@ export function DashboardOverviewContent({
         overview.creditsConsumedLast7Days > 0
           ? "dashboard.overview.creditsConsumedHint"
           : "dashboard.overview.noConsumptionYet",
-      value: formatCreditsWithSuffix(overview.creditsConsumedLast7Days),
+      value: dashboardFormatCreditsWithSuffix(overview.creditsConsumedLast7Days),
       href: "/dashboard/credits",
       icon: Coins,
     },
@@ -549,7 +549,7 @@ function RecentActivityCard({
   t: (key: string) => string;
 }) {
   const hasSuccessfulActivity = overview.recentActivity.some(
-    (row) => usageStatusTone(row.status) === "success"
+    (row) => dashboardUsageStatusTone(row.status) === "success"
   );
 
   return (
@@ -713,16 +713,16 @@ function RecentActivityTable({
           {rows.map((row) => (
             <tr key={row.id} className="border-b last:border-0">
               <td className="px-4 py-3 font-mono text-xs">
-                {formatDate(row.created_at)}
+                {dashboardFormatDate(row.created_at)}
               </td>
               <td className="px-4 py-3 font-mono text-xs">
-                {getModelLabel(row.model)}
+                {dashboardGetModelLabel(row.model)}
               </td>
               <td className="px-4 py-3">
                 <StatusBadge status={row.status} t={t} />
               </td>
               <td className="px-4 py-3 font-mono text-xs">
-                {formatTokens(row.total_tokens)}
+                {dashboardFormatTokens(row.total_tokens)}
               </td>
               <td className="px-4 py-3 font-mono text-xs">
                 {formatActivityCredits(row)}
@@ -742,8 +742,8 @@ function StatusBadge({
   status: string | null;
   t: (key: string) => string;
 }) {
-  const tone = usageStatusTone(status);
-  const label = usageStatusLabel(status, t);
+  const tone = dashboardUsageStatusTone(status);
+  const label = dashboardUsageStatusLabel(status, t);
 
   return (
     <Badge
@@ -763,5 +763,5 @@ function StatusBadge({
 function formatActivityCredits(
   row: DashboardOverviewData["recentActivity"][number]
 ): string {
-  return formatCreditsWithSuffix(row.credits_charged);
+  return dashboardFormatCreditsWithSuffix(row.credits_charged);
 }

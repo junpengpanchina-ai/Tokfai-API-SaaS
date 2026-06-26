@@ -1,6 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import type { ProfileRow, UsageLogRow } from "@/lib/supabase/types";
-import { getUsageKind, usageStatusTone } from "@/lib/usage-safe-display";
+import {
+  dashboardGetUsageKind,
+  dashboardUsageStatusTone,
+} from "@/lib/dashboard-display-helpers";
 
 const RECENT_ACTIVITY_LIMIT = 5;
 
@@ -118,8 +121,8 @@ function derivePlaygroundSuccessFlags(
   let hasImagePlaygroundSuccess = false;
 
   for (const row of rows) {
-    if (usageStatusTone(row.status) !== "success") continue;
-    const kind = getUsageKind(row.model);
+    if (dashboardUsageStatusTone(row.status) !== "success") continue;
+    const kind = dashboardGetUsageKind(row.model);
     if (kind === "chat") hasChatPlaygroundSuccess = true;
     if (kind === "image") hasImagePlaygroundSuccess = true;
   }

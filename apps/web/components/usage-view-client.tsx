@@ -15,20 +15,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { formatInt } from "@/lib/format";
 import {
-  formatCreditsWithSuffix,
-  formatDate,
-  formatUsageCredits,
-  formatUsageTokenCell,
-  getModelLabel,
-  getUsageKind,
-  resolveUsageRoute,
-  shortRequestId,
-  usageStatusLabel,
-  usageStatusTone,
-  type UsageKind,
-} from "@/lib/usage-safe-display";
+  dashboardFormatCreditsWithSuffix,
+  dashboardFormatDate,
+  dashboardFormatInt,
+  dashboardFormatUsageCredits,
+  dashboardFormatUsageTokenCell,
+  dashboardGetModelLabel,
+  dashboardGetUsageKind,
+  dashboardResolveUsageRoute,
+  dashboardShortRequestId,
+  dashboardUsageStatusLabel,
+  dashboardUsageStatusTone,
+  type DashboardUsageKind,
+} from "@/lib/dashboard-display-helpers";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import type { UsagePageLog, UsagePageState } from "@/lib/usage-page";
 
@@ -51,19 +51,19 @@ export function UsageViewClient({ state }: { state: UsagePageState }) {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <AdminStatCard
             label={t("dashboard.usage.statRequests24h")}
-            value={formatInt(state.stats.requestsLast24Hours)}
+            value={dashboardFormatInt(state.stats.requestsLast24Hours)}
           />
           <AdminStatCard
             label={t("dashboard.usage.statRequests7d")}
-            value={formatInt(state.stats.requestsLast7Days)}
+            value={dashboardFormatInt(state.stats.requestsLast7Days)}
           />
           <AdminStatCard
             label={t("dashboard.usage.statTokens7d")}
-            value={formatInt(state.stats.tokensLast7Days)}
+            value={dashboardFormatInt(state.stats.tokensLast7Days)}
           />
           <AdminStatCard
             label={t("dashboard.usage.statCredits7d")}
-            value={formatCreditsWithSuffix(state.stats.creditsLast7Days)}
+            value={dashboardFormatCreditsWithSuffix(state.stats.creditsLast7Days)}
           />
         </div>
       ) : null}
@@ -190,7 +190,7 @@ function UsageTable({
         </thead>
         <tbody>
           {logs.map((row) => {
-            const kind = getUsageKind(row.model);
+            const kind = dashboardGetUsageKind(row.model);
             return (
               <UsageRow
                 key={row.id}
@@ -216,7 +216,7 @@ function UsageRow({
   t,
 }: {
   row: UsagePageLog;
-  kind: UsageKind;
+  kind: DashboardUsageKind;
   copiedId: string | null;
   onCopy: (id: string, value: string) => void;
   t: (key: string) => string;
@@ -226,22 +226,22 @@ function UsageRow({
   return (
     <tr className="border-b last:border-0 align-top">
       <td className="py-2.5 pr-3 text-muted-foreground whitespace-nowrap">
-        {formatDate(row.created_at)}
+        {dashboardFormatDate(row.created_at)}
       </td>
       <td className="max-w-[9rem] py-2.5 pr-3 font-mono text-xs break-all sm:max-w-none">
-        {getModelLabel(row.model)}
+        {dashboardGetModelLabel(row.model)}
       </td>
       <td className="py-2.5 pr-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
-        {resolveUsageRoute(row.model)}
+        {dashboardResolveUsageRoute(row.model)}
       </td>
       <td className="py-2.5 pr-3 whitespace-nowrap">
         <StatusBadge status={row.status} t={t} />
       </td>
       <td className="hidden py-2.5 pr-3 text-right font-mono text-xs md:table-cell">
-        {formatUsageTokenCell(kind, row.prompt_tokens, "prompt")}
+        {dashboardFormatUsageTokenCell(kind, row.prompt_tokens, "prompt")}
       </td>
       <td className="hidden py-2.5 pr-3 text-right font-mono text-xs lg:table-cell">
-        {formatUsageTokenCell(kind, row.completion_tokens, "completion")}
+        {dashboardFormatUsageTokenCell(kind, row.completion_tokens, "completion")}
       </td>
       <td
         className={`hidden py-2.5 pr-3 text-right text-xs sm:table-cell ${
@@ -250,10 +250,10 @@ function UsageRow({
       >
         {kind === "image" && row.total_tokens == null
           ? t("dashboard.usage.imageGeneration")
-          : formatUsageTokenCell(kind, row.total_tokens, "total")}
+          : dashboardFormatUsageTokenCell(kind, row.total_tokens, "total")}
       </td>
       <td className="py-2.5 pr-3 text-right text-xs whitespace-nowrap">
-        {formatUsageCredits(row, kind)}
+        {dashboardFormatUsageCredits(row, kind)}
       </td>
       <td className="py-2.5 pr-0">
         {row.request_id ? (
@@ -262,7 +262,7 @@ function UsageRow({
               className="max-w-[10rem] truncate font-mono text-xs text-muted-foreground"
               title={row.request_id}
             >
-              {shortRequestId(row.request_id)}
+              {dashboardShortRequestId(row.request_id)}
             </code>
             <CopyButton
               copied={copiedId === copyId}
@@ -287,8 +287,8 @@ function StatusBadge({
   status: string | null;
   t: (key: string) => string;
 }) {
-  const tone = usageStatusTone(status);
-  const label = usageStatusLabel(status, t);
+  const tone = dashboardUsageStatusTone(status);
+  const label = dashboardUsageStatusLabel(status, t);
 
   if (tone === "success") {
     return <Badge variant="success">{label}</Badge>;

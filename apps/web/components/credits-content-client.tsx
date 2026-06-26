@@ -37,11 +37,11 @@ import { formatCny } from "@/lib/billing/recharge-plans";
 import type { CreditsPageData } from "@/lib/credits";
 import { formatCredits as formatCreditsBalance } from "@/lib/format";
 import {
-  formatCreditsWithSuffix,
-  formatDate,
-  safeNumber,
-  shortRequestId,
-} from "@/lib/usage-safe-display";
+  dashboardFormatCreditsWithSuffix,
+  dashboardFormatDate,
+  dashboardSafeNumber,
+  dashboardShortRequestId,
+} from "@/lib/dashboard-display-helpers";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import type { CreditLedgerRow } from "@/lib/supabase/types";
 
@@ -105,7 +105,7 @@ export function CreditsContentClient({
             label={t("dashboard.credits.lastChange")}
             value={
               balance.lastChangeAt
-                ? formatDate(balance.lastChangeAt)
+                ? dashboardFormatDate(balance.lastChangeAt)
                 : "—"
             }
           />
@@ -277,7 +277,7 @@ export function CreditsContentClient({
                       }
                     >
                       <td className="py-2 pr-4 text-muted-foreground">
-                        {formatDate(order.created_at)}
+                        {dashboardFormatDate(order.created_at)}
                       </td>
                       <td className="py-2 pr-4 text-right font-mono text-xs">
                         {formatOrderAmount(order)}
@@ -335,7 +335,7 @@ function LedgerRow({
   return (
     <tr className="border-b last:border-0">
       <td className="py-2 pr-4 text-muted-foreground">
-        {formatDate(entry.created_at)}
+        {dashboardFormatDate(entry.created_at)}
       </td>
       <td className="py-2 pr-4">
         <LedgerTypeBadge type={entry.type} t={t} />
@@ -361,7 +361,7 @@ function LedgerRow({
               className="max-w-[10rem] truncate font-mono text-xs text-muted-foreground"
               title={entry.reference_id}
             >
-              {shortRequestId(entry.reference_id)}
+              {dashboardShortRequestId(entry.reference_id)}
             </code>
             <CopyButton
               copied={copiedId === referenceCopyId}
@@ -489,9 +489,9 @@ function CheckoutStatusBanner({
 }
 
 function AmountCell({ amount }: { amount: number | string | null }) {
-  const formatted = formatCreditsWithSuffix(amount);
+  const formatted = dashboardFormatCreditsWithSuffix(amount);
   if (formatted === "—") return <span>—</span>;
-  const n = safeNumber(amount);
+  const n = dashboardSafeNumber(amount);
   const isPositive = n != null && n >= 0;
   const label = isPositive ? `+${formatted}` : formatted;
   return (
