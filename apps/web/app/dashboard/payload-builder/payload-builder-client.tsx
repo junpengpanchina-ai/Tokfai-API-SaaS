@@ -4,12 +4,13 @@ import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 
 import { useCopyToClipboard } from "@/components/copy-code-block";
-import { CustomerPayloadBuilder } from "@/components/customer-payload-builder";
-import { parsePayloadBuilderSearchParams } from "@/lib/customer-payload-builder";
-import { useQuickStartApiKey } from "@/lib/use-quick-start-api-key";
+
+import { PayloadBuilderPanelClient } from "./payload-builder-panel-client";
+import { parsePayloadBuilderSearchParams } from "./payload-builder-params";
+import { usePayloadBuilderApiKey } from "./use-payload-builder-api-key";
 
 export function PayloadBuilderPageClient() {
-  const apiKey = useQuickStartApiKey();
+  const apiKey = usePayloadBuilderApiKey();
   const { copiedId, copyText } = useCopyToClipboard();
   const searchParams = useSearchParams();
 
@@ -20,7 +21,7 @@ export function PayloadBuilderPageClient() {
 
   return (
     <div className="flex flex-col gap-6">
-      <CustomerPayloadBuilder
+      <PayloadBuilderPanelClient
         apiKey={apiKey}
         copiedId={copiedId}
         onCopy={copyText}
