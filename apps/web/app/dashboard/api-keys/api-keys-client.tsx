@@ -43,9 +43,6 @@ import {
   type MeApiKeyMetadata,
 } from "@/lib/dmit/client";
 import { buildNodeSdkConfigSnippet, buildPythonSdkConfigSnippet } from "@/lib/customer-openai-sdk-chapter";
-import { buildCherryConfigSnippet } from "@/lib/customer-cherry-chapter";
-import { buildCursorConfigSnippet } from "@/lib/customer-cursor-chapter";
-import { authorizationHeader } from "@/lib/customer-integration-snippets";
 import {
   batchCreateCurlOneLine,
   batchCreateCurlPowerShellOneLine,
@@ -77,19 +74,23 @@ import { buildGoLiveTrackerCopies } from "@/lib/customer-go-live-copy";
 import { buildCustomerIntegrationPlan } from "@/lib/customer-integration-plan";
 import { DEFAULT_PLANNER_INPUT } from "@/lib/customer-capacity-planner";
 import { isFullTokfaiApiKey, TOKFAI_API_BASE_URL, TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
-import {
-  userMessageForDashboardError,
-  userMessageForDmitError,
-} from "@/lib/dmit-messages";
-import { extractDmitActionErrorDetails } from "@/lib/dmit-error-details";
 import { useI18n } from "@/lib/i18n/i18n-provider";
-import { formatMessage } from "@/lib/i18n/messages";
+import { formatMessage } from "@/lib/i18n/format-message";
 import { DashboardFirstRunOnboardingCard } from "@/components/dashboard-first-run-onboarding";
 import { CopyConfigAction } from "@/components/copyable-snippet-field";
 import {
   setQuickStartApiKeySecret,
   clearQuickStartApiKeyIfMatches,
 } from "@/lib/customer-quick-start-key-session";
+import {
+  authorizationHeader,
+  buildCherryConfigSnippet,
+  buildCursorConfigSnippet,
+  formatApiKeyDateTime,
+  getApiKeyStatusTone,
+  toApiKeyActionError,
+  type ApiKeyActionErrorState,
+} from "./api-keys-display-helpers";
 
 export interface ApiKeyListItem {
   id: string;
@@ -102,14 +103,7 @@ export interface ApiKeyListItem {
   can_reveal?: boolean;
 }
 
-interface ActionErrorState {
-  message: string;
-  status: number;
-  code?: string;
-  requestId?: string;
-  method?: string;
-  url?: string;
-}
+type ActionErrorState = ApiKeyActionErrorState;
 
 const LEGACY_KEY_MESSAGE_KEY = "dashboard.apiKeys.fullKeyUnavailable";
 
@@ -164,7 +158,7 @@ export function ApiKeysClient({
       setNewName("");
     } catch (err) {
       setCreateError(
-        toActionError(err, {
+        toApiKeyActionError(err, {
           method: "POST",
           url: dmitUrl(ME_API_KEYS_PATH),
         })
@@ -1118,7 +1112,7 @@ function ApiKeysTable({
       }
     } catch (err) {
       setCopyError(
-        toActionError(err, {
+        toApiKeyActionError(err, {
           method: "POST",
           url: dmitUrl(ME_API_KEYS_REVEAL_PATH),
         })
@@ -1205,16 +1199,16 @@ function ApiKeysTable({
                   <StatusBadge status={key.status} t={t} />
                 </td>
                 <td className="py-3 pr-4 text-muted-foreground">
-                  {formatDate(key.created_at)}
+                  {formatApiKeyDateTime(key.created_at)}
                 </td>
                 <td className="py-3 pr-4 text-muted-foreground">
                   {key.last_used_at
-                    ? formatDate(key.last_used_at)
+                    ? formatApiKeyDateTime(key.last_used_at)
                     : t("dashboard.apiKeys.neverUsed")}
                 </td>
                 <td className="py-3 pr-4 text-muted-foreground">
                   {key.revoked_at
-                    ? formatDate(key.revoked_at)
+                    ? formatApiKeyDateTime(key.revoked_at)
                     : "—"}
                 </td>
                 <td className="py-3 pr-0 text-right">
@@ -1333,13 +1327,14 @@ function StatusBadge({
   status: string;
   t: (key: string) => string;
 }) {
+  const tone = getApiKeyStatusTone(status);
   if (status === "active") {
-    return <Badge variant="success">{t("dashboard.apiKeys.active")}</Badge>;
+    return <Badge variant={tone}>{t("dashboard.apiKeys.active")}</Badge>;
   }
   if (status === "revoked") {
-    return <Badge variant="outline">{t("dashboard.apiKeys.revoked")}</Badge>;
+    return <Badge variant={tone}>{t("dashboard.apiKeys.revoked")}</Badge>;
   }
-  return <Badge variant="outline">{status}</Badge>;
+  return <Badge variant={tone}>{status}</Badge>;
 }
 
 function EmptyState({ t }: { t: (key: string) => string }) {
@@ -1393,7 +1388,7 @@ function meKeyToListItem(key: MeKeyLike): ApiKeyListItem {
 }
 
 function toRevokeActionError(err: unknown): ActionErrorState {
-  const base = toActionError(err, {
+  const base = toApiKeyActionError(err, {
     method: "POST",
     url: dmitUrl(ME_API_KEYS_REVOKE_PATH),
   });
@@ -1409,41 +1404,6 @@ function dmitUrl(path: string): string {
   return `${getDmitBaseUrl()}${path}`;
 }
 
-function toActionError(
-  err: unknown,
-  fallback?: { method: string; url: string }
-): ActionErrorState {
-  if (err instanceof DmitApiError) {
-    const { code, requestId } = extractDmitActionErrorDetails(err);
-    const detail =
-      code && err.message
-        ? `${err.message} (${code})`
-        : err.message;
-    return {
-      message: userMessageForDashboardError(err.status, code, detail),
-      status: err.status,
-      code,
-      requestId,
-      method: err.requestMethod ?? fallback?.method,
-      url: err.requestUrl ?? fallback?.url,
-    };
-  }
-  if (err instanceof Error) {
-    return {
-      message: userMessageForDmitError(0, undefined, err.message),
-      status: 0,
-      method: fallback?.method,
-      url: fallback?.url,
-    };
-  }
-  return {
-    message: userMessageForDashboardError(500),
-    status: 500,
-    method: fallback?.method,
-    url: fallback?.url,
-  };
-}
-
 async function copyToClipboard(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
@@ -1451,16 +1411,4 @@ async function copyToClipboard(text: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }

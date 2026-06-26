@@ -2,7 +2,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { loginPathWithNext } from "@/lib/auth/login-redirect";
-import { ApiKeysErrorView } from "@/components/api-keys-error-view";
+import { ApiKeysErrorView } from "./api-keys-error-view";
 import {
   DmitServerError,
   dmitServerFetch,
