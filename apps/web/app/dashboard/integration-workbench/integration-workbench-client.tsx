@@ -4,11 +4,11 @@ import { IntegrationCommandCenter } from "@/components/integration-command-cente
 import { IntegrationWorkbenchPanel } from "@/components/integration-workbench-panel";
 import { useCopyToClipboard } from "@/components/copy-code-block";
 import { useI18n } from "@/lib/i18n/i18n-provider";
-import { useQuickStartApiKey } from "@/lib/use-quick-start-api-key";
+import { useWorkbenchApiKey } from "./use-workbench-api-key";
 
 export function IntegrationWorkbenchPageClient() {
   const { t } = useI18n();
-  const apiKey = useQuickStartApiKey();
+  const apiKey = useWorkbenchApiKey();
   const { copiedId, copyText } = useCopyToClipboard();
 
   return (
