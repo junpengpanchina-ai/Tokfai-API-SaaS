@@ -5,19 +5,20 @@ import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 
 import { useCopyToClipboard } from "@/components/copy-code-block";
-import { CustomerStarterTemplateLibrary } from "@/components/customer-starter-template-library";
-import { StarterTemplateConfigurator } from "@/components/starter-template-configurator";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/lib/i18n/i18n-provider";
+
+import { StarterTemplateConfiguratorClient } from "./starter-template-configurator-client";
+import { StarterTemplateLibraryClient } from "./starter-template-library-client";
 import {
   parseConfiguratorSearchParams,
   TEMPLATE_CONFIGURATOR_PATH,
-} from "@/lib/customer-template-configurator";
-import { useI18n } from "@/lib/i18n/i18n-provider";
-import { useQuickStartApiKey } from "@/lib/use-quick-start-api-key";
+} from "./starter-templates-configurator-params";
+import { useStarterTemplatesApiKey } from "./use-starter-templates-api-key";
 
 export function StarterTemplatesPageClient() {
   const { t } = useI18n();
-  const apiKey = useQuickStartApiKey();
+  const apiKey = useStarterTemplatesApiKey();
   const { copiedId, copyText } = useCopyToClipboard();
   const searchParams = useSearchParams();
 
@@ -55,7 +56,7 @@ export function StarterTemplatesPageClient() {
         </div>
       </div>
 
-      <StarterTemplateConfigurator
+      <StarterTemplateConfiguratorClient
         apiKey={apiKey}
         copiedId={copiedId}
         onCopy={copyText}
@@ -63,7 +64,7 @@ export function StarterTemplatesPageClient() {
         initialInput={configuratorInitial}
       />
 
-      <CustomerStarterTemplateLibrary
+      <StarterTemplateLibraryClient
         apiKey={apiKey}
         copiedId={copiedId}
         onCopy={copyText}
@@ -75,7 +76,7 @@ export function StarterTemplatesPageClient() {
         presetFeaturedOnly
       />
 
-      <CustomerStarterTemplateLibrary
+      <StarterTemplateLibraryClient
         apiKey={apiKey}
         copiedId={copiedId}
         onCopy={copyText}
@@ -86,7 +87,7 @@ export function StarterTemplatesPageClient() {
         presetCategories={["industry"]}
       />
 
-      <CustomerStarterTemplateLibrary
+      <StarterTemplateLibraryClient
         apiKey={apiKey}
         copiedId={copiedId}
         onCopy={copyText}
