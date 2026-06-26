@@ -33,12 +33,12 @@ import {
   truncateCheckoutSessionId,
   type CreditOrderDisplayStatus,
 } from "@/lib/billing/credit-order-status";
-import { formatCny } from "@/lib/billing/recharge-plans";
 import type { CreditsPageData } from "@/lib/credits";
-import { formatCredits as formatCreditsBalance } from "@/lib/format";
 import {
+  dashboardFormatBalanceCredits,
   dashboardFormatCreditsWithSuffix,
   dashboardFormatDate,
+  dashboardFormatCny,
   dashboardSafeNumber,
   dashboardShortRequestId,
 } from "@/lib/dashboard-display-helpers";
@@ -92,7 +92,7 @@ export function CreditsContentClient({
         <CardHeader>
           <CardDescription>{t("dashboard.credits.currentBalance")}</CardDescription>
           <CardTitle className="text-4xl">
-            {error ? t("common.unavailable") : formatCreditsBalance(balance.balance)}
+            {error ? t("common.unavailable") : dashboardFormatBalanceCredits(balance.balance)}
           </CardTitle>
           {balance.showNoLedgerHint && !error ? (
             <p className="text-sm text-muted-foreground">
@@ -111,11 +111,11 @@ export function CreditsContentClient({
           />
           <BalanceStat
             label={t("dashboard.credits.todayConsumed")}
-            value={formatCreditsBalance(balance.todayConsumed)}
+            value={dashboardFormatBalanceCredits(balance.todayConsumed)}
           />
           <BalanceStat
             label={t("dashboard.credits.last7DaysConsumed")}
-            value={formatCreditsBalance(balance.last7DaysConsumed)}
+            value={dashboardFormatBalanceCredits(balance.last7DaysConsumed)}
           />
         </CardContent>
       </Card>
@@ -345,7 +345,7 @@ function LedgerRow({
       </td>
       <td className="py-2 pr-4 text-right font-mono text-xs">
         {entry.balance_after != null
-          ? formatCreditsBalance(entry.balance_after)
+          ? dashboardFormatBalanceCredits(entry.balance_after)
           : "—"}
       </td>
       <td
@@ -618,10 +618,10 @@ function EmptyLedgerState({ t }: { t: (key: string) => string }) {
 
 function formatOrderAmount(order: CreditsLoadState["orders"][number]): string {
   if (order.amount_cents != null) {
-    return formatCny(order.amount_cents);
+    return dashboardFormatCny(order.amount_cents);
   }
   if (order.amount_cny != null) {
-    return formatCny(order.amount_cny * 100);
+    return dashboardFormatCny(order.amount_cny * 100);
   }
   return "—";
 }

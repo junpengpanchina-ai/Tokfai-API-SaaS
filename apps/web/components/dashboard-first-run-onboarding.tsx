@@ -20,7 +20,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n/i18n-provider";
-import { formatMessage } from "@/lib/i18n/messages";
+import { formatMessage } from "@/lib/i18n/format-message";
 import {
   TOKFAI_API_BASE_URL,
   TOKFAI_RECOMMENDED_MODEL,

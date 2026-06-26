@@ -81,6 +81,27 @@ function dashboardFormatCreditsDecimal(
   return CREDITS_DECIMAL.format(n);
 }
 
+/** Rounded credits for sidebar and shell UI (max 2 decimal places). */
+export function dashboardFormatCreditBalanceDisplay(
+  value: number | null | undefined
+): string {
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value ?? 0);
+}
+
+export function dashboardFormatCny(amountCents: number): string {
+  const yuan = amountCents / 100;
+  const hasFraction = amountCents % 100 !== 0;
+  return new Intl.NumberFormat("zh-CN", {
+    style: "currency",
+    currency: "CNY",
+    minimumFractionDigits: hasFraction ? 1 : 0,
+    maximumFractionDigits: 2,
+  }).format(yuan);
+}
+
 /** Balance card style — matches format.ts formatCredits output. */
 export function dashboardFormatBalanceCredits(
   value: number | null | undefined
