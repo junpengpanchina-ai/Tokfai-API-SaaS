@@ -42,46 +42,24 @@ import {
   type CreateApiKeyResponse,
   type MeApiKeyMetadata,
 } from "@/lib/dmit/client";
-import { buildNodeSdkConfigSnippet, buildPythonSdkConfigSnippet } from "@/lib/customer-openai-sdk-chapter";
 import {
-  batchCreateCurlOneLine,
-  batchCreateCurlPowerShellOneLine,
-  batchItemsCurlOneLine,
-  batchItemsCurlPowerShellOneLine,
-  batchPollCurlOneLine,
-  batchPollCurlPowerShellOneLine,
-  chatCurlOneLine,
-  chatCurlPowerShellOneLine,
-  modelsCurlOneLine,
-} from "@/lib/customer-curl-oneline";
-import { BATCH_POLL_PLACEHOLDER_ID } from "@/lib/customer-batch-api-chapter";
-import { buildTemplateCurlOneLine } from "@/lib/customer-industry-templates";
+  clearDashboardApiKeyIfMatches,
+  setDashboardApiKeySecret,
+} from "@/lib/dashboard-safe/api-key-session";
 import {
-  getStarterTemplateCopyText,
-  starterTemplateById,
-} from "@/lib/customer-starter-templates";
+  chatCurlOneLineSafe,
+  chatCurlPowerShellOneLineSafe,
+  modelsCurlOneLineSafe,
+} from "@/lib/dashboard-safe/curl-one-line";
 import {
-  buildSafeClientSnippet,
-} from "@/lib/customer-safe-client-snippets";
-import { buildTrafficGovernorSnippet } from "@/lib/customer-traffic-governor-snippets";
-import {
-  buildGoLiveAcceptanceText,
-  buildIntegrationPlanJson,
-  buildIntegrationPlanMarkdown,
-  buildIntegrationPlanPlainText,
-} from "@/lib/customer-integration-plan-copy";
-import { buildGoLiveTrackerCopies } from "@/lib/customer-go-live-copy";
-import { buildCustomerIntegrationPlan } from "@/lib/customer-integration-plan";
-import { DEFAULT_PLANNER_INPUT } from "@/lib/customer-capacity-planner";
+  buildNodeSdkConfigSnippetSafe,
+  buildPythonSdkConfigSnippetSafe,
+} from "@/lib/dashboard-safe/sdk-snippets";
 import { isFullTokfaiApiKey, TOKFAI_API_BASE_URL, TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/format-message";
 import { DashboardFirstRunOnboardingCard } from "@/components/dashboard-first-run-onboarding";
 import { CopyConfigAction } from "@/components/copyable-snippet-field";
-import {
-  setQuickStartApiKeySecret,
-  clearQuickStartApiKeyIfMatches,
-} from "@/lib/customer-quick-start-key-session";
 import {
   authorizationHeader,
   buildCherryConfigSnippet,
@@ -151,7 +129,7 @@ export function ApiKeysClient({
         { accessToken }
       );
       setOneTimeSecret(result.secret);
-      setQuickStartApiKeySecret(result.secret, result.api_key.id);
+      setDashboardApiKeySecret(result.secret, result.api_key.id);
       setCreatedKey(result.api_key);
       setCopyFullKeyStatus("idle");
       applyCreateResult(result);
@@ -195,7 +173,7 @@ export function ApiKeysClient({
       setKeys((prev) =>
         prev.map((row) => (row.id === key.id ? updated : row))
       );
-      clearQuickStartApiKeyIfMatches(key.id);
+      clearDashboardApiKeyIfMatches(key.id);
       if (oneTimeSecret && createdKey?.id === key.id) {
         setOneTimeSecret(null);
         setCreatedKey(null);
@@ -604,7 +582,7 @@ function OneTimeSecretCard({
           <div className="mt-3 flex flex-wrap gap-2">
             <CopyConfigAction
               id="one-time-secret-copy-chat-curl-primary"
-              value={chatCurlOneLine(secret)}
+              value={chatCurlOneLineSafe(secret)}
               copiedId={snippetCopiedId}
               onCopy={handleSnippetCopy}
               label={t("dashboard.apiKeys.copyOneLineChatCurl")}
@@ -650,39 +628,6 @@ function OneTimeSecretCard({
             <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/credits">{t("dashboard.apiKeys.goToCredits")}</Link>
             </Button>
-            <CopyConfigAction
-              id="one-time-secret-copy-node-starter"
-              value={getStarterTemplateCopyText(
-                starterTemplateById("node-chat-fetch")!,
-                secret
-              )}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copyNodeStarter")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-            <CopyConfigAction
-              id="one-time-secret-copy-python-starter"
-              value={getStarterTemplateCopyText(
-                starterTemplateById("python-chat-requests")!,
-                secret
-              )}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copyPythonStarter")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-            <CopyConfigAction
-              id="one-time-secret-copy-batch-worker"
-              value={getStarterTemplateCopyText(
-                starterTemplateById("node-batch-worker")!,
-                secret
-              )}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copyBatchWorker")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
             {t("integration.oneLineCurlPasteAnywhere")}
@@ -704,225 +649,11 @@ function OneTimeSecretCard({
               </Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/troubleshooting?code=powershell_line_break">
-                {t("integration.troubleshooting.powershellGuide")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/dashboard/troubleshooting">
                 <Wrench className="mr-1.5 h-4 w-4" />
                 {t("integration.troubleshooting.openTroubleshooting")}
               </Link>
             </Button>
-          </div>
-        </div>
-        <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
-            {t("dashboard.apiKeys.industryTemplatesTitle")}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#industry-examples">
-                {t("dashboard.apiKeys.industryTemplatesLink")}
-              </Link>
-            </Button>
-            <CopyConfigAction
-              id="one-time-secret-copy-hospital-template"
-              value={buildTemplateCurlOneLine("hospital-chart-summary", secret)}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copyHospitalExample")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-            <CopyConfigAction
-              id="one-time-secret-copy-auto-template"
-              value={buildTemplateCurlOneLine("auto-ticket-summary", secret)}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copyAutoServiceExample")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-            <CopyConfigAction
-              id="one-time-secret-copy-ecommerce-template"
-              value={buildTemplateCurlOneLine("ecommerce-batch-sku", secret)}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copyEcommerceBatchExample")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-            <CopyConfigAction
-              id="one-time-secret-copy-support-template"
-              value={buildTemplateCurlOneLine("support-ticket-classify", secret)}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copyCustomerServiceExample")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-          </div>
-        </div>
-        <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
-            {t("dashboard.apiKeys.safeRetryTitle")}
-          </p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {t("dashboard.apiKeys.safeRetryNote")}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <CopyConfigAction
-              id="one-time-secret-copy-bash-safe-retry"
-              value={buildSafeClientSnippet("bash-safe-retry", secret)}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copySafeRetryChatCurl")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-            <CopyConfigAction
-              id="one-time-secret-copy-node-safe-retry"
-              value={buildSafeClientSnippet("node-safe-retry", secret)}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copySafeNodeClient")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-            <CopyConfigAction
-              id="one-time-secret-copy-python-safe-retry"
-              value={buildSafeClientSnippet("python-safe-retry", secret)}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copySafePythonClient")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#retry-and-backoff">
-                {t("dashboard.apiKeys.retryBackoffGuide")}
-              </Link>
-            </Button>
-          </div>
-        </div>
-        <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
-            {t("dashboard.apiKeys.trafficGovernorTitle")}
-          </p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {t("dashboard.apiKeys.trafficGovernorNote")}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <CopyConfigAction
-              id="one-time-secret-copy-node-traffic-governor"
-              value={buildTrafficGovernorSnippet("node-traffic-governor", secret)}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copyNodeTrafficGovernor")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-            <CopyConfigAction
-              id="one-time-secret-copy-python-traffic-governor"
-              value={buildTrafficGovernorSnippet("python-traffic-governor", secret)}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copyPythonTrafficGovernor")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-            <CopyConfigAction
-              id="one-time-secret-copy-node-batch-worker"
-              value={buildTrafficGovernorSnippet("node-batch-worker", secret)}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copyNodeBatchWorker")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-            <CopyConfigAction
-              id="one-time-secret-copy-python-batch-worker"
-              value={buildTrafficGovernorSnippet("python-batch-worker", secret)}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copyPythonBatchWorker")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#traffic-governor">
-                {t("dashboard.apiKeys.trafficGovernorGuide")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#batch-worker">
-                {t("dashboard.apiKeys.batchWorkerGuide")}
-              </Link>
-            </Button>
-          </div>
-        </div>
-        <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-100/80">
-            {t("dashboard.apiKeys.planIntegrationTitle")}
-          </p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {t("dashboard.apiKeys.planIntegrationNote")}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#capacity-planner">
-                {t("dashboard.apiKeys.planMyIntegration")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#capacity-planner">
-                {t("dashboard.apiKeys.capacityPlannerLink")}
-              </Link>
-            </Button>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#traffic-governor">
-                {t("dashboard.apiKeys.scaleSafelyLink")}
-              </Link>
-            </Button>
-            <CopyConfigAction
-              id="one-time-secret-copy-integration-plan"
-              value={buildIntegrationPlanPlainText(
-                buildCustomerIntegrationPlan(DEFAULT_PLANNER_INPUT),
-                DEFAULT_PLANNER_INPUT
-              )}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copyIntegrationPlan")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#integration-plan">
-                {t("dashboard.apiKeys.planHandoffPack")}
-              </Link>
-            </Button>
-            <CopyConfigAction
-              id="one-time-secret-copy-go-live"
-              value={buildGoLiveAcceptanceText()}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copyGoLiveAcceptance")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#go-live-tracker">
-                {t("dashboard.apiKeys.startGoLiveTracker")}
-              </Link>
-            </Button>
-            <CopyConfigAction
-              id="one-time-secret-copy-acceptance-report"
-              value={
-                buildGoLiveTrackerCopies(DEFAULT_PLANNER_INPUT, {}).finalReport
-              }
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copyAcceptanceReport")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-            <CopyConfigAction
-              id="one-time-secret-copy-technical-handoff"
-              value={
-                buildGoLiveTrackerCopies(DEFAULT_PLANNER_INPUT, {}).technicalHandoff
-              }
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copyTechnicalHandoff")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
           </div>
         </div>
         <div className="rounded-lg border border-emerald-200 bg-white/80 p-3 dark:border-emerald-800 dark:bg-background/80">
@@ -935,7 +666,7 @@ function OneTimeSecretCard({
           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <CopyConfigAction
               id="one-time-secret-copy-chat-curl"
-              value={chatCurlOneLine(secret)}
+              value={chatCurlOneLineSafe(secret)}
               copiedId={snippetCopiedId}
               onCopy={handleSnippetCopy}
               label={t("dashboard.apiKeys.copyOneLineChatCurl")}
@@ -943,7 +674,7 @@ function OneTimeSecretCard({
             />
             <CopyConfigAction
               id="one-time-secret-copy-models-curl"
-              value={modelsCurlOneLine(secret)}
+              value={modelsCurlOneLineSafe(secret)}
               copiedId={snippetCopiedId}
               onCopy={handleSnippetCopy}
               label={t("dashboard.apiKeys.copyOneLineModelsCurl")}
@@ -975,7 +706,7 @@ function OneTimeSecretCard({
           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <CopyConfigAction
               id="one-time-secret-copy-chat-curl-ps"
-              value={chatCurlPowerShellOneLine(secret)}
+              value={chatCurlPowerShellOneLineSafe(secret)}
               copiedId={snippetCopiedId}
               onCopy={handleSnippetCopy}
               label={t("dashboard.apiKeys.copyPowerShellChatCurl")}
@@ -999,7 +730,7 @@ function OneTimeSecretCard({
             />
             <CopyConfigAction
               id="one-time-secret-copy-node-sdk-config"
-              value={buildNodeSdkConfigSnippet(secret)}
+              value={buildNodeSdkConfigSnippetSafe(secret)}
               copiedId={snippetCopiedId}
               onCopy={handleSnippetCopy}
               label={t("dashboard.apiKeys.copyNodeSdkConfig")}
@@ -1007,42 +738,10 @@ function OneTimeSecretCard({
             />
             <CopyConfigAction
               id="one-time-secret-copy-python-sdk-config"
-              value={buildPythonSdkConfigSnippet(secret)}
+              value={buildPythonSdkConfigSnippetSafe(secret)}
               copiedId={snippetCopiedId}
               onCopy={handleSnippetCopy}
               label={t("dashboard.apiKeys.copyPythonSdkConfig")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-            <CopyConfigAction
-              id="one-time-secret-copy-batch-create-curl"
-              value={batchCreateCurlOneLine(secret)}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copyOneLineBatchCurl")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-            <CopyConfigAction
-              id="one-time-secret-copy-batch-poll-curl"
-              value={batchPollCurlOneLine(secret, BATCH_POLL_PLACEHOLDER_ID)}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copyOneLineBatchPollCurl")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-            <CopyConfigAction
-              id="one-time-secret-copy-batch-items-curl"
-              value={batchItemsCurlOneLine(secret, BATCH_POLL_PLACEHOLDER_ID)}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copyOneLineBatchItemsCurl")}
-              copiedLabel={t("dashboard.apiKeys.copied")}
-            />
-            <CopyConfigAction
-              id="one-time-secret-copy-batch-create-curl-ps"
-              value={batchCreateCurlPowerShellOneLine(secret)}
-              copiedId={snippetCopiedId}
-              onCopy={handleSnippetCopy}
-              label={t("dashboard.apiKeys.copyPowerShellBatchCurl")}
               copiedLabel={t("dashboard.apiKeys.copied")}
             />
             <CopyConfigAction

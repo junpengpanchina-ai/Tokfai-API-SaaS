@@ -13,9 +13,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { createCheckoutSession, DmitApiError, type BillingRechargePlan } from "@/lib/dmit/client";
-import { userMessageForDmitError } from "@/lib/dmit-messages";
+import { userMessageForDmitErrorSafe } from "@/lib/dashboard-safe/error-helpers";
 import { useI18n } from "@/lib/i18n/i18n-provider";
-import { formatMessage } from "@/lib/i18n/messages";
+import { formatMessage } from "@/lib/i18n/format-message";
 import { formatCny, formatPlanCredits } from "@/lib/billing/recharge-plans";
 import { formatImageModelPriceExample } from "@/lib/model-pricing-display";
 import { createClient } from "@/lib/supabase/client";
@@ -183,7 +183,7 @@ function checkoutErrorMessage(
     ) {
       return t("dashboard.credits.checkoutUnavailable");
     }
-    return userMessageForDmitError(err.status, err.code, err.message);
+    return userMessageForDmitErrorSafe(err.status, err.code, err.message);
   }
   return t("dashboard.credits.checkoutUnavailable");
 }

@@ -3,13 +3,9 @@
 import { useCopyToClipboard } from "@/components/copy-code-block";
 import { DashboardSafeFallback } from "@/components/dashboard-safe-fallback";
 
-export function PayloadBuilderPageClient() {
+export function DocsPageClient() {
   const { copiedId, copyText } = useCopyToClipboard();
   return (
-    <DashboardSafeFallback
-      page="payload-builder"
-      copiedId={copiedId}
-      onCopy={copyText}
-    />
+    <DashboardSafeFallback page="docs" copiedId={copiedId} onCopy={copyText} />
   );
 }

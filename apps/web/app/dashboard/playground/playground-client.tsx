@@ -17,8 +17,7 @@ import {
 
 import { CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
 import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
-import { setQuickStartApiKeySecret } from "@/lib/customer-quick-start-key-session";
-import { PlaygroundErrorPanel } from "@/components/playground-error-panel";
+import { setDashboardApiKeySecret } from "@/lib/dashboard-safe/api-key-session";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,16 +36,20 @@ import {
   revealMeApiKey,
   type ChatCompletionResponse,
 } from "@/lib/dmit/client";
-import { formatDateTime, formatCreditsPrecise, formatInt } from "@/lib/format";
+import {
+  formatCreditsSafe,
+  formatDateTimeSafe,
+  formatIntSafe,
+} from "@/lib/dashboard-safe/format-helpers";
+import { extractRequestIdSafe as extractRequestIdFromBody } from "@/lib/dashboard-safe/error-helpers";
 import { useI18n } from "@/lib/i18n/i18n-provider";
-import { formatMessage } from "@/lib/i18n/messages";
+import { formatMessage } from "@/lib/i18n/format-message";
 import {
   AVAILABLE_CHAT_MODEL_IDS,
   getChatModelById,
   isAvailableChatModel,
   PLAYGROUND_CHAT_MODEL_IDS,
 } from "@/lib/model-catalog";
-import { extractRequestIdFromBody } from "@/lib/dmit-error-details";
 import { resolvePlaygroundRiskMessage } from "@/lib/playground-risk-errors";
 import {
   isFullTokfaiApiKey,
@@ -235,7 +238,7 @@ export function PlaygroundClient({
         ...prev,
         [listItem.id]: result.secret,
       }));
-      setQuickStartApiKeySecret(result.secret, result.api_key.id);
+      setDashboardApiKeySecret(result.secret, result.api_key.id);
       setLocalKeys((prev) => {
         const without = prev.filter((row) => row.id !== listItem.id);
         return [listItem, ...without];
@@ -877,7 +880,9 @@ function ResponsePanel({
           copiedId={copiedId}
           onCopyRequestId={onCopyRequestId}
         />
-        <PlaygroundErrorPanel scope="playground" error={error} t={t} />
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+          {error.message}
+        </div>
       </div>
     );
   }
@@ -1067,7 +1072,7 @@ function ResultMeta({
             <dt className="text-muted-foreground">
               {t("dashboard.playground.createdAt")}
             </dt>
-            <dd className="font-mono">{formatDateTime(completedAt)}</dd>
+            <dd className="font-mono">{formatDateTimeSafe(completedAt)}</dd>
           </div>
         ) : null}
       </dl>
@@ -1102,7 +1107,7 @@ function UsageDetails({
   if (creditsCharged != null) {
     items.push({
       label: t("dashboard.playground.creditsCharged"),
-      value: formatCreditsPrecise(creditsCharged),
+      value: formatCreditsSafe(creditsCharged),
     });
   }
 
@@ -1237,5 +1242,5 @@ function formatOptionalTokenCount(
   if (value === undefined || value === null || !Number.isFinite(Number(value))) {
     return t("dashboard.playground.tokensNotReturned");
   }
-  return formatInt(value);
+  return formatIntSafe(value);
 }

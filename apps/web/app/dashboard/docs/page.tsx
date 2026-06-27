@@ -1,4 +1,4 @@
-import { CustomerIntegrationGuide } from "@/components/customer-integration-guide";
+import { DocsPageClient } from "./docs-client";
 
 export const metadata = {
   title: "API integration handbook",
@@ -9,7 +9,7 @@ export const metadata = {
 export default function DashboardDocsPage() {
   return (
     <div className="w-full max-w-none">
-      <CustomerIntegrationGuide showDashboardLinks />
+      <DocsPageClient />
     </div>
   );
 }

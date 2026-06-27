@@ -40,7 +40,7 @@ import {
   resolveImageCreatedAt,
 } from "@/lib/image-playground-display";
 import { useI18n } from "@/lib/i18n/i18n-provider";
-import { formatMessage } from "@/lib/i18n/messages";
+import { formatMessage } from "@/lib/i18n/format-message";
 import {
   getImageModelById,
   getImageModelCreditsPerRequest,
@@ -57,7 +57,7 @@ import {
   TOKFAI_IMAGES_GENERATIONS_ENDPOINT,
 } from "@/lib/tokfai-api";
 import { buildImageGenerationCurlOneLine } from "@/lib/image-api-curl";
-import { setQuickStartApiKeySecret } from "@/lib/customer-quick-start-key-session";
+import { setDashboardApiKeySecret } from "@/lib/dashboard-safe/api-key-session";
 import {
   isValidImageUrl,
   MAX_PLAYGROUND_INPUT_IMAGES,
@@ -540,7 +540,7 @@ export function ImagePlaygroundClient({
         ...prev,
         [listItem.id]: keyResult.secret,
       }));
-      setQuickStartApiKeySecret(keyResult.secret, keyResult.api_key.id);
+      setDashboardApiKeySecret(keyResult.secret, keyResult.api_key.id);
       setLocalKeys((prev) => {
         const without = prev.filter((row) => row.id !== listItem.id);
         return [listItem, ...without];

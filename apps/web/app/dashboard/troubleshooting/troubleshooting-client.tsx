@@ -1,59 +1,15 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
-
 import { useCopyToClipboard } from "@/components/copy-code-block";
-import { useI18n } from "@/lib/i18n/i18n-provider";
-
-import { TroubleshootingCenterClient } from "./troubleshooting-center-client";
-import {
-  troubleshootingCaseByErrorCode,
-  type TroubleshootingCategory,
-} from "./troubleshooting-cases";
-import { useTroubleshootingApiKey } from "./use-troubleshooting-api-key";
-
-const CATEGORY_SET = new Set<string>([
-  "api_key",
-  "request_format",
-  "model",
-  "rate_limits",
-  "image",
-  "batch",
-  "cursor_cherry",
-  "sdk",
-  "usage_credits",
-]);
+import { DashboardSafeFallback } from "@/components/dashboard-safe-fallback";
 
 export function TroubleshootingPageClient() {
-  const { t } = useI18n();
-  const apiKey = useTroubleshootingApiKey();
   const { copiedId, copyText } = useCopyToClipboard();
-  const searchParams = useSearchParams();
-  const codeParam = searchParams.get("code") ?? "";
-  const categoryParam = searchParams.get("category") ?? "";
-  const matched = codeParam ? troubleshootingCaseByErrorCode(codeParam) : undefined;
-  const initialCategory: TroubleshootingCategory | "all" = CATEGORY_SET.has(categoryParam)
-    ? (categoryParam as TroubleshootingCategory)
-    : "all";
-
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          {t("integration.troubleshooting.title")}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("integration.troubleshooting.subtitle")}
-        </p>
-      </div>
-      <TroubleshootingCenterClient
-        apiKey={apiKey}
-        copiedId={copiedId}
-        onCopy={copyText}
-        idPrefix="dashboard-troubleshooting"
-        initialQuery={matched?.errorCode ?? codeParam}
-        initialCategory={matched?.category ?? initialCategory}
-      />
-    </div>
+    <DashboardSafeFallback
+      page="troubleshooting"
+      copiedId={copiedId}
+      onCopy={copyText}
+    />
   );
 }

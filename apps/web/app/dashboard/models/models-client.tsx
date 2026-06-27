@@ -27,12 +27,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { CatalogModelPricingItem } from "@/lib/dmit/client";
-import { chatCurlOneLine } from "@/lib/customer-curl-oneline";
-import { buildConfiguratorHref } from "@/lib/customer-template-configurator";
-import { buildPayloadBuilderHref } from "@/lib/customer-payload-builder";
-import { useQuickStartApiKey } from "@/lib/use-quick-start-api-key";
+import {
+  chatCurlOneLineSafe,
+} from "@/lib/dashboard-safe/curl-one-line";
+import { useDashboardApiKey } from "@/lib/dashboard-safe/use-dashboard-api-key";
 import { useI18n } from "@/lib/i18n/i18n-provider";
-import { formatMessage } from "@/lib/i18n/messages";
+import { formatMessage } from "@/lib/i18n/format-message";
 import {
   buildPackageUsageEstimates,
   getDefaultAvailableImageModel,
@@ -86,7 +86,7 @@ export function ModelsClient({
 }) {
   const { t, locale } = useI18n();
   const { copiedId, copyText } = useCopyToClipboard();
-  const apiKey = useQuickStartApiKey();
+  const apiKey = useDashboardApiKey();
 
   const stats = summarizeModelsCatalog(DASHBOARD_CATALOG_MODELS);
   const rows = buildModelsTableRows(
@@ -164,7 +164,7 @@ export function ModelsClient({
             <li>{t("dashboard.models.starterTemplateHint")}</li>
             <li>
               <Link
-                href={buildPayloadBuilderHref({ model: "auto-fast", api: "chat", industry: "general" })}
+                href="/dashboard/payload-builder"
                 className="underline"
               >
                 {t("dashboard.models.buildPayloadAutoFast")}
@@ -172,7 +172,7 @@ export function ModelsClient({
             </li>
             <li>
               <Link
-                href={buildPayloadBuilderHref({ model: "auto-pro", api: "chat", industry: "hospital" })}
+                href="/dashboard/payload-builder"
                 className="underline"
               >
                 {t("dashboard.models.buildPayloadAutoPro")}
@@ -180,11 +180,7 @@ export function ModelsClient({
             </li>
             <li>
               <Link
-                href={buildPayloadBuilderHref({
-                  model: "auto-cheap",
-                  api: "batch",
-                  industry: "ecommerce",
-                })}
+                href="/dashboard/payload-builder"
                 className="underline"
               >
                 {t("dashboard.models.buildPayloadAutoCheap")}
@@ -192,7 +188,7 @@ export function ModelsClient({
             </li>
             <li>
               <Link
-                href={buildPayloadBuilderHref({ model: "gpt-image-2", api: "image", industry: "ecommerce" })}
+                href="/dashboard/payload-builder"
                 className="underline"
               >
                 {t("dashboard.models.buildPayloadImage")}
@@ -200,7 +196,7 @@ export function ModelsClient({
             </li>
             <li>
               <Link
-                href={buildConfiguratorHref({ model: "auto-fast", api: "chat", industry: "general" })}
+                href="/dashboard/starter-templates"
                 className="underline"
               >
                 {t("dashboard.models.buildTemplateAutoFast")}
@@ -208,7 +204,7 @@ export function ModelsClient({
             </li>
             <li>
               <Link
-                href={buildConfiguratorHref({ model: "auto-pro", api: "chat", industry: "hospital" })}
+                href="/dashboard/starter-templates"
                 className="underline"
               >
                 {t("dashboard.models.buildTemplateAutoPro")}
@@ -216,12 +212,7 @@ export function ModelsClient({
             </li>
             <li>
               <Link
-                href={buildConfiguratorHref({
-                  model: "auto-cheap",
-                  api: "batch",
-                  industry: "ecommerce",
-                  workloadSize: "small-batch",
-                })}
+                href="/dashboard/starter-templates"
                 className="underline"
               >
                 {t("dashboard.models.buildTemplateAutoCheap")}
@@ -229,7 +220,7 @@ export function ModelsClient({
             </li>
             <li>
               <Link
-                href={buildConfiguratorHref({ model: "gpt-image-2", api: "image", industry: "ecommerce" })}
+                href="/dashboard/starter-templates"
                 className="underline"
               >
                 {t("dashboard.models.buildTemplateImage")}
@@ -260,7 +251,7 @@ export function ModelsClient({
           <div className="flex flex-wrap gap-2">
             <CopyConfigAction
               id="models-curl-auto-fast"
-              value={chatCurlOneLine(apiKey, "auto-fast")}
+              value={chatCurlOneLineSafe(apiKey, "auto-fast")}
               copiedId={copiedId}
               onCopy={copyText}
               label={t("dashboard.models.copyCurlWithModel")}
@@ -274,12 +265,12 @@ export function ModelsClient({
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
-              <Link href={buildPayloadBuilderHref()}>
+              <Link href="/dashboard/payload-builder">
                 {t("dashboard.models.buildPayloadWithModel")}
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
-              <Link href={buildConfiguratorHref()}>
+              <Link href="/dashboard/starter-templates">
                 {t("dashboard.models.buildTemplateWithModel")}
               </Link>
             </Button>
