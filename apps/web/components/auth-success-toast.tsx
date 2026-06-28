@@ -6,10 +6,10 @@ import {
   consumeAuthSuccess,
   type AuthSuccessKind,
 } from "@/lib/auth/auth-success-flash";
-import { useI18n } from "@/lib/i18n/i18n-provider";
+import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 
 export function AuthSuccessToast() {
-  const { t } = useI18n();
+  const { t } = useDashboardLabels();
   const [kind, setKind] = useState<AuthSuccessKind | null>(null);
 
   useEffect(() => {

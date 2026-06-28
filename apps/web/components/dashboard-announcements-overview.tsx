@@ -17,14 +17,14 @@ import {
   announcementTypeLabelKey,
 } from "@/lib/announcements";
 import type { PublicAnnouncement } from "@/lib/announcements";
-import { useI18n } from "@/lib/i18n/i18n-provider";
+import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 
 export function DashboardAnnouncementsOverview({
   announcements,
 }: {
   announcements: PublicAnnouncement[];
 }) {
-  const { t } = useI18n();
+  const { t } = useDashboardLabels();
 
   return (
     <Card>

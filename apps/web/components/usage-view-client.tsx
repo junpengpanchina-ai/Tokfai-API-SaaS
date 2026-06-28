@@ -5,7 +5,6 @@ import { AlertTriangle, Gauge, Info } from "lucide-react";
 
 import { AdminStatCard } from "@/components/admin/admin-stat-card";
 import { ResponsiveTableScroll } from "@/components/responsive-table-scroll";
-import { CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,12 +28,16 @@ import {
   dashboardUsageStatusTone,
   type DashboardUsageKind,
 } from "@/lib/dashboard-display-helpers";
-import { useI18n } from "@/lib/i18n/i18n-provider";
+import {
+  DashboardCopyButton,
+  useDashboardCopyToClipboard,
+} from "@/lib/dashboard-safe/copy-block";
+import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 import type { UsagePageLog, UsagePageState } from "@/lib/usage-page";
 
 export function UsageViewClient({ state }: { state: UsagePageState }) {
-  const { t } = useI18n();
-  const { copiedId, copyText } = useCopyToClipboard();
+  const { t } = useDashboardLabels();
+  const { copiedId, copyText } = useDashboardCopyToClipboard();
 
   return (
     <div className="flex flex-col gap-6">
@@ -264,7 +267,7 @@ function UsageRow({
             >
               {dashboardShortRequestId(row.request_id)}
             </code>
-            <CopyButton
+            <DashboardCopyButton
               copied={copiedId === copyId}
               onCopy={() => onCopy(copyId, row.request_id!)}
               copyLabel={t("dashboard.usage.copyRequestId")}

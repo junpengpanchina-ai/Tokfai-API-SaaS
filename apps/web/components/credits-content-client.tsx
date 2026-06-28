@@ -13,7 +13,11 @@ import {
   KeyRound,
 } from "lucide-react";
 
-import { CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
+import {
+  DashboardCopyButton,
+  useDashboardCopyToClipboard,
+} from "@/lib/dashboard-safe/copy-block";
+import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 
 import { ResponsiveTableScroll } from "@/components/responsive-table-scroll";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +46,6 @@ import {
   dashboardSafeNumber,
   dashboardShortRequestId,
 } from "@/lib/dashboard-display-helpers";
-import { useI18n } from "@/lib/i18n/i18n-provider";
 import type { CreditLedgerRow } from "@/lib/supabase/types";
 
 export type CreditsLoadState = CreditsPageData;
@@ -58,7 +61,7 @@ export function CreditsContentClient({
   checkoutStatus?: string;
   checkoutSessionId?: string;
 }) {
-  const { t } = useI18n();
+  const { t } = useDashboardLabels();
   const { balance, ledger, orders, error } = creditsState;
   const [referenceFilter, setReferenceFilter] = useState("");
   const filteredLedger = useMemo(() => {
@@ -329,7 +332,7 @@ function LedgerRow({
   entry: CreditLedgerRow;
   t: (key: string) => string;
 }) {
-  const { copiedId, copyText } = useCopyToClipboard();
+  const { copiedId, copyText } = useDashboardCopyToClipboard();
   const referenceCopyId = `ledger-ref-${entry.id}`;
 
   return (
@@ -363,7 +366,7 @@ function LedgerRow({
             >
               {dashboardShortRequestId(entry.reference_id)}
             </code>
-            <CopyButton
+            <DashboardCopyButton
               copied={copiedId === referenceCopyId}
               onCopy={() => copyText(referenceCopyId, entry.reference_id!)}
               copyLabel={t("dashboard.credits.copyReference")}

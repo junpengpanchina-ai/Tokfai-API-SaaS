@@ -1,23 +1,40 @@
 /**
- * Generates dashboard-safe flat labels from i18n messages for keys used in app/dashboard.
+ * Generates dashboard-safe flat labels from i18n messages for dashboard UI keys.
  * Run: npx tsx scripts/generate-dashboard-labels.ts
  */
-import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { messages } from "../lib/i18n/messages";
 
-const DASHBOARD_ROOT = join(process.cwd(), "app", "dashboard");
 const OUT = join(process.cwd(), "lib", "dashboard-safe", "labels.generated.ts");
 
+const SCAN_ROOTS = [
+  join(process.cwd(), "app", "dashboard"),
+  join(process.cwd(), "components"),
+];
+
+const EXTRA_FILES = [
+  join(process.cwd(), "components", "usage-view-client.tsx"),
+  join(process.cwd(), "components", "credits-content-client.tsx"),
+  join(process.cwd(), "components", "auth-success-toast.tsx"),
+];
+
 function walkFiles(dir: string, acc: string[] = []): string[] {
+  if (!existsSync(dir)) return acc;
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) {
       walkFiles(full, acc);
       continue;
     }
-    if (/\.(ts|tsx)$/.test(entry)) acc.push(full);
+    if (/\.(ts|tsx)$/.test(entry)) {
+      if (dir.endsWith("components") && entry.startsWith("dashboard-")) {
+        acc.push(full);
+      } else if (!dir.endsWith("components")) {
+        acc.push(full);
+      }
+    }
   }
   return acc;
 }
@@ -26,7 +43,12 @@ function collectTranslationKeys(): Set<string> {
   const keys = new Set<string>();
   const keyPattern = /\bt\(\s*["'`]([^"'`]+)["'`]/g;
 
-  for (const file of walkFiles(DASHBOARD_ROOT)) {
+  const files = [
+    ...SCAN_ROOTS.flatMap((root) => walkFiles(root)),
+    ...EXTRA_FILES.filter((f) => existsSync(f)),
+  ];
+
+  for (const file of files) {
     const content = readFileSync(file, "utf8");
     for (const match of content.matchAll(keyPattern)) {
       keys.add(match[1]);

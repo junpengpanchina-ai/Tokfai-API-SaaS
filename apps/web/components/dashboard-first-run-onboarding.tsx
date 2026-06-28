@@ -19,8 +19,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useI18n } from "@/lib/i18n/i18n-provider";
-import { formatMessage } from "@/lib/i18n/format-message";
+import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 import {
   TOKFAI_API_BASE_URL,
   TOKFAI_RECOMMENDED_MODEL,
@@ -67,7 +66,7 @@ export function DashboardFirstRunOnboardingCard({
   hasRecentUsage = false,
   variant = "dashboard",
 }: DashboardFirstRunOnboardingProps) {
-  const { t } = useI18n();
+  const { t, formatMessage } = useDashboardLabels();
   const complete = isFirstRunOnboardingComplete({
     hasActiveApiKey,
     hasChatSuccess,

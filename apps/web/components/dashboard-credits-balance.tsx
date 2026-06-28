@@ -11,7 +11,7 @@ import {
   isLowCreditsBalance,
   type DashboardShellCredits,
 } from "@/lib/dashboard-shell-credits";
-import { useI18n } from "@/lib/i18n/i18n-provider";
+import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 
 export function formatShellCreditsAmount(credits: DashboardShellCredits): string {
   if (!credits.loaded) {
@@ -25,7 +25,7 @@ export function DashboardSidebarCreditsSummary({
 }: {
   credits: DashboardShellCredits;
 }) {
-  const { t } = useI18n();
+  const { t } = useDashboardLabels();
   const amount = formatShellCreditsAmount(credits);
   const lowCredits = isLowCreditsBalance(credits);
 

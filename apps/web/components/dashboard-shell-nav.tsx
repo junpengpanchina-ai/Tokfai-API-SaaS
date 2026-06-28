@@ -7,7 +7,8 @@ import { useState } from "react";
 import {
   DashboardSidebarCreditsSummary,
 } from "@/components/dashboard-credits-balance";
-import { LanguageSwitcher } from "@/components/language-switcher";
+import { DashboardLanguageSwitcher } from "@/lib/dashboard-safe/language-switcher";
+import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/auth-provider";
 import {
@@ -17,7 +18,6 @@ import {
   type DashboardNavItem,
 } from "@/lib/dashboard-nav";
 import type { DashboardShellCredits } from "@/lib/dashboard-shell-credits";
-import { useI18n } from "@/lib/i18n/i18n-provider";
 import { cn } from "@/lib/utils";
 
 function truncateEmail(email: string, maxLength = 32): string {
@@ -39,7 +39,7 @@ export function DashboardMobileShell({
   credits: DashboardShellCredits;
 }) {
   const pathname = usePathname();
-  const { t } = useI18n();
+  const { t } = useDashboardLabels();
   const displayEmail = truncateEmail(email);
 
   return (
@@ -52,7 +52,7 @@ export function DashboardMobileShell({
           <span className="text-sm font-semibold tracking-tight">Tokfai</span>
         </Link>
         <div className="flex shrink-0 items-center gap-1">
-          <LanguageSwitcher dropUp />
+          <DashboardLanguageSwitcher dropUp />
           <DashboardSidebarSignOut compact />
         </div>
       </div>
@@ -106,7 +106,7 @@ export function DashboardSidebar({
   credits: DashboardShellCredits;
 }) {
   const pathname = usePathname();
-  const { t } = useI18n();
+  const { t } = useDashboardLabels();
   const displayEmail = truncateEmail(email);
 
   return (
@@ -196,7 +196,7 @@ function DashboardSidebarAccount({
   email: string;
   fullEmail: string;
 }) {
-  const { t } = useI18n();
+  const { t } = useDashboardLabels();
 
   return (
     <div className="space-y-3 border-t border-border/60 px-3 py-3">
@@ -209,7 +209,7 @@ function DashboardSidebarAccount({
         </div>
       ) : null}
       <div className="flex flex-wrap items-center gap-2">
-        <LanguageSwitcher dropUp className="w-full sm:w-auto" />
+        <DashboardLanguageSwitcher dropUp className="w-full sm:w-auto" />
         <DashboardSidebarSignOut />
       </div>
     </div>
@@ -217,7 +217,7 @@ function DashboardSidebarAccount({
 }
 
 function DashboardSidebarSignOut({ compact = false }: { compact?: boolean }) {
-  const { t } = useI18n();
+  const { t } = useDashboardLabels();
   const { signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);

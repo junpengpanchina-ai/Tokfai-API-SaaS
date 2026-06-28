@@ -1,27 +1,41 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { formatDashboardMessage } from "./format-message";
 import {
   dashboardLabel,
   readDashboardLocale,
+  setDashboardLocale,
+  DASHBOARD_LOCALE_EVENT,
   type DashboardLocale,
 } from "./labels";
 
 export function useDashboardLabels() {
-  const [locale, setLocale] = useState<DashboardLocale>("en");
+  const [locale, setLocaleState] = useState<DashboardLocale>("en");
 
   useEffect(() => {
-    setLocale(readDashboardLocale());
+    const refresh = () => setLocaleState(readDashboardLocale());
+    refresh();
+    window.addEventListener(DASHBOARD_LOCALE_EVENT, refresh);
+    return () => window.removeEventListener(DASHBOARD_LOCALE_EVENT, refresh);
   }, []);
 
-  const t = (key: string) => dashboardLabel(key, locale);
+  const t = useCallback(
+    (key: string) => dashboardLabel(key, locale),
+    [locale]
+  );
 
-  const formatMessage = (
-    template: string,
-    vars: Record<string, string | number>
-  ) => formatDashboardMessage(template, vars);
+  const formatMessage = useCallback(
+    (template: string, vars: Record<string, string | number>) =>
+      formatDashboardMessage(template, vars),
+    []
+  );
 
-  return { locale, t, formatMessage };
+  const setLocale = useCallback((next: DashboardLocale) => {
+    setDashboardLocale(next);
+    setLocaleState(next);
+  }, []);
+
+  return { locale, t, formatMessage, setLocale };
 }

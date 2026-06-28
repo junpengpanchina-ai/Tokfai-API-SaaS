@@ -17,14 +17,14 @@ import {
 } from "@/lib/announcements";
 import type { PublicAnnouncement } from "@/lib/announcements";
 import { dashboardFormatDateTime } from "@/lib/dashboard-display-helpers";
-import { useI18n } from "@/lib/i18n/i18n-provider";
+import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 
 export function DashboardAnnouncementsList({
   announcements,
 }: {
   announcements: PublicAnnouncement[];
 }) {
-  const { t } = useI18n();
+  const { t } = useDashboardLabels();
 
   return (
     <div className="flex flex-col gap-8">

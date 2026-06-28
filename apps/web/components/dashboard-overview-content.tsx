@@ -29,7 +29,7 @@ import {
   dashboardUsageStatusLabel,
   dashboardUsageStatusTone,
 } from "@/lib/dashboard-display-helpers";
-import { useI18n } from "@/lib/i18n/i18n-provider";
+import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -138,7 +138,7 @@ export function DashboardOverviewContent({
   overview: DashboardOverviewData;
   announcements?: PublicAnnouncement[];
 }) {
-  const { t } = useI18n();
+  const { t } = useDashboardLabels();
   const phase = getUserPhase(overview);
   const isReturning = phase === "returning";
   const allOnboardingComplete = ONBOARDING_STEPS.every((step) =>

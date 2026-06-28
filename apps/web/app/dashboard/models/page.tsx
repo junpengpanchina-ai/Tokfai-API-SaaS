@@ -1,8 +1,11 @@
 import { redirect } from "next/navigation";
 
 import { loginPathWithNext } from "@/lib/auth/login-redirect";
-import { DashboardSafeFallback } from "@/lib/dashboard-safe/fallback-page";
+import { listCatalogModelPricing } from "@/lib/dmit/server";
+import { buildModelsClientData } from "@/lib/models-page-server";
 import { createClient } from "@/lib/supabase/server";
+
+import { ModelsClient } from "./models-client";
 
 export const metadata = {
   title: "Models",
@@ -20,5 +23,14 @@ export default async function ModelsPage() {
     redirect(loginPathWithNext("/dashboard/models"));
   }
 
-  return <DashboardSafeFallback page="models" />;
+  let catalogPricing = [] as Awaited<ReturnType<typeof listCatalogModelPricing>>;
+  try {
+    catalogPricing = await listCatalogModelPricing(session.access_token);
+  } catch {
+    catalogPricing = [];
+  }
+
+  const modelsData = buildModelsClientData(catalogPricing);
+
+  return <ModelsClient modelsData={modelsData} />;
 }

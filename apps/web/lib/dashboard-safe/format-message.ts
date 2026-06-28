@@ -1,4 +1,4 @@
-/** Template helper — no i18n/messages dependency. */
+/** Template helper — dashboard-safe, no shared locale tree. */
 
 export function formatDashboardMessage(
   template: string,

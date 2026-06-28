@@ -1,10 +1,10 @@
 "use client";
 
 import { ApiReferenceLink } from "@/components/api-reference-link";
-import { useI18n } from "@/lib/i18n/i18n-provider";
+import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 
 export function DashboardFooter() {
-  const { t } = useI18n();
+  const { t } = useDashboardLabels();
 
   return (
     <footer className="border-t px-4 py-4 text-xs text-muted-foreground sm:px-6">
