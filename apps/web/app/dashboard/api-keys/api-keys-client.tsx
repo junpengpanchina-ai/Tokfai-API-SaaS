@@ -56,10 +56,9 @@ import {
   buildPythonSdkConfigSnippetSafe,
 } from "@/lib/dashboard-safe/sdk-snippets";
 import { isFullTokfaiApiKey, TOKFAI_API_BASE_URL, TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
-import { useI18n } from "@/lib/i18n/i18n-provider";
-import { formatMessage } from "@/lib/i18n/format-message";
+import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
+import { DashboardCopyConfigAction } from "@/lib/dashboard-safe/copy-block";
 import { DashboardFirstRunOnboardingCard } from "@/components/dashboard-first-run-onboarding";
-import { CopyConfigAction } from "@/components/copyable-snippet-field";
 import {
   authorizationHeader,
   buildCherryConfigSnippet,
@@ -100,7 +99,7 @@ export function ApiKeysClient({
     httpStatus?: number;
   };
 }) {
-  const { t } = useI18n();
+  const { t, formatMessage } = useDashboardLabels();
   const [keys, setKeys] = useState<ApiKeyListItem[]>(initialKeys);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -248,6 +247,7 @@ export function ApiKeysClient({
           onCopy={handleCopyFullKey}
           onDismiss={dismissOneTimeSecret}
           t={t}
+          formatMessage={formatMessage}
         />
       ) : null}
 
@@ -411,6 +411,7 @@ function OneTimeSecretCard({
   onCopy,
   onDismiss,
   t,
+  formatMessage,
 }: {
   secret: string;
   keyName?: string;
@@ -418,6 +419,10 @@ function OneTimeSecretCard({
   onCopy: () => void;
   onDismiss: () => void;
   t: (key: string) => string;
+  formatMessage: (
+    template: string,
+    vars: Record<string, string | number>
+  ) => string;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [snippetCopiedId, setSnippetCopiedId] = useState<string | null>(null);
@@ -580,7 +585,7 @@ function OneTimeSecretCard({
             {t("integration.apiReadiness.apiKeysHint")}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <CopyConfigAction
+            <DashboardCopyConfigAction
               id="one-time-secret-copy-chat-curl-primary"
               value={chatCurlOneLineSafe(secret)}
               copiedId={snippetCopiedId}
@@ -664,7 +669,7 @@ function OneTimeSecretCard({
             {t("dashboard.apiKeys.pasteTerminalNote")}
           </p>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <CopyConfigAction
+            <DashboardCopyConfigAction
               id="one-time-secret-copy-chat-curl"
               value={chatCurlOneLineSafe(secret)}
               copiedId={snippetCopiedId}
@@ -672,7 +677,7 @@ function OneTimeSecretCard({
               label={t("dashboard.apiKeys.copyOneLineChatCurl")}
               copiedLabel={t("dashboard.apiKeys.copied")}
             />
-            <CopyConfigAction
+            <DashboardCopyConfigAction
               id="one-time-secret-copy-models-curl"
               value={modelsCurlOneLineSafe(secret)}
               copiedId={snippetCopiedId}
@@ -704,7 +709,7 @@ function OneTimeSecretCard({
             {t("dashboard.apiKeys.sessionKeyDocsNote")}
           </p>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <CopyConfigAction
+            <DashboardCopyConfigAction
               id="one-time-secret-copy-chat-curl-ps"
               value={chatCurlPowerShellOneLineSafe(secret)}
               copiedId={snippetCopiedId}
@@ -712,7 +717,7 @@ function OneTimeSecretCard({
               label={t("dashboard.apiKeys.copyPowerShellChatCurl")}
               copiedLabel={t("dashboard.apiKeys.copied")}
             />
-            <CopyConfigAction
+            <DashboardCopyConfigAction
               id="one-time-secret-copy-cursor-config"
               value={buildCursorConfigSnippet(secret)}
               copiedId={snippetCopiedId}
@@ -720,7 +725,7 @@ function OneTimeSecretCard({
               label={t("dashboard.apiKeys.copyCursorConfig")}
               copiedLabel={t("dashboard.apiKeys.copied")}
             />
-            <CopyConfigAction
+            <DashboardCopyConfigAction
               id="one-time-secret-copy-cherry-config"
               value={buildCherryConfigSnippet(secret)}
               copiedId={snippetCopiedId}
@@ -728,7 +733,7 @@ function OneTimeSecretCard({
               label={t("dashboard.apiKeys.copyCherryConfig")}
               copiedLabel={t("dashboard.apiKeys.copied")}
             />
-            <CopyConfigAction
+            <DashboardCopyConfigAction
               id="one-time-secret-copy-node-sdk-config"
               value={buildNodeSdkConfigSnippetSafe(secret)}
               copiedId={snippetCopiedId}
@@ -736,7 +741,7 @@ function OneTimeSecretCard({
               label={t("dashboard.apiKeys.copyNodeSdkConfig")}
               copiedLabel={t("dashboard.apiKeys.copied")}
             />
-            <CopyConfigAction
+            <DashboardCopyConfigAction
               id="one-time-secret-copy-python-sdk-config"
               value={buildPythonSdkConfigSnippetSafe(secret)}
               copiedId={snippetCopiedId}
@@ -744,7 +749,7 @@ function OneTimeSecretCard({
               label={t("dashboard.apiKeys.copyPythonSdkConfig")}
               copiedLabel={t("dashboard.apiKeys.copied")}
             />
-            <CopyConfigAction
+            <DashboardCopyConfigAction
               id="one-time-secret-copy-auth-header"
               value={authorizationHeader(secret)}
               copiedId={snippetCopiedId}
@@ -954,8 +959,8 @@ function ActionErrorAlert({
   title?: string;
   t?: (key: string) => string;
 }) {
-  const { t: i18nT } = useI18n();
-  const t = translate ?? i18nT;
+  const { t: labelT } = useDashboardLabels();
+  const t = translate ?? labelT;
 
   return (
     <Card className={`border-destructive/30 bg-destructive/5 ${className ?? ""}`}>

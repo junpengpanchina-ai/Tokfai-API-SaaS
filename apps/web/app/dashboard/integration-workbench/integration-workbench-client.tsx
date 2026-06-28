@@ -1,15 +1,7 @@
 "use client";
 
-import { useCopyToClipboard } from "@/components/copy-code-block";
-import { DashboardSafeFallback } from "@/components/dashboard-safe-fallback";
+import { DashboardSafeFallback } from "@/lib/dashboard-safe/fallback-page";
 
 export function IntegrationWorkbenchPageClient() {
-  const { copiedId, copyText } = useCopyToClipboard();
-  return (
-    <DashboardSafeFallback
-      page="integration-workbench"
-      copiedId={copiedId}
-      onCopy={copyText}
-    />
-  );
+  return <DashboardSafeFallback page="integration-workbench" />;
 }

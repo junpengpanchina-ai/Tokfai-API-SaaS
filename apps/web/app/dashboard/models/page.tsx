@@ -4,6 +4,8 @@ import { loginPathWithNext } from "@/lib/auth/login-redirect";
 import { listCatalogModelPricing } from "@/lib/dmit/server";
 import { createClient } from "@/lib/supabase/server";
 
+import { buildModelsClientData } from "@/lib/models-page-server";
+
 import { ModelsClient } from "./models-client";
 
 export const metadata = {
@@ -29,5 +31,7 @@ export default async function ModelsPage() {
     catalogPricing = [];
   }
 
-  return <ModelsClient catalogPricing={catalogPricing} />;
+  const modelsData = buildModelsClientData(catalogPricing);
+
+  return <ModelsClient modelsData={modelsData} />;
 }

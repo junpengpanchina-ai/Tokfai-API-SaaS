@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useI18n } from "@/lib/i18n/i18n-provider";
+import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 
 export function ApiKeysErrorView({
   message,
@@ -26,7 +26,7 @@ export function ApiKeysErrorView({
   httpStatus?: number;
   code?: string;
 }) {
-  const { t } = useI18n();
+  const { t } = useDashboardLabels();
   const displayMessage =
     messageKey === "auth"
       ? t("dashboard.apiKeys.loadErrorAuthDesc")

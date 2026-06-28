@@ -1,4 +1,4 @@
-/** Route-local image model list — no @/lib/model-catalog. */
+/** Route-local image model list — dashboard-safe boundary. */
 
 export type ImagePlaygroundSize =
   | "1024x1024"

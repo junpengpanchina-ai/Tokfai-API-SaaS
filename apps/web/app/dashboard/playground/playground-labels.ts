@@ -1,4 +1,4 @@
-/** Route-local labels — no @/lib/i18n/messages. */
+/** Route-local labels — dashboard-safe boundary. */
 
 export type PlaygroundLocale = "en" | "zh";
 

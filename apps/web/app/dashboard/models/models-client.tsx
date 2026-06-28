@@ -14,8 +14,13 @@ import {
 } from "lucide-react";
 
 import { ApiServiceReadinessBanner } from "@/components/api-service-readiness-banner";
-import { CodeBlock, CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
-import { CopyConfigAction } from "@/components/copyable-snippet-field";
+import {
+  DashboardCodeBlock,
+  DashboardCopyButton,
+  DashboardCopyConfigAction,
+  useDashboardCopyToClipboard,
+} from "@/lib/dashboard-safe/copy-block";
+import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 import { ResponsiveTableScroll } from "@/components/responsive-table-scroll";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,23 +31,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { CatalogModelPricingItem } from "@/lib/dmit/client";
-import {
-  chatCurlOneLineSafe,
-} from "@/lib/dashboard-safe/curl-one-line";
+import { chatCurlOneLineSafe } from "@/lib/dashboard-safe/curl-one-line";
 import { useDashboardApiKey } from "@/lib/dashboard-safe/use-dashboard-api-key";
-import { useI18n } from "@/lib/i18n/i18n-provider";
-import { formatMessage } from "@/lib/i18n/format-message";
-import {
-  buildPackageUsageEstimates,
-  getDefaultAvailableImageModel,
-} from "@/lib/model-cost-estimate";
-import { DASHBOARD_CATALOG_MODELS } from "@/lib/model-catalog";
-import {
-  buildModelsTableRows,
-  summarizeModelsCatalog,
-  type ModelsTableRow,
-} from "@/lib/models-page";
+import type { ModelsClientData } from "@/lib/models-page-server";
+import { type ModelsTableRow } from "@/lib/models-page";
 import {
   TOKFAI_RECOMMENDED_MODEL,
   TOKFAI_SMART_MODEL_ALIASES,
@@ -80,24 +72,15 @@ const HOW_TO_ESTIMATE_KEYS = [
 ] as const;
 
 export function ModelsClient({
-  catalogPricing,
+  modelsData,
 }: {
-  catalogPricing: CatalogModelPricingItem[];
+  modelsData: ModelsClientData;
 }) {
-  const { t, locale } = useI18n();
-  const { copiedId, copyText } = useCopyToClipboard();
+  const { t, formatMessage, locale } = useDashboardLabels();
+  const { copiedId, copyText } = useDashboardCopyToClipboard();
   const apiKey = useDashboardApiKey();
 
-  const stats = summarizeModelsCatalog(DASHBOARD_CATALOG_MODELS);
-  const rows = buildModelsTableRows(
-    DASHBOARD_CATALOG_MODELS,
-    catalogPricing,
-    t,
-    locale
-  );
-  const packageRows = buildPackageUsageEstimates(catalogPricing, t);
-
-  const defaultImage = getDefaultAvailableImageModel();
+  const { stats, rows, packageRows, defaultImage, hasCatalogPricing } = modelsData;
 
   return (
     <div className="flex flex-col gap-6">
@@ -249,7 +232,7 @@ export function ModelsClient({
           </ul>
           <ApiServiceReadinessBanner compact />
           <div className="flex flex-wrap gap-2">
-            <CopyConfigAction
+            <DashboardCopyConfigAction
               id="models-curl-auto-fast"
               value={chatCurlOneLineSafe(apiKey, "auto-fast")}
               copiedId={copiedId}
@@ -455,9 +438,9 @@ export function ModelsClient({
           <CardTitle>{t("dashboard.models.tableTitle")}</CardTitle>
           <CardDescription>
             {t("dashboard.models.tableDesc")}
-            {catalogPricing.length === 0
-              ? ` ${t("dashboard.models.listDisclaimer")}`
-              : null}
+            {hasCatalogPricing
+              ? null
+              : ` ${t("dashboard.models.listDisclaimer")}`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -516,7 +499,7 @@ export function ModelsClient({
           <CardDescription>
             {formatMessage(t("dashboard.models.packageEstimateDesc"), {
               model: stats.defaultModelId,
-              imageModel: defaultImage?.id ?? "—",
+              imageModel: defaultImage,
             })}
           </CardDescription>
         </CardHeader>
@@ -598,10 +581,10 @@ export function ModelsClient({
           <CardDescription>{t("dashboard.models.exampleDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
-          <CodeBlock
+          <DashboardCodeBlock
             id="models-curl-chat"
             label="curl"
-            code={CHAT_COMPLETIONS_CURL}
+            value={CHAT_COMPLETIONS_CURL}
             copied={copiedId === "models-curl-chat"}
             onCopy={copyText}
             copyLabel={t("quickstart.copy")}
@@ -742,7 +725,7 @@ function ModelTableRow({
       <td className="py-2 pr-4">
         <div className="flex items-center gap-1">
           <code className="font-mono text-xs">{row.id}</code>
-          <CopyButton
+          <DashboardCopyButton
             copied={copiedId === copyId}
             onCopy={() => onCopy(copyId, row.id)}
             copyLabel={t("dashboard.models.copyModelId")}
