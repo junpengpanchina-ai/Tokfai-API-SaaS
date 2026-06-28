@@ -15,10 +15,25 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { CopyButton, useCopyToClipboard } from "@/components/copy-code-block";
-import { CopyableSnippetField, CopyConfigAction } from "@/components/copyable-snippet-field";
-import { setDashboardApiKeySecret } from "@/lib/dashboard-safe/api-key-session";
-import { Badge } from "@/components/ui/badge";
+import {
+  PlaygroundCopyButton,
+  PlaygroundCopyConfigAction,
+  usePlaygroundCopyToClipboard,
+} from "./playground-copy-block";
+import {
+  extractRequestIdSafe as extractRequestIdFromBody,
+  formatCreditsSafe,
+  formatDateTimeSafe,
+  formatIntSafe,
+  setDashboardApiKeySecret,
+} from "./playground-display-helpers";
+import {
+  getChatModelById,
+  isAvailableChatModel,
+  PLAYGROUND_CHAT_MODEL_IDS,
+} from "./playground-model-options";
+import { usePlaygroundLabels } from "./use-playground-labels";
+import { formatPlaygroundLabel } from "./playground-labels";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -36,21 +51,7 @@ import {
   revealMeApiKey,
   type ChatCompletionResponse,
 } from "@/lib/dmit/client";
-import {
-  formatCreditsSafe,
-  formatDateTimeSafe,
-  formatIntSafe,
-} from "@/lib/dashboard-safe/format-helpers";
-import { extractRequestIdSafe as extractRequestIdFromBody } from "@/lib/dashboard-safe/error-helpers";
-import { useI18n } from "@/lib/i18n/i18n-provider";
-import { formatMessage } from "@/lib/i18n/format-message";
-import {
-  AVAILABLE_CHAT_MODEL_IDS,
-  getChatModelById,
-  isAvailableChatModel,
-  PLAYGROUND_CHAT_MODEL_IDS,
-} from "@/lib/model-catalog";
-import { resolvePlaygroundRiskMessage } from "@/lib/playground-risk-errors";
+import { Badge } from "@/components/ui/badge";
 import {
   isFullTokfaiApiKey,
   isSmartModelAlias,
@@ -58,6 +59,7 @@ import {
   TOKFAI_CHAT_COMPLETIONS_ENDPOINT,
   TOKFAI_RECOMMENDED_MODEL,
 } from "@/lib/tokfai-api";
+import { resolvePlaygroundRiskMessage } from "@/lib/playground-risk-errors";
 
 const DEFAULT_MODEL = TOKFAI_RECOMMENDED_MODEL;
 const MODEL_OPTIONS = PLAYGROUND_CHAT_MODEL_IDS;
@@ -144,10 +146,10 @@ export function PlaygroundClient({
   activeKeys: PlaygroundApiKeyOption[];
   initialModel?: string;
 }) {
-  const { t } = useI18n();
+  const { t, formatMessage } = usePlaygroundLabels();
   const router = useRouter();
   const promptRef = useRef<HTMLTextAreaElement>(null);
-  const { copiedId, copyText } = useCopyToClipboard();
+  const { copiedId, copyText } = usePlaygroundCopyToClipboard();
 
   const [localKeys, setLocalKeys] = useState<PlaygroundApiKeyOption[]>(activeKeys);
   const [sessionSecrets, setSessionSecrets] = useState<Record<string, string>>({});
@@ -614,7 +616,7 @@ function ApiKeySection({
   onFocusPrompt: () => void;
   t: (key: string) => string;
 }) {
-  const { copiedId, copyText } = useCopyToClipboard();
+  const { copiedId, copyText } = usePlaygroundCopyToClipboard();
   const secretCopied = copiedId === "playground-created-secret";
 
   if (keyPanelView === "paste") {
@@ -749,7 +751,7 @@ function ApiKeySection({
 
       {selectedKey ? (
         <p className="text-sm text-muted-foreground">
-          {formatMessage(t("dashboard.playground.currentKeySelection"), {
+          {formatPlaygroundLabel(t("dashboard.playground.currentKeySelection"), {
             name: selectedKey.name,
             prefix: selectedKey.prefix || "sk-tokfai",
           })}
@@ -826,7 +828,7 @@ function CreatedKeyBanner({
         {t("dashboard.playground.secretOnceHint")}
       </p>
       <div className="flex flex-wrap gap-2">
-        <CopyButton
+        <PlaygroundCopyButton
           copied={secretCopied}
           onCopy={onCopy}
           copyLabel={t("dashboard.playground.copySecret")}
@@ -947,7 +949,7 @@ function ResponsePanel({
                 {t("dashboard.playground.successReconcileHint")}
               </p>
               <div className="flex flex-wrap items-center gap-2">
-                <CopyConfigAction
+                <PlaygroundCopyConfigAction
                   id="playground-success-copy-request-id"
                   value={requestId}
                   copiedId={copiedId}
@@ -1057,7 +1059,7 @@ function ResultMeta({
             </dt>
             <dd className="font-mono break-all">{requestId}</dd>
             {onCopyRequestId ? (
-              <CopyButton
+              <PlaygroundCopyButton
                 copied={copiedId === requestCopyId}
                 onCopy={() => onCopyRequestId(requestCopyId, requestId)}
                 copyLabel={t("dashboard.usage.copyRequestId")}
