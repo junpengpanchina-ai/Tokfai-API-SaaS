@@ -1,4 +1,4 @@
-import { DocsPageClient } from "./docs-client";
+import { DashboardSafeFallback } from "@/lib/dashboard-safe/fallback-page";
 
 export const metadata = {
   title: "API integration handbook",
@@ -9,7 +9,7 @@ export const metadata = {
 export default function DashboardDocsPage() {
   return (
     <div className="w-full max-w-none">
-      <DocsPageClient />
+      <DashboardSafeFallback page="docs" />
     </div>
   );
 }

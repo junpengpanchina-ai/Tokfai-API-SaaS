@@ -1,4 +1,4 @@
-import { IntegrationWorkbenchPageClient } from "./integration-workbench-client";
+import { DashboardSafeFallback } from "@/lib/dashboard-safe/fallback-page";
 
 export const metadata = {
   title: "Integration Workbench",
@@ -7,5 +7,5 @@ export const metadata = {
 };
 
 export default function IntegrationWorkbenchPage() {
-  return <IntegrationWorkbenchPageClient />;
+  return <DashboardSafeFallback page="integration-workbench" />;
 }

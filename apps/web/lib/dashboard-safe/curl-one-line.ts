@@ -39,3 +39,14 @@ export function chatCurlPowerShellOneLineSafe(
 export function modelsCurlOneLineSafe(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
   return `curl -sS ${API_ROOT}/models -H "Authorization: Bearer ${apiKey}"`;
 }
+
+export function imageCurlOneLineSafe(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
+  const body = shellSingleQuotedJson({
+    model: "gpt-image-2",
+    prompt: "Create a clean product-style image of a futuristic API dashboard.",
+    size: "1024x1024",
+    n: 1,
+    response_format: "url",
+  });
+  return `curl -sS ${API_ROOT}/images/generations -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d '${body}'`;
+}

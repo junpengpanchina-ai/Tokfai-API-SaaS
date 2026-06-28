@@ -1,3 +1,4 @@
-"use client";
-
-export { DashboardSafeFallback } from "@/lib/dashboard-safe/fallback-page";
+export {
+  DashboardSafeFallback,
+  type DashboardSafePageId,
+} from "@/lib/dashboard-safe/fallback-page";
