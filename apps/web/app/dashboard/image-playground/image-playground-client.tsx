@@ -16,7 +16,7 @@ import {
   ImagePlaygroundGenerateActions,
   ImagePlaygroundResultArea,
   ImagePlaygroundRunSettingsPanel,
-} from "@/components/image-playground-toolbench";
+} from "./image-playground-toolbench-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,26 +38,25 @@ import {
 import {
   imagePlaygroundErrorMessage,
   resolveImageCreatedAt,
-} from "@/lib/image-playground-display";
-import { useI18n } from "@/lib/i18n/i18n-provider";
-import { formatMessage } from "@/lib/i18n/format-message";
+  setDashboardApiKeySecret,
+} from "./image-playground-display-helpers";
 import {
-  getImageModelById,
   getImageModelCreditsPerRequest,
+  getImageModelOptionById,
   IMAGE_PLAYGROUND_DEFAULT_MODEL,
   isAvailableImageModel,
   type ImagePlaygroundModelId,
   type ImagePlaygroundSize,
-} from "@/lib/model-catalog";
+} from "./image-playground-model-options";
+import { buildImageGenerationCurlOneLine } from "./image-playground-safe-snippets";
+import { formatImagePlaygroundLabel } from "./image-playground-labels";
+import { useImagePlaygroundLabels } from "./use-image-playground-labels";
 import {
   isFullTokfaiApiKey,
   IMAGE_PLAYGROUND_IMAGE_TO_IMAGE_PLACEHOLDER,
   IMAGE_PLAYGROUND_TEXT_TO_IMAGE_PLACEHOLDER,
-  TOKFAI_API_KEY_PLACEHOLDER,
   TOKFAI_IMAGES_GENERATIONS_ENDPOINT,
 } from "@/lib/tokfai-api";
-import { buildImageGenerationCurlOneLine } from "@/lib/image-api-curl";
-import { setDashboardApiKeySecret } from "@/lib/dashboard-safe/api-key-session";
 import {
   isValidImageUrl,
   MAX_PLAYGROUND_INPUT_IMAGES,
@@ -221,7 +220,7 @@ export function ImagePlaygroundClient({
   initialCreditsBalance?: number | null;
   creditsLoaded?: boolean;
 }) {
-  const { t, locale } = useI18n();
+  const { t, locale } = useImagePlaygroundLabels();
   const router = useRouter();
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -316,7 +315,7 @@ export function ImagePlaygroundClient({
     [localKeys, selectedKeyId]
   );
 
-  const selectedModelEntry = getImageModelById(model);
+  const selectedModelEntry = getImageModelOptionById(model);
   const isModelComingSoon = selectedModelEntry?.status === "coming_soon";
 
   const createdSecret =
@@ -1052,9 +1051,12 @@ function ImageInputsPanel({
 
     if (atLimit) {
       onDropInvalid(
-        formatMessage(t("dashboard.imagePlayground.errors.tooManyImages"), {
-          max: MAX_PLAYGROUND_INPUT_IMAGES,
-        }),
+        formatImagePlaygroundLabel(
+          t("dashboard.imagePlayground.errors.tooManyImages"),
+          {
+            max: MAX_PLAYGROUND_INPUT_IMAGES,
+          }
+        ),
         "too_many_images"
       );
       return;
@@ -1092,9 +1094,12 @@ function ImageInputsPanel({
             {t("dashboard.imagePlayground.inputImagesTitle")}
           </div>
           <p className="text-xs text-muted-foreground">
-            {formatMessage(t("dashboard.imagePlayground.inputImagesDesc"), {
-              max: MAX_PLAYGROUND_INPUT_IMAGES,
-            })}
+            {formatImagePlaygroundLabel(
+              t("dashboard.imagePlayground.inputImagesDesc"),
+              {
+                max: MAX_PLAYGROUND_INPUT_IMAGES,
+              }
+            )}
           </p>
         </>
       ) : null}
