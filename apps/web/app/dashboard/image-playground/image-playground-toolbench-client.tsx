@@ -23,10 +23,10 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { ImageGenerationResponse } from "@/lib/dmit/client";
-import { isLowCreditsBalance } from "@/lib/dashboard-shell-credits";
-import { TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
-import { cn } from "@/lib/utils";
+import type { ImageGenerationResponse } from "@/lib/dashboard-safe/image-api";
+import { isLowCreditsBalance } from "@/lib/dashboard-safe/shell-credits";
+import { TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/dashboard-safe/constants";
+import { cn } from "@/lib/dashboard-safe/classnames";
 
 import {
   ImagePlaygroundCopyButton,

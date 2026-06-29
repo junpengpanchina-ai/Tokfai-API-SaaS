@@ -1,40 +1,23 @@
 import { resolveCreditOrderDisplayStatus } from "@/lib/billing/credit-order-status";
 import { createClient } from "@/lib/supabase/server";
 import type { CreditLedgerRow, ProfileRow } from "@/lib/supabase/types";
+import type {
+  CreditLedgerEntry,
+  CreditOrderView,
+  CreditsPageData,
+  CreditsPageError,
+} from "@/lib/dashboard-safe/dtos/credits";
 
 const LEDGER_LIMIT = 50;
 const ORDERS_LIMIT = 10;
 
-export type CreditsPageError = "auth" | "temporary";
-
-export interface CreditsBalanceView {
-  balance: number;
-  balanceFromProfile: boolean;
-  lastChangeAt: string | null;
-  todayConsumed: number;
-  last7DaysConsumed: number;
-  showNoLedgerHint: boolean;
-}
-
-export interface CreditOrderView {
-  id: string;
-  created_at: string;
-  plan_id: string | null;
-  package_code: string | null;
-  status: string;
-  display_status: ReturnType<typeof resolveCreditOrderDisplayStatus>;
-  currency: string;
-  amount_cents: number | null;
-  amount_cny: number | null;
-  stripe_checkout_session_id: string | null;
-}
-
-export interface CreditsPageData {
-  balance: CreditsBalanceView;
-  ledger: CreditLedgerRow[];
-  orders: CreditOrderView[];
-  error: CreditsPageError | null;
-}
+export type {
+  CreditLedgerEntry,
+  CreditOrderView,
+  CreditsBalanceView,
+  CreditsPageData,
+  CreditsPageError,
+} from "@/lib/dashboard-safe/dtos/credits";
 
 type DebitRow = { amount: number | string | null };
 
@@ -84,7 +67,8 @@ export async function loadCreditsPageData(userId: string): Promise<CreditsPageDa
     return emptyCreditsPageData("temporary");
   }
 
-  const ledger = (ledgerRes.data ?? []) as CreditLedgerRow[];
+  const ledgerRows = (ledgerRes.data ?? []) as CreditLedgerRow[];
+  const ledger = ledgerRows.map(mapCreditLedgerEntry);
   const profile = profileRes.data as Pick<
     ProfileRow,
     "credits_balance" | "updated_at"
@@ -153,6 +137,18 @@ type CreditOrderRow = {
   stripe_checkout_session_id: string | null;
   created_at: string;
 };
+
+function mapCreditLedgerEntry(row: CreditLedgerRow): CreditLedgerEntry {
+  return {
+    id: row.id,
+    created_at: row.created_at,
+    type: row.type ?? "unknown",
+    amount: row.amount ?? 0,
+    balance_after: row.balance_after,
+    reason: row.reason,
+    reference_id: row.reference_id,
+  };
+}
 
 function mapCreditOrders(rows: CreditOrderRow[]): CreditOrderView[] {
   return rows.map((row) => {

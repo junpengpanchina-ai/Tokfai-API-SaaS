@@ -33,12 +33,11 @@ import {
 } from "@/components/ui/card";
 import { chatCurlOneLineSafe } from "@/lib/dashboard-safe/curl-one-line";
 import { useDashboardApiKey } from "@/lib/dashboard-safe/use-dashboard-api-key";
-import type { ModelsClientData } from "@/lib/models-page-server";
-import { type ModelsTableRow } from "@/lib/models-page";
+import type { ModelsClientData, ModelsTableRow } from "@/lib/dashboard-safe/dtos/models";
 import {
   TOKFAI_RECOMMENDED_MODEL,
   TOKFAI_SMART_MODEL_ALIASES,
-} from "@/lib/tokfai-api";
+} from "@/lib/dashboard-safe/constants";
 
 const CHAT_COMPLETIONS_CURL = `curl https://api.tokfai.com/v1/chat/completions \\
   -H "Authorization: Bearer sk-tokfai_xxx" \\

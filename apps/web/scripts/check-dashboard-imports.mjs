@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 /**
- * Hard dashboard import boundary — source + build chunk scan.
+ * P828 dashboard import boundary — source + build chunk scan.
+ *
+ * Dashboard client islands may only pull shared logic from lib/dashboard-safe.
+ * Server pages under app/dashboard may use dmit/server and supabase/server.
  */
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -12,6 +15,12 @@ const WEB_ROOT = join(__dirname, "..");
 const SOURCE_SCAN_ROOTS = [
   join(WEB_ROOT, "app", "dashboard"),
   join(WEB_ROOT, "lib", "dashboard-safe"),
+];
+
+const SHARED_CLIENT_COMPONENTS = [
+  "usage-view-client.tsx",
+  "credits-content-client.tsx",
+  "auth-success-toast.tsx",
 ];
 
 const SOURCE_BANNED = [
@@ -39,6 +48,26 @@ const SOURCE_BANNED = [
   { id: "useQuickStartApiKey", pattern: /useQuickStartApiKey/ },
 ];
 
+const CLIENT_ONLY_BANNED = [
+  { id: "@/lib/dmit/", pattern: /@\/lib\/dmit\// },
+  { id: "@/lib/supabase/client", pattern: /@\/lib\/supabase\/client/ },
+  { id: "@/lib/tokfai-api", pattern: /@\/lib\/tokfai-api/ },
+  { id: "@/lib/playground-risk-errors", pattern: /@\/lib\/playground-risk-errors/ },
+  { id: "@/lib/storage/upload-image", pattern: /@\/lib\/storage\/upload-image/ },
+  { id: "@/lib/model-catalog", pattern: /@\/lib\/model-catalog/ },
+  { id: "@/lib/dashboard-display-helpers", pattern: /@\/lib\/dashboard-display-helpers/ },
+  { id: "@/lib/dashboard-shell-credits", pattern: /@\/lib\/dashboard-shell-credits/ },
+  { id: "@/lib/dashboard-shell-format", pattern: /@\/lib\/dashboard-shell-format/ },
+  { id: "@/lib/billing/", pattern: /@\/lib\/billing\// },
+  { id: "@/lib/credits", pattern: /@\/lib\/credits/ },
+  { id: "@/lib/usage-page", pattern: /@\/lib\/usage-page/ },
+  { id: "@/lib/models-page", pattern: /@\/lib\/models-page/ },
+  { id: "@/lib/models-page-server", pattern: /@\/lib\/models-page-server/ },
+];
+
+const CLIENT_LIB_ALLOWLIST =
+  /^@\/lib\/(dashboard-safe|auth\/auth-provider)(\/|$)/;
+
 const BUILD_BANNED = [
   "customer-",
   "customer_",
@@ -55,6 +84,9 @@ const BUILD_BANNED = [
   "copyable-snippet-field",
   "dmit-error-details",
   "dmit-messages",
+  "lib/dmit/client",
+  "lib/supabase/client",
+  "createBrowserSupabase",
 ];
 
 function walkFiles(dir, acc = []) {
@@ -81,6 +113,13 @@ function collectDashboardComponentFiles() {
     .map((name) => join(componentsDir, name));
 }
 
+function collectSharedDashboardClientFiles() {
+  const componentsDir = join(WEB_ROOT, "components");
+  return SHARED_CLIENT_COMPONENTS.map((name) => join(componentsDir, name)).filter(
+    (path) => existsSync(path)
+  );
+}
+
 function isSkippableLine(line) {
   const trimmed = line.trim();
   return (
@@ -91,17 +130,58 @@ function isSkippableLine(line) {
   );
 }
 
+function isClientModule(content) {
+  return /^["']use client["'];?\s*$/m.test(content.split("\n").slice(0, 3).join("\n"));
+}
+
+function scanImportLine(line, rules, file, violations) {
+  if (isSkippableLine(line)) return;
+  for (const rule of rules) {
+    if (rule.pattern.test(line)) {
+      violations.push({
+        file: relative(WEB_ROOT, file),
+        line: null,
+        rule: rule.id,
+        text: line.trim(),
+      });
+    }
+  }
+}
+
+function scanClientLibImports(content, file, violations) {
+  const lines = content.split("\n");
+  lines.forEach((line, index) => {
+    if (isSkippableLine(line)) return;
+    const fromMatch = line.match(/from\s+["'](@\/lib\/[^"']+)["']/);
+    if (!fromMatch) return;
+    const spec = fromMatch[1];
+    if (CLIENT_LIB_ALLOWLIST.test(spec)) return;
+    violations.push({
+      file: relative(WEB_ROOT, file),
+      line: index + 1,
+      rule: "client-lib-allowlist",
+      text: `Dashboard client may only import @/lib/dashboard-safe/* (found ${spec})`,
+    });
+  });
+}
+
 function scanSourceFiles() {
   const violations = [];
-  const files = [
+  const allFiles = [
     ...SOURCE_SCAN_ROOTS.flatMap((root) => walkFiles(root)),
     ...collectDashboardComponentFiles(),
+    ...collectSharedDashboardClientFiles(),
   ];
 
-  for (const file of files) {
+  for (const file of allFiles) {
     const content = readFileSync(file, "utf8");
     const lines = content.split("\n");
-    for (const rule of SOURCE_BANNED) {
+    const isClient = isClientModule(content);
+    const rules = isClient
+      ? [...SOURCE_BANNED, ...CLIENT_ONLY_BANNED]
+      : SOURCE_BANNED;
+
+    for (const rule of rules) {
       lines.forEach((line, index) => {
         if (isSkippableLine(line)) return;
         if (rule.pattern.test(line)) {
@@ -113,6 +193,10 @@ function scanSourceFiles() {
           });
         }
       });
+    }
+
+    if (isClient) {
+      scanClientLibImports(content, file, violations);
     }
   }
 
@@ -160,7 +244,8 @@ function main() {
     failed = true;
     console.error("Dashboard source import violations:");
     for (const v of sourceViolations) {
-      console.error(`  ${v.file}:${v.line} [${v.rule}] ${v.text}`);
+      const loc = v.line != null ? `${v.file}:${v.line}` : v.file;
+      console.error(`  ${loc} [${v.rule}] ${v.text}`);
     }
     console.error("");
   } else {

@@ -1,7 +1,7 @@
 import {
   isFullTokfaiApiKey,
   TOKFAI_API_KEY_PLACEHOLDER,
-} from "@/lib/tokfai-api";
+} from "./constants";
 
 import { readDashboardApiKeySecret } from "./api-key-session";
 

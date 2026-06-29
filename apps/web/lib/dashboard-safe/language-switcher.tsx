@@ -4,7 +4,7 @@ import { Check, Globe } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn } from "./classnames";
 
 import { type DashboardLocale } from "./labels";
 import { useDashboardLabels } from "./use-dashboard-labels";

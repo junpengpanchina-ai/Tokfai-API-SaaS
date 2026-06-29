@@ -15,8 +15,8 @@ import {
 import {
   announcementDetailHref,
   announcementTypeLabelKey,
-} from "@/lib/announcements";
-import type { PublicAnnouncement } from "@/lib/announcements";
+  type PublicAnnouncement,
+} from "@/lib/dashboard-safe/dtos/announcements";
 import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 
 export function DashboardAnnouncementsOverview({

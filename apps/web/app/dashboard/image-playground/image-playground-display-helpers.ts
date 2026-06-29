@@ -1,5 +1,5 @@
-import type { ImageGenerationResponse } from "@/lib/dmit/client";
-import { resolvePlaygroundRiskMessage } from "@/lib/playground-risk-errors";
+import type { ImageGenerationResponse } from "@/lib/dashboard-safe/image-api";
+import { resolvePlaygroundRiskMessage } from "@/lib/dashboard-safe/playground-errors";
 
 export {
   formatCreditsSafe,

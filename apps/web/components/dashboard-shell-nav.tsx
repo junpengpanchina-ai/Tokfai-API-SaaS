@@ -16,9 +16,9 @@ import {
   DASHBOARD_NAV_SECTIONS,
   isDashboardNavActive,
   type DashboardNavItem,
-} from "@/lib/dashboard-nav";
-import type { DashboardShellCredits } from "@/lib/dashboard-shell-credits";
-import { cn } from "@/lib/utils";
+} from "@/lib/dashboard-safe/nav";
+import type { DashboardShellCredits } from "@/lib/dashboard-safe/shell-credits";
+import { cn } from "@/lib/dashboard-safe/classnames";
 
 function truncateEmail(email: string, maxLength = 32): string {
   if (email.length <= maxLength) return email;

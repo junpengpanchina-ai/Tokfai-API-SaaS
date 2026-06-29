@@ -23,7 +23,7 @@ import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 import {
   TOKFAI_API_BASE_URL,
   TOKFAI_RECOMMENDED_MODEL,
-} from "@/lib/tokfai-api";
+} from "@/lib/dashboard-safe/constants";
 
 export interface DashboardFirstRunOnboardingProps {
   /** User has at least one active API key. */

@@ -18,8 +18,8 @@ import {
 
 import { DashboardAnnouncementsOverview } from "@/components/dashboard-announcements-overview";
 import { DashboardFirstRunOnboardingCard } from "@/components/dashboard-first-run-onboarding";
-import type { PublicAnnouncement } from "@/lib/announcements";
-import type { DashboardOverviewData } from "@/lib/dashboard-overview-types";
+import type { PublicAnnouncement } from "@/lib/dashboard-safe/dtos/announcements";
+import type { DashboardOverviewData } from "@/lib/dashboard-safe/dtos/overview";
 import {
   dashboardFormatCreditsWithSuffix,
   dashboardFormatDate,
@@ -28,7 +28,7 @@ import {
   dashboardGetModelLabel,
   dashboardUsageStatusLabel,
   dashboardUsageStatusTone,
-} from "@/lib/dashboard-display-helpers";
+} from "@/lib/dashboard-safe/display-helpers";
 import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 
 import { Badge } from "@/components/ui/badge";

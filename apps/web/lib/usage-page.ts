@@ -1,32 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
 import type { UsageLogRow } from "@/lib/supabase/types";
 import { toneForStatus } from "@/lib/format";
+import type {
+  UsagePageLog,
+  UsagePageState,
+  UsagePageStats,
+} from "@/lib/dashboard-safe/dtos/usage";
+
+export type { UsagePageLog, UsagePageState, UsagePageStats } from "@/lib/dashboard-safe/dtos/usage";
 
 export const USAGE_RECENT_LIMIT = 50;
-
-export interface UsagePageStats {
-  requestsLast24Hours: number;
-  requestsLast7Days: number;
-  tokensLast7Days: number;
-  creditsLast7Days: number;
-}
-
-export interface UsagePageLog {
-  id: string;
-  created_at: string;
-  model: string | null;
-  status: string;
-  prompt_tokens: number | null;
-  completion_tokens: number | null;
-  total_tokens: number | null;
-  credits_charged: number | null;
-  request_id: string | null;
-  error_code: string | null;
-}
-
-export type UsagePageState =
-  | { status: "ready"; stats: UsagePageStats; logs: UsagePageLog[] }
-  | { status: "error" };
 
 const USAGE_LOG_SELECT =
   "id, created_at, model, status, prompt_tokens, completion_tokens, total_tokens, credits_charged, request_id, error_code";

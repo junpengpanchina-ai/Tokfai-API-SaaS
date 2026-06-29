@@ -1,4 +1,4 @@
-import { TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
+import { TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/dashboard-safe/constants";
 
 const API_ROOT = "https://api.tokfai.com/v1";
 

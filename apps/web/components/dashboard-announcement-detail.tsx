@@ -6,9 +6,11 @@ import { ArrowLeft, Pin } from "lucide-react";
 import { AnnouncementContent } from "@/components/announcement-content";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { announcementTypeLabelKey } from "@/lib/announcements";
-import type { PublicAnnouncement } from "@/lib/announcements";
-import { dashboardFormatDateTime } from "@/lib/dashboard-display-helpers";
+import {
+  announcementTypeLabelKey,
+  type PublicAnnouncement,
+} from "@/lib/dashboard-safe/dtos/announcements";
+import { dashboardFormatDateTime } from "@/lib/dashboard-safe/display-helpers";
 import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 
 export function DashboardAnnouncementDetail({

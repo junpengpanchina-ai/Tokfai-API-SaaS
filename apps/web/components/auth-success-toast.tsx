@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import {
   consumeAuthSuccess,
   type AuthSuccessKind,
-} from "@/lib/auth/auth-success-flash";
+} from "@/lib/dashboard-safe/auth-success-flash";
 import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 
 export function AuthSuccessToast() {

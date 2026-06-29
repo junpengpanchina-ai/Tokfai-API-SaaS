@@ -12,13 +12,9 @@ import {
 } from "@/lib/models-page";
 import { dashboardLabel, type DashboardLocale } from "@/lib/dashboard-safe/labels";
 
-export type ModelsClientData = {
-  stats: ModelsOverviewStats;
-  rows: ModelsTableRow[];
-  packageRows: ReturnType<typeof buildPackageUsageEstimates>;
-  defaultImage: string;
-  hasCatalogPricing: boolean;
-};
+import type { ModelsClientData } from "@/lib/dashboard-safe/dtos/models";
+
+export type { ModelsClientData } from "@/lib/dashboard-safe/dtos/models";
 
 export function buildModelsClientData(
   catalogPricing: CatalogModelPricingItem[],

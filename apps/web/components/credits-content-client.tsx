@@ -36,8 +36,8 @@ import {
   toneForCreditOrderStatus,
   truncateCheckoutSessionId,
   type CreditOrderDisplayStatus,
-} from "@/lib/billing/credit-order-status";
-import type { CreditsPageData } from "@/lib/credits";
+} from "@/lib/dashboard-safe/billing-display";
+import type { CreditsPageData } from "@/lib/dashboard-safe/dtos/credits";
 import {
   dashboardFormatBalanceCredits,
   dashboardFormatCreditsWithSuffix,
@@ -45,8 +45,8 @@ import {
   dashboardFormatCny,
   dashboardSafeNumber,
   dashboardShortRequestId,
-} from "@/lib/dashboard-display-helpers";
-import type { CreditLedgerRow } from "@/lib/supabase/types";
+} from "@/lib/dashboard-safe/display-helpers";
+import type { CreditLedgerEntry } from "@/lib/dashboard-safe/dtos/credits";
 
 export type CreditsLoadState = CreditsPageData;
 
@@ -329,7 +329,7 @@ function LedgerRow({
   entry,
   t,
 }: {
-  entry: CreditLedgerRow;
+  entry: CreditLedgerEntry;
   t: (key: string) => string;
 }) {
   const { copiedId, copyText } = useDashboardCopyToClipboard();
@@ -348,7 +348,7 @@ function LedgerRow({
       </td>
       <td className="py-2 pr-4 text-right font-mono text-xs">
         {entry.balance_after != null
-          ? dashboardFormatBalanceCredits(entry.balance_after)
+          ? dashboardFormatBalanceCredits(dashboardSafeNumber(entry.balance_after))
           : "—"}
       </td>
       <td

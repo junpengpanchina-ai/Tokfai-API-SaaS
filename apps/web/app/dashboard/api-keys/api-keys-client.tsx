@@ -41,7 +41,7 @@ import {
   revokeApiKey,
   type CreateApiKeyResponse,
   type MeApiKeyMetadata,
-} from "@/lib/dmit/client";
+} from "@/lib/dashboard-safe/api-keys-client";
 import {
   clearDashboardApiKeyIfMatches,
   setDashboardApiKeySecret,
@@ -55,7 +55,7 @@ import {
   buildNodeSdkConfigSnippetSafe,
   buildPythonSdkConfigSnippetSafe,
 } from "@/lib/dashboard-safe/sdk-snippets";
-import { isFullTokfaiApiKey, TOKFAI_API_BASE_URL, TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
+import { isFullTokfaiApiKey, TOKFAI_API_BASE_URL, TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/dashboard-safe/constants";
 import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 import { DashboardCopyConfigAction } from "@/lib/dashboard-safe/copy-block";
 import { DashboardFirstRunOnboardingCard } from "@/components/dashboard-first-run-onboarding";

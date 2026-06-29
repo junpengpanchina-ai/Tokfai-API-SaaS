@@ -29,12 +29,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  createApiKey,
   DmitApiError,
   imageGenerations,
-  revealMeApiKey,
   type ImageGenerationResponse,
-} from "@/lib/dmit/client";
+} from "@/lib/dashboard-safe/image-api";
+import {
+  createApiKey,
+  revealMeApiKey,
+} from "@/lib/dashboard-safe/api-keys-client";
 import {
   imagePlaygroundErrorMessage,
   resolveImageCreatedAt,
@@ -56,14 +58,14 @@ import {
   IMAGE_PLAYGROUND_IMAGE_TO_IMAGE_PLACEHOLDER,
   IMAGE_PLAYGROUND_TEXT_TO_IMAGE_PLACEHOLDER,
   TOKFAI_IMAGES_GENERATIONS_ENDPOINT,
-} from "@/lib/tokfai-api";
+} from "@/lib/dashboard-safe/constants";
 import {
   isValidImageUrl,
   MAX_PLAYGROUND_INPUT_IMAGES,
   PlaygroundImageUploadError,
-  uploadPlaygroundImage,
   validatePlaygroundImageFile,
-} from "@/lib/storage/upload-image";
+} from "@/lib/dashboard-safe/upload-validation";
+import { uploadPlaygroundImageAction } from "./upload-playground-image-action";
 
 import {
   IMAGE_PLAYGROUND_DEFAULT_PROMPT,
@@ -430,7 +432,16 @@ export function ImagePlaygroundClient({
 
         try {
           validatePlaygroundImageFile(entry.file);
-          publicUrl = await uploadPlaygroundImage(entry.file);
+          const formData = new FormData();
+          formData.set("file", entry.file);
+          const uploadResult = await uploadPlaygroundImageAction(formData);
+          if (!uploadResult.ok) {
+            throw new PlaygroundImageUploadError(
+              uploadResult.message,
+              uploadResult.code
+            );
+          }
+          publicUrl = uploadResult.publicUrl;
           uploadStatus = "ready";
         } catch (err) {
           errorMessage =

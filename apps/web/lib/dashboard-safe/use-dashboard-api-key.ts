@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/tokfai-api";
+import { TOKFAI_API_KEY_PLACEHOLDER } from "./constants";
 
 import { DASHBOARD_API_KEY_EVENT } from "./api-key-session";
 import { resolveApiKeyPlaceholderSafe } from "./resolve-api-key";

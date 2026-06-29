@@ -27,13 +27,13 @@ import {
   dashboardUsageStatusLabel,
   dashboardUsageStatusTone,
   type DashboardUsageKind,
-} from "@/lib/dashboard-display-helpers";
+} from "@/lib/dashboard-safe/display-helpers";
 import {
   DashboardCopyButton,
   useDashboardCopyToClipboard,
 } from "@/lib/dashboard-safe/copy-block";
 import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
-import type { UsagePageLog, UsagePageState } from "@/lib/usage-page";
+import type { UsagePageLog, UsagePageState } from "@/lib/dashboard-safe/dtos/usage";
 
 export function UsageViewClient({ state }: { state: UsagePageState }) {
   const { t } = useDashboardLabels();

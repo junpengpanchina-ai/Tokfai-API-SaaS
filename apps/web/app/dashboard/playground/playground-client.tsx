@@ -46,11 +46,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   chatCompletions,
-  createApiKey,
   DmitApiError,
-  revealMeApiKey,
   type ChatCompletionResponse,
-} from "@/lib/dmit/client";
+} from "@/lib/dashboard-safe/chat-api";
+import {
+  createApiKey,
+  revealMeApiKey,
+} from "@/lib/dashboard-safe/api-keys-client";
 import { Badge } from "@/components/ui/badge";
 import {
   isFullTokfaiApiKey,
@@ -58,8 +60,8 @@ import {
   TOKFAI_API_KEY_PLACEHOLDER,
   TOKFAI_CHAT_COMPLETIONS_ENDPOINT,
   TOKFAI_RECOMMENDED_MODEL,
-} from "@/lib/tokfai-api";
-import { resolvePlaygroundRiskMessage } from "@/lib/playground-risk-errors";
+} from "@/lib/dashboard-safe/constants";
+import { resolvePlaygroundRiskMessage } from "@/lib/dashboard-safe/playground-errors";
 
 const DEFAULT_MODEL = TOKFAI_RECOMMENDED_MODEL;
 const MODEL_OPTIONS = PLAYGROUND_CHAT_MODEL_IDS;

@@ -6,11 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   dashboardShellFormatCreditBalance,
-} from "@/lib/dashboard-shell-format";
-import {
   isLowCreditsBalance,
   type DashboardShellCredits,
-} from "@/lib/dashboard-shell-credits";
+} from "@/lib/dashboard-safe/shell-credits";
 import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 
 export function formatShellCreditsAmount(credits: DashboardShellCredits): string {
