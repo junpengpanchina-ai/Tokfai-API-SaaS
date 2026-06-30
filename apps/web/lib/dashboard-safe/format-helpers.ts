@@ -27,17 +27,31 @@ export function formatCreditsSafe(
   return CREDITS_DECIMAL.format(n);
 }
 
-export function formatDateTimeSafe(iso: string | null | undefined): string {
+const SSR_DATE_TIME_OPTS: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "UTC",
+};
+
+/** Deterministic UTC formatting — identical on server and client hydration. */
+export function formatIsoDateTimeUtc(
+  iso: string | null | undefined,
+  invalidFallback?: string
+): string {
   if (!iso) return "—";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  if (Number.isNaN(d.getTime())) {
+    return invalidFallback ?? iso;
+  }
+  return d.toLocaleString("en-US", SSR_DATE_TIME_OPTS);
+}
+
+export function formatDateTimeSafe(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return formatIsoDateTimeUtc(iso, iso);
 }
 
 export function truncateRequestIdSafe(

@@ -8,11 +8,7 @@ import { DASHBOARD_API_KEY_EVENT } from "./api-key-session";
 import { resolveApiKeyPlaceholderSafe } from "./resolve-api-key";
 
 export function useDashboardApiKey(explicitKey?: string | null): string {
-  const [apiKey, setApiKey] = useState(() =>
-    typeof window !== "undefined"
-      ? resolveApiKeyPlaceholderSafe(explicitKey)
-      : TOKFAI_API_KEY_PLACEHOLDER
-  );
+  const [apiKey, setApiKey] = useState(TOKFAI_API_KEY_PLACEHOLDER);
 
   useEffect(() => {
     const refresh = () => setApiKey(resolveApiKeyPlaceholderSafe(explicitKey));

@@ -1,5 +1,7 @@
 /** Dashboard display helpers — dashboard-safe contract layer. */
 
+import { formatIsoDateTimeUtc } from "./format-helpers";
+
 
 type DashboardSemanticTone = "success" | "destructive" | "warning" | "muted";
 
@@ -101,16 +103,7 @@ export function dashboardFormatCny(amountCents: number): string {
 }
 
 export function dashboardFormatDateTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatIsoDateTimeUtc(iso, iso ?? "—");
 }
 
 /** Balance card style — matches format.ts formatCredits output. */
@@ -128,16 +121,7 @@ export function dashboardFormatCreditsWithSuffix(
 }
 
 export function dashboardFormatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatIsoDateTimeUtc(iso);
 }
 
 export function dashboardShortRequestId(
