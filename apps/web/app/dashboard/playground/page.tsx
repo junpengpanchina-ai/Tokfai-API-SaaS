@@ -2,8 +2,8 @@ import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { loginPathWithNext } from "@/lib/auth/login-redirect";
-import { dmitServerFetch, getDmitBaseUrl } from "@/lib/dmit/server";
-import { createClient } from "@/lib/supabase/server";
+import { dmitServerFetch } from "@/lib/dmit/server";
+import { loadDashboardPageSession } from "@/lib/dashboard-safe/server-session";
 
 import {
   PlaygroundClient,
@@ -23,18 +23,21 @@ export default async function PlaygroundPage({
 }) {
   noStore();
 
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, session, error } = await loadDashboardPageSession();
+
+  if (error) {
+    return (
+      <PlaygroundClient
+        accessToken=""
+        activeKeys={[]}
+        initialModel={searchParams?.model}
+      />
+    );
+  }
 
   if (!user) {
     redirect(loginPathWithNext("/dashboard/playground"));
   }
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
 
   const accessToken = session?.access_token ?? "";
   const activeKeys = accessToken ? await loadActiveKeys(accessToken) : [];

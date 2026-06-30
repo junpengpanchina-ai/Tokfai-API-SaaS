@@ -8,7 +8,7 @@ import {
   dmitServerFetch,
   getDmitBaseUrl,
 } from "@/lib/dmit/server";
-import { createClient } from "@/lib/supabase/server";
+import { loadDashboardPageSession } from "@/lib/dashboard-safe/server-session";
 
 import {
   ApiKeysClient,
@@ -37,18 +37,24 @@ export default async function ApiKeysPage() {
   noStore();
   const apiKeysUrl = `${getDmitBaseUrl()}/v1/me/api-keys`;
 
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, session, error } = await loadDashboardPageSession();
+
+  if (error) {
+    return (
+      <ApiKeysClient
+        accessToken=""
+        initialKeys={[]}
+        listLoadFailed
+        listLoadError={{
+          message: "Dashboard session is temporarily unavailable.",
+        }}
+      />
+    );
+  }
 
   if (!user) {
     redirect(loginPathWithNext("/dashboard/api-keys"));
   }
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
 
   if (!session?.access_token) {
     return (

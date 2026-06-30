@@ -1,4 +1,3 @@
-import { createClient } from "@/lib/supabase/server";
 import type { ProfileRow, UsageLogRow } from "@/lib/supabase/types";
 import {
   dashboardGetUsageKind,
@@ -8,6 +7,10 @@ import type {
   DashboardOverviewActivity,
   DashboardOverviewData,
 } from "@/lib/dashboard-overview-types";
+import {
+  EMPTY_DASHBOARD_OVERVIEW,
+  tryCreateServerClient,
+} from "@/lib/dashboard-safe/server-session";
 
 export type {
   DashboardOverviewActivity,
@@ -21,7 +24,12 @@ type DebitRow = { amount: number | string | null };
 export async function loadDashboardOverviewData(
   userId: string
 ): Promise<DashboardOverviewData> {
-  const supabase = createClient();
+  const supabase = tryCreateServerClient();
+  if (!supabase) {
+    return EMPTY_DASHBOARD_OVERVIEW;
+  }
+
+  try {
   const sevenDaysAgo = new Date(
     Date.now() - 7 * 24 * 60 * 60 * 1000
   ).toISOString();
@@ -97,6 +105,9 @@ export async function loadDashboardOverviewData(
       : mapRecentActivity((recentRes.data ?? []) as UsageLogRow[]),
     profileMissing: !profileRes.error && !profileRes.data,
   };
+  } catch {
+    return EMPTY_DASHBOARD_OVERVIEW;
+  }
 }
 
 function derivePlaygroundSuccessFlags(

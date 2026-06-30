@@ -1,5 +1,8 @@
 import { resolveCreditOrderDisplayStatus } from "@/lib/billing/credit-order-status";
-import { createClient } from "@/lib/supabase/server";
+import {
+  EMPTY_CREDITS_PAGE_DATA,
+  tryCreateServerClient,
+} from "@/lib/dashboard-safe/server-session";
 import type { CreditLedgerRow, ProfileRow } from "@/lib/supabase/types";
 import type {
   CreditLedgerEntry,
@@ -22,7 +25,12 @@ export type {
 type DebitRow = { amount: number | string | null };
 
 export async function loadCreditsPageData(userId: string): Promise<CreditsPageData> {
-  const supabase = createClient();
+  const supabase = tryCreateServerClient();
+  if (!supabase) {
+    return EMPTY_CREDITS_PAGE_DATA;
+  }
+
+  try {
   const now = new Date();
   const todayStart = new Date(now);
   todayStart.setHours(0, 0, 0, 0);
@@ -108,6 +116,9 @@ export async function loadCreditsPageData(userId: string): Promise<CreditsPageDa
     orders,
     error: null,
   };
+  } catch {
+    return EMPTY_CREDITS_PAGE_DATA;
+  }
 }
 
 function emptyCreditsPageData(error: CreditsPageError): CreditsPageData {

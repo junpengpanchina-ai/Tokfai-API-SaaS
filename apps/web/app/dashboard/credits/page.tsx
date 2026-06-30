@@ -4,7 +4,10 @@ import { redirect } from "next/navigation";
 import { loginPathWithNext } from "@/lib/auth/login-redirect";
 import { CreditsContentClient } from "@/components/credits-content-client";
 import { loadCreditsPageData } from "@/lib/credits";
-import { createClient } from "@/lib/supabase/server";
+import {
+  EMPTY_CREDITS_PAGE_DATA,
+  loadDashboardPageSession,
+} from "@/lib/dashboard-safe/server-session";
 
 import { CreditsReturnRefresh } from "./credits-return-refresh";
 
@@ -20,18 +23,32 @@ export default async function CreditsPage({
 }) {
   noStore();
 
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, error } = await loadDashboardPageSession();
+  const checkoutSucceeded =
+    searchParams.success === "true" || Boolean(searchParams.session_id);
+
+  if (error) {
+    return (
+      <>
+        <CreditsReturnRefresh
+          shouldRefresh={checkoutSucceeded}
+          sessionId={searchParams.session_id}
+        />
+        <CreditsContentClient
+          creditsState={EMPTY_CREDITS_PAGE_DATA}
+          checkoutSucceeded={checkoutSucceeded}
+          checkoutStatus={searchParams.status}
+          checkoutSessionId={searchParams.session_id}
+        />
+      </>
+    );
+  }
 
   if (!user) {
     redirect(loginPathWithNext("/dashboard/credits"));
   }
 
   const creditsState = await loadCreditsPageData(user.id);
-  const checkoutSucceeded =
-    searchParams.success === "true" || Boolean(searchParams.session_id);
 
   return (
     <>

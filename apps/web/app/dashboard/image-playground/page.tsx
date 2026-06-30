@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { loginPathWithNext } from "@/lib/auth/login-redirect";
 import { dmitServerFetch } from "@/lib/dmit/server";
 import { loadDashboardShellCredits } from "@/lib/load-dashboard-shell-credits";
-import { createClient } from "@/lib/supabase/server";
+import { loadDashboardPageSession } from "@/lib/dashboard-safe/server-session";
+import { EMPTY_SHELL_CREDITS } from "@/lib/dashboard-safe/shell-credits";
 
 import {
   ImagePlaygroundClient,
@@ -24,18 +25,23 @@ export default async function ImagePlaygroundPage({
 }) {
   noStore();
 
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, session, error } = await loadDashboardPageSession();
+
+  if (error) {
+    return (
+      <ImagePlaygroundClient
+        accessToken=""
+        activeKeys={[]}
+        initialModel={searchParams?.model}
+        initialCreditsBalance={EMPTY_SHELL_CREDITS.balance}
+        creditsLoaded={false}
+      />
+    );
+  }
 
   if (!user) {
     redirect(loginPathWithNext("/dashboard/image-playground"));
   }
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
 
   const accessToken = session?.access_token ?? "";
   const activeKeys = accessToken ? await loadActiveKeys(accessToken) : [];

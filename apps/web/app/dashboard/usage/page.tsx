@@ -4,7 +4,10 @@ import { redirect } from "next/navigation";
 import { loginPathWithNext } from "@/lib/auth/login-redirect";
 import { UsageViewClient } from "@/components/usage-view-client";
 import { loadUsagePageData } from "@/lib/usage-page";
-import { createClient } from "@/lib/supabase/server";
+import {
+  EMPTY_USAGE_PAGE_STATE,
+  loadDashboardPageSession,
+} from "@/lib/dashboard-safe/server-session";
 
 export const metadata = {
   title: "Usage",
@@ -15,10 +18,11 @@ export const dynamic = "force-dynamic";
 export default async function UsagePage() {
   noStore();
 
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, error } = await loadDashboardPageSession();
+
+  if (error) {
+    return <UsageViewClient state={EMPTY_USAGE_PAGE_STATE} />;
+  }
 
   if (!user) {
     redirect(loginPathWithNext("/dashboard/usage"));

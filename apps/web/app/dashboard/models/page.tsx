@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { loginPathWithNext } from "@/lib/auth/login-redirect";
 import { listCatalogModelPricing } from "@/lib/dmit/server";
 import { buildModelsClientData } from "@/lib/models-page-server";
-import { createClient } from "@/lib/supabase/server";
+import { loadDashboardPageSession } from "@/lib/dashboard-safe/server-session";
 
 import { ModelsClient } from "./models-client";
 
@@ -14,10 +14,11 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function ModelsPage() {
-  const supabase = createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const { session, error } = await loadDashboardPageSession();
+
+  if (error) {
+    return <ModelsClient modelsData={buildModelsClientData([])} />;
+  }
 
   if (!session?.user) {
     redirect(loginPathWithNext("/dashboard/models"));

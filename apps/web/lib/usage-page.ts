@@ -1,4 +1,7 @@
-import { createClient } from "@/lib/supabase/server";
+import {
+  EMPTY_USAGE_PAGE_STATE,
+  tryCreateServerClient,
+} from "@/lib/dashboard-safe/server-session";
 import type { UsageLogRow } from "@/lib/supabase/types";
 import { toneForStatus } from "@/lib/format";
 import type {
@@ -58,7 +61,12 @@ function sumSevenDayMetrics(
 }
 
 export async function loadUsagePageData(userId: string): Promise<UsagePageState> {
-  const supabase = createClient();
+  const supabase = tryCreateServerClient();
+  if (!supabase) {
+    return EMPTY_USAGE_PAGE_STATE;
+  }
+
+  try {
   const now = Date.now();
   const twentyFourHoursAgo = new Date(now - 24 * 60 * 60 * 1000).toISOString();
   const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -113,4 +121,7 @@ export async function loadUsagePageData(userId: string): Promise<UsagePageState>
     },
     logs: ((recentRes.data ?? []) as UsageLogRow[]).map(mapUsageLog),
   };
+  } catch {
+    return EMPTY_USAGE_PAGE_STATE;
+  }
 }

@@ -1,15 +1,17 @@
-import { createClient } from "@/lib/supabase/server";
-
 import {
   EMPTY_SHELL_CREDITS,
   type DashboardShellCredits,
 } from "@/lib/dashboard-shell-credits";
+import { tryCreateServerClient } from "@/lib/dashboard-safe/server-session";
 
 export async function loadDashboardShellCredits(
   userId: string
 ): Promise<DashboardShellCredits> {
   try {
-    const supabase = createClient();
+    const supabase = tryCreateServerClient();
+    if (!supabase) {
+      return EMPTY_SHELL_CREDITS;
+    }
     const { data, error } = await supabase
       .from("profiles")
       .select("credits_balance")

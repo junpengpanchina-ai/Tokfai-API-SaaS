@@ -34,13 +34,19 @@ function truncateEmail(email: string, maxLength = 32): string {
 export function DashboardMobileShell({
   email,
   credits,
+  sessionUnavailable = false,
 }: {
   email: string;
   credits: DashboardShellCredits;
+  sessionUnavailable?: boolean;
 }) {
   const pathname = usePathname();
   const { t } = useDashboardLabels();
-  const displayEmail = truncateEmail(email);
+  const displayEmail = email
+    ? truncateEmail(email)
+    : sessionUnavailable
+      ? "Unknown"
+      : "";
 
   return (
     <div className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur md:hidden">
@@ -59,7 +65,7 @@ export function DashboardMobileShell({
       {displayEmail ? (
         <p
           className="truncate border-b border-border/50 px-4 pb-2 text-xs text-muted-foreground"
-          title={email}
+          title={email || displayEmail}
         >
           {t("common.signedInAs")}{" "}
           <span className="font-medium text-foreground">{displayEmail}</span>
@@ -101,13 +107,19 @@ export function DashboardMobileShell({
 export function DashboardSidebar({
   email,
   credits,
+  sessionUnavailable = false,
 }: {
   email: string;
   credits: DashboardShellCredits;
+  sessionUnavailable?: boolean;
 }) {
   const pathname = usePathname();
   const { t } = useDashboardLabels();
-  const displayEmail = truncateEmail(email);
+  const displayEmail = email
+    ? truncateEmail(email)
+    : sessionUnavailable
+      ? "Unknown"
+      : "";
 
   return (
     <div className="flex h-full w-full min-w-0 flex-col overflow-x-hidden">
@@ -154,7 +166,10 @@ export function DashboardSidebar({
         <div className="p-3 pb-2">
           <DashboardSidebarCreditsSummary credits={credits} />
         </div>
-        <DashboardSidebarAccount email={displayEmail} fullEmail={email} />
+        <DashboardSidebarAccount
+          email={displayEmail}
+          fullEmail={email || displayEmail}
+        />
       </div>
     </div>
   );
