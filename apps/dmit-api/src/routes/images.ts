@@ -18,6 +18,7 @@ import {
   generateImage,
   mapSizeToGrsai,
 } from "../upstream/imageAdapter.js";
+import { resolveImageModelId } from "../upstream/imageModelAliases.js";
 import {
   resolveImageInputUrls,
   sanitizeImageUrlForLog,
@@ -86,7 +87,7 @@ imageRoutes.post("/v1/images/generations", async (c) => {
     );
   }
 
-  const resolvedModel = parsed.data.model;
+  const resolvedModel = resolveImageModelId(parsed.data.model);
   const prompt = parsed.data.prompt?.trim();
   const n = parsed.data.n ?? 1;
   const responseFormat = parsed.data.response_format ?? "url";
