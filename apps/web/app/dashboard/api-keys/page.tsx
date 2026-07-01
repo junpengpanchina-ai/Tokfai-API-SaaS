@@ -35,7 +35,8 @@ type ApiKeysState =
 
 export default async function ApiKeysPage() {
   noStore();
-  const apiKeysUrl = `${getDmitBaseUrl()}/v1/me/api-keys`;
+  const path = "/v1/me/api-keys";
+  const apiKeysUrl = `${getDmitBaseUrl()}${path}`;
 
   const { user, session, error } = await loadDashboardPageSession();
 

@@ -1,5 +1,6 @@
 /** Public Tokfai API surface (marketing + docs + dashboard copy). */
-export const TOKFAI_API_BASE_URL = "https://api.tokfai.com/v1";
+export const TOKFAI_API_ORIGIN = "https://api.tokfai.com";
+export const TOKFAI_API_BASE_URL = `${TOKFAI_API_ORIGIN}/v1`;
 export const TOKFAI_MODELS_ENDPOINT = "GET /models";
 export const TOKFAI_CHAT_COMPLETIONS_ENDPOINT = "POST /chat/completions";
 export const TOKFAI_IMAGES_GENERATIONS_ENDPOINT = "POST /images/generations";
@@ -30,7 +31,20 @@ export function isSmartModelAlias(modelId: string): modelId is TokfaiSmartModelA
 }
 export const TOKFAI_CLIENT_TEST_PROMPT =
   "Hello from Tokfai — reply in one sentence.";
-export const TOKFAI_HEALTH_URL = "https://api.tokfai.com/v1/health";
+export const TOKFAI_HEALTH_URL = `${TOKFAI_API_ORIGIN}/v1/health`;
+
+/**
+ * Resolve DMIT API origin for fetch clients.
+ * Env vars must be the origin only (https://api.tokfai.com). Callers append /v1/... paths.
+ * A trailing /v1 in env is stripped so misconfiguration cannot produce /v1/v1/... URLs.
+ */
+export function resolveTokfaiApiBaseUrl(
+  raw?: string | null,
+  fallback = TOKFAI_API_ORIGIN
+): string {
+  const trimmed = (raw?.trim() || fallback).replace(/\/+$/, "");
+  return trimmed.replace(/\/v1$/i, "");
+}
 
 export const TOKFAI_PRODUCT_TAGLINE =
   "OpenAI-compatible image & chat API — one API for chat, image, and AI apps.";

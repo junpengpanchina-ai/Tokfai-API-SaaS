@@ -14,15 +14,12 @@
  */
 
 import { createClient as createBrowserSupabase } from "@/lib/supabase/client";
-import { isFullTokfaiApiKey } from "@/lib/tokfai-api";
-
-const DEFAULT_BASE = "https://api.tokfai.com";
+import { isFullTokfaiApiKey, resolveTokfaiApiBaseUrl } from "@/lib/tokfai-api";
 
 export function getDmitBaseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ??
-    process.env.NEXT_PUBLIC_DMIT_API_BASE?.replace(/\/+$/, "") ??
-    DEFAULT_BASE
+  return resolveTokfaiApiBaseUrl(
+    process.env.NEXT_PUBLIC_API_BASE_URL ??
+      process.env.NEXT_PUBLIC_DMIT_API_BASE
   );
 }
 

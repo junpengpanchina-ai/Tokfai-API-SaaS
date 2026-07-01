@@ -1,5 +1,7 @@
 /** Public Tokfai API constants — dashboard-safe, no unstable imports. */
 
+import { resolveTokfaiApiBaseUrl } from "@/lib/tokfai-api";
+
 export const TOKFAI_API_BASE_URL = "https://api.tokfai.com/v1";
 export const TOKFAI_CHAT_COMPLETIONS_ENDPOINT = "POST /chat/completions";
 export const TOKFAI_IMAGES_GENERATIONS_ENDPOINT = "POST /images/generations";
@@ -27,10 +29,8 @@ export function isSmartModelAlias(modelId: string): modelId is TokfaiSmartModelA
 }
 
 export function getDmitBaseUrl(): string {
-  const DEFAULT_BASE = "https://api.tokfai.com";
-  return (
-    process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ??
-    process.env.NEXT_PUBLIC_DMIT_API_BASE?.replace(/\/+$/, "") ??
-    DEFAULT_BASE
+  return resolveTokfaiApiBaseUrl(
+    process.env.NEXT_PUBLIC_API_BASE_URL ??
+      process.env.NEXT_PUBLIC_DMIT_API_BASE
   );
 }
