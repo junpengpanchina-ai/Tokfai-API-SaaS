@@ -10,7 +10,19 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  */
 let browserClient: SupabaseClient | undefined;
 
-export function createClient() {
+export function hasSupabaseBrowserEnv(): boolean {
+  return Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() &&
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+  );
+}
+
+/** Returns null instead of throwing when public Supabase env is missing. */
+export function createClient(): SupabaseClient | null {
+  if (!hasSupabaseBrowserEnv()) {
+    return null;
+  }
+
   if (!browserClient) {
     browserClient = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

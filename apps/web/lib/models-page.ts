@@ -79,44 +79,71 @@ export function buildModelsTableRows(
   const billingFallback = t("dashboard.models.billingFallback");
   const pricePending = t("dashboard.models.pricePending");
 
-  return models.map((model) => {
-    const dbPricing = pricingByModelId.get(model.id) ?? null;
-    const useCaseBase =
-      model.type === "image"
-        ? getImageModelUseCase(model.id, t)
-        : model.type === "chat"
-          ? getChatModelUseCase(model.id, t)
-          : model.description;
-    const chatNote =
-      model.type === "chat" ? getChatModelNote(model.id, t) : null;
-    const useCase =
-      chatNote && useCaseBase !== "—"
-        ? `${useCaseBase}\n${chatNote}`
-        : chatNote ?? (useCaseBase === "—" ? model.description : useCaseBase);
+  return models.flatMap((model) => {
+    try {
+      const dbPricing = pricingByModelId.get(model.id) ?? null;
+      const useCaseBase =
+        model.type === "image"
+          ? getImageModelUseCase(model.id, t)
+          : model.type === "chat"
+            ? getChatModelUseCase(model.id, t)
+            : model.description;
+      const chatNote =
+        model.type === "chat" ? getChatModelNote(model.id, t) : null;
+      const useCase =
+        chatNote && useCaseBase !== "—"
+          ? `${useCaseBase}\n${chatNote}`
+          : chatNote ?? (useCaseBase === "—" ? model.description : useCaseBase);
 
-    const prices = resolveModelPrices(model, dbPricing, t, locale, billingFallback);
-    const estimates = resolveCostEstimates(
-      model,
-      dbPricing,
-      t,
-      locale,
-      pricePending,
-      billingFallback
-    );
+      const prices = resolveModelPrices(
+        model,
+        dbPricing,
+        t,
+        locale,
+        billingFallback
+      );
+      const estimates = resolveCostEstimates(
+        model,
+        dbPricing,
+        t,
+        locale,
+        pricePending,
+        billingFallback
+      );
 
-    return {
-      id: model.id,
-      type: model.type,
-      status: model.status,
-      useCase: useCase === "—" ? model.description : useCase,
-      inputPrice: prices.inputPrice,
-      outputPrice: prices.outputPrice,
-      unit: prices.unit,
-      note: prices.note,
-      shortEstimate: estimates.shortEstimate,
-      longEstimate: estimates.longEstimate,
-      approxRmb: estimates.approxRmb,
-    };
+      return [
+        {
+          id: model.id,
+          type: model.type,
+          status: model.status,
+          useCase: useCase === "—" ? model.description : useCase,
+          inputPrice: prices.inputPrice,
+          outputPrice: prices.outputPrice,
+          unit: prices.unit,
+          note: prices.note,
+          shortEstimate: estimates.shortEstimate,
+          longEstimate: estimates.longEstimate,
+          approxRmb: estimates.approxRmb,
+        },
+      ];
+    } catch (error) {
+      console.error("[dashboard-ssr-fail-open]", "buildModelsTableRow", model.id, error);
+      return [
+        {
+          id: model.id,
+          type: model.type,
+          status: model.status,
+          useCase: model.description,
+          inputPrice: billingFallback,
+          outputPrice: "—",
+          unit: "—",
+          note: billingFallback,
+          shortEstimate: billingFallback,
+          longEstimate: billingFallback,
+          approxRmb: billingFallback,
+        },
+      ];
+    }
   });
 }
 

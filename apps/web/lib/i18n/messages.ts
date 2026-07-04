@@ -1531,7 +1531,7 @@ export const messages = {
       smartRoutingAutoFast:
         "auto-fast — default fast & stable: gemini-3-flash → gemini-2.5-flash → gemini-3-pro",
       smartRoutingAutoPro:
-        "auto-pro — high quality: gpt-5.5 → gpt-5.4 → gemini-3.1-pro → gemini-3-pro",
+        "auto-pro — high quality: gpt-5.5 → gpt-5.4 → gemini-3-pro",
       smartRoutingAutoCheap:
         "auto-cheap — low cost: gemini-2.5-flash → gemini-3-flash",
       smartRoutingRealModelNote:
@@ -6458,7 +6458,7 @@ export const messages = {
       smartRoutingAutoFast:
         "auto-fast — 默认快速稳定：gemini-3-flash → gemini-2.5-flash → gemini-3-pro",
       smartRoutingAutoPro:
-        "auto-pro — 高质量：gpt-5.5 → gpt-5.4 → gemini-3.1-pro → gemini-3-pro",
+        "auto-pro — 高质量：gpt-5.5 → gpt-5.4 → gemini-3-pro",
       smartRoutingAutoCheap:
         "auto-cheap — 低成本：gemini-2.5-flash → gemini-3-flash",
       smartRoutingRealModelNote:

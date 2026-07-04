@@ -56,6 +56,11 @@ export function LoginForm({
 
     try {
       const supabase = createClient();
+      if (!supabase) {
+        setError("Authentication is temporarily unavailable.");
+        setLoading(false);
+        return;
+      }
       const { error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
@@ -83,6 +88,11 @@ export function LoginForm({
       callbackUrl.searchParams.set("next", postLoginPath);
 
       const supabase = createClient();
+      if (!supabase) {
+        setError("Authentication is temporarily unavailable.");
+        setGoogleLoading(false);
+        return;
+      }
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {

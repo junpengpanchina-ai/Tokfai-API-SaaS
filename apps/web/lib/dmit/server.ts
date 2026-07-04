@@ -331,31 +331,41 @@ function mapPublicAnnouncement(row: {
 export async function listPublicAnnouncements(
   limit = 10
 ): Promise<PublicAnnouncement[]> {
-  const base = getDmitBaseUrl();
-  const res = await fetch(`${base}/v1/announcements?limit=${limit}`, {
-    cache: "no-store",
-  });
-  const text = await res.text();
-  const body = parseJson(text);
-  if (!res.ok) {
+  try {
+    const base = getDmitBaseUrl();
+    const res = await fetch(`${base}/v1/announcements?limit=${limit}`, {
+      cache: "no-store",
+    });
+    const text = await res.text();
+    const body = parseJson(text);
+    if (!res.ok) {
+      return [];
+    }
+    const data = (body as { data?: PublicAnnouncement[] })?.data;
+    return Array.isArray(data) ? data.map(mapPublicAnnouncement) : [];
+  } catch (error) {
+    console.error("[dashboard-ssr-fail-open]", "listPublicAnnouncements", error);
     return [];
   }
-  const data = (body as { data?: PublicAnnouncement[] })?.data;
-  return Array.isArray(data) ? data.map(mapPublicAnnouncement) : [];
 }
 
 export async function getPublicAnnouncementBySlug(
   slug: string
 ): Promise<PublicAnnouncement | null> {
-  const base = getDmitBaseUrl();
-  const res = await fetch(
-    `${base}/v1/announcements/${encodeURIComponent(slug)}`,
-    { cache: "no-store" }
-  );
-  if (res.status === 404) return null;
-  const text = await res.text();
-  const body = parseJson(text);
-  if (!res.ok) return null;
-  const row = (body as { data?: PublicAnnouncement })?.data;
-  return row ? mapPublicAnnouncement(row) : null;
+  try {
+    const base = getDmitBaseUrl();
+    const res = await fetch(
+      `${base}/v1/announcements/${encodeURIComponent(slug)}`,
+      { cache: "no-store" }
+    );
+    if (res.status === 404) return null;
+    const text = await res.text();
+    const body = parseJson(text);
+    if (!res.ok) return null;
+    const row = (body as { data?: PublicAnnouncement })?.data;
+    return row ? mapPublicAnnouncement(row) : null;
+  } catch (error) {
+    console.error("[dashboard-ssr-fail-open]", "getPublicAnnouncementBySlug", error);
+    return null;
+  }
 }

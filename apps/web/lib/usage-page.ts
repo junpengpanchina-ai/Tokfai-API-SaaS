@@ -121,7 +121,8 @@ export async function loadUsagePageData(userId: string): Promise<UsagePageState>
     },
     logs: ((recentRes.data ?? []) as UsageLogRow[]).map(mapUsageLog),
   };
-  } catch {
+  } catch (error) {
+    console.error("[dashboard-ssr-fail-open]", "loadUsagePageData", error);
     return EMPTY_USAGE_PAGE_STATE;
   }
 }

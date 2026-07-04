@@ -105,7 +105,8 @@ export async function loadDashboardOverviewData(
       : mapRecentActivity((recentRes.data ?? []) as UsageLogRow[]),
     profileMissing: !profileRes.error && !profileRes.data,
   };
-  } catch {
+  } catch (error) {
+    console.error("[dashboard-ssr-fail-open]", "loadDashboardOverviewData", error);
     return EMPTY_DASHBOARD_OVERVIEW;
   }
 }

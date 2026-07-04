@@ -16,52 +16,83 @@ export const metadata = {
 };
 export const dynamic = "force-dynamic";
 
+type CreditsSearchParams = {
+  status?: string;
+  success?: string;
+  session_id?: string;
+};
+
 export default async function CreditsPage({
   searchParams,
 }: {
-  searchParams: { status?: string; success?: string; session_id?: string };
+  searchParams?: CreditsSearchParams;
 }) {
   noStore();
 
-  const { user, error } = await loadDashboardPageSession();
+  const params = searchParams ?? {};
   const checkoutSucceeded =
-    searchParams.success === "true" || Boolean(searchParams.session_id);
+    params.success === "true" || Boolean(params.session_id);
 
-  if (error) {
+  try {
+    const { user, error } = await loadDashboardPageSession();
+
+    if (error) {
+      return (
+        <>
+          <CreditsReturnRefresh
+            shouldRefresh={checkoutSucceeded}
+            sessionId={params.session_id}
+          />
+          <CreditsContentClient
+            creditsState={EMPTY_CREDITS_PAGE_DATA}
+            checkoutSucceeded={checkoutSucceeded}
+            checkoutStatus={params.status}
+            checkoutSessionId={params.session_id}
+          />
+        </>
+      );
+    }
+
+    if (!user) {
+      redirect(loginPathWithNext("/dashboard/credits"));
+    }
+
+    let creditsState = EMPTY_CREDITS_PAGE_DATA;
+    try {
+      creditsState = await loadCreditsPageData(user.id);
+    } catch (err) {
+      console.error("[dashboard-ssr-fail-open]", "credits/loadCreditsPageData", err);
+    }
+
     return (
       <>
         <CreditsReturnRefresh
           shouldRefresh={checkoutSucceeded}
-          sessionId={searchParams.session_id}
+          sessionId={params.session_id}
+        />
+        <CreditsContentClient
+          creditsState={creditsState}
+          checkoutSucceeded={checkoutSucceeded}
+          checkoutStatus={params.status}
+          checkoutSessionId={params.session_id}
+        />
+      </>
+    );
+  } catch (err) {
+    console.error("[dashboard-ssr-fail-open]", "credits/page", err);
+    return (
+      <>
+        <CreditsReturnRefresh
+          shouldRefresh={checkoutSucceeded}
+          sessionId={params.session_id}
         />
         <CreditsContentClient
           creditsState={EMPTY_CREDITS_PAGE_DATA}
           checkoutSucceeded={checkoutSucceeded}
-          checkoutStatus={searchParams.status}
-          checkoutSessionId={searchParams.session_id}
+          checkoutStatus={params.status}
+          checkoutSessionId={params.session_id}
         />
       </>
     );
   }
-
-  if (!user) {
-    redirect(loginPathWithNext("/dashboard/credits"));
-  }
-
-  const creditsState = await loadCreditsPageData(user.id);
-
-  return (
-    <>
-      <CreditsReturnRefresh
-        shouldRefresh={checkoutSucceeded}
-        sessionId={searchParams.session_id}
-      />
-      <CreditsContentClient
-        creditsState={creditsState}
-        checkoutSucceeded={checkoutSucceeded}
-        checkoutStatus={searchParams.status}
-        checkoutSessionId={searchParams.session_id}
-      />
-    </>
-  );
 }

@@ -17,14 +17,16 @@ import {
   type PublicAnnouncement,
 } from "@/lib/dashboard-safe/dtos/announcements";
 import { dashboardFormatDateTime } from "@/lib/dashboard-safe/display-helpers";
+import { normalizePublicAnnouncements } from "@/lib/dashboard-safe/normalize-dashboard-data";
 import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 
 export function DashboardAnnouncementsList({
   announcements,
 }: {
-  announcements: PublicAnnouncement[];
+  announcements: PublicAnnouncement[] | unknown;
 }) {
   const { t } = useDashboardLabels();
+  const items = normalizePublicAnnouncements(announcements);
 
   return (
     <div className="flex flex-col gap-8">
@@ -37,7 +39,7 @@ export function DashboardAnnouncementsList({
         </p>
       </div>
 
-      {announcements.length === 0 ? (
+      {items.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
             {t("dashboard.announcements.noAnnouncements")}
@@ -45,9 +47,10 @@ export function DashboardAnnouncementsList({
         </Card>
       ) : (
         <div className="flex flex-col gap-4">
-          {announcements.map((item) => {
+          {items.map((item, index) => {
             const href = announcementDetailHref(item.slug);
             const typeKey = announcementTypeLabelKey(item.type);
+            const itemKey = item.id || `announcement-${index}`;
             const card = (
               <Card className="transition-colors hover:bg-muted/30">
                 <CardHeader className="pb-2">
@@ -69,11 +72,11 @@ export function DashboardAnnouncementsList({
             );
 
             if (!href) {
-              return <div key={item.id}>{card}</div>;
+              return <div key={itemKey}>{card}</div>;
             }
 
             return (
-              <Link key={item.id} href={href} className="block">
+              <Link key={itemKey} href={href} className="block">
                 {card}
               </Link>
             );

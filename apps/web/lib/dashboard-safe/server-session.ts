@@ -3,7 +3,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { loadDashboardShellCredits } from "@/lib/load-dashboard-shell-credits";
 import { createClient } from "@/lib/supabase/server";
 
-import type { DashboardOverviewData } from "./dtos/overview";
+import { EMPTY_DASHBOARD_OVERVIEW } from "./dtos/overview";
 import type { CreditsPageData } from "./dtos/credits";
 import type { UsagePageState } from "./dtos/usage";
 import {
@@ -29,17 +29,7 @@ export type DashboardPageSession = {
   error: DashboardSupabaseError | null;
 };
 
-export const EMPTY_DASHBOARD_OVERVIEW: DashboardOverviewData = {
-  creditsBalance: 0,
-  activeApiKeyCount: 0,
-  requestsLast7Days: 0,
-  creditsConsumedLast7Days: 0,
-  hasActiveApiKey: false,
-  hasChatPlaygroundSuccess: false,
-  hasImagePlaygroundSuccess: false,
-  recentActivity: [],
-  profileMissing: true,
-};
+export { EMPTY_DASHBOARD_OVERVIEW };
 
 export const EMPTY_USAGE_PAGE_STATE: UsagePageState = { status: "error" };
 
@@ -72,7 +62,8 @@ export function tryCreateServerClient() {
 
   try {
     return createClient();
-  } catch {
+  } catch (error) {
+    console.error("[dashboard-ssr-fail-open]", "tryCreateServerClient", error);
     return null;
   }
 }
@@ -117,7 +108,8 @@ export async function loadDashboardShellSession(): Promise<DashboardShellSession
       credits,
       error: null,
     };
-  } catch {
+  } catch (error) {
+    console.error("[dashboard-ssr-fail-open]", "loadDashboardShellSession", error);
     return {
       user: null,
       email: "",
@@ -160,7 +152,8 @@ export async function loadDashboardPageSession(): Promise<DashboardPageSession> 
       session: session ?? null,
       error: null,
     };
-  } catch {
+  } catch (error) {
+    console.error("[dashboard-ssr-fail-open]", "loadDashboardPageSession", error);
     return {
       user: null,
       session: null,

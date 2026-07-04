@@ -152,11 +152,12 @@ export function PlaygroundClient({
   const router = useRouter();
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const { copiedId, copyText } = usePlaygroundCopyToClipboard();
+  const safeActiveKeys = Array.isArray(activeKeys) ? activeKeys : [];
 
-  const [localKeys, setLocalKeys] = useState<PlaygroundApiKeyOption[]>(activeKeys);
+  const [localKeys, setLocalKeys] = useState<PlaygroundApiKeyOption[]>(safeActiveKeys);
   const [sessionSecrets, setSessionSecrets] = useState<Record<string, string>>({});
   const [keyPanelView, setKeyPanelView] = useState<KeyPanelView>(() =>
-    activeKeys.length > 0 ? "select" : "empty"
+    safeActiveKeys.length > 0 ? "select" : "empty"
   );
   const [createdBannerKeyId, setCreatedBannerKeyId] = useState<string | null>(
     null
@@ -167,7 +168,7 @@ export function PlaygroundClient({
   const [apiKey, setApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [selectedKeyId, setSelectedKeyId] = useState(() =>
-    firstActiveKeyId(activeKeys)
+    firstActiveKeyId(safeActiveKeys)
   );
   const [creatingKey, setCreatingKey] = useState(false);
   const [createKeyError, setCreateKeyError] = useState<string | null>(null);
@@ -177,8 +178,9 @@ export function PlaygroundClient({
   const [error, setError] = useState<PlaygroundError | null>(null);
 
   useEffect(() => {
-    setLocalKeys(activeKeys);
-    if (activeKeys.length > 0 && keyPanelView === "empty") {
+    const nextKeys = Array.isArray(activeKeys) ? activeKeys : [];
+    setLocalKeys(nextKeys);
+    if (nextKeys.length > 0 && keyPanelView === "empty") {
       setKeyPanelView("select");
     }
   }, [activeKeys, keyPanelView]);

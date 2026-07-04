@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { isSlowExperimentalChatModel } from "../catalog/modelRegistry.js";
+
 import { ApiError } from "../errors.js";
 import { env } from "../env.js";
 import { log } from "../logger.js";
@@ -8,6 +10,7 @@ import { supabase } from "../supabase.js";
 import type { UsageLogInsert } from "../types.js";
 import {
   isModelAllowedForChat,
+  listAvailableChatModelIds,
   priceCreditsFor,
 } from "../catalog/modelCatalog.js";
 import { providerFetch, isChatFallbackEligible } from "../upstream/grsai.js";
@@ -104,6 +107,7 @@ export type ExecuteChatCompletionResult =
       errorMessage: string;
       requestId: string;
       httpStatus: number;
+      suggestedModels?: string[];
     };
 
 export async function executeChatCompletion(
@@ -118,6 +122,9 @@ export async function executeChatCompletion(
   const stream = input.body.stream ?? false;
 
   if (!(await isModelAllowedForChat(requestedModel))) {
+    const suggestedModels = await listAvailableChatModelIds();
+    const errorMessage = "当前模型暂不可用或未注册，请切换推荐模型";
+
     await writeUsageLog(
       failedUsageLog({
         user_id: caller.userId,
@@ -125,8 +132,8 @@ export async function executeChatCompletion(
         model: requestedModel,
         status: "failed",
         request_id: requestId,
-        error_code: "model_not_found",
-        error_message: `The model \`${requestedModel}\` does not exist.`,
+        error_code: "model_not_available",
+        error_message: errorMessage,
         latency_ms: Date.now() - startedAt,
       }),
       route
@@ -134,10 +141,11 @@ export async function executeChatCompletion(
 
     return {
       ok: false,
-      errorCode: "model_not_found",
-      errorMessage: `The model \`${requestedModel}\` does not exist.`,
+      errorCode: "model_not_available",
+      errorMessage,
       requestId,
-      httpStatus: 404,
+      httpStatus: 400,
+      suggestedModels,
     };
   }
 
@@ -180,7 +188,7 @@ export async function executeChatCompletion(
       err,
       route,
     });
-    return failureResult(err, requestId);
+    return failureResult(err, requestId, requestedModel);
   }
 
   if (input.idempotencyKey && caller.apiKeyId) {
@@ -256,7 +264,7 @@ export async function executeChatCompletion(
               lastAttempt: timeoutErr,
               route,
             });
-            return failureResult(exhausted, requestId);
+            return failureResult(exhausted, requestId, requestedModel);
           }
           await logChatFailure({
             caller,
@@ -266,7 +274,7 @@ export async function executeChatCompletion(
             err: timeoutErr,
             route,
           });
-          return failureResult(timeoutErr, requestId);
+          return failureResult(timeoutErr, requestId, requestedModel);
         }
 
         if (!(await tryAcquireGlobalUpstream())) {
@@ -281,7 +289,7 @@ export async function executeChatCompletion(
             requestedModel,
             startedAt,
           });
-          return failureResult(err, requestId);
+          return failureResult(err, requestId, requestedModel);
         }
 
         try {
@@ -436,7 +444,7 @@ export async function executeChatCompletion(
               lastAttempt: err,
               route,
             });
-            return failureResult(exhausted, requestId);
+            return failureResult(exhausted, requestId, requestedModel);
           }
 
           await logChatFailure({
@@ -447,7 +455,7 @@ export async function executeChatCompletion(
             err,
             route,
           });
-          return failureResult(err, requestId);
+          return failureResult(err, requestId, requestedModel);
         } finally {
           await releaseGlobalUpstream();
         }
@@ -467,10 +475,10 @@ export async function executeChatCompletion(
       err: fallbackErr,
       route,
     });
-    return failureResult(fallbackErr, requestId);
+    return failureResult(fallbackErr, requestId, requestedModel);
   } catch (err) {
     if (err instanceof ApiError) {
-      return failureResult(err, requestId);
+      return failureResult(err, requestId, requestedModel);
     }
 
     await writeUsageLog(
@@ -508,12 +516,25 @@ export async function executeChatCompletion(
 
 function failureResult(
   err: ApiError,
-  requestId: string
+  requestId: string,
+  requestedModel?: string
 ): Extract<ExecuteChatCompletionResult, { ok: false }> {
+  let errorMessage = err.publicMessage;
+  const errorCode = err.code ?? "failed";
+
+  if (
+    requestedModel &&
+    isSlowExperimentalChatModel(requestedModel) &&
+    errorCode === "upstream_timeout"
+  ) {
+    errorMessage =
+      "gemini-3.1-pro 响应较慢或当前超时，请切换其他推荐模型。";
+  }
+
   return {
     ok: false,
-    errorCode: err.code ?? "failed",
-    errorMessage: err.publicMessage,
+    errorCode,
+    errorMessage,
     requestId,
     httpStatus: err.status,
   };

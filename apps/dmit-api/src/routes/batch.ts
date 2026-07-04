@@ -6,7 +6,7 @@ import { env } from "../env.js";
 import { requireApiKey } from "../middleware/apiKey.js";
 import type { VerifiedApiKey } from "../auth/apiKey.js";
 import { supabase } from "../supabase.js";
-import { isModelAllowedForChat } from "../catalog/modelCatalog.js";
+import { isModelAllowedForChat, listAvailableChatModelIds } from "../catalog/modelCatalog.js";
 import { formatBatchId, parseBatchId } from "../batch/batchIds.js";
 import { finalizeBatch } from "../batch/finalize.js";
 import { enqueueBatchProcessing } from "../batch/worker.js";
@@ -61,9 +61,17 @@ batchRoutes.post("/v1/batches/chat", async (c) => {
   }
 
   if (!(await isModelAllowedForChat(model))) {
-    throw ApiError.notFound(
-      `The model \`${model}\` does not exist.`,
-      "model_not_found"
+    const suggestedModels = await listAvailableChatModelIds();
+    return c.json(
+      {
+        error: {
+          message: "当前模型暂不可用或未注册，请切换推荐模型",
+          code: "model_not_available",
+          type: "invalid_request_error",
+        },
+        suggestedModels,
+      },
+      400
     );
   }
 

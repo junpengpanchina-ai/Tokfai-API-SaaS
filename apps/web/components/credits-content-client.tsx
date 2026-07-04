@@ -37,7 +37,7 @@ import {
   truncateCheckoutSessionId,
   type CreditOrderDisplayStatus,
 } from "@/lib/dashboard-safe/billing-display";
-import type { CreditsPageData } from "@/lib/dashboard-safe/dtos/credits";
+import type { CreditLedgerEntry, CreditsPageData } from "@/lib/dashboard-safe/dtos/credits";
 import {
   dashboardFormatBalanceCredits,
   dashboardFormatCreditsWithSuffix,
@@ -46,7 +46,7 @@ import {
   dashboardSafeNumber,
   dashboardShortRequestId,
 } from "@/lib/dashboard-safe/display-helpers";
-import type { CreditLedgerEntry } from "@/lib/dashboard-safe/dtos/credits";
+import { normalizeCreditsPageData } from "@/lib/dashboard-safe/normalize-dashboard-data";
 
 export type CreditsLoadState = CreditsPageData;
 
@@ -56,18 +56,20 @@ export function CreditsContentClient({
   checkoutStatus,
   checkoutSessionId,
 }: {
-  creditsState: CreditsLoadState;
+  creditsState: CreditsLoadState | null | undefined;
   checkoutSucceeded: boolean;
   checkoutStatus?: string;
   checkoutSessionId?: string;
 }) {
   const { t } = useDashboardLabels();
-  const { balance, ledger, orders, error } = creditsState;
+  const safeCreditsState = normalizeCreditsPageData(creditsState);
+  const { balance, ledger, orders, error } = safeCreditsState;
   const [referenceFilter, setReferenceFilter] = useState("");
   const filteredLedger = useMemo(() => {
+    const safeLedger = Array.isArray(ledger) ? ledger : [];
     const q = referenceFilter.trim();
-    if (!q) return ledger;
-    return ledger.filter((entry) => entry.reference_id?.includes(q));
+    if (!q) return safeLedger;
+    return safeLedger.filter((entry) => entry.reference_id?.includes(q));
   }, [ledger, referenceFilter]);
 
   return (
@@ -189,7 +191,7 @@ export function CreditsContentClient({
               placeholder="req_..."
             />
           </div>
-          {ledger.length === 0 ? (
+          {Array.isArray(ledger) && ledger.length === 0 ? (
             <EmptyLedgerState t={t} />
           ) : filteredLedger.length === 0 ? (
             <p className="rounded-md border border-dashed py-10 text-center text-sm text-muted-foreground">
@@ -237,7 +239,7 @@ export function CreditsContentClient({
           <CardDescription>{t("dashboard.credits.recentOrdersDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
-          {orders.length === 0 ? (
+          {Array.isArray(orders) && orders.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-8 text-center">
               <p className="max-w-md text-sm text-muted-foreground">
                 {t("dashboard.credits.emptyOrders")}
@@ -422,8 +424,9 @@ function CheckoutStatusBanner({
   orders: CreditsLoadState["orders"];
   t: (key: string) => string;
 }) {
+  const safeOrders = Array.isArray(orders) ? orders : [];
   const matchedOrder = checkoutSessionId
-    ? orders.find(
+    ? safeOrders.find(
         (order) => order.stripe_checkout_session_id === checkoutSessionId
       )
     : undefined;

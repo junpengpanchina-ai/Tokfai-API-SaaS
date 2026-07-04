@@ -9,32 +9,66 @@ import {
   loadDashboardPageSession,
 } from "@/lib/dashboard-safe/server-session";
 
-export default async function DashboardOverviewPage() {
-  const { user, error } = await loadDashboardPageSession();
+export const dynamic = "force-dynamic";
 
-  if (error) {
-    const announcements = await listPublicAnnouncements(3);
+export default async function DashboardOverviewPage() {
+  try {
+    const { user, error } = await loadDashboardPageSession();
+
+    if (error) {
+      let announcements: Awaited<ReturnType<typeof listPublicAnnouncements>> = [];
+      try {
+        announcements = await listPublicAnnouncements(3);
+      } catch (err) {
+        console.error("[dashboard-ssr-fail-open]", "dashboard/announcements", err);
+      }
+      return (
+        <DashboardOverviewContent
+          overview={EMPTY_DASHBOARD_OVERVIEW}
+          announcements={announcements}
+        />
+      );
+    }
+
+    if (!user) {
+      redirect(loginPathWithNext("/dashboard"));
+    }
+
+    let overview = EMPTY_DASHBOARD_OVERVIEW;
+    let announcements: Awaited<ReturnType<typeof listPublicAnnouncements>> = [];
+
+    try {
+      [overview, announcements] = await Promise.all([
+        loadDashboardOverviewData(user.id),
+        listPublicAnnouncements(3),
+      ]);
+    } catch (err) {
+      console.error("[dashboard-ssr-fail-open]", "dashboard/overview", err);
+      try {
+        overview = await loadDashboardOverviewData(user.id);
+      } catch (inner) {
+        console.error("[dashboard-ssr-fail-open]", "dashboard/overview-data", inner);
+      }
+      try {
+        announcements = await listPublicAnnouncements(3);
+      } catch (inner) {
+        console.error("[dashboard-ssr-fail-open]", "dashboard/announcements", inner);
+      }
+    }
+
     return (
       <DashboardOverviewContent
-        overview={EMPTY_DASHBOARD_OVERVIEW}
+        overview={overview}
         announcements={announcements}
       />
     );
+  } catch (err) {
+    console.error("[dashboard-ssr-fail-open]", "dashboard/page", err);
+    return (
+      <DashboardOverviewContent
+        overview={EMPTY_DASHBOARD_OVERVIEW}
+        announcements={[]}
+      />
+    );
   }
-
-  if (!user) {
-    redirect(loginPathWithNext("/dashboard"));
-  }
-
-  const [overview, announcements] = await Promise.all([
-    loadDashboardOverviewData(user.id),
-    listPublicAnnouncements(3),
-  ]);
-
-  return (
-    <DashboardOverviewContent
-      overview={overview}
-      announcements={announcements}
-    />
-  );
 }

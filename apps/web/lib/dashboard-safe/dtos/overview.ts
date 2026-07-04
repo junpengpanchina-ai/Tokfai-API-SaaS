@@ -20,3 +20,15 @@ export interface DashboardOverviewData {
   recentActivity: DashboardOverviewActivity[];
   profileMissing: boolean;
 }
+
+export const EMPTY_DASHBOARD_OVERVIEW: DashboardOverviewData = {
+  creditsBalance: 0,
+  activeApiKeyCount: 0,
+  requestsLast7Days: 0,
+  creditsConsumedLast7Days: 0,
+  hasActiveApiKey: false,
+  hasChatPlaygroundSuccess: false,
+  hasImagePlaygroundSuccess: false,
+  recentActivity: [],
+  profileMissing: true,
+};

@@ -1,7 +1,7 @@
 /** Smart routing aliases — resolved server-side with ordered fallback. */
 export const MODEL_ALIAS_CHAINS = {
   "auto-fast": ["gemini-3-flash", "gemini-2.5-flash", "gemini-3-pro"],
-  "auto-pro": ["gpt-5.5", "gpt-5.4", "gemini-3.1-pro", "gemini-3-pro"],
+  "auto-pro": ["gpt-5.5", "gpt-5.4", "gemini-3-pro"],
   "auto-cheap": ["gemini-2.5-flash", "gemini-3-flash"],
 } as const;
 

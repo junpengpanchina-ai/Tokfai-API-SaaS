@@ -80,7 +80,7 @@ const EN: Record<string, string> = {
   "dashboard.playground.smartAliasDesc.auto-fast":
     "Smart routing — tries gemini-3-flash → gemini-2.5-flash → gemini-3-pro.",
   "dashboard.playground.smartAliasDesc.auto-pro":
-    "Smart routing — tries gpt-5.5 → gpt-5.4 → gemini-3.1-pro → gemini-3-pro.",
+    "Smart routing — tries gpt-5.5 → gpt-5.4 → gemini-3-pro.",
   "dashboard.playground.smartAliasDesc.auto-cheap":
     "Smart routing — tries gemini-2.5-flash → gemini-3-flash.",
   "dashboard.playground.responseContent": "Response",
@@ -209,7 +209,7 @@ const ZH: Record<string, string> = {
   "dashboard.playground.smartAliasDesc.auto-fast":
     "智能路由 — 依次尝试 gemini-3-flash → gemini-2.5-flash → gemini-3-pro。",
   "dashboard.playground.smartAliasDesc.auto-pro":
-    "智能路由 — 依次尝试 gpt-5.5 → gpt-5.4 → gemini-3.1-pro → gemini-3-pro。",
+    "智能路由 — 依次尝试 gpt-5.5 → gpt-5.4 → gemini-3-pro。",
   "dashboard.playground.smartAliasDesc.auto-cheap":
     "智能路由 — 依次尝试 gemini-2.5-flash → gemini-3-flash。",
   "dashboard.playground.responseContent": "响应内容",

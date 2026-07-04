@@ -208,9 +208,10 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     type: "chat",
     status: "available",
     billingUnit: CHAT_BILLING_UNIT,
-    description: "Main premium chat model for high-quality completions.",
+    description: "Slow/experimental premium chat — explicit use only; may timeout.",
     pricing: chatPricing(1.5, 3, 7, 14),
-    traits: { speed: "medium", quality: "high", cost: "medium" },
+    traits: { speed: "low", quality: "high", cost: "medium" },
+    tags: ["Experimental", "Slow"],
     categories: ["high_quality"],
     catalogMeta: catalogMeta(),
   },
@@ -430,13 +431,13 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
 
 /** Curated Image Playground model order (display-only). */
 export const IMAGE_PLAYGROUND_PRIMARY_MODEL_IDS = [
-  "gpt-image-2",
   "nano-banana-fast",
+  "gpt-image-2",
   "nano-banana",
   "nano-banana-pro",
 ] as const;
 
-export const IMAGE_PLAYGROUND_DEFAULT_MODEL = "gpt-image-2";
+export const IMAGE_PLAYGROUND_DEFAULT_MODEL = "nano-banana-fast";
 
 /** Image models exposed in the Image Playground dropdown. */
 export const IMAGE_PLAYGROUND_MODEL_IDS: string[] =
@@ -607,9 +608,9 @@ export const DASHBOARD_USE_CASES: DashboardUseCaseEntry[] = [
   },
   {
     id: "text_to_image",
-    recommendedModelIds: ["gpt-image-2", "nano-banana-fast"],
+    recommendedModelIds: ["nano-banana-fast", "gpt-image-2"],
     playground: "image",
-    defaultModelId: "gpt-image-2",
+    defaultModelId: "nano-banana-fast",
   },
   {
     id: "high_quality_image",

@@ -27,5 +27,6 @@ const SHELL_CREDITS = new Intl.NumberFormat("en-US", {
 export function dashboardShellFormatCreditBalance(
   value: number | null | undefined
 ): string {
-  return SHELL_CREDITS.format(value ?? 0);
+  const n = Number(value);
+  return SHELL_CREDITS.format(Number.isFinite(n) ? n : 0);
 }

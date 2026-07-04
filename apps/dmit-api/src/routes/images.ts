@@ -2,9 +2,12 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import {
+  DEFAULT_IMAGE_MODEL_ID,
   isModelAllowedForImage,
+  listAvailableImageModelIds,
   priceCreditsForImage,
 } from "../catalog/modelCatalog.js";
+import { isKnownChatModelKind } from "../catalog/modelRegistry.js";
 import { env } from "../env.js";
 import { ApiError } from "../errors.js";
 import { log } from "../logger.js";
@@ -27,7 +30,7 @@ import {
 
 const ImageGenerationRequestSchema = z
   .object({
-    model: z.string().min(1),
+    model: z.string().min(1).optional(),
     prompt: z.string().optional(),
     n: z.number().int().positive().optional(),
     size: z.string().optional(),
@@ -87,7 +90,9 @@ imageRoutes.post("/v1/images/generations", async (c) => {
     );
   }
 
-  const resolvedModel = resolveImageModelId(parsed.data.model);
+  const resolvedModel = resolveImageModelId(
+    parsed.data.model?.trim() || DEFAULT_IMAGE_MODEL_ID
+  );
   const prompt = parsed.data.prompt?.trim();
   const n = parsed.data.n ?? 1;
   const responseFormat = parsed.data.response_format ?? "url";
@@ -147,7 +152,10 @@ imageRoutes.post("/v1/images/generations", async (c) => {
     );
   }
 
-  if (!(await isModelAllowedForImage(resolvedModel))) {
+  if (isKnownChatModelKind(resolvedModel) || !(await isModelAllowedForImage(resolvedModel))) {
+    const suggestedModels = await listAvailableImageModelIds();
+    const errorMessage = "当前图片模型不可用，请切换图片模型";
+
     await writeUsageLog(
       failedUsageLog({
         user_id: caller.userId,
@@ -155,15 +163,22 @@ imageRoutes.post("/v1/images/generations", async (c) => {
         model: resolvedModel,
         status: "failed",
         request_id: requestId,
-        error_code: "model_not_found",
-        error_message: `The model \`${resolvedModel}\` does not exist.`,
+        error_code: "image_model_not_available",
+        error_message: errorMessage,
         latency_ms: Date.now() - startedAt,
       })
     );
 
-    throw ApiError.badRequest(
-      `The model \`${resolvedModel}\` does not exist.`,
-      "model_not_found"
+    return c.json(
+      {
+        error: {
+          message: errorMessage,
+          code: "image_model_not_available",
+          type: "invalid_request_error",
+        },
+        suggestedModels,
+      },
+      400
     );
   }
 

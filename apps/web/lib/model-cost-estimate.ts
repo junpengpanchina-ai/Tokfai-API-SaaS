@@ -1,6 +1,7 @@
 import type { CatalogModelPricingItem } from "@/lib/dmit/client";
 import {
   DASHBOARD_CATALOG_MODELS,
+  IMAGE_PLAYGROUND_DEFAULT_MODEL,
   isChatModelEntry,
   isImageModelEntry,
   type ModelCatalogEntry,
@@ -49,6 +50,14 @@ export interface PackageUsageEstimateRow {
 }
 
 export function getDefaultAvailableImageModel(): ModelCatalogEntry | null {
+  const preferred = DASHBOARD_CATALOG_MODELS.find(
+    (model) =>
+      model.id === IMAGE_PLAYGROUND_DEFAULT_MODEL &&
+      model.type === "image" &&
+      model.status === "available"
+  );
+  if (preferred) return preferred;
+
   return (
     DASHBOARD_CATALOG_MODELS.find(
       (model) => model.type === "image" && model.status === "available"
@@ -178,20 +187,25 @@ export function buildPackageUsageEstimates(
   _catalogPricing: CatalogModelPricingItem[],
   t: (key: string) => string
 ): PackageUsageEstimateRow[] {
-  return ESTIMATE_RECHARGE_PLANS.map((plan) => {
-    const fitKey = `dashboard.models.packageUsageFit.${plan.planId}`;
-    const fitLabel = t(fitKey);
-    const usageFitLabel =
-      fitLabel === fitKey
-        ? t("dashboard.models.packageEstimateUnavailable")
-        : fitLabel;
+  try {
+    return ESTIMATE_RECHARGE_PLANS.map((plan) => {
+      const fitKey = `dashboard.models.packageUsageFit.${plan.planId}`;
+      const fitLabel = t(fitKey);
+      const usageFitLabel =
+        fitLabel === fitKey
+          ? t("dashboard.models.packageEstimateUnavailable")
+          : fitLabel;
 
-    return {
-      planId: plan.planId,
-      planLabel: plan.label,
-      amountLabel: plan.amountLabel,
-      credits: plan.credits,
-      usageFitLabel,
-    };
-  });
+      return {
+        planId: plan.planId,
+        planLabel: plan.label,
+        amountLabel: plan.amountLabel,
+        credits: plan.credits,
+        usageFitLabel,
+      };
+    });
+  } catch (error) {
+    console.error("[dashboard-ssr-fail-open]", "buildPackageUsageEstimates", error);
+    return [];
+  }
 }

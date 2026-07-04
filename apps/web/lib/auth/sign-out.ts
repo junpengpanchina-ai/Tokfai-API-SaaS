@@ -8,6 +8,12 @@ import { createClient } from "@/lib/supabase/client";
  */
 export async function signOut(): Promise<{ error: Error | null }> {
   const supabase = createClient();
+  if (!supabase) {
+    return {
+      error: new Error("Authentication is temporarily unavailable."),
+    };
+  }
+
   const { error } = await supabase.auth.signOut();
   return { error: error ?? null };
 }

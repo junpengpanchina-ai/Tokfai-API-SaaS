@@ -24,7 +24,7 @@ export const MODEL_CATALOG: Record<string, TokfaiModelCatalogItem> = {
     kind: "chat",
     input_per_1k: 0.002,
     output_per_1k: 0.004,
-    note: "Main premium chat model."
+    note: "Slow/experimental — explicit use only; may upstream_timeout."
   },
 
   "gemini-3-pro": {
@@ -111,11 +111,11 @@ export const MODEL_CATALOG: Record<string, TokfaiModelCatalogItem> = {
     owned_by: "tokfai",
     provider: "grsai",
     upstream_model: "gpt-4o-mini",
-    enabled: true,
+    enabled: false,
     kind: "chat",
     input_per_1k: 0.00015,
     output_per_1k: 0.0006,
-    note: "Not registered upstream — listed for catalog compatibility only."
+    note: "Internal only — not registered upstream."
   },
 
   "gpt-5.4": {
@@ -215,7 +215,9 @@ export function listEnabledModels(): TokfaiModelCatalogItem[] {
 }
 
 export function listAllowedModels(): string[] {
-  return listEnabledModels().map((model) => model.id);
+  return listEnabledModels()
+    .filter((model) => !model.id.startsWith("test-admin-"))
+    .map((model) => model.id);
 }
 
 export function getModelConfig(model: string): TokfaiModelCatalogItem | null {

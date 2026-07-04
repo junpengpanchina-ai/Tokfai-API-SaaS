@@ -116,7 +116,8 @@ export async function loadCreditsPageData(userId: string): Promise<CreditsPageDa
     orders,
     error: null,
   };
-  } catch {
+  } catch (error) {
+    console.error("[dashboard-ssr-fail-open]", "loadCreditsPageData", error);
     return EMPTY_CREDITS_PAGE_DATA;
   }
 }

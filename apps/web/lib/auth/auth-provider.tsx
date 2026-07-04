@@ -36,6 +36,10 @@ export function AuthProvider({
 
   useEffect(() => {
     const supabase = createClient();
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
 
     void supabase.auth.getUser().then(({ data: { user: clientUser } }) => {
       setUser(clientUser);
@@ -65,6 +69,11 @@ export function AuthProvider({
   }, [router]);
 
   const signOut = useCallback(async () => {
+    const supabase = createClient();
+    if (!supabase) {
+      return { error: "Authentication is temporarily unavailable." };
+    }
+
     const { error } = await performSignOut();
     if (error) {
       return { error: error.message };

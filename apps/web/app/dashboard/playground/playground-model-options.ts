@@ -33,7 +33,7 @@ const PLAYGROUND_CHAT_MODELS: PlaygroundChatModelOption[] = [
   {
     id: "gemini-3.1-pro",
     displayName: "Gemini 3.1 Pro",
-    description: "Main premium chat model for high-quality completions.",
+    description: "Slow/experimental — explicit use only; may timeout under load.",
   },
   {
     id: "gemini-3-pro",

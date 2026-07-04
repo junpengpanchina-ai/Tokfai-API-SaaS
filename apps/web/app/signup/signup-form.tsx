@@ -53,6 +53,11 @@ export function SignupForm({
 
     try {
       const supabase = createClient();
+      if (!supabase) {
+        setError("Authentication is temporarily unavailable.");
+        setLoading(false);
+        return;
+      }
       const origin = getOAuthRedirectOrigin();
       const callbackUrl = new URL(`${origin}/auth/callback`);
       callbackUrl.searchParams.set("next", postLoginPath);
@@ -99,6 +104,11 @@ export function SignupForm({
       callbackUrl.searchParams.set("next", postLoginPath);
 
       const supabase = createClient();
+      if (!supabase) {
+        setError("Authentication is temporarily unavailable.");
+        setGoogleLoading(false);
+        return;
+      }
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {

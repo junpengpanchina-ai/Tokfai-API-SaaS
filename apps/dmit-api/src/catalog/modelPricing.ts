@@ -3,6 +3,15 @@ import { supabase } from "../supabase.js";
 import { getModelConfig } from "../upstream/modelCatalog.js";
 import { isModelAlias, listAliasModelsForCatalog } from "../upstream/modelAliases.js";
 import { priceFor } from "../upstream/pricing.js";
+import {
+  DEFAULT_IMAGE_MODEL_ID,
+  isHiddenInternalModel,
+  isKnownChatModelKind,
+  isSlowExperimentalChatModel,
+  listStaticSuggestedChatModelIds,
+  listStaticSuggestedImageModelIds,
+  STATIC_IMAGE_MODEL_IDS,
+} from "./modelRegistry.js";
 
 export type ModelBillingType = "chat" | "image";
 
@@ -43,9 +52,10 @@ const DEFAULT_IMAGE_MODEL_CREDITS: Record<string, number> = {
   "gpt-image-2": 2,
 };
 
-export const DEFAULT_IMAGE_MODEL_ALLOWLIST = new Set(
-  Object.keys(DEFAULT_IMAGE_MODEL_CREDITS)
-);
+export const DEFAULT_IMAGE_MODEL_ALLOWLIST = new Set([
+  ...Object.keys(DEFAULT_IMAGE_MODEL_CREDITS),
+  ...STATIC_IMAGE_MODEL_IDS,
+]);
 
 function toNumber(value: string | number | null | undefined): number {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -301,6 +311,7 @@ export async function priceCreditsForImage(model: string): Promise<number> {
 }
 
 export async function isModelAllowedForChat(model: string): Promise<boolean> {
+  if (isHiddenInternalModel(model)) return false;
   if (isModelAlias(model)) return true;
 
   const fromDb = await isModelAllowedFromDb(model, "chat");
@@ -311,6 +322,9 @@ export async function isModelAllowedForChat(model: string): Promise<boolean> {
 }
 
 export async function isModelAllowedForImage(model: string): Promise<boolean> {
+  if (isHiddenInternalModel(model)) return false;
+  if (isKnownChatModelKind(model)) return false;
+
   const fromDb = await isModelAllowedFromDb(model, "image");
   if (fromDb !== null) return fromDb;
 
@@ -322,10 +336,116 @@ export async function isModelAllowedForImage(model: string): Promise<boolean> {
   );
 }
 
+/** Chat models customers can switch to when validation fails. */
+export async function listAvailableChatModelIds(): Promise<string[]> {
+  const fromDb = await listAvailableModelIdsFromDb("chat");
+  if (fromDb !== null) {
+    return fromDb.filter(
+      (id) => !isHiddenInternalModel(id) && !isSlowExperimentalChatModel(id)
+    );
+  }
+  return listStaticSuggestedChatModelIds();
+}
+
+/** Image models customers can switch to when validation fails. */
+export async function listAvailableImageModelIds(): Promise<string[]> {
+  const fromDb = await listAvailableModelIdsFromDb("image");
+  if (fromDb !== null) {
+    return fromDb.filter((id) => !isHiddenInternalModel(id));
+  }
+  return listStaticSuggestedImageModelIds();
+}
+
+async function listAvailableModelIdsFromDb(
+  billingType: ModelBillingType
+): Promise<string[] | null> {
+  const { data, error } = await supabase()
+    .from("models")
+    .select(
+      `
+      id,
+      enabled,
+      visible,
+      model_type,
+      model_pricing (
+        enabled,
+        billable,
+        billing_type,
+        billing_mode
+      )
+    `
+    )
+    .eq("enabled", true)
+    .eq("visible", true)
+    .order("sort_order", { ascending: true })
+    .order("id", { ascending: true });
+
+  if (error) {
+    log.warn("available_models_query_failed", {
+      code: "available_models_query_failed",
+      message: error.message,
+      billingType,
+    });
+    return null;
+  }
+
+  if (!data?.length) return null;
+
+  const ids: string[] = [];
+
+  for (const row of data as Array<{
+    id: string;
+    model_type: string | null;
+    model_pricing:
+      | {
+          enabled: boolean | null;
+          billable: boolean | null;
+          billing_type: string | null;
+          billing_mode: string | null;
+        }
+      | Array<{
+          enabled: boolean | null;
+          billable: boolean | null;
+          billing_type: string | null;
+          billing_mode: string | null;
+        }>
+      | null;
+  }>) {
+    if (isHiddenInternalModel(row.id)) continue;
+
+    const pricing = Array.isArray(row.model_pricing)
+      ? row.model_pricing[0]
+      : row.model_pricing;
+    if (!pricing) continue;
+    if (!(pricing.enabled === true || pricing.billable === true)) continue;
+
+    const resolvedType =
+      pricing.billing_type === "image" || pricing.billing_mode === "per_image"
+        ? "image"
+        : "chat";
+    const modelType = row.model_type === "image" ? "image" : resolvedType;
+
+    if (billingType === "image" && modelType !== "image") continue;
+    if (billingType === "chat" && modelType === "image") continue;
+
+    ids.push(row.id);
+  }
+
+  if (billingType === "chat") {
+    const aliases = listAliasModelsForCatalog().map((row) => row.id);
+    const aliasSet = new Set(aliases);
+    return [...aliases, ...ids.filter((id) => !aliasSet.has(id))];
+  }
+
+  return ids;
+}
+
 async function isModelAllowedFromDb(
   model: string,
   billingType: ModelBillingType
 ): Promise<boolean | null> {
+  if (isHiddenInternalModel(model)) return false;
+
   const [modelResult, pricingResult] = await Promise.all([
     supabase()
       .from("models")
@@ -410,7 +530,12 @@ export async function listCatalogModels(): Promise<OpenAiModelListItem[]> {
     })());
 
   const aliasIds = new Set(aliases.map((row) => row.id));
-  return [...aliases, ...base.filter((row) => !aliasIds.has(row.id))];
+  return [
+    ...aliases,
+    ...base.filter(
+      (row) => !aliasIds.has(row.id) && !isHiddenInternalModel(row.id)
+    ),
+  ];
 }
 
 async function listCatalogModelsFromDb(): Promise<OpenAiModelListItem[] | null> {
@@ -460,3 +585,5 @@ function resolveCreatedUnix(row: ModelRow): number {
   }
   return Math.floor(Date.now() / 1000);
 }
+
+export { DEFAULT_IMAGE_MODEL_ID } from "./modelRegistry.js";

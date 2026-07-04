@@ -18,16 +18,27 @@ export const dynamic = "force-dynamic";
 export default async function UsagePage() {
   noStore();
 
-  const { user, error } = await loadDashboardPageSession();
+  try {
+    const { user, error } = await loadDashboardPageSession();
 
-  if (error) {
+    if (error) {
+      return <UsageViewClient state={EMPTY_USAGE_PAGE_STATE} />;
+    }
+
+    if (!user) {
+      redirect(loginPathWithNext("/dashboard/usage"));
+    }
+
+    let state = EMPTY_USAGE_PAGE_STATE;
+    try {
+      state = await loadUsagePageData(user.id);
+    } catch (err) {
+      console.error("[dashboard-ssr-fail-open]", "usage/loadUsagePageData", err);
+    }
+
+    return <UsageViewClient state={state} />;
+  } catch (err) {
+    console.error("[dashboard-ssr-fail-open]", "usage/page", err);
     return <UsageViewClient state={EMPTY_USAGE_PAGE_STATE} />;
   }
-
-  if (!user) {
-    redirect(loginPathWithNext("/dashboard/usage"));
-  }
-
-  const state = await loadUsagePageData(user.id);
-  return <UsageViewClient state={state} />;
 }

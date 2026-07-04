@@ -100,7 +100,8 @@ export function ApiKeysClient({
   };
 }) {
   const { t, formatMessage } = useDashboardLabels();
-  const [keys, setKeys] = useState<ApiKeyListItem[]>(initialKeys);
+  const safeInitialKeys = Array.isArray(initialKeys) ? initialKeys : [];
+  const [keys, setKeys] = useState<ApiKeyListItem[]>(safeInitialKeys);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<ActionErrorState | null>(null);

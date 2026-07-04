@@ -16,15 +16,15 @@ export type ImagePlaygroundModelOption = {
 
 const IMAGE_MODELS: ImagePlaygroundModelOption[] = [
   {
-    id: "gpt-image-2",
-    displayName: "GPT Image 2",
-    creditsPerRequest: 600,
-    status: "available",
-  },
-  {
     id: "nano-banana-fast",
     displayName: "Nano Banana Fast",
     creditsPerRequest: 440,
+    status: "available",
+  },
+  {
+    id: "gpt-image-2",
+    displayName: "GPT Image 2",
+    creditsPerRequest: 600,
     status: "available",
   },
   {
@@ -41,7 +41,7 @@ const IMAGE_MODELS: ImagePlaygroundModelOption[] = [
   },
 ];
 
-export const IMAGE_PLAYGROUND_DEFAULT_MODEL = "gpt-image-2";
+export const IMAGE_PLAYGROUND_DEFAULT_MODEL = "nano-banana-fast";
 
 export const IMAGE_PLAYGROUND_MODEL_IDS = IMAGE_MODELS
   .filter((model) => model.status === "available")

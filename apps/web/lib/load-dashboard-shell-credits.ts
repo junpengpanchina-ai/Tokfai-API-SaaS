@@ -32,7 +32,8 @@ export async function loadDashboardShellCredits(
       balance: Number.isFinite(balance) ? balance : 0,
       loaded: true,
     };
-  } catch {
+  } catch (error) {
+    console.error("[dashboard-ssr-fail-open]", "loadDashboardShellCredits", error);
     return EMPTY_SHELL_CREDITS;
   }
 }

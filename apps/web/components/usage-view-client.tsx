@@ -34,10 +34,12 @@ import {
 } from "@/lib/dashboard-safe/copy-block";
 import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 import type { UsagePageLog, UsagePageState } from "@/lib/dashboard-safe/dtos/usage";
+import { normalizeUsagePageState } from "@/lib/dashboard-safe/normalize-dashboard-data";
 
-export function UsageViewClient({ state }: { state: UsagePageState }) {
+export function UsageViewClient({ state }: { state: UsagePageState | null | undefined }) {
   const { t } = useDashboardLabels();
   const { copiedId, copyText } = useDashboardCopyToClipboard();
+  const safeState = normalizeUsagePageState(state);
 
   return (
     <div className="flex flex-col gap-6">
@@ -50,23 +52,23 @@ export function UsageViewClient({ state }: { state: UsagePageState }) {
         </p>
       </div>
 
-      {state.status === "ready" ? (
+      {safeState.status === "ready" ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <AdminStatCard
             label={t("dashboard.usage.statRequests24h")}
-            value={dashboardFormatInt(state.stats.requestsLast24Hours)}
+            value={dashboardFormatInt(safeState.stats.requestsLast24Hours)}
           />
           <AdminStatCard
             label={t("dashboard.usage.statRequests7d")}
-            value={dashboardFormatInt(state.stats.requestsLast7Days)}
+            value={dashboardFormatInt(safeState.stats.requestsLast7Days)}
           />
           <AdminStatCard
             label={t("dashboard.usage.statTokens7d")}
-            value={dashboardFormatInt(state.stats.tokensLast7Days)}
+            value={dashboardFormatInt(safeState.stats.tokensLast7Days)}
           />
           <AdminStatCard
             label={t("dashboard.usage.statCredits7d")}
-            value={dashboardFormatCreditsWithSuffix(state.stats.creditsLast7Days)}
+            value={dashboardFormatCreditsWithSuffix(safeState.stats.creditsLast7Days)}
           />
         </div>
       ) : null}
@@ -99,7 +101,7 @@ export function UsageViewClient({ state }: { state: UsagePageState }) {
         </CardContent>
       </Card>
 
-      {state.status === "error" ? <UsageError t={t} /> : null}
+      {safeState.status === "error" ? <UsageError t={t} /> : null}
 
       <Card>
         <CardHeader>
@@ -109,16 +111,16 @@ export function UsageViewClient({ state }: { state: UsagePageState }) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {state.status === "ready" && state.logs.length > 0 ? (
+          {safeState.status === "ready" && safeState.logs.length > 0 ? (
             <UsageTable
-              logs={state.logs}
+              logs={safeState.logs}
               copiedId={copiedId}
               onCopy={copyText}
               t={t}
             />
-          ) : state.status === "ready" ? (
+          ) : safeState.status === "ready" ? (
             <EmptyState t={t} />
-          ) : state.status === "error" ? (
+          ) : safeState.status === "error" ? (
             <p className="text-sm text-muted-foreground">
               {t("dashboard.usage.loadErrorDesc")}
             </p>
@@ -154,6 +156,8 @@ function UsageTable({
   onCopy: (id: string, value: string) => void;
   t: (key: string) => string;
 }) {
+  const safeLogs = Array.isArray(logs) ? logs : [];
+
   return (
     <ResponsiveTableScroll>
       <table className="w-full min-w-[720px] text-sm">
@@ -192,11 +196,11 @@ function UsageTable({
           </tr>
         </thead>
         <tbody>
-          {logs.map((row) => {
+          {safeLogs.map((row, index) => {
             const kind = dashboardGetUsageKind(row.model);
             return (
               <UsageRow
-                key={row.id}
+                key={row.id || `usage-row-${index}`}
                 row={row}
                 kind={kind}
                 copiedId={copiedId}

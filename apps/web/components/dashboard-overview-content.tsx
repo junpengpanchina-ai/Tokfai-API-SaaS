@@ -21,6 +21,10 @@ import { DashboardFirstRunOnboardingCard } from "@/components/dashboard-first-ru
 import type { PublicAnnouncement } from "@/lib/dashboard-safe/dtos/announcements";
 import type { DashboardOverviewData } from "@/lib/dashboard-safe/dtos/overview";
 import {
+  normalizeDashboardOverview,
+  normalizePublicAnnouncements,
+} from "@/lib/dashboard-safe/normalize-dashboard-data";
+import {
   dashboardFormatCreditsWithSuffix,
   dashboardFormatDate,
   dashboardFormatInt,
@@ -133,57 +137,59 @@ const SECURITY_ITEM_KEYS = [
 
 export function DashboardOverviewContent({
   overview,
-  announcements = [],
+  announcements,
 }: {
-  overview: DashboardOverviewData;
-  announcements?: PublicAnnouncement[];
+  overview: DashboardOverviewData | null | undefined;
+  announcements?: PublicAnnouncement[] | unknown;
 }) {
   const { t } = useDashboardLabels();
-  const phase = getUserPhase(overview);
+  const safeOverview = normalizeDashboardOverview(overview);
+  const safeAnnouncements = normalizePublicAnnouncements(announcements);
+  const phase = getUserPhase(safeOverview);
   const isReturning = phase === "returning";
   const allOnboardingComplete = ONBOARDING_STEPS.every((step) =>
-    isOnboardingStepComplete(step, overview)
+    isOnboardingStepComplete(step, safeOverview)
   );
 
   const statCards = [
     {
       labelKey: "dashboard.overview.creditsBalance",
-      subKey: overview.profileMissing
+      subKey: safeOverview.profileMissing
         ? "dashboard.overview.profileMissing"
-        : overview.creditsBalance <= 0
+        : safeOverview.creditsBalance <= 0
           ? "dashboard.overview.topUpToStart"
           : "dashboard.overview.creditsBalanceHint",
-      value: dashboardFormatCreditsWithSuffix(overview.creditsBalance),
+      value: dashboardFormatCreditsWithSuffix(safeOverview.creditsBalance),
       href: "/dashboard/credits",
       icon: CreditCard,
     },
     {
       labelKey: "dashboard.overview.activeApiKeys",
       subKey:
-        overview.activeApiKeyCount > 0
+        safeOverview.activeApiKeyCount > 0
           ? "dashboard.overview.keysReady"
           : "dashboard.overview.createFirstKey",
-      value: dashboardFormatInt(overview.activeApiKeyCount),
+      value: dashboardFormatInt(safeOverview.activeApiKeyCount),
       href: "/dashboard/api-keys",
       icon: KeyRound,
     },
     {
       labelKey: "dashboard.overview.requestsLast7Days",
       subKey:
-        overview.requestsLast7Days > 0
+        safeOverview.requestsLast7Days > 0
           ? "dashboard.overview.recentTraffic"
           : "dashboard.overview.noTrafficYet",
-      value: dashboardFormatInt(overview.requestsLast7Days),
+      value: dashboardFormatInt(safeOverview.requestsLast7Days),
       href: "/dashboard/usage",
       icon: Activity,
     },
     {
       labelKey: "dashboard.overview.creditsConsumedLast7Days",
       subKey:
-        overview.creditsConsumedLast7Days > 0
+        safeOverview.creditsConsumedLast7Days > 0
           ? "dashboard.overview.creditsConsumedHint"
           : "dashboard.overview.noConsumptionYet",
-      value: dashboardFormatCreditsWithSuffix(overview.creditsConsumedLast7Days),
+      value: dashboardFormatCreditsWithSuffix(safeOverview.creditsConsumedLast7Days),
       href: "/dashboard/credits",
       icon: Coins,
     },
@@ -204,12 +210,12 @@ export function DashboardOverviewContent({
         </p>
       </div>
 
-      <DashboardAnnouncementsOverview announcements={announcements} />
+      <DashboardAnnouncementsOverview announcements={safeAnnouncements} />
 
       <DashboardFirstRunOnboardingCard
-        hasActiveApiKey={overview.hasActiveApiKey}
-        hasChatSuccess={overview.hasChatPlaygroundSuccess}
-        hasRecentUsage={overview.requestsLast7Days > 0}
+        hasActiveApiKey={safeOverview.hasActiveApiKey}
+        hasChatSuccess={safeOverview.hasChatPlaygroundSuccess}
+        hasRecentUsage={safeOverview.requestsLast7Days > 0}
         variant="dashboard"
       />
 
@@ -220,9 +226,9 @@ export function DashboardOverviewContent({
       {isReturning ? (
         <>
           <StatCards statCards={statCards} t={t} />
-          <RecentActivityCard overview={overview} t={t} />
+          <RecentActivityCard overview={safeOverview} t={t} />
           <OnboardingSection
-            overview={overview}
+            overview={safeOverview}
             isReturning
             allComplete={allOnboardingComplete}
             t={t}
@@ -231,13 +237,13 @@ export function DashboardOverviewContent({
       ) : (
         <>
           <OnboardingSection
-            overview={overview}
+            overview={safeOverview}
             isReturning={false}
             allComplete={allOnboardingComplete}
             t={t}
           />
           <StatCards statCards={statCards} t={t} />
-          <RecentActivityCard overview={overview} t={t} />
+          <RecentActivityCard overview={safeOverview} t={t} />
         </>
       )}
 
@@ -505,9 +511,11 @@ function StatCards({
   }>;
   t: (key: string) => string;
 }) {
+  const items = Array.isArray(statCards) ? statCards : [];
+
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {statCards.map((stat) => {
+      {items.map((stat) => {
         const Icon = stat.icon;
         return (
           <Card key={stat.labelKey}>
@@ -548,7 +556,10 @@ function RecentActivityCard({
   overview: DashboardOverviewData;
   t: (key: string) => string;
 }) {
-  const hasSuccessfulActivity = overview.recentActivity.some(
+  const safeRecentActivity = Array.isArray(overview.recentActivity)
+    ? overview.recentActivity
+    : [];
+  const hasSuccessfulActivity = safeRecentActivity.some(
     (row) => dashboardUsageStatusTone(row.status) === "success"
   );
 
@@ -561,9 +572,9 @@ function RecentActivityCard({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {overview.recentActivity.length > 0 ? (
+        {safeRecentActivity.length > 0 ? (
           <div className="flex flex-col gap-4">
-            <RecentActivityTable rows={overview.recentActivity} t={t} />
+            <RecentActivityTable rows={safeRecentActivity} t={t} />
             <div className="flex flex-wrap justify-end gap-2">
               <Button asChild size="sm" variant="outline">
                 <Link href="/dashboard/usage" prefetch={false}>
@@ -687,6 +698,8 @@ function RecentActivityTable({
   rows: DashboardOverviewData["recentActivity"];
   t: (key: string) => string;
 }) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+
   return (
     <div className="-mx-1 overflow-x-auto rounded-md border px-1">
       <table className="w-full min-w-[640px] text-sm">
@@ -710,8 +723,8 @@ function RecentActivityTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} className="border-b last:border-0">
+          {safeRows.map((row, index) => (
+            <tr key={row.id || `activity-row-${index}`} className="border-b last:border-0">
               <td className="px-4 py-3 font-mono text-xs">
                 {dashboardFormatDate(row.created_at)}
               </td>
@@ -739,11 +752,12 @@ function StatusBadge({
   status,
   t,
 }: {
-  status: string | null;
+  status: string | null | undefined;
   t: (key: string) => string;
 }) {
-  const tone = dashboardUsageStatusTone(status);
-  const label = dashboardUsageStatusLabel(status, t);
+  const safeStatus = typeof status === "string" ? status : null;
+  const tone = dashboardUsageStatusTone(safeStatus);
+  const label = dashboardUsageStatusLabel(safeStatus, t);
 
   return (
     <Badge

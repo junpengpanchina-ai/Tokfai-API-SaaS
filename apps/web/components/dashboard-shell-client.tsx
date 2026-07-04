@@ -8,6 +8,8 @@ import {
   DashboardSidebar,
 } from "@/components/dashboard-shell-nav";
 import { DashboardMountedOnly } from "@/lib/dashboard-safe/mounted-only";
+import { normalizeShellCredits } from "@/lib/dashboard-safe/normalize-dashboard-data";
+import { DashboardSectionErrorBoundary } from "@/lib/dashboard-safe/section-error-boundary";
 import type { DashboardShellCredits } from "@/lib/dashboard-safe/shell-credits";
 
 export function DashboardShellClient({
@@ -21,6 +23,9 @@ export function DashboardShellClient({
   sessionUnavailable?: boolean;
   children: React.ReactNode;
 }) {
+  const safeEmail = typeof email === "string" ? email : "";
+  const safeCredits = normalizeShellCredits(credits);
+
   return (
     <div className="min-h-svh overflow-x-hidden bg-background">
       <DashboardMountedOnly
@@ -28,20 +33,28 @@ export function DashboardShellClient({
       >
         <AuthSuccessToast />
         <aside className="fixed left-0 top-0 z-30 hidden h-svh w-60 border-r bg-muted/30 md:flex md:flex-col">
-          <DashboardSidebar
-            email={email}
-            credits={credits}
-            sessionUnavailable={sessionUnavailable}
-          />
+          <DashboardSectionErrorBoundary context="dashboard-sidebar">
+            <DashboardSidebar
+              email={safeEmail}
+              credits={safeCredits}
+              sessionUnavailable={sessionUnavailable}
+            />
+          </DashboardSectionErrorBoundary>
         </aside>
         <div className="flex min-w-0 flex-col md:pl-60">
-          <DashboardMobileShell
-            email={email}
-            credits={credits}
-            sessionUnavailable={sessionUnavailable}
-          />
+          <DashboardSectionErrorBoundary context="dashboard-mobile-shell">
+            <DashboardMobileShell
+              email={safeEmail}
+              credits={safeCredits}
+              sessionUnavailable={sessionUnavailable}
+            />
+          </DashboardSectionErrorBoundary>
           <main className="min-h-svh min-w-0 flex-1 px-4 py-6 sm:px-6 md:py-8">
-            <div className="mx-auto w-full max-w-6xl">{children}</div>
+            <div className="mx-auto w-full max-w-6xl">
+              <DashboardSectionErrorBoundary context="dashboard-main">
+                {children}
+              </DashboardSectionErrorBoundary>
+            </div>
           </main>
           <DashboardFooter />
         </div>

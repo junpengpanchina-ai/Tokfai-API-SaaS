@@ -251,6 +251,9 @@ export type AdminFetchOptions = Omit<RequestInit, "body"> & {
 
 export async function getAdminAccessToken(): Promise<string | null> {
   const supabase = createClient();
+  if (!supabase) {
+    return null;
+  }
   const {
     data: { session },
   } = await supabase.auth.getSession();

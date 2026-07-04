@@ -23,9 +23,40 @@ export default async function PlaygroundPage({
 }) {
   noStore();
 
-  const { user, session, error } = await loadDashboardPageSession();
+  try {
+    const { user, session, error } = await loadDashboardPageSession();
 
-  if (error) {
+    if (error) {
+      return (
+        <PlaygroundClient
+          accessToken=""
+          activeKeys={[]}
+          initialModel={searchParams?.model}
+        />
+      );
+    }
+
+    if (!user) {
+      redirect(loginPathWithNext("/dashboard/playground"));
+    }
+
+    const accessToken = session?.access_token ?? "";
+    let activeKeys: PlaygroundApiKeyOption[] = [];
+    try {
+      activeKeys = accessToken ? await loadActiveKeys(accessToken) : [];
+    } catch (err) {
+      console.error("[dashboard-ssr-fail-open]", "playground/activeKeys", err);
+    }
+
+    return (
+      <PlaygroundClient
+        accessToken={accessToken}
+        activeKeys={activeKeys}
+        initialModel={searchParams?.model}
+      />
+    );
+  } catch (err) {
+    console.error("[dashboard-ssr-fail-open]", "playground/page", err);
     return (
       <PlaygroundClient
         accessToken=""
@@ -34,21 +65,6 @@ export default async function PlaygroundPage({
       />
     );
   }
-
-  if (!user) {
-    redirect(loginPathWithNext("/dashboard/playground"));
-  }
-
-  const accessToken = session?.access_token ?? "";
-  const activeKeys = accessToken ? await loadActiveKeys(accessToken) : [];
-
-  return (
-    <PlaygroundClient
-      accessToken={accessToken}
-      activeKeys={activeKeys}
-      initialModel={searchParams?.model}
-    />
-  );
 }
 
 async function loadActiveKeys(
@@ -62,7 +78,8 @@ async function loadActiveKeys(
     >(path, accessToken);
     const rows = "data" in res ? res.data : res.keys;
     return rows.filter((row) => row.status === "active");
-  } catch {
+  } catch (err) {
+    console.error("[dashboard-ssr-fail-open]", "playground/loadActiveKeys", err);
     return [];
   }
 }

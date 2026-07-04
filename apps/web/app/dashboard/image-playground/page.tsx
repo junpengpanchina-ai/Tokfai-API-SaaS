@@ -25,9 +25,52 @@ export default async function ImagePlaygroundPage({
 }) {
   noStore();
 
-  const { user, session, error } = await loadDashboardPageSession();
+  try {
+    const { user, session, error } = await loadDashboardPageSession();
 
-  if (error) {
+    if (error) {
+      return (
+        <ImagePlaygroundClient
+          accessToken=""
+          activeKeys={[]}
+          initialModel={searchParams?.model}
+          initialCreditsBalance={EMPTY_SHELL_CREDITS.balance}
+          creditsLoaded={false}
+        />
+      );
+    }
+
+    if (!user) {
+      redirect(loginPathWithNext("/dashboard/image-playground"));
+    }
+
+    const accessToken = session?.access_token ?? "";
+    let activeKeys: ImagePlaygroundApiKeyOption[] = [];
+    let shellCredits = EMPTY_SHELL_CREDITS;
+
+    try {
+      activeKeys = accessToken ? await loadActiveKeys(accessToken) : [];
+    } catch (err) {
+      console.error("[dashboard-ssr-fail-open]", "image-playground/activeKeys", err);
+    }
+
+    try {
+      shellCredits = await loadDashboardShellCredits(user.id);
+    } catch (err) {
+      console.error("[dashboard-ssr-fail-open]", "image-playground/credits", err);
+    }
+
+    return (
+      <ImagePlaygroundClient
+        accessToken={accessToken}
+        activeKeys={activeKeys}
+        initialModel={searchParams?.model}
+        initialCreditsBalance={shellCredits.balance}
+        creditsLoaded={shellCredits.loaded}
+      />
+    );
+  } catch (err) {
+    console.error("[dashboard-ssr-fail-open]", "image-playground/page", err);
     return (
       <ImagePlaygroundClient
         accessToken=""
@@ -38,24 +81,6 @@ export default async function ImagePlaygroundPage({
       />
     );
   }
-
-  if (!user) {
-    redirect(loginPathWithNext("/dashboard/image-playground"));
-  }
-
-  const accessToken = session?.access_token ?? "";
-  const activeKeys = accessToken ? await loadActiveKeys(accessToken) : [];
-  const shellCredits = await loadDashboardShellCredits(user.id);
-
-  return (
-    <ImagePlaygroundClient
-      accessToken={accessToken}
-      activeKeys={activeKeys}
-      initialModel={searchParams?.model}
-      initialCreditsBalance={shellCredits.balance}
-      creditsLoaded={shellCredits.loaded}
-    />
-  );
 }
 
 async function loadActiveKeys(
@@ -69,7 +94,8 @@ async function loadActiveKeys(
     >(path, accessToken);
     const rows = "data" in res ? res.data : res.keys;
     return rows.filter((row) => row.status === "active");
-  } catch {
+  } catch (err) {
+    console.error("[dashboard-ssr-fail-open]", "image-playground/loadActiveKeys", err);
     return [];
   }
 }

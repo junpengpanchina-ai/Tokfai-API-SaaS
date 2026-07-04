@@ -7,9 +7,6 @@ export function respondExecuteChatCompletionFailure(
   c: Context,
   result: ExecuteChatCompletionResult & { ok: false }
 ): Response {
-  if (result.httpStatus === 404) {
-    throw ApiError.notFound(result.errorMessage, result.errorCode);
-  }
   if (result.httpStatus === 400) {
     return c.json(
       {
@@ -18,9 +15,15 @@ export function respondExecuteChatCompletionFailure(
           code: result.errorCode,
           type: "invalid_request_error",
         },
+        ...(result.suggestedModels?.length
+          ? { suggestedModels: result.suggestedModels }
+          : {}),
       },
       400
     );
+  }
+  if (result.httpStatus === 404) {
+    throw ApiError.notFound(result.errorMessage, result.errorCode);
   }
   if (result.httpStatus === 402) {
     throw new ApiError({

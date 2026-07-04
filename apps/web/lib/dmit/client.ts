@@ -174,6 +174,9 @@ async function getCurrentAccessToken(): Promise<string | null> {
     });
   }
   const supabase = createBrowserSupabase();
+  if (!supabase) {
+    return null;
+  }
   const {
     data: { session },
   } = await supabase.auth.getSession();

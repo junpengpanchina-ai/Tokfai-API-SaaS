@@ -17,14 +17,16 @@ import {
   announcementTypeLabelKey,
   type PublicAnnouncement,
 } from "@/lib/dashboard-safe/dtos/announcements";
+import { normalizePublicAnnouncements } from "@/lib/dashboard-safe/normalize-dashboard-data";
 import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 
 export function DashboardAnnouncementsOverview({
   announcements,
 }: {
-  announcements: PublicAnnouncement[];
+  announcements: PublicAnnouncement[] | unknown;
 }) {
   const { t } = useDashboardLabels();
+  const items = normalizePublicAnnouncements(announcements);
 
   return (
     <Card>
@@ -44,14 +46,15 @@ export function DashboardAnnouncementsOverview({
         </Button>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        {announcements.length === 0 ? (
+        {items.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {t("dashboard.announcements.noAnnouncements")}
           </p>
         ) : (
-          announcements.map((item) => {
+          items.map((item, index) => {
             const href = announcementDetailHref(item.slug);
             const typeKey = announcementTypeLabelKey(item.type);
+            const itemKey = item.id || `announcement-${index}`;
             const inner = (
               <div className="flex flex-col gap-1 rounded-md border p-4 transition-colors hover:bg-muted/40">
                 <div className="flex flex-wrap items-center gap-2">
@@ -72,11 +75,11 @@ export function DashboardAnnouncementsOverview({
             );
 
             if (!href) {
-              return <div key={item.id}>{inner}</div>;
+              return <div key={itemKey}>{inner}</div>;
             }
 
             return (
-              <Link key={item.id} href={href} prefetch={false} className="block">
+              <Link key={itemKey} href={href} prefetch={false} className="block">
                 {inner}
               </Link>
             );

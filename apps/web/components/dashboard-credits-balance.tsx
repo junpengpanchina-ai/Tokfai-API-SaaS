@@ -9,23 +9,26 @@ import {
   isLowCreditsBalance,
   type DashboardShellCredits,
 } from "@/lib/dashboard-safe/shell-credits";
+import { normalizeShellCredits } from "@/lib/dashboard-safe/normalize-dashboard-data";
 import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 
 export function formatShellCreditsAmount(credits: DashboardShellCredits): string {
-  if (!credits.loaded) {
+  const safeCredits = normalizeShellCredits(credits);
+  if (!safeCredits.loaded) {
     return "—";
   }
-  return dashboardShellFormatCreditBalance(credits.balance ?? 0);
+  return dashboardShellFormatCreditBalance(safeCredits.balance);
 }
 
 export function DashboardSidebarCreditsSummary({
   credits,
 }: {
-  credits: DashboardShellCredits;
+  credits: DashboardShellCredits | null | undefined;
 }) {
   const { t } = useDashboardLabels();
-  const amount = formatShellCreditsAmount(credits);
-  const lowCredits = isLowCreditsBalance(credits);
+  const safeCredits = normalizeShellCredits(credits);
+  const amount = formatShellCreditsAmount(safeCredits);
+  const lowCredits = isLowCreditsBalance(safeCredits);
 
   return (
     <div className="rounded-md border bg-background/80 p-3 text-sm shadow-sm">

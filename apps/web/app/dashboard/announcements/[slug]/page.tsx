@@ -3,29 +3,39 @@ import { notFound } from "next/navigation";
 import { DashboardAnnouncementDetail } from "@/components/dashboard-announcement-detail";
 import { getPublicAnnouncementBySlug } from "@/lib/dmit/server";
 
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: { slug: string };
 }) {
-  const { slug } = await params;
-  const announcement = await getPublicAnnouncementBySlug(slug);
-  return {
-    title: announcement?.title ?? "Announcement",
-  };
+  try {
+    const announcement = await getPublicAnnouncementBySlug(params.slug);
+    return {
+      title: announcement?.title ?? "Announcement",
+    };
+  } catch (err) {
+    console.error("[dashboard-ssr-fail-open]", "announcements/metadata", err);
+    return { title: "Announcement" };
+  }
 }
 
 export default async function DashboardAnnouncementDetailPage({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: { slug: string };
 }) {
-  const { slug } = await params;
-  const announcement = await getPublicAnnouncementBySlug(slug);
+  try {
+    const announcement = await getPublicAnnouncementBySlug(params.slug);
 
-  if (!announcement) {
+    if (!announcement) {
+      notFound();
+    }
+
+    return <DashboardAnnouncementDetail announcement={announcement} />;
+  } catch (err) {
+    console.error("[dashboard-ssr-fail-open]", "announcements/detail", err);
     notFound();
   }
-
-  return <DashboardAnnouncementDetail announcement={announcement} />;
 }

@@ -80,6 +80,12 @@ export async function uploadPlaygroundImage(file: File): Promise<string> {
   }
 
   const supabase = createClient();
+  if (!supabase) {
+    throw new PlaygroundImageUploadError(
+      "Authentication is temporarily unavailable.",
+      "not_authenticated"
+    );
+  }
   const {
     data: { user },
     error: authError,
