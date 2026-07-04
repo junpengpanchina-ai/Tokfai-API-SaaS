@@ -19,6 +19,9 @@ const CLIENT_OPTIONS = {
       "X-Client-Info": "tokfai-dmit-api/0.1",
     },
   },
+  realtime: {
+    transport: WebSocket as any,
+  },
 };
 
 function decodeJwtRole(key: string): string | null {
