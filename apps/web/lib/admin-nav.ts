@@ -3,11 +3,16 @@ import {
   ArrowLeft,
   Coins,
   Cpu,
+  FileWarning,
   Gauge,
+  KeyRound,
   LayoutDashboard,
   Megaphone,
   Package,
+  Radio,
   Receipt,
+  Settings,
+  Tags,
   Users,
 } from "lucide-react";
 
@@ -19,57 +24,102 @@ export interface AdminNavItem {
   prefetch?: boolean;
   /** Shown in the sidebar only — excluded from the horizontal tab bar. */
   backLink?: boolean;
+  /** Secondary items appear after primary in the sidebar; tabs show primary only. */
+  section?: "primary" | "secondary";
 }
 
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   {
-    href: "/admin",
+    href: "/admin/overview",
     labelKey: "admin.nav.overview",
     icon: LayoutDashboard,
     exact: true,
     prefetch: true,
-  },
-  {
-    href: "/admin/models",
-    labelKey: "admin.nav.modelPricing",
-    icon: Cpu,
-    prefetch: true,
-  },
-  {
-    href: "/admin/announcements",
-    labelKey: "admin.nav.announcements",
-    icon: Megaphone,
-    prefetch: true,
-  },
-  {
-    href: "/admin/usage",
-    labelKey: "admin.nav.usageLogs",
-    icon: Gauge,
-    prefetch: true,
-  },
-  {
-    href: "/admin/recharge-plans",
-    labelKey: "admin.nav.rechargePlans",
-    icon: Package,
-    prefetch: true,
-  },
-  {
-    href: "/admin/credit-orders",
-    labelKey: "admin.nav.creditOrders",
-    icon: Receipt,
-    prefetch: true,
-  },
-  {
-    href: "/admin/credits",
-    labelKey: "admin.nav.creditsLedger",
-    icon: Coins,
-    prefetch: false,
+    section: "primary",
   },
   {
     href: "/admin/users",
     labelKey: "admin.nav.users",
     icon: Users,
     prefetch: true,
+    section: "primary",
+  },
+  {
+    href: "/admin/api-keys",
+    labelKey: "admin.nav.apiKeys",
+    icon: KeyRound,
+    prefetch: true,
+    section: "primary",
+  },
+  {
+    href: "/admin/models",
+    labelKey: "admin.nav.models",
+    icon: Cpu,
+    prefetch: true,
+    section: "primary",
+  },
+  {
+    href: "/admin/channels",
+    labelKey: "admin.nav.channels",
+    icon: Radio,
+    prefetch: true,
+    section: "primary",
+  },
+  {
+    href: "/admin/pricing",
+    labelKey: "admin.nav.pricing",
+    icon: Tags,
+    prefetch: true,
+    section: "primary",
+  },
+  {
+    href: "/admin/usage",
+    labelKey: "admin.nav.usageLogs",
+    icon: Gauge,
+    prefetch: true,
+    section: "primary",
+  },
+  {
+    href: "/admin/credit-orders",
+    labelKey: "admin.nav.creditOrders",
+    icon: Receipt,
+    prefetch: true,
+    section: "primary",
+  },
+  {
+    href: "/admin/logs",
+    labelKey: "admin.nav.errorLogs",
+    icon: FileWarning,
+    prefetch: true,
+    section: "primary",
+  },
+  {
+    href: "/admin/settings",
+    labelKey: "admin.nav.settings",
+    icon: Settings,
+    prefetch: true,
+    section: "primary",
+  },
+  {
+    href: "/admin/announcements",
+    labelKey: "admin.nav.announcements",
+    icon: Megaphone,
+    prefetch: true,
+    section: "secondary",
+  },
+  {
+    href: "/admin/recharge-plans",
+    labelKey: "admin.nav.rechargePlans",
+    icon: Package,
+    prefetch: true,
+    section: "secondary",
+  },
+  {
+    href: "/admin/credits",
+    labelKey: "admin.nav.creditsLedger",
+    icon: Coins,
+    prefetch: false,
+    section: "secondary",
   },
   {
     href: "/dashboard",
@@ -80,7 +130,9 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   },
 ];
 
-export const ADMIN_TAB_ITEMS = ADMIN_NAV_ITEMS.filter((item) => !item.backLink);
+export const ADMIN_TAB_ITEMS = ADMIN_NAV_ITEMS.filter(
+  (item) => !item.backLink && item.section === "primary"
+);
 
 export function isAdminNavActive(
   pathname: string,
@@ -88,6 +140,10 @@ export function isAdminNavActive(
 ): boolean {
   if (item.backLink) {
     return false;
+  }
+
+  if (pathname === "/admin" && item.href === "/admin/overview") {
+    return true;
   }
 
   if (item.exact) {

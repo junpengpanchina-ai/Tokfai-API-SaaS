@@ -21,6 +21,26 @@ export type AdminDashboardRecentUser = {
   created_at: string;
 };
 
+export type AdminDashboardSparklinePoint = {
+  date: string;
+  count: number;
+};
+
+export type AdminDashboardModelTopRow = {
+  model: string;
+  request_count: number;
+};
+
+export type AdminDashboardRecentError = {
+  id: string;
+  request_id: string | null;
+  model: string | null;
+  status: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string;
+};
+
 export type AdminDashboardSummary = {
   /** Terminal users from public.profiles (one row per auth.users). */
   total_users: number | null;
@@ -52,6 +72,16 @@ export type AdminDashboardSummary = {
 
   recent_orders: AdminDashboardRecentOrder[];
   recent_users: AdminDashboardRecentUser[];
+
+  today_requests: number | null;
+  today_credits_consumed: number | null;
+  today_revenue_cents: number;
+  active_users_7d: number | null;
+  total_api_keys: number | null;
+  error_rate_percent: number | null;
+  request_sparkline_7d: AdminDashboardSparklinePoint[];
+  model_top_10: AdminDashboardModelTopRow[];
+  recent_errors: AdminDashboardRecentError[];
 
   updated_at: string;
 };
@@ -458,6 +488,211 @@ function collectWarning(
   }
 }
 
+async function countUsageSince(iso: string): Promise<SafeCountResult> {
+  return safeCount("usage_logs", (q) => q.gte("created_at", iso));
+}
+
+async function sumUsageCreditsSince(iso: string): Promise<SafeSumResult> {
+  try {
+    let total = 0;
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const to = from + PAGE_SIZE - 1;
+      const { data, error } = await supabase()
+        .from("usage_logs")
+        .select("credits_charged")
+        .gte("created_at", iso)
+        .range(from, to);
+
+      if (error) {
+        return { value: null, warning: `usage_logs credits since: ${error.message}` };
+      }
+
+      const page = (data ?? []) as Array<{ credits_charged: number | string | null }>;
+      total += page.reduce((sum, row) => sum + toNumber(row.credits_charged), 0);
+      if (page.length < PAGE_SIZE) break;
+    }
+    return { value: total };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { value: null, warning: `usage_logs credits since: ${message}` };
+  }
+}
+
+async function sumPaidOrdersAmountSince(iso: string): Promise<{ value: number; warning?: string }> {
+  try {
+    let total = 0;
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const to = from + PAGE_SIZE - 1;
+      const { data, error } = await supabase()
+        .from("credit_orders")
+        .select("amount_cents, amount_cny")
+        .in("status", PAID_ORDER_STATUSES)
+        .gte("created_at", iso)
+        .range(from, to);
+
+      if (error) {
+        if (isMissingColumnError(error.message)) {
+          return { value: 0 };
+        }
+        return { value: 0, warning: `credit_orders today revenue: ${error.message}` };
+      }
+
+      const page = (data ?? []) as Array<{
+        amount_cents: number | null;
+        amount_cny: number | null;
+      }>;
+
+      for (const row of page) {
+        if (row.amount_cents != null) {
+          total += toNumber(row.amount_cents);
+        } else if (row.amount_cny != null) {
+          total += toNumber(row.amount_cny) * 100;
+        }
+      }
+
+      if (page.length < PAGE_SIZE) break;
+    }
+    return { value: total };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { value: 0, warning: `credit_orders today revenue: ${message}` };
+  }
+}
+
+async function countActiveUsersSince(iso: string): Promise<SafeCountResult> {
+  try {
+    const { data, error } = await supabase()
+      .from("usage_logs")
+      .select("user_id")
+      .gte("created_at", iso)
+      .limit(PAGE_SIZE);
+
+    if (error) {
+      return { value: null, warning: `active users: ${error.message}` };
+    }
+
+    const ids = new Set(
+      ((data ?? []) as Array<{ user_id: string }>).map((row) => row.user_id)
+    );
+    return { value: ids.size };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { value: null, warning: `active users: ${message}` };
+  }
+}
+
+async function buildRequestSparkline7d(): Promise<{
+  points: AdminDashboardSparklinePoint[];
+  warning?: string;
+}> {
+  try {
+    const since7d = isoSinceDays(7);
+    const buckets = new Map<string, number>();
+
+    for (let day = 6; day >= 0; day -= 1) {
+      const d = new Date(Date.now() - day * 24 * 60 * 60 * 1000);
+      const key = d.toISOString().slice(0, 10);
+      buckets.set(key, 0);
+    }
+
+    const { data, error } = await supabase()
+      .from("usage_logs")
+      .select("created_at")
+      .gte("created_at", since7d)
+      .limit(PAGE_SIZE * 5);
+
+    if (error) {
+      return { points: [], warning: `request sparkline: ${error.message}` };
+    }
+
+    for (const row of (data ?? []) as Array<{ created_at: string }>) {
+      const key = row.created_at.slice(0, 10);
+      if (buckets.has(key)) {
+        buckets.set(key, (buckets.get(key) ?? 0) + 1);
+      }
+    }
+
+    return {
+      points: [...buckets.entries()].map(([date, count]) => ({ date, count })),
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { points: [], warning: `request sparkline: ${message}` };
+  }
+}
+
+async function buildModelTop10(): Promise<{
+  rows: AdminDashboardModelTopRow[];
+  warning?: string;
+}> {
+  try {
+    const since7d = isoSinceDays(7);
+    const counts = new Map<string, number>();
+
+    const { data, error } = await supabase()
+      .from("usage_logs")
+      .select("model")
+      .gte("created_at", since7d)
+      .limit(PAGE_SIZE * 5);
+
+    if (error) {
+      return { rows: [], warning: `model top 10: ${error.message}` };
+    }
+
+    for (const row of (data ?? []) as Array<{ model: string | null }>) {
+      const model = row.model?.trim() || "unknown";
+      counts.set(model, (counts.get(model) ?? 0) + 1);
+    }
+
+    const rows = [...counts.entries()]
+      .map(([model, request_count]) => ({ model, request_count }))
+      .sort((a, b) => b.request_count - a.request_count)
+      .slice(0, 10);
+
+    return { rows };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { rows: [], warning: `model top 10: ${message}` };
+  }
+}
+
+async function fetchRecentErrors(): Promise<{
+  errors: AdminDashboardRecentError[];
+  warning?: string;
+}> {
+  try {
+    const { data, error } = await supabase()
+      .from("usage_logs")
+      .select("id, request_id, model, status, error_code, error_message, created_at")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      return { errors: [], warning: `recent errors: ${error.message}` };
+    }
+
+    const errors = ((data ?? []) as AdminDashboardRecentError[]).filter(
+      (row) =>
+        !USAGE_SUCCESS_STATUSES.includes((row.status ?? "").toLowerCase()) ||
+        Boolean(row.error_code?.trim()) ||
+        Boolean(row.error_message?.trim())
+    );
+
+    return { errors: errors.slice(0, 10) };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { errors: [], warning: `recent errors: ${message}` };
+  }
+}
+
+function computeErrorRatePercent(
+  total: number | null,
+  failed: number | null
+): number | null {
+  if (total == null || failed == null || total <= 0) return null;
+  return Math.round((failed / total) * 1000) / 10;
+}
+
 export async function buildAdminDashboardSummary(): Promise<{
   summary: AdminDashboardSummary;
   warnings: string[];
@@ -482,6 +717,14 @@ export async function buildAdminDashboardSummary(): Promise<{
     usageAggregate,
     recentOrdersResult,
     recentUsersResult,
+    todayRequests,
+    todayCredits,
+    todayRevenue,
+    activeUsers7d,
+    totalApiKeys,
+    sparklineResult,
+    modelTopResult,
+    recentErrorsResult,
   ] = await Promise.all([
     safeCount("profiles"),
     safeCount("admin_users"),
@@ -497,6 +740,14 @@ export async function buildAdminDashboardSummary(): Promise<{
     aggregateUsageMetrics(),
     fetchRecentOrders(),
     fetchRecentUsers(),
+    countUsageSince(sinceToday),
+    sumUsageCreditsSince(sinceToday),
+    sumPaidOrdersAmountSince(sinceToday),
+    countActiveUsersSince(since7d),
+    safeCount("api_keys", (q) => q.is("revoked_at", null)),
+    buildRequestSparkline7d(),
+    buildModelTop10(),
+    fetchRecentErrors(),
   ]);
 
   const failedRequests: SafeCountResult = {
@@ -520,6 +771,14 @@ export async function buildAdminDashboardSummary(): Promise<{
   collectWarning(warnings, usageAggregate);
   collectWarning(warnings, recentOrdersResult);
   collectWarning(warnings, recentUsersResult);
+  collectWarning(warnings, todayRequests);
+  collectWarning(warnings, todayCredits);
+  collectWarning(warnings, todayRevenue);
+  collectWarning(warnings, activeUsers7d);
+  collectWarning(warnings, totalApiKeys);
+  collectWarning(warnings, sparklineResult);
+  collectWarning(warnings, modelTopResult);
+  collectWarning(warnings, recentErrorsResult);
 
   return {
     summary: {
@@ -546,6 +805,19 @@ export async function buildAdminDashboardSummary(): Promise<{
 
       recent_orders: recentOrdersResult.orders,
       recent_users: recentUsersResult.users,
+
+      today_requests: todayRequests.value,
+      today_credits_consumed: todayCredits.value,
+      today_revenue_cents: todayRevenue.value,
+      active_users_7d: activeUsers7d.value,
+      total_api_keys: totalApiKeys.value,
+      error_rate_percent: computeErrorRatePercent(
+        totalRequests.value,
+        failedRequests.value
+      ),
+      request_sparkline_7d: sparklineResult.points,
+      model_top_10: modelTopResult.rows,
+      recent_errors: recentErrorsResult.errors,
 
       updated_at: new Date().toISOString(),
     },

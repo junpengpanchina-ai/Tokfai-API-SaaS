@@ -1,16 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  Activity,
-  ArrowRight,
-  Coins,
-  Cpu,
-  Gauge,
-  Package,
-  Receipt,
-  Users,
-} from "lucide-react";
+import { Activity } from "lucide-react";
 
 import { AdminDebugCard } from "@/components/admin/admin-debug-card";
 import { AdminStatCard } from "@/components/admin/admin-stat-card";
@@ -25,7 +16,12 @@ import {
 import type { AdminDashboardSummary } from "@/lib/admin/client";
 import type { AdminDebug } from "@/lib/admin/server";
 import { formatCny } from "@/lib/billing/recharge-plans";
-import { formatCreditsPrecise, formatDateTime, formatInt } from "@/lib/format";
+import {
+  formatCreditsPrecise,
+  formatDateTime,
+  formatInt,
+} from "@/lib/format";
+import { useI18n } from "@/lib/i18n/i18n-provider";
 
 type ApiHealth = {
   ok: boolean;
@@ -34,52 +30,14 @@ type ApiHealth = {
   timestamp?: string;
 };
 
-const QUICK_LINKS = [
-  {
-    href: "/admin/recharge-plans",
-    title: "充值套餐",
-    desc: "管理充值套餐与 Stripe 定价",
-    icon: Package,
-  },
-  {
-    href: "/admin/credit-orders",
-    title: "充值订单",
-    desc: "查看 Stripe Checkout 订单",
-    icon: Receipt,
-  },
-  {
-    href: "/admin/credits",
-    title: "积分账本",
-    desc: "按用户查询余额与账本",
-    icon: Coins,
-  },
-  {
-    href: "/admin/users",
-    title: "用户管理",
-    desc: "账户列表与积分概况",
-    icon: Users,
-  },
-  {
-    href: "/admin/usage",
-    title: "全站用量",
-    desc: "全站 API 调用记录",
-    icon: Gauge,
-  },
-  {
-    href: "/admin/models",
-    title: "模型价格",
-    desc: "模型目录与定价配置",
-    icon: Cpu,
-  },
-] as const;
-
 function formatCount(value: number | null | undefined): string {
   if (value == null) return "—";
   return formatInt(value);
 }
 
-function formatRechargeTotal(cents: number): string {
-  return formatCny(cents);
+function formatPercent(value: number | null | undefined): string {
+  if (value == null) return "—";
+  return `${value}%`;
 }
 
 function resolveHealthTimestamp(health: ApiHealth | null): string | null {
@@ -89,33 +47,22 @@ function resolveHealthTimestamp(health: ApiHealth | null): string | null {
 
 function formatTokenMetric(
   summary: AdminDashboardSummary,
-  field: "total_tokens" | "total_input_tokens" | "total_output_tokens"
+  field: "total_tokens" | "total_input_tokens" | "total_output_tokens",
+  noDataLabel: string
 ): string {
-  if (!summary.has_token_data) return "暂无 token 数据";
+  if (!summary.has_token_data) return noDataLabel;
   const value = summary[field];
   if (value == null) return "—";
   return formatInt(value);
 }
 
-function formatOrderStatusLabel(status: string): string {
-  const normalized = status.trim().toLowerCase();
-  switch (normalized) {
-    case "pending":
-      return "待支付";
-    case "paid":
-    case "succeeded":
-    case "completed":
-      return "已支付";
-    case "cancelled":
-      return "已取消";
-    case "failed":
-      return "失败";
-    default:
-      return status;
-  }
-}
-
-function OrderStatusBadge({ status }: { status: string }) {
+function OrderStatusBadge({
+  status,
+  t,
+}: {
+  status: string;
+  t: (key: string) => string;
+}) {
   const normalized = status.trim().toLowerCase();
   const variant =
     normalized === "paid" ||
@@ -128,7 +75,54 @@ function OrderStatusBadge({ status }: { status: string }) {
           ? "destructive"
           : "outline";
 
-  return <Badge variant={variant}>{formatOrderStatusLabel(status)}</Badge>;
+  let label = status;
+  if (normalized === "pending") label = t("admin.creditOrders.statusPending");
+  else if (
+    normalized === "paid" ||
+    normalized === "succeeded" ||
+    normalized === "completed"
+  ) {
+    label = t("admin.creditOrders.statusPaid");
+  } else if (normalized === "cancelled") {
+    label = t("admin.creditOrders.statusCancelled");
+  } else if (normalized === "failed") {
+    label = t("admin.creditOrders.statusFailed");
+  }
+
+  return <Badge variant={variant}>{label}</Badge>;
+}
+
+function RequestSparkline({
+  points,
+  emptyLabel,
+}: {
+  points: AdminDashboardSummary["request_sparkline_7d"];
+  emptyLabel: string;
+}) {
+  if (!points.length) {
+    return (
+      <p className="text-sm text-muted-foreground">{emptyLabel}</p>
+    );
+  }
+
+  const max = Math.max(...points.map((point) => point.count), 1);
+
+  return (
+    <div className="flex h-32 items-end gap-2">
+      {points.map((point) => (
+        <div key={point.date} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+          <div
+            className="w-full rounded-sm bg-primary/80"
+            style={{ height: `${Math.max(8, (point.count / max) * 100)}%` }}
+            title={`${point.date}: ${point.count}`}
+          />
+          <span className="truncate text-[10px] text-muted-foreground">
+            {point.date.slice(5)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function AdminOverviewPanel({
@@ -142,21 +136,25 @@ export function AdminOverviewPanel({
   health: ApiHealth | null;
   debug: AdminDebug | null;
 }) {
+  const { t } = useI18n();
   const healthOk = health?.ok === true;
   const healthTimestamp = resolveHealthTimestamp(health);
   const summaryUpdatedAt = summary?.updated_at ?? null;
   const recentUsersLabel =
-    summary?.user_source === "admin_users" ? "后台用户" : "终端注册用户";
+    summary?.user_source === "admin_users"
+      ? t("admin.overview.recentAdminUsers")
+      : t("admin.overview.recentEndUsers");
+  const noTokenData = t("admin.overview.noTokenData");
 
   return (
     <>
       <div>
-        <Badge variant="secondary">运营后台</Badge>
+        <Badge variant="secondary">{t("admin.common.adminTools")}</Badge>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight">
-          总览看板
+          {t("admin.overview.dashboardTitle")}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          核心指标一览。数据来自 DMIT Admin API，只读展示。
+          {t("admin.overview.dashboardSubtitle")}
         </p>
       </div>
 
@@ -165,9 +163,11 @@ export function AdminOverviewPanel({
       {warnings.length > 0 ? (
         <Card className="border-amber-500/40 bg-amber-500/5">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">部分指标未能加载</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {t("admin.overview.partialLoadTitle")}
+            </CardTitle>
             <CardDescription>
-              以下查询失败，对应卡片显示为「—」，其余数据仍可用。
+              {t("admin.overview.partialLoadDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -184,93 +184,235 @@ export function AdminOverviewPanel({
         <>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <AdminStatCard
-              label="用户数"
+              label={t("admin.overview.todayRequests")}
+              value={formatCount(summary.today_requests)}
+            />
+            <AdminStatCard
+              label={t("admin.overview.todayCredits")}
+              value={
+                summary.today_credits_consumed != null
+                  ? formatCreditsPrecise(summary.today_credits_consumed)
+                  : "—"
+              }
+            />
+            <AdminStatCard
+              label={t("admin.overview.todayRevenue")}
+              value={formatCny(summary.today_revenue_cents)}
+            />
+            <AdminStatCard
+              label={t("admin.overview.activeUsers7d")}
+              value={formatCount(summary.active_users_7d)}
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <AdminStatCard
+              label={t("admin.overview.totalApiKeys")}
+              value={formatCount(summary.total_api_keys)}
+            />
+            <AdminStatCard
+              label={t("admin.overview.errorRate")}
+              value={formatPercent(summary.error_rate_percent)}
+            />
+            <AdminStatCard
+              label={t("admin.overview.totalUsers")}
               value={formatCount(summary.total_users)}
               hint={
                 summary.admin_user_count != null
-                  ? `管理员 ${formatCount(summary.admin_user_count)}`
+                  ? t("admin.overview.adminCountHint").replace(
+                      "{count}",
+                      formatCount(summary.admin_user_count)
+                    )
                   : undefined
               }
             />
             <AdminStatCard
-              label="今日新用户"
-              value={formatCount(summary.today_new_users)}
-            />
-            <AdminStatCard
-              label="近 7 天新用户"
-              value={formatCount(summary.last_7d_new_users)}
-            />
-            <AdminStatCard
-              label="近 30 天新用户"
-              value={formatCount(summary.last_30d_new_users)}
-            />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <AdminStatCard
-              label="订单总数"
-              value={formatCount(summary.total_credit_orders)}
-            />
-            <AdminStatCard
-              label="已支付订单"
-              value={formatCount(summary.paid_orders)}
-            />
-            <AdminStatCard
-              label="待支付订单"
-              value={formatCount(summary.pending_orders)}
-            />
-            <AdminStatCard
-              label="累计实付金额"
-              value={formatRechargeTotal(summary.total_recharge_amount_cents)}
-              hint="仅已支付订单"
-            />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <AdminStatCard
-              label="总请求数"
+              label={t("admin.overview.totalRequests")}
               value={formatCount(summary.total_requests)}
-            />
-            <AdminStatCard
-              label="成功请求数"
-              value={formatCount(summary.successful_requests)}
-            />
-            <AdminStatCard
-              label="失败请求数"
-              value={formatCount(summary.failed_requests)}
-            />
-            <AdminStatCard
-              label="总 Token"
-              value={formatTokenMetric(summary, "total_tokens")}
-              hint={
-                summary.has_token_data
-                  ? `输入 / 输出：${formatTokenMetric(summary, "total_input_tokens")} / ${formatTokenMetric(summary, "total_output_tokens")}`
-                  : undefined
-              }
             />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">最近 5 条订单</CardTitle>
+                <CardTitle className="text-base">
+                  {t("admin.overview.requestSparklineTitle")}
+                </CardTitle>
                 <CardDescription>
-                  来自 public.credit_orders，按创建时间倒序
+                  {t("admin.overview.requestSparklineDesc")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RequestSparkline
+                  points={summary.request_sparkline_7d ?? []}
+                  emptyLabel={t("admin.overview.sparklineEmpty")}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">
+                  {t("admin.overview.modelTop10Title")}
+                </CardTitle>
+                <CardDescription>
+                  {t("admin.overview.modelTop10Desc")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(summary.model_top_10 ?? []).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {t("admin.overview.modelTop10Empty")}
+                  </p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="pb-2 pr-3 font-medium">
+                          {t("admin.overview.colModel")}
+                        </th>
+                        <th className="pb-2 text-right font-medium">
+                          {t("admin.overview.colRequests")}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {summary.model_top_10.map((row) => (
+                        <tr key={row.model} className="border-b last:border-0">
+                          <td className="py-2 pr-3 font-mono text-xs">
+                            {row.model}
+                          </td>
+                          <td className="py-2 text-right">
+                            {formatInt(row.request_count)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="text-base">
+                    {t("admin.overview.recentErrorsTitle")}
+                  </CardTitle>
+                  <CardDescription>
+                    {t("admin.overview.recentErrorsDesc")}
+                  </CardDescription>
+                </div>
+                <Link
+                  href="/admin/logs"
+                  className="text-sm text-primary hover:underline"
+                >
+                  {t("admin.overview.viewAllLogs")}
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {(summary.recent_errors ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {t("admin.overview.recentErrorsEmpty")}
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="pb-2 pr-3 font-medium">
+                          {t("admin.overview.colRequestId")}
+                        </th>
+                        <th className="pb-2 pr-3 font-medium">
+                          {t("admin.overview.colModel")}
+                        </th>
+                        <th className="pb-2 pr-3 font-medium">
+                          {t("admin.overview.colError")}
+                        </th>
+                        <th className="pb-2 font-medium">
+                          {t("admin.overview.colCreated")}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {summary.recent_errors.map((row) => (
+                        <tr key={row.id} className="border-b last:border-0">
+                          <td className="py-2 pr-3 font-mono text-xs">
+                            {row.request_id ?? "—"}
+                          </td>
+                          <td className="py-2 pr-3">{row.model ?? "—"}</td>
+                          <td className="max-w-[280px] truncate py-2 pr-3">
+                            {row.error_message ?? row.error_code ?? row.status ?? "—"}
+                          </td>
+                          <td className="py-2">
+                            {formatDateTime(row.created_at)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <AdminStatCard
+              label={t("admin.overview.todayNewUsers")}
+              value={formatCount(summary.today_new_users)}
+            />
+            <AdminStatCard
+              label={t("admin.overview.last7dNewUsers")}
+              value={formatCount(summary.last_7d_new_users)}
+            />
+            <AdminStatCard
+              label={t("admin.overview.paidOrders")}
+              value={formatCount(summary.paid_orders)}
+            />
+            <AdminStatCard
+              label={t("admin.overview.totalRecharge")}
+              value={formatCny(summary.total_recharge_amount_cents)}
+            />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">
+                  {t("admin.overview.recentOrdersTitle")}
+                </CardTitle>
+                <CardDescription>
+                  {t("admin.overview.recentOrdersDesc")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {summary.recent_orders.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">暂无订单</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("admin.overview.recentOrdersEmpty")}
+                  </p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b text-left text-muted-foreground">
-                          <th className="pb-2 pr-3 font-medium">邮箱</th>
-                          <th className="pb-2 pr-3 font-medium">套餐</th>
-                          <th className="pb-2 pr-3 font-medium">金额</th>
-                          <th className="pb-2 pr-3 font-medium">状态</th>
-                          <th className="pb-2 font-medium">创建时间</th>
+                          <th className="pb-2 pr-3 font-medium">
+                            {t("admin.creditOrders.colEmail")}
+                          </th>
+                          <th className="pb-2 pr-3 font-medium">
+                            {t("admin.creditOrders.colPlan")}
+                          </th>
+                          <th className="pb-2 pr-3 font-medium">
+                            {t("admin.creditOrders.colAmount")}
+                          </th>
+                          <th className="pb-2 pr-3 font-medium">
+                            {t("admin.creditOrders.colStatus")}
+                          </th>
+                          <th className="pb-2 font-medium">
+                            {t("admin.creditOrders.colCreated")}
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -286,7 +428,7 @@ export function AdminOverviewPanel({
                                 : "—"}
                             </td>
                             <td className="py-2 pr-3">
-                              <OrderStatusBadge status={order.status} />
+                              <OrderStatusBadge status={order.status} t={t} />
                             </td>
                             <td className="py-2">
                               {formatDateTime(order.created_at)}
@@ -305,20 +447,26 @@ export function AdminOverviewPanel({
                 <CardTitle className="text-base">{recentUsersLabel}</CardTitle>
                 <CardDescription>
                   {summary.user_source === "admin_users"
-                    ? "public.admin_users（后台管理员，非终端用户）"
-                    : "public.profiles（终端注册用户）"}
+                    ? t("admin.overview.recentAdminUsersDesc")
+                    : t("admin.overview.recentEndUsersDesc")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {summary.recent_users.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">暂无用户</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("admin.overview.recentUsersEmpty")}
+                  </p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b text-left text-muted-foreground">
-                          <th className="pb-2 pr-3 font-medium">邮箱</th>
-                          <th className="pb-2 font-medium">创建时间</th>
+                          <th className="pb-2 pr-3 font-medium">
+                            {t("admin.creditOrders.colEmail")}
+                          </th>
+                          <th className="pb-2 font-medium">
+                            {t("admin.creditOrders.colCreated")}
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -340,9 +488,48 @@ export function AdminOverviewPanel({
 
           {summary.has_token_data && summary.total_usage_credits != null ? (
             <p className="text-xs text-muted-foreground">
-              累计消耗积分：{formatCreditsPrecise(summary.total_usage_credits)}
+              {t("admin.overview.totalUsageCredits").replace(
+                "{amount}",
+                formatCreditsPrecise(summary.total_usage_credits)
+              )}
             </p>
           ) : null}
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <AdminStatCard
+              label={t("admin.overview.succeeded")}
+              value={formatCount(summary.successful_requests)}
+            />
+            <AdminStatCard
+              label={t("admin.overview.failed")}
+              value={formatCount(summary.failed_requests)}
+            />
+            <AdminStatCard
+              label={t("admin.overview.totalTokens")}
+              value={formatTokenMetric(summary, "total_tokens", noTokenData)}
+              hint={
+                summary.has_token_data
+                  ? t("admin.overview.tokenBreakdown")
+                      .replace(
+                        "{input}",
+                        formatTokenMetric(
+                          summary,
+                          "total_input_tokens",
+                          noTokenData
+                        )
+                      )
+                      .replace(
+                        "{output}",
+                        formatTokenMetric(
+                          summary,
+                          "total_output_tokens",
+                          noTokenData
+                        )
+                      )
+                  : undefined
+              }
+            />
+          </div>
         </>
       ) : null}
 
@@ -350,58 +537,41 @@ export function AdminOverviewPanel({
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <Activity className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-base">最近健康状态</CardTitle>
+            <CardTitle className="text-base">
+              {t("admin.overview.healthTitle")}
+            </CardTitle>
           </div>
-          <CardDescription>DMIT API 公开健康检查端点</CardDescription>
+          <CardDescription>{t("admin.overview.healthDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap items-center gap-3">
             <Badge variant={healthOk ? "default" : "destructive"}>
-              API {healthOk ? "正常" : "异常"}
+              {healthOk
+                ? t("admin.overview.apiHealthy")
+                : t("admin.overview.apiUnhealthy")}
             </Badge>
             {health?.service ? (
               <span className="text-sm text-muted-foreground">
-                服务：{health.service}
+                {t("admin.overview.serviceLabel")}: {health.service}
               </span>
             ) : null}
           </div>
           <div className="grid gap-2 text-sm sm:grid-cols-2">
             <div>
-              <span className="text-muted-foreground">健康检查时间：</span>
+              <span className="text-muted-foreground">
+                {t("admin.overview.healthCheckedAt")}:{" "}
+              </span>
               {formatDateTime(healthTimestamp)}
             </div>
             <div>
-              <span className="text-muted-foreground">看板数据更新时间：</span>
+              <span className="text-muted-foreground">
+                {t("admin.overview.summaryUpdatedAt")}:{" "}
+              </span>
               {formatDateTime(summaryUpdatedAt)}
             </div>
           </div>
         </CardContent>
       </Card>
-
-      <div>
-        <h2 className="text-sm font-medium text-muted-foreground">快捷入口</h2>
-        <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {QUICK_LINKS.map((link) => (
-            <Card
-              key={link.href}
-              className="transition-colors hover:bg-muted/30"
-            >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-3">
-                  <link.icon className="h-5 w-5 text-muted-foreground" />
-                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <CardTitle className="text-base">
-                  <Link href={link.href} className="hover:underline">
-                    {link.title}
-                  </Link>
-                </CardTitle>
-                <CardDescription>{link.desc}</CardDescription>
-              </CardHeader>
-            </Card>
-          ))}
-        </div>
-      </div>
     </>
   );
 }

@@ -160,6 +160,26 @@ export type AdminDashboardRecentUser = {
   created_at: string;
 };
 
+export type AdminDashboardSparklinePoint = {
+  date: string;
+  count: number;
+};
+
+export type AdminDashboardModelTopRow = {
+  model: string;
+  request_count: number;
+};
+
+export type AdminDashboardRecentError = {
+  id: string;
+  request_id: string | null;
+  model: string | null;
+  status: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string;
+};
+
 export type AdminDashboardSummary = {
   total_users: number | null;
   admin_user_count: number | null;
@@ -181,6 +201,82 @@ export type AdminDashboardSummary = {
   total_usage_credits: number | null;
   recent_orders: AdminDashboardRecentOrder[];
   recent_users: AdminDashboardRecentUser[];
+
+  today_requests: number | null;
+  today_credits_consumed: number | null;
+  today_revenue_cents: number;
+  active_users_7d: number | null;
+  total_api_keys: number | null;
+  error_rate_percent: number | null;
+  request_sparkline_7d: AdminDashboardSparklinePoint[];
+  model_top_10: AdminDashboardModelTopRow[];
+  recent_errors: AdminDashboardRecentError[];
+
+  updated_at: string;
+};
+
+export type AdminApiKeyRow = {
+  id: string;
+  user_id: string;
+  owner_email: string | null;
+  name: string;
+  prefix: string;
+  status: "active" | "revoked";
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  total_usage: number;
+};
+
+export type AdminChannelRow = {
+  id: string;
+  provider_name: string;
+  base_url: string;
+  status: "active" | "disabled";
+  priority: number;
+  weight: number;
+  timeout_ms: number | null;
+  success_rate: number | null;
+  last_error: string | null;
+  enabled: boolean;
+  modalities: Array<"chat" | "image">;
+};
+
+export type AdminPricingRow = {
+  model_id: string;
+  display_name: string | null;
+  provider: string | null;
+  modality: string | null;
+  input_price: number | null;
+  output_price: number | null;
+  image_price: number | null;
+  credits_multiplier: number | null;
+  minimum_charge: number | null;
+  effective_status: "active" | "disabled" | "archived";
+};
+
+export type AdminErrorLogRow = {
+  id: string;
+  request_id: string | null;
+  route: string | null;
+  user_id: string;
+  email: string | null;
+  model: string | null;
+  status: string | null;
+  code: string | null;
+  message: string | null;
+  upstream_status: number | null;
+  latency_ms: number | null;
+  created_at: string;
+};
+
+export type AdminSettingsView = {
+  site_name: string;
+  default_signup_credits: number | null;
+  api_base_url: string;
+  payments_enabled: boolean;
+  registration_enabled: boolean;
+  maintenance_mode: boolean;
   updated_at: string;
 };
 

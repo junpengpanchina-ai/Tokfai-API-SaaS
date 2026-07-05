@@ -22,7 +22,11 @@ import {
   listAdminAnnouncements,
   updateAdminAnnouncement,
 } from "./adminAnnouncements.js";
+import { listAdminChannels } from "./adminChannels.js";
 import { buildAdminDashboardSummary } from "./adminDashboardSummary.js";
+import { listAdminErrorLogs } from "./adminLogs.js";
+import { listAdminPricing } from "./adminPricing.js";
+import { getAdminSettings } from "./adminSettings.js";
 import {
   listAdminCreditOrders,
   parseAdminCreditOrdersQuery,
@@ -86,6 +90,7 @@ type UsageCreditRow = {
 
 type ApiKeyAdminRow = {
   id: string;
+  user_id: string;
   name: string;
   prefix: string;
   created_at: string;
@@ -441,7 +446,7 @@ async function listAllApiKeys(): Promise<ApiKeyAdminRow[]> {
     const to = from + PAGE_SIZE - 1;
     const { data, error } = await supabase()
       .from("api_keys")
-      .select("id, name, prefix, created_at, last_used_at, revoked_at")
+      .select("id, user_id, name, prefix, created_at, last_used_at, revoked_at")
       .order("created_at", { ascending: false })
       .range(from, to);
 
@@ -458,6 +463,82 @@ async function listAllApiKeys(): Promise<ApiKeyAdminRow[]> {
   }
 
   return rows;
+}
+
+async function countUsageByApiKeyIds(
+  apiKeyIds: string[]
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (apiKeyIds.length === 0) return counts;
+
+  for (const apiKeyId of apiKeyIds) {
+    counts.set(apiKeyId, 0);
+  }
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await supabase()
+      .from("usage_logs")
+      .select("api_key_id")
+      .in("api_key_id", apiKeyIds)
+      .range(from, to);
+
+    if (error) {
+      break;
+    }
+
+    const page = (data ?? []) as Array<{ api_key_id: string | null }>;
+    for (const row of page) {
+      if (!row.api_key_id) continue;
+      counts.set(row.api_key_id, (counts.get(row.api_key_id) ?? 0) + 1);
+    }
+
+    if (page.length < PAGE_SIZE) break;
+  }
+
+  return counts;
+}
+
+async function listAdminApiKeysEnriched() {
+  const apiKeys = await listAllApiKeys();
+  const userIds = [...new Set(apiKeys.map((row) => row.user_id))];
+  const emails = new Map<string, string | null>();
+
+  if (userIds.length > 0) {
+    const { data: profiles, error: profileError } = await supabase()
+      .from("profiles")
+      .select("id, email")
+      .in("id", userIds);
+
+    if (profileError) {
+      throw ApiError.internal(
+        `Failed to map API key emails: ${profileError.message}`,
+        "admin_api_keys_email_map_failed"
+      );
+    }
+
+    for (const profile of (profiles ?? []) as Array<{
+      id: string;
+      email: string | null;
+    }>) {
+      emails.set(profile.id, profile.email);
+    }
+  }
+
+  const usageCounts = await countUsageByApiKeyIds(apiKeys.map((row) => row.id));
+
+  return apiKeys.map((row) => ({
+    id: row.id,
+    user_id: row.user_id,
+    owner_email: emails.get(row.user_id) ?? null,
+    name: row.name,
+    prefix: row.prefix,
+    status: row.revoked_at ? "revoked" : "active",
+    created_at: row.created_at,
+    last_used_at: row.last_used_at,
+    revoked_at: row.revoked_at,
+    total_usage: usageCounts.get(row.id) ?? 0,
+  }));
 }
 
 async function getAdminCreditsByEmail(email: string, ledgerLimit: number) {
@@ -584,18 +665,29 @@ protectedAdminRoutes.get("/users", async (c) => {
 });
 
 protectedAdminRoutes.get("/api-keys", async (c) => {
-  const apiKeys = await listAllApiKeys();
+  const apiKeys = await listAdminApiKeysEnriched();
+  return c.json({ data: apiKeys });
+});
 
-  return c.json({
-    data: apiKeys.map((row) => ({
-      id: row.id,
-      name: row.name,
-      prefix: row.prefix,
-      created_at: row.created_at,
-      last_used_at: row.last_used_at,
-      revoked_at: row.revoked_at,
-    })),
+protectedAdminRoutes.get("/channels", async (c) => {
+  return c.json({ data: listAdminChannels() });
+});
+
+protectedAdminRoutes.get("/pricing", async (c) => {
+  const pricing = await listAdminPricing();
+  return c.json({ data: pricing });
+});
+
+protectedAdminRoutes.get("/logs", async (c) => {
+  const logs = await listAdminErrorLogs({
+    request_id: c.req.query("request_id"),
+    limit: c.req.query("limit"),
   });
+  return c.json({ data: logs });
+});
+
+protectedAdminRoutes.get("/settings", async (c) => {
+  return c.json({ data: getAdminSettings() });
 });
 
 protectedAdminRoutes.get("/announcements", async (c) => {

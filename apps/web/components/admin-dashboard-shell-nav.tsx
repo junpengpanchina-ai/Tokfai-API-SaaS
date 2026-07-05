@@ -122,14 +122,27 @@ export function AdminDashboardSidebar({
         className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-3"
       >
         <div className="flex flex-col gap-0.5">
-          {ADMIN_NAV_ITEMS.map((item) => (
-            <AdminDashboardNavLink
-              key={item.href}
-              item={item}
-              active={isAdminNavActive(pathname, item)}
-              t={t}
-            />
-          ))}
+          {ADMIN_NAV_ITEMS.filter((item) => !item.backLink).map((item, index, arr) => {
+            const prev = arr[index - 1];
+            const showDivider =
+              item.section === "secondary" && prev?.section === "primary";
+
+            return (
+              <div key={item.href}>
+                {showDivider ? (
+                  <div
+                    className="my-2 border-t border-border/60"
+                    aria-hidden
+                  />
+                ) : null}
+                <AdminDashboardNavLink
+                  item={item}
+                  active={isAdminNavActive(pathname, item)}
+                  t={t}
+                />
+              </div>
+            );
+          })}
         </div>
       </nav>
 
