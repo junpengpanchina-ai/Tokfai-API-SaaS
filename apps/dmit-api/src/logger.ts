@@ -45,6 +45,10 @@ const ALLOWED_FIELD_KEYS = new Set([
   "providerId",
   "providerIndex",
   "dbErrorCode",
+  "stage",
+  "dbErrorDetails",
+  "dbErrorHint",
+  "errorName",
 ]);
 
 /**
