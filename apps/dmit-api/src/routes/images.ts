@@ -18,8 +18,11 @@ import {
 import { supabase } from "../supabase.js";
 import type { UsageLogInsert } from "../types.js";
 import {
-  generateImage,
+  buildGrsaiImagePayload,
+  buildImageGenerationPrompt,
   mapSizeToGrsai,
+  type ImageGenerateDebugInfo,
+  type ImageGenerateResult,
 } from "../upstream/imageAdapter.js";
 import { resolveImageModelId } from "../upstream/imageModelAliases.js";
 import {
@@ -68,6 +71,8 @@ const UPSTREAM_ERROR_CODES = new Set([
 ]);
 
 const IMAGE_LEDGER_REASON = "Image generation usage";
+const GRSAI_BASE = env.GRSAI_BASE_URL.replace(/\/+$/, "");
+const UPSTREAM_BODY_PREVIEW_MAX = 1000;
 
 /**
  * /v1/images/generations — OpenAI-compatible image generation, customer-facing.
@@ -90,9 +95,8 @@ imageRoutes.post("/v1/images/generations", async (c) => {
     );
   }
 
-  const resolvedModel = resolveImageModelId(
-    parsed.data.model?.trim() || DEFAULT_IMAGE_MODEL_ID
-  );
+  const requestedModel = parsed.data.model?.trim() || DEFAULT_IMAGE_MODEL_ID;
+  const resolvedModel = resolveImageModelId(requestedModel);
   const prompt = parsed.data.prompt?.trim();
   const n = parsed.data.n ?? 1;
   const responseFormat = parsed.data.response_format ?? "url";
@@ -217,8 +221,10 @@ imageRoutes.post("/v1/images/generations", async (c) => {
 
     await assertHasCredits(caller.userId);
 
-    const { url, upstreamId, debug } = await generateImage({
-      model: resolvedModel,
+    const { url, upstreamId, debug } = await callGrsaiImageUpstream({
+      requestId,
+      requestedModel,
+      resolvedModel,
       prompt,
       aspectRatio,
       imageSize,
@@ -498,4 +504,449 @@ async function writeUsageLog(entry: UsageLogInsert): Promise<void> {
       message: "Failed to write usage log.",
     });
   }
+}
+
+type GrsaiUpstreamCallParams = {
+  requestId: string;
+  requestedModel: string;
+  resolvedModel: string;
+  prompt: string;
+  aspectRatio: string;
+  imageSize: string;
+  imageUrls: string[];
+  imageUrlSources: ImageUrlResolveSource[];
+};
+
+type ParsedImageExtraction = {
+  url: string;
+  upstreamId: string | null;
+  responseParseMode: string;
+};
+
+function grsaiImageUpstreamUrl(): string {
+  const path = env.GRSAI_IMAGE_GENERATE_PATH;
+  return `${GRSAI_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+function previewUpstreamBody(text: string): string {
+  const preview =
+    text.length > UPSTREAM_BODY_PREVIEW_MAX
+      ? `${text.slice(0, UPSTREAM_BODY_PREVIEW_MAX)}…`
+      : text;
+  const apiKey = env.GRSAI_API_KEY;
+  if (!apiKey || !preview.includes(apiKey)) {
+    return preview;
+  }
+  return preview.split(apiKey).join("[REDACTED]");
+}
+
+function logGrsaiImageUpstreamDiagnostic(fields: {
+  requestId: string;
+  requestedModel: string;
+  resolvedModel: string;
+  upstreamUrl: string;
+  upstreamMethod: "POST";
+  upstreamStatus: number;
+  upstreamContentType: string | null;
+  upstreamBodyPreview: string;
+  latencyMs: number;
+  responseParseMode: string;
+}): void {
+  log.info("grsai_image_upstream_diagnostic", fields);
+}
+
+function truncateText(value: string, max: number): string {
+  return value.length > max ? `${value.slice(0, max)}…` : value;
+}
+
+function isTimeoutError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  return err.name === "TimeoutError" || err.name === "AbortError";
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function extractUpstreamId(parsed: Record<string, unknown>): string | null {
+  if (typeof parsed.id === "string" && parsed.id.trim()) {
+    return parsed.id.trim();
+  }
+  return null;
+}
+
+function extractUpstreamErrorMessage(
+  parsed: unknown,
+  upstreamText: string
+): string | null {
+  const obj = asRecord(parsed);
+  if (obj) {
+    const error = asRecord(obj.error);
+    if (error) {
+      const message = error.message;
+      if (typeof message === "string" && message.trim()) {
+        return message.trim();
+      }
+    }
+    if (typeof obj.message === "string" && obj.message.trim()) {
+      return obj.message.trim();
+    }
+  }
+
+  const trimmed = upstreamText.trim();
+  return trimmed ? truncateText(trimmed, 200) : null;
+}
+
+function extractImageFromContentString(
+  content: string,
+  parsed: Record<string, unknown>
+): ParsedImageExtraction | null {
+  const markdownMatch = content.match(/!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/i);
+  if (markdownMatch?.[1]) {
+    return {
+      url: markdownMatch[1],
+      upstreamId: extractUpstreamId(parsed),
+      responseParseMode: "chat_completions_content_markdown",
+    };
+  }
+
+  const dataUrlMatch = content.match(
+    /(data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+)/i
+  );
+  if (dataUrlMatch?.[1]) {
+    return {
+      url: dataUrlMatch[1].replace(/\s+/g, ""),
+      upstreamId: extractUpstreamId(parsed),
+      responseParseMode: "chat_completions_content_base64",
+    };
+  }
+
+  const plainUrlMatch = content.match(/(https?:\/\/[^\s"'<>]+)/i);
+  if (plainUrlMatch?.[1]) {
+    return {
+      url: plainUrlMatch[1],
+      upstreamId: extractUpstreamId(parsed),
+      responseParseMode: "chat_completions_content_url",
+    };
+  }
+
+  return null;
+}
+
+function extractImageFromParsed(parsed: unknown): ParsedImageExtraction | null {
+  const obj = asRecord(parsed);
+  if (!obj) return null;
+
+  const results = obj.results;
+  if (Array.isArray(results)) {
+    const first = asRecord(results[0]);
+    if (first && typeof first.url === "string" && first.url.trim()) {
+      return {
+        url: first.url.trim(),
+        upstreamId: extractUpstreamId(obj),
+        responseParseMode: "grsai_results_url",
+      };
+    }
+  }
+
+  const data = obj.data;
+  if (Array.isArray(data)) {
+    const first = asRecord(data[0]);
+    if (first) {
+      if (typeof first.url === "string" && first.url.trim()) {
+        return {
+          url: first.url.trim(),
+          upstreamId: extractUpstreamId(obj),
+          responseParseMode: "openai_data_url",
+        };
+      }
+      if (typeof first.b64_json === "string" && first.b64_json.trim()) {
+        const mime =
+          typeof first.mime_type === "string" && first.mime_type.trim()
+            ? first.mime_type.trim()
+            : "image/png";
+        return {
+          url: `data:${mime};base64,${first.b64_json.trim()}`,
+          upstreamId: extractUpstreamId(obj),
+          responseParseMode: "openai_data_b64",
+        };
+      }
+    }
+  }
+
+  const choices = obj.choices;
+  if (Array.isArray(choices)) {
+    const firstChoice = asRecord(choices[0]);
+    const message = firstChoice ? asRecord(firstChoice.message) : null;
+    const content = message?.content;
+    if (typeof content === "string" && content.trim()) {
+      const fromContent = extractImageFromContentString(content.trim(), obj);
+      if (fromContent) return fromContent;
+    }
+  }
+
+  if (typeof obj.url === "string" && obj.url.trim()) {
+    return {
+      url: obj.url.trim(),
+      upstreamId: extractUpstreamId(obj),
+      responseParseMode: "top_level_url",
+    };
+  }
+
+  return null;
+}
+
+function throwUpstreamError(params: {
+  status: number;
+  code: string;
+  serverMessage: string;
+  publicMessage: string;
+  upstreamStatus?: number;
+  upstreamErrorSnippet?: string;
+}): never {
+  throw new ApiError({
+    status: params.status,
+    message: params.serverMessage,
+    code: params.code,
+    type: "upstream_error",
+    publicMessage: params.publicMessage,
+    upstreamStatus: params.upstreamStatus,
+    upstreamErrorSnippet: params.upstreamErrorSnippet,
+  });
+}
+
+async function callGrsaiImageUpstream(
+  params: GrsaiUpstreamCallParams
+): Promise<ImageGenerateResult> {
+  const upstreamUrl = grsaiImageUpstreamUrl();
+  const upstreamMethod = "POST" as const;
+  const upstreamStartedAt = Date.now();
+  const upstreamPrompt = buildImageGenerationPrompt(
+    params.prompt,
+    params.imageUrls.length
+  );
+
+  const { payload, adapterMode, upstreamPayloadKeys } =
+    await buildGrsaiImagePayload({
+      model: params.resolvedModel,
+      prompt: upstreamPrompt,
+      aspectRatio: params.aspectRatio,
+      imageSize: params.imageSize,
+      resolvedImageUrls: params.imageUrls,
+    });
+
+  log.info("image_generation_upstream_request", {
+    requestId: params.requestId,
+    model: params.resolvedModel,
+    requestedModel: params.requestedModel,
+    has_input_images: params.imageUrls.length > 0,
+    input_images_count: params.imageUrls.length,
+    image_url_sources: params.imageUrlSources,
+    upstream_payload_keys: upstreamPayloadKeys,
+    adapter_mode: adapterMode,
+    prompt_prefix: upstreamPrompt.slice(0, 120),
+  });
+
+  let response: Response;
+  try {
+    response = await fetch(upstreamUrl, {
+      method: upstreamMethod,
+      headers: {
+        Authorization: `Bearer ${env.GRSAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(env.IMAGE_REQUEST_TIMEOUT_MS),
+    });
+  } catch (err) {
+    const latencyMs = Date.now() - upstreamStartedAt;
+    logGrsaiImageUpstreamDiagnostic({
+      requestId: params.requestId,
+      requestedModel: params.requestedModel,
+      resolvedModel: params.resolvedModel,
+      upstreamUrl,
+      upstreamMethod,
+      upstreamStatus: 0,
+      upstreamContentType: null,
+      upstreamBodyPreview: "",
+      latencyMs,
+      responseParseMode: isTimeoutError(err)
+        ? "fetch_timeout"
+        : "fetch_failed",
+    });
+
+    if (isTimeoutError(err)) {
+      throwUpstreamError({
+        status: 504,
+        code: "upstream_timeout",
+        serverMessage: "GRSAI image generation timed out.",
+        publicMessage: "Upstream provider timed out.",
+        upstreamStatus: 504,
+      });
+    }
+
+    throw ApiError.internal(
+      err instanceof Error ? err.message : "Image generation failed.",
+      "server_error"
+    );
+  }
+
+  const latencyMs = Date.now() - upstreamStartedAt;
+  const upstreamStatus = response.status;
+  const upstreamContentType = response.headers.get("content-type");
+  const headerUpstreamId =
+    response.headers.get("x-request-id") ?? response.headers.get("x-upstream-id");
+  const upstreamText = await response.text();
+  const upstreamBodyPreview = previewUpstreamBody(upstreamText);
+
+  let parsed: unknown = null;
+  let responseParseMode = "json_parse_failed";
+
+  if (upstreamText.trim()) {
+    try {
+      parsed = JSON.parse(upstreamText);
+      responseParseMode = "json";
+    } catch {
+      parsed = null;
+      responseParseMode = "json_parse_failed";
+    }
+  } else {
+    responseParseMode = "empty_body";
+  }
+
+  const upstreamErrorMessage = extractUpstreamErrorMessage(parsed, upstreamText);
+  const errorObj = asRecord(parsed)?.error;
+  const hasStructuredUpstreamError =
+    errorObj !== undefined && errorObj !== null;
+
+  if (hasStructuredUpstreamError) {
+    logGrsaiImageUpstreamDiagnostic({
+      requestId: params.requestId,
+      requestedModel: params.requestedModel,
+      resolvedModel: params.resolvedModel,
+      upstreamUrl,
+      upstreamMethod,
+      upstreamStatus,
+      upstreamContentType,
+      upstreamBodyPreview,
+      latencyMs,
+      responseParseMode: "upstream_error_json",
+    });
+
+    throwUpstreamError({
+      status: 502,
+      code: "upstream_error",
+      serverMessage: `GRSAI returned upstream error: ${upstreamErrorMessage ?? "unknown"}`,
+      publicMessage:
+        upstreamErrorMessage ?? "Upstream provider failed.",
+      upstreamStatus,
+      upstreamErrorSnippet: truncateText(upstreamText, 200),
+    });
+  }
+
+  if (!response.ok) {
+    logGrsaiImageUpstreamDiagnostic({
+      requestId: params.requestId,
+      requestedModel: params.requestedModel,
+      resolvedModel: params.resolvedModel,
+      upstreamUrl,
+      upstreamMethod,
+      upstreamStatus,
+      upstreamContentType,
+      upstreamBodyPreview,
+      latencyMs,
+      responseParseMode:
+        responseParseMode === "json"
+          ? "http_error_json"
+          : responseParseMode,
+    });
+
+    throwUpstreamError({
+      status: 502,
+      code: "upstream_error",
+      serverMessage: `GRSAI returned ${upstreamStatus}.`,
+      publicMessage:
+        upstreamErrorMessage ??
+        (truncateText(upstreamText, 200) || "Upstream provider failed."),
+      upstreamStatus,
+      upstreamErrorSnippet: truncateText(upstreamText, 200),
+    });
+  }
+
+  if (parsed === null) {
+    logGrsaiImageUpstreamDiagnostic({
+      requestId: params.requestId,
+      requestedModel: params.requestedModel,
+      resolvedModel: params.resolvedModel,
+      upstreamUrl,
+      upstreamMethod,
+      upstreamStatus,
+      upstreamContentType,
+      upstreamBodyPreview,
+      latencyMs,
+      responseParseMode,
+    });
+
+    throwUpstreamError({
+      status: 502,
+      code: "upstream_invalid_response",
+      serverMessage: "GRSAI returned invalid JSON.",
+      publicMessage: "Upstream provider returned an invalid response.",
+      upstreamStatus,
+      upstreamErrorSnippet: upstreamBodyPreview,
+    });
+  }
+
+  const extracted = extractImageFromParsed(parsed);
+  if (!extracted) {
+    logGrsaiImageUpstreamDiagnostic({
+      requestId: params.requestId,
+      requestedModel: params.requestedModel,
+      resolvedModel: params.resolvedModel,
+      upstreamUrl,
+      upstreamMethod,
+      upstreamStatus,
+      upstreamContentType,
+      upstreamBodyPreview,
+      latencyMs,
+      responseParseMode: "unexpected_format",
+    });
+
+    throwUpstreamError({
+      status: 502,
+      code: "upstream_invalid_response",
+      serverMessage: "GRSAI image response missing image URL.",
+      publicMessage: "Upstream provider returned an invalid response.",
+      upstreamStatus,
+      upstreamErrorSnippet: upstreamBodyPreview,
+    });
+  }
+
+  logGrsaiImageUpstreamDiagnostic({
+    requestId: params.requestId,
+    requestedModel: params.requestedModel,
+    resolvedModel: params.resolvedModel,
+    upstreamUrl,
+    upstreamMethod,
+    upstreamStatus,
+    upstreamContentType,
+    upstreamBodyPreview,
+    latencyMs,
+    responseParseMode: extracted.responseParseMode,
+  });
+
+  const debug: ImageGenerateDebugInfo = {
+    resolved_images_count: params.imageUrls.length,
+    image_url_sources: params.imageUrlSources,
+    upstream_payload_keys: upstreamPayloadKeys,
+    adapter_mode: adapterMode,
+  };
+
+  return {
+    url: extracted.url,
+    upstreamId: extracted.upstreamId ?? headerUpstreamId,
+    debug,
+  };
 }
