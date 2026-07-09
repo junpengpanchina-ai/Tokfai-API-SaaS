@@ -49,6 +49,9 @@ const ALLOWED_FIELD_KEYS = new Set([
   "dbErrorDetails",
   "dbErrorHint",
   "errorName",
+  "resourceType",
+  "resourceId",
+  "action",
 ]);
 
 /**

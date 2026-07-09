@@ -1,10 +1,82 @@
 import { ApiError } from "../errors.js";
+import { recordAdminAuditLog } from "../lib/adminAuditLog.js";
 import { log } from "../logger.js";
+import type { AdminUserContext } from "../middleware/requireAdminV1.js";
 import { supabase } from "../supabase.js";
 
 const PAGE_SIZE = 1000;
 /** PostgREST `.in()` list size — avoids oversized filters under load. */
 const IN_CHUNK_SIZE = 100;
+
+const API_KEY_ADMIN_WRITE_SELECT = "id, name, prefix, user_id, revoked_at";
+
+type AdminApiKeyWriteRow = {
+  id: string;
+  name: string;
+  prefix: string;
+  user_id: string;
+  revoked_at: string | null;
+};
+
+function isMissingCanRevealColumn(error: {
+  code?: string;
+  message?: string;
+} | null): boolean {
+  if (!error) return false;
+  const message = (error.message ?? "").toLowerCase();
+  return (
+    message.includes("can_reveal") &&
+    (message.includes("column") || error.code === "PGRST204")
+  );
+}
+
+async function adminRevokeApiKeyRow(
+  id: string,
+  revokedAt: string
+): Promise<{ data: AdminApiKeyWriteRow | null; error: { message: string; code?: string } | null }> {
+  const withFlag = await supabase()
+    .from("api_keys")
+    .update({ revoked_at: revokedAt, can_reveal: false })
+    .eq("id", id)
+    .select(API_KEY_ADMIN_WRITE_SELECT)
+    .maybeSingle();
+
+  if (!withFlag.error) {
+    return { data: (withFlag.data as AdminApiKeyWriteRow | null) ?? null, error: null };
+  }
+
+  if (!isMissingCanRevealColumn(withFlag.error)) {
+    return { data: null, error: withFlag.error };
+  }
+
+  const fallback = await supabase()
+    .from("api_keys")
+    .update({ revoked_at: revokedAt })
+    .eq("id", id)
+    .select(API_KEY_ADMIN_WRITE_SELECT)
+    .maybeSingle();
+
+  return {
+    data: (fallback.data as AdminApiKeyWriteRow | null) ?? null,
+    error: fallback.error,
+  };
+}
+
+async function adminRestoreApiKeyRow(
+  id: string
+): Promise<{ data: AdminApiKeyWriteRow | null; error: { message: string; code?: string } | null }> {
+  const result = await supabase()
+    .from("api_keys")
+    .update({ revoked_at: null })
+    .eq("id", id)
+    .select(API_KEY_ADMIN_WRITE_SELECT)
+    .maybeSingle();
+
+  return {
+    data: (result.data as AdminApiKeyWriteRow | null) ?? null,
+    error: result.error,
+  };
+}
 
 export type AdminApiKeysLogContext = {
   requestId: string;
@@ -342,6 +414,211 @@ function mergeAdminApiKeyRows(
   } catch (error) {
     throw { stage, error };
   }
+}
+
+export type AdminApiKeyWriteContext = {
+  adminUser: AdminUserContext;
+  ipAddress: string | null;
+  userAgent: string | null;
+  idempotencyKey: string;
+  requestId: string;
+  route: string;
+};
+
+export type AdminApiKeyWriteResult =
+  | {
+      ok: true;
+      key: {
+        id: string;
+        user_id: string;
+        name: string;
+        prefix: string;
+        status: "active" | "revoked";
+        revoked_at: string | null;
+      };
+    }
+  | { ok: false; status: 400 | 404; error: string };
+
+async function auditApiKeyWrite(
+  ctx: AdminApiKeyWriteContext,
+  args: {
+    action: string;
+    resourceId: string;
+    requestPayload: Record<string, unknown>;
+    status: "succeeded" | "failed";
+    error?: string | null;
+    result?: Record<string, unknown>;
+  }
+): Promise<void> {
+  await recordAdminAuditLog({
+    actorUserId: ctx.adminUser.userId,
+    actorEmail: ctx.adminUser.email,
+    action: args.action,
+    resourceType: "api_key",
+    resourceId: args.resourceId,
+    requestPayload: args.requestPayload,
+    status: args.status,
+    resultPayload: {
+      ok: args.status === "succeeded",
+      api_key_id: args.resourceId,
+      action: args.action,
+      error: args.error ?? null,
+      ...(args.result ?? {}),
+    },
+    ipAddress: ctx.ipAddress,
+    userAgent: ctx.userAgent,
+    idempotencyKey: ctx.idempotencyKey || undefined,
+  });
+}
+
+function sanitizeApiKeyWriteResult(row: {
+  id: string;
+  user_id: string;
+  name: string;
+  prefix: string;
+  revoked_at: string | null;
+}) {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    name: row.name,
+    prefix: row.prefix,
+    status: (row.revoked_at ? "revoked" : "active") as "active" | "revoked",
+    revoked_at: row.revoked_at,
+  };
+}
+
+/** Admin revoke — never returns secret / hash / encrypted_secret. */
+export async function revokeAdminApiKey(
+  id: string,
+  ctx: AdminApiKeyWriteContext
+): Promise<AdminApiKeyWriteResult> {
+  const keyId = id.trim();
+  if (!keyId) {
+    await auditApiKeyWrite(ctx, {
+      action: "api_keys.revoke",
+      resourceId: "unknown",
+      requestPayload: {},
+      status: "failed",
+      error: "missing_api_key_id",
+    });
+    return { ok: false, status: 400, error: "missing_api_key_id" };
+  }
+
+  const revokedAt = new Date().toISOString();
+  const { data, error } = await adminRevokeApiKeyRow(keyId, revokedAt);
+
+  if (error) {
+    log.error("admin_api_key_revoke_failed", {
+      requestId: ctx.requestId,
+      route: ctx.route,
+      code: "admin_api_key_revoke_failed",
+      message: error.message,
+      apiKeyId: keyId,
+      dbErrorCode: error.code,
+    });
+    throw ApiError.internal(
+      "Failed to revoke API key.",
+      "admin_api_key_revoke_failed"
+    );
+  }
+
+  if (!data) {
+    await auditApiKeyWrite(ctx, {
+      action: "api_keys.revoke",
+      resourceId: keyId,
+      requestPayload: { id: keyId },
+      status: "failed",
+      error: "api_key_not_found",
+    });
+    return { ok: false, status: 404, error: "api_key_not_found" };
+  }
+
+  const key = sanitizeApiKeyWriteResult(data);
+  await auditApiKeyWrite(ctx, {
+    action: "api_keys.revoke",
+    resourceId: keyId,
+    requestPayload: { id: keyId },
+    status: "succeeded",
+    result: { prefix: key.prefix, status: key.status },
+  });
+
+  log.info("admin_api_key_revoke_ok", {
+    requestId: ctx.requestId,
+    route: ctx.route,
+    code: "admin_api_key_revoke_ok",
+    message: "Admin revoked API key.",
+    apiKeyId: keyId,
+    adminUserId: ctx.adminUser.adminUserId ?? undefined,
+  });
+
+  return { ok: true, key };
+}
+
+/** Admin restore — never returns secret / hash / encrypted_secret. */
+export async function restoreAdminApiKey(
+  id: string,
+  ctx: AdminApiKeyWriteContext
+): Promise<AdminApiKeyWriteResult> {
+  const keyId = id.trim();
+  if (!keyId) {
+    await auditApiKeyWrite(ctx, {
+      action: "api_keys.restore",
+      resourceId: "unknown",
+      requestPayload: {},
+      status: "failed",
+      error: "missing_api_key_id",
+    });
+    return { ok: false, status: 400, error: "missing_api_key_id" };
+  }
+
+  const { data, error } = await adminRestoreApiKeyRow(keyId);
+
+  if (error) {
+    log.error("admin_api_key_restore_failed", {
+      requestId: ctx.requestId,
+      route: ctx.route,
+      code: "admin_api_key_restore_failed",
+      message: error.message,
+      apiKeyId: keyId,
+      dbErrorCode: error.code,
+    });
+    throw ApiError.internal(
+      "Failed to restore API key.",
+      "admin_api_key_restore_failed"
+    );
+  }
+
+  if (!data) {
+    await auditApiKeyWrite(ctx, {
+      action: "api_keys.restore",
+      resourceId: keyId,
+      requestPayload: { id: keyId },
+      status: "failed",
+      error: "api_key_not_found",
+    });
+    return { ok: false, status: 404, error: "api_key_not_found" };
+  }
+
+  const key = sanitizeApiKeyWriteResult(data);
+  await auditApiKeyWrite(ctx, {
+    action: "api_keys.restore",
+    resourceId: keyId,
+    requestPayload: { id: keyId },
+    status: "succeeded",
+    result: { prefix: key.prefix, status: key.status },
+  });
+
+  log.info("admin_api_key_restore_ok", {
+    requestId: ctx.requestId,
+    route: ctx.route,
+    code: "admin_api_key_restore_ok",
+    message: "Admin restored API key.",
+    apiKeyId: keyId,
+    adminUserId: ctx.adminUser.adminUserId ?? undefined,
+  });
+
+  return { ok: true, key };
 }
 
 /**

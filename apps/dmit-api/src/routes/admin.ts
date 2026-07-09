@@ -22,12 +22,16 @@ import {
   listAdminAnnouncements,
   updateAdminAnnouncement,
 } from "./adminAnnouncements.js";
-import { listAdminChannels } from "./adminChannels.js";
+import { listAdminChannels, updateAdminChannel } from "./adminChannels.js";
 import { buildAdminDashboardSummary } from "./adminDashboardSummary.js";
 import { listAdminErrorLogs } from "./adminLogs.js";
-import { listAdminApiKeysEnriched } from "./adminApiKeys.js";
-import { getAdminSettings } from "./adminSettings.js";
-import { listAdminPricing } from "./adminPricing.js";
+import {
+  listAdminApiKeysEnriched,
+  restoreAdminApiKey,
+  revokeAdminApiKey,
+} from "./adminApiKeys.js";
+import { getAdminSettings, updateAdminSettings } from "./adminSettings.js";
+import { listAdminPricing, updateAdminPricing } from "./adminPricing.js";
 import {
   listAdminCreditOrders,
   parseAdminCreditOrdersQuery,
@@ -150,6 +154,8 @@ function adminModelWriteContext(c: Context): {
   ipAddress: string | null;
   userAgent: string | null;
   idempotencyKey: string;
+  requestId: string;
+  route: string;
 } {
   const adminUser = c.get("adminUser" as never) as AdminUserContext;
   const forwarded = c.req.header("x-forwarded-for");
@@ -164,6 +170,8 @@ function adminModelWriteContext(c: Context): {
     ipAddress,
     userAgent: c.req.header("user-agent") ?? null,
     idempotencyKey: idempotencyKey.trim(),
+    requestId: (c.get("requestId" as never) as string) ?? "",
+    route: `${c.req.method} ${c.req.path}`,
   };
 }
 
@@ -561,13 +569,107 @@ protectedAdminRoutes.get("/api-keys", async (c) => {
   return c.json({ data: apiKeys });
 });
 
+protectedAdminRoutes.post("/api-keys/:id/revoke", async (c) => {
+  const id = c.req.param("id").trim();
+  const result = await revokeAdminApiKey(id, adminModelWriteContext(c));
+  if (!result.ok) {
+    return adminApiError(
+      c,
+      result.status,
+      result.error === "api_key_not_found"
+        ? "API key not found."
+        : "API key ID is required.",
+      result.error,
+      result.status === 404 ? "not_found" : "validation_error"
+    );
+  }
+  return c.json({ data: result.key });
+});
+
+protectedAdminRoutes.post("/api-keys/:id/restore", async (c) => {
+  const id = c.req.param("id").trim();
+  const result = await restoreAdminApiKey(id, adminModelWriteContext(c));
+  if (!result.ok) {
+    return adminApiError(
+      c,
+      result.status,
+      result.error === "api_key_not_found"
+        ? "API key not found."
+        : "API key ID is required.",
+      result.error,
+      result.status === 404 ? "not_found" : "validation_error"
+    );
+  }
+  return c.json({ data: result.key });
+});
+
 protectedAdminRoutes.get("/channels", async (c) => {
   return c.json({ data: listAdminChannels() });
+});
+
+protectedAdminRoutes.patch("/channels/:id", async (c) => {
+  const id = c.req.param("id").trim();
+  if (!id) {
+    return adminApiError(c, 400, "Channel ID is required.", "missing_channel_id");
+  }
+
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const result = await updateAdminChannel(id, body, adminModelWriteContext(c));
+
+  if (!result.ok) {
+    const message =
+      result.error === "channel_not_found"
+        ? "Channel not found."
+        : result.error === "empty_patch"
+          ? "No fields to update."
+          : result.error === "invalid_priority"
+            ? "Invalid priority."
+            : result.error === "invalid_weight"
+              ? "Invalid weight."
+              : result.error === "invalid_base_url"
+                ? "Invalid base_url."
+                : result.error === "unknown_field"
+                  ? "Unknown field in request body."
+                  : "Failed to update channel.";
+    return adminApiError(
+      c,
+      result.status,
+      message,
+      result.error,
+      result.status === 404 ? "not_found" : "validation_error",
+      result.detail
+    );
+  }
+
+  return c.json({ data: result.channel });
 });
 
 protectedAdminRoutes.get("/pricing", async (c) => {
   const pricing = await listAdminPricing();
   return c.json({ data: pricing });
+});
+
+protectedAdminRoutes.patch("/pricing/:modelId", async (c) => {
+  const modelId = c.req.param("modelId").trim();
+  if (!modelId) {
+    return adminApiError(c, 400, "Model ID is required.", "missing_model_id");
+  }
+
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const result = await updateAdminPricing(modelId, body, adminModelWriteContext(c));
+
+  if (!result.ok) {
+    return adminApiError(
+      c,
+      result.status,
+      adminModelErrorMessage(result.error),
+      result.error,
+      result.status === 404 ? "not_found" : "validation_error",
+      result.detail
+    );
+  }
+
+  return c.json({ data: result.pricing });
 });
 
 protectedAdminRoutes.get("/logs", async (c) => {
@@ -580,6 +682,38 @@ protectedAdminRoutes.get("/logs", async (c) => {
 
 protectedAdminRoutes.get("/settings", async (c) => {
   return c.json({ data: getAdminSettings() });
+});
+
+protectedAdminRoutes.patch("/settings", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const result = await updateAdminSettings(body, adminModelWriteContext(c));
+
+  if (!result.ok) {
+    const message =
+      result.error === "empty_patch"
+        ? "No fields to update."
+        : result.error === "unknown_or_disallowed_field"
+          ? "Unknown or disallowed settings field."
+          : result.error === "invalid_site_name"
+            ? "Invalid site_name."
+            : result.error === "invalid_default_signup_credits"
+              ? "Invalid default_signup_credits."
+              : result.error === "invalid_registration_enabled"
+                ? "Invalid registration_enabled."
+                : result.error === "invalid_maintenance_mode"
+                  ? "Invalid maintenance_mode."
+                  : "Failed to update settings.";
+    return adminApiError(
+      c,
+      result.status,
+      message,
+      result.error,
+      "validation_error",
+      result.detail
+    );
+  }
+
+  return c.json({ data: result.settings });
 });
 
 protectedAdminRoutes.get("/announcements", async (c) => {
@@ -639,6 +773,70 @@ protectedAdminRoutes.patch("/announcements/:id", async (c) => {
       c,
       result.status,
       message,
+      result.error,
+      result.status === 404 ? "not_found" : "validation_error"
+    );
+  }
+
+  return c.json({ data: result.announcement });
+});
+
+protectedAdminRoutes.post("/announcements/:id/publish", async (c) => {
+  const id = c.req.param("id").trim();
+  if (!id) {
+    return adminApiError(
+      c,
+      400,
+      "Announcement ID is required.",
+      "missing_announcement_id"
+    );
+  }
+
+  const result = await updateAdminAnnouncement(
+    id,
+    { enabled: true },
+    adminModelWriteContext(c)
+  );
+
+  if (!result.ok) {
+    return adminApiError(
+      c,
+      result.status,
+      result.error === "announcement_not_found"
+        ? "Announcement not found."
+        : "Failed to publish announcement.",
+      result.error,
+      result.status === 404 ? "not_found" : "validation_error"
+    );
+  }
+
+  return c.json({ data: result.announcement });
+});
+
+protectedAdminRoutes.post("/announcements/:id/unpublish", async (c) => {
+  const id = c.req.param("id").trim();
+  if (!id) {
+    return adminApiError(
+      c,
+      400,
+      "Announcement ID is required.",
+      "missing_announcement_id"
+    );
+  }
+
+  const result = await updateAdminAnnouncement(
+    id,
+    { enabled: false },
+    adminModelWriteContext(c)
+  );
+
+  if (!result.ok) {
+    return adminApiError(
+      c,
+      result.status,
+      result.error === "announcement_not_found"
+        ? "Announcement not found."
+        : "Failed to unpublish announcement.",
       result.error,
       result.status === 404 ? "not_found" : "validation_error"
     );

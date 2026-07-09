@@ -12,6 +12,9 @@ const MODEL_PATCH_FIELDS = [
   "provider",
   "model_type",
   "sort_order",
+  // New API–style aliases
+  "priority",
+  "status",
 ] as const;
 
 const PRICING_PATCH_FIELDS = [
@@ -117,15 +120,15 @@ function resolveModelResourceId(
 }
 
 function collectChangedFieldNames(
-  model: z.infer<typeof ModelPatchSchema>,
-  pricing: z.infer<typeof PricingPatchSchema>
+  model: Record<string, unknown>,
+  pricing: Record<string, unknown>
 ): string[] {
   return [...Object.keys(model), ...Object.keys(pricing)];
 }
 
 function resolveModelAuditAction(
   body: Record<string, unknown>,
-  modelPatch: z.infer<typeof ModelPatchSchema>
+  modelPatch: { enabled?: boolean; visible?: boolean }
 ): "models.update" | "models.restore" {
   if (body.action === "restore") return "models.restore";
   if (modelPatch.enabled === true && modelPatch.visible === true) {
@@ -206,6 +209,12 @@ const ModelPatchSchema = z
     provider: z.string().trim().max(64).optional(),
     model_type: z.enum(["chat", "image", "video", "other"]).optional(),
     sort_order: z.number().int().min(0).max(100_000).optional(),
+    /** Alias for sort_order (New API–style). */
+    priority: z.number().int().min(0).max(100_000).optional(),
+    /** Derived status → enabled/visible mapping. */
+    status: z
+      .enum(["available", "disabled", "coming_soon", "archived"])
+      .optional(),
   })
   .strict();
 
@@ -772,10 +781,47 @@ function buildPricingUpsertFromPatch(
   return row;
 }
 
+function statusToEnabledVisible(
+  status: AdminModelStatus
+): { enabled: boolean; visible: boolean } {
+  switch (status) {
+    case "available":
+      return { enabled: true, visible: true };
+    case "coming_soon":
+      return { enabled: false, visible: true };
+    case "disabled":
+      return { enabled: true, visible: false };
+    case "archived":
+    default:
+      return { enabled: false, visible: false };
+  }
+}
+
+function normalizeModelPatchAliases(
+  model: z.infer<typeof ModelPatchSchema>
+): Omit<z.infer<typeof ModelPatchSchema>, "priority" | "status"> {
+  const { priority, status, ...rest } = model;
+  const out: Omit<z.infer<typeof ModelPatchSchema>, "priority" | "status"> = {
+    ...rest,
+  };
+
+  if (priority !== undefined && out.sort_order === undefined) {
+    out.sort_order = priority;
+  }
+
+  if (status !== undefined) {
+    const mapped = statusToEnabledVisible(status);
+    if (out.enabled === undefined) out.enabled = mapped.enabled;
+    if (out.visible === undefined) out.visible = mapped.visible;
+  }
+
+  return out;
+}
+
 function partitionPatchBody(body: Record<string, unknown>):
   | {
       ok: true;
-      model: z.infer<typeof ModelPatchSchema>;
+      model: Omit<z.infer<typeof ModelPatchSchema>, "priority" | "status">;
       pricing: z.infer<typeof PricingPatchSchema>;
       pricingRaw: Record<string, unknown>;
     }
@@ -822,8 +868,10 @@ function partitionPatchBody(body: Record<string, unknown>):
     };
   }
 
+  const normalizedModel = normalizeModelPatchAliases(modelParsed.data);
+
   if (
-    Object.keys(modelParsed.data).length === 0 &&
+    Object.keys(normalizedModel).length === 0 &&
     Object.keys(pricingParsed.data).length === 0
   ) {
     return { ok: false, error: "empty_patch" };
@@ -831,7 +879,7 @@ function partitionPatchBody(body: Record<string, unknown>):
 
   return {
     ok: true,
-    model: modelParsed.data,
+    model: normalizedModel,
     pricing: pricingParsed.data,
     pricingRaw: pricingBody,
   };
@@ -839,7 +887,14 @@ function partitionPatchBody(body: Record<string, unknown>):
 
 async function applyModelPatch(
   id: string,
-  model: z.infer<typeof ModelPatchSchema>,
+  model: {
+    enabled?: boolean;
+    visible?: boolean;
+    display_name?: string;
+    provider?: string;
+    model_type?: "chat" | "image" | "video" | "other";
+    sort_order?: number;
+  },
   pricingRaw: Record<string, unknown>
 ): Promise<void> {
   const now = new Date().toISOString();

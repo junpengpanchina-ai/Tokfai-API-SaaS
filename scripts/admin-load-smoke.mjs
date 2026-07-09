@@ -12,6 +12,17 @@
  *   TOKFAI_LOAD_CONCURRENCY   default 20
  *   TOKFAI_LOAD_TIMEOUT_MS    default 30000
  *   TOKFAI_LOAD_P95_WARN_MS   default 1000
+ *
+ * Fail-fast:
+ *   - Missing JWT → exit 1
+ *   - Expired / undecodable JWT → exit 1 (prompt regenerate)
+ *
+ * Per-endpoint:
+ *   - 5xx → FAIL
+ *   - 401/403 with valid admin JWT → FAIL
+ *   - timeout / network → FAIL
+ *   - p95 > TOKFAI_LOAD_P95_WARN_MS → WARN only
+ *   - Must complete all TOTAL iterations
  */
 
 import { getAcceptanceHeaders } from "./lib/acceptance-http.mjs";
@@ -56,6 +67,53 @@ const ENDPOINTS = [
 
 function normalizeBase(value, fallback) {
   return (value?.trim() || fallback).replace(/\/+$/, "");
+}
+
+function decodeJwtExp(token) {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const payload = JSON.parse(
+      Buffer.from(parts[1].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString(
+        "utf8"
+      )
+    );
+    return typeof payload.exp === "number" ? payload.exp : null;
+  } catch {
+    return null;
+  }
+}
+
+function assertAdminJwtOrExit(token) {
+  if (!token) {
+    console.error(
+      "FAIL: TOKFAI_ADMIN_JWT is required (Supabase access token for admin user)."
+    );
+    process.exit(1);
+  }
+
+  const exp = decodeJwtExp(token);
+  if (exp === null) {
+    console.error(
+      "FAIL: TOKFAI_ADMIN_JWT could not be decoded as a JWT. Regenerate a Supabase access token and retry."
+    );
+    process.exit(1);
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  if (exp <= now) {
+    console.error(
+      `FAIL: TOKFAI_ADMIN_JWT expired at ${new Date(exp * 1000).toISOString()}. Regenerate the admin access token and retry.`
+    );
+    process.exit(1);
+  }
+
+  const remainingMin = Math.round((exp - now) / 60);
+  if (remainingMin < 15) {
+    console.warn(
+      `WARN: TOKFAI_ADMIN_JWT expires in ~${remainingMin}m — consider regenerating before a long 10k run.`
+    );
+  }
 }
 
 function percentile(sorted, p) {
@@ -214,6 +272,7 @@ function summarizeEndpoint(id, stats) {
   if (stats.server5xx > 0) fails.push(`5xx=${stats.server5xx}`);
   if (stats.timeouts > 0) fails.push(`timeout=${stats.timeouts}`);
   if (stats.authErrors > 0) fails.push(`401/403=${stats.authErrors}`);
+  if (stats.networkErrors > 0) fails.push(`network=${stats.networkErrors}`);
   if (p95 >= P95_WARN_MS) warns.push(`p95=${p95}ms (threshold ${P95_WARN_MS}ms)`);
 
   let status = "PASS";
@@ -234,8 +293,12 @@ function summarizeEndpoint(id, stats) {
 
 function printEndpointReport(summary) {
   const s = summary.stats;
-  console.log(`\n[${summary.status}] GET /admin/${summary.id === "overview" ? "dashboard-summary (overview)" : summary.id}`);
-  console.log(`  requests=${s.requests} success=${s.success} 401/403=${s.authErrors} 4xx=${s.client4xx} 5xx=${s.server5xx} timeout=${s.timeouts} network=${s.networkErrors}`);
+  console.log(
+    `\n[${summary.status}] GET /admin/${summary.id === "overview" ? "dashboard-summary (overview)" : summary.id}`
+  );
+  console.log(
+    `  requests=${s.requests} success=${s.success} 401/403=${s.authErrors} 4xx=${s.client4xx} 5xx=${s.server5xx} timeout=${s.timeouts} network=${s.networkErrors}`
+  );
   console.log(`  p50=${summary.p50}ms p95=${summary.p95}ms p99=${summary.p99}ms`);
   if (s.requestIdSamples.length > 0) {
     console.log(`  request_id samples: ${s.requestIdSamples.join(", ")}`);
@@ -254,13 +317,11 @@ async function main() {
   console.log(`TOTAL:       ${TOTAL}`);
   console.log(`CONCURRENCY: ${CONCURRENCY}`);
   console.log(`TIMEOUT:     ${TIMEOUT_MS}ms`);
+  console.log(`P95_WARN:    ${P95_WARN_MS}ms`);
   console.log(`JWT:         ${ADMIN_JWT ? `${ADMIN_JWT.slice(0, 12)}…` : "(missing)"}`);
   console.log("");
 
-  if (!ADMIN_JWT) {
-    console.error("TOKFAI_ADMIN_JWT is required (Supabase access token for admin user).");
-    process.exit(1);
-  }
+  assertAdminJwtOrExit(ADMIN_JWT);
 
   const perEndpoint = Object.fromEntries(
     ENDPOINTS.map((endpoint) => [endpoint.id, createEmptyStats()])
@@ -281,6 +342,7 @@ async function main() {
     summarizeEndpoint(endpoint.id, perEndpoint[endpoint.id])
   );
 
+  console.log("\n=== Per-endpoint PASS/WARN/FAIL ===");
   for (const summary of summaries) {
     printEndpointReport(summary);
   }
@@ -314,12 +376,18 @@ async function main() {
     `global latency: p50=${Math.round(percentile(globalLatencies, 50))}ms p95=${globalP95}ms p99=${Math.round(percentile(globalLatencies, 99))}ms`
   );
   console.log(`endpoints: PASS=${passCount} WARN=${warnCount} FAIL=${failCount}`);
-  console.log(`completed iterations: ${results.length}`);
+  console.log(`completed iterations: ${results.length} (required ${TOTAL})`);
+
+  if (results.length < TOTAL) {
+    console.log("\nRESULT: FAIL (did not complete all iterations)");
+    process.exit(1);
+  }
 
   const globalFail =
     global.server5xx > 0 ||
     global.timeouts > 0 ||
     global.authErrors > 0 ||
+    global.networkErrors > 0 ||
     failCount > 0;
 
   if (globalFail) {
