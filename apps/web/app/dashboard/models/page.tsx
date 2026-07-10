@@ -4,7 +4,7 @@ import { loginPathWithNext } from "@/lib/auth/login-redirect";
 import { listCatalogModelPricing } from "@/lib/dmit/server";
 import { buildModelsClientData } from "@/lib/models-page-server";
 import { buildFallbackModelsClientData } from "@/lib/dashboard-safe/catalog-fallback";
-import { loadDashboardPageSession } from "@/lib/dashboard-safe/server-session";
+import { loadDashboardPageSession, rethrowIfNextNavigation } from "@/lib/dashboard-safe/server-session";
 
 import { ModelsClient } from "./models-client";
 
@@ -38,6 +38,7 @@ export default async function ModelsPage() {
 
     return <ModelsClient modelsData={modelsData} />;
   } catch (err) {
+    rethrowIfNextNavigation(err);
     console.error("[dashboard-ssr-fail-open]", "models/page", err);
     return <ModelsClient modelsData={buildFallbackModelsClientData()} />;
   }

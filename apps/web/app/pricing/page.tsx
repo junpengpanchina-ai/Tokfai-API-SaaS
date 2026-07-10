@@ -18,10 +18,18 @@ export const dynamic = "force-dynamic";
 export default async function PricingPage() {
   noStore();
 
-  const supabase = createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  let isLoggedIn = false;
+  try {
+    const supabase = createClient();
+    if (supabase) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      isLoggedIn = Boolean(session?.user);
+    }
+  } catch {
+    isLoggedIn = false;
+  }
 
   const { plans, purchaseDisabled } = await fetchBillingPlansForPricing();
 
@@ -32,7 +40,7 @@ export default async function PricingPage() {
         <PricingContent
           plans={plans}
           purchaseDisabled={purchaseDisabled}
-          isLoggedIn={Boolean(session?.user)}
+          isLoggedIn={isLoggedIn}
         />
       </main>
       <PublicFooter />

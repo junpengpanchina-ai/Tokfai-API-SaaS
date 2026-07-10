@@ -8,8 +8,13 @@ export const metadata = {
   title: "Admin — Recharge plans",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminRechargePlansPage() {
   const supabase = createClient();
+  if (!supabase) {
+    redirect("/login?redirect=/admin");
+  }
 
   const {
     data: { user },

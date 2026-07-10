@@ -41,6 +41,14 @@ export async function uploadPlaygroundImageAction(
   }
 
   const supabase = createClient();
+  if (!supabase) {
+    return {
+      ok: false,
+      message: "Upload temporarily unavailable.",
+      code: "client_unavailable",
+    };
+  }
+
   const {
     data: { user },
     error: authError,

@@ -20,6 +20,9 @@ type ChannelsResponse = {
 export default async function AdminChannelsPage() {
   noStore();
   const supabase = createClient();
+  if (!supabase) {
+    redirect("/login?redirect=/admin");
+  }
   const dmitBaseUrl = getDmitBaseUrl();
 
   const {

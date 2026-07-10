@@ -1,7 +1,10 @@
 import type { Session, User } from "@supabase/supabase-js";
 
 import { loadDashboardShellCredits } from "@/lib/load-dashboard-shell-credits";
-import { createClient } from "@/lib/supabase/server";
+import {
+  hasSupabaseServerEnv,
+  tryCreateServerClient,
+} from "@/lib/supabase/server";
 
 import { EMPTY_DASHBOARD_OVERVIEW } from "./dtos/overview";
 import type { CreditsPageData } from "./dtos/credits";
@@ -47,39 +50,36 @@ export const EMPTY_CREDITS_PAGE_DATA: CreditsPageData = {
   error: "temporary",
 };
 
-function hasSupabaseEnv(): boolean {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
-}
-
-/** Returns null instead of throwing when env or client creation fails. */
-export function tryCreateServerClient() {
-  if (!hasSupabaseEnv()) {
-    return null;
-  }
-
-  try {
-    return createClient();
-  } catch (error) {
-    console.error("[dashboard-ssr-fail-open]", "tryCreateServerClient", error);
-    return null;
-  }
-}
+/** Re-export fail-open client for dashboard data loaders. */
+export { tryCreateServerClient };
 
 function resolveClientError(): DashboardSupabaseError {
-  return hasSupabaseEnv() ? "client_unavailable" : "missing_env";
+  return hasSupabaseServerEnv() ? "client_unavailable" : "missing_env";
+}
+
+function logDashboardSsr(
+  event: string,
+  detail: Record<string, string | boolean | null | undefined> = {}
+) {
+  console.info("[dashboard-ssr]", event, detail);
 }
 
 export async function loadDashboardShellSession(): Promise<DashboardShellSession> {
+  logDashboardSsr("start", { scope: "shell" });
+  logDashboardSsr("supabase_env", {
+    present: hasSupabaseServerEnv(),
+  });
+
   const supabase = tryCreateServerClient();
   if (!supabase) {
+    const error = resolveClientError();
+    logDashboardSsr("session", { status: "error", error });
+    logDashboardSsr("fallback_render", { scope: "shell", reason: error });
     return {
       user: null,
       email: "",
       credits: EMPTY_SHELL_CREDITS,
-      error: resolveClientError(),
+      error,
     };
   }
 
@@ -90,6 +90,14 @@ export async function loadDashboardShellSession(): Promise<DashboardShellSession
     } = await supabase.auth.getUser();
 
     if (error) {
+      logDashboardSsr("session", {
+        status: "error",
+        error: "auth_unavailable",
+      });
+      logDashboardSsr("fallback_render", {
+        scope: "shell",
+        reason: "auth_unavailable",
+      });
       return {
         user: null,
         email: "",
@@ -102,6 +110,11 @@ export async function loadDashboardShellSession(): Promise<DashboardShellSession
       ? await loadDashboardShellCredits(user.id)
       : EMPTY_SHELL_CREDITS;
 
+    logDashboardSsr("session", {
+      status: user ? "loaded" : "null",
+      hasUser: Boolean(user),
+    });
+
     return {
       user: user ?? null,
       email: user?.email ?? "",
@@ -110,6 +123,11 @@ export async function loadDashboardShellSession(): Promise<DashboardShellSession
     };
   } catch (error) {
     console.error("[dashboard-ssr-fail-open]", "loadDashboardShellSession", error);
+    logDashboardSsr("session", { status: "error", error: "auth_unavailable" });
+    logDashboardSsr("fallback_render", {
+      scope: "shell",
+      reason: "auth_unavailable",
+    });
     return {
       user: null,
       email: "",
@@ -120,12 +138,20 @@ export async function loadDashboardShellSession(): Promise<DashboardShellSession
 }
 
 export async function loadDashboardPageSession(): Promise<DashboardPageSession> {
+  logDashboardSsr("start", { scope: "page" });
+  logDashboardSsr("supabase_env", {
+    present: hasSupabaseServerEnv(),
+  });
+
   const supabase = tryCreateServerClient();
   if (!supabase) {
+    const error = resolveClientError();
+    logDashboardSsr("session", { status: "error", error });
+    logDashboardSsr("fallback_render", { scope: "page", reason: error });
     return {
       user: null,
       session: null,
-      error: resolveClientError(),
+      error,
     };
   }
 
@@ -136,6 +162,14 @@ export async function loadDashboardPageSession(): Promise<DashboardPageSession> 
     } = await supabase.auth.getUser();
 
     if (userError) {
+      logDashboardSsr("session", {
+        status: "error",
+        error: "auth_unavailable",
+      });
+      logDashboardSsr("fallback_render", {
+        scope: "page",
+        reason: "auth_unavailable",
+      });
       return {
         user: null,
         session: null,
@@ -147,6 +181,12 @@ export async function loadDashboardPageSession(): Promise<DashboardPageSession> 
       data: { session },
     } = await supabase.auth.getSession();
 
+    logDashboardSsr("session", {
+      status: user ? "loaded" : "null",
+      hasUser: Boolean(user),
+      hasSession: Boolean(session),
+    });
+
     return {
       user: user ?? null,
       session: session ?? null,
@@ -154,10 +194,33 @@ export async function loadDashboardPageSession(): Promise<DashboardPageSession> 
     };
   } catch (error) {
     console.error("[dashboard-ssr-fail-open]", "loadDashboardPageSession", error);
+    logDashboardSsr("session", { status: "error", error: "auth_unavailable" });
+    logDashboardSsr("fallback_render", {
+      scope: "page",
+      reason: "auth_unavailable",
+    });
     return {
       user: null,
       session: null,
       error: "auth_unavailable",
     };
+  }
+}
+
+/** Re-throw Next.js navigation errors so try/catch fail-open does not swallow redirects. */
+export function rethrowIfNextNavigation(error: unknown): void {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "digest" in error &&
+    typeof (error as { digest?: unknown }).digest === "string"
+  ) {
+    const digest = (error as { digest: string }).digest;
+    if (
+      digest.startsWith("NEXT_REDIRECT") ||
+      digest.startsWith("NEXT_NOT_FOUND")
+    ) {
+      throw error;
+    }
   }
 }

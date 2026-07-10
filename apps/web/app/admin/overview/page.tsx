@@ -53,6 +53,9 @@ async function fetchApiHealth(dmitBaseUrl: string): Promise<ApiHealth | null> {
 export default async function AdminOverviewPage() {
   noStore();
   const supabase = createClient();
+  if (!supabase) {
+    redirect("/login?redirect=/admin");
+  }
   const dmitBaseUrl = getDmitBaseUrl();
   const {
     data: { user },

@@ -20,6 +20,9 @@ type ApiKeysResponse = {
 export default async function AdminApiKeysPage() {
   noStore();
   const supabase = createClient();
+  if (!supabase) {
+    redirect("/login?redirect=/admin");
+  }
   const dmitBaseUrl = getDmitBaseUrl();
 
   const {

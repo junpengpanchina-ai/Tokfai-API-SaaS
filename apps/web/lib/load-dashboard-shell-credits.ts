@@ -2,7 +2,7 @@ import {
   EMPTY_SHELL_CREDITS,
   type DashboardShellCredits,
 } from "@/lib/dashboard-shell-credits";
-import { tryCreateServerClient } from "@/lib/dashboard-safe/server-session";
+import { tryCreateServerClient } from "@/lib/supabase/server";
 
 export async function loadDashboardShellCredits(
   userId: string

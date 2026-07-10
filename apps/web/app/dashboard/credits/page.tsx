@@ -7,6 +7,7 @@ import { loadCreditsPageData } from "@/lib/credits";
 import {
   EMPTY_CREDITS_PAGE_DATA,
   loadDashboardPageSession,
+  rethrowIfNextNavigation,
 } from "@/lib/dashboard-safe/server-session";
 
 import { CreditsReturnRefresh } from "./credits-return-refresh";
@@ -79,6 +80,7 @@ export default async function CreditsPage({
       </>
     );
   } catch (err) {
+    rethrowIfNextNavigation(err);
     console.error("[dashboard-ssr-fail-open]", "credits/page", err);
     return (
       <>

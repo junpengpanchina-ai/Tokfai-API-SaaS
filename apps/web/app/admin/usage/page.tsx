@@ -27,6 +27,9 @@ export default async function AdminUsagePage({
 }) {
   noStore();
   const supabase = createClient();
+  if (!supabase) {
+    redirect("/login?redirect=/admin");
+  }
   const dmitBaseUrl = getDmitBaseUrl();
 
   const {

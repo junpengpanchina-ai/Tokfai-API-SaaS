@@ -7,6 +7,7 @@ import { loadUsagePageData } from "@/lib/usage-page";
 import {
   EMPTY_USAGE_PAGE_STATE,
   loadDashboardPageSession,
+  rethrowIfNextNavigation,
 } from "@/lib/dashboard-safe/server-session";
 
 export const metadata = {
@@ -38,6 +39,7 @@ export default async function UsagePage() {
 
     return <UsageViewClient state={state} />;
   } catch (err) {
+    rethrowIfNextNavigation(err);
     console.error("[dashboard-ssr-fail-open]", "usage/page", err);
     return <UsageViewClient state={EMPTY_USAGE_PAGE_STATE} />;
   }

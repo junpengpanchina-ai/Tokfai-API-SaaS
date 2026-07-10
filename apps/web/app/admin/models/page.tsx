@@ -8,8 +8,13 @@ export const metadata = {
   title: "Admin — Models & pricing",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminModelsPage() {
   const supabase = createClient();
+  if (!supabase) {
+    redirect("/login?redirect=/admin");
+  }
 
   const {
     data: { user },

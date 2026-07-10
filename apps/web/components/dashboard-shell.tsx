@@ -1,8 +1,6 @@
 import { DashboardDataUnavailableBanner } from "@/components/dashboard-data-unavailable-banner";
 import { DashboardShellClient } from "@/components/dashboard-shell-client";
-import {
-  loadDashboardShellSession,
-} from "@/lib/dashboard-safe/server-session";
+import { loadDashboardShellSession } from "@/lib/dashboard-safe/server-session";
 import { EMPTY_SHELL_CREDITS } from "@/lib/dashboard-safe/shell-credits";
 
 export async function DashboardShell({
@@ -10,6 +8,8 @@ export async function DashboardShell({
 }: {
   children: React.ReactNode;
 }) {
+  console.info("[dashboard-ssr]", "start", { scope: "DashboardShell" });
+
   let email = "";
   let credits = EMPTY_SHELL_CREDITS;
   let error: "missing_env" | "client_unavailable" | "auth_unavailable" | null =
@@ -23,6 +23,15 @@ export async function DashboardShell({
   } catch (err) {
     console.error("[dashboard-ssr-fail-open]", "DashboardShell", err);
     error = "auth_unavailable";
+  }
+
+  if (error) {
+    console.info("[dashboard-ssr]", "fallback_render", {
+      scope: "DashboardShell",
+      reason: error,
+      emailEmpty: !email,
+      creditsLoaded: credits.loaded,
+    });
   }
 
   return (

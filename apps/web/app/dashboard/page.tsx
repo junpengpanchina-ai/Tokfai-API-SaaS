@@ -7,6 +7,7 @@ import { listPublicAnnouncements } from "@/lib/dmit/server";
 import {
   EMPTY_DASHBOARD_OVERVIEW,
   loadDashboardPageSession,
+  rethrowIfNextNavigation,
 } from "@/lib/dashboard-safe/server-session";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,10 @@ export default async function DashboardOverviewPage() {
       } catch (err) {
         console.error("[dashboard-ssr-fail-open]", "dashboard/announcements", err);
       }
+      console.info("[dashboard-ssr]", "fallback_render", {
+        scope: "dashboard/page",
+        reason: error,
+      });
       return (
         <DashboardOverviewContent
           overview={EMPTY_DASHBOARD_OVERVIEW}
@@ -63,7 +68,12 @@ export default async function DashboardOverviewPage() {
       />
     );
   } catch (err) {
+    rethrowIfNextNavigation(err);
     console.error("[dashboard-ssr-fail-open]", "dashboard/page", err);
+    console.info("[dashboard-ssr]", "fallback_render", {
+      scope: "dashboard/page",
+      reason: "uncaught",
+    });
     return (
       <DashboardOverviewContent
         overview={EMPTY_DASHBOARD_OVERVIEW}

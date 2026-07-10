@@ -7,8 +7,13 @@ export const metadata = {
   title: "Admin — Announcements",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminAnnouncementsPage() {
   const supabase = createClient();
+  if (!supabase) {
+    redirect("/login?redirect=/admin");
+  }
   const {
     data: { user },
   } = await supabase.auth.getUser();

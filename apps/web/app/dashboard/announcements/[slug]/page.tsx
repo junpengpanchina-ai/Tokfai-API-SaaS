@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { DashboardAnnouncementDetail } from "@/components/dashboard-announcement-detail";
+import { rethrowIfNextNavigation } from "@/lib/dashboard-safe/server-session";
 import { getPublicAnnouncementBySlug } from "@/lib/dmit/server";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +36,7 @@ export default async function DashboardAnnouncementDetailPage({
 
     return <DashboardAnnouncementDetail announcement={announcement} />;
   } catch (err) {
+    rethrowIfNextNavigation(err);
     console.error("[dashboard-ssr-fail-open]", "announcements/detail", err);
     notFound();
   }

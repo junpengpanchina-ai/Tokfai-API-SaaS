@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { loginPathWithNext } from "@/lib/auth/login-redirect";
 import { dmitServerFetch } from "@/lib/dmit/server";
-import { loadDashboardPageSession } from "@/lib/dashboard-safe/server-session";
+import { loadDashboardPageSession, rethrowIfNextNavigation } from "@/lib/dashboard-safe/server-session";
 
 import {
   PlaygroundClient,
@@ -56,6 +56,7 @@ export default async function PlaygroundPage({
       />
     );
   } catch (err) {
+    rethrowIfNextNavigation(err);
     console.error("[dashboard-ssr-fail-open]", "playground/page", err);
     return (
       <PlaygroundClient

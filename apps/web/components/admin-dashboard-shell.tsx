@@ -14,16 +14,24 @@ export async function AdminDashboardShell({
   children: React.ReactNode;
 }) {
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const email = user?.email ?? "";
+  let email = "";
   let credits = { balance: null, loaded: false } as DashboardShellCredits;
-  if (user) {
+
+  if (supabase) {
     try {
-      credits = await loadDashboardShellCredits(user.id);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      email = user?.email ?? "";
+      if (user) {
+        try {
+          credits = await loadDashboardShellCredits(user.id);
+        } catch {
+          credits = { balance: null, loaded: false };
+        }
+      }
     } catch {
+      email = "";
       credits = { balance: null, loaded: false };
     }
   }

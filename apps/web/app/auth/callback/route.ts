@@ -40,6 +40,12 @@ export async function GET(request: Request) {
   }
 
   const supabase = createRouteHandlerClient();
+  if (!supabase) {
+    return NextResponse.redirect(
+      new URL(loginPathWithError("auth_callback_failed", nextPath), origin)
+    );
+  }
+
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {

@@ -20,6 +20,9 @@ type PricingResponse = {
 export default async function AdminPricingPage() {
   noStore();
   const supabase = createClient();
+  if (!supabase) {
+    redirect("/login?redirect=/admin");
+  }
   const dmitBaseUrl = getDmitBaseUrl();
 
   const {

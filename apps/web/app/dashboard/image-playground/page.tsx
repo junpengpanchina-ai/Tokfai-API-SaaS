@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { loginPathWithNext } from "@/lib/auth/login-redirect";
 import { dmitServerFetch } from "@/lib/dmit/server";
 import { loadDashboardShellCredits } from "@/lib/load-dashboard-shell-credits";
-import { loadDashboardPageSession } from "@/lib/dashboard-safe/server-session";
+import { loadDashboardPageSession, rethrowIfNextNavigation } from "@/lib/dashboard-safe/server-session";
 import { EMPTY_SHELL_CREDITS } from "@/lib/dashboard-safe/shell-credits";
 
 import {
@@ -70,6 +70,7 @@ export default async function ImagePlaygroundPage({
       />
     );
   } catch (err) {
+    rethrowIfNextNavigation(err);
     console.error("[dashboard-ssr-fail-open]", "image-playground/page", err);
     return (
       <ImagePlaygroundClient

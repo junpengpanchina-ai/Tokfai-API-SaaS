@@ -8,7 +8,7 @@ import {
   dmitServerFetch,
   getDmitBaseUrl,
 } from "@/lib/dmit/server";
-import { loadDashboardPageSession } from "@/lib/dashboard-safe/server-session";
+import { loadDashboardPageSession, rethrowIfNextNavigation } from "@/lib/dashboard-safe/server-session";
 
 import {
   ApiKeysClient,
@@ -107,6 +107,7 @@ export default async function ApiKeysPage() {
       />
     );
   } catch (err) {
+    rethrowIfNextNavigation(err);
     console.error("[dashboard-ssr-fail-open]", "api-keys/page", err);
     return (
       <ApiKeysClient

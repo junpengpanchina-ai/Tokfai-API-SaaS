@@ -1,5 +1,5 @@
 import { AuthProvider } from "@/lib/auth/auth-provider";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, hasSupabaseServerEnv } from "@/lib/supabase/server";
 
 export async function AuthProviderWrapper({
   children,
@@ -8,16 +8,15 @@ export async function AuthProviderWrapper({
 }) {
   let initialUser = null;
 
-  if (
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  ) {
+  if (hasSupabaseServerEnv()) {
     try {
       const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      initialUser = user;
+      if (supabase) {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        initialUser = user;
+      }
     } catch {
       initialUser = null;
     }
