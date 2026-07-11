@@ -38,6 +38,19 @@ function main(): void {
       pass: !MODEL_ALIAS_CHAINS["auto-pro"].includes("gemini-3.1-pro"),
     },
     {
+      name: "gpt-5 family aliases map to gpt-5.5/gpt-5.4",
+      pass:
+        MODEL_ALIAS_CHAINS["gpt-5"][0] === "gpt-5.5" &&
+        MODEL_ALIAS_CHAINS["gpt-5-chat"].includes("gpt-5.4") &&
+        MODEL_ALIAS_CHAINS["gpt-5-pro"].includes("gpt-5.5") &&
+        MODEL_ALIAS_CHAINS["gpt-5.1"].includes("gpt-5.5") &&
+        MODEL_ALIAS_CHAINS["gpt-5.2"].includes("gpt-5.4"),
+    },
+    {
+      name: "auto-fast includes gemini-2.5-flash",
+      pass: MODEL_ALIAS_CHAINS["auto-fast"].includes("gemini-2.5-flash"),
+    },
+    {
       name: "static chat whitelist excludes hidden",
       pass: !chat.some((id) => HIDDEN_INTERNAL_MODEL_IDS.has(id)),
     },

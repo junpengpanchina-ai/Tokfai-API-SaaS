@@ -68,6 +68,18 @@ responsesRoutes.post("/v1/responses", async (c) => {
   }
 
   const chatBody = responsesBodyToChatBody(parsed.data);
+  if (
+    !chatBody.messages?.length ||
+    chatBody.messages.every(
+      (message) =>
+        typeof message.content !== "string" || message.content.trim() === ""
+    )
+  ) {
+    throw ApiError.badRequest(
+      "Invalid responses request: input produced empty messages.",
+      "invalid_request_error"
+    );
+  }
   const chatParsed = ChatCompletionRequestSchema.safeParse(chatBody);
   if (!chatParsed.success) {
     throw ApiError.badRequest(

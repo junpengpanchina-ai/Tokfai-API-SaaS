@@ -348,11 +348,30 @@ export function startMockGateway(options = {}) {
       }
 
       if (req.method === "GET" && path === "/v1/models") {
-        const authErr = checkAuth(req, validKey);
-        if (authErr) return sendJson(res, authErr.status, authErr.body);
+        const now = Math.floor(Date.now() / 1000);
+        const ids = [
+          "auto-fast",
+          "auto-pro",
+          "auto-cheap",
+          "gpt-5",
+          "gpt-5-chat",
+          "gpt-5-pro",
+          "gpt-5.1",
+          "gpt-5.2",
+          "gpt-5.5",
+          "gpt-5.4",
+          "gemini-2.5-flash",
+          "gemini-3-flash",
+          "nano-banana-fast",
+        ];
         return sendJson(res, 200, {
           object: "list",
-          data: [{ id: "auto-fast", object: "model" }],
+          data: ids.map((id) => ({
+            id,
+            object: "model",
+            created: now,
+            owned_by: "tokfai",
+          })),
         });
       }
 

@@ -512,30 +512,61 @@ type ModelRow = {
 
 const DEFAULT_OWNED_BY = "tokfai";
 
-/** Visible catalog for GET /v1/models — DB first, then pricing.ts fallback. */
+/**
+ * Visible catalog for GET /v1/models.
+ *
+ * Only exposes models that are callable via chat/image gateways, or alias
+ * fallbacks that resolve to callable targets — avoids clients picking a listed
+ * id and then hitting model_not_available.
+ */
 export async function listCatalogModels(): Promise<OpenAiModelListItem[]> {
   const aliases = listAliasModelsForCatalog();
-  const fromDb = await listCatalogModelsFromDb();
-  const base =
-    fromDb ??
-    (await (async () => {
-      const { listAllowedModels } = await import("../upstream/pricing.js");
-      const now = Math.floor(Date.now() / 1000);
-      return listAllowedModels().map((id) => ({
-        id,
-        object: "model" as const,
-        created: now,
-        owned_by: DEFAULT_OWNED_BY,
-      }));
-    })());
-
   const aliasIds = new Set(aliases.map((row) => row.id));
-  return [
-    ...aliases,
-    ...base.filter(
-      (row) => !aliasIds.has(row.id) && !isHiddenInternalModel(row.id)
-    ),
-  ];
+  const now = Math.floor(Date.now() / 1000);
+
+  const [chatIds, imageIds, fromDb] = await Promise.all([
+    listAvailableChatModelIds(),
+    listAvailableImageModelIds(),
+    listCatalogModelsFromDb(),
+  ]);
+
+  const callableIds = new Set<string>([
+    ...chatIds.filter((id) => !aliasIds.has(id)),
+    ...imageIds.filter((id) => !aliasIds.has(id)),
+  ]);
+
+  const dbById = new Map((fromDb ?? []).map((row) => [row.id, row]));
+
+  const concrete: OpenAiModelListItem[] = [];
+  for (const id of callableIds) {
+    if (isHiddenInternalModel(id)) continue;
+    const fromRow = dbById.get(id);
+    if (fromRow) {
+      concrete.push(fromRow);
+      continue;
+    }
+    concrete.push({
+      id,
+      object: "model",
+      created: now,
+      owned_by: DEFAULT_OWNED_BY,
+    });
+  }
+
+  // Preserve DB sort_order when available; otherwise keep chat-then-image order.
+  if (fromDb?.length) {
+    const order = new Map(fromDb.map((row, index) => [row.id, index]));
+    concrete.sort((a, b) => {
+      const ai = order.get(a.id);
+      const bi = order.get(b.id);
+      if (ai == null && bi == null) return a.id.localeCompare(b.id);
+      if (ai == null) return 1;
+      if (bi == null) return -1;
+      return ai - bi;
+    });
+  }
+
+  return [...aliases, ...concrete];
 }
 
 async function listCatalogModelsFromDb(): Promise<OpenAiModelListItem[] | null> {

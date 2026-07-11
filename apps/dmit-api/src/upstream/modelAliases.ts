@@ -3,6 +3,15 @@ export const MODEL_ALIAS_CHAINS = {
   "auto-fast": ["gemini-3-flash", "gemini-2.5-flash", "gemini-3-pro"],
   "auto-pro": ["gpt-5.5", "gpt-5.4", "gemini-3-pro"],
   "auto-cheap": ["gemini-2.5-flash", "gemini-3-flash"],
+  /**
+   * Client-facing GPT-5 family names that may not exist upstream.
+   * Map to currently available GPT tiers with ordered fallback.
+   */
+  "gpt-5": ["gpt-5.5", "gpt-5.4"],
+  "gpt-5-chat": ["gpt-5.5", "gpt-5.4"],
+  "gpt-5-pro": ["gpt-5.5", "gpt-5.4"],
+  "gpt-5.1": ["gpt-5.5", "gpt-5.4"],
+  "gpt-5.2": ["gpt-5.5", "gpt-5.4"],
 } as const;
 
 export type ModelAliasId = keyof typeof MODEL_ALIAS_CHAINS;

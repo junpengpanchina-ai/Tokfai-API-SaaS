@@ -2,31 +2,25 @@ import { z } from "zod";
 
 import type { ChatCompletionRequestBody } from "./executeChatCompletion.js";
 
-const InputTextPartSchema = z
-  .object({
-    type: z.literal("input_text").optional(),
-    text: z.string(),
-  })
-  .passthrough();
-
-const ResponsesInputMessageSchema = z
-  .object({
-    role: z.string().optional(),
-    content: z.union([
-      z.string(),
-      z.array(z.union([InputTextPartSchema, z.record(z.unknown())])),
-      z.record(z.unknown()),
-    ]),
-  })
-  .passthrough();
+/**
+ * OpenAI Responses API request → chat completions conversion (minimal MVP).
+ *
+ * Accepts common client shapes from Cherry Studio / OpenCat / OpenAI SDKs:
+ * - input: string
+ * - input: message array (role/content, type:message, content parts)
+ * - input: array of strings or input_text parts
+ * - max_output_tokens (Responses) and max_tokens (chat-style)
+ */
 
 export const ResponsesRequestSchema = z
   .object({
     model: z.string().min(1).optional(),
-    input: z.union([z.string(), z.array(ResponsesInputMessageSchema).min(1)]),
+    input: z.union([z.string(), z.array(z.unknown()).min(1), z.record(z.unknown())]),
     stream: z.boolean().optional(),
     temperature: z.number().optional(),
     max_tokens: z.number().int().positive().optional(),
+    max_output_tokens: z.number().int().positive().optional(),
+    instructions: z.string().optional(),
   })
   .passthrough();
 
@@ -37,42 +31,115 @@ function normalizeMessageContent(content: unknown): string {
   if (Array.isArray(content)) {
     const parts: string[] = [];
     for (const item of content) {
+      if (typeof item === "string") {
+        parts.push(item);
+        continue;
+      }
       if (item && typeof item === "object") {
         const part = item as Record<string, unknown>;
         if (typeof part.text === "string") {
           parts.push(part.text);
+          continue;
+        }
+        if (typeof part.content === "string") {
+          parts.push(part.content);
         }
       }
     }
     return parts.join("");
   }
-  if (content && typeof content === "object" && "text" in content) {
-    const text = (content as { text?: unknown }).text;
-    if (typeof text === "string") return text;
+  if (content && typeof content === "object") {
+    const obj = content as Record<string, unknown>;
+    if (typeof obj.text === "string") return obj.text;
+    if (typeof obj.content === "string") return obj.content;
   }
   return "";
 }
 
+function inputItemToMessage(
+  item: unknown
+): { role: string; content: string } | null {
+  if (typeof item === "string") {
+    const text = item.trim();
+    return text ? { role: "user", content: text } : null;
+  }
+
+  if (!item || typeof item !== "object") return null;
+
+  const obj = item as Record<string, unknown>;
+  const type = typeof obj.type === "string" ? obj.type : null;
+
+  // Top-level content part: { type: "input_text", text: "..." }
+  if (
+    type === "input_text" ||
+    type === "output_text" ||
+    type === "text"
+  ) {
+    const text = typeof obj.text === "string" ? obj.text : "";
+    return text ? { role: "user", content: text } : null;
+  }
+
+  // Message-like: { type?: "message", role?, content? }
+  const role =
+    typeof obj.role === "string" && obj.role.trim()
+      ? obj.role.trim()
+      : "user";
+  const content = normalizeMessageContent(
+    obj.content !== undefined ? obj.content : obj.text
+  );
+  if (!content) return null;
+  return { role, content };
+}
+
 export function responsesInputToMessages(
-  input: string | z.infer<typeof ResponsesInputMessageSchema>[]
+  input: string | unknown[] | Record<string, unknown>
 ): Array<{ role: string; content: string }> {
   if (typeof input === "string") {
     return [{ role: "user", content: input }];
   }
 
-  return input.map((item) => ({
-    role: typeof item.role === "string" && item.role ? item.role : "user",
-    content: normalizeMessageContent(item.content),
-  }));
+  if (!Array.isArray(input)) {
+    const single = inputItemToMessage(input);
+    return single ? [single] : [{ role: "user", content: "" }];
+  }
+
+  const messages: Array<{ role: string; content: string }> = [];
+  for (const item of input) {
+    const message = inputItemToMessage(item);
+    if (message) messages.push(message);
+  }
+
+  if (messages.length === 0) {
+    return [{ role: "user", content: "" }];
+  }
+  return messages;
 }
 
 export function responsesBodyToChatBody(
   body: ResponsesRequestBody
 ): ChatCompletionRequestBody {
-  const { input, ...rest } = body;
+  const {
+    input,
+    max_output_tokens,
+    max_tokens,
+    instructions,
+    stream: _stream,
+    ...rest
+  } = body;
+
+  const messages = responsesInputToMessages(input);
+  if (typeof instructions === "string" && instructions.trim()) {
+    messages.unshift({ role: "system", content: instructions.trim() });
+  }
+
+  const resolvedMaxTokens = max_tokens ?? max_output_tokens;
+
   return {
     ...rest,
-    messages: responsesInputToMessages(input),
+    messages,
+    ...(resolvedMaxTokens !== undefined
+      ? { max_tokens: resolvedMaxTokens }
+      : {}),
   };
 }
 
