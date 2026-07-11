@@ -4,7 +4,6 @@ import Link from "next/link";
 import { Fragment, useEffect, useState } from "react";
 
 import { AdminDebugCard } from "@/components/admin/admin-debug-card";
-import { AdminFutureControlsCard } from "@/components/admin/admin-future-controls-card";
 import { AdminUserDetailPanel } from "@/components/admin/admin-user-detail-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,6 +36,7 @@ export function AdminUsersPanel({
   const { t } = useI18n();
   const [users, setUsers] = useState(initialUsers);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
 
   useEffect(() => {
     setUsers(initialUsers);
@@ -44,6 +44,18 @@ export function AdminUsersPanel({
 
   function toggleUserDetails(userId: string) {
     setExpandedUserId((current) => (current === userId ? null : userId));
+  }
+
+  async function copyUserId(userId: string) {
+    try {
+      await navigator.clipboard.writeText(userId);
+      setCopiedUserId(userId);
+      window.setTimeout(() => {
+        setCopiedUserId((current) => (current === userId ? null : current));
+      }, 1500);
+    } catch {
+      // Clipboard may be unavailable; ignore.
+    }
   }
 
   return (
@@ -62,24 +74,10 @@ export function AdminUsersPanel({
 
       <Card className="border-muted bg-muted/30">
         <CardHeader className="pb-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <CardTitle className="text-base">{t("admin.users.userManagement")}</CardTitle>
-            <Badge variant="secondary">{t("admin.common.readOnlyPhase")}</Badge>
-          </div>
+          <CardTitle className="text-base">{t("admin.users.userManagement")}</CardTitle>
           <CardDescription>{t("admin.users.userManagementDesc")}</CardDescription>
         </CardHeader>
       </Card>
-
-      <AdminFutureControlsCard
-        titleKey="admin.users.futureControlsTitle"
-        descriptionKey="admin.users.futureControlsDesc"
-        controlLabelKeys={[
-          "admin.users.searchUserByEmail",
-          "admin.users.viewApiKeysCount",
-          "admin.users.viewUsage",
-          "admin.users.adjustCreditsAfterApproval",
-        ]}
-      />
 
       <Card>
         <CardHeader>
@@ -93,10 +91,11 @@ export function AdminUsersPanel({
         <CardContent>
           {users.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[56rem] text-sm">
+              <table className="w-full min-w-[64rem] text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
                     <th className="py-2 pr-4 font-medium">{t("admin.users.email")}</th>
+                    <th className="py-2 pr-4 font-medium">{t("admin.users.userId")}</th>
                     <th className="py-2 pr-4 text-right font-medium">
                       {t("admin.users.creditsBalance")}
                     </th>
@@ -119,6 +118,12 @@ export function AdminUsersPanel({
                       <Fragment key={row.id}>
                         <tr className="border-b last:border-0">
                           <td className="py-2 pr-4">{row.email ?? "—"}</td>
+                          <td
+                            className="max-w-[12rem] truncate py-2 pr-4 font-mono text-xs text-muted-foreground"
+                            title={row.id}
+                          >
+                            {row.id}
+                          </td>
                           <td className="py-2 pr-4 text-right font-mono text-xs">
                             {formatCredits(row.credits_balance)}
                           </td>
@@ -146,20 +151,42 @@ export function AdminUsersPanel({
                                   ? t("admin.users.hideDetails")
                                   : t("admin.users.viewDetails")}
                               </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void copyUserId(row.id)}
+                              >
+                                {copiedUserId === row.id
+                                  ? t("admin.users.userIdCopied")
+                                  : t("admin.users.copyUserId")}
+                              </Button>
                               {row.email ? (
                                 <Link
                                   href={`/admin/credits?email=${encodeURIComponent(row.email)}`}
                                   className="text-xs font-medium text-muted-foreground underline-offset-4 hover:underline"
                                 >
-                                  {t("admin.users.ledger")}
+                                  {t("admin.users.viewRecentLedger")}
                                 </Link>
                               ) : null}
+                              <Link
+                                href={`/admin/credits-adjust?user_id=${encodeURIComponent(row.id)}&direction=add`}
+                                className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                              >
+                                {t("admin.users.addCredits")}
+                              </Link>
+                              <Link
+                                href={`/admin/credits-adjust?user_id=${encodeURIComponent(row.id)}&direction=deduct`}
+                                className="text-xs font-medium text-destructive underline-offset-4 hover:underline"
+                              >
+                                {t("admin.users.deductCredits")}
+                              </Link>
                             </div>
                           </td>
                         </tr>
                         {isExpanded ? (
                           <tr className="border-b last:border-0">
-                            <td colSpan={7} className="py-3 pr-4">
+                            <td colSpan={8} className="py-3 pr-4">
                               <AdminUserDetailPanel user={row} />
                             </td>
                           </tr>

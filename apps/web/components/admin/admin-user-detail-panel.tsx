@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 
-import { AdminDisabledWriteActions } from "@/components/admin/admin-disabled-write-actions";
 import { Button } from "@/components/ui/button";
 import {
   formatCredits,
@@ -14,6 +14,17 @@ import type { AdminUserRow } from "@/components/admin/admin-users-panel";
 export function AdminUserDetailPanel({ user }: { user: AdminUserRow }) {
   const { t } = useI18n();
   const email = user.email ?? "";
+  const [copied, setCopied] = useState(false);
+
+  async function copyUserId() {
+    try {
+      await navigator.clipboard.writeText(user.id);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard may be unavailable; ignore.
+    }
+  }
 
   return (
     <div className="rounded-lg border bg-muted/20 p-4">
@@ -21,13 +32,33 @@ export function AdminUserDetailPanel({ user }: { user: AdminUserRow }) {
         <div>
           <h3 className="text-sm font-semibold">{t("admin.users.userDetailTitle")}</h3>
           <p className="mt-1 text-sm text-muted-foreground">{email || "—"}</p>
+          <p className="mt-1 font-mono text-xs text-muted-foreground" title={user.id}>
+            {t("admin.users.userId")}: {user.id}
+          </p>
         </div>
-        <AdminDisabledWriteActions
-          actionKeys={["admin.users.revokeKey", "admin.users.adjustCreditsAfterApproval"]}
-        />
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => void copyUserId()}>
+            {copied ? t("admin.users.userIdCopied") : t("admin.users.copyUserId")}
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link
+              href={`/admin/credits-adjust?user_id=${encodeURIComponent(user.id)}&direction=add`}
+            >
+              {t("admin.users.addCredits")}
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link
+              href={`/admin/credits-adjust?user_id=${encodeURIComponent(user.id)}&direction=deduct`}
+            >
+              {t("admin.users.deductCredits")}
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <DetailItem label={t("admin.users.userId")} value={user.id} mono />
         <DetailItem label={t("admin.users.email")} value={email || "—"} />
         <DetailItem
           label={t("admin.users.creditsBalance")}
@@ -58,16 +89,12 @@ export function AdminUserDetailPanel({ user }: { user: AdminUserRow }) {
         {email ? (
           <>
             <Button variant="outline" size="sm" asChild>
-              <Link
-                href={`/admin/usage?email=${encodeURIComponent(email)}`}
-              >
+              <Link href={`/admin/usage?email=${encodeURIComponent(email)}`}>
                 {t("admin.users.viewRecentUsage")}
               </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link
-                href={`/admin/credits?email=${encodeURIComponent(email)}`}
-              >
+              <Link href={`/admin/credits?email=${encodeURIComponent(email)}`}>
                 {t("admin.users.viewRecentLedger")}
               </Link>
             </Button>
@@ -92,7 +119,9 @@ function DetailItem({
       <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </dt>
-      <dd className={`mt-1 text-sm ${mono ? "font-mono" : ""}`}>{value}</dd>
+      <dd className={`mt-1 break-all text-sm ${mono ? "font-mono text-xs" : ""}`}>
+        {value}
+      </dd>
     </div>
   );
 }

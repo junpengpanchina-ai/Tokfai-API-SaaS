@@ -7,11 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatAdminAdjustError } from "@/lib/admin/adjust-errors";
 import {
+  AdminApiError,
   adjustAdminCredits,
   createAdminAdjustIdempotencyKey,
   type AdminCreditsAdjustSuccess,
 } from "@/lib/admin/client";
-import { formatCredits } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 
 type AdjustDirection = "add" | "deduct";
@@ -29,13 +29,18 @@ export function AdminCreditsAdjustForm({
 }) {
   const { t } = useI18n();
   const [direction, setDirection] = useState<AdjustDirection>("add");
-  const [amount, setAmount] = useState("");
-  const [reason, setReason] = useState("");
+  const [amount, setAmount] = useState("300000");
+  const [reason, setReason] = useState("pre-demo credits top-up");
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<{ code: string; message: string } | null>(
+  const [error, setError] = useState<{
+    status: number | null;
+    code: string;
+    message: string;
+    request_id: string | null;
+  } | null>(null);
+  const [success, setSuccess] = useState<AdminCreditsAdjustSuccess | null>(
     null
   );
-  const [success, setSuccess] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,8 +49,10 @@ export function AdminCreditsAdjustForm({
     const parsedAmount = Number(amount);
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       setError({
+        status: null,
         code: "invalid_amount",
         message: t("admin.adjust.invalidAmount"),
+        request_id: null,
       });
       setSuccess(null);
       return;
@@ -54,8 +61,10 @@ export function AdminCreditsAdjustForm({
     const trimmedReason = reason.trim();
     if (!trimmedReason) {
       setError({
+        status: null,
         code: "missing_reason",
         message: t("admin.adjust.missingReason"),
+        request_id: null,
       });
       setSuccess(null);
       return;
@@ -73,19 +82,19 @@ export function AdminCreditsAdjustForm({
           amount: parsedAmount,
           reason: trimmedReason,
         },
-        createAdminAdjustIdempotencyKey()
+        createAdminAdjustIdempotencyKey(userId, direction)
       );
 
-      setSuccess(
-        t("admin.adjust.success")
-          .replace("{balance}", formatCredits(result.balance_after))
-          .replace("{delta}", formatCredits(Math.abs(result.delta)))
-      );
-      setAmount("");
-      setReason("");
+      setSuccess(result);
       onSuccess?.(result);
     } catch (err) {
-      setError(formatAdminAdjustError(err, t));
+      const formatted = formatAdminAdjustError(err, t);
+      setError({
+        status: err instanceof AdminApiError ? err.status : null,
+        code: formatted.code,
+        message: formatted.message,
+        request_id: err instanceof AdminApiError ? err.requestId : null,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -181,7 +190,7 @@ export function AdminCreditsAdjustForm({
               value={amount}
               disabled={isBusy}
               onChange={(event) => setAmount(event.target.value)}
-              placeholder="1000"
+              placeholder="300000"
               required
             />
           </div>
@@ -207,14 +216,37 @@ export function AdminCreditsAdjustForm({
             className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm"
             role="alert"
           >
-            <p className="font-mono text-xs text-destructive">{error.code}</p>
-            <p className="mt-1 text-destructive">{error.message}</p>
+            <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-xs text-destructive">
+              {JSON.stringify(
+                {
+                  status: error.status,
+                  error: {
+                    code: error.code,
+                    message: error.message,
+                  },
+                  request_id: error.request_id,
+                },
+                null,
+                2
+              )}
+            </pre>
           </div>
         ) : null}
 
         {success ? (
-          <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">
-            {success}
+          <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm">
+            <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-xs text-emerald-800 dark:text-emerald-300">
+              {JSON.stringify(
+                {
+                  balance_after: success.balance_after,
+                  delta: success.delta,
+                  reference_id: success.reference_id,
+                  reason: success.reason,
+                },
+                null,
+                2
+              )}
+            </pre>
           </div>
         ) : null}
 

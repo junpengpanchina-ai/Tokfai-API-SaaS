@@ -427,9 +427,11 @@ export async function fetchAdminMe(): Promise<AdminMe> {
   return res.data;
 }
 
-export function createAdminAdjustIdempotencyKey(): string {
-  const random = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
-  return `admin-adjust-${Date.now()}-${random}`;
+export function createAdminAdjustIdempotencyKey(
+  userId: string,
+  direction: "add" | "deduct"
+): string {
+  return `admin-adjust-${userId}-${direction}-${Date.now()}`;
 }
 
 export async function adjustAdminCredits(
@@ -439,7 +441,9 @@ export async function adjustAdminCredits(
   return fetchAdminApi<AdminCreditsAdjustSuccess>("/admin/credits/adjust", {
     method: "POST",
     json: body,
-    idempotencyKey: idempotencyKey ?? createAdminAdjustIdempotencyKey(),
+    idempotencyKey:
+      idempotencyKey ??
+      createAdminAdjustIdempotencyKey(body.user_id, body.direction),
   });
 }
 

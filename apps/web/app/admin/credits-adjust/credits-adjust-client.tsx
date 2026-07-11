@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 
+import { AdminLedgerMiniTable } from "@/components/admin/admin-ledger-mini-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,9 +11,11 @@ import {
   adjustAdminCredits,
   createAdminAdjustIdempotencyKey,
   fetchAdminApi,
+  fetchAdminUsers,
   type AdminApiKeyRow,
   type AdminCreditsAdjustSuccess,
 } from "@/lib/admin/client";
+import { formatCredits, formatDateTime } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 
 type AdjustDirection = "add" | "deduct";
@@ -29,6 +32,25 @@ type ApiKeyMatch = {
   email: string | null;
   created_at: string;
   prefix: string;
+};
+
+type LedgerEntry = {
+  id: string;
+  created_at: string;
+  type: string;
+  amount: number;
+  balance_after: number;
+  reason: string | null;
+  reference_id: string | null;
+};
+
+type CreditsLookupData = {
+  profile: {
+    id: string;
+    email: string | null;
+    credits_balance: number;
+  };
+  ledger: LedgerEntry[];
 };
 
 const DEFAULT_AMOUNT = "300000";
@@ -54,12 +76,18 @@ function matchApiKeyPrefix(
     }));
 }
 
-export function CreditsAdjustClient() {
+export function CreditsAdjustClient({
+  initialUserId = "",
+  initialDirection = "add",
+}: {
+  initialUserId?: string;
+  initialDirection?: AdjustDirection;
+}) {
   const { t } = useI18n();
 
-  const [userId, setUserId] = useState("");
+  const [userId, setUserId] = useState(initialUserId);
   const [amount, setAmount] = useState(DEFAULT_AMOUNT);
-  const [direction, setDirection] = useState<AdjustDirection>("add");
+  const [direction, setDirection] = useState<AdjustDirection>(initialDirection);
   const [reason, setReason] = useState(DEFAULT_REASON);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<AdminCreditsAdjustSuccess | null>(
@@ -71,6 +99,65 @@ export function CreditsAdjustClient() {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<AdjustErrorView | null>(null);
   const [matches, setMatches] = useState<ApiKeyMatch[] | null>(null);
+
+  const [ledgerEmail, setLedgerEmail] = useState("");
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [ledgerError, setLedgerError] = useState<string | null>(null);
+  const [creditsData, setCreditsData] = useState<CreditsLookupData | null>(
+    null
+  );
+
+  useEffect(() => {
+    setUserId(initialUserId);
+    setDirection(initialDirection);
+  }, [initialUserId, initialDirection]);
+
+  const loadCreditsByEmail = useCallback(async (email: string) => {
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setLedgerError(t("admin.credits.enterEmail"));
+      setCreditsData(null);
+      return;
+    }
+
+    setLedgerLoading(true);
+    setLedgerError(null);
+
+    try {
+      const params = new URLSearchParams({
+        email: trimmed,
+        limit: "50",
+      });
+      const body = await fetchAdminApi<{ data?: CreditsLookupData }>(
+        `/admin/credits?${params.toString()}`
+      );
+      setCreditsData(body.data ?? null);
+      if (!body.data) {
+        setLedgerError(`No profile found for ${trimmed}.`);
+      }
+    } catch (err) {
+      setCreditsData(null);
+      setLedgerError(
+        err instanceof AdminApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Failed to load credits data."
+      );
+    } finally {
+      setLedgerLoading(false);
+    }
+  }, [t]);
+
+  async function resolveEmailForUser(targetUserId: string): Promise<string | null> {
+    try {
+      const users = await fetchAdminUsers();
+      const match = users.find((user) => user.id === targetUserId);
+      return match?.email ?? null;
+    } catch {
+      return null;
+    }
+  }
 
   async function handleAdjust(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -124,9 +211,18 @@ export function CreditsAdjustClient() {
           direction,
           reason: trimmedReason,
         },
-        createAdminAdjustIdempotencyKey()
+        createAdminAdjustIdempotencyKey(trimmedUserId, direction)
       );
       setSuccess(result);
+
+      const email =
+        ledgerEmail.trim() ||
+        (await resolveEmailForUser(trimmedUserId)) ||
+        "";
+      if (email) {
+        setLedgerEmail(email);
+        await loadCreditsByEmail(email);
+      }
     } catch (err) {
       if (err instanceof AdminApiError) {
         setError({
@@ -164,7 +260,8 @@ export function CreditsAdjustClient() {
       setSearchError({
         status: null,
         code: "invalid_prefix",
-        message: "Enter at least 12 characters of the API key prefix (e.g. sk-tokfai_…).",
+        message:
+          "Enter at least 12 characters of the API key prefix (e.g. sk-tokfai_…).",
         request_id: null,
       });
       setMatches(null);
@@ -209,6 +306,11 @@ export function CreditsAdjustClient() {
     }
   }
 
+  function handleLedgerSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void loadCreditsByEmail(ledgerEmail);
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -236,7 +338,6 @@ export function CreditsAdjustClient() {
             <Input
               id="credits-adjust-user-id"
               value={userId}
-              disabled={submitting}
               onChange={(event) => setUserId(event.target.value)}
               placeholder="uuid"
               className="font-mono text-xs"
@@ -256,7 +357,6 @@ export function CreditsAdjustClient() {
                 step="1"
                 inputMode="numeric"
                 value={amount}
-                disabled={submitting}
                 onChange={(event) => setAmount(event.target.value)}
                 required
               />
@@ -268,7 +368,6 @@ export function CreditsAdjustClient() {
               <select
                 id="credits-adjust-direction"
                 value={direction}
-                disabled={submitting}
                 onChange={(event) =>
                   setDirection(event.target.value as AdjustDirection)
                 }
@@ -289,7 +388,6 @@ export function CreditsAdjustClient() {
             <Input
               id="credits-adjust-reason"
               value={reason}
-              disabled={submitting}
               onChange={(event) => setReason(event.target.value)}
               maxLength={200}
               required
@@ -311,7 +409,18 @@ export function CreditsAdjustClient() {
             role="alert"
           >
             <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-xs text-destructive">
-              {JSON.stringify(error, null, 2)}
+              {JSON.stringify(
+                {
+                  status: error.status,
+                  error: {
+                    code: error.code,
+                    message: error.message,
+                  },
+                  request_id: error.request_id,
+                },
+                null,
+                2
+              )}
             </pre>
           </div>
         ) : null}
@@ -319,8 +428,131 @@ export function CreditsAdjustClient() {
         {success ? (
           <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm">
             <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-xs text-emerald-800 dark:text-emerald-300">
-              {JSON.stringify(success, null, 2)}
+              {JSON.stringify(
+                {
+                  balance_after: success.balance_after,
+                  delta: success.delta,
+                  reference_id: success.reference_id,
+                  reason: success.reason,
+                },
+                null,
+                2
+              )}
             </pre>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="space-y-4 rounded-lg border bg-background p-4">
+        <div>
+          <h2 className="text-sm font-semibold">
+            {t("admin.credits.searchByEmail")}
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {t("admin.credits.searchByEmailDesc")}
+          </p>
+        </div>
+
+        <form
+          className="flex flex-wrap items-end gap-3"
+          onSubmit={handleLedgerSearch}
+        >
+          <div className="min-w-[16rem] flex-1 space-y-2">
+            <Label htmlFor="credits-adjust-ledger-email">
+              {t("admin.credits.email")}
+            </Label>
+            <Input
+              id="credits-adjust-ledger-email"
+              type="email"
+              value={ledgerEmail}
+              onChange={(event) => setLedgerEmail(event.target.value)}
+              placeholder="user@example.com"
+              disabled={ledgerLoading}
+              required
+            />
+          </div>
+          <Button type="submit" size="sm" variant="outline" disabled={ledgerLoading}>
+            {ledgerLoading
+              ? t("admin.credits.searching")
+              : t("admin.credits.search")}
+          </Button>
+        </form>
+
+        {ledgerError ? (
+          <div
+            className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+            role="alert"
+          >
+            {ledgerError}
+          </div>
+        ) : null}
+
+        {creditsData ? (
+          <div className="space-y-4">
+            <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
+              <p>
+                {t("admin.credits.currentBalance")}:{" "}
+                <span className="font-mono font-medium">
+                  {formatCredits(creditsData.profile.credits_balance)}
+                </span>
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                {t("admin.credits.email")}: {creditsData.profile.email ?? "—"}
+              </p>
+              <p className="mt-1 font-mono text-xs text-muted-foreground">
+                user_id: {creditsData.profile.id}
+              </p>
+            </div>
+
+            {creditsData.ledger.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                      <th className="py-2 pr-4 font-medium">
+                        {t("admin.credits.colType")}
+                      </th>
+                      <th className="py-2 pr-4 text-right font-medium">
+                        {t("admin.credits.colAmount")}
+                      </th>
+                      <th className="py-2 pr-4 text-right font-medium">
+                        {t("admin.credits.colBalanceAfter")}
+                      </th>
+                      <th className="py-2 pr-4 font-medium">
+                        {t("admin.credits.colReason")}
+                      </th>
+                      <th className="py-2 pr-4 font-medium">
+                        {t("admin.credits.colCreated")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {creditsData.ledger.map((entry) => (
+                      <tr key={entry.id} className="border-b last:border-0">
+                        <td className="py-2 pr-4">{entry.type}</td>
+                        <td className="py-2 pr-4 text-right font-mono text-xs">
+                          {formatCredits(entry.amount)}
+                        </td>
+                        <td className="py-2 pr-4 text-right font-mono text-xs">
+                          {formatCredits(entry.balance_after)}
+                        </td>
+                        <td className="py-2 pr-4 text-muted-foreground">
+                          {entry.reason ?? "—"}
+                        </td>
+                        <td className="py-2 pr-4 text-muted-foreground">
+                          {formatDateTime(entry.created_at)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <AdminLedgerMiniTable
+                entries={[]}
+                emptyLabel={t("admin.credits.noLedgerEntries")}
+              />
+            )}
           </div>
         ) : null}
       </section>
@@ -340,14 +572,18 @@ export function CreditsAdjustClient() {
             <Input
               id="credits-adjust-key-prefix"
               value={keyPrefix}
-              disabled={searching}
               onChange={(event) => setKeyPrefix(event.target.value)}
               placeholder="sk-tokfai_xxxxxxxxxxxx"
               className="font-mono text-xs"
             />
           </div>
           <div>
-            <Button type="submit" size="sm" variant="outline" disabled={searching}>
+            <Button
+              type="submit"
+              size="sm"
+              variant="outline"
+              disabled={searching}
+            >
               {searching ? "Searching…" : "Search"}
             </Button>
           </div>
@@ -380,12 +616,18 @@ export function CreditsAdjustClient() {
                 </thead>
                 <tbody>
                   {matches.map((row) => (
-                    <tr key={`${row.user_id}-${row.prefix}`} className="border-b">
+                    <tr
+                      key={`${row.user_id}-${row.prefix}`}
+                      className="border-b"
+                    >
                       <td className="py-2 pr-3 align-top">
                         <button
                           type="button"
                           className="font-mono text-xs text-primary underline-offset-2 hover:underline"
-                          onClick={() => setUserId(row.user_id)}
+                          onClick={() => {
+                            setUserId(row.user_id);
+                            if (row.email) setLedgerEmail(row.email);
+                          }}
                         >
                           {row.user_id}
                         </button>
