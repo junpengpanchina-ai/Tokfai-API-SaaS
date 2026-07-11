@@ -157,6 +157,49 @@ function sendJson(res, status, body) {
   res.end(payload);
 }
 
+function sendSse(res, bodyText) {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+  });
+  res.end(bodyText);
+}
+
+function chatCompletionToSse(completion) {
+  const id = completion.id ?? `chatcmpl_mock`;
+  const created = completion.created ?? Math.floor(Date.now() / 1000);
+  const model = completion.model ?? "gemini-3-flash";
+  const content =
+    completion.choices?.[0]?.message?.content ??
+    (typeof completion.choices?.[0]?.message?.content === "string"
+      ? completion.choices[0].message.content
+      : "ok");
+  const finishReason = completion.choices?.[0]?.finish_reason ?? "stop";
+  const base = { id, object: "chat.completion.chunk", created, model };
+  return [
+    `data: ${JSON.stringify({
+      ...base,
+      choices: [
+        {
+          index: 0,
+          delta: { role: "assistant", content: "" },
+          finish_reason: null,
+        },
+      ],
+    })}\n\n`,
+    `data: ${JSON.stringify({
+      ...base,
+      choices: [{ index: 0, delta: { content }, finish_reason: null }],
+    })}\n\n`,
+    `data: ${JSON.stringify({
+      ...base,
+      choices: [{ index: 0, delta: {}, finish_reason: finishReason }],
+    })}\n\n`,
+    "data: [DONE]\n\n",
+  ].join("");
+}
+
 function chatCompletionBody(body) {
   const requestedModel = typeof body.model === "string" ? body.model : "auto-fast";
   const resolvedModel = "gemini-3-flash";
@@ -382,7 +425,11 @@ export function startMockGateway(options = {}) {
         if (!slot.ok) return sendJson(res, slot.response.status, slot.response.body);
         try {
           const body = await readJsonBody(req);
-          return sendJson(res, 200, chatCompletionBody(body));
+          const completion = chatCompletionBody(body);
+          if (body?.stream === true) {
+            return sendSse(res, chatCompletionToSse(completion));
+          }
+          return sendJson(res, 200, completion);
         } finally {
           slot.release?.();
         }

@@ -138,6 +138,9 @@ export function AdminPricingPanel({
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
   const [draft, setDraft] = useState<PricingDraft | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [statusBusyModelId, setStatusBusyModelId] = useState<string | null>(
+    null
+  );
   const [rowError, setRowError] = useState<RowError | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -214,6 +217,53 @@ export function AdminPricingPanel({
     }
   }
 
+  async function handleListUnlist(
+    row: AdminPricingRow,
+    action: "list" | "unlist"
+  ) {
+    if (submitting || statusBusyModelId) return;
+
+    setStatusBusyModelId(row.model_id);
+    setRowError(null);
+    setStatusMessage(null);
+
+    try {
+      const updated = await updateAdminPricing(row.model_id, { action });
+      setRows((current) =>
+        current.map((item) =>
+          item.model_id === updated.model_id ? updated : item
+        )
+      );
+      setStatusMessage(
+        action === "list"
+          ? t("admin.pricing.listed")
+          : t("admin.pricing.unlisted")
+      );
+    } catch (error) {
+      const fallback =
+        action === "list"
+          ? t("admin.pricing.listFailed")
+          : t("admin.pricing.unlistFailed");
+      if (error instanceof AdminApiError) {
+        setRowError({
+          message: error.isSessionExpired
+            ? t("admin.common.sessionExpired")
+            : error.message || fallback,
+          request_id: error.requestId,
+        });
+      } else if (error instanceof Error) {
+        setRowError({
+          message: error.message || fallback,
+          request_id: null,
+        });
+      } else {
+        setRowError({ message: fallback, request_id: null });
+      }
+    } finally {
+      setStatusBusyModelId(null);
+    }
+  }
+
   return (
     <>
       <div>
@@ -232,6 +282,20 @@ export function AdminPricingPanel({
         <p className="text-sm text-emerald-700 dark:text-emerald-400">
           {statusMessage}
         </p>
+      ) : null}
+
+      {rowError && !editingModelId ? (
+        <div
+          className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm"
+          role="alert"
+        >
+          <p className="text-destructive">{rowError.message}</p>
+          {rowError.request_id ? (
+            <p className="mt-1 font-mono text-xs text-destructive">
+              request_id: {rowError.request_id}
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       <Card>
@@ -285,6 +349,8 @@ export function AdminPricingPanel({
                   {rows.map((row) => {
                     const editing = editingModelId === row.model_id;
                     const isImage = isImageModality(row.modality);
+                    const statusBusy = statusBusyModelId === row.model_id;
+                    const isActive = row.effective_status === "active";
 
                     return (
                       <Fragment key={row.model_id}>
@@ -326,19 +392,55 @@ export function AdminPricingPanel({
                             </Badge>
                           </td>
                           <td className="py-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={submitting && editing}
-                              onClick={() =>
-                                editing ? cancelEdit() : startEdit(row)
-                              }
-                            >
-                              {editing
-                                ? t("admin.pricing.cancel")
-                                : t("admin.pricing.editPricing")}
-                            </Button>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={
+                                  (submitting && editing) ||
+                                  Boolean(statusBusyModelId)
+                                }
+                                onClick={() =>
+                                  editing ? cancelEdit() : startEdit(row)
+                                }
+                              >
+                                {editing
+                                  ? t("admin.pricing.cancel")
+                                  : t("admin.pricing.editPricing")}
+                              </Button>
+                              {isActive ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={
+                                    submitting || Boolean(statusBusyModelId)
+                                  }
+                                  onClick={() =>
+                                    handleListUnlist(row, "unlist")
+                                  }
+                                >
+                                  {statusBusy
+                                    ? t("admin.pricing.unlisting")
+                                    : t("admin.pricing.unlistModel")}
+                                </Button>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={
+                                    submitting || Boolean(statusBusyModelId)
+                                  }
+                                  onClick={() => handleListUnlist(row, "list")}
+                                >
+                                  {statusBusy
+                                    ? t("admin.pricing.listing")
+                                    : t("admin.pricing.listModel")}
+                                </Button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                         {editing && draft ? (

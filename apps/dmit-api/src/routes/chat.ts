@@ -11,6 +11,7 @@ import {
   getGlobalUpstreamInflight,
   getKeyInflight,
 } from "../gateway/concurrency.js";
+import { chatCompletionToSseBody } from "../lib/chatCompletionSse.js";
 import {
   ChatCompletionRequestSchema,
   executeChatCompletion,
@@ -24,8 +25,8 @@ import { logGatewayRejection } from "./chatGatewayLogs.js";
  * /v1/chat/completions — OpenAI-compatible chat completions, customer-facing.
  *
  * Auth is handled by requireApiKeyOrSupabaseJwt (sk-tokfai_ or Supabase JWT).
- * The route proxies non-streaming
- * OpenAI-compatible requests to GRSAI and records usage after completion.
+ * Non-stream requests return JSON; stream=true returns OpenAI-compatible SSE
+ * (synthesized from a completed upstream response) ending with data: [DONE].
  */
 export const chatRoutes = new Hono();
 
@@ -72,16 +73,31 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     );
   }
 
+  const wantsStream = parsed.data.stream === true;
+
   const result = await executeChatCompletion({
     caller,
     requestId,
-    body: parsed.data,
+    body: { ...parsed.data, stream: false },
     limitKey,
     idempotencyKey,
   });
 
   if (!result.ok) {
     return respondExecuteChatCompletionFailure(c, result);
+  }
+
+  if (wantsStream) {
+    const sseBody = chatCompletionToSseBody(result.response);
+    return c.newResponse(sseBody, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Request-Id": result.requestId,
+      },
+    });
   }
 
   return c.json(result.response);

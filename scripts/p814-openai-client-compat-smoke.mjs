@@ -3,9 +3,10 @@
  * Internal operator smoke — OpenAI-compatible client connection paths.
  *
  * Covers the endpoints Cherry Studio / OpenCat / OpenAI Compatible clients hit:
- *   - POST /v1/responses (auto-fast, gemini-2.5-flash, gpt-5.5)
- *   - POST /v1/chat/completions (auto-fast)
- *   - POST /v1/images/generations (nano-banana-fast)
+ *   - GET /v1/models (required catalog IDs)
+ *   - POST /v1/chat/completions non-stream (Gemini + GPT)
+ *   - POST /v1/chat/completions stream=true (SSE + [DONE])
+ *   - POST /v1/responses (Gemini + GPT)
  *
  * Usage:
  *   node scripts/p814-openai-client-compat-smoke.mjs
@@ -40,6 +41,17 @@ const TIMEOUT_MS = Math.max(
   parseInt(process.env.CHAT_TIMEOUT_MS ?? "120000", 10) || 120_000
 );
 
+const REQUIRED_MODEL_IDS = [
+  "auto-fast",
+  "gemini-2.5-flash",
+  "gemini-3-flash",
+  "gpt-5",
+  "gpt-5-chat",
+  "gpt-5-pro",
+  "gpt-5.4",
+  "gpt-5.5",
+];
+
 function pass(label) {
   console.log(`PASS  ${label}`);
   return true;
@@ -52,7 +64,7 @@ function fail(label, detail) {
 }
 
 async function postJson(path, body) {
-  const { res, body: json } = await acceptanceFetch(`${BASE}${path}`, {
+  const { res, body: json, text } = await acceptanceFetch(`${BASE}${path}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${API_KEY}`,
@@ -61,7 +73,20 @@ async function postJson(path, body) {
     body: JSON.stringify(body),
     timeoutMs: TIMEOUT_MS,
   });
-  return { status: res.status, body: json };
+  return { status: res.status, body: json, text, headers: res.headers };
+}
+
+function assertChatOk(res, label) {
+  const ok =
+    res.status === 200 &&
+    typeof res.body?.choices?.[0]?.message?.content === "string" &&
+    res.body.choices[0].message.content.length > 0 &&
+    typeof res.body?.request_id === "string";
+  if (ok) return pass(label);
+  return fail(
+    label,
+    `HTTP ${res.status}, code=${res.body?.error?.code}, content=${JSON.stringify(res.body?.choices?.[0]?.message?.content)?.slice(0, 80)}`
+  );
 }
 
 function assertResponsesOk(res, label) {
@@ -84,6 +109,22 @@ function assertResponsesOk(res, label) {
   );
 }
 
+function assertSseOk(res, label) {
+  const contentType = res.headers.get("content-type") ?? "";
+  const text = res.text ?? "";
+  const hasEventStream =
+    contentType.includes("text/event-stream") || text.includes("data:");
+  const hasDone = /data:\s*\[DONE\]/.test(text);
+  const hasChunk =
+    text.includes("chat.completion.chunk") || text.includes('"delta"');
+  const ok = res.status === 200 && hasEventStream && hasDone && hasChunk;
+  if (ok) return pass(label);
+  return fail(
+    label,
+    `HTTP ${res.status}, content-type=${contentType}, hasDone=${hasDone}, hasChunk=${hasChunk}, preview=${JSON.stringify(text.slice(0, 160))}`
+  );
+}
+
 async function run() {
   if (!LIVE) {
     printOfflineDefaultHint(SCRIPT);
@@ -101,7 +142,7 @@ async function run() {
 
   let ok = true;
 
-  // --- /v1/models includes aliases clients may pick ---
+  // --- /v1/models includes Cherry Studio catalog IDs ---
   {
     const { res, body } = await acceptanceFetch(`${BASE}/v1/models`, {
       timeoutMs: TIMEOUT_MS,
@@ -109,10 +150,10 @@ async function run() {
     const ids = Array.isArray(body?.data)
       ? body.data.map((row) => row.id)
       : [];
-    const required = ["auto-fast", "gpt-5", "gpt-5.5", "gemini-2.5-flash"];
-    const missing = required.filter((id) => !ids.includes(id));
+    const missing = REQUIRED_MODEL_IDS.filter((id) => !ids.includes(id));
     if (res.status === 200 && missing.length === 0) {
-      ok = pass(`GET /v1/models includes ${required.join(", ")}`) && ok;
+      ok =
+        pass(`GET /v1/models includes ${REQUIRED_MODEL_IDS.join(", ")}`) && ok;
     } else {
       ok =
         fail(
@@ -122,59 +163,70 @@ async function run() {
     }
   }
 
-  // --- Responses API ---
-  const responseCases = [
-    {
-      label: "POST /v1/responses model=auto-fast",
-      body: { model: "auto-fast", input: "Say ok only." },
-    },
-    {
-      label: "POST /v1/responses model=gemini-2.5-flash",
-      body: { model: "gemini-2.5-flash", input: "Say ok only." },
-    },
-    {
-      label: "POST /v1/responses model=gpt-5.5",
-      body: { model: "gpt-5.5", input: "Say ok only." },
-    },
-    {
-      label: "POST /v1/responses model=gpt-5 (alias) + max_output_tokens",
-      body: {
-        model: "gpt-5",
-        input: [{ type: "message", role: "user", content: "Say ok only." }],
-        max_output_tokens: 64,
-      },
-    },
-  ];
-
-  for (const { label, body } of responseCases) {
-    const res = await postJson("/v1/responses", body);
-    ok = assertResponsesOk(res, label) && ok;
+  // --- Chat completions (non-stream) ---
+  {
+    const res = await postJson("/v1/chat/completions", {
+      model: "gemini-2.5-flash",
+      messages: [{ role: "user", content: "Say ok only." }],
+      stream: false,
+    });
+    ok = assertChatOk(res, "POST /v1/chat/completions non-stream gemini-2.5-flash") && ok;
   }
 
-  // --- Chat completions ---
+  {
+    const res = await postJson("/v1/chat/completions", {
+      model: "gpt-5.5",
+      messages: [{ role: "user", content: "Say ok only." }],
+      stream: false,
+    });
+    ok = assertChatOk(res, "POST /v1/chat/completions non-stream gpt-5.5") && ok;
+  }
+
+  // --- Chat completions (stream=true SSE) ---
   {
     const res = await postJson("/v1/chat/completions", {
       model: "auto-fast",
       messages: [{ role: "user", content: "Say ok only." }],
-      stream: false,
+      stream: true,
     });
-    const chatOk =
-      res.status === 200 &&
-      typeof res.body?.choices?.[0]?.message?.content === "string" &&
-      res.body.choices[0].message.content.length > 0 &&
-      typeof res.body?.request_id === "string";
-    if (chatOk) {
-      ok = pass("POST /v1/chat/completions model=auto-fast") && ok;
-    } else {
-      ok =
-        fail(
-          "POST /v1/chat/completions model=auto-fast",
-          `HTTP ${res.status}, code=${res.body?.error?.code}`
-        ) && ok;
-    }
+    ok =
+      assertSseOk(
+        res,
+        "POST /v1/chat/completions stream=true auto-fast (SSE + [DONE])"
+      ) && ok;
   }
 
-  // --- Image generations ---
+  // --- Responses API ---
+  {
+    const res = await postJson("/v1/responses", {
+      model: "gemini-2.5-flash",
+      input: "Say ok only.",
+    });
+    ok = assertResponsesOk(res, "POST /v1/responses model=gemini-2.5-flash") && ok;
+  }
+
+  {
+    const res = await postJson("/v1/responses", {
+      model: "gpt-5.5",
+      input: "Say ok only.",
+    });
+    ok = assertResponsesOk(res, "POST /v1/responses model=gpt-5.5") && ok;
+  }
+
+  {
+    const res = await postJson("/v1/responses", {
+      model: "gpt-5",
+      input: [{ type: "message", role: "user", content: "Say ok only." }],
+      max_output_tokens: 64,
+    });
+    ok =
+      assertResponsesOk(
+        res,
+        "POST /v1/responses model=gpt-5 (alias) + max_output_tokens"
+      ) && ok;
+  }
+
+  // --- Image generations (still covered for OpenAI-compatible clients) ---
   {
     const res = await postJson("/v1/images/generations", {
       model: "nano-banana-fast",

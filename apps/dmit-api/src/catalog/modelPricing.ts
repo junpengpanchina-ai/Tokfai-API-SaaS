@@ -449,7 +449,7 @@ async function isModelAllowedFromDb(
   const [modelResult, pricingResult] = await Promise.all([
     supabase()
       .from("models")
-      .select("enabled, model_type")
+      .select("enabled, visible, model_type")
       .eq("id", model)
       .maybeSingle(),
     supabase()
@@ -479,6 +479,9 @@ async function isModelAllowedFromDb(
   };
 
   const pricingEnabled = pricing.enabled === true || pricing.billable === true;
+  // Catalog unlist (enabled=false or visible=false) must also block API calls.
+  const modelListed =
+    modelResult.data.enabled === true && modelResult.data.visible === true;
   const resolvedType =
     pricing.billing_type === "image" || pricing.billing_mode === "per_image"
       ? "image"
@@ -487,13 +490,13 @@ async function isModelAllowedFromDb(
   if (billingType === "image") {
     const modelType = modelResult.data.model_type;
     return (
-      modelResult.data.enabled === true &&
+      modelListed &&
       pricingEnabled &&
       (modelType === "image" || resolvedType === "image")
     );
   }
 
-  return modelResult.data.enabled === true && pricingEnabled;
+  return modelListed && pricingEnabled;
 }
 
 export type OpenAiModelListItem = {

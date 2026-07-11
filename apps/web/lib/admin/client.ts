@@ -261,6 +261,9 @@ export type AdminPricingUpdateBody = {
   output_credits_per_million_tokens?: number;
   image_credits_per_generation?: number;
   markup_ratio?: number;
+  /** Soft list/unlist via models.enabled + models.visible (never hard-delete). */
+  action?: "list" | "unlist";
+  status?: "available" | "disabled" | "coming_soon" | "archived";
 };
 
 export type AdminErrorLogRow = {

@@ -5,7 +5,7 @@ export const CHERRY_PROVIDER_NAME = "Tokfai";
 export const CHERRY_PROVIDER_TYPE = "OpenAI compatible / Custom OpenAI";
 export const CHERRY_DEFAULT_MODEL = "auto-fast";
 export const CHERRY_STREAM_FIELD_VALUE =
-  "Client default; disable stream if the test fails";
+  "Supported (OpenAI SSE; ends with data: [DONE])";
 
 export type CherryCopyField = {
   id: string;

@@ -57,8 +57,13 @@ const PRICING_FIELD_ALIASES: Record<string, string> = {
   markup_ratio: "markup_ratio",
   billing_type: "billing_type",
   upstream_cost_note: "upstream_cost_note",
+  // Pricing-table enabled/visible aliases → model_pricing.*
   enabled: "pricing_enabled",
   visible: "pricing_visible",
+  // Catalog list/unlist → models.enabled / models.visible via status mapping
+  status: "status",
+  model_enabled: "enabled",
+  model_visible: "visible",
   billing_mode: "billing_mode",
   input_per_1k: "input_per_1k",
   output_per_1k: "output_per_1k",
@@ -85,7 +90,24 @@ export async function updateAdminPricing(
 
   const modelPatch: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(body)) {
-    if (key === "model_id" || key === "action") continue;
+    if (key === "model_id") continue;
+    // action: list | unlist → models.enabled/visible (soft archive, never DELETE)
+    if (key === "action") {
+      if (value === "list" || value === "publish") {
+        modelPatch.status = "available";
+        modelPatch.pricing_enabled = true;
+      } else if (value === "unlist" || value === "archive") {
+        modelPatch.status = "archived";
+      } else {
+        return {
+          ok: false,
+          status: 400,
+          error: "unknown_field",
+          detail: { field: "action", value },
+        };
+      }
+      continue;
+    }
     const mapped = PRICING_FIELD_ALIASES[key];
     if (!mapped) {
       return {

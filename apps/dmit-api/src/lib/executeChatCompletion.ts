@@ -119,7 +119,6 @@ export async function executeChatCompletion(
   const limitKey = input.limitKey ?? caller.apiKeyId ?? `user:${caller.userId}`;
 
   const requestedModel = input.body.model || env.BOT_MODEL;
-  const stream = input.body.stream ?? false;
 
   if (!(await isModelAllowedForChat(requestedModel))) {
     const suggestedModels = await listAvailableChatModelIds();
@@ -149,34 +148,20 @@ export async function executeChatCompletion(
     };
   }
 
-  if (stream) {
-    await writeUsageLog(
-      failedUsageLog({
-        user_id: caller.userId,
-        api_key_id: caller.apiKeyId,
-        model: requestedModel,
-        status: "failed",
-        request_id: requestId,
-        error_code: "stream_not_supported",
-        error_message: "Streaming is not supported yet.",
-        latency_ms: Date.now() - startedAt,
-      }),
-      route
-    );
-
-    return {
-      ok: false,
-      errorCode: "stream_not_supported",
-      errorMessage: "Streaming is not supported yet.",
-      requestId,
-      httpStatus: 400,
-    };
-  }
-
   const { isAlias, attempts: rawAttempts } = resolveModelAttempts(requestedModel);
-  const attempts = isAlias
+  let attempts = isAlias
     ? await filterAttemptsByCircuitBreaker(rawAttempts)
     : rawAttempts;
+
+  if (isAlias) {
+    const listed: string[] = [];
+    for (const attemptModel of attempts) {
+      if (await isModelAllowedForChat(attemptModel)) {
+        listed.push(attemptModel);
+      }
+    }
+    attempts = listed;
+  }
 
   if (isAlias && attempts.length === 0) {
     const err = allUpstreamsUnavailableError();
