@@ -38,12 +38,25 @@ import {
 } from "@/lib/tokfai-api";
 
 const PLAN_DESCRIPTION_KEYS: Record<string, string> = {
+  credit_10: "pricing.planDescCredit10",
+  credit_20: "pricing.planDescCredit20",
+  credit_49: "pricing.planDescCredit49",
+  credit_99: "pricing.planDescCredit99",
+  credit_499: "pricing.planDescCredit499",
+  credit_999: "pricing.planDescCredit999",
+  // Legacy plan ids (archived) — keep keys for any cached responses.
   starter: "pricing.planDescStarter",
   pro: "pricing.planDescPro",
   business: "pricing.planDescBusiness",
 };
 
 const PLAN_AUDIENCE_KEYS: Record<string, string> = {
+  credit_10: "pricing.planAudienceCredit10",
+  credit_20: "pricing.planAudienceCredit20",
+  credit_49: "pricing.planAudienceCredit49",
+  credit_99: "pricing.planAudienceCredit99",
+  credit_499: "pricing.planAudienceCredit499",
+  credit_999: "pricing.planAudienceCredit999",
   starter: "pricing.planAudienceStarter",
   pro: "pricing.planAudiencePro",
   business: "pricing.planAudienceBusiness",

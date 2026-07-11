@@ -165,8 +165,8 @@ const ZH: Record<string, string> = {
   "dashboard.playground.running": "发送中…",
   "dashboard.playground.run": "发送测试",
   "dashboard.playground.costHint":
-    "Playground 会消耗 credits，请先确认余额。实际扣费以积分账本为准。",
-  "dashboard.playground.viewCreditsLedger": "查看积分账本",
+    "Playground 会消耗 credits，请先确认余额。实际扣费以算力积分账本为准。",
+  "dashboard.playground.viewCreditsLedger": "查看算力积分账本",
   "dashboard.playground.productionKeyHint":
     "用于生产接入时，请在 API Keys 页面创建并复制 sk-tokfai 密钥。",
   "dashboard.playground.apiKey": "API Key",
@@ -220,7 +220,7 @@ const ZH: Record<string, string> = {
   "dashboard.playground.totalTokens": "total tokens",
   "dashboard.playground.creditsCharged": "credits charged",
   "dashboard.playground.usageFallback":
-    "本次调用的用量记录在 /dashboard/credits 积分账本中。",
+    "本次调用的用量记录在 /dashboard/credits 算力积分账本中。",
   "dashboard.playground.responsePlaceholder": "发送后模型响应将显示在这里。",
   "dashboard.playground.viewModels": "查看模型",
   "dashboard.playground.viewDocs": "查看文档",
@@ -237,7 +237,7 @@ const ZH: Record<string, string> = {
   "dashboard.playground.errors.invalidToken": "API Key 无效或已吊销。请创建新密钥。",
   "dashboard.playground.errors.invalidOrMissingToken":
     "API Key 无效或缺失。请选择或创建 API Key。",
-  "dashboard.playground.errors.insufficientCredits": "积分不足。请先充值。",
+  "dashboard.playground.errors.insufficientCredits": "算力积分不足。请先充值。",
   "dashboard.playground.errors.modelNotFound": "模型不存在或不可用。请换用其他模型。",
   "dashboard.playground.errors.upstreamError": "所选模型暂时不可用或负载较高。",
   "dashboard.playground.errors.upstreamTimeout": "所选模型暂时不可用或负载较高。",

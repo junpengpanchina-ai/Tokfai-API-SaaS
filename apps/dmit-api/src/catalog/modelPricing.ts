@@ -80,23 +80,31 @@ function resolveBillingType(row: ModelPricingRow): ModelBillingType {
   return "chat";
 }
 
+/** ¥1 = 10,000 compute credits. Fractional DB values are treated as yuan. */
+const CREDITS_PER_YUAN = 10_000;
+
+function asComputeCredits(value: number): number {
+  if (value > 0 && value < 1) return value * CREDITS_PER_YUAN;
+  return value;
+}
+
 function resolveInputCreditsPerMillion(row: ModelPricingRow): number {
   const fromP710 = toNumber(row.input_credits_per_million_tokens);
-  if (fromP710 > 0) return fromP710;
+  if (fromP710 > 0) return asComputeCredits(fromP710);
   const legacyPer1k = toNumber(row.input_per_1k);
   return legacyPer1k > 0 ? legacyPer1k * 1000 : 0;
 }
 
 function resolveOutputCreditsPerMillion(row: ModelPricingRow): number {
   const fromP710 = toNumber(row.output_credits_per_million_tokens);
-  if (fromP710 > 0) return fromP710;
+  if (fromP710 > 0) return asComputeCredits(fromP710);
   const legacyPer1k = toNumber(row.output_per_1k);
   return legacyPer1k > 0 ? legacyPer1k * 1000 : 0;
 }
 
 function resolveImageCreditsPerGeneration(row: ModelPricingRow): number {
   const fromP710 = toNumber(row.image_credits_per_generation);
-  if (fromP710 > 0) return fromP710;
+  if (fromP710 > 0) return asComputeCredits(fromP710);
   if (resolveBillingType(row) !== "image") return 0;
   const legacyBase = toNumber(row.input_per_1k);
   if (legacyBase <= 0) return 0;

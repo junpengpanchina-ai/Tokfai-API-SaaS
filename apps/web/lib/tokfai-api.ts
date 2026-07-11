@@ -54,7 +54,7 @@ export const TOKFAI_PRICING_DISCLAIMER =
   "Current reference prices are shown for planning. Usage and Credits are the source of truth for actual charges.";
 export const TOKFAI_PLAYGROUND_POLICY =
   "Chat Playground supports chat models. Image Playground supports image models. Video models will use a separate playground later.";
-export const TOKFAI_STARTER_PLAN = "Starter ¥29 = 10,000 credits";
+export const TOKFAI_STARTER_PLAN = "¥10 = 100,000 compute credits (¥1 = 10,000)";
 
 /** Full plaintext API key shown once at creation (not the display prefix). */
 export const TOKFAI_FULL_API_KEY_PATTERN = /^sk-tokfai_[0-9a-f]{48}$/;

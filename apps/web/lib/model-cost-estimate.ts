@@ -1,5 +1,9 @@
 import type { CatalogModelPricingItem } from "@/lib/dmit/client";
 import {
+  CREDITS_PER_YUAN,
+  YUAN_PER_CREDIT,
+} from "@/lib/credits-units";
+import {
   DASHBOARD_CATALOG_MODELS,
   IMAGE_PLAYGROUND_DEFAULT_MODEL,
   isChatModelEntry,
@@ -12,9 +16,8 @@ import {
 } from "@/lib/model-pricing-display";
 import { TOKFAI_RECOMMENDED_MODEL } from "@/lib/tokfai-api";
 
-/** Display-only conversion for /dashboard/models estimates. */
-export const CREDITS_PER_YUAN = 1000;
-export const YUAN_PER_CREDIT = 0.001;
+/** Display-only conversion for /dashboard/models estimates. ¥1 = 10,000 算力积分. */
+export { CREDITS_PER_YUAN, YUAN_PER_CREDIT };
 
 export const SHORT_CHAT_INPUT_TOKENS = 1000;
 export const SHORT_CHAT_OUTPUT_TOKENS = 1000;
@@ -30,15 +33,22 @@ export interface EstimateRechargePlan {
 
 /** Static plan credits for package usage estimates (read-only display). */
 export const ESTIMATE_RECHARGE_PLANS: EstimateRechargePlan[] = [
-  { planId: "starter", label: "Starter", amountLabel: "¥29.9", credits: 10_000 },
+  { planId: "credit_10", label: "¥10", amountLabel: "¥10", credits: 100_000 },
+  { planId: "credit_20", label: "¥20", amountLabel: "¥20", credits: 220_000 },
+  { planId: "credit_49", label: "¥49", amountLabel: "¥49", credits: 563_500 },
+  { planId: "credit_99", label: "¥99", amountLabel: "¥99", credits: 1_188_000 },
   {
-    planId: "starter-plus",
-    label: "Starter Plus",
-    amountLabel: "Starter Plus",
-    credits: 25_000,
+    planId: "credit_499",
+    label: "¥499",
+    amountLabel: "¥499",
+    credits: 5_988_000,
   },
-  { planId: "pro", label: "Pro", amountLabel: "¥99.9", credits: 60_000 },
-  { planId: "business", label: "Business", amountLabel: "¥299", credits: 260_000 },
+  {
+    planId: "credit_999",
+    label: "¥999",
+    amountLabel: "¥999",
+    credits: 11_988_000,
+  },
 ];
 
 export interface PackageUsageEstimateRow {

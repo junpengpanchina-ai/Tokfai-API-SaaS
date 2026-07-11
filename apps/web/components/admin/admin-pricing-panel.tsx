@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, type FormEvent } from "react";
+import { Fragment, useState, type FormEvent, type ReactNode } from "react";
 
 import { AdminDebugCard } from "@/components/admin/admin-debug-card";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,7 @@ import {
 } from "@/lib/admin/client";
 import type { AdminDebug } from "@/lib/admin/server";
 import { formatCreditsPrecise } from "@/lib/format";
+import { formatApproxYuanFromCredits } from "@/lib/credits-units";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 
 type PricingDraft = {
@@ -36,9 +37,19 @@ type RowError = {
   request_id: string | null;
 };
 
-function formatPrice(value: number | null): string {
+function formatPriceWithYuan(
+  value: number | null,
+  locale: "en" | "zh"
+): ReactNode {
   if (value == null) return "—";
-  return formatCreditsPrecise(value);
+  const credits = formatCreditsPrecise(value);
+  const yuan = formatApproxYuanFromCredits(value, locale);
+  return (
+    <div>
+      <div className="font-mono text-xs">{credits}</div>
+      <div className="text-xs text-muted-foreground">{yuan}</div>
+    </div>
+  );
 }
 
 function isImageModality(modality: string | null): boolean {
@@ -133,7 +144,7 @@ export function AdminPricingPanel({
   pricing: AdminPricingRow[];
   debug: AdminDebug | null;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [rows, setRows] = useState<AdminPricingRow[]>(initialPricing);
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
   const [draft, setDraft] = useState<PricingDraft | null>(null);
@@ -366,13 +377,19 @@ export function AdminPricingPanel({
                           <td className="py-2 pr-4">{row.provider ?? "—"}</td>
                           <td className="py-2 pr-4">{row.modality ?? "—"}</td>
                           <td className="py-2 pr-4">
-                            {formatPrice(row.input_price)}
+                            {isImage
+                              ? "—"
+                              : formatPriceWithYuan(row.input_price, locale)}
                           </td>
                           <td className="py-2 pr-4">
-                            {formatPrice(row.output_price)}
+                            {isImage
+                              ? "—"
+                              : formatPriceWithYuan(row.output_price, locale)}
                           </td>
                           <td className="py-2 pr-4">
-                            {formatPrice(row.image_price)}
+                            {isImage
+                              ? formatPriceWithYuan(row.image_price, locale)
+                              : "—"}
                           </td>
                           <td className="py-2 pr-4">
                             {row.credits_multiplier ?? "—"}

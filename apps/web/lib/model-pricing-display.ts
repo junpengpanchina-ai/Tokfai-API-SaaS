@@ -1,6 +1,13 @@
 import type { Locale } from "@/lib/i18n/messages";
 import type { CatalogModelPricingItem } from "@/lib/dmit/client";
 import {
+  CREDITS_PER_YUAN,
+  creditsToYuan,
+  formatApproxYuanFromCredits,
+  formatYuanAmount,
+  normalizeCreditsAmount,
+} from "@/lib/credits-units";
+import {
   getImageModelById,
   type ChatModelPricing,
   type ImageModelPricing,
@@ -12,18 +19,12 @@ import {
 } from "@/lib/model-catalog";
 
 /**
- * Display-only ¥/credit anchors from common top-up tiers (best / worst rate).
- * Used for dashboard RMB example ranges — not billing.
+ * Display-only ¥ conversion at retail base rate: ¥1 = 10,000 算力积分.
  */
-const DISPLAY_CNY_PER_CREDIT_MIN = 299 / 200_000;
-const DISPLAY_CNY_PER_CREDIT_MAX = 29 / 10_000;
-
 export function creditsToDisplayYuanRange(credits: number): PriceRangeYuan | null {
   if (!Number.isFinite(credits) || credits <= 0) return null;
-  return {
-    min: credits * DISPLAY_CNY_PER_CREDIT_MIN,
-    max: credits * DISPLAY_CNY_PER_CREDIT_MAX,
-  };
+  const yuan = creditsToYuan(credits);
+  return { min: yuan, max: yuan };
 }
 
 export function getChatYuanRange(
@@ -58,24 +59,15 @@ export function hasDisplayYuanExample(range: PriceRangeYuan | null | undefined):
   return range.min > 0 && range.max > 0;
 }
 
-function formatYuanValue(yuan: number): string {
-  if (!Number.isFinite(yuan)) return "0";
-  if (yuan >= 10) return yuan.toFixed(2);
-  if (yuan >= 1) return yuan.toFixed(2);
-  if (yuan >= 0.1) return yuan.toFixed(3);
-  if (yuan >= 0.01) return yuan.toFixed(4);
-  return yuan.toFixed(5);
-}
-
 function formatDisplayYuanRange(range: PriceRangeYuan, locale: Locale): string {
-  const min = formatYuanValue(range.min);
-  const max = formatYuanValue(range.max);
+  const min = formatYuanAmount(range.min);
+  const max = formatYuanAmount(range.max);
   const yuan = min === max ? `¥${min}` : `¥${min} ~ ¥${max}`;
   return locale === "zh" ? `约 ${yuan}` : yuan;
 }
 
-function chatYuanExampleUnit(locale: Locale): string {
-  return locale === "zh" ? "/M tokens" : "/M tokens";
+function chatYuanExampleUnit(_locale: Locale): string {
+  return "/M tokens";
 }
 
 function imageYuanExampleUnit(locale: Locale): string {
@@ -88,8 +80,7 @@ export function formatChatInputYuanExample(
 ): string | null {
   const range = creditsToDisplayYuanRange(millionCredits);
   if (!hasDisplayYuanExample(range)) return null;
-  const label = locale === "zh" ? "Input" : "Input";
-  return `${label}: ${formatDisplayYuanRange(range!, locale)} ${chatYuanExampleUnit(locale)}`;
+  return `Input: ${formatDisplayYuanRange(range!, locale)} ${chatYuanExampleUnit(locale)}`;
 }
 
 export function formatChatOutputYuanExample(
@@ -98,17 +89,18 @@ export function formatChatOutputYuanExample(
 ): string | null {
   const range = creditsToDisplayYuanRange(millionCredits);
   if (!hasDisplayYuanExample(range)) return null;
-  const label = locale === "zh" ? "Output" : "Output";
-  return `${label}: ${formatDisplayYuanRange(range!, locale)} ${chatYuanExampleUnit(locale)}`;
+  return `Output: ${formatDisplayYuanRange(range!, locale)} ${chatYuanExampleUnit(locale)}`;
 }
 
 export function formatImageYuanExample(
   creditsPerGeneration: number,
   locale: Locale
 ): string | null {
-  const range = creditsToDisplayYuanRange(creditsPerGeneration);
-  if (!hasDisplayYuanExample(range)) return null;
-  return `${formatDisplayYuanRange(range!, locale)} ${imageYuanExampleUnit(locale)}`;
+  if (!Number.isFinite(creditsPerGeneration) || creditsPerGeneration <= 0) {
+    return null;
+  }
+  const approx = formatApproxYuanFromCredits(creditsPerGeneration, locale);
+  return `${approx} ${imageYuanExampleUnit(locale)}`;
 }
 
 export function formatChatInputYuanExampleFromRange(
@@ -116,8 +108,7 @@ export function formatChatInputYuanExampleFromRange(
   locale: Locale
 ): string | null {
   if (!hasDisplayYuanExample(range)) return null;
-  const label = locale === "zh" ? "Input" : "Input";
-  return `${label}: ${formatDisplayYuanRange(range, locale)} ${chatYuanExampleUnit(locale)}`;
+  return `Input: ${formatDisplayYuanRange(range, locale)} ${chatYuanExampleUnit(locale)}`;
 }
 
 export function formatChatOutputYuanExampleFromRange(
@@ -125,8 +116,7 @@ export function formatChatOutputYuanExampleFromRange(
   locale: Locale
 ): string | null {
   if (!hasDisplayYuanExample(range)) return null;
-  const label = locale === "zh" ? "Output" : "Output";
-  return `${label}: ${formatDisplayYuanRange(range, locale)} ${chatYuanExampleUnit(locale)}`;
+  return `Output: ${formatDisplayYuanRange(range, locale)} ${chatYuanExampleUnit(locale)}`;
 }
 
 function formatCreditsAmount(value: number, locale: Locale): string {
@@ -137,33 +127,39 @@ export function formatDbChatInputCreditsPerMillion(
   credits: number,
   locale: Locale
 ): string {
-  const amount = formatCreditsAmount(credits, locale);
+  const normalized = normalizeCreditsAmount(credits) ?? credits;
+  const amount = formatCreditsAmount(normalized, locale);
+  const yuan = formatApproxYuanFromCredits(normalized, locale);
   if (locale === "zh") {
-    return `Input: ${amount} 积分 / 100万 tokens`;
+    return `Input: ${amount} 算力积分 / 100万 tokens（${yuan}）`;
   }
-  return `Input: ${amount} credits / 1M tokens`;
+  return `Input: ${amount} credits / 1M tokens (${yuan})`;
 }
 
 export function formatDbChatOutputCreditsPerMillion(
   credits: number,
   locale: Locale
 ): string {
-  const amount = formatCreditsAmount(credits, locale);
+  const normalized = normalizeCreditsAmount(credits) ?? credits;
+  const amount = formatCreditsAmount(normalized, locale);
+  const yuan = formatApproxYuanFromCredits(normalized, locale);
   if (locale === "zh") {
-    return `Output: ${amount} 积分 / 100万 tokens`;
+    return `Output: ${amount} 算力积分 / 100万 tokens（${yuan}）`;
   }
-  return `Output: ${amount} credits / 1M tokens`;
+  return `Output: ${amount} credits / 1M tokens (${yuan})`;
 }
 
 export function formatDbImageCreditsPerGeneration(
   credits: number,
   locale: Locale
 ): string {
-  const amount = formatCredits(credits, locale);
+  const normalized = normalizeCreditsAmount(credits) ?? credits;
+  const amount = formatCredits(normalized, locale);
+  const yuan = formatApproxYuanFromCredits(normalized, locale);
   if (locale === "zh") {
-    return `${amount} 积分 / 次`;
+    return `${amount} 算力积分 / 次（${yuan}）`;
   }
-  return `${amount} credits / generation`;
+  return `${amount} credits / generation (${yuan})`;
 }
 
 export function formatCredits(value: number, locale: Locale): string {
@@ -190,7 +186,7 @@ export function resolveDbImageCredits(
 ): number | null {
   if (resolveCatalogBillingType(dbPricing, modelType) !== "image") return null;
   const credits = dbPricing?.image_credits_per_generation;
-  return credits == null ? null : credits;
+  return normalizeCreditsAmount(credits);
 }
 
 export function resolveDbChatCredits(
@@ -201,8 +197,10 @@ export function resolveDbChatCredits(
   outputPerMillion: number;
 } | null {
   if (resolveCatalogBillingType(dbPricing, modelType) !== "chat") return null;
-  const input = dbPricing?.input_credits_per_million_tokens;
-  const output = dbPricing?.output_credits_per_million_tokens;
+  const input = normalizeCreditsAmount(dbPricing?.input_credits_per_million_tokens);
+  const output = normalizeCreditsAmount(
+    dbPricing?.output_credits_per_million_tokens
+  );
   if (input == null || output == null) return null;
   return { inputPerMillion: input, outputPerMillion: output };
 }
@@ -213,13 +211,13 @@ export function catalogPricingByModelId(
   return new Map(items.map((item) => [item.model_id, item]));
 }
 
-function formatYuanAmount(value: number): string {
+function formatYuanAmountLocal(value: number): string {
   return Number.isInteger(value) ? value.toString() : value.toString();
 }
 
 export function formatYuanRange(range: PriceRangeYuan): string {
-  const min = formatYuanAmount(range.min);
-  const max = formatYuanAmount(range.max);
+  const min = formatYuanAmountLocal(range.min);
+  const max = formatYuanAmountLocal(range.max);
   if (range.min === range.max) {
     return `¥${min}`;
   }
@@ -238,6 +236,10 @@ export function formatImageReferenceYuanPerRequest(
   pricing: ImageModelPricing,
   locale: Locale
 ): string {
+  if (pricing.creditsPerRequest > 0) {
+    const approx = formatApproxYuanFromCredits(pricing.creditsPerRequest, locale);
+    return locale === "zh" ? `${approx} / 次` : `${approx} / generation`;
+  }
   const yuan = formatYuanRange(pricing.referenceYuanPerRequest);
   if (locale === "zh") {
     return `${yuan} / 次`;
@@ -245,7 +247,7 @@ export function formatImageReferenceYuanPerRequest(
   return `${yuan} / generation`;
 }
 
-/** Image model price line, e.g. `600 积分/次` or `600 credits / generation`. */
+/** Image model price line, e.g. `1,400 算力积分/次`. */
 export function formatImageCreditsPerRequest(
   pricing: ImageModelPricing,
   locale: Locale
@@ -254,7 +256,7 @@ export function formatImageCreditsPerRequest(
     locale === "zh" ? "zh-CN" : "en-US"
   );
   if (locale === "zh") {
-    return `${credits} 积分/次`;
+    return `${credits} 算力积分/次`;
   }
   return `${credits} credits / generation`;
 }
@@ -274,24 +276,20 @@ export function formatModelPriceSummary(
   return `input ${input}, output ${output}`;
 }
 
-/** Short unit label when price is shown separately — kept for table headers if needed. */
 export function getImagePriceUnitLabel(locale: Locale): string {
-  return locale === "zh" ? "积分/次" : "credits / generation";
+  return locale === "zh" ? "算力积分/次" : "credits / generation";
 }
 
-/** Billing unit for image models in pricing tables and cards. */
 export function getImagePerRequestBillingUnitLabel(locale: Locale): string {
   return locale === "zh" ? "按次计费" : "Per generation";
 }
 
-/** Billing unit on model cards — per successful generation. */
 export function getImageBillingChargeLabel(locale: Locale): string {
   return locale === "zh"
     ? "每次成功生成扣费"
     : "Charged per successful generation";
 }
 
-/** Billing unit on chat model cards. */
 export function getChatBillingUnitLabel(locale: Locale): string {
   return locale === "zh"
     ? "按 input/output tokens 计费"
@@ -366,7 +364,6 @@ export function formatImageCreditsAmount(
   return credits.toLocaleString(locale === "zh" ? "zh-CN" : "en-US");
 }
 
-/** Model select label, e.g. `Nano Banana (nano-banana) · 1,400 credits / generation`. */
 export function formatImageModelSelectLabel(modelId: string, locale: Locale): string {
   const entry = getImageModelById(modelId);
   if (!entry || !isImageModelEntry(entry)) {
@@ -395,6 +392,9 @@ export function formatImageReferenceYuanForModelId(
   if (!entry || !isImageModelEntry(entry)) {
     return null;
   }
+  if (entry.pricing.creditsPerRequest > 0) {
+    return formatImageReferenceYuanPerRequest(entry.pricing, locale);
+  }
   if (
     entry.pricing.referenceYuanPerRequest.min === 0 &&
     entry.pricing.referenceYuanPerRequest.max === 0
@@ -404,7 +404,6 @@ export function formatImageReferenceYuanForModelId(
   return formatImageReferenceYuanPerRequest(entry.pricing, locale);
 }
 
-/** Credits page example, e.g. `Nano Banana is 1,400 credits / generation`. */
 export function formatImageModelPriceExample(
   modelId: string,
   locale: Locale
@@ -419,3 +418,5 @@ export function formatImageModelPriceExample(
   }
   return `${entry.displayName} is ${price}`;
 }
+
+export { CREDITS_PER_YUAN };
