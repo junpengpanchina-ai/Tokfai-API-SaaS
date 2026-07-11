@@ -596,8 +596,8 @@ export async function createCheckoutSession(
 // ---------------------------------------------------------------------------
 // Chat completions — POST /v1/chat/completions
 //
-// Auth: sk-tokfai_ API key (external customers) or Supabase access JWT
-// (dashboard Playground). DMIT runs the same billing / usage logging for both.
+// Live dashboard Playground uses sk-tokfai_ API keys (same path as external
+// customers). Prefer lib/dashboard-safe/chat-api.ts from Playground UI.
 // ---------------------------------------------------------------------------
 
 export type ChatRole = "system" | "user" | "assistant";
@@ -680,37 +680,11 @@ export async function listModels(apiKey: string): Promise<ModelListItem[]> {
 }
 
 /**
- * Dashboard Playground — POST /v1/chat/completions with the Supabase JWT.
- */
-export async function playgroundChatCompletions(
-  accessToken: string,
-  body: Pick<ChatCompletionRequest, "model" | "messages">
-): Promise<ChatCompletionResponse> {
-  const token = requireDmitAccessToken(accessToken);
-  const res = await dmitFetchWithHeaders<ChatCompletionResponse>(
-    "/v1/chat/completions",
-    {
-      method: "POST",
-      json: { ...body, stream: false },
-      accessToken: token,
-    }
-  );
-  const requestId = res.headers.get("x-request-id");
-  if (!requestId) return res.data;
-  return {
-    ...res.data,
-    tokfai: {
-      ...res.data.tokfai,
-      request_id: res.data.tokfai?.request_id ?? requestId,
-    },
-  };
-}
-
-/**
  * Call POST /v1/chat/completions using the user's own sk-tokfai_... key.
  *
  * The api key is passed through to the Authorization header and never logged,
- * stored, or persisted by this module.
+ * stored, or persisted by this module. Do not pass a Supabase JWT here —
+ * dashboard Playground uses this API-key path on purpose.
  */
 export async function chatCompletions(
   apiKey: string,

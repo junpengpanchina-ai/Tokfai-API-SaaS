@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import {
   AdminApiError,
   adjustAdminCredits,
+  createAdminAdjustIdempotencyKey,
   fetchAdminApi,
   type AdminApiKeyRow,
   type AdminCreditsAdjustSuccess,
@@ -32,10 +33,6 @@ type ApiKeyMatch = {
 
 const DEFAULT_AMOUNT = "300000";
 const DEFAULT_REASON = "pre-demo credits top-up";
-
-function buildIdempotencyKey(userId: string): string {
-  return `admin-credit-adjust-${userId}-${Date.now()}`;
-}
 
 function matchApiKeyPrefix(
   rows: AdminApiKeyRow[],
@@ -127,7 +124,7 @@ export function CreditsAdjustClient() {
           direction,
           reason: trimmedReason,
         },
-        buildIdempotencyKey(trimmedUserId)
+        createAdminAdjustIdempotencyKey()
       );
       setSuccess(result);
     } catch (err) {

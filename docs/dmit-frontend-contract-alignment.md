@@ -13,6 +13,9 @@
 | 3 | 信息 | `lib/billing/recharge-plans.ts` `creditsPurchaseHref` | 登录后指向 `/dashboard/credits`，与 Pricing 互跳形成死环 | 登录后指向 `/pricing`（选套餐） | ✅ 已修 |
 | 4 | — | Credits「充值」→ `/pricing` | 本身不是 API 错路径；在 #1 修复后合理（去选套餐再 checkout） | 保持链到 Pricing | 无需改 |
 
+| 5 | — | Credits checkout return banner | pending vs paid display | pending uses amber wait state; paid stays green; no client balance write | ✅ |
+| 6 | — | `playgroundChatCompletions` JWT helper | unused JWT path conflicted with live API Key contract | removed | ✅ |
+
 ## 重点项核对结果
 
 | 检查项 | 结果 |
@@ -22,8 +25,8 @@
 | Credits 充值是否调用 checkout | 修复前否（死环）；修复后：Credits → Pricing → `POST /v1/billing/checkout` |
 | Checkout body 是否为 `{ plan_id }` | **是**（`createCheckoutSession`）；非 `planId` / `id` / `package_code` |
 | Admin credits adjust | **正确**：`POST /admin/credits/adjust`，body `user_id` + `amount` + `direction` + `reason`，带 `Idempotency-Key`（后端真实字段为 `user_id`，非用户摘要里的 `userId`） |
-| Image playground | **正确**：仅 `POST /v1/images/generations` |
-| Chat playground | **正确**：仅 `POST /v1/chat/completions` |
+| Image playground | **正确**：`/image-playground` → `/dashboard/image-playground`；仅 `POST /v1/images/generations` + API Key |
+| Chat playground | **正确**：仅 `POST /v1/chat/completions` + API Key |
 
 ## 与「简写合同」的路径差（非前端 bug）
 

@@ -462,14 +462,16 @@ function CheckoutStatusBanner({
       );
     }
 
+    // Pending (or webhook not yet reflected): show waiting state only —
+    // never write balance from the client; Stripe webhook + DMIT credits it.
     return (
-      <Card className="border-emerald-300 bg-emerald-50 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+      <Card className="border-amber-300 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            <Info className="h-4 w-4 text-amber-600" />
             {t("dashboard.credits.paymentReceived")}
           </CardTitle>
-          <CardDescription className="text-emerald-900/80 dark:text-emerald-100/80">
+          <CardDescription className="text-amber-900/80 dark:text-amber-100/80">
             {t("dashboard.credits.paymentReceivedDesc")}
           </CardDescription>
         </CardHeader>
