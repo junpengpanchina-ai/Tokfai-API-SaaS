@@ -310,6 +310,8 @@ export async function executeChatCompletion(
 
           const response: Record<string, unknown> = {
             ...data,
+            // Upstream may omit or send empty object; OpenAI clients require this.
+            object: "chat.completion",
             model: resolvedModel,
             credits_charged: creditsCharged,
             request_id: requestId,

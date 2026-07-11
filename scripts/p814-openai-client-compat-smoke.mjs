@@ -79,13 +79,14 @@ async function postJson(path, body) {
 function assertChatOk(res, label) {
   const ok =
     res.status === 200 &&
+    res.body?.object === "chat.completion" &&
     typeof res.body?.choices?.[0]?.message?.content === "string" &&
     res.body.choices[0].message.content.length > 0 &&
     typeof res.body?.request_id === "string";
   if (ok) return pass(label);
   return fail(
     label,
-    `HTTP ${res.status}, code=${res.body?.error?.code}, content=${JSON.stringify(res.body?.choices?.[0]?.message?.content)?.slice(0, 80)}`
+    `HTTP ${res.status}, object=${JSON.stringify(res.body?.object)}, code=${res.body?.error?.code}, content=${JSON.stringify(res.body?.choices?.[0]?.message?.content)?.slice(0, 80)}`
   );
 }
 
@@ -115,13 +116,20 @@ function assertSseOk(res, label) {
   const hasEventStream =
     contentType.includes("text/event-stream") || text.includes("data:");
   const hasDone = /data:\s*\[DONE\]/.test(text);
-  const hasChunk =
-    text.includes("chat.completion.chunk") || text.includes('"delta"');
-  const ok = res.status === 200 && hasEventStream && hasDone && hasChunk;
+  const hasChunkObject =
+    /"object"\s*:\s*"chat\.completion\.chunk"/.test(text) ||
+    text.includes('"object":"chat.completion.chunk"');
+  const hasDelta = text.includes('"delta"');
+  const ok =
+    res.status === 200 &&
+    hasEventStream &&
+    hasDone &&
+    hasChunkObject &&
+    hasDelta;
   if (ok) return pass(label);
   return fail(
     label,
-    `HTTP ${res.status}, content-type=${contentType}, hasDone=${hasDone}, hasChunk=${hasChunk}, preview=${JSON.stringify(text.slice(0, 160))}`
+    `HTTP ${res.status}, content-type=${contentType}, hasDone=${hasDone}, hasChunkObject=${hasChunkObject}, hasDelta=${hasDelta}, preview=${JSON.stringify(text.slice(0, 160))}`
   );
 }
 
