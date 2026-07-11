@@ -122,6 +122,13 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     section: "secondary",
   },
   {
+    href: "/admin/credits-adjust",
+    labelKey: "admin.nav.creditsAdjust",
+    icon: Coins,
+    prefetch: false,
+    section: "secondary",
+  },
+  {
     href: "/dashboard",
     labelKey: "admin.nav.backToDashboard",
     icon: ArrowLeft,
