@@ -15,8 +15,9 @@
 | DB | Supabase service_role（`@supabase/supabase-js`） |
 | 支付 | Stripe SDK |
 | 缓存/限流 | Redis 可选；默认进程内 |
-| 部署 | Docker / PM2 / `node dist/index.js` |
+| 部署 | **生产：PM2 `tokfai-api` only**（见 `deploy/runtime/`）；本地可用 `node` |
 | 本地默认 | `http://127.0.0.1:8787` |
+| 生产绑定 | `127.0.0.1:8788`（Nginx → 8788；勿裸跑 node） |
 
 入口：`src/index.ts`（启动）、`src/app.ts`（路由组装）。
 

@@ -52,6 +52,13 @@ const ALLOWED_FIELD_KEYS = new Set([
   "resourceType",
   "resourceId",
   "action",
+  "planId",
+  "orderId",
+  "stripeCustomerId",
+  "stripeErrorCode",
+  "stripeErrorType",
+  "stripeErrorParam",
+  "recreatedCustomer",
 ]);
 
 /**

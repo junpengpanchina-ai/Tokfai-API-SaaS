@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono";
 import Stripe from "stripe";
 
 import { ApiError } from "../errors.js";
+import { log } from "../logger.js";
 import { requireSupabaseJwt } from "../middleware/supabaseJwt.js";
 import {
   listBillingRechargePlans,
@@ -26,6 +27,10 @@ let _billingStripe: Stripe | null = null;
 
 function authedUser(c: { get: (key: never) => unknown }): AuthedUser {
   return c.get("user" as never) as AuthedUser;
+}
+
+function requestIdOf(c: Context): string | undefined {
+  return c.get("requestId" as never) as string | undefined;
 }
 
 const csv = (raw: string) =>
@@ -229,6 +234,222 @@ function buildCheckoutMetadata(args: {
   };
 }
 
+type StripeErrFields = {
+  stripeErrorCode?: string;
+  stripeErrorType?: string;
+  stripeErrorParam?: string;
+  message?: string;
+};
+
+function stripeErrorFields(err: unknown): StripeErrFields {
+  if (err instanceof Stripe.errors.StripeError) {
+    return {
+      stripeErrorCode: err.code ?? undefined,
+      stripeErrorType: err.type ?? undefined,
+      stripeErrorParam:
+        typeof err.param === "string" && err.param.length > 0
+          ? err.param
+          : undefined,
+      message: err.message,
+    };
+  }
+  if (err instanceof Error) {
+    return { message: err.message };
+  }
+  return { message: String(err) };
+}
+
+/** Stale / deleted / test-vs-live customer ids typically surface as resource_missing. */
+function isInvalidStripeCustomerError(err: unknown): boolean {
+  if (!(err instanceof Stripe.errors.StripeError)) return false;
+  if (err.code === "resource_missing") return true;
+  const msg = err.message.toLowerCase();
+  return (
+    msg.includes("no such customer") ||
+    (msg.includes("customer") && msg.includes("does not exist")) ||
+    (err.param === "customer" && err.statusCode === 400)
+  );
+}
+
+function logCheckoutFailure(
+  msg: string,
+  fields: {
+    requestId?: string;
+    userId: string;
+    planId: string;
+    orderId?: string;
+    stripeCustomerId?: string | null;
+    code: string;
+    err?: unknown;
+    recreatedCustomer?: boolean;
+  }
+): void {
+  const stripeFields = stripeErrorFields(fields.err);
+  log.error(msg, {
+    requestId: fields.requestId,
+    route: "POST /v1/billing/checkout",
+    status: 500,
+    userId: fields.userId,
+    planId: fields.planId,
+    orderId: fields.orderId,
+    stripeCustomerId: fields.stripeCustomerId ?? undefined,
+    code: fields.code,
+    message: stripeFields.message ?? fields.code,
+    stripeErrorCode: stripeFields.stripeErrorCode,
+    stripeErrorType: stripeFields.stripeErrorType,
+    stripeErrorParam: stripeFields.stripeErrorParam,
+    recreatedCustomer: fields.recreatedCustomer,
+  });
+}
+
+async function persistStripeCustomerId(
+  userId: string,
+  stripeCustomerId: string
+): Promise<void> {
+  const { error: updateError } = await supabase()
+    .from("profiles")
+    .update({
+      stripe_customer_id: stripeCustomerId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId);
+
+  if (updateError) {
+    throw ApiError.internal(
+      `Failed to save Stripe customer id: ${updateError.message}`,
+      "billing_customer_save_failed"
+    );
+  }
+}
+
+async function createAndPersistStripeCustomer(args: {
+  stripe: Stripe;
+  userId: string;
+  email: string | undefined;
+  requestId?: string;
+  planId: string;
+  previousCustomerId?: string | null;
+}): Promise<string> {
+  let customer: Stripe.Customer;
+  try {
+    customer = await args.stripe.customers.create({
+      email: args.email,
+      metadata: {
+        tokfai_user_id: args.userId,
+      },
+    });
+  } catch (err) {
+    logCheckoutFailure("billing_checkout_failed", {
+      requestId: args.requestId,
+      userId: args.userId,
+      planId: args.planId,
+      stripeCustomerId: args.previousCustomerId,
+      code: "stripe_customer_create_failed",
+      err,
+    });
+    throw stripeCheckoutError(err, "stripe_customer_create_failed");
+  }
+
+  await persistStripeCustomerId(args.userId, customer.id);
+
+  if (args.previousCustomerId) {
+    log.info("billing_stripe_customer_recreated", {
+      requestId: args.requestId,
+      route: "POST /v1/billing/checkout",
+      userId: args.userId,
+      planId: args.planId,
+      stripeCustomerId: customer.id,
+      code: "stripe_customer_recreated",
+      message: `Replaced invalid Stripe customer ${args.previousCustomerId} with ${customer.id}.`,
+      recreatedCustomer: true,
+    });
+  }
+
+  return customer.id;
+}
+
+/**
+ * Resolve a usable Stripe customer for checkout. Creates one when missing;
+ * if the stored id is gone or belongs to the wrong Stripe mode (test/live),
+ * recreates and updates profiles.stripe_customer_id.
+ */
+async function ensureStripeCustomer(args: {
+  stripe: Stripe;
+  userId: string;
+  email: string | undefined;
+  storedCustomerId: string | null | undefined;
+  requestId?: string;
+  planId: string;
+}): Promise<{ customerId: string; recreated: boolean }> {
+  const stored = args.storedCustomerId?.trim() || null;
+
+  if (stored) {
+    try {
+      const existing = await args.stripe.customers.retrieve(stored);
+      if (!("deleted" in existing && existing.deleted)) {
+        return { customerId: existing.id, recreated: false };
+      }
+    } catch (err) {
+      if (!isInvalidStripeCustomerError(err)) {
+        logCheckoutFailure("billing_checkout_failed", {
+          requestId: args.requestId,
+          userId: args.userId,
+          planId: args.planId,
+          stripeCustomerId: stored,
+          code: "stripe_customer_retrieve_failed",
+          err,
+        });
+        throw stripeCheckoutError(err, "stripe_customer_retrieve_failed");
+      }
+      log.warn("billing_stripe_customer_invalid", {
+        requestId: args.requestId,
+        route: "POST /v1/billing/checkout",
+        userId: args.userId,
+        planId: args.planId,
+        stripeCustomerId: stored,
+        code: "stripe_customer_invalid",
+        message: stripeErrorFields(err).message ?? "Stored Stripe customer is invalid.",
+        stripeErrorCode: stripeErrorFields(err).stripeErrorCode,
+        stripeErrorType: stripeErrorFields(err).stripeErrorType,
+      });
+    }
+  }
+
+  const customerId = await createAndPersistStripeCustomer({
+    stripe: args.stripe,
+    userId: args.userId,
+    email: args.email,
+    requestId: args.requestId,
+    planId: args.planId,
+    previousCustomerId: stored,
+  });
+
+  return { customerId, recreated: Boolean(stored) };
+}
+
+async function createStripeCheckoutSession(args: {
+  stripe: Stripe;
+  customerId: string;
+  userId: string;
+  successUrl: string;
+  cancelUrl: string;
+  plan: AdminRechargePlanListItem;
+  metadata: Record<string, string>;
+}): Promise<Stripe.Checkout.Session> {
+  return args.stripe.checkout.sessions.create({
+    mode: "payment",
+    customer: args.customerId,
+    client_reference_id: args.userId,
+    success_url: args.successUrl,
+    cancel_url: args.cancelUrl,
+    line_items: [buildCheckoutLineItem(args.plan)],
+    metadata: args.metadata,
+    payment_intent_data: {
+      metadata: args.metadata,
+    },
+  });
+}
+
 async function listBillingPlans(c: Context) {
   const plans = await listBillingRechargePlans();
   return c.json({ data: plans });
@@ -236,6 +457,7 @@ async function listBillingPlans(c: Context) {
 
 async function createCheckoutSession(c: Context) {
   const user = authedUser(c);
+  const requestId = requestIdOf(c);
   let body: unknown;
   try {
     body = await c.req.json();
@@ -269,6 +491,13 @@ async function createCheckoutSession(c: Context) {
     .maybeSingle();
 
   if (profileError) {
+    logCheckoutFailure("billing_checkout_failed", {
+      requestId,
+      userId: user.id,
+      planId,
+      code: "billing_profile_load_failed",
+      err: new Error(profileError.message),
+    });
     throw ApiError.internal(
       `Failed to load billing profile: ${profileError.message}`,
       "billing_profile_load_failed"
@@ -278,40 +507,36 @@ async function createCheckoutSession(c: Context) {
     throw ApiError.notFound("Profile not found.", "profile_not_found");
   }
 
-  let stripeCustomerId = (profile as { stripe_customer_id?: string | null })
-    .stripe_customer_id;
-  if (!stripeCustomerId) {
-    let customer: Stripe.Customer;
-    try {
-      customer = await stripe.customers.create({
-        email: user.email ?? (profile as { email?: string | null }).email ?? undefined,
-        metadata: {
-          tokfai_user_id: user.id,
-        },
-      });
-    } catch (err) {
-      throw stripeCheckoutError(err, "stripe_customer_create_failed");
-    }
-    stripeCustomerId = customer.id;
-
-    const { error: updateError } = await sb
-      .from("profiles")
-      .update({
-        stripe_customer_id: stripeCustomerId,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", user.id);
-
-    if (updateError) {
-      throw ApiError.internal(
-        `Failed to save Stripe customer id: ${updateError.message}`,
-        "billing_customer_save_failed"
-      );
-    }
-  }
-
   const profileEmail =
     user.email ?? (profile as { email?: string | null }).email ?? null;
+  const storedCustomerId = (profile as { stripe_customer_id?: string | null })
+    .stripe_customer_id;
+
+  let stripeCustomerId: string;
+  let recreatedCustomer = false;
+  try {
+    const ensured = await ensureStripeCustomer({
+      stripe,
+      userId: user.id,
+      email: profileEmail ?? undefined,
+      storedCustomerId,
+      requestId,
+      planId,
+    });
+    stripeCustomerId = ensured.customerId;
+    recreatedCustomer = ensured.recreated;
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
+    logCheckoutFailure("billing_checkout_failed", {
+      requestId,
+      userId: user.id,
+      planId,
+      stripeCustomerId: storedCustomerId,
+      code: "billing_checkout_failed",
+      err,
+    });
+    throw stripeCheckoutError(err, "billing_checkout_failed");
+  }
 
   const { data: order, error: orderError } = await sb
     .from("credit_orders")
@@ -326,6 +551,15 @@ async function createCheckoutSession(c: Context) {
     .single();
 
   if (orderError || !order) {
+    logCheckoutFailure("billing_checkout_failed", {
+      requestId,
+      userId: user.id,
+      planId,
+      stripeCustomerId,
+      code: "credit_order_create_failed",
+      err: new Error(orderError?.message ?? "missing order"),
+      recreatedCustomer,
+    });
     throw ApiError.internal(
       `Failed to create credit order: ${orderError?.message ?? "missing order"}`,
       "credit_order_create_failed"
@@ -341,23 +575,90 @@ async function createCheckoutSession(c: Context) {
 
   let session: Stripe.Checkout.Session;
   try {
-    session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      customer: stripeCustomerId,
-      client_reference_id: user.id,
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      line_items: [buildCheckoutLineItem(plan)],
+    session = await createStripeCheckoutSession({
+      stripe,
+      customerId: stripeCustomerId,
+      userId: user.id,
+      successUrl,
+      cancelUrl,
+      plan,
       metadata,
-      payment_intent_data: {
-        metadata,
-      },
     });
   } catch (err) {
-    throw stripeCheckoutError(err, "stripe_checkout_create_failed");
+    if (isInvalidStripeCustomerError(err)) {
+      log.warn("billing_stripe_customer_invalid", {
+        requestId,
+        route: "POST /v1/billing/checkout",
+        userId: user.id,
+        planId,
+        orderId,
+        stripeCustomerId,
+        code: "stripe_customer_invalid",
+        message:
+          stripeErrorFields(err).message ??
+          "Stripe rejected customer on checkout session create.",
+        stripeErrorCode: stripeErrorFields(err).stripeErrorCode,
+        stripeErrorType: stripeErrorFields(err).stripeErrorType,
+      });
+
+      try {
+        stripeCustomerId = await createAndPersistStripeCustomer({
+          stripe,
+          userId: user.id,
+          email: profileEmail ?? undefined,
+          requestId,
+          planId,
+          previousCustomerId: stripeCustomerId,
+        });
+        recreatedCustomer = true;
+        session = await createStripeCheckoutSession({
+          stripe,
+          customerId: stripeCustomerId,
+          userId: user.id,
+          successUrl,
+          cancelUrl,
+          plan,
+          metadata,
+        });
+      } catch (retryErr) {
+        logCheckoutFailure("billing_checkout_failed", {
+          requestId,
+          userId: user.id,
+          planId,
+          orderId,
+          stripeCustomerId,
+          code: "stripe_checkout_create_failed",
+          err: retryErr,
+          recreatedCustomer: true,
+        });
+        throw stripeCheckoutError(retryErr, "stripe_checkout_create_failed");
+      }
+    } else {
+      logCheckoutFailure("billing_checkout_failed", {
+        requestId,
+        userId: user.id,
+        planId,
+        orderId,
+        stripeCustomerId,
+        code: "stripe_checkout_create_failed",
+        err,
+        recreatedCustomer,
+      });
+      throw stripeCheckoutError(err, "stripe_checkout_create_failed");
+    }
   }
 
   if (!session.url) {
+    logCheckoutFailure("billing_checkout_failed", {
+      requestId,
+      userId: user.id,
+      planId,
+      orderId,
+      stripeCustomerId,
+      code: "checkout_url_missing",
+      err: new Error("Stripe Checkout did not return a URL."),
+      recreatedCustomer,
+    });
     throw ApiError.internal("Stripe Checkout did not return a URL.", "checkout_url_missing");
   }
 
@@ -369,11 +670,34 @@ async function createCheckoutSession(c: Context) {
     .eq("id", orderId);
 
   if (updateOrderError) {
+    logCheckoutFailure("billing_checkout_failed", {
+      requestId,
+      userId: user.id,
+      planId,
+      orderId,
+      stripeCustomerId,
+      code: "checkout_session_save_failed",
+      err: new Error(updateOrderError.message),
+      recreatedCustomer,
+    });
     throw ApiError.internal(
       `Failed to save checkout session id: ${updateOrderError.message}`,
       "checkout_session_save_failed"
     );
   }
+
+  log.info("billing_checkout_session_created", {
+    requestId,
+    route: "POST /v1/billing/checkout",
+    status: 200,
+    userId: user.id,
+    planId: plan.id,
+    orderId,
+    stripeCustomerId,
+    code: "checkout_session_created",
+    message: `Checkout session ${session.id} created for plan ${plan.id}.`,
+    recreatedCustomer,
+  });
 
   return c.json({
     url: session.url,

@@ -1,0 +1,43 @@
+# Example Nginx upstream for api.tokfai.com
+# Install on the DMIT host and point proxy_pass at PM2 tokfai-api.
+#
+# Contract:
+#   - Public TLS terminates at Nginx (80/443)
+#   - Backend is ONLY PM2 process tokfai-api on 127.0.0.1:8788
+#   - Do not expose 8787/8788 publicly
+#   - Do not run bare `node dist/index.js` alongside PM2
+
+upstream tokfai_api {
+    server 127.0.0.1:8788;
+    keepalive 32;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name api.tokfai.com;
+
+    # ssl_certificate     /path/to/fullchain.pem;
+    # ssl_certificate_key /path/to/privkey.pem;
+
+    client_max_body_size 1m;
+    proxy_connect_timeout 10s;
+    proxy_send_timeout 130s;
+    proxy_read_timeout 130s;
+
+    location / {
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Request-Id $http_x_request_id;
+        proxy_pass http://tokfai_api;
+    }
+}
+
+server {
+    listen 80;
+    server_name api.tokfai.com;
+    return 301 https://$host$request_uri;
+}

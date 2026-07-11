@@ -114,8 +114,9 @@ async function loadEnv() {
 async function maybePm2Inspect() {
   if (process.env.RUN_PM2_INSPECT !== "1") return;
   console.log("=== PM2 inspect (redacted) ===");
+  const pm2App = process.env.PM2_APP_NAME ?? "tokfai-api";
   try {
-    const show = await execFileAsync("pm2", ["show", "dmit-api"], {
+    const show = await execFileAsync("pm2", ["show", pm2App], {
       maxBuffer: 2 * 1024 * 1024,
     });
     console.log(redactPm2Output(show.stdout));
@@ -123,7 +124,7 @@ async function maybePm2Inspect() {
     console.log("pm2 show failed:", err instanceof Error ? err.message : err);
   }
   try {
-    const envOut = await execFileAsync("pm2", ["env", "dmit-api"], {
+    const envOut = await execFileAsync("pm2", ["env", pm2App], {
       maxBuffer: 2 * 1024 * 1024,
     });
     console.log(redactPm2Output(envOut.stdout));
