@@ -255,6 +255,14 @@ export type AdminPricingRow = {
   effective_status: "active" | "disabled" | "archived";
 };
 
+/** PATCH /admin/pricing/:modelId — canonical field names (aliases also accepted by DMIT). */
+export type AdminPricingUpdateBody = {
+  input_credits_per_million_tokens?: number;
+  output_credits_per_million_tokens?: number;
+  image_credits_per_generation?: number;
+  markup_ratio?: number;
+};
+
 export type AdminErrorLogRow = {
   id: string;
   request_id: string | null;
@@ -531,6 +539,25 @@ export async function syncAdminCatalog(): Promise<SyncCatalogResult> {
     {
       method: "POST",
       json: {},
+    }
+  );
+  return res.data;
+}
+
+export async function fetchAdminPricing(): Promise<AdminPricingRow[]> {
+  const res = await fetchAdminApi<{ data?: AdminPricingRow[] }>("/admin/pricing");
+  return Array.isArray(res.data) ? res.data : [];
+}
+
+export async function updateAdminPricing(
+  modelId: string,
+  body: AdminPricingUpdateBody
+): Promise<AdminPricingRow> {
+  const res = await fetchAdminApi<{ data: AdminPricingRow }>(
+    `/admin/pricing/${encodeURIComponent(modelId)}`,
+    {
+      method: "PATCH",
+      json: body,
     }
   );
   return res.data;
