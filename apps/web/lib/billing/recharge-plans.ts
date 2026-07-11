@@ -72,10 +72,9 @@ export function filterVisibleRechargePlans(
 
 export { formatCny, formatPlanCredits } from "./money-format";
 
+/** Post-login / CTA target for buying credits — plan selection lives on /pricing. */
 export function creditsPurchaseHref(isLoggedIn: boolean): string {
-  return isLoggedIn
-    ? "/dashboard/credits"
-    : loginPathWithNext("/dashboard/credits");
+  return isLoggedIn ? "/pricing" : loginPathWithNext("/pricing");
 }
 
 /**

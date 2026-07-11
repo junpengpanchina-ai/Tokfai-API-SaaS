@@ -500,7 +500,7 @@ export async function revealMeApiKey(
 }
 
 // ---------------------------------------------------------------------------
-// Billing — Stripe Checkout (UI wired in /dashboard/credits)
+// Billing — Stripe Checkout (UI wired on /pricing Buy → POST /v1/billing/checkout)
 // ---------------------------------------------------------------------------
 
 export interface BillingRechargePlan {

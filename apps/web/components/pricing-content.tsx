@@ -20,9 +20,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { PricingBuyButton } from "@/components/pricing-buy-button";
 import {
   type BillingRechargePlan,
-  creditsPurchaseHref,
   formatCny,
   formatPlanCredits,
 } from "@/lib/billing/recharge-plans";
@@ -59,7 +59,6 @@ export function PricingContent({
   isLoggedIn?: boolean;
 }) {
   const { t, locale } = useI18n();
-  const purchaseHref = creditsPurchaseHref(isLoggedIn);
   const dashHref = (path: string) => dashboardCtaHref(path, isLoggedIn);
 
   const usagePoints = [
@@ -238,11 +237,11 @@ export function PricingContent({
                 </CardHeader>
                 <CardContent className="pt-0">
                   {canPurchase ? (
-                    <Button asChild className="w-full" size="lg">
-                      <Link href={purchaseHref}>
-                        {formatMessage(t("pricing.buyPlan"), { name: plan.name })}
-                      </Link>
-                    </Button>
+                    <PricingBuyButton
+                      planId={plan.plan_id}
+                      planName={plan.name}
+                      isLoggedIn={isLoggedIn}
+                    />
                   ) : (
                     <Button className="w-full" disabled variant="outline">
                       {t("pricing.comingSoon")}
