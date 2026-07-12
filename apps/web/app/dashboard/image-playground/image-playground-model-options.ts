@@ -33,12 +33,6 @@ const IMAGE_MODELS: ImagePlaygroundModelOption[] = [
     creditsPerRequest: 1400,
     status: "available",
   },
-  {
-    id: "nano-banana-pro",
-    displayName: "Nano Banana Pro",
-    creditsPerRequest: 1800,
-    status: "available",
-  },
 ];
 
 export const IMAGE_PLAYGROUND_DEFAULT_MODEL = "nano-banana-fast";
@@ -83,5 +77,8 @@ export function formatImageModelSelectLabel(
   const entry = getImageModelOptionById(modelId);
   if (!entry) return modelId;
   const price = formatImageCreditsAmount(entry.creditsPerRequest, locale);
-  return `${entry.displayName} (${modelId}) · ${price} credits / generation`;
+  if (locale === "zh") {
+    return `${entry.displayName} (${modelId}) · ${price} 算力积分 / 次`;
+  }
+  return `${entry.displayName} (${modelId}) · ${price} compute credits / generation`;
 }

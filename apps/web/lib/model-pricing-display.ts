@@ -133,7 +133,7 @@ export function formatDbChatInputCreditsPerMillion(
   if (locale === "zh") {
     return `Input: ${amount} 算力积分 / 100万 tokens（${yuan}）`;
   }
-  return `Input: ${amount} credits / 1M tokens (${yuan})`;
+  return `Input: ${amount} compute credits / 1M tokens (${yuan})`;
 }
 
 export function formatDbChatOutputCreditsPerMillion(
@@ -146,7 +146,7 @@ export function formatDbChatOutputCreditsPerMillion(
   if (locale === "zh") {
     return `Output: ${amount} 算力积分 / 100万 tokens（${yuan}）`;
   }
-  return `Output: ${amount} credits / 1M tokens (${yuan})`;
+  return `Output: ${amount} compute credits / 1M tokens (${yuan})`;
 }
 
 export function formatDbImageCreditsPerGeneration(
@@ -159,7 +159,7 @@ export function formatDbImageCreditsPerGeneration(
   if (locale === "zh") {
     return `${amount} 算力积分 / 次（${yuan}）`;
   }
-  return `${amount} credits / generation (${yuan})`;
+  return `${amount} compute credits / generation (${yuan})`;
 }
 
 export function formatCredits(value: number, locale: Locale): string {
@@ -258,7 +258,7 @@ export function formatImageCreditsPerRequest(
   if (locale === "zh") {
     return `${credits} 算力积分/次`;
   }
-  return `${credits} credits / generation`;
+  return `${credits} compute credits / generation`;
 }
 
 export function formatModelPriceSummary(
@@ -277,7 +277,7 @@ export function formatModelPriceSummary(
 }
 
 export function getImagePriceUnitLabel(locale: Locale): string {
-  return locale === "zh" ? "算力积分/次" : "credits / generation";
+  return locale === "zh" ? "算力积分/次" : "compute credits / generation";
 }
 
 export function getImagePerRequestBillingUnitLabel(locale: Locale): string {

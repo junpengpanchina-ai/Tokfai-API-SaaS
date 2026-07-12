@@ -4,12 +4,8 @@ export type PlaygroundChatModelOption = {
   description: string;
 };
 
+/** Concrete chat models shown in Playground (consumer curated). */
 const PLAYGROUND_CHAT_MODELS: PlaygroundChatModelOption[] = [
-  {
-    id: "gpt-5.4",
-    displayName: "GPT 5.4",
-    description: "GPT 5.4 chat model for OpenAI-compatible workloads.",
-  },
   {
     id: "gpt-5.5",
     displayName: "GPT 5.5",
@@ -21,19 +17,9 @@ const PLAYGROUND_CHAT_MODELS: PlaygroundChatModelOption[] = [
     description: "Fast Gemini 3 chat model for low-latency responses.",
   },
   {
-    id: "gemini-3.5-flash",
-    displayName: "Gemini 3.5 Flash",
-    description: "Latest Gemini 3.5 flash tier for responsive chat workloads.",
-  },
-  {
     id: "gemini-2.5-flash",
     displayName: "Gemini 2.5 Flash",
     description: "Efficient Gemini 2.5 flash model for everyday chat.",
-  },
-  {
-    id: "gemini-3.1-pro",
-    displayName: "Gemini 3.1 Pro",
-    description: "Slow/experimental — explicit use only; may timeout under load.",
   },
   {
     id: "gemini-3-pro",
@@ -51,6 +37,7 @@ export const PLAYGROUND_CHAT_MODEL_IDS = [
   "auto-fast",
   "auto-pro",
   "auto-cheap",
+  "gpt-5",
   ...PLAYGROUND_CHAT_MODELS.map((m) => m.id),
 ] as const;
 
@@ -58,6 +45,8 @@ export function isAvailableChatModel(modelId: string): boolean {
   return (PLAYGROUND_CHAT_MODEL_IDS as readonly string[]).includes(modelId);
 }
 
-export function getChatModelById(modelId: string): PlaygroundChatModelOption | undefined {
+export function getChatModelById(
+  modelId: string
+): PlaygroundChatModelOption | undefined {
   return PLAYGROUND_CHAT_MODELS.find((model) => model.id === modelId);
 }

@@ -61,7 +61,7 @@ export function CreditsContentClient({
   checkoutStatus?: string;
   checkoutSessionId?: string;
 }) {
-  const { t } = useDashboardLabels();
+  const { t, locale } = useDashboardLabels();
   const safeCreditsState = normalizeCreditsPageData(creditsState);
   const { balance, ledger, orders, error } = safeCreditsState;
   const [referenceFilter, setReferenceFilter] = useState("");
@@ -97,7 +97,9 @@ export function CreditsContentClient({
         <CardHeader>
           <CardDescription>{t("dashboard.credits.currentBalance")}</CardDescription>
           <CardTitle className="text-4xl">
-            {error ? t("common.unavailable") : dashboardFormatBalanceCredits(balance.balance)}
+            {error
+              ? t("common.unavailable")
+              : dashboardFormatBalanceCredits(balance.balance, locale)}
           </CardTitle>
           {balance.showNoLedgerHint && !error ? (
             <p className="text-sm text-muted-foreground">
@@ -116,11 +118,11 @@ export function CreditsContentClient({
           />
           <BalanceStat
             label={t("dashboard.credits.todayConsumed")}
-            value={dashboardFormatBalanceCredits(balance.todayConsumed)}
+            value={dashboardFormatBalanceCredits(balance.todayConsumed, locale)}
           />
           <BalanceStat
             label={t("dashboard.credits.last7DaysConsumed")}
-            value={dashboardFormatBalanceCredits(balance.last7DaysConsumed)}
+            value={dashboardFormatBalanceCredits(balance.last7DaysConsumed, locale)}
           />
         </CardContent>
       </Card>
@@ -224,7 +226,7 @@ export function CreditsContentClient({
                 </thead>
                 <tbody>
                   {filteredLedger.map((entry) => (
-                    <LedgerRow key={entry.id} entry={entry} t={t} />
+                    <LedgerRow key={entry.id} entry={entry} t={t} locale={locale} />
                   ))}
                 </tbody>
               </table>
@@ -330,9 +332,11 @@ function BalanceStat({ label, value }: { label: string; value: string }) {
 function LedgerRow({
   entry,
   t,
+  locale,
 }: {
   entry: CreditLedgerEntry;
   t: (key: string) => string;
+  locale: "en" | "zh";
 }) {
   const { copiedId, copyText } = useDashboardCopyToClipboard();
   const referenceCopyId = `ledger-ref-${entry.id}`;
@@ -346,11 +350,14 @@ function LedgerRow({
         <LedgerTypeBadge type={entry.type} t={t} />
       </td>
       <td className="py-2 pr-4 text-right font-mono text-xs">
-        <AmountCell amount={entry.amount} />
+        <AmountCell amount={entry.amount} locale={locale} />
       </td>
       <td className="py-2 pr-4 text-right font-mono text-xs">
         {entry.balance_after != null
-          ? dashboardFormatBalanceCredits(dashboardSafeNumber(entry.balance_after))
+          ? dashboardFormatBalanceCredits(
+              dashboardSafeNumber(entry.balance_after),
+              locale
+            )
           : "—"}
       </td>
       <td
@@ -496,8 +503,14 @@ function CheckoutStatusBanner({
   return null;
 }
 
-function AmountCell({ amount }: { amount: number | string | null }) {
-  const formatted = dashboardFormatCreditsWithSuffix(amount);
+function AmountCell({
+  amount,
+  locale = "en",
+}: {
+  amount: number | string | null;
+  locale?: "en" | "zh";
+}) {
+  const formatted = dashboardFormatCreditsWithSuffix(amount, locale);
   if (formatted === "—") return <span>—</span>;
   const n = dashboardSafeNumber(amount);
   const isPositive = n != null && n >= 0;

@@ -108,16 +108,20 @@ export function dashboardFormatDateTime(iso: string | null | undefined): string 
 
 /** Balance card style — matches format.ts formatCredits output. */
 export function dashboardFormatBalanceCredits(
-  value: number | null | undefined
+  value: number | null | undefined,
+  locale: "en" | "zh" = "en"
 ): string {
-  return `${CREDITS_DECIMAL.format(value ?? 0)} credits`;
+  const amount = CREDITS_DECIMAL.format(value ?? 0);
+  return locale === "zh" ? `${amount} 算力积分` : `${amount} compute credits`;
 }
 
 export function dashboardFormatCreditsWithSuffix(
-  value: number | string | null | undefined
+  value: number | string | null | undefined,
+  locale: "en" | "zh" = "en"
 ): string {
   const amount = dashboardFormatCreditsDecimal(value);
-  return amount === "—" ? "—" : `${amount} credits`;
+  if (amount === "—") return "—";
+  return locale === "zh" ? `${amount} 算力积分` : `${amount} compute credits`;
 }
 
 export function dashboardFormatDate(iso: string | null | undefined): string {

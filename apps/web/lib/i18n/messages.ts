@@ -35,11 +35,11 @@ export const messages = {
       dashboard: "Dashboard",
     },
     home: {
-      headline: "OpenAI-compatible image & chat API",
+      headline: "Tokfai API Gateway",
       tagline:
-        "One API for chat and image — plug into Cursor, Cherry Studio, the OpenAI SDK, or your own app.",
+        "One API key for GPT, Gemini, and image models — OpenAI-compatible, Gemini-compatible, and Tokfai Image API.",
       description:
-        "Same endpoints and request shapes as OpenAI. Buy prepaid credits, create an sk-tokfai_… key, and start calling models in minutes.",
+        "Top up compute credits, then call. Text models bill by usage; image models bill per generation. Failed requests are not charged.",
       compatLabel: "Works with",
       compatCursor: "Cursor",
       compatCherryStudio: "Cherry Studio",
@@ -61,17 +61,17 @@ export const messages = {
         "Point Cursor or Cherry Studio at api.tokfai.com/v1 with your sk-tokfai_… key — no code changes required.",
       scenarioDevToolsCta: "Integration guide",
       scenarioEndpointLabel: "Endpoint",
-      scenarioModelLabel: "Starter model",
-      startWithCredits: "Start with credits",
+      scenarioModelLabel: "Recommended model",
+      startWithCredits: "Top up now",
       tryImagePlayground: "Try Image Playground",
       viewPricing: "View pricing",
-      readDocs: "Read docs",
+      readDocs: "View integration docs",
       howItWorksTitle: "How it works",
       howItWorksDesc: "From sign-up to your first API call in five steps.",
       step1Title: "Sign in",
       step1Body:
         "Create a Tokfai account or log in with your existing credentials.",
-      step2Title: "Buy credits",
+      step2Title: "Buy compute credits",
       step2Body:
         "¥10 = 100,000 compute credits — prepaid balance powers every API call.",
       step3Title: "Create API key",
@@ -107,7 +107,7 @@ export const messages = {
       unavailable: "Unavailable",
       chatPlayground: "Chat Playground",
       imagePlayground: "Image Playground",
-      footerTagline: "Tokfai · OpenAI-compatible image & chat API",
+      footerTagline: "Tokfai · API gateway for GPT, Gemini, and image models",
       apiReference: "API reference →",
       copyright: "© {year} Tokfai",
     },
@@ -216,7 +216,7 @@ export const messages = {
         stepCurrent: "Current",
         stepNext: "Next",
         creditsBalance: "Compute credits balance",
-        creditsBalanceHint: "Compute credits never expire and work for Chat API and Image API.",
+        creditsBalanceHint: "Compute credits power Chat API and Image API. Actual balance follows the ledger.",
         creditsRemaining: "Credits remaining",
         profileMissing: "Account profile not found yet; balance shows 0.",
         topUpToStart: "Top up to start calling the API.",
@@ -437,12 +437,14 @@ export const messages = {
           "auto-fast":
             "Recommended default — fast, stable chat. Fallback: gemini-3-flash → gemini-2.5-flash → gemini-3-pro.",
           "auto-pro":
-            "High quality — gpt-5.5 → gpt-5.4 → gemini-3.1-pro → gemini-3-pro.",
+            "High quality — gpt-5.5 → gpt-5.4 → gemini-3-pro.",
           "auto-cheap":
             "Low-cost batch — gemini-2.5-flash → gemini-3-flash.",
+          "gpt-5":
+            "GPT-5 alias — tries gpt-5.5 first, then gpt-5.4.",
         },
         smartRoutingRealModelNote:
-          "You can still pass a real model ID (e.g. gpt-5.4). Tokfai will not auto-fallback for explicit IDs — you get upstream_model_busy if that model is hot.",
+          "You can still pass a real model ID (e.g. gemini-2.5-flash). Tokfai will not auto-fallback for explicit IDs — you get upstream_model_busy if that model is hot.",
         productionGuidanceTitle: "Production model strategy",
         productionGuidanceAutoFast:
           "auto-fast — default recommendation for go-live smoke tests and general traffic.",
@@ -923,14 +925,16 @@ export const messages = {
           "auto-fast": "auto-fast (recommended)",
           "auto-pro": "auto-pro (high quality)",
           "auto-cheap": "auto-cheap (low cost batch)",
+          "gpt-5": "gpt-5 (alias)",
         },
         smartAliasDesc: {
           "auto-fast":
             "Smart routing — tries gemini-3-flash → gemini-2.5-flash → gemini-3-pro.",
           "auto-pro":
-            "Smart routing — tries gpt-5.5 → gpt-5.4 → gemini-3.1-pro → gemini-3-pro.",
+            "Smart routing — tries gpt-5.5 → gpt-5.4 → gemini-3-pro.",
           "auto-cheap":
             "Smart routing — tries gemini-2.5-flash → gemini-3-flash.",
+          "gpt-5": "Smart routing — tries gpt-5.5 → gpt-5.4.",
         },
         responseContent: "Response",
         requestId: "request_id",
@@ -1153,21 +1157,21 @@ export const messages = {
         },
       },
       credits: {
-        title: "Credits ledger",
+        title: "Compute credits ledger",
         subtitle:
-          "View your balance, recharge orders, and API usage debit history.",
-        howItWorksTitle: "How credits work",
+          "View your current balance, top-up history, and API usage debit ledger.",
+        howItWorksTitle: "Billing rules",
         howItWorksItem1:
-          "Your balance and totals on this page match Usage and Credits records — they are the source of truth.",
+          "Text models debit compute credits from input / output tokens.",
         howItWorksItem2:
-          "Chat API (POST /v1/chat/completions) is billed by input and output tokens.",
+          "Image models debit compute credits per successful generation.",
         howItWorksItem3:
-          "Image API (POST /v1/images/generations) is billed per successful generation.",
-        howItWorksItem4:
-          "Playground and API calls charge credits only after a successful response.",
-        howItWorksItem5: "Failed requests are not charged.",
+          "Playground and API requests debit only on successful results.",
+        howItWorksItem4: "Failed requests are not charged.",
+        howItWorksItem5:
+          "Balance follows ledger records as the source of truth.",
         howItWorksItem6:
-          "The Credits ledger is the authoritative record of balance changes; debits follow successful requests.",
+          "Usage and ledger entries are the reconciliation source for charges.",
         currentBalance: "Current balance",
         lastChange: "Last change",
         todayConsumed: "Consumed today",
@@ -1343,11 +1347,11 @@ export const messages = {
       },
     },
     pricing: {
-      heroTitle: "OpenAI-compatible image & chat API",
+      heroTitle: "Compute credit packs",
       heroDesc:
-        "Prepaid credits power Chat API and Image API calls. Pick a package, create an API key, and integrate with Cursor, Cherry Studio, OpenAI SDK, or your own app.",
+        "Top up compute credits (¥1 = 10,000). Text models bill by usage; image models bill per generation. Failed requests are not charged.",
       budgetNote:
-        "Reference prices help you plan spend — actual charges follow Usage and Credits (not exact ¥ billing).",
+        "Reference prices help planning — actual charges follow Usage and the compute-credits ledger (admin model pricing is authoritative).",
       usageTitle: "Usage-based billing",
       usageDesc:
         "Prepaid credits power every API call. You only pay for what you use.",
@@ -1374,14 +1378,14 @@ export const messages = {
       imageBillingSummary: "Image models: billed per generation in credits.",
       starterPlanLine:
         "¥10 / ¥20 / ¥49 / ¥99 / ¥499 / ¥999 — prepaid compute credits (¥1 = 10,000) for Chat and Image API.",
-      starterUse: "Credits work for Chat API and Image API testing.",
+      starterUse: "Compute credits work for Chat API and Image API.",
       planDescCredit10: "¥10 → 100,000 compute credits",
       planDescCredit20: "¥20 → 220,000 compute credits (+10%)",
       planDescCredit49: "¥49 → 563,500 compute credits (+15%)",
       planDescCredit99: "¥99 → 1,188,000 compute credits (+20%)",
       planDescCredit499: "¥499 → 5,988,000 compute credits (+20%)",
       planDescCredit999: "¥999 → 11,988,000 compute credits (+20%)",
-      planAudienceCredit10: "Best for a first top-up",
+      planAudienceCredit10: "Best for first top-up / smoke tests",
       planAudienceCredit20: "Best for light usage",
       planAudienceCredit49: "Best for regular usage",
       planAudienceCredit99: "Best for builders",
@@ -1393,13 +1397,13 @@ export const messages = {
       planAudienceStarter: "Best for testing",
       planAudiencePro: "Best for small teams",
       planAudienceBusiness: "Best for high-volume use",
-      planCreditsUse: "Credits work for Chat API and Image API.",
+      planCreditsUse: "Compute credits work for Chat API and Image API.",
       buyPlan: "Buy {name}",
       creditsUnit: "credits",
       includesBonusCredits: "Includes {bonus} bonus credits",
-      baseCreditsLine: "{credits} base credits",
-      bonusCreditsLine: "Bonus +{bonus} credits",
-      finalCreditsLine: "{credits} credits credited",
+      baseCreditsLine: "{credits} base compute credits",
+      bonusCreditsLine: "Bonus +{bonus} compute credits",
+      finalCreditsLine: "{credits} compute credits credited",
       plansUnavailable:
         "Recharge plans are temporarily unavailable. Please try again later.",
       getStarter: "Get Starter",
@@ -1424,7 +1428,10 @@ export const messages = {
       devLabelApiKeys: "API Keys",
       devLabelDocs: "Docs",
       afterPurchaseTip:
-        "After purchase, check Credits for balance and ledger entries. Test consumption in Chat or Image Playground.",
+        "After purchase, check the compute-credits ledger for balance and history. Test in Chat or Image Playground.",
+      paymentMethods:
+        "WeChat Pay and Visa / international cards are supported.",
+      devLabelPayment: "Payment methods",
     },
     catalog: {
       chatUseCase: {
@@ -5238,11 +5245,11 @@ export const messages = {
       dashboard: "控制台",
     },
     home: {
-      headline: "OpenAI 兼容的图像与对话 API",
+      headline: "Tokfai API 网关",
       tagline:
-        "一个 API 覆盖对话与图像 — 可接入 Cursor、Cherry Studio、OpenAI SDK 或自研 App。",
+        "一个 API Key 接入 GPT、Gemini 与图片生成模型，支持 OpenAI-compatible、Gemini-compatible 与 Tokfai Image API。",
       description:
-        "与 OpenAI 相同的 endpoint 与请求格式。购买预付费算力积分、创建 sk-tokfai_… 密钥，数分钟内即可调用。",
+        "充值算力积分后即可调用。文本模型按用量扣费，图片模型按次扣费。失败请求不扣费。",
       compatLabel: "兼容",
       compatCursor: "Cursor",
       compatCherryStudio: "Cherry Studio",
@@ -5265,10 +5272,10 @@ export const messages = {
       scenarioDevToolsCta: "接入指南",
       scenarioEndpointLabel: "接口",
       scenarioModelLabel: "推荐 model",
-      startWithCredits: "从算力积分开始",
+      startWithCredits: "立即充值",
       tryImagePlayground: "体验 Image Playground",
       viewPricing: "查看定价",
-      readDocs: "阅读文档",
+      readDocs: "查看接入文档",
       howItWorksTitle: "如何开始",
       howItWorksDesc: "从注册到第一次 API 调用，共五个步骤。",
       step1Title: "登录",
@@ -5306,7 +5313,7 @@ export const messages = {
       unavailable: "不可用",
       chatPlayground: "Chat Playground",
       imagePlayground: "Image Playground",
-      footerTagline: "Tokfai · OpenAI 兼容的图像与对话 API",
+      footerTagline: "Tokfai · GPT / Gemini / 图片模型 API 网关",
       apiReference: "API 参考 →",
       copyright: "© {year} Tokfai",
     },
@@ -5408,7 +5415,7 @@ export const messages = {
         stepCurrent: "当前步骤",
         stepNext: "待完成",
         creditsBalance: "算力积分余额",
-        creditsBalanceHint: "算力积分长期有效，可用于 Chat API 与 Image API。",
+        creditsBalanceHint: "算力积分可用于 Chat API 与 Image API，余额以账本记录为准。",
         creditsRemaining: "剩余算力积分",
         profileMissing: "尚未找到账户资料，余额暂显示为 0。",
         topUpToStart: "充值后即可开始调用 API。",
@@ -5621,12 +5628,14 @@ export const messages = {
           "auto-fast":
             "推荐默认 — 快速稳定对话。回退顺序：gemini-3-flash → gemini-2.5-flash → gemini-3-pro。",
           "auto-pro":
-            "高质量 — gpt-5.5 → gpt-5.4 → gemini-3.1-pro → gemini-3-pro。",
+            "高质量 — gpt-5.5 → gpt-5.4 → gemini-3-pro。",
           "auto-cheap":
             "低成本批量 — gemini-2.5-flash → gemini-3-flash。",
+          "gpt-5":
+            "GPT-5 别名 — 优先 gpt-5.5，再回退 gpt-5.4。",
         },
         smartRoutingRealModelNote:
-          "仍可传入真实 model ID（如 gpt-5.4）。明确指定时 Tokfai 不会自动 fallback — 若该模型繁忙将返回 upstream_model_busy。",
+          "仍可传入真实 model ID（如 gemini-2.5-flash）。明确指定时 Tokfai 不会自动 fallback — 若该模型繁忙将返回 upstream_model_busy。",
         productionGuidanceTitle: "生产模型策略",
         productionGuidanceAutoFast: "auto-fast — 默认推荐，适合上线冒烟与普通业务。",
         productionGuidanceAutoPro: "auto-pro — 高质量任务。",
@@ -6080,14 +6089,16 @@ export const messages = {
           "auto-fast": "auto-fast（推荐）",
           "auto-pro": "auto-pro（高质量）",
           "auto-cheap": "auto-cheap（批量低成本）",
+          "gpt-5": "gpt-5（别名）",
         },
         smartAliasDesc: {
           "auto-fast":
             "智能路由 — 依次尝试 gemini-3-flash → gemini-2.5-flash → gemini-3-pro。",
           "auto-pro":
-            "智能路由 — 依次尝试 gpt-5.5 → gpt-5.4 → gemini-3.1-pro → gemini-3-pro。",
+            "智能路由 — 依次尝试 gpt-5.5 → gpt-5.4 → gemini-3-pro。",
           "auto-cheap":
             "智能路由 — 依次尝试 gemini-2.5-flash → gemini-3-flash。",
+          "gpt-5": "智能路由 — 依次尝试 gpt-5.5 → gpt-5.4。",
         },
         responseContent: "回复内容",
         requestId: "request_id",
@@ -6292,22 +6303,23 @@ export const messages = {
       credits: {
         title: "算力积分账本",
         subtitle:
-          "算力积分余额长期有效，可用于 Chat API 与 Image API。查看充值记录与调用消耗流水。",
-        howItWorksTitle: "Credits 如何工作",
+          "查看当前余额、充值记录和 API 调用消耗流水。",
+        howItWorksTitle: "扣费规则",
         howItWorksItem1:
-          "本页余额与累计数据以 Usage 和 Credits 记录为准，是核账来源。",
+          "文本模型按输入 / 输出 tokens 折算扣费。",
         howItWorksItem2:
-          "Chat API（POST /v1/chat/completions）按 input / output tokens 扣费。",
+          "图片模型按每次成功生成扣费。",
         howItWorksItem3:
-          "Image API（POST /v1/images/generations）按每次成功生成扣费。",
-        howItWorksItem4: "Playground 与 API 仅在请求成功后才扣费。",
-        howItWorksItem5: "失败请求不扣费。",
+          "Playground 与 API 请求均按成功结果扣费。",
+        howItWorksItem4: "失败请求不扣费。",
+        howItWorksItem5:
+          "余额以账本记录为准。",
         howItWorksItem6:
-          "Credits 账本是余额变化准账本；扣费以成功请求记录为准。",
+          "Usage 与算力积分账本是核账来源。",
         currentBalance: "算力积分余额",
         lastChange: "最近一次变动",
-        todayConsumed: "今日消耗 credits",
-        last7DaysConsumed: "近 7 天消耗 credits",
+        todayConsumed: "今日消耗算力积分",
+        last7DaysConsumed: "近 7 天消耗算力积分",
         noLedgerHint: "暂无算力积分记录",
         quickActions: "快捷操作",
         actionRecharge: "充值算力积分",
@@ -6351,14 +6363,14 @@ export const messages = {
         colCreated: "时间",
         rechargeCredits: "充值算力积分",
         rechargeDesc:
-          "Credits 可用于 Chat API 与 Image API。选择固定一次性套餐——支付由 Stripe 处理，Checkout 完成后算力积分入账。",
+          "算力积分可用于 Chat API 与 Image API。选择一次性充值套餐，支付完成后算力积分入账。",
         rechargeStarterPlan: "¥10 = 100,000 算力积分（¥1 = 10,000 算力积分）。",
         rechargeImageBillingNote:
           "图片模型按每次成功生成扣除对应算力积分，具体价格见 Models / Pricing。",
         rechargeImageExample:
-          "图片模型会按所选模型价格扣除 credits，例如 {example}。",
+          "图片模型会按所选模型价格扣除算力积分，例如 {example}。",
         creditsUnit: "算力积分",
-        buyStarter: "购买 Starter",
+        buyStarter: "立即充值",
         buyPlan: "购买套餐",
         checkoutUnavailable: "充值通道暂时不可用，请稍后重试或联系支持。",
         noRechargePlans: "当前没有可用的充值套餐。",
@@ -6473,18 +6485,18 @@ export const messages = {
       },
     },
     pricing: {
-      heroTitle: "OpenAI 兼容的图像与对话 API",
+      heroTitle: "算力积分充值套餐",
       heroDesc:
-        "预付费算力积分（¥1 = 10,000）可用于 Chat API 与 Image API。选择套餐、创建 API Key，即可接入 Cursor、Cherry Studio、OpenAI SDK 或自研产品。",
+        "充值算力积分（¥1 = 10,000）即可调用。文本模型按用量扣费，图片模型按次扣费。失败请求不扣费。",
       budgetNote:
-        "参考价格便于预算规划，实际扣费以 Usage 与 Credits 为准（非精确人民币计费）。",
+        "参考价格便于预算规划，实际扣费以 Usage 与算力积分账本为准（以后台模型定价为准）。",
       usageTitle: "按量计费",
       usageDesc: "预付费算力积分驱动每次 API 调用，按实际使用扣费。",
       modelRatesTitle: "模型价格",
       modelRatesDesc:
-        "10000 算力积分约等于 ¥1 基础额度。Chat API 按输入 / 输出 tokens 扣费。Image API 按生成次数扣费。实际扣费以 Usage 与 Credits 记录为准。",
+        "10000 算力积分约等于 ¥1 基础额度。Chat API 按输入 / 输出 tokens 扣费。Image API 按生成次数扣费。实际扣费以 Usage 与算力积分账本为准。",
       disclaimer:
-        "展示当前参考价格供规划使用，实际扣费以 Usage 与 Credits 记录为准。失败请求不扣费。",
+        "展示当前参考价格供规划使用，实际扣费以 Usage 与算力积分账本为准。失败请求不扣费。",
       chatModelsTitle: "对话模型",
       imageModelsTitle: "图像模型",
       colModel: "模型",
@@ -6503,14 +6515,14 @@ export const messages = {
       imageBillingSummary: "图片模型：按每次成功生成扣除算力积分。",
       starterPlanLine:
         "¥10 / ¥20 / ¥49 / ¥99 / ¥499 / ¥999 — 预付费算力积分（¥1 = 10,000）用于 Chat 与 Image API。",
-      starterUse: "Credits 可用于 Chat API 与 Image API 测试。",
+      starterUse: "算力积分可用于 Chat API 与 Image API。",
       planDescCredit10: "¥10 到账 100,000 算力积分",
       planDescCredit20: "¥20 到账 220,000 算力积分，送10%",
       planDescCredit49: "¥49 到账 563,500 算力积分，送15%",
       planDescCredit99: "¥99 到账 1,188,000 算力积分，送20%",
       planDescCredit499: "¥499 到账 5,988,000 算力积分，送20%",
       planDescCredit999: "¥999 到账 11,988,000 算力积分，送20%",
-      planAudienceCredit10: "适合首次充值",
+      planAudienceCredit10: "适合首次充值 / 冒烟测试",
       planAudienceCredit20: "适合轻度使用",
       planAudienceCredit49: "适合日常使用",
       planAudienceCredit99: "适合开发者",
@@ -6552,7 +6564,9 @@ export const messages = {
       devLabelApiKeys: "API Keys",
       devLabelDocs: "Docs",
       afterPurchaseTip:
-        "充值后可在 Credits 查看到账与流水，在 Chat 或 Image Playground 测试消耗。",
+        "充值后可在算力积分账本查看到账与流水，在 Chat 或 Image Playground 测试消耗。",
+      paymentMethods: "支持微信支付、Visa / 国际银行卡。",
+      devLabelPayment: "支付方式",
     },
     catalog: {
       chatUseCase: {

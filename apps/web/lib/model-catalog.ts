@@ -434,7 +434,6 @@ export const IMAGE_PLAYGROUND_PRIMARY_MODEL_IDS = [
   "nano-banana-fast",
   "gpt-image-2",
   "nano-banana",
-  "nano-banana-pro",
 ] as const;
 
 export const IMAGE_PLAYGROUND_DEFAULT_MODEL = "nano-banana-fast";
@@ -501,8 +500,41 @@ export const ALL_CATALOG_MODELS: ModelCatalogEntry[] = [
   ...VIDEO_MODELS,
 ];
 
-/** Dashboard Models page — same order as the full catalog. */
-export const DASHBOARD_CATALOG_MODELS: ModelCatalogEntry[] = ALL_CATALOG_MODELS;
+/**
+ * Consumer-facing chat model ids (concrete). Smart aliases auto-* / gpt-5 are
+ * shown separately on Models / Playground — not duplicated here.
+ */
+export const CONSUMER_CHAT_MODEL_IDS = [
+  "gpt-5.5",
+  "gemini-2.5-flash",
+  "gemini-2.5-pro",
+  "gemini-3-flash",
+  "gemini-3-pro",
+] as const;
+
+/** Consumer-facing image models — verified + priced only. */
+export const CONSUMER_IMAGE_MODEL_IDS = [
+  "gpt-image-2",
+  "nano-banana-fast",
+  "nano-banana",
+] as const;
+
+const CONSUMER_CHAT_ID_SET = new Set<string>(CONSUMER_CHAT_MODEL_IDS);
+const CONSUMER_IMAGE_ID_SET = new Set<string>(CONSUMER_IMAGE_MODEL_IDS);
+
+export function isConsumerVisibleChatModel(modelId: string): boolean {
+  return CONSUMER_CHAT_ID_SET.has(modelId);
+}
+
+export function isConsumerVisibleImageModel(modelId: string): boolean {
+  return CONSUMER_IMAGE_ID_SET.has(modelId);
+}
+
+/** Dashboard / pricing / playground — curated sellable subset. */
+export const DASHBOARD_CATALOG_MODELS: ModelCatalogEntry[] = [
+  ...CHAT_MODELS.filter((model) => CONSUMER_CHAT_ID_SET.has(model.id)),
+  ...IMAGE_MODELS.filter((model) => CONSUMER_IMAGE_ID_SET.has(model.id)),
+];
 
 export function resolveModelCategories(model: ModelCatalogEntry): ModelCategory[] {
   const set = new Set<ModelCategory>(model.categories ?? []);
@@ -675,13 +707,14 @@ export function isCatalogModelPlaygroundAvailable(model: ModelCatalogEntry): boo
 }
 
 export const AVAILABLE_CHAT_MODEL_IDS = CHAT_MODELS.filter(
-  (model) => model.status === "available"
+  (model) => model.status === "available" && CONSUMER_CHAT_ID_SET.has(model.id)
 ).map((model) => model.id);
 
 export const PLAYGROUND_CHAT_MODEL_IDS = [
   "auto-fast",
   "auto-pro",
   "auto-cheap",
+  "gpt-5",
   ...AVAILABLE_CHAT_MODEL_IDS,
 ] as const;
 

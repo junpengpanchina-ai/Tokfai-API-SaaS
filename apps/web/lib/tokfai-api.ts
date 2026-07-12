@@ -21,6 +21,7 @@ export const TOKFAI_SMART_MODEL_ALIASES = [
   "auto-fast",
   "auto-pro",
   "auto-cheap",
+  "gpt-5",
 ] as const;
 export type TokfaiSmartModelAlias = (typeof TOKFAI_SMART_MODEL_ALIASES)[number];
 /** Premium chat models — may return upstream_model_busy under high load. */
@@ -47,14 +48,16 @@ export function resolveTokfaiApiBaseUrl(
 }
 
 export const TOKFAI_PRODUCT_TAGLINE =
-  "OpenAI-compatible image & chat API — one API for chat, image, and AI apps.";
+  "Tokfai API gateway — one API key for GPT, Gemini, and image models.";
 export const TOKFAI_BILLING_POLICY =
-  "Successful calls debit credits. Failed calls are not charged.";
+  "Successful calls debit compute credits. Failed calls are not charged.";
 export const TOKFAI_PRICING_DISCLAIMER =
-  "Current reference prices are shown for planning. Usage and Credits are the source of truth for actual charges.";
+  "Reference prices help planning. Actual charges follow Usage and the compute-credits ledger.";
 export const TOKFAI_PLAYGROUND_POLICY =
-  "Chat Playground supports chat models. Image Playground supports image models. Video models will use a separate playground later.";
+  "Chat Playground supports chat models. Image Playground supports image models.";
 export const TOKFAI_STARTER_PLAN = "¥10 = 100,000 compute credits (¥1 = 10,000)";
+export const TOKFAI_PAYMENT_METHODS =
+  "WeChat Pay, Visa / international cards";
 
 /** Full plaintext API key shown once at creation (not the display prefix). */
 export const TOKFAI_FULL_API_KEY_PATTERN = /^sk-tokfai_[0-9a-f]{48}$/;

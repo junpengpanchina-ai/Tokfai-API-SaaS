@@ -37,6 +37,15 @@ import {
   TOKFAI_STARTER_PLAN,
 } from "@/lib/tokfai-api";
 
+const CREDIT_PLAN_IDS = new Set([
+  "credit_10",
+  "credit_20",
+  "credit_49",
+  "credit_99",
+  "credit_499",
+  "credit_999",
+]);
+
 const PLAN_DESCRIPTION_KEYS: Record<string, string> = {
   credit_10: "pricing.planDescCredit10",
   credit_20: "pricing.planDescCredit20",
@@ -44,10 +53,6 @@ const PLAN_DESCRIPTION_KEYS: Record<string, string> = {
   credit_99: "pricing.planDescCredit99",
   credit_499: "pricing.planDescCredit499",
   credit_999: "pricing.planDescCredit999",
-  // Legacy plan ids (archived) — keep keys for any cached responses.
-  starter: "pricing.planDescStarter",
-  pro: "pricing.planDescPro",
-  business: "pricing.planDescBusiness",
 };
 
 const PLAN_AUDIENCE_KEYS: Record<string, string> = {
@@ -57,9 +62,6 @@ const PLAN_AUDIENCE_KEYS: Record<string, string> = {
   credit_99: "pricing.planAudienceCredit99",
   credit_499: "pricing.planAudienceCredit499",
   credit_999: "pricing.planAudienceCredit999",
-  starter: "pricing.planAudienceStarter",
-  pro: "pricing.planAudiencePro",
-  business: "pricing.planAudienceBusiness",
 };
 
 export function PricingContent({
@@ -73,6 +75,7 @@ export function PricingContent({
 }) {
   const { t, locale } = useI18n();
   const dashHref = (path: string) => dashboardCtaHref(path, isLoggedIn);
+  const visiblePlans = plans.filter((plan) => CREDIT_PLAN_IDS.has(plan.plan_id));
 
   const usagePoints = [
     { id: "starter-plan", icon: Wallet, text: t("pricing.starterPlanLine") },
@@ -140,6 +143,7 @@ export function PricingContent({
     { label: t("pricing.devLabelApiKeyFormat"), value: TOKFAI_API_KEY_FORMAT },
     { label: t("pricing.devLabelStarter"), value: TOKFAI_STARTER_PLAN },
     { label: t("pricing.devLabelBilling"), value: TOKFAI_BILLING_POLICY },
+    { label: t("pricing.devLabelPayment"), value: t("pricing.paymentMethods") },
     { label: t("pricing.devLabelPlayground"), value: TOKFAI_PLAYGROUND_POLICY },
     {
       label: t("pricing.devLabelModels"),
@@ -190,11 +194,11 @@ export function PricingContent({
         ) : null}
 
         <div className="mx-auto mt-10 grid max-w-5xl min-w-0 grid-cols-1 gap-6 overflow-x-hidden sm:mt-16 md:grid-cols-3">
-          {plans.map((plan) => {
+          {visiblePlans.map((plan) => {
             const descriptionKey = PLAN_DESCRIPTION_KEYS[plan.plan_id];
             const audienceKey = PLAN_AUDIENCE_KEYS[plan.plan_id];
             const canPurchase = plan.enabled && !purchaseDisabled;
-            const isHighlight = plan.plan_id === "pro";
+            const isHighlight = plan.plan_id === "credit_20";
 
             return (
               <Card
@@ -266,7 +270,10 @@ export function PricingContent({
           })}
         </div>
 
-        <p className="mx-auto mt-10 max-w-2xl text-center text-sm text-muted-foreground">
+        <p className="mx-auto mt-6 max-w-2xl text-center text-sm text-muted-foreground">
+          {t("pricing.paymentMethods")}
+        </p>
+        <p className="mx-auto mt-4 max-w-2xl text-center text-sm text-muted-foreground">
           {t("pricing.afterPurchaseTip")}
         </p>
       </section>

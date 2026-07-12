@@ -77,12 +77,15 @@ const EN: Record<string, string> = {
   "dashboard.playground.smartAlias.auto-fast": "auto-fast (recommended)",
   "dashboard.playground.smartAlias.auto-pro": "auto-pro (high quality)",
   "dashboard.playground.smartAlias.auto-cheap": "auto-cheap (low cost batch)",
+  "dashboard.playground.smartAlias.gpt-5": "gpt-5 (alias)",
   "dashboard.playground.smartAliasDesc.auto-fast":
     "Smart routing — tries gemini-3-flash → gemini-2.5-flash → gemini-3-pro.",
   "dashboard.playground.smartAliasDesc.auto-pro":
     "Smart routing — tries gpt-5.5 → gpt-5.4 → gemini-3-pro.",
   "dashboard.playground.smartAliasDesc.auto-cheap":
     "Smart routing — tries gemini-2.5-flash → gemini-3-flash.",
+  "dashboard.playground.smartAliasDesc.gpt-5":
+    "Smart routing — tries gpt-5.5 → gpt-5.4.",
   "dashboard.playground.responseContent": "Response",
   "dashboard.playground.requestId": "request_id",
   "dashboard.playground.createdAt": "created_at",
@@ -206,12 +209,15 @@ const ZH: Record<string, string> = {
   "dashboard.playground.smartAlias.auto-fast": "auto-fast（推荐）",
   "dashboard.playground.smartAlias.auto-pro": "auto-pro（高质量）",
   "dashboard.playground.smartAlias.auto-cheap": "auto-cheap（低成本批量）",
+  "dashboard.playground.smartAlias.gpt-5": "gpt-5（别名）",
   "dashboard.playground.smartAliasDesc.auto-fast":
     "智能路由 — 依次尝试 gemini-3-flash → gemini-2.5-flash → gemini-3-pro。",
   "dashboard.playground.smartAliasDesc.auto-pro":
     "智能路由 — 依次尝试 gpt-5.5 → gpt-5.4 → gemini-3-pro。",
   "dashboard.playground.smartAliasDesc.auto-cheap":
     "智能路由 — 依次尝试 gemini-2.5-flash → gemini-3-flash。",
+  "dashboard.playground.smartAliasDesc.gpt-5":
+    "智能路由 — 依次尝试 gpt-5.5 → gpt-5.4。",
   "dashboard.playground.responseContent": "响应内容",
   "dashboard.playground.requestId": "request_id",
   "dashboard.playground.createdAt": "created_at",

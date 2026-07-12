@@ -1,33 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ImageIcon } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { dashboardCtaHref } from "@/lib/auth/public-cta";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useI18n } from "@/lib/i18n/i18n-provider";
-import { TOKFAI_API_BASE_URL } from "@/lib/tokfai-api";
-
-const COMPAT_CLIENTS = [
-  "compatCursor",
-  "compatCherryStudio",
-  "compatOpenAiSdk",
-  "compatCustomApp",
-] as const;
+import { creditsPurchaseHref } from "@/lib/billing/recharge-plans";
+import { TOKFAI_API_ORIGIN } from "@/lib/tokfai-api";
 
 export function HomeHero() {
   const { t } = useI18n();
   const { user, loading } = useAuth();
   const isLoggedIn = Boolean(user);
 
-  const creditsHref = dashboardCtaHref("/dashboard/credits", isLoggedIn);
-  const dashboardHref = dashboardCtaHref("/dashboard", isLoggedIn);
-  const imagePlaygroundHref = dashboardCtaHref(
-    "/dashboard/image-playground",
-    isLoggedIn
-  );
+  const rechargeHref = creditsPurchaseHref(isLoggedIn);
   const docsHref = isLoggedIn ? "/dashboard/docs" : "/docs";
+  const dashboardHref = dashboardCtaHref("/dashboard", isLoggedIn);
 
   return (
     <section className="container min-w-0 overflow-x-hidden py-20 md:py-28">
@@ -44,24 +34,9 @@ export function HomeHero() {
         <p className="mx-auto mt-4 max-w-2xl text-balance text-base text-muted-foreground sm:text-lg">
           {t("home.description")}
         </p>
-        <div className="mx-auto mt-8 max-w-2xl">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {t("home.compatLabel")}
-          </p>
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-            {COMPAT_CLIENTS.map((key) => (
-              <span
-                key={key}
-                className="rounded-full border bg-background px-3 py-1 text-xs font-medium text-foreground"
-              >
-                {t(`home.${key}`)}
-              </span>
-            ))}
-          </div>
-          <p className="mt-4 font-mono text-xs text-muted-foreground">
-            {TOKFAI_API_BASE_URL}
-          </p>
-        </div>
+        <p className="mt-6 font-mono text-xs text-muted-foreground">
+          {TOKFAI_API_ORIGIN}
+        </p>
         <div className="mt-10 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <Button
             asChild
@@ -69,7 +44,7 @@ export function HomeHero() {
             className="w-full sm:w-auto"
             disabled={loading}
           >
-            <Link href={creditsHref}>
+            <Link href={rechargeHref}>
               {t("home.startWithCredits")}
               <ArrowRight className="h-4 w-4" />
             </Link>
@@ -81,19 +56,15 @@ export function HomeHero() {
             className="w-full sm:w-auto"
             disabled={loading}
           >
-            <Link href={imagePlaygroundHref}>
-              {t("home.tryImagePlayground")}
-              <ImageIcon className="h-4 w-4" />
-            </Link>
-          </Button>
-          <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
-            <Link href="/pricing">{t("home.viewPricing")}</Link>
-          </Button>
-          <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
             <Link href={docsHref}>{t("home.readDocs")}</Link>
           </Button>
           {isLoggedIn ? (
-            <Button asChild size="lg" variant="outline" className="w-full sm:w-auto">
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="w-full sm:w-auto"
+            >
               <Link href={dashboardHref}>{t("nav.dashboard")}</Link>
             </Button>
           ) : null}

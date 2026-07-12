@@ -39,14 +39,23 @@ type RowError = {
 
 function formatPriceWithYuan(
   value: number | null,
-  locale: "en" | "zh"
+  locale: "en" | "zh",
+  opts?: { imagePerGeneration?: boolean }
 ): ReactNode {
   if (value == null) return "—";
   const credits = formatCreditsPrecise(value);
   const yuan = formatApproxYuanFromCredits(value, locale);
+  const unit = opts?.imagePerGeneration
+    ? locale === "zh"
+      ? "算力积分 / 次"
+      : "credits / generation"
+    : "";
   return (
     <div>
-      <div className="font-mono text-xs">{credits}</div>
+      <div className="font-mono text-xs">
+        {credits}
+        {unit ? ` ${unit}` : ""}
+      </div>
       <div className="text-xs text-muted-foreground">{yuan}</div>
     </div>
   );
@@ -388,7 +397,9 @@ export function AdminPricingPanel({
                           </td>
                           <td className="py-2 pr-4">
                             {isImage
-                              ? formatPriceWithYuan(row.image_price, locale)
+                              ? formatPriceWithYuan(row.image_price, locale, {
+                                  imagePerGeneration: true,
+                                })
                               : "—"}
                           </td>
                           <td className="py-2 pr-4">

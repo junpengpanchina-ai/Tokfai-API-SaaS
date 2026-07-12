@@ -6,10 +6,9 @@ export const FALLBACK_CHAT_MODEL_IDS = [
   "auto-fast",
   "auto-pro",
   "auto-cheap",
-  "gpt-5.4",
+  "gpt-5",
   "gpt-5.5",
   "gemini-3-flash",
-  "gemini-3.5-flash",
   "gemini-2.5-flash",
   "gemini-2.5-pro",
   "gemini-3-pro",
@@ -18,8 +17,6 @@ export const FALLBACK_CHAT_MODEL_IDS = [
 export const FALLBACK_IMAGE_MODEL_IDS = [
   "nano-banana-fast",
   "nano-banana",
-  "nano-banana-pro",
-  "nano-banana-2",
   "gpt-image-2",
 ] as const;
 

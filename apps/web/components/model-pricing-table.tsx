@@ -4,6 +4,8 @@ import type { Locale } from "@/lib/i18n/messages";
 import {
   CHAT_MODELS,
   IMAGE_MODELS,
+  CONSUMER_CHAT_MODEL_IDS,
+  CONSUMER_IMAGE_MODEL_IDS,
   type ModelCatalogEntry,
   isChatModelEntry,
   isImageModelEntry,
@@ -39,12 +41,17 @@ type ModelPricingTableProps = {
   };
 };
 
+const CONSUMER_CHAT = new Set<string>(CONSUMER_CHAT_MODEL_IDS);
+const CONSUMER_IMAGE = new Set<string>(CONSUMER_IMAGE_MODEL_IDS);
+
 export function ModelPricingTables({ locale, t, labels }: ModelPricingTableProps) {
+  const chatModels = CHAT_MODELS.filter((model) => CONSUMER_CHAT.has(model.id));
   const availableImageModels = IMAGE_MODELS.filter(
-    (model) => model.status === "available"
-  );
-  const comingSoonImageModels = IMAGE_MODELS.filter(
-    (model) => model.status === "coming_soon"
+    (model) =>
+      model.status === "available" &&
+      CONSUMER_IMAGE.has(model.id) &&
+      isImageModelEntry(model) &&
+      model.pricing.creditsPerRequest > 0
   );
 
   return (
@@ -62,7 +69,7 @@ export function ModelPricingTables({ locale, t, labels }: ModelPricingTableProps
             </tr>
           </thead>
           <tbody>
-            {CHAT_MODELS.map((model) => (
+            {chatModels.map((model) => (
               <ChatPricingRow key={model.id} model={model} locale={locale} />
             ))}
           </tbody>
@@ -92,16 +99,6 @@ export function ModelPricingTables({ locale, t, labels }: ModelPricingTableProps
                 model={model}
                 locale={locale}
                 t={t}
-              />
-            ))}
-            {comingSoonImageModels.map((model) => (
-              <ImagePricingRow
-                key={model.id}
-                model={model}
-                locale={locale}
-                t={t}
-                comingSoonLabel={labels.comingSoon}
-                comingSoon
               />
             ))}
           </tbody>
