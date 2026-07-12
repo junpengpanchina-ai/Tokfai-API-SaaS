@@ -21,7 +21,7 @@ export const messages = {
       starterTemplates: "Starter Templates",
       payloadBuilder: "Payload Builder",
       playground: "Chat",
-      imagePlayground: "Images",
+      imagePlayground: "Image workbench",
       models: "Models",
       usage: "Usage",
       credits: "Compute credits",
@@ -168,13 +168,13 @@ export const messages = {
       overview: {
         title: "Welcome back",
         subtitle:
-          "Try Tokfai Chat API and Image API, or connect Cherry Studio / the OpenAI SDK.",
+          "Try Tokfai Chat API, analyze product images, or connect Cherry Studio / the OpenAI SDK.",
         subtitleReturning:
-          "Try Tokfai Chat API and Image API, or connect Cherry Studio / the OpenAI SDK.",
+          "Try Tokfai Chat API, analyze product images, or connect Cherry Studio / the OpenAI SDK.",
         continueTitle: "Get started",
-        continueDesc: "Try chat, generate images, or connect Cherry Studio.",
+        continueDesc: "Try chat, analyze product images, or connect Cherry Studio.",
         startChat: "Try chat models",
-        startImage: "Try image generation",
+        startImage: "Analyze product images",
         startCherry: "Connect Cherry Studio",
         goTopUp: "Top up",
         goUsage: "View usage",
@@ -5247,7 +5247,7 @@ export const messages = {
       starterTemplates: "接入模板库",
       payloadBuilder: "业务字段生成器",
       playground: "对话体验",
-      imagePlayground: "图片体验",
+      imagePlayground: "图片工作台",
       models: "模型",
       usage: "用量",
       credits: "算力积分",
@@ -5387,13 +5387,13 @@ export const messages = {
       overview: {
         title: "欢迎回来",
         subtitle:
-          "使用 Tokfai 体验 Chat API、Image API，或接入 Cherry Studio / OpenAI SDK。",
+          "使用 Tokfai 体验 Chat API、分析商品图，或接入 Cherry Studio / OpenAI SDK。",
         subtitleReturning:
-          "使用 Tokfai 体验 Chat API、Image API，或接入 Cherry Studio / OpenAI SDK。",
+          "使用 Tokfai 体验 Chat API、分析商品图，或接入 Cherry Studio / OpenAI SDK。",
         continueTitle: "立即开始",
-        continueDesc: "体验对话、生成图片，或接入 Cherry Studio。",
+        continueDesc: "体验对话、分析商品图，或接入 Cherry Studio。",
         startChat: "体验对话模型",
-        startImage: "体验图片生成",
+        startImage: "分析商品图",
         startCherry: "接入 Cherry Studio",
         goTopUp: "去充值",
         goUsage: "查看用量",

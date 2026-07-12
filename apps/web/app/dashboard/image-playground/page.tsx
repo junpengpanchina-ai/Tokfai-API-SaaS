@@ -10,10 +10,10 @@ import { EMPTY_SHELL_CREDITS } from "@/lib/dashboard-safe/shell-credits";
 import {
   ImagePlaygroundClient,
   type ImagePlaygroundApiKeyOption,
-} from "./image-playground-client";
+} from "./image-workbench-client";
 
 export const metadata = {
-  title: "Image Playground",
+  title: "图片工作台",
 };
 
 export const dynamic = "force-dynamic";

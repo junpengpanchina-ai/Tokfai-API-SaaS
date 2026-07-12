@@ -62,7 +62,6 @@ import {
   isFullTokfaiApiKey,
   IMAGE_PLAYGROUND_IMAGE_TO_IMAGE_PLACEHOLDER,
   IMAGE_PLAYGROUND_TEXT_TO_IMAGE_PLACEHOLDER,
-  TOKFAI_IMAGES_GENERATIONS_ENDPOINT,
 } from "@/lib/dashboard-safe/constants";
 import {
   isValidImageUrl,
@@ -191,7 +190,7 @@ function getDroppedFiles(dataTransfer: DataTransfer): File[] {
   return fromItems;
 }
 
-export function ImagePlaygroundClient({
+export function ImageGeneratePanel({
   accessToken,
   activeKeys,
   initialModel,
@@ -704,21 +703,15 @@ export function ImagePlaygroundClient({
       }}
       className="flex min-w-0 flex-col gap-4 overflow-x-hidden"
     >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-2">
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          <h2 className="text-lg font-semibold tracking-tight">
             {t("dashboard.imagePlayground.title")}
-          </h1>
+          </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {t("dashboard.imagePlayground.toolbenchSubtitle")}
           </p>
         </div>
-        <Badge
-          variant="secondary"
-          className="max-w-full shrink-0 self-start break-all font-mono text-xs"
-        >
-          {TOKFAI_IMAGES_GENERATIONS_ENDPOINT}
-        </Badge>
       </div>
 
       <div className={IMAGE_PLAYGROUND_TOOLBENCH.shell}>
