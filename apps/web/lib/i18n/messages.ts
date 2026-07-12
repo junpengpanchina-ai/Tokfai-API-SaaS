@@ -33,6 +33,7 @@ export const messages = {
       home: "Home",
       pricing: "Pricing",
       dashboard: "Dashboard",
+      language: "Language",
     },
     home: {
       headline: "Tokfai API Gateway",
@@ -5259,6 +5260,7 @@ export const messages = {
       home: "首页",
       pricing: "定价",
       dashboard: "控制台",
+      language: "语言",
     },
     home: {
       headline: "Tokfai API 网关",

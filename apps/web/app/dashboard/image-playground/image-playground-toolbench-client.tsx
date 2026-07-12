@@ -670,15 +670,21 @@ export function ImagePlaygroundResultArea({
     state === "loading" && !attention && "border-primary/25"
   );
 
-  const friendlyError =
-    error?.code?.toLowerCase().includes("timeout") ||
-    error?.message?.toLowerCase().includes("timeout") ||
-    error?.message?.includes("超时")
+  // Client-side validation (status 0) already has localized friendly copy —
+  // show that as the primary message. Upstream/API failures stay generic;
+  // raw upstream text only appears inside collapsed Details.
+  const isClientValidation = error?.status === 0;
+  const friendlyError = isClientValidation && error?.message
+    ? error.message
+    : error?.code?.toLowerCase().includes("timeout") ||
+        error?.message?.toLowerCase().includes("timeout") ||
+        error?.message?.includes("超时")
       ? t("dashboard.imageWorkbench.imageTimeoutFriendly")
       : t("dashboard.imageWorkbench.imageFailFriendly");
 
-  const billingHint =
-    error?.code === "no_charge" || error?.code === "not_charged"
+  const billingHint = isClientValidation
+    ? null
+    : error?.code === "no_charge" || error?.code === "not_charged"
       ? t("dashboard.imageWorkbench.noChargeHint")
       : t("dashboard.imageWorkbench.billingUnknownHint");
 
@@ -718,7 +724,9 @@ export function ImagePlaygroundResultArea({
             <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
               {friendlyError}
             </div>
-            <p className="text-xs text-muted-foreground">{billingHint}</p>
+            {billingHint ? (
+              <p className="text-xs text-muted-foreground">{billingHint}</p>
+            ) : null}
             <div className="flex flex-wrap gap-2">
               {onRetry ? (
                 <Button
@@ -760,7 +768,9 @@ export function ImagePlaygroundResultArea({
               </summary>
               <div className="mt-2 space-y-2">
                 <div className="space-y-1 font-mono">
-                  {error?.message ? <p>{error.message}</p> : null}
+                  {!isClientValidation && error?.message ? (
+                    <p>{error.message}</p>
+                  ) : null}
                   {error?.code ? <p>code: {error.code}</p> : null}
                   {error?.requestId ? (
                     <p>request_id: {error.requestId}</p>

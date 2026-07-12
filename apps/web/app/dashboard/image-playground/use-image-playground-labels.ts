@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+import {
+  DASHBOARD_LOCALE_EVENT,
+} from "@/lib/dashboard-safe/labels";
 
 import {
   formatImagePlaygroundLabel,
@@ -13,15 +17,22 @@ export function useImagePlaygroundLabels() {
   const [locale, setLocale] = useState<ImagePlaygroundLocale>("en");
 
   useEffect(() => {
-    setLocale(readImagePlaygroundLocale());
+    const refresh = () => setLocale(readImagePlaygroundLocale());
+    refresh();
+    window.addEventListener(DASHBOARD_LOCALE_EVENT, refresh);
+    return () => window.removeEventListener(DASHBOARD_LOCALE_EVENT, refresh);
   }, []);
 
-  const t = (key: string) => imagePlaygroundLabel(key, locale);
+  const t = useCallback(
+    (key: string) => imagePlaygroundLabel(key, locale),
+    [locale]
+  );
 
-  const formatMessage = (
-    template: string,
-    vars: Record<string, string | number>
-  ) => formatImagePlaygroundLabel(template, vars);
+  const formatMessage = useCallback(
+    (template: string, vars: Record<string, string | number>) =>
+      formatImagePlaygroundLabel(template, vars),
+    []
+  );
 
   return { locale, t, formatMessage };
 }
