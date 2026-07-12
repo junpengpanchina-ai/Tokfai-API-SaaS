@@ -129,6 +129,26 @@ function checkAuth(req, validKey = VALID_KEY) {
   return null;
 }
 
+function checkGeminiAuth(req, validKey = VALID_KEY) {
+  const googHeader = req.headers["x-goog-api-key"];
+  const googKey =
+    typeof googHeader === "string"
+      ? googHeader.trim()
+      : Array.isArray(googHeader)
+        ? String(googHeader[0] ?? "").trim()
+        : "";
+  const url = new URL(req.url ?? "/", "http://127.0.0.1");
+  const queryKey = url.searchParams.get("key")?.trim() ?? "";
+  const token = googKey || queryKey || parseBearer(req);
+  if (!token) {
+    return authFailure("missing_token", "Missing API key.");
+  }
+  if (token !== validKey) {
+    return authFailure("invalid_token", "API key not recognised.");
+  }
+  return null;
+}
+
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -242,6 +262,58 @@ function responsesBody(body) {
     usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
     ...meta,
   };
+}
+
+function geminiGenerateContentBody(body, modelId = "gemini-2.5-flash") {
+  const text =
+    body?.contents?.[0]?.parts?.[0]?.text != null ? "ok" : "ok";
+  return {
+    candidates: [
+      {
+        content: {
+          parts: [{ text }],
+          role: "model",
+        },
+        finishReason: "STOP",
+        index: 0,
+      },
+    ],
+    usageMetadata: {
+      promptTokenCount: 1,
+      candidatesTokenCount: 1,
+      totalTokenCount: 2,
+    },
+    modelVersion: modelId,
+  };
+}
+
+function geminiGenerateContentToSse(response) {
+  const text = response?.candidates?.[0]?.content?.parts?.[0]?.text ?? "ok";
+  const usageMetadata = response?.usageMetadata ?? {
+    promptTokenCount: 1,
+    candidatesTokenCount: 1,
+    totalTokenCount: 2,
+  };
+  return [
+    `data: ${JSON.stringify({
+      candidates: [
+        {
+          content: { parts: [{ text }], role: "model" },
+          index: 0,
+        },
+      ],
+    })}\n\n`,
+    `data: ${JSON.stringify({
+      candidates: [
+        {
+          content: { parts: [{ text: "" }], role: "model" },
+          finishReason: "STOP",
+          index: 0,
+        },
+      ],
+      usageMetadata,
+    })}\n\n`,
+  ].join("");
 }
 
 function imageGenerationBody(body) {
@@ -384,10 +456,58 @@ export function startMockGateway(options = {}) {
             "GET /v1/models",
             "POST /v1/chat/completions",
             "POST /v1/responses",
+            "GET /v1beta/models",
+            "POST /v1beta/models/:model:generateContent",
+            "POST /v1beta/models/:model:streamGenerateContent",
             "POST /v1/images/generations",
             "POST /v1/batches/chat",
           ],
         });
+      }
+
+      if (req.method === "GET" && path === "/v1beta/models") {
+        const ids = [
+          "gemini-2.5-flash",
+          "gemini-2.5-pro",
+          "gemini-3-flash",
+          "gemini-3-pro",
+          "gemini-3.5-flash",
+        ];
+        return sendJson(res, 200, {
+          models: ids.map((id) => ({
+            name: `models/${id}`,
+            displayName: id,
+            supportedGenerationMethods: [
+              "generateContent",
+              "streamGenerateContent",
+            ],
+          })),
+        });
+      }
+
+      const geminiActionMatch = path.match(
+        /^\/v1beta\/models\/(.+):(generateContent|streamGenerateContent)$/
+      );
+      if (req.method === "POST" && geminiActionMatch) {
+        const authErr = checkGeminiAuth(req, validKey);
+        if (authErr) return sendJson(res, authErr.status, authErr.body);
+        const slot = acquireConcurrencySlot("chat");
+        if (!slot.ok) return sendJson(res, slot.response.status, slot.response.body);
+        try {
+          const modelId = decodeURIComponent(geminiActionMatch[1]).replace(
+            /^models\//,
+            ""
+          );
+          const action = geminiActionMatch[2];
+          const body = await readJsonBody(req);
+          const response = geminiGenerateContentBody(body, modelId);
+          if (action === "streamGenerateContent") {
+            return sendSse(res, geminiGenerateContentToSse(response));
+          }
+          return sendJson(res, 200, response);
+        } finally {
+          slot.release?.();
+        }
       }
 
       if (req.method === "GET" && path === "/v1/models") {
@@ -527,6 +647,8 @@ if (isMain) {
     console.log(`P786 mock gateway listening on ${baseUrl}`);
     console.log(`Valid API key: ${validKey}`);
     console.log("Endpoints: GET /v1/models, POST /v1/chat/completions, POST /v1/responses,");
+    console.log("  GET /v1beta/models, POST /v1beta/models/:model:generateContent,");
+    console.log("  POST /v1beta/models/:model:streamGenerateContent,");
     console.log("  POST /v1/images/generations, POST /v1/batches/chat, GET /v1/batches/:id,");
     console.log("  GET /v1/batches/:id/items");
   });
