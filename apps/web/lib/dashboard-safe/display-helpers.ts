@@ -112,7 +112,8 @@ export function dashboardFormatBalanceCredits(
   locale: "en" | "zh" = "en"
 ): string {
   const amount = CREDITS_DECIMAL.format(value ?? 0);
-  return locale === "zh" ? `${amount} 算力积分` : `${amount} compute credits`;
+  void locale;
+  return `${amount} 算力积分`;
 }
 
 export function dashboardFormatCreditsWithSuffix(
@@ -121,7 +122,8 @@ export function dashboardFormatCreditsWithSuffix(
 ): string {
   const amount = dashboardFormatCreditsDecimal(value);
   if (amount === "—") return "—";
-  return locale === "zh" ? `${amount} 算力积分` : `${amount} compute credits`;
+  void locale;
+  return `${amount} 算力积分`;
 }
 
 export function dashboardFormatDate(iso: string | null | undefined): string {

@@ -1,16 +1,17 @@
 /**
- * Image workbench vision helpers — understand-image vs copywriting are separate.
+ * Image workbench vision helpers — recognition vs copywriting are separate.
  * Both use /v1/chat/completions multimodal; never Image API generation.
  */
 
 export type ImageUnderstandUseCaseId =
   | "taobao_pdd"
-  | "tiktok_shop"
-  | "amazon_dtc"
   | "xiaohongshu"
-  | "feed_ads"
+  | "tiktok_shop"
+  | "dtc_detail"
+  | "amazon"
   | "livestream"
-  | "medical_aesthetic"
+  | "private_domain"
+  | "portrait_formal"
   | "general";
 
 export type CopywritingUseCaseId =
@@ -29,7 +30,6 @@ export type EcommerceWorkbenchMode =
   | "product_copy"
   | "image_generate";
 
-/** Vision-capable chat models (never image-generation models). */
 export const ECOMMERCE_VISION_MODEL_IDS = [
   "gemini-2.5-flash",
   "gemini-2.5-pro",
@@ -41,7 +41,6 @@ export const ECOMMERCE_VISION_MODEL_IDS = [
 
 export const ECOMMERCE_VISION_DEFAULT_MODEL = "gemini-2.5-flash";
 
-/** @deprecated Use IMAGE_UNDERSTAND_USE_CASES — kept for type aliases. */
 export type EcommerceUseCaseId = ImageUnderstandUseCaseId;
 
 export const IMAGE_UNDERSTAND_USE_CASES: Array<{
@@ -50,17 +49,22 @@ export const IMAGE_UNDERSTAND_USE_CASES: Array<{
   labelEn: string;
 }> = [
   { id: "taobao_pdd", labelZh: "淘宝/拼多多商品图", labelEn: "Taobao / PDD listing" },
-  { id: "tiktok_shop", labelZh: "TikTok Shop", labelEn: "TikTok Shop" },
-  { id: "amazon_dtc", labelZh: "Amazon / 独立站", labelEn: "Amazon / DTC" },
-  { id: "xiaohongshu", labelZh: "小红书种草", labelEn: "Xiaohongshu seeding" },
-  { id: "feed_ads", labelZh: "信息流广告", labelEn: "Feed ads" },
+  { id: "xiaohongshu", labelZh: "小红书种草图", labelEn: "Xiaohongshu seeding" },
+  { id: "tiktok_shop", labelZh: "TikTok Shop 素材", labelEn: "TikTok Shop creative" },
+  { id: "dtc_detail", labelZh: "独立站详情页", labelEn: "DTC detail page" },
+  { id: "amazon", labelZh: "Amazon 商品图", labelEn: "Amazon listing image" },
   { id: "livestream", labelZh: "直播带货素材", labelEn: "Livestream commerce" },
   {
-    id: "medical_aesthetic",
-    labelZh: "医美/医疗素材",
-    labelEn: "Medical / aesthetic",
+    id: "private_domain",
+    labelZh: "私域朋友圈素材",
+    labelEn: "Private-domain Moments",
   },
-  { id: "general", labelZh: "通用商品分析", labelEn: "General product" },
+  {
+    id: "portrait_formal",
+    labelZh: "人物形象/职业照",
+    labelEn: "Portrait / professional photo",
+  },
+  { id: "general", labelZh: "通用电商素材", labelEn: "General ecommerce asset" },
 ];
 
 export const COPYWRITING_USE_CASES: Array<{
@@ -87,17 +91,17 @@ export const COPYWRITING_USE_CASES: Array<{
   { id: "general", labelZh: "通用电商文案", labelEn: "General ecommerce copy" },
 ];
 
-/** @deprecated Prefer IMAGE_UNDERSTAND_USE_CASES */
 export const ECOMMERCE_USE_CASES = IMAGE_UNDERSTAND_USE_CASES;
 
 const UNDERSTAND_HINT: Record<ImageUnderstandUseCaseId, string> = {
   taobao_pdd: "关注淘宝/拼多多主图与详情页适用场景。",
-  tiktok_shop: "关注短视频带货与 TikTok Shop 场景。",
-  amazon_dtc: "关注 Amazon / 独立站 listing 场景。",
   xiaohongshu: "关注小红书种草内容场景。",
-  feed_ads: "关注信息流广告投放场景。",
+  tiktok_shop: "关注短视频带货与 TikTok Shop 场景。",
+  dtc_detail: "关注独立站详情页与转化场景。",
+  amazon: "关注 Amazon 商品图与 listing 场景。",
   livestream: "关注直播讲解与逼单场景。",
-  medical_aesthetic: "重点识别医疗/功效承诺与合规风险。",
+  private_domain: "关注私域朋友圈种草与转发场景。",
+  portrait_formal: "关注人物形象、职业照、正装/商务人设场景。",
   general: "按通用电商素材识别。",
 };
 
@@ -122,18 +126,19 @@ function buildUnderstandPrompt(options: {
 
   return [
     "你是一名电商图片识别专家。",
-    "请基于用户上传的图片做内容识别与拆解。图片只是输入素材，不要生成或修改图片。",
+    "请基于用户上传的图片做内容识别与电商分析。图片只是输入素材，不要生成或修改图片。",
     "",
     "只输出以下结构：",
     "1. 图片主体",
     "2. 商品/人物/场景判断",
-    "3. 可见卖点",
-    "4. 适合平台",
-    "5. 风险提示（夸大、侵权、医疗/功效承诺、敏感元素）",
-    "6. 下一步建议（只给运营动作建议，例如可继续去生成文案；不要给换图/改图/生成图指令）",
+    "3. 适合售卖方向",
+    "4. 可提炼卖点",
+    "5. 适合平台",
+    "6. 可生成的文案方向",
+    "7. 下一步建议（可提示去「商品文案生成」；不要给换图/改图/生成图指令）",
     "",
     "禁止：",
-    "- 不要输出长篇营销文案、标题矩阵、广告短句",
+    "- 不要输出长篇营销正文、标题矩阵、广告短句全集",
     "- 不要建议换背景、换服装、生成新图、改图",
     "- 不要写技术解释",
     "",
@@ -153,18 +158,17 @@ function buildCopywritingPrompt(options: {
 
   return [
     "你是一名电商文案与内容运营专家。",
-    "用户会上传一张商品图、人物图或电商素材图，并说明想要的文案用途。",
-    "你的任务不是修改图片，也不是生成图片，而是基于图片信息和用户需求，直接输出可复制使用的文案。",
+    "用户会上传商品图、人物图或电商素材图，并说明想要生成的文案用途。",
+    "你的任务不是修改图片，也不是生成图片，而是基于图片信息和用户需求，直接输出可复制使用的电商文案。",
     "",
-    "请严格遵守：",
+    "严格遵守：",
     "1. 只输出文案结果",
-    "2. 不要说“我看到了图片里有什么”太多",
-    "3. 不要输出图片拆解报告",
-    "4. 不要建议换图、改图、生成图，除非用户明确要求",
-    "5. 不要写技术解释",
-    "6. 文案要能直接复制给运营使用",
-    "7. 如果图片是人物图，要根据用户需求判断是写服装文案、形象照文案、职场人设文案还是广告文案",
-    "8. 如果用户补充需求写了“做西装文案”，就围绕西装/正装/职业形象写文案，不要跑去分析人物本身",
+    "2. 不要输出图片拆解报告",
+    "3. 不要建议用户换图、改图、生成图，除非用户明确要求",
+    "4. 如果用户说“做西装文案”，就围绕西装、正装、职业形象、面试、商务、会议等场景写文案",
+    "5. 如果图片是人物图，也要根据用户需求判断是服装文案、形象照文案、职业人设文案还是广告文案",
+    "6. 文案必须能直接复制给运营使用",
+    "7. 不要解释模型、接口或技术细节",
     "",
     "输出结构：",
     "- 标题 5 条",
@@ -199,9 +203,7 @@ export function buildEcommerceVisionPrompt(options: {
   });
 }
 
-export function pickEcommerceVisionModel(
-  preferred?: string | null
-): string {
+export function pickEcommerceVisionModel(preferred?: string | null): string {
   if (
     preferred &&
     (ECOMMERCE_VISION_MODEL_IDS as readonly string[]).includes(preferred)

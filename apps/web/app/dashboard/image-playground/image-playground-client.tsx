@@ -196,12 +196,20 @@ export function ImageGeneratePanel({
   initialModel,
   initialCreditsBalance = null,
   creditsLoaded = false,
+  handoffKey = 0,
+  initialReferenceImageUrl,
+  initialReferenceImageLabel,
+  initialPromptHint,
 }: {
   accessToken: string;
   activeKeys: ImagePlaygroundApiKeyOption[];
   initialModel?: string;
   initialCreditsBalance?: number | null;
   creditsLoaded?: boolean;
+  handoffKey?: number;
+  initialReferenceImageUrl?: string;
+  initialReferenceImageLabel?: string;
+  initialPromptHint?: string;
 }) {
   const { t, locale } = useImagePlaygroundLabels();
   const router = useRouter();
@@ -244,6 +252,29 @@ export function ImageGeneratePanel({
   );
   const [resultAttention, setResultAttention] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!handoffKey) return;
+    if (initialReferenceImageUrl) {
+      const item: ImageInputItem = {
+        id: `handoff-${handoffKey}`,
+        url: initialReferenceImageUrl,
+        label: initialReferenceImageLabel || "reference",
+        source: "url",
+        status: "ready",
+      };
+      setImageInputs([item]);
+      imageInputsRef.current = [item];
+    }
+    if (initialPromptHint?.trim()) {
+      setPrompt(initialPromptHint.trim());
+    }
+  }, [
+    handoffKey,
+    initialReferenceImageUrl,
+    initialReferenceImageLabel,
+    initialPromptHint,
+  ]);
 
   const readyImageUrls = getReadyImageUrls(imageInputs);
   const imageMode = getImagePlaygroundMode(readyImageUrls.length > 0);
@@ -709,7 +740,7 @@ export function ImageGeneratePanel({
             {t("dashboard.imageWorkbench.tabGenerate")}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {t("dashboard.imagePlayground.toolbenchSubtitle")}
+            {t("dashboard.imageWorkbench.generateSubtitle")}
           </p>
         </div>
       </div>
@@ -878,6 +909,10 @@ export function ImageGeneratePanel({
               }
               attention={resultAttention || loading}
               onRetry={() => formRef.current?.requestSubmit()}
+              onSimplifyRetry={() => {
+                setPrompt((prev) => prev.trim().slice(0, 80));
+                setError(null);
+              }}
               t={t}
             />
           </div>

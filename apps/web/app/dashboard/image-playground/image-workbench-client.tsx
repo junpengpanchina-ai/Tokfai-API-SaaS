@@ -12,6 +12,14 @@ import { useImagePlaygroundLabels } from "./use-image-playground-labels";
 
 type WorkbenchTab = "analysis" | "copy" | "generate";
 
+export type WorkbenchHandoff = {
+  key: number;
+  imageUrl?: string;
+  imageLabel?: string;
+  copyExtraNeed?: string;
+  generatePromptHint?: string;
+};
+
 export function ImagePlaygroundClient({
   accessToken,
   activeKeys,
@@ -26,7 +34,8 @@ export function ImagePlaygroundClient({
   creditsLoaded?: boolean;
 }) {
   const { t } = useImagePlaygroundLabels();
-  const [tab, setTab] = useState<WorkbenchTab>("copy");
+  const [tab, setTab] = useState<WorkbenchTab>("analysis");
+  const [handoff, setHandoff] = useState<WorkbenchHandoff>({ key: 0 });
 
   const tabs: Array<{ id: WorkbenchTab; labelKey: string; descKey: string }> = [
     {
@@ -46,7 +55,14 @@ export function ImagePlaygroundClient({
     },
   ];
 
-  const activeTab = tabs.find((item) => item.id === tab) ?? tabs[1];
+  const activeTab = tabs.find((item) => item.id === tab) ?? tabs[0];
+
+  function bumpHandoff(patch: Omit<WorkbenchHandoff, "key">) {
+    setHandoff((prev) => ({
+      key: prev.key + 1,
+      ...patch,
+    }));
+  }
 
   return (
     <div className="flex min-w-0 flex-col gap-5 overflow-x-hidden">
@@ -83,6 +99,21 @@ export function ImagePlaygroundClient({
           activeKeys={activeKeys}
           initialCreditsBalance={initialCreditsBalance}
           creditsLoaded={creditsLoaded}
+          onGoToCopy={(payload) => {
+            bumpHandoff({
+              imageUrl: payload.imageUrl,
+              imageLabel: payload.imageLabel,
+              copyExtraNeed: payload.copyBrief,
+            });
+            setTab("copy");
+          }}
+          onGoToGenerate={(payload) => {
+            bumpHandoff({
+              imageUrl: payload.imageUrl,
+              imageLabel: payload.imageLabel,
+            });
+            setTab("generate");
+          }}
         />
       ) : null}
 
@@ -93,6 +124,18 @@ export function ImagePlaygroundClient({
           activeKeys={activeKeys}
           initialCreditsBalance={initialCreditsBalance}
           creditsLoaded={creditsLoaded}
+          handoffKey={handoff.key}
+          initialImageUrl={handoff.imageUrl}
+          initialImageLabel={handoff.imageLabel}
+          initialExtraNeed={handoff.copyExtraNeed}
+          onGoToGenerate={(payload) => {
+            bumpHandoff({
+              imageUrl: payload.imageUrl,
+              imageLabel: payload.imageLabel,
+              generatePromptHint: payload.promptHint,
+            });
+            setTab("generate");
+          }}
         />
       ) : null}
 
@@ -103,6 +146,10 @@ export function ImagePlaygroundClient({
           initialModel={initialModel}
           initialCreditsBalance={initialCreditsBalance}
           creditsLoaded={creditsLoaded}
+          handoffKey={handoff.key}
+          initialReferenceImageUrl={handoff.imageUrl}
+          initialReferenceImageLabel={handoff.imageLabel}
+          initialPromptHint={handoff.generatePromptHint}
         />
       ) : null}
     </div>

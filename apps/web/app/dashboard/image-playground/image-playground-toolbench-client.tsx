@@ -27,6 +27,8 @@ import type { ImageGenerationResponse } from "@/lib/dashboard-safe/image-api";
 import { isLowCreditsBalance } from "@/lib/dashboard-safe/shell-credits";
 import { TOKFAI_API_KEY_PLACEHOLDER } from "@/lib/dashboard-safe/constants";
 import { cn } from "@/lib/dashboard-safe/classnames";
+import { WorkbenchProgressPanel } from "./workbench-progress";
+import { useImagePlaygroundLabels } from "./use-image-playground-labels";
 
 import {
   ImagePlaygroundCopyButton,
@@ -607,6 +609,7 @@ export function ImagePlaygroundResultArea({
   inputImagesCount,
   attention = false,
   onRetry,
+  onSimplifyRetry,
   t,
 }: {
   loading: boolean;
@@ -616,9 +619,11 @@ export function ImagePlaygroundResultArea({
   inputImagesCount: number | null | undefined;
   attention?: boolean;
   onRetry?: () => void;
+  onSimplifyRetry?: () => void;
   t: (key: string) => string;
 }) {
   const { copiedId, copyText } = useImagePlaygroundCopyToClipboard();
+  const { locale } = useImagePlaygroundLabels();
 
   const state: "loading" | "error" | "success" | "empty" = loading
     ? "loading"
@@ -630,7 +635,7 @@ export function ImagePlaygroundResultArea({
 
   const title =
     state === "loading"
-      ? t("dashboard.imagePlayground.toolbenchResultLoadingTitle")
+      ? t("dashboard.imageWorkbench.imageProgressTitle")
       : t("dashboard.imagePlayground.toolbenchResultPanelTitle");
 
   const cardClass = cn(
@@ -641,6 +646,18 @@ export function ImagePlaygroundResultArea({
     state === "error" && attention && "ring-destructive/15 border-destructive/40",
     state === "loading" && !attention && "border-primary/25"
   );
+
+  const friendlyError =
+    error?.code?.toLowerCase().includes("timeout") ||
+    error?.message?.toLowerCase().includes("timeout") ||
+    error?.message?.includes("超时")
+      ? t("dashboard.imageWorkbench.imageTimeoutFriendly")
+      : t("dashboard.imageWorkbench.imageFailFriendly");
+
+  const billingHint =
+    error?.code === "no_charge" || error?.code === "not_charged"
+      ? t("dashboard.imageWorkbench.noChargeHint")
+      : t("dashboard.imageWorkbench.billingUnknownHint");
 
   return (
     <Card className={cardClass}>
@@ -663,17 +680,12 @@ export function ImagePlaygroundResultArea({
         className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex flex-col`}
       >
         {state === "loading" ? (
-          <div
-            className={`${IMAGE_PLAYGROUND_TOOLBENCH.resultBody} items-center justify-center gap-3 px-4 py-6 text-center`}
-          >
-            <div className="h-28 w-full max-w-xs animate-pulse rounded-md bg-muted/50" />
-            <p className="text-sm font-medium text-foreground">
-              {t("dashboard.imagePlayground.toolbenchResultLoadingTitle")}
-            </p>
-            <p className="max-w-xs text-xs text-muted-foreground">
-              {t("dashboard.imagePlayground.toolbenchResultLoadingHint")}
-            </p>
-          </div>
+          <WorkbenchProgressPanel
+            kind="image_generate"
+            locale={locale}
+            title={t("dashboard.imageWorkbench.imageProgressTitle")}
+            patienceHint={t("dashboard.imageWorkbench.progressPatienceImage")}
+          />
         ) : null}
 
         {state === "error" ? (
@@ -681,28 +693,77 @@ export function ImagePlaygroundResultArea({
             className={`${IMAGE_PLAYGROUND_TOOLBENCH.resultBody} gap-3 p-4`}
           >
             <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-              {error!.message}
-              {error!.requestId ? (
-                <p className="mt-2 font-mono text-xs text-muted-foreground">
-                  {error!.requestId}
-                </p>
-              ) : null}
+              {friendlyError}
             </div>
-            <p className="text-xs text-muted-foreground">
-              {t("dashboard.imagePlayground.errors.billingNotChargedHint")}
-            </p>
-            {onRetry ? (
+            <p className="text-xs text-muted-foreground">{billingHint}</p>
+            <div className="flex flex-wrap gap-2">
+              {onRetry ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className={IMAGE_PLAYGROUND_TOOLBENCH.control}
+                  onClick={onRetry}
+                >
+                  <RotateCw className="h-4 w-4" />
+                  {t("dashboard.imagePlayground.toolbenchRetry")}
+                </Button>
+              ) : null}
+              {onSimplifyRetry ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className={IMAGE_PLAYGROUND_TOOLBENCH.control}
+                  onClick={onSimplifyRetry}
+                >
+                  {t("dashboard.imageWorkbench.simplifyRetry")}
+                </Button>
+              ) : null}
+              {error?.requestId ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className={IMAGE_PLAYGROUND_TOOLBENCH.control}
+                  onClick={() =>
+                    copyText("image-error-request-id", error.requestId!)
+                  }
+                >
+                  {copiedId === "image-error-request-id" ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" />
+                      {t("dashboard.imagePlayground.copiedRequestId")}
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" />
+                      {t("dashboard.imageWorkbench.copyRequestId")}
+                    </>
+                  )}
+                </Button>
+              ) : null}
               <Button
-                type="button"
+                asChild
                 size="sm"
                 variant="outline"
                 className={IMAGE_PLAYGROUND_TOOLBENCH.control}
-                onClick={onRetry}
               >
-                <RotateCw className="h-4 w-4" />
-                {t("dashboard.imagePlayground.toolbenchRetry")}
+                <Link href="/dashboard/usage">
+                  {t("dashboard.imageWorkbench.viewUsage")}
+                </Link>
               </Button>
-            ) : null}
+            </div>
+            <details className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+              <summary className="cursor-pointer select-none font-medium text-foreground">
+                {t("dashboard.imageWorkbench.advancedInfo")}
+              </summary>
+              <div className="mt-2 space-y-1 font-mono">
+                {error?.message ? <p>{error.message}</p> : null}
+                {error?.code ? <p>code: {error.code}</p> : null}
+                {error?.requestId ? <p>request_id: {error.requestId}</p> : null}
+              </div>
+            </details>
           </div>
         ) : null}
 
@@ -750,66 +811,16 @@ export function ImagePlaygroundResultArea({
                     </div>
                   ) : null}
 
-                  <div className="flex flex-col gap-2 text-sm">
-                    {creditsCharged != null ? (
-                      <p className="text-sm font-medium">
-                        {formatImagePlaygroundLabel(
-                          t("dashboard.imagePlayground.successCreditsCharged"),
-                          { credits: formatCreditsSafe(creditsCharged) }
-                        )}
-                      </p>
-                    ) : null}
-                    {resolvedModel ? (
-                      <p className="text-sm text-muted-foreground">
-                        {t("dashboard.imagePlayground.metaModel")}:{" "}
-                        <span className="font-mono text-foreground">
-                          {resolvedModel}
-                        </span>
-                      </p>
-                    ) : null}
-                    {requestId ? (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-muted-foreground">
-                          request_id
-                        </span>
-                        <code className="max-w-full truncate rounded bg-muted px-2 py-0.5 font-mono text-xs">
-                          {requestId}
-                        </code>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className={`h-8 ${IMAGE_PLAYGROUND_TOOLBENCH.control}`}
-                          onClick={() => copyText(requestCopyId, requestId)}
-                        >
-                          {copiedId === requestCopyId ? (
-                            <>
-                              <Check className="h-3.5 w-3.5" />
-                              {t("dashboard.imagePlayground.copiedRequestId")}
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-3.5 w-3.5" />
-                              {t("dashboard.imagePlayground.copyRequestId")}
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    ) : null}
-                  </div>
+                  {creditsCharged != null ? (
+                    <p className="text-sm font-medium">
+                      {formatImagePlaygroundLabel(
+                        t("dashboard.imagePlayground.successCreditsCharged"),
+                        { credits: formatCreditsSafe(creditsCharged) }
+                      )}
+                    </p>
+                  ) : null}
 
                   <div className="flex flex-wrap gap-2">
-                    {requestId ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className={IMAGE_PLAYGROUND_TOOLBENCH.control}
-                        onClick={() => copyText(requestCopyId, requestId)}
-                      >
-                        {t("dashboard.imagePlayground.copyRequestId")}
-                      </Button>
-                    ) : null}
                     <Button
                       asChild
                       size="sm"
@@ -838,6 +849,12 @@ export function ImagePlaygroundResultArea({
                       {t("dashboard.imagePlayground.technicalDetails")}
                     </summary>
                     <div className="mt-2 space-y-1 font-mono">
+                      {resolvedModel ? (
+                        <p>
+                          {t("dashboard.imagePlayground.metaModel")}:{" "}
+                          {resolvedModel}
+                        </p>
+                      ) : null}
                       {completedAt ? (
                         <p>
                           {t("dashboard.imagePlayground.metaCreatedAt")}:{" "}
@@ -847,7 +864,30 @@ export function ImagePlaygroundResultArea({
                       {inputImagesCount != null ? (
                         <p>input_images: {inputImagesCount}</p>
                       ) : null}
-                      {requestId ? <p>request_id: {requestId}</p> : null}
+                      {requestId ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p>request_id: {requestId}</p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className={`h-8 ${IMAGE_PLAYGROUND_TOOLBENCH.control}`}
+                            onClick={() => copyText(requestCopyId, requestId)}
+                          >
+                            {copiedId === requestCopyId ? (
+                              <>
+                                <Check className="h-3.5 w-3.5" />
+                                {t("dashboard.imagePlayground.copiedRequestId")}
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-3.5 w-3.5" />
+                                {t("dashboard.imageWorkbench.copyRequestId")}
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                   </details>
                 </>

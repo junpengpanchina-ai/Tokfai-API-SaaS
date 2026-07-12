@@ -41,6 +41,11 @@ import { dashboardFormatCreditsWithSuffix } from "@/lib/dashboard-safe/display-h
 import { uploadPlaygroundImageAction } from "./upload-playground-image-action";
 import { useImagePlaygroundLabels } from "./use-image-playground-labels";
 import type { ImagePlaygroundApiKeyOption } from "./image-playground-client";
+import {
+  distillCopyToImagePrompt,
+  summarizeRecognitionForCopy,
+  WorkbenchProgressPanel,
+} from "./workbench-progress";
 
 type VisionMode = "ecommerce_image_analysis" | "product_copy";
 
@@ -87,12 +92,32 @@ export function EcommerceVisionTab({
   activeKeys,
   initialCreditsBalance = null,
   creditsLoaded = false,
+  handoffKey = 0,
+  initialImageUrl,
+  initialImageLabel,
+  initialExtraNeed,
+  onGoToCopy,
+  onGoToGenerate,
 }: {
   mode: VisionMode;
   accessToken: string;
   activeKeys: ImagePlaygroundApiKeyOption[];
   initialCreditsBalance?: number | null;
   creditsLoaded?: boolean;
+  handoffKey?: number;
+  initialImageUrl?: string;
+  initialImageLabel?: string;
+  initialExtraNeed?: string;
+  onGoToCopy?: (payload: {
+    imageUrl: string;
+    imageLabel?: string;
+    copyBrief: string;
+  }) => void;
+  onGoToGenerate?: (payload: {
+    imageUrl: string;
+    imageLabel?: string;
+    promptHint?: string;
+  }) => void;
 }) {
   const { t, locale } = useImagePlaygroundLabels();
   const router = useRouter();
@@ -109,7 +134,7 @@ export function EcommerceVisionTab({
   const [needsCreate, setNeedsCreate] = useState(() => activeKeys.length === 0);
 
   const [useCase, setUseCase] = useState(() => defaultUseCaseForMode(mode));
-  const [extraNeed, setExtraNeed] = useState("");
+  const [extraNeed, setExtraNeed] = useState(initialExtraNeed ?? "");
   const [images, setImages] = useState<UploadItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,6 +154,23 @@ export function EcommerceVisionTab({
     setError(null);
     setTechnicalError(null);
   }, [mode]);
+
+  useEffect(() => {
+    if (!handoffKey) return;
+    if (initialImageUrl) {
+      setImages([
+        {
+          id: `handoff-${handoffKey}`,
+          url: initialImageUrl,
+          label: initialImageLabel || "reference",
+          status: "ready",
+        },
+      ]);
+    }
+    if (initialExtraNeed) {
+      setExtraNeed(initialExtraNeed);
+    }
+  }, [handoffKey, initialImageUrl, initialImageLabel, initialExtraNeed]);
 
   useEffect(() => {
     setLocalKeys(activeKeys);
@@ -221,14 +263,7 @@ export function EcommerceVisionTab({
       }
 
       const id = `img-${Date.now()}`;
-      setImages([
-        {
-          id,
-          url: "",
-          label: file.name,
-          status: "uploading",
-        },
-      ]);
+      setImages([{ id, url: "", label: file.name, status: "uploading" }]);
 
       try {
         const formData = new FormData();
@@ -342,6 +377,31 @@ export function EcommerceVisionTab({
     }
   }
 
+  function handleGoToCopy() {
+    if (!readyUrls[0] || !resultText || !onGoToCopy) return;
+    const brief = summarizeRecognitionForCopy(
+      resultText,
+      ecommerceUseCaseLabel(useCase, locale, mode)
+    );
+    onGoToCopy({
+      imageUrl: readyUrls[0],
+      imageLabel: images[0]?.label,
+      copyBrief: brief,
+    });
+  }
+
+  function handleGoToGenerate(fromCopy = false) {
+    if (!readyUrls[0] || !onGoToGenerate) return;
+    onGoToGenerate({
+      imageUrl: readyUrls[0],
+      imageLabel: images[0]?.label,
+      promptHint:
+        fromCopy && resultText
+          ? distillCopyToImagePrompt(resultText)
+          : undefined,
+    });
+  }
+
   const titleKey = isCopyMode
     ? "dashboard.imageWorkbench.copyTitle"
     : "dashboard.imageWorkbench.analysisTitle";
@@ -357,12 +417,6 @@ export function EcommerceVisionTab({
   const extraPlaceholderKey = isCopyMode
     ? "dashboard.imageWorkbench.copyExtraPlaceholder"
     : "dashboard.imageWorkbench.extraNeedPlaceholder";
-  const loadingKey = isCopyMode
-    ? "dashboard.imageWorkbench.copying"
-    : "dashboard.imageWorkbench.analyzing";
-  const loadingHintKey = isCopyMode
-    ? "dashboard.imageWorkbench.copyingHint"
-    : "dashboard.imageWorkbench.analyzingHint";
   const resultTitleKey = isCopyMode
     ? "dashboard.imageWorkbench.copyResultTitle"
     : "dashboard.imageWorkbench.analysisResultTitle";
@@ -515,7 +569,9 @@ export function EcommerceVisionTab({
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {t(loadingKey)}
+                {isCopyMode
+                  ? t("dashboard.imageWorkbench.copying")
+                  : t("dashboard.imageWorkbench.analyzing")}
               </>
             ) : (
               t(ctaKey)
@@ -531,16 +587,60 @@ export function EcommerceVisionTab({
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {error ? (
-            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-              {error}
+            <div className="flex flex-col gap-3">
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void handleRun()}
+                >
+                  <RotateCw className="h-3.5 w-3.5" />
+                  {t("dashboard.imageWorkbench.regenerate")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setExtraNeed((prev) => prev.slice(0, 40));
+                    setError(null);
+                  }}
+                >
+                  {t("dashboard.imageWorkbench.simplifyRetry")}
+                </Button>
+                {requestId || technicalError ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const text = requestId ?? technicalError ?? "";
+                      void navigator.clipboard.writeText(text);
+                    }}
+                  >
+                    {t("dashboard.imageWorkbench.copyRequestId")}
+                  </Button>
+                ) : null}
+                <Button asChild type="button" size="sm" variant="outline">
+                  <a href="/dashboard/usage">
+                    {t("dashboard.imageWorkbench.viewUsage")}
+                  </a>
+                </Button>
+              </div>
             </div>
           ) : null}
 
           {loading ? (
-            <div className="flex min-h-[240px] flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-6 w-6 animate-spin" />
-              {t(loadingHintKey)}
-            </div>
+            <WorkbenchProgressPanel
+              kind="vision"
+              locale={locale}
+              title={t("dashboard.imageWorkbench.progressTitle")}
+              patienceHint={t("dashboard.imageWorkbench.progressPatienceVision")}
+            />
           ) : null}
 
           {!loading && !resultText && !error ? (
@@ -578,6 +678,23 @@ export function EcommerceVisionTab({
                   <RotateCw className="h-3.5 w-3.5" />
                   {t("dashboard.imageWorkbench.regenerate")}
                 </Button>
+                {!isCopyMode && onGoToCopy ? (
+                  <Button type="button" size="sm" onClick={handleGoToCopy}>
+                    {t("dashboard.imageWorkbench.goToCopy")}
+                  </Button>
+                ) : null}
+                {onGoToGenerate ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleGoToGenerate(isCopyMode)}
+                  >
+                    {isCopyMode
+                      ? t("dashboard.imageWorkbench.goToGenerateFromCopy")
+                      : t("dashboard.imageWorkbench.goToGenerate")}
+                  </Button>
+                ) : null}
                 <Button asChild type="button" size="sm" variant="outline">
                   <a href="/dashboard/usage">
                     {t("dashboard.imageWorkbench.viewUsage")}

@@ -92,5 +92,5 @@ export function formatImageModelSelectLabel(
   if (locale === "zh") {
     return `${entry.displayName} (${modelId}) · ${price} 算力积分 / 次`;
   }
-  return `${entry.displayName} (${modelId}) · ${price} compute credits / generation`;
+  return `${entry.displayName} (${modelId}) · ${price} 算力积分 / generation`;
 }

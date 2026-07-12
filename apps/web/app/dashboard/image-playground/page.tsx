@@ -13,7 +13,7 @@ import {
 } from "./image-workbench-client";
 
 export const metadata = {
-  title: "图片工作台",
+  title: "电商图片工作台",
 };
 
 export const dynamic = "force-dynamic";
