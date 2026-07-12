@@ -10,15 +10,15 @@
 
 /** Explicit edit / preserve intent — used to require a reference image. */
 const REFERENCE_EDIT_INTENT_PATTERN =
-  /保留人物|保留主体|保留脸|不要换人|保持人物|只换衣服|换背景|换服装|换风格|参考图|按原图|照着这张|保留商品|不要换脸|同一张脸|基于原图|局部改图|改图|换成|替换成|改成/;
+  /保留人物|保留主体|保留脸|不要换人|保持人物|只换衣服|换背景|换服装|换风格|换场景|参考图|按原图|照着这张|保留商品|不要换脸|同一张脸|同一个人|基于原图|局部改图|改图|换成|替换成|改成|keep(?:\s+the)?\s+subject|preserve(?:\s+the)?\s+subject|same\s+person|same\s+face|don'?t\s+change(?:\s+the)?\s+face|do\s+not\s+change(?:\s+the)?\s+face|no\s+face\s+swap|keep(?:\s+the)?\s+face|change(?:\s+the)?\s+clothes|change(?:\s+the)?\s+outfit|change(?:\s+the)?\s+background|change(?:\s+the)?\s+scene|outfit\s+change|background\s+change|scene\s+change|edit(?:\s+the)?\s+(?:image|photo)|based\s+on\s+(?:this|the)\s+(?:image|photo|reference)|reference\s+(?:image|photo|edit)/i;
 
 /** Softer hints that still benefit from subject-preserve wrapping when images exist. */
 const EDIT_HINT_PATTERN =
-  /保留|替换|换成|改成|变成|参考|保持|主体|脸|人物|衣服|背景|西装|中山装|服装|发型|姿态|构图|龙袍|商品|白底/;
+  /保留|替换|换成|改成|变成|参考|保持|主体|脸|人物|衣服|背景|场景|西装|中山装|服装|发型|姿态|构图|龙袍|商品|白底|keep|preserve|subject|face|person|outfit|clothes|background|scene|reference|edit/i;
 
 /** Clothing-swap intent — keep edit local; do not reinvent identity/scene. */
 const CLOTHING_SWAP_PATTERN =
-  /换龙袍|换衣服|换西装|换服装|穿上|把衣服换成|把西装换成|把西服换成|替换成.+袍|换成.+袍|换成.+装/;
+  /换龙袍|换衣服|换西装|换服装|穿上|把衣服换成|把西装换成|把西服换成|替换成.+袍|换成.+袍|换成.+装|change(?:\s+the)?\s+(?:clothes|outfit|suit)|put\s+on|swap(?:\s+the)?\s+(?:clothes|outfit)/i;
 
 export type ImagePlaygroundMode = "text_to_image" | "reference_edit";
 

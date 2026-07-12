@@ -35,7 +35,6 @@ import {
 } from "@/lib/dashboard-safe/image-api";
 import {
   ensurePlaygroundApiKey,
-  PlaygroundKeyError,
 } from "@/lib/dashboard-safe/playground-default-key";
 import {
   getImageModelCapability,
@@ -331,6 +330,9 @@ export function ImageGeneratePanel({
   const readyImageUrls = getReadyImageUrls(imageInputs);
   const imageMode = getImagePlaygroundMode(readyImageUrls.length > 0);
   const selectedCapability = getImageModelCapability(model);
+  const wantsSubjectPreserve = promptImpliesReferenceEdit(prompt);
+  const showSubjectPreserveExpectation =
+    readyImageUrls.length > 0 && wantsSubjectPreserve;
   const subjectPreserveHonesty =
     imageMode === "reference_edit" && !selectedCapability.supportsSubjectPreserve;
 
@@ -439,15 +441,9 @@ export function ImageGeneratePanel({
       });
       setNeedsManualCreate(false);
       if (ensured.created) router.refresh();
-    } catch (err) {
+    } catch {
       setNeedsManualCreate(true);
-      setCreateKeyError(
-        err instanceof DmitApiError
-          ? imagePlaygroundErrorMessage(err.status, err.code, t)
-          : err instanceof PlaygroundKeyError
-            ? err.message
-            : t("dashboard.imagePlayground.errors.unknown")
-      );
+      setCreateKeyError(t("dashboard.imagePlayground.noKeyBody"));
     } finally {
       setPreparingKey(false);
     }
@@ -503,7 +499,7 @@ export function ImageGeneratePanel({
         setError({
           status: 0,
           code: "invalid_image_url",
-          message: "Enter a valid http or https URL.",
+          message: t("dashboard.imagePlayground.errors.invalidImageUrl"),
         });
         return;
       }
@@ -513,7 +509,10 @@ export function ImageGeneratePanel({
           setError({
             status: 0,
             code: "too_many_images",
-            message: `Up to ${MAX_PLAYGROUND_INPUT_IMAGES} input images are allowed.`,
+            message: formatImagePlaygroundLabel(
+              t("dashboard.imagePlayground.errors.tooManyImages"),
+              { max: MAX_PLAYGROUND_INPUT_IMAGES }
+            ),
           });
           return current;
         }
@@ -598,7 +597,7 @@ export function ImageGeneratePanel({
       entries.map(async (entry) => {
         let uploadStatus: "ready" | "error" = "error";
         let publicUrl = "";
-        let errorMessage = "Upload failed.";
+        let errorMessage = t("dashboard.imagePlayground.errors.uploadFailed");
         let sourceDataUrl = "";
 
         try {
@@ -630,21 +629,16 @@ export function ImageGeneratePanel({
           } else {
             // Data URL is enough for generation; keep ready if we have it.
             uploadStatus = sourceDataUrl ? "ready" : "error";
-            errorMessage = uploadResult.message;
+            errorMessage = t("dashboard.imagePlayground.errors.uploadFailed");
             if (!sourceDataUrl) {
               throw new PlaygroundImageUploadError(
-                uploadResult.message,
+                t("dashboard.imagePlayground.errors.uploadFailed"),
                 uploadResult.code
               );
             }
           }
         } catch (err) {
-          errorMessage =
-            err instanceof PlaygroundImageUploadError
-              ? err.message
-              : err instanceof Error
-                ? err.message
-                : "Upload failed.";
+          errorMessage = t("dashboard.imagePlayground.errors.uploadFailed");
           console.error("[image-upload] failed", err);
           if (!sourceDataUrl) {
             setError({
@@ -677,7 +671,7 @@ export function ImageGeneratePanel({
         }
       })
     );
-  }, []);
+  }, [t]);
 
   const removeImageInput = useCallback((id: string) => {
     setImageInputs((current) => {
@@ -789,7 +783,7 @@ export function ImageGeneratePanel({
       setError({
         status: 0,
         code: "upload_in_progress",
-        message: "Wait for input images to finish uploading or resolving.",
+        message: t("dashboard.imagePlayground.errors.waitingForImages"),
       });
       pulseResultAttention();
       focusResultPanel("onComplete");
@@ -1002,9 +996,15 @@ export function ImageGeneratePanel({
                       : t("dashboard.imagePlayground.modeText")}
                   </Badge>
                 </div>
-                {subjectPreserveHonesty || warnFastForEdit ? (
+                {showSubjectPreserveExpectation ||
+                subjectPreserveHonesty ||
+                warnFastForEdit ? (
                   <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
-                    {t("dashboard.imagePlayground.subjectPreserveHonesty")}
+                    {t(
+                      showSubjectPreserveExpectation || subjectPreserveHonesty
+                        ? "dashboard.imagePlayground.subjectPreserveExpectation"
+                        : "dashboard.imagePlayground.fastModelEditHint"
+                    )}
                   </p>
                 ) : null}
               </CardHeader>
@@ -1396,6 +1396,7 @@ function ImageInputsPanel({
               onRemove={() => onRemoveImage(item.id)}
               onPreviewError={(message) => onPreviewError(item.id, message)}
               onPreviewReady={() => onPreviewReady(item.id)}
+              t={t}
             />
           ))}
         </div>
@@ -1410,12 +1411,14 @@ function ImageInputThumbnail({
   onRemove,
   onPreviewError,
   onPreviewReady,
+  t,
 }: {
   item: ImageInputItem;
   loading: boolean;
   onRemove: () => void;
   onPreviewError: (message: string) => void;
   onPreviewReady: () => void;
+  t: (key: string) => string;
 }) {
   const displayUrl = getDisplayUrl(item);
   const showPreview =
@@ -1424,7 +1427,7 @@ function ImageInputThumbnail({
     !item.previewError &&
     item.status === "ready";
 
-  const referenceMessage = getInputReferenceMessage(item);
+  const referenceMessage = getInputReferenceMessage(item, t);
 
   return (
     <div className="relative overflow-hidden rounded-md border bg-background">
@@ -1436,7 +1439,7 @@ function ImageInputThumbnail({
             alt={item.label}
             className="h-full w-full object-cover"
             onError={() =>
-              onPreviewError("Could not load image preview.")
+              onPreviewError(t("dashboard.imagePlayground.errors.previewFailed"))
             }
           />
         ) : item.status === "uploading" ? (
@@ -1451,14 +1454,18 @@ function ImageInputThumbnail({
             ) : null}
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-background/50 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
-              <span className="text-[10px]">Preparing…</span>
+              <span className="text-[10px]">
+                {t("dashboard.imagePlayground.preparingShort")}
+              </span>
             </div>
           </div>
         ) : item.status === "resolving" ? (
           <>
             <div className="flex h-full flex-col items-center justify-center gap-1 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
-              <span className="text-[10px]">Resolving…</span>
+              <span className="text-[10px]">
+                {t("dashboard.imagePlayground.resolvingShort")}
+              </span>
             </div>
             {displayUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -1468,18 +1475,22 @@ function ImageInputThumbnail({
                 className="hidden"
                 onLoad={() => onPreviewReady()}
                 onError={() =>
-                  onPreviewError("Could not load image from this URL.")
+                  onPreviewError(
+                    t("dashboard.imagePlayground.errors.previewUrlFailed")
+                  )
                 }
               />
             ) : null}
           </>
         ) : item.previewError || item.error ? (
           <div className="flex h-full items-center justify-center px-2 text-center text-xs text-destructive">
-            {item.previewError ?? item.error ?? "Failed"}
+            {item.previewError ??
+              item.error ??
+              t("dashboard.imagePlayground.errors.uploadFailed")}
           </div>
         ) : (
           <div className="flex h-full items-center justify-center px-2 text-center text-xs text-destructive">
-            Upload failed
+            {t("dashboard.imagePlayground.errors.uploadFailed")}
           </div>
         )}
       </div>
@@ -1513,18 +1524,16 @@ function ImageInputThumbnail({
   );
 }
 
-function getInputReferenceMessage(item: ImageInputItem): string | null {
+function getInputReferenceMessage(
+  item: ImageInputItem,
+  t: (key: string) => string
+): string | null {
   if (item.status === "error") {
-    return item.error ?? item.previewError ?? "This input image cannot be used.";
-  }
-  if (item.source === "upload" && item.status === "ready") {
-    return "This image will be used as visual reference.";
-  }
-  if (item.source === "url" && item.status === "ready") {
-    return "Resolved and will be used as visual reference.";
-  }
-  if (item.source === "url" && item.status === "resolving") {
-    return "Checking whether this URL can be used as a visual reference.";
+    return (
+      item.error ??
+      item.previewError ??
+      t("dashboard.imagePlayground.errors.inputUnusable")
+    );
   }
   return null;
 }
@@ -1534,7 +1543,7 @@ function formatUrlLabel(url: string): string {
     const parsed = new URL(url);
     return parsed.hostname;
   } catch {
-    return "Linked image";
+    return url.slice(0, 24);
   }
 }
 

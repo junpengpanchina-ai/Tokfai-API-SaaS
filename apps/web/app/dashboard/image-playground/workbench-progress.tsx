@@ -3,37 +3,28 @@
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 
-const VISION_STAGES_ZH = [
-  "已收到图片，正在读取素材信息…",
-  "正在识别商品主体、场景和卖点…",
-  "正在结合你的用途整理输出…",
-  "正在生成适合电商运营的内容…",
-  "即将完成，请稍等…",
-];
+import {
+  formatImagePlaygroundLabel,
+  imagePlaygroundLabel,
+  type ImagePlaygroundLocale,
+} from "./image-playground-labels";
 
-const VISION_STAGES_EN = [
-  "Image received — reading your asset…",
-  "Identifying subject, scene, and selling points…",
-  "Organizing output for your use case…",
-  "Drafting ecommerce-ready content…",
-  "Almost done — please wait…",
-];
+const IMAGE_STAGE_KEYS = [
+  "dashboard.imageWorkbench.imageStage1",
+  "dashboard.imageWorkbench.imageStage2",
+  "dashboard.imageWorkbench.imageStage3",
+  "dashboard.imageWorkbench.imageStage4",
+  "dashboard.imageWorkbench.imageStage5",
+  "dashboard.imageWorkbench.imageStage6",
+] as const;
 
-const IMAGE_GEN_STAGES_ZH = [
-  "已收到生成任务，正在准备参考图…",
-  "正在理解主体、风格和构图要求…",
-  "图片模型正在生成，通常需要 20～90 秒…",
-  "正在取回生成结果…",
-  "正在写入用量记录，请稍等…",
-];
-
-const IMAGE_GEN_STAGES_EN = [
-  "Task received — preparing reference images…",
-  "Understanding subject, style, and composition…",
-  "Image model is generating — usually 20–90 seconds…",
-  "Fetching the generated result…",
-  "Writing usage records — please wait…",
-];
+const VISION_STAGE_KEYS = [
+  "dashboard.imageWorkbench.visionStage1",
+  "dashboard.imageWorkbench.visionStage2",
+  "dashboard.imageWorkbench.visionStage3",
+  "dashboard.imageWorkbench.visionStage4",
+  "dashboard.imageWorkbench.visionStage5",
+] as const;
 
 export type WorkbenchProgressKind = "vision" | "image_generate";
 
@@ -44,18 +35,16 @@ export function WorkbenchProgressPanel({
   patienceHint,
 }: {
   kind: WorkbenchProgressKind;
-  locale: "en" | "zh";
+  locale: ImagePlaygroundLocale;
   title: string;
   patienceHint: string;
 }) {
-  const stages =
+  const stageKeys =
+    kind === "image_generate" ? IMAGE_STAGE_KEYS : VISION_STAGE_KEYS;
+  const stillRunningKey =
     kind === "image_generate"
-      ? locale === "zh"
-        ? IMAGE_GEN_STAGES_ZH
-        : IMAGE_GEN_STAGES_EN
-      : locale === "zh"
-        ? VISION_STAGES_ZH
-        : VISION_STAGES_EN;
+      ? "dashboard.imageWorkbench.imageStageStillRunning"
+      : "dashboard.imageWorkbench.visionStageStillRunning";
 
   const [elapsedSec, setElapsedSec] = useState(0);
   const [stageIndex, setStageIndex] = useState(0);
@@ -67,16 +56,23 @@ export function WorkbenchProgressPanel({
       setElapsedSec((n) => n + 1);
     }, 1000);
     const stage = window.setInterval(() => {
-      setStageIndex((i) => (i + 1) % stages.length);
+      setStageIndex((i) => (i + 1) % stageKeys.length);
     }, 4500);
     return () => {
       window.clearInterval(tick);
       window.clearInterval(stage);
     };
-  }, [stages.length]);
+  }, [stageKeys.length]);
 
-  const waitedLabel =
-    locale === "zh" ? `已等待 ${elapsedSec} 秒` : `Waited ${elapsedSec}s`;
+  const stageText = imagePlaygroundLabel(stageKeys[stageIndex], locale);
+  const waitedLabel = formatImagePlaygroundLabel(
+    imagePlaygroundLabel("dashboard.imageWorkbench.waitedSeconds", locale),
+    { seconds: elapsedSec }
+  );
+  const longWait =
+    elapsedSec >= 30
+      ? imagePlaygroundLabel(stillRunningKey, locale)
+      : patienceHint;
 
   return (
     <div className="flex min-h-[240px] flex-col items-center justify-center gap-4 px-4 py-8 text-center">
@@ -85,11 +81,9 @@ export function WorkbenchProgressPanel({
         <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
         {title}
       </div>
-      <p className="max-w-sm text-sm text-muted-foreground">{stages[stageIndex]}</p>
-      <p className="font-mono text-xs tabular-nums text-muted-foreground">
-        {waitedLabel}
-      </p>
-      <p className="max-w-sm text-xs text-muted-foreground">{patienceHint}</p>
+      <p className="max-w-sm text-sm text-muted-foreground">{stageText}</p>
+      <p className="text-xs tabular-nums text-muted-foreground">{waitedLabel}</p>
+      <p className="max-w-sm text-xs text-muted-foreground">{longWait}</p>
     </div>
   );
 }
@@ -102,8 +96,8 @@ export function summarizeRecognitionForCopy(
   const cleaned = fullText.replace(/\s+/g, " ").trim();
   const snippet = cleaned.slice(0, 180);
   return [
-    `识别摘要（仅供文案参考，请直接写文案，不要再拆图）：用途=${useCaseLabel}。`,
-    snippet ? `要点：${snippet}${cleaned.length > 180 ? "…" : ""}` : "",
+    `Recognition summary (for copywriting only): use case=${useCaseLabel}.`,
+    snippet ? `Highlights: ${snippet}${cleaned.length > 180 ? "…" : ""}` : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -122,12 +116,14 @@ export function distillCopyToImagePrompt(fullText: string): string {
     "";
   const bullet =
     lines.find((line) => /^[-*•]/.test(line) || /卖点|bullet/i.test(line)) ?? "";
-  const subject = titleLine.replace(/^[#*\d.、\s标题：:]+/, "").slice(0, 60);
-  const point = bullet.replace(/^[-*•\s卖点：:]+/, "").slice(0, 60);
+  const subject = titleLine.replace(/^[#*\d.、\s标题：:Title]+/i, "").slice(0, 60);
+  const point = bullet.replace(/^[-*•\s卖点：:Bullets]+/i, "").slice(0, 60);
   return [
-    subject ? `主体：${subject}` : "主体：根据参考图保留人物/商品主体",
-    point ? `卖点氛围：${point}` : "风格：电商主图，干净布光",
-    "构图：居中主体，留白适中，适合电商主图",
-    "禁止：文字水印、杂乱背景、变形肢体",
-  ].join("；");
+    subject
+      ? `Subject: ${subject}`
+      : "Subject: keep the person/product subject from the reference image",
+    point ? `Selling-point mood: ${point}` : "Style: clean ecommerce hero lighting",
+    "Composition: centered subject, moderate whitespace, ecommerce-ready",
+    "Avoid: watermarks, cluttered background, distorted limbs",
+  ].join("; ");
 }

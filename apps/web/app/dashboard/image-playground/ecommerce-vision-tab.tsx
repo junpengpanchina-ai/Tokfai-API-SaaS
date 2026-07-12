@@ -30,7 +30,6 @@ import {
 } from "@/lib/dashboard-safe/ecommerce-image-analysis";
 import {
   ensurePlaygroundApiKey,
-  PlaygroundKeyError,
 } from "@/lib/dashboard-safe/playground-default-key";
 import { isFullTokfaiApiKey } from "@/lib/dashboard-safe/constants";
 import {
@@ -208,13 +207,9 @@ export function EcommerceVisionTab({
       });
       setNeedsCreate(false);
       if (ensured.created) router.refresh();
-    } catch (err) {
+    } catch {
       setNeedsCreate(true);
-      setKeyError(
-        err instanceof DmitApiError || err instanceof PlaygroundKeyError
-          ? err.message
-          : t("dashboard.imageWorkbench.keyPrepareFailed")
-      );
+      setKeyError(t("dashboard.imageWorkbench.keyPrepareFailed"));
     } finally {
       setPreparingKey(false);
     }
@@ -612,19 +607,6 @@ export function EcommerceVisionTab({
                 >
                   {t("dashboard.imageWorkbench.simplifyRetry")}
                 </Button>
-                {requestId || technicalError ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const text = requestId ?? technicalError ?? "";
-                      void navigator.clipboard.writeText(text);
-                    }}
-                  >
-                    {t("dashboard.imageWorkbench.copyRequestId")}
-                  </Button>
-                ) : null}
                 <Button asChild type="button" size="sm" variant="outline">
                   <a href="/dashboard/usage">
                     {t("dashboard.imageWorkbench.viewUsage")}

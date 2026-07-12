@@ -530,6 +530,8 @@ export interface ImagePlaygroundGenerateActionsProps {
   copyRequestStatus: "idle" | "copied";
   layout?: "row" | "stack";
   generateLabel?: string;
+  /** Integrator-only; hidden in the default consumer flow. */
+  showApiRequestCopy?: boolean;
   onCopyApiRequest: () => void;
   t: (key: string) => string;
 }
@@ -541,6 +543,7 @@ export function ImagePlaygroundGenerateActions({
   copyRequestStatus,
   layout = "row",
   generateLabel,
+  showApiRequestCopy = false,
   onCopyApiRequest,
   t,
 }: ImagePlaygroundGenerateActionsProps) {
@@ -576,25 +579,27 @@ export function ImagePlaygroundGenerateActions({
           </>
         )}
       </Button>
-      <Button
-        type="button"
-        variant="outline"
-        disabled={loading || hasUploadingImages}
-        onClick={onCopyApiRequest}
-        className={`w-full sm:w-auto ${layout === "stack" ? "h-9" : IMAGE_PLAYGROUND_TOOLBENCH.control}`}
-      >
-        {copyRequestStatus === "copied" ? (
-          <>
-            <Check className="h-4 w-4" />
-            {t("dashboard.apiKeys.copied")}
-          </>
-        ) : (
-          <>
-            <Copy className="h-4 w-4" />
-            {t("dashboard.imagePlayground.copyApiRequest")}
-          </>
-        )}
-      </Button>
+      {showApiRequestCopy ? (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={loading || hasUploadingImages}
+          onClick={onCopyApiRequest}
+          className={`w-full sm:w-auto ${layout === "stack" ? "h-9" : IMAGE_PLAYGROUND_TOOLBENCH.control}`}
+        >
+          {copyRequestStatus === "copied" ? (
+            <>
+              <Check className="h-4 w-4" />
+              {t("dashboard.apiKeys.copied")}
+            </>
+          ) : (
+            <>
+              <Copy className="h-4 w-4" />
+              {t("dashboard.imagePlayground.copyApiRequest")}
+            </>
+          )}
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -650,8 +655,10 @@ export function ImagePlaygroundResultArea({
   const title =
     state === "loading"
       ? t("dashboard.imageWorkbench.imageProgressTitle")
-      : isReferenceEdit && state === "success"
-        ? t("dashboard.imagePlayground.referenceEditResultTitle")
+      : state === "success"
+        ? isReferenceEdit
+          ? t("dashboard.imagePlayground.referenceEditResultTitle")
+          : t("dashboard.imagePlayground.successComplete")
         : t("dashboard.imagePlayground.toolbenchResultPanelTitle");
 
   const cardClass = cn(
@@ -736,29 +743,6 @@ export function ImagePlaygroundResultArea({
                   {t("dashboard.imageWorkbench.simplifyRetry")}
                 </Button>
               ) : null}
-              {error?.requestId ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className={IMAGE_PLAYGROUND_TOOLBENCH.control}
-                  onClick={() =>
-                    copyText("image-error-request-id", error.requestId!)
-                  }
-                >
-                  {copiedId === "image-error-request-id" ? (
-                    <>
-                      <Check className="h-3.5 w-3.5" />
-                      {t("dashboard.imagePlayground.copiedRequestId")}
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-3.5 w-3.5" />
-                      {t("dashboard.imageWorkbench.copyRequestId")}
-                    </>
-                  )}
-                </Button>
-              ) : null}
               <Button
                 asChild
                 size="sm"
@@ -774,10 +758,37 @@ export function ImagePlaygroundResultArea({
               <summary className="cursor-pointer select-none font-medium text-foreground">
                 {t("dashboard.imageWorkbench.advancedInfo")}
               </summary>
-              <div className="mt-2 space-y-1 font-mono">
-                {error?.message ? <p>{error.message}</p> : null}
-                {error?.code ? <p>code: {error.code}</p> : null}
-                {error?.requestId ? <p>request_id: {error.requestId}</p> : null}
+              <div className="mt-2 space-y-2">
+                <div className="space-y-1 font-mono">
+                  {error?.message ? <p>{error.message}</p> : null}
+                  {error?.code ? <p>code: {error.code}</p> : null}
+                  {error?.requestId ? (
+                    <p>request_id: {error.requestId}</p>
+                  ) : null}
+                </div>
+                {error?.requestId ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className={IMAGE_PLAYGROUND_TOOLBENCH.control}
+                    onClick={() =>
+                      copyText("image-error-request-id", error.requestId!)
+                    }
+                  >
+                    {copiedId === "image-error-request-id" ? (
+                      <>
+                        <Check className="h-3.5 w-3.5" />
+                        {t("dashboard.imagePlayground.copiedRequestId")}
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        {t("dashboard.imageWorkbench.copyRequestId")}
+                      </>
+                    )}
+                  </Button>
+                ) : null}
               </div>
             </details>
           </div>
@@ -931,7 +942,10 @@ export function ImagePlaygroundResultArea({
                       ) : null}
                       {creditsCharged != null ? (
                         <p>
-                          charged: {formatCreditsSafe(creditsCharged)} 算力积分
+                          {formatImagePlaygroundLabel(
+                            t("dashboard.imagePlayground.successCreditsCharged"),
+                            { credits: formatCreditsSafe(creditsCharged) }
+                          )}
                         </p>
                       ) : null}
                       {completedAt ? (

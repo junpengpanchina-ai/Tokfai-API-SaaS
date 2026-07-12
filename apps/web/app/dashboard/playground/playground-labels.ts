@@ -20,7 +20,7 @@ const EN: Record<string, string> = {
   "dashboard.playground.autoKeyHint":
     "No need to pick an API key here — Tokfai uses your default active key for this test call.",
   "dashboard.playground.createExperienceKey": "Create experience key",
-  "dashboard.playground.balanceLabel": "Compute credits balance",
+  "dashboard.playground.balanceLabel": "Credits balance",
   "dashboard.playground.estimatedCostLabel": "Estimated charge",
   "dashboard.playground.estimatedCostHint": "Charged by token usage after success",
   "dashboard.playground.model": "Model",
@@ -123,7 +123,7 @@ const EN: Record<string, string> = {
   "dashboard.playground.errors.invalidOrMissingToken":
     "API key is invalid or missing. Select or create an API key.",
   "dashboard.playground.errors.insufficientCredits":
-    "Insufficient credits. Top up credits first.",
+    "Not enough credits. Add credits first.",
   "dashboard.playground.errors.modelNotFound":
     "Model not found or not available. Try another model.",
   "dashboard.playground.errors.upstreamError":
