@@ -529,6 +529,7 @@ export interface ImagePlaygroundGenerateActionsProps {
   isModelComingSoon: boolean;
   copyRequestStatus: "idle" | "copied";
   layout?: "row" | "stack";
+  generateLabel?: string;
   onCopyApiRequest: () => void;
   t: (key: string) => string;
 }
@@ -539,6 +540,7 @@ export function ImagePlaygroundGenerateActions({
   isModelComingSoon,
   copyRequestStatus,
   layout = "row",
+  generateLabel,
   onCopyApiRequest,
   t,
 }: ImagePlaygroundGenerateActionsProps) {
@@ -546,6 +548,9 @@ export function ImagePlaygroundGenerateActions({
     layout === "stack"
       ? "flex flex-col gap-2"
       : "flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center";
+
+  const submitLabel =
+    generateLabel ?? t("dashboard.imagePlayground.generate");
 
   return (
     <div className={layoutClass}>
@@ -567,7 +572,7 @@ export function ImagePlaygroundGenerateActions({
         ) : (
           <>
             <Sparkles className="h-4 w-4" />
-            {t("dashboard.imagePlayground.generate")}
+            {submitLabel}
           </>
         )}
       </Button>
@@ -607,9 +612,12 @@ export function ImagePlaygroundResultArea({
   result,
   completedAt,
   inputImagesCount,
+  requestMode = null,
+  referenceImageIncluded = false,
   attention = false,
   onRetry,
   onSimplifyRetry,
+  onStrengthenSubjectRetry,
   t,
 }: {
   loading: boolean;
@@ -617,9 +625,12 @@ export function ImagePlaygroundResultArea({
   result: ImageGenerationResponse | null;
   completedAt: string | null;
   inputImagesCount: number | null | undefined;
+  requestMode?: "text_to_image" | "reference_edit" | null;
+  referenceImageIncluded?: boolean;
   attention?: boolean;
   onRetry?: () => void;
   onSimplifyRetry?: () => void;
+  onStrengthenSubjectRetry?: () => void;
   t: (key: string) => string;
 }) {
   const { copiedId, copyText } = useImagePlaygroundCopyToClipboard();
@@ -633,10 +644,15 @@ export function ImagePlaygroundResultArea({
         ? "success"
         : "empty";
 
+  const isReferenceEdit =
+    requestMode === "reference_edit" || referenceImageIncluded;
+
   const title =
     state === "loading"
       ? t("dashboard.imageWorkbench.imageProgressTitle")
-      : t("dashboard.imagePlayground.toolbenchResultPanelTitle");
+      : isReferenceEdit && state === "success"
+        ? t("dashboard.imagePlayground.referenceEditResultTitle")
+        : t("dashboard.imagePlayground.toolbenchResultPanelTitle");
 
   const cardClass = cn(
     IMAGE_PLAYGROUND_TOOLBENCH.card,
@@ -820,6 +836,29 @@ export function ImagePlaygroundResultArea({
                     </p>
                   ) : null}
 
+                  {isReferenceEdit ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t("dashboard.imagePlayground.referenceEditResultHint")}
+                    </p>
+                  ) : null}
+
+                  {isReferenceEdit && onStrengthenSubjectRetry ? (
+                    <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm">
+                      <p className="text-muted-foreground">
+                        {t("dashboard.imagePlayground.subjectDriftHint")}
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className={`mt-2 ${IMAGE_PLAYGROUND_TOOLBENCH.control}`}
+                        onClick={onStrengthenSubjectRetry}
+                      >
+                        {t("dashboard.imagePlayground.strengthenSubjectRetry")}
+                      </Button>
+                    </div>
+                  ) : null}
+
                   <div className="flex flex-wrap gap-2">
                     <Button
                       asChild
@@ -849,10 +888,34 @@ export function ImagePlaygroundResultArea({
                       {t("dashboard.imagePlayground.technicalDetails")}
                     </summary>
                     <div className="mt-2 space-y-1 font-mono">
+                      <p>
+                        mode:{" "}
+                        {requestMode ??
+                          (referenceImageIncluded
+                            ? "reference_edit"
+                            : "text_to_image")}
+                      </p>
+                      <p>
+                        reference_image_included:{" "}
+                        {referenceImageIncluded ||
+                        (typeof inputImagesCount === "number" &&
+                          inputImagesCount > 0)
+                          ? "yes"
+                          : "no"}
+                      </p>
+                      <p>
+                        images_count:{" "}
+                        {inputImagesCount != null ? inputImagesCount : 0}
+                      </p>
                       {resolvedModel ? (
                         <p>
                           {t("dashboard.imagePlayground.metaModel")}:{" "}
                           {resolvedModel}
+                        </p>
+                      ) : null}
+                      {creditsCharged != null ? (
+                        <p>
+                          charged: {formatCreditsSafe(creditsCharged)} 算力积分
                         </p>
                       ) : null}
                       {completedAt ? (
@@ -860,9 +923,6 @@ export function ImagePlaygroundResultArea({
                           {t("dashboard.imagePlayground.metaCreatedAt")}:{" "}
                           {completedAt}
                         </p>
-                      ) : null}
-                      {inputImagesCount != null ? (
-                        <p>input_images: {inputImagesCount}</p>
                       ) : null}
                       {requestId ? (
                         <div className="flex flex-wrap items-center gap-2">

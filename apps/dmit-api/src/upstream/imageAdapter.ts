@@ -8,7 +8,7 @@ import {
 } from "./imageUrlResolver.js";
 
 const IMAGE_TO_IMAGE_PROMPT_PREFIX =
-  "Use the input image as the visual reference. Preserve the main subject unless the user explicitly asks to change it.";
+  "You are editing a reference image. Strictly preserve the same person/product subject: same face or product identity, proportions, pose, camera angle, and subject count. Do not invent a new person/product. Do not create dual-person, side-by-side comparison, or multi-version collage. Only change what the user explicitly requests. Output a single complete image.";
 
 const BASE = env.GRSAI_BASE_URL.replace(/\/+$/, "");
 

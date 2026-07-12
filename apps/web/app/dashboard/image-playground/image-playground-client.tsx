@@ -40,6 +40,7 @@ import {
 import {
   getImagePlaygroundMode,
   pickPreferredImageModel,
+  promptImpliesReferenceEdit,
   resolveImagePromptForRequest,
 } from "@/lib/dashboard-safe/image-edit-prompt";
 import {
@@ -247,6 +248,11 @@ export function ImageGeneratePanel({
   const [lastRequestInputCount, setLastRequestInputCount] = useState<
     number | null
   >(null);
+  const [lastRequestMode, setLastRequestMode] = useState<
+    "text_to_image" | "reference_edit" | null
+  >(null);
+  const [lastUserPrompt, setLastUserPrompt] = useState<string>("");
+  const [strengthenNext, setStrengthenNext] = useState(false);
   const [copyRequestStatus, setCopyRequestStatus] = useState<"idle" | "copied">(
     "idle"
   );
@@ -677,6 +683,19 @@ export function ImageGeneratePanel({
     }
 
     const imageUrlsForRequest = getReadyImageUrls(currentInputs);
+    const hasReferenceImages = imageUrlsForRequest.length > 0;
+    const wantsReferenceEdit = promptImpliesReferenceEdit(trimmedPrompt);
+
+    if (wantsReferenceEdit && !hasReferenceImages) {
+      setError({
+        status: 0,
+        code: "reference_image_required",
+        message: t("dashboard.imagePlayground.referenceImageRequired"),
+      });
+      pulseResultAttention();
+      focusResultPanel("onComplete");
+      return;
+    }
 
     let resolvedKey: string;
     try {
@@ -688,24 +707,32 @@ export function ImageGeneratePanel({
       return;
     }
 
+    const useStrengthen = strengthenNext;
+    setStrengthenNext(false);
+    setLastUserPrompt(trimmedPrompt);
+
     pulseResultAttention();
     focusResultPanel("onStart");
     setLoading(true);
     try {
+      // DMIT contract uses `image_urls` (http/https). Do not send empty arrays.
       const finalPrompt = resolveImagePromptForRequest({
         prompt: trimmedPrompt,
-        hasReferenceImages: imageUrlsForRequest.length > 0,
+        hasReferenceImages,
+        strengthen: useStrengthen,
       });
+      const requestMode = getImagePlaygroundMode(hasReferenceImages);
       const payload: Parameters<typeof imageGenerations>[1] = {
         model,
         prompt: finalPrompt,
         size,
         n: 1,
         response_format: "url",
-        image_urls: imageUrlsForRequest.length > 0 ? imageUrlsForRequest : undefined,
+        image_urls: hasReferenceImages ? imageUrlsForRequest : undefined,
       };
 
       setLastRequestInputCount(imageUrlsForRequest.length);
+      setLastRequestMode(requestMode);
       const res = await imageGenerations(resolvedKey, payload);
       setResult(res);
       setCompletedAt(
@@ -875,6 +902,11 @@ export function ImageGeneratePanel({
                     hasUploadingImages={hasUploadingImages}
                     isModelComingSoon={isModelComingSoon}
                     copyRequestStatus={copyRequestStatus}
+                    generateLabel={
+                      imageMode === "reference_edit"
+                        ? t("dashboard.imagePlayground.generateFromReference")
+                        : t("dashboard.imagePlayground.generate")
+                    }
                     onCopyApiRequest={() => void handleCopyApiRequest()}
                     t={t}
                   />
@@ -890,6 +922,11 @@ export function ImageGeneratePanel({
               isModelComingSoon={isModelComingSoon}
               copyRequestStatus={copyRequestStatus}
               layout="stack"
+              generateLabel={
+                imageMode === "reference_edit"
+                  ? t("dashboard.imagePlayground.generateFromReference")
+                  : t("dashboard.imagePlayground.generate")
+              }
               onCopyApiRequest={() => void handleCopyApiRequest()}
               t={t}
             />
@@ -907,11 +944,25 @@ export function ImageGeneratePanel({
               inputImagesCount={
                 result?.input_images_count ?? lastRequestInputCount
               }
+              requestMode={lastRequestMode}
+              referenceImageIncluded={
+                lastRequestMode === "reference_edit" ||
+                (lastRequestInputCount != null && lastRequestInputCount > 0)
+              }
               attention={resultAttention || loading}
               onRetry={() => formRef.current?.requestSubmit()}
               onSimplifyRetry={() => {
                 setPrompt((prev) => prev.trim().slice(0, 80));
                 setError(null);
+              }}
+              onStrengthenSubjectRetry={() => {
+                if (lastUserPrompt.trim()) {
+                  setPrompt(lastUserPrompt);
+                }
+                setStrengthenNext(true);
+                window.setTimeout(() => {
+                  formRef.current?.requestSubmit();
+                }, 0);
               }}
               t={t}
             />
