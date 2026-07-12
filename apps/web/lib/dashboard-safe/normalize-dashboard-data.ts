@@ -65,6 +65,7 @@ export function normalizeDashboardOverviewActivity(
   const row = asRecord(raw);
   const totalTokens = Number(row.total_tokens);
   const creditsCharged = Number(row.credits_charged);
+  const kind = row.kind === "image" ? "image" : "chat";
 
   return {
     id: safeDashboardString(row.id) || `activity-${index}`,
@@ -83,6 +84,13 @@ export function normalizeDashboardOverviewActivity(
           : safeDashboardString(row.status) || null,
     total_tokens: Number.isFinite(totalTokens) ? totalTokens : null,
     credits_charged: Number.isFinite(creditsCharged) ? creditsCharged : null,
+    request_id:
+      typeof row.request_id === "string"
+        ? row.request_id
+        : row.request_id == null
+          ? null
+          : safeDashboardString(row.request_id) || null,
+    kind,
   };
 }
 

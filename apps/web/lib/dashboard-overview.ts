@@ -66,7 +66,7 @@ export async function loadDashboardOverviewData(
       supabase
         .from("usage_logs")
         .select(
-          "id, created_at, model, status, total_tokens, credits_charged"
+          "id, created_at, model, status, total_tokens, credits_charged, request_id"
         )
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
@@ -139,6 +139,8 @@ function mapRecentActivity(rows: UsageLogRow[]): DashboardOverviewActivity[] {
     total_tokens: row.total_tokens,
     credits_charged:
       row.credits_charged != null ? toNumber(row.credits_charged) : null,
+    request_id: row.request_id ?? null,
+    kind: dashboardGetUsageKind(row.model),
   }));
 }
 

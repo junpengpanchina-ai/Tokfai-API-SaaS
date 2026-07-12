@@ -22,15 +22,27 @@ const IMAGE_MODELS: ImagePlaygroundModelOption[] = [
     status: "available",
   },
   {
-    id: "gpt-image-2",
-    displayName: "GPT Image 2",
-    creditsPerRequest: 600,
-    status: "available",
-  },
-  {
     id: "nano-banana",
     displayName: "Nano Banana",
     creditsPerRequest: 1400,
+    status: "available",
+  },
+  {
+    id: "nano-banana-2",
+    displayName: "Nano Banana 2",
+    creditsPerRequest: 1200,
+    status: "available",
+  },
+  {
+    id: "nano-banana-pro",
+    displayName: "Nano Banana Pro",
+    creditsPerRequest: 1800,
+    status: "available",
+  },
+  {
+    id: "gpt-image-2",
+    displayName: "GPT Image 2",
+    creditsPerRequest: 600,
     status: "available",
   },
 ];

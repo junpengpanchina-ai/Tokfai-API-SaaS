@@ -34,18 +34,23 @@ import {
   type ImageGenerationResponse,
 } from "@/lib/dashboard-safe/image-api";
 import {
-  createApiKey,
-  revealMeApiKey,
-} from "@/lib/dashboard-safe/api-keys-client";
+  ensurePlaygroundApiKey,
+  PlaygroundKeyError,
+} from "@/lib/dashboard-safe/playground-default-key";
+import {
+  getImagePlaygroundMode,
+  pickPreferredImageModel,
+  resolveImagePromptForRequest,
+} from "@/lib/dashboard-safe/image-edit-prompt";
 import {
   imagePlaygroundErrorMessage,
   resolveImageCreatedAt,
-  setDashboardApiKeySecret,
 } from "./image-playground-display-helpers";
 import {
   getImageModelCreditsPerRequest,
   getImageModelOptionById,
   IMAGE_PLAYGROUND_DEFAULT_MODEL,
+  IMAGE_PLAYGROUND_MODEL_IDS,
   isAvailableImageModel,
   type ImagePlaygroundModelId,
   type ImagePlaygroundSize,
@@ -77,8 +82,6 @@ import {
 
 const DEFAULT_MODEL: ImagePlaygroundModelId = IMAGE_PLAYGROUND_DEFAULT_MODEL;
 const DEFAULT_SIZE: ImagePlaygroundSize = "1024x1024";
-const REVEAL_KEY_TIMEOUT_MS = 30_000;
-const PLAYGROUND_TEST_KEY_NAME = "playground-test";
 
 function resolveInitialModel(initialModel?: string): ImagePlaygroundModelId {
   if (initialModel && isAvailableImageModel(initialModel)) {
@@ -87,33 +90,14 @@ function resolveInitialModel(initialModel?: string): ImagePlaygroundModelId {
   return DEFAULT_MODEL;
 }
 
-function firstActiveKeyId(keys: ImagePlaygroundApiKeyOption[]): string {
-  return keys[0]?.id ?? "";
-}
-
-function playgroundTestKeyNameWithDate(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${PLAYGROUND_TEST_KEY_NAME}-${y}${m}${day}`;
-}
-
-function meKeyToPlaygroundOption(
-  apiKey: {
-    id: string;
-    name: string;
-    prefix: string;
-    status: string;
-    can_reveal?: boolean;
-  }
-): ImagePlaygroundApiKeyOption {
+function toPlaygroundKeyOption(
+  key: ImagePlaygroundApiKeyOption
+): { id: string; name: string; prefix: string; can_reveal: boolean } {
   return {
-    id: apiKey.id,
-    name: apiKey.name,
-    prefix: apiKey.prefix,
-    status: apiKey.status,
-    can_reveal: apiKey.can_reveal,
+    id: key.id,
+    name: key.name,
+    prefix: key.prefix,
+    can_reveal: key.can_reveal !== false,
   };
 }
 
@@ -131,8 +115,6 @@ interface PlaygroundError {
   message: string;
   requestId?: string;
 }
-
-type KeyPanelView = "select" | "paste" | "empty";
 
 type ImageInputSource = "upload" | "url";
 
@@ -233,26 +215,20 @@ export function ImagePlaygroundClient({
 
   const [localKeys, setLocalKeys] =
     useState<ImagePlaygroundApiKeyOption[]>(activeKeys);
-  const [sessionSecrets, setSessionSecrets] = useState<Record<string, string>>(
-    {}
+  const [resolvedSecret, setResolvedSecret] = useState<string | null>(null);
+  const [preferredKeyId, setPreferredKeyId] = useState<string | null>(
+    activeKeys[0]?.id ?? null
   );
-  const [keyPanelView, setKeyPanelView] = useState<KeyPanelView>(() =>
-    activeKeys.length > 0 ? "select" : "empty"
-  );
-  const [createdBannerKeyId, setCreatedBannerKeyId] = useState<string | null>(
-    null
-  );
-  const [creatingKey, setCreatingKey] = useState(false);
+  const [preparingKey, setPreparingKey] = useState(false);
   const [createKeyError, setCreateKeyError] = useState<string | null>(null);
+  const [needsManualCreate, setNeedsManualCreate] = useState(
+    () => activeKeys.length === 0
+  );
+  const [warnFastForEdit, setWarnFastForEdit] = useState(false);
 
   const [model, setModel] = useState(() => resolveInitialModel(initialModel));
   const [size, setSize] = useState<ImagePlaygroundSize>(DEFAULT_SIZE);
   const [prompt, setPrompt] = useState(IMAGE_PLAYGROUND_DEFAULT_PROMPT);
-  const [apiKey, setApiKey] = useState("");
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [selectedKeyId, setSelectedKeyId] = useState(() =>
-    firstActiveKeyId(activeKeys)
-  );
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImageGenerationResponse | null>(null);
   const [completedAt, setCompletedAt] = useState<string | null>(null);
@@ -271,13 +247,15 @@ export function ImagePlaygroundClient({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const readyImageUrls = getReadyImageUrls(imageInputs);
+  const imageMode = getImagePlaygroundMode(readyImageUrls.length > 0);
 
   useEffect(() => {
     setLocalKeys(activeKeys);
-    if (activeKeys.length > 0 && keyPanelView === "empty") {
-      setKeyPanelView("select");
+    if (activeKeys.length > 0) {
+      setNeedsManualCreate(false);
+      setPreferredKeyId((prev) => prev ?? activeKeys[0].id);
     }
-  }, [activeKeys, keyPanelView]);
+  }, [activeKeys]);
 
   useEffect(() => {
     return () => {
@@ -303,35 +281,110 @@ export function ImagePlaygroundClient({
     });
   }
 
-  useEffect(() => {
-    if (
-      localKeys.length > 0 &&
-      !localKeys.some((row) => row.id === selectedKeyId)
-    ) {
-      setSelectedKeyId(localKeys[0].id);
-    }
-  }, [localKeys, selectedKeyId]);
+  const prevHadReferenceRef = useRef(false);
 
-  const selectedKey = useMemo(
-    () => localKeys.find((row) => row.id === selectedKeyId) ?? null,
-    [localKeys, selectedKeyId]
-  );
+  useEffect(() => {
+    const hasReference = readyImageUrls.length > 0;
+    const enteredReference = hasReference && !prevHadReferenceRef.current;
+    prevHadReferenceRef.current = hasReference;
+
+    const picked = pickPreferredImageModel({
+      hasReferenceImages: hasReference,
+      availableModelIds: IMAGE_PLAYGROUND_MODEL_IDS,
+      currentModel: model,
+    });
+
+    if (enteredReference && picked.switched && picked.model !== model) {
+      setModel(picked.model);
+      setWarnFastForEdit(false);
+      return;
+    }
+
+    setWarnFastForEdit(hasReference && picked.warnFastForEdit);
+  }, [readyImageUrls.length, model]);
 
   const selectedModelEntry = getImageModelOptionById(model);
   const isModelComingSoon = selectedModelEntry?.status === "coming_soon";
 
-  const createdSecret =
-    createdBannerKeyId != null
-      ? (sessionSecrets[createdBannerKeyId] ?? null)
-      : null;
-
   const hasInputImages = imageInputs.some((item) => item.status !== "error");
   const isImageToImage = hasInputImages;
-  const promptPlaceholder = isImageToImage
-    ? IMAGE_PLAYGROUND_IMAGE_TO_IMAGE_PLACEHOLDER
-    : IMAGE_PLAYGROUND_TEXT_TO_IMAGE_PLACEHOLDER;
+  const promptPlaceholder =
+    imageMode === "reference_edit"
+      ? t("dashboard.imagePlayground.modeReferenceHint")
+      : t("dashboard.imagePlayground.modeTextHint");
 
   const selectedModelCredits = getImageModelCreditsPerRequest(model);
+
+  async function prepareDefaultKey(forceCreate = false) {
+    if (!accessToken || preparingKey) return;
+    setPreparingKey(true);
+    setCreateKeyError(null);
+    try {
+      const ensured = await ensurePlaygroundApiKey({
+        accessToken,
+        activeKeys: forceCreate ? [] : localKeys.map(toPlaygroundKeyOption),
+        preferredKeyId,
+        sessionSecrets:
+          resolvedSecret && preferredKeyId
+            ? { [preferredKeyId]: resolvedSecret }
+            : {},
+      });
+      setResolvedSecret(ensured.secret);
+      setPreferredKeyId(ensured.keyId);
+      setLocalKeys((prev) => {
+        const next: ImagePlaygroundApiKeyOption = {
+          id: ensured.key.id,
+          name: ensured.key.name,
+          prefix: ensured.key.prefix,
+          status: "active",
+          can_reveal: ensured.key.can_reveal,
+        };
+        const without = prev.filter((row) => row.id !== next.id);
+        return [next, ...without];
+      });
+      setNeedsManualCreate(false);
+      if (ensured.created) router.refresh();
+    } catch (err) {
+      setNeedsManualCreate(true);
+      setCreateKeyError(
+        err instanceof DmitApiError
+          ? imagePlaygroundErrorMessage(err.status, err.code, t)
+          : err instanceof PlaygroundKeyError
+            ? err.message
+            : t("dashboard.imagePlayground.errors.unknown")
+      );
+    } finally {
+      setPreparingKey(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!accessToken || resolvedSecret) return;
+    void prepareDefaultKey(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount / token only
+  }, [accessToken]);
+
+  async function resolveApiKey(): Promise<string> {
+    if (resolvedSecret && isFullTokfaiApiKey(resolvedSecret)) {
+      return resolvedSecret;
+    }
+    if (!accessToken) {
+      throw new PlaygroundValidationError(
+        t("dashboard.imagePlayground.errors.unknown"),
+        "missing_access_token"
+      );
+    }
+    const ensured = await ensurePlaygroundApiKey({
+      accessToken,
+      activeKeys: localKeys.map(toPlaygroundKeyOption),
+      preferredKeyId,
+    });
+    setResolvedSecret(ensured.secret);
+    setPreferredKeyId(ensured.keyId);
+    setNeedsManualCreate(false);
+    if (ensured.created) router.refresh();
+    return ensured.secret;
+  }
 
   const hasUploadingImages = imageInputs.some(
     (item) => item.status === "uploading" || item.status === "resolving"
@@ -517,69 +570,9 @@ export function ImagePlaygroundClient({
     });
   }, []);
 
-  async function handleCreateTestKey() {
-    if (creatingKey) return;
-    if (!accessToken) {
-      setCreateKeyError(t("dashboard.imagePlayground.errors.unknown"));
-      return;
-    }
-
-    setCreatingKey(true);
-    setCreateKeyError(null);
-
-    try {
-      let keyResult;
-      try {
-        keyResult = await createApiKey(
-          { name: PLAYGROUND_TEST_KEY_NAME },
-          { accessToken }
-        );
-      } catch (err) {
-        if (err instanceof DmitApiError && err.status === 409) {
-          keyResult = await createApiKey(
-            { name: playgroundTestKeyNameWithDate() },
-            { accessToken }
-          );
-        } else {
-          throw err;
-        }
-      }
-
-      const listItem = meKeyToPlaygroundOption(keyResult.api_key);
-      setSessionSecrets((prev) => ({
-        ...prev,
-        [listItem.id]: keyResult.secret,
-      }));
-      setDashboardApiKeySecret(keyResult.secret, keyResult.api_key.id);
-      setLocalKeys((prev) => {
-        const without = prev.filter((row) => row.id !== listItem.id);
-        return [listItem, ...without];
-      });
-      setSelectedKeyId(listItem.id);
-      setCreatedBannerKeyId(listItem.id);
-      setKeyPanelView("select");
-      router.refresh();
-    } catch (err) {
-      setCreateKeyError(
-        err instanceof DmitApiError
-          ? imagePlaygroundErrorMessage(err.status, err.code, t)
-          : t("dashboard.imagePlayground.errors.unknown")
-      );
-    } finally {
-      setCreatingKey(false);
-    }
-  }
-
   function resolveApiKeyForCopy(): string | undefined {
-    if (keyPanelView === "paste") {
-      const trimmed = apiKey.trim();
-      return isFullTokfaiApiKey(trimmed) ? trimmed : undefined;
-    }
-    if (selectedKey) {
-      const sessionSecret = sessionSecrets[selectedKey.id];
-      if (sessionSecret && isFullTokfaiApiKey(sessionSecret)) {
-        return sessionSecret;
-      }
+    if (resolvedSecret && isFullTokfaiApiKey(resolvedSecret)) {
+      return resolvedSecret;
     }
     return undefined;
   }
@@ -669,13 +662,17 @@ export function ImagePlaygroundClient({
     focusResultPanel("onStart");
     setLoading(true);
     try {
+      const finalPrompt = resolveImagePromptForRequest({
+        prompt: trimmedPrompt,
+        hasReferenceImages: imageUrlsForRequest.length > 0,
+      });
       const payload: Parameters<typeof imageGenerations>[1] = {
         model,
-        prompt: trimmedPrompt,
+        prompt: finalPrompt,
         size,
         n: 1,
         response_format: "url",
-        image_urls: imageUrlsForRequest,
+        image_urls: imageUrlsForRequest.length > 0 ? imageUrlsForRequest : undefined,
       };
 
       setLastRequestInputCount(imageUrlsForRequest.length);
@@ -693,86 +690,6 @@ export function ImagePlaygroundClient({
       pulseResultAttention();
       focusResultPanel("onComplete");
     }
-  }
-
-  async function revealApiKeyWithTimeout(
-    keyId: string,
-    token: string
-  ): Promise<string> {
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    try {
-      return await Promise.race([
-        revealMeApiKey(keyId, { accessToken: token }),
-        new Promise<string>((_, reject) => {
-          timeoutId = setTimeout(() => {
-            reject(
-              new PlaygroundValidationError(
-                t("dashboard.playground.apiKeyLoadTimedOut"),
-                "key_reveal_timeout"
-              )
-            );
-          }, REVEAL_KEY_TIMEOUT_MS);
-        }),
-      ]);
-    } finally {
-      if (timeoutId !== undefined) {
-        clearTimeout(timeoutId);
-      }
-    }
-  }
-
-  async function resolveApiKey(): Promise<string> {
-    if (keyPanelView === "paste") {
-      const trimmed = apiKey.trim();
-      if (!trimmed) {
-        throw new PlaygroundValidationError(
-          t("dashboard.imagePlayground.errors.missingToken"),
-          "missing_api_key"
-        );
-      }
-      if (!isFullTokfaiApiKey(trimmed)) {
-        throw new PlaygroundValidationError(
-          t("dashboard.imagePlayground.errors.invalidToken"),
-          "invalid_api_key"
-        );
-      }
-      return trimmed;
-    }
-
-    if (keyPanelView === "empty" || !selectedKey) {
-      throw new PlaygroundValidationError(
-        t("dashboard.imagePlayground.errors.missingToken"),
-        "missing_api_key"
-      );
-    }
-
-    const sessionSecret = sessionSecrets[selectedKey.id];
-    if (sessionSecret && isFullTokfaiApiKey(sessionSecret)) {
-      return sessionSecret;
-    }
-
-    if (selectedKey.can_reveal === false) {
-      throw new PlaygroundValidationError(
-        t("dashboard.imagePlayground.errors.keyNotRetrievable"),
-        "key_not_revealable"
-      );
-    }
-
-    if (!accessToken) {
-      throw new PlaygroundValidationError(
-        t("dashboard.imagePlayground.errors.unknown"),
-        "missing_access_token"
-      );
-    }
-
-    const secret = await revealApiKeyWithTimeout(selectedKey.id, accessToken);
-    if (!isFullTokfaiApiKey(secret)) {
-      throw new PlaygroundValidationError(
-        t("dashboard.imagePlayground.errors.keyNotRetrievable"),
-        "key_not_revealable"
-      );
-    }
-    return secret;
   }
 
   return (
@@ -807,23 +724,41 @@ export function ImagePlaygroundClient({
       <div className={IMAGE_PLAYGROUND_TOOLBENCH.shell}>
         <div className={IMAGE_PLAYGROUND_TOOLBENCH.grid}>
           <div className="order-1 min-w-0 lg:col-start-2 lg:row-start-1">
+            {(needsManualCreate || createKeyError || preparingKey) && !resolvedSecret ? (
+              <div className="mb-3 flex flex-col gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+                <p className="text-sm text-muted-foreground">
+                  {createKeyError ?? t("dashboard.imagePlayground.noKeyBody")}
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={preparingKey || loading || !accessToken}
+                  onClick={() => void prepareDefaultKey(true)}
+                >
+                  {preparingKey
+                    ? t("dashboard.imagePlayground.creatingKey")
+                    : t("dashboard.imagePlayground.createExperienceKey")}
+                </Button>
+              </div>
+            ) : null}
             <ImagePlaygroundRunSettingsPanel
-              keyPanelView={keyPanelView}
+              hideApiKeyUi
+              keyPanelView="select"
               localKeys={localKeys}
-              selectedKey={selectedKey}
-              selectedKeyId={selectedKeyId}
-              apiKey={apiKey}
-              showApiKey={showApiKey}
-              creatingKey={creatingKey}
+              selectedKey={localKeys[0] ?? null}
+              selectedKeyId={preferredKeyId ?? ""}
+              apiKey=""
+              showApiKey={false}
+              creatingKey={preparingKey}
               createKeyError={createKeyError}
-              createdSecret={createdSecret}
-              createdBannerKeyId={createdBannerKeyId}
+              createdSecret={null}
+              createdBannerKeyId={null}
               loading={loading}
-              onCreateTestKey={handleCreateTestKey}
-              onKeyPanelViewChange={setKeyPanelView}
-              onSelectedKeyChange={setSelectedKeyId}
-              onApiKeyChange={setApiKey}
-              onShowApiKeyChange={setShowApiKey}
+              onCreateTestKey={() => void prepareDefaultKey(true)}
+              onKeyPanelViewChange={() => {}}
+              onSelectedKeyChange={() => {}}
+              onApiKeyChange={() => {}}
+              onShowApiKeyChange={() => {}}
               model={model}
               size={size}
               creditsBalance={initialCreditsBalance}
@@ -833,6 +768,7 @@ export function ImagePlaygroundClient({
               locale={locale}
               onModelChange={setModel}
               onSizeChange={setSize}
+              warnFastForEdit={warnFastForEdit}
               t={t}
             />
           </div>
@@ -844,10 +780,10 @@ export function ImagePlaygroundClient({
                   <CardTitle className={IMAGE_PLAYGROUND_TOOLBENCH.cardTitle}>
                     {t("dashboard.imagePlayground.toolbenchInputTitle")}
                   </CardTitle>
-                  <Badge variant={isImageToImage ? "default" : "secondary"} className="text-[10px]">
-                    {isImageToImage
-                      ? t("dashboard.imagePlayground.imageToImage")
-                      : t("dashboard.imagePlayground.textToImage")}
+                  <Badge variant={imageMode === "reference_edit" ? "default" : "secondary"} className="text-[10px]">
+                    {imageMode === "reference_edit"
+                      ? t("dashboard.imagePlayground.modeReference")
+                      : t("dashboard.imagePlayground.modeText")}
                   </Badge>
                 </div>
               </CardHeader>
@@ -872,6 +808,12 @@ export function ImagePlaygroundClient({
                   placeholder={promptPlaceholder}
                   className="flex h-28 min-h-[7rem] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                 />
+
+                <p className="text-xs text-muted-foreground">
+                  {imageMode === "reference_edit"
+                    ? t("dashboard.imagePlayground.modeReferenceHint")
+                    : t("dashboard.imagePlayground.modeTextHint")}
+                </p>
 
                 <ImageInputsPanel
                   embedded

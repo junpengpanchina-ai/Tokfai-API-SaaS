@@ -18,6 +18,15 @@ const EXTRA_FILES = [
   join(process.cwd(), "components", "usage-view-client.tsx"),
   join(process.cwd(), "components", "credits-content-client.tsx"),
   join(process.cwd(), "components", "auth-success-toast.tsx"),
+  join(process.cwd(), "lib", "dashboard-safe", "nav.ts"),
+];
+
+/** Always include these trees so dynamic t(item.labelKey) never leaks raw keys. */
+const ALWAYS_INCLUDE_PREFIXES = [
+  "nav.",
+  "dashboard.overview.",
+  "dashboard.announcements.",
+  "common.",
 ];
 
 function walkFiles(dir: string, acc: string[] = []): string[] {
@@ -39,9 +48,39 @@ function walkFiles(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
-function collectTranslationKeys(): Set<string> {
+function flattenTree(
+  tree: Record<string, unknown>,
+  prefix = "",
+  out: string[] = []
+): string[] {
+  for (const [key, value] of Object.entries(tree)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (typeof value === "string") {
+      out.push(path);
+    } else if (value && typeof value === "object" && !Array.isArray(value)) {
+      flattenTree(value as Record<string, unknown>, path, out);
+    }
+  }
+  return out;
+}
+
+function collectAlwaysIncludedKeys(): Set<string> {
   const keys = new Set<string>();
+  for (const locale of ["en", "zh"] as const) {
+    const root = messages[locale] as Record<string, unknown>;
+    for (const path of flattenTree(root)) {
+      if (ALWAYS_INCLUDE_PREFIXES.some((prefix) => path.startsWith(prefix))) {
+        keys.add(path);
+      }
+    }
+  }
+  return keys;
+}
+
+function collectTranslationKeys(): Set<string> {
+  const keys = collectAlwaysIncludedKeys();
   const keyPattern = /\bt\(\s*["'`]([^"'`]+)["'`]/g;
+  const labelKeyPattern = /labelKey:\s*["'`]([^"'`]+)["'`]/g;
 
   const files = [
     ...SCAN_ROOTS.flatMap((root) => walkFiles(root)),
@@ -51,6 +90,9 @@ function collectTranslationKeys(): Set<string> {
   for (const file of files) {
     const content = readFileSync(file, "utf8");
     for (const match of content.matchAll(keyPattern)) {
+      keys.add(match[1]);
+    }
+    for (const match of content.matchAll(labelKeyPattern)) {
       keys.add(match[1]);
     }
   }

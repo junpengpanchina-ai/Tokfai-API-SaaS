@@ -305,9 +305,14 @@ function ImagePlaygroundSettingsKeySection({
 
 export interface ImagePlaygroundRunSettingsPanelProps
   extends ImagePlaygroundCompactKeyRowProps,
-    ImagePlaygroundSettingsSidebarProps {}
+    ImagePlaygroundSettingsSidebarProps {
+  hideApiKeyUi?: boolean;
+  warnFastForEdit?: boolean;
+}
 
 export function ImagePlaygroundRunSettingsPanel({
+  hideApiKeyUi = false,
+  warnFastForEdit = false,
   keyPanelView,
   localKeys,
   selectedKey,
@@ -378,25 +383,27 @@ export function ImagePlaygroundRunSettingsPanel({
         </CardTitle>
       </CardHeader>
       <CardContent className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex flex-col gap-3`}>
-        <ImagePlaygroundSettingsKeySection
-          keyPanelView={keyPanelView}
-          localKeys={localKeys}
-          selectedKey={selectedKey}
-          selectedKeyId={selectedKeyId}
-          apiKey={apiKey}
-          showApiKey={showApiKey}
-          creatingKey={creatingKey}
-          createKeyError={createKeyError}
-          createdSecret={createdSecret}
-          createdBannerKeyId={createdBannerKeyId}
-          loading={loading}
-          onCreateTestKey={onCreateTestKey}
-          onKeyPanelViewChange={onKeyPanelViewChange}
-          onSelectedKeyChange={onSelectedKeyChange}
-          onApiKeyChange={onApiKeyChange}
-          onShowApiKeyChange={onShowApiKeyChange}
-          t={t}
-        />
+        {hideApiKeyUi ? null : (
+          <ImagePlaygroundSettingsKeySection
+            keyPanelView={keyPanelView}
+            localKeys={localKeys}
+            selectedKey={selectedKey}
+            selectedKeyId={selectedKeyId}
+            apiKey={apiKey}
+            showApiKey={showApiKey}
+            creatingKey={creatingKey}
+            createKeyError={createKeyError}
+            createdSecret={createdSecret}
+            createdBannerKeyId={createdBannerKeyId}
+            loading={loading}
+            onCreateTestKey={onCreateTestKey}
+            onKeyPanelViewChange={onKeyPanelViewChange}
+            onSelectedKeyChange={onSelectedKeyChange}
+            onApiKeyChange={onApiKeyChange}
+            onShowApiKeyChange={onShowApiKeyChange}
+            t={t}
+          />
+        )}
 
         <div className="flex items-start justify-between gap-3 border-t pt-3">
           <div className="min-w-0 flex-1">
@@ -461,6 +468,11 @@ export function ImagePlaygroundRunSettingsPanel({
             {isModelComingSoon ? (
               <p className="text-[11px] font-medium text-destructive">
                 {t("dashboard.imagePlayground.modelComingSoon")}
+              </p>
+            ) : null}
+            {warnFastForEdit ? (
+              <p className="text-[11px] leading-snug text-amber-700 dark:text-amber-400">
+                {t("dashboard.imagePlayground.fastModelEditHint")}
               </p>
             ) : null}
           </div>
@@ -739,49 +751,8 @@ export function ImagePlaygroundResultArea({
                   ) : null}
 
                   <div className="flex flex-col gap-2 text-sm">
-                    {requestId ? (
-                      <div className="flex flex-col gap-2">
-                        <p className="text-xs text-muted-foreground">
-                          {t("dashboard.imagePlayground.successReconcileHint")}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <code className="max-w-full truncate rounded bg-muted px-2 py-0.5 font-mono text-xs">
-                            {requestId}
-                          </code>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className={`h-8 ${IMAGE_PLAYGROUND_TOOLBENCH.control}`}
-                            onClick={() => copyText(requestCopyId, requestId)}
-                          >
-                            {copiedId === requestCopyId ? (
-                              <>
-                                <Check className="h-3.5 w-3.5" />
-                                {t("dashboard.imagePlayground.copiedRequestId")}
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="h-3.5 w-3.5" />
-                                {t("dashboard.imagePlayground.copyRequestId")}
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            asChild
-                            size="sm"
-                            variant="outline"
-                            className={IMAGE_PLAYGROUND_TOOLBENCH.control}
-                          >
-                            <Link href={IMAGE_API_DOCS_HREF}>
-                              {t("dashboard.imagePlayground.viewImageApiDocs")}
-                            </Link>
-                          </Button>
-                        </div>
-                      </div>
-                    ) : null}
                     {creditsCharged != null ? (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm font-medium">
                         {formatImagePlaygroundLabel(
                           t("dashboard.imagePlayground.successCreditsCharged"),
                           { credits: formatCreditsSafe(creditsCharged) }
@@ -789,16 +760,56 @@ export function ImagePlaygroundResultArea({
                       </p>
                     ) : null}
                     {resolvedModel ? (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm text-muted-foreground">
                         {t("dashboard.imagePlayground.metaModel")}:{" "}
                         <span className="font-mono text-foreground">
                           {resolvedModel}
                         </span>
                       </p>
                     ) : null}
+                    {requestId ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          request_id
+                        </span>
+                        <code className="max-w-full truncate rounded bg-muted px-2 py-0.5 font-mono text-xs">
+                          {requestId}
+                        </code>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className={`h-8 ${IMAGE_PLAYGROUND_TOOLBENCH.control}`}
+                          onClick={() => copyText(requestCopyId, requestId)}
+                        >
+                          {copiedId === requestCopyId ? (
+                            <>
+                              <Check className="h-3.5 w-3.5" />
+                              {t("dashboard.imagePlayground.copiedRequestId")}
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3.5 w-3.5" />
+                              {t("dashboard.imagePlayground.copyRequestId")}
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="flex flex-wrap gap-2">
+                    {requestId ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className={IMAGE_PLAYGROUND_TOOLBENCH.control}
+                        onClick={() => copyText(requestCopyId, requestId)}
+                      >
+                        {t("dashboard.imagePlayground.copyRequestId")}
+                      </Button>
+                    ) : null}
                     <Button
                       asChild
                       size="sm"
@@ -809,26 +820,36 @@ export function ImagePlaygroundResultArea({
                         {t("dashboard.imagePlayground.viewUsage")}
                       </Link>
                     </Button>
-                    <Button
-                      asChild
-                      size="sm"
-                      variant="outline"
-                      className={IMAGE_PLAYGROUND_TOOLBENCH.control}
-                    >
-                      <Link href="/dashboard/credits">
-                        {t("dashboard.imagePlayground.viewCredits")}
-                      </Link>
-                    </Button>
+                    {onRetry ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className={IMAGE_PLAYGROUND_TOOLBENCH.control}
+                        onClick={onRetry}
+                      >
+                        <RotateCw className="h-4 w-4" />
+                        {t("dashboard.imagePlayground.continueGenerate")}
+                      </Button>
+                    ) : null}
                   </div>
 
-                  {completedAt ? (
-                    <p className="text-xs text-muted-foreground">
-                      {t("dashboard.imagePlayground.metaCreatedAt")}: {completedAt}
-                      {inputImagesCount != null
-                        ? ` · ${inputImagesCount} input(s)`
-                        : ""}
-                    </p>
-                  ) : null}
+                  <details className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                    <summary className="cursor-pointer select-none font-medium text-foreground">
+                      {t("dashboard.imagePlayground.technicalDetails")}
+                    </summary>
+                    <div className="mt-2 space-y-1 font-mono">
+                      {completedAt ? (
+                        <p>
+                          {t("dashboard.imagePlayground.metaCreatedAt")}:{" "}
+                          {completedAt}
+                        </p>
+                      ) : null}
+                      {inputImagesCount != null ? (
+                        <p>input_images: {inputImagesCount}</p>
+                      ) : null}
+                      {requestId ? <p>request_id: {requestId}</p> : null}
+                    </div>
+                  </details>
                 </>
               );
             })()}

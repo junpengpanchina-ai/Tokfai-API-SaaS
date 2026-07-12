@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 
 import { loginPathWithNext } from "@/lib/auth/login-redirect";
 import { dmitServerFetch } from "@/lib/dmit/server";
+import { loadDashboardShellCredits } from "@/lib/load-dashboard-shell-credits";
 import { loadDashboardPageSession, rethrowIfNextNavigation } from "@/lib/dashboard-safe/server-session";
+import { EMPTY_SHELL_CREDITS } from "@/lib/dashboard-safe/shell-credits";
 
 import {
   PlaygroundClient,
@@ -32,6 +34,8 @@ export default async function PlaygroundPage({
           accessToken=""
           activeKeys={[]}
           initialModel={searchParams?.model}
+          initialCreditsBalance={EMPTY_SHELL_CREDITS.balance}
+          creditsLoaded={false}
         />
       );
     }
@@ -42,10 +46,16 @@ export default async function PlaygroundPage({
 
     const accessToken = session?.access_token ?? "";
     let activeKeys: PlaygroundApiKeyOption[] = [];
+    let shellCredits = EMPTY_SHELL_CREDITS;
     try {
       activeKeys = accessToken ? await loadActiveKeys(accessToken) : [];
     } catch (err) {
       console.error("[dashboard-ssr-fail-open]", "playground/activeKeys", err);
+    }
+    try {
+      shellCredits = await loadDashboardShellCredits(user.id);
+    } catch (err) {
+      console.error("[dashboard-ssr-fail-open]", "playground/credits", err);
     }
 
     return (
@@ -53,6 +63,8 @@ export default async function PlaygroundPage({
         accessToken={accessToken}
         activeKeys={activeKeys}
         initialModel={searchParams?.model}
+        initialCreditsBalance={shellCredits.balance}
+        creditsLoaded={shellCredits.loaded}
       />
     );
   } catch (err) {
@@ -63,6 +75,8 @@ export default async function PlaygroundPage({
         accessToken=""
         activeKeys={[]}
         initialModel={searchParams?.model}
+        initialCreditsBalance={EMPTY_SHELL_CREDITS.balance}
+        creditsLoaded={false}
       />
     );
   }

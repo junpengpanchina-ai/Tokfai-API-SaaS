@@ -8,13 +8,21 @@ const EN: Record<string, string> = {
   "common.imagePlayground": "Image Playground",
   "dashboard.usage.copyRequestId": "Copy request ID",
   "dashboard.usage.copiedRequestId": "Copied",
-  "dashboard.playground.title": "Playground",
+  "dashboard.playground.title": "Chat",
   "dashboard.playground.subtitle":
-    "Choose a model, send a test request, and verify the Tokfai API works.",
+    "Pick a model, type a message, and send — your default API key is used automatically.",
   "dashboard.playground.forImageModels": "For image models, use",
   "dashboard.playground.request": "Test request",
   "dashboard.playground.requestDesc":
     "Select or create an API key, pick a chat model, and send one non-streaming message.",
+  "dashboard.playground.requestDescSimple":
+    "Choose a model, enter a prompt, and send. Billing uses your own API key automatically.",
+  "dashboard.playground.autoKeyHint":
+    "No need to pick an API key here — Tokfai uses your default active key for this test call.",
+  "dashboard.playground.createExperienceKey": "Create experience key",
+  "dashboard.playground.balanceLabel": "Compute credits balance",
+  "dashboard.playground.estimatedCostLabel": "Estimated charge",
+  "dashboard.playground.estimatedCostHint": "Charged by token usage after success",
   "dashboard.playground.model": "Model",
   "dashboard.playground.prompt": "Prompt",
   "dashboard.playground.promptPlaceholder":
@@ -140,16 +148,24 @@ const EN: Record<string, string> = {
 };
 
 const ZH: Record<string, string> = {
-  "common.imagePlayground": "图像 Playground",
+  "common.imagePlayground": "图片体验",
   "dashboard.usage.copyRequestId": "复制 request_id",
   "dashboard.usage.copiedRequestId": "已复制",
-  "dashboard.playground.title": "Playground",
+  "dashboard.playground.title": "对话体验",
   "dashboard.playground.subtitle":
-    "选择模型，发送一次测试请求，验证 Tokfai API 是否正常工作。",
-  "dashboard.playground.forImageModels": "图像模型请使用",
+    "选择模型、输入内容并发送——系统会自动使用你的默认 API Key。",
+  "dashboard.playground.forImageModels": "图片模型请使用",
   "dashboard.playground.request": "测试请求",
   "dashboard.playground.requestDesc":
     "选择或创建 API Key，选择对话模型，发送一条非流式消息进行测试。",
+  "dashboard.playground.requestDescSimple":
+    "选择模型、输入提示词并发送。系统会自动使用你自己的 API Key 扣费。",
+  "dashboard.playground.autoKeyHint":
+    "无需手动选择 API Key——本次体验会自动使用你的默认可用密钥。",
+  "dashboard.playground.createExperienceKey": "一键创建体验 Key",
+  "dashboard.playground.balanceLabel": "算力积分余额",
+  "dashboard.playground.estimatedCostLabel": "预计扣费",
+  "dashboard.playground.estimatedCostHint": "成功后按 token 用量扣费",
   "dashboard.playground.model": "模型",
   "dashboard.playground.prompt": "Prompt",
   "dashboard.playground.promptPlaceholder":
@@ -166,21 +182,22 @@ const ZH: Record<string, string> = {
   "dashboard.playground.presetSummaryPrompt":
     "请用中文总结：OpenAI 兼容 API 对开发者有什么价值。",
   "dashboard.playground.running": "发送中…",
-  "dashboard.playground.run": "发送测试",
+  "dashboard.playground.run": "发送",
   "dashboard.playground.costHint":
-    "Playground 会消耗 credits，请先确认余额。实际扣费以算力积分账本为准。",
-  "dashboard.playground.viewCreditsLedger": "查看算力积分账本",
+    "对话体验会消耗算力积分，请先确认余额。实际扣费以算力积分账本为准。",
+  "dashboard.playground.viewCreditsLedger": "查看算力积分",
   "dashboard.playground.productionKeyHint":
-    "用于生产接入时，请在 API Keys 页面创建并复制 sk-tokfai 密钥。",
+    "用于生产接入时，请在 API 密钥页面创建并复制 sk-tokfai 密钥。",
+  "dashboard.playground.creatingTestKey": "创建中…",
+  "dashboard.playground.noKeyBody":
+    "还没有可用 API Key。点击下方按钮一键创建体验 Key。",
   "dashboard.playground.apiKey": "API Key",
   "dashboard.playground.currentKeySelection": "当前选择：{name}（{prefix}…）",
   "dashboard.playground.pasteOtherKey": "粘贴其他 Key",
   "dashboard.playground.manageApiKeys": "管理 API Keys",
   "dashboard.playground.manageApiKeysHint": "如需吊销或删除密钥，请前往 API Keys 页面管理。",
   "dashboard.playground.noKeyTitle": "还没有可用 API Key",
-  "dashboard.playground.noKeyBody": "创建一个测试 Key 后，即可在 Playground 里完成第一次真实调用。",
   "dashboard.playground.createTestKey": "创建测试 Key",
-  "dashboard.playground.creatingTestKey": "创建中…",
   "dashboard.playground.goToApiKeys": "前往 API Keys",
   "dashboard.playground.testKeyCreated":
     "测试 Key 已创建。请复制完整 secret；刷新页面后不会再次显示。",

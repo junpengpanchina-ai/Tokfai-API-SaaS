@@ -6,7 +6,7 @@ const LOCALE_STORAGE_KEY = "tokfai-locale";
 
 const EN: Record<string, string> = {
   "dashboard.apiKeys.copied": "Copied",
-  "dashboard.shell.lowCredits": "Low credits",
+  "dashboard.shell.lowCredits": "Low compute credits",
   "dashboard.playground.selectKey": "Select key",
   "dashboard.playground.testKeyCreated":
     "Test key created. Copy the full secret — it won't be shown again after refresh.",
@@ -14,7 +14,7 @@ const EN: Record<string, string> = {
   "dashboard.playground.copied": "Copied",
   "dashboard.playground.apiKeyLoadTimedOut":
     "Timed out loading the selected API key. Paste the full secret or try again.",
-  "dashboard.imagePlayground.title": "Image Playground",
+  "dashboard.imagePlayground.title": "Images",
   "dashboard.imagePlayground.toolbenchSubtitle":
     "Prompt → optional reference images → Generate. Charged only on successful API responses.",
   "dashboard.imagePlayground.toolbenchInputTitle": "Input",
@@ -42,9 +42,9 @@ const EN: Record<string, string> = {
   "dashboard.imagePlayground.toolbenchCurrentKeyLine": "Current: {name} · {prefix}…",
   "dashboard.imagePlayground.toolbenchRunSettings": "Run settings",
   "dashboard.imagePlayground.toolbenchBalanceLabel": "Balance",
-  "dashboard.imagePlayground.estimatedCost": "Estimated cost: {credits} credits",
+  "dashboard.imagePlayground.estimatedCost": "Estimated: {credits} compute credits",
   "dashboard.imagePlayground.toolbenchInsufficientCredits":
-    "Insufficient credits — top up before generating.",
+    "Insufficient compute credits — top up before generating.",
   "dashboard.imagePlayground.topUp": "Top up",
   "dashboard.imagePlayground.toolbenchModelLabel": "Model",
   "dashboard.imagePlayground.size": "Size",
@@ -52,8 +52,8 @@ const EN: Record<string, string> = {
     "Successful generations are charged. Failed calls are usually not charged.",
   "dashboard.imagePlayground.toolbenchServiceDocs": "Service docs",
   "dashboard.imagePlayground.toolbenchViewImageApiDocs": "View Image API docs",
-  "dashboard.imagePlayground.viewUsage": "View Usage",
-  "dashboard.imagePlayground.viewCredits": "View Credits",
+  "dashboard.imagePlayground.viewUsage": "View usage",
+  "dashboard.imagePlayground.viewCredits": "View compute credits",
   "dashboard.imagePlayground.toolbenchOpenIntegrationDocs": "Open integration docs",
   "dashboard.imagePlayground.generating": "Generating…",
   "dashboard.imagePlayground.preparingImages": "Preparing input images…",
@@ -74,9 +74,19 @@ const EN: Record<string, string> = {
   "dashboard.imagePlayground.copiedRequestId": "Copied",
   "dashboard.imagePlayground.copyRequestId": "Copy request ID",
   "dashboard.imagePlayground.viewImageApiDocs": "Image API docs",
-  "dashboard.imagePlayground.successCreditsCharged": "Charged {credits} credits.",
+  "dashboard.imagePlayground.successCreditsCharged": "Charged {credits} compute credits.",
   "dashboard.imagePlayground.metaModel": "Model",
   "dashboard.imagePlayground.metaCreatedAt": "Created at",
+  "dashboard.imagePlayground.modeText": "Text to image",
+  "dashboard.imagePlayground.modeReference": "Reference edit",
+  "dashboard.imagePlayground.modeTextHint": "Describe the image you want to generate.",
+  "dashboard.imagePlayground.modeReferenceHint": "The system will keep the reference subject and only change what you specify.",
+  "dashboard.imagePlayground.fastModelEditHint": "Fast models are better for drafts. For person consistency, prefer standard / pro models.",
+  "dashboard.imagePlayground.createExperienceKey": "Create experience key",
+  "dashboard.imagePlayground.creatingKey": "Creating…",
+  "dashboard.imagePlayground.noKeyBody": "No active API key yet. Create one to start generating.",
+  "dashboard.imagePlayground.continueGenerate": "Generate again",
+  "dashboard.imagePlayground.technicalDetails": "Technical details",
   "dashboard.imagePlayground.presetProduct": "Product shot",
   "dashboard.imagePlayground.presetAvatar": "Avatar",
   "dashboard.imagePlayground.presetEcommerce": "E-commerce hero",
@@ -96,7 +106,7 @@ const EN: Record<string, string> = {
   "dashboard.imagePlayground.errors.invalidOrMissingToken":
     "API key is invalid or missing. Select or create an API key.",
   "dashboard.imagePlayground.errors.insufficientCredits":
-    "Insufficient credits. Top up credits first.",
+    "Insufficient compute credits. Top up first.",
   "dashboard.imagePlayground.errors.upstreamTimeout":
     "The image model is temporarily unavailable or slow. Try again later or switch models.",
   "dashboard.imagePlayground.errors.upstreamError":
@@ -126,9 +136,9 @@ const ZH: Record<string, string> = {
   "dashboard.playground.copied": "已复制",
   "dashboard.playground.apiKeyLoadTimedOut":
     "加载所选 API Key 超时。请粘贴完整 secret 或重试。",
-  "dashboard.imagePlayground.title": "Image Playground",
+  "dashboard.imagePlayground.title": "图片体验",
   "dashboard.imagePlayground.toolbenchSubtitle":
-    "输入 Prompt → 可选参考图 → 生成。仅成功响应才扣费。",
+    "输入需求 → 可选上传参考图 → 选择图片类型 → 生成。成功才扣算力积分。",
   "dashboard.imagePlayground.toolbenchInputTitle": "输入",
   "dashboard.imagePlayground.textToImage": "文生图",
   "dashboard.imagePlayground.imageToImage": "图生图",
@@ -152,8 +162,8 @@ const ZH: Record<string, string> = {
   "dashboard.imagePlayground.toolbenchManageKeysShort": "管理",
   "dashboard.imagePlayground.toolbenchCurrentKeyLine": "当前：{name} · {prefix}…",
   "dashboard.imagePlayground.toolbenchRunSettings": "调用设置",
-  "dashboard.imagePlayground.toolbenchBalanceLabel": "余额",
-  "dashboard.imagePlayground.estimatedCost": "预计消耗：{credits} credits",
+  "dashboard.imagePlayground.toolbenchBalanceLabel": "算力积分余额",
+  "dashboard.imagePlayground.estimatedCost": "预计消耗：{credits} 算力积分",
   "dashboard.imagePlayground.toolbenchInsufficientCredits": "余额不足——请先充值再生成。",
   "dashboard.imagePlayground.topUp": "去充值",
   "dashboard.imagePlayground.toolbenchModelLabel": "模型",
@@ -161,8 +171,8 @@ const ZH: Record<string, string> = {
   "dashboard.imagePlayground.toolbenchBillingNoteShort": "成功生成会扣费，失败通常不扣费。",
   "dashboard.imagePlayground.toolbenchServiceDocs": "服务文档",
   "dashboard.imagePlayground.toolbenchViewImageApiDocs": "查看 Image API 文档",
-  "dashboard.imagePlayground.viewUsage": "查看 Usage",
-  "dashboard.imagePlayground.viewCredits": "查看 Credits",
+  "dashboard.imagePlayground.viewUsage": "查看用量",
+  "dashboard.imagePlayground.viewCredits": "查看算力积分",
   "dashboard.imagePlayground.toolbenchOpenIntegrationDocs": "打开接入文档",
   "dashboard.imagePlayground.generating": "生成中…",
   "dashboard.imagePlayground.preparingImages": "准备输入图…",
@@ -172,7 +182,7 @@ const ZH: Record<string, string> = {
   "dashboard.imagePlayground.toolbenchResultPanelTitle": "结果",
   "dashboard.imagePlayground.toolbenchResultLoadingHint": "请保持此面板可见，结果将显示在这里。",
   "dashboard.imagePlayground.errors.billingNotChargedHint":
-    "失败请求通常不会扣费，以 Usage / Credits 记录为准。",
+    "失败请求通常不会扣费，以用量 / 算力积分记录为准。",
   "dashboard.imagePlayground.toolbenchRetry": "重试",
   "dashboard.imagePlayground.toolbenchResultPlaceholder": "生成的图片将显示在这里",
   "dashboard.imagePlayground.base64OnlyHint":
@@ -182,7 +192,7 @@ const ZH: Record<string, string> = {
   "dashboard.imagePlayground.copiedRequestId": "已复制",
   "dashboard.imagePlayground.copyRequestId": "复制 request_id",
   "dashboard.imagePlayground.viewImageApiDocs": "Image API 文档",
-  "dashboard.imagePlayground.successCreditsCharged": "本次扣费 {credits} credits。",
+  "dashboard.imagePlayground.successCreditsCharged": "本次扣费：{credits} 算力积分",
   "dashboard.imagePlayground.metaModel": "模型",
   "dashboard.imagePlayground.metaCreatedAt": "创建时间",
   "dashboard.imagePlayground.presetProduct": "产品图",
@@ -201,7 +211,7 @@ const ZH: Record<string, string> = {
   "dashboard.imagePlayground.errors.invalidToken": "API Key 无效或已吊销，请重新创建。",
   "dashboard.imagePlayground.errors.invalidOrMissingToken":
     "API Key 无效或缺失，请选择或创建 API Key。",
-  "dashboard.imagePlayground.errors.insufficientCredits": "余额不足，请先充值 credits。",
+  "dashboard.imagePlayground.errors.insufficientCredits": "余额不足，请先充值算力积分。",
   "dashboard.imagePlayground.errors.upstreamTimeout":
     "图片模型暂时不可用或生成较慢，请稍后重试或切换模型。",
   "dashboard.imagePlayground.errors.upstreamError":

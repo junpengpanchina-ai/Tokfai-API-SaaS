@@ -7,6 +7,8 @@ export interface DashboardOverviewActivity {
   status: string | null;
   total_tokens: number | null;
   credits_charged: number | null;
+  request_id: string | null;
+  kind: "chat" | "image";
 }
 
 export interface DashboardOverviewData {

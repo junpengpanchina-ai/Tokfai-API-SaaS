@@ -3,21 +3,16 @@
 import Link from "next/link";
 import {
   Activity,
-  ArrowUpRight,
-  BookOpen,
-  Boxes,
-  CheckCircle2,
   Coins,
   CreditCard,
   ImageIcon,
   KeyRound,
-  Shield,
+  Sparkles,
   Terminal,
   type LucideIcon,
 } from "lucide-react";
 
 import { DashboardAnnouncementsOverview } from "@/components/dashboard-announcements-overview";
-import { DashboardFirstRunOnboardingCard } from "@/components/dashboard-first-run-onboarding";
 import type { PublicAnnouncement } from "@/lib/dashboard-safe/dtos/announcements";
 import type { DashboardOverviewData } from "@/lib/dashboard-safe/dtos/overview";
 import {
@@ -28,10 +23,7 @@ import {
   dashboardFormatCreditsWithSuffix,
   dashboardFormatDate,
   dashboardFormatInt,
-  dashboardFormatTokens,
   dashboardGetModelLabel,
-  dashboardUsageStatusLabel,
-  dashboardUsageStatusTone,
 } from "@/lib/dashboard-safe/display-helpers";
 import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 
@@ -45,96 +37,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-type OnboardingCompleteWhen =
-  | "creditsBalance"
-  | "activeApiKey"
-  | "chatPlayground"
-  | "imagePlayground";
-
-type OnboardingStepConfig = {
-  step: number;
-  titleKey: string;
-  bodyKey: string;
-  buttonKey: string;
-  href: string;
-  icon: LucideIcon;
-  completeWhen?: OnboardingCompleteWhen;
-};
-
-type UserPhase = "needsCredits" | "needsApiKey" | "needsFirstCall" | "returning";
-
-type OnboardingStepStatus = "completed" | "current" | "upcoming";
-
-const ONBOARDING_STEPS: OnboardingStepConfig[] = [
-  {
-    step: 1,
-    titleKey: "dashboard.overview.onboardingStep1Title",
-    bodyKey: "dashboard.overview.onboardingStep1Body",
-    buttonKey: "dashboard.overview.goRecharge",
-    href: "/pricing",
-    icon: CreditCard,
-    completeWhen: "creditsBalance",
-  },
-  {
-    step: 2,
-    titleKey: "dashboard.overview.onboardingStep2Title",
-    bodyKey: "dashboard.overview.onboardingStep2Body",
-    buttonKey: "dashboard.overview.goCreate",
-    href: "/dashboard/api-keys",
-    icon: KeyRound,
-    completeWhen: "activeApiKey",
-  },
-  {
-    step: 3,
-    titleKey: "dashboard.overview.onboardingStep3Title",
-    bodyKey: "dashboard.overview.onboardingStep3Body",
-    buttonKey: "dashboard.overview.goView",
-    href: "/dashboard/docs",
-    icon: BookOpen,
-  },
-  {
-    step: 4,
-    titleKey: "dashboard.overview.onboardingStep4Title",
-    bodyKey: "dashboard.overview.onboardingStep4Body",
-    buttonKey: "dashboard.overview.goTest",
-    href: "/dashboard/playground",
-    icon: Terminal,
-    completeWhen: "chatPlayground",
-  },
-  {
-    step: 5,
-    titleKey: "dashboard.overview.onboardingStep5Title",
-    bodyKey: "dashboard.overview.onboardingStep5Body",
-    buttonKey: "dashboard.overview.goTest",
-    href: "/dashboard/image-playground",
-    icon: ImageIcon,
-    completeWhen: "imagePlayground",
-  },
-];
-
-const CONTINUE_LINKS = [
-  {
-    href: "/dashboard/playground",
-    labelKey: "common.chatPlayground",
-    icon: Terminal,
-  },
-  {
-    href: "/dashboard/image-playground",
-    labelKey: "common.imagePlayground",
-    icon: ImageIcon,
-  },
-  { href: "/dashboard/usage", labelKey: "nav.usage", icon: Activity },
-  { href: "/dashboard/credits", labelKey: "nav.credits", icon: CreditCard },
-  { href: "/dashboard/models", labelKey: "nav.models", icon: Boxes },
-] as const;
-
-const SECURITY_ITEM_KEYS = [
-  "dashboard.overview.securityItem1",
-  "dashboard.overview.securityItem2",
-  "dashboard.overview.securityItem3",
-  "dashboard.overview.securityItem4",
-] as const;
-
 export function DashboardOverviewContent({
   overview,
   announcements,
@@ -145,637 +47,273 @@ export function DashboardOverviewContent({
   const { t } = useDashboardLabels();
   const safeOverview = normalizeDashboardOverview(overview);
   const safeAnnouncements = normalizePublicAnnouncements(announcements);
-  const phase = getUserPhase(safeOverview);
-  const isReturning = phase === "returning";
-  const allOnboardingComplete = ONBOARDING_STEPS.every((step) =>
-    isOnboardingStepComplete(step, safeOverview)
-  );
 
   const statCards = [
     {
       labelKey: "dashboard.overview.creditsBalance",
-      subKey: safeOverview.profileMissing
-        ? "dashboard.overview.profileMissing"
-        : safeOverview.creditsBalance <= 0
-          ? "dashboard.overview.topUpToStart"
-          : "dashboard.overview.creditsBalanceHint",
       value: dashboardFormatCreditsWithSuffix(safeOverview.creditsBalance),
-      href: "/dashboard/credits",
       icon: CreditCard,
     },
     {
+      labelKey: "dashboard.overview.creditsConsumedLast7Days",
+      value: dashboardFormatCreditsWithSuffix(
+        safeOverview.creditsConsumedLast7Days
+      ),
+      icon: Coins,
+    },
+    {
       labelKey: "dashboard.overview.activeApiKeys",
-      subKey:
-        safeOverview.activeApiKeyCount > 0
-          ? "dashboard.overview.keysReady"
-          : "dashboard.overview.createFirstKey",
       value: dashboardFormatInt(safeOverview.activeApiKeyCount),
-      href: "/dashboard/api-keys",
       icon: KeyRound,
     },
     {
       labelKey: "dashboard.overview.requestsLast7Days",
-      subKey:
-        safeOverview.requestsLast7Days > 0
-          ? "dashboard.overview.recentTraffic"
-          : "dashboard.overview.noTrafficYet",
       value: dashboardFormatInt(safeOverview.requestsLast7Days),
-      href: "/dashboard/usage",
       icon: Activity,
-    },
-    {
-      labelKey: "dashboard.overview.creditsConsumedLast7Days",
-      subKey:
-        safeOverview.creditsConsumedLast7Days > 0
-          ? "dashboard.overview.creditsConsumedHint"
-          : "dashboard.overview.noConsumptionYet",
-      value: dashboardFormatCreditsWithSuffix(safeOverview.creditsConsumedLast7Days),
-      href: "/dashboard/credits",
-      icon: Coins,
     },
   ] as const;
 
   return (
     <div className="flex flex-col gap-8">
+      {/* 1. Welcome */}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
           {t("dashboard.overview.title")}
         </h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          {t(
-            isReturning
-              ? "dashboard.overview.subtitleReturning"
-              : "dashboard.overview.subtitle"
-          )}
+          {t("dashboard.overview.subtitle")}
         </p>
       </div>
 
-      <DashboardAnnouncementsOverview announcements={safeAnnouncements} />
-
-      <DashboardFirstRunOnboardingCard
-        hasActiveApiKey={safeOverview.hasActiveApiKey}
-        hasChatSuccess={safeOverview.hasChatPlaygroundSuccess}
-        hasRecentUsage={safeOverview.requestsLast7Days > 0}
-        variant="dashboard"
-      />
-
-      {!isReturning ? <StatePriorityBanner phase={phase} t={t} /> : null}
-
-      <ContinueCard t={t} emphasize={isReturning} />
-
-      {isReturning ? (
-        <>
-          <StatCards statCards={statCards} t={t} />
-          <RecentActivityCard overview={safeOverview} t={t} />
-          <OnboardingSection
-            overview={safeOverview}
-            isReturning
-            allComplete={allOnboardingComplete}
-            t={t}
-          />
-        </>
-      ) : (
-        <>
-          <OnboardingSection
-            overview={safeOverview}
-            isReturning={false}
-            allComplete={allOnboardingComplete}
-            t={t}
-          />
-          <StatCards statCards={statCards} t={t} />
-          <RecentActivityCard overview={safeOverview} t={t} />
-        </>
-      )}
-
-      <Card className="border-muted bg-muted/30">
+      {/* 2. Account status */}
+      <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Shield className="h-4 w-4 shrink-0" />
-            {t("dashboard.overview.securityTitle")}
+          <CardTitle className="text-base">
+            {t("dashboard.overview.accountStatusTitle")}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
-            {SECURITY_ITEM_KEYS.map((key) => (
-              <li key={key}>{t(key)}</li>
-            ))}
-          </ul>
-          <Button asChild size="sm" variant="outline" className="mt-4">
-            <Link href="/dashboard/api-keys" prefetch={false}>
-              {t("dashboard.overview.manageApiKeys")}
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function getUserPhase(overview: DashboardOverviewData): UserPhase {
-  if (overview.creditsBalance <= 0) return "needsCredits";
-  if (!overview.hasActiveApiKey) return "needsApiKey";
-  if (
-    !overview.hasChatPlaygroundSuccess &&
-    !overview.hasImagePlaygroundSuccess
-  ) {
-    return "needsFirstCall";
-  }
-  return "returning";
-}
-
-function isOnboardingStepComplete(
-  item: OnboardingStepConfig,
-  overview: DashboardOverviewData
-): boolean {
-  if (item.completeWhen) {
-    return isCompleteByFlag(item.completeWhen, overview);
-  }
-  if (item.step === 3) {
-    return (
-      overview.hasChatPlaygroundSuccess || overview.hasImagePlaygroundSuccess
-    );
-  }
-  return false;
-}
-
-function isCompleteByFlag(
-  completeWhen: OnboardingCompleteWhen,
-  overview: DashboardOverviewData
-): boolean {
-  switch (completeWhen) {
-    case "creditsBalance":
-      return overview.creditsBalance > 0;
-    case "activeApiKey":
-      return overview.hasActiveApiKey;
-    case "chatPlayground":
-      return overview.hasChatPlaygroundSuccess;
-    case "imagePlayground":
-      return overview.hasImagePlaygroundSuccess;
-    default:
-      return false;
-  }
-}
-
-function getOnboardingStepStatus(
-  item: OnboardingStepConfig,
-  overview: DashboardOverviewData
-): OnboardingStepStatus {
-  if (isOnboardingStepComplete(item, overview)) return "completed";
-  const firstIncomplete = ONBOARDING_STEPS.find(
-    (step) => !isOnboardingStepComplete(step, overview)
-  );
-  if (firstIncomplete?.step === item.step) return "current";
-  return "upcoming";
-}
-
-function StatePriorityBanner({
-  phase,
-  t,
-}: {
-  phase: Exclude<UserPhase, "returning">;
-  t: (key: string) => string;
-}) {
-  const config = {
-    needsCredits: {
-      titleKey: "dashboard.overview.stateNeedsCreditsTitle",
-      bodyKey: "dashboard.overview.stateNeedsCreditsBody",
-      actionKey: "dashboard.overview.stateNeedsCreditsAction",
-      href: "/pricing",
-    },
-    needsApiKey: {
-      titleKey: "dashboard.overview.stateNeedsApiKeyTitle",
-      bodyKey: "dashboard.overview.stateNeedsApiKeyBody",
-      actionKey: "dashboard.overview.stateNeedsApiKeyAction",
-      href: "/dashboard/api-keys",
-    },
-    needsFirstCall: {
-      titleKey: "dashboard.overview.stateNeedsFirstCallTitle",
-      bodyKey: "dashboard.overview.stateNeedsFirstCallBody",
-      actionKey: null,
-      href: null,
-    },
-  }[phase];
-
-  return (
-    <Card className="border-primary/30 bg-primary/5">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">{t(config.titleKey)}</CardTitle>
-        <CardDescription>{t(config.bodyKey)}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-wrap gap-2">
-        {phase === "needsFirstCall" ? (
-          <>
+        <CardContent className="flex flex-col gap-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {statCards.map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <div
+                  key={stat.labelKey}
+                  className="rounded-md border bg-muted/20 px-4 py-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">
+                      {t(stat.labelKey)}
+                    </p>
+                    <Icon className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <p className="mt-2 text-2xl font-semibold tracking-tight">
+                    {stat.value}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap gap-2">
             <Button asChild size="sm">
-              <Link href="/dashboard/docs" prefetch={false}>
-                {t("dashboard.overview.stateNeedsFirstCallQuickstart")}
+              <Link href="/pricing" prefetch={false}>
+                {t("dashboard.overview.goTopUp")}
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
-              <Link href="/dashboard/playground" prefetch={false}>
-                {t("dashboard.overview.stateNeedsFirstCallPlayground")}
+              <Link href="/dashboard/usage" prefetch={false}>
+                {t("dashboard.overview.goUsage")}
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
-              <Link href="/dashboard/image-playground" prefetch={false}>
-                {t("common.imagePlayground")}
+              <Link href="/dashboard/api-keys" prefetch={false}>
+                {t("dashboard.overview.goManageKeys")}
               </Link>
             </Button>
-          </>
-        ) : config.href && config.actionKey ? (
-          <Button asChild size="sm">
-            <Link href={config.href} prefetch={false}>{t(config.actionKey)}</Link>
-          </Button>
-        ) : null}
-      </CardContent>
-    </Card>
-  );
-}
-
-function ContinueCard({
-  t,
-  emphasize,
-}: {
-  t: (key: string) => string;
-  emphasize?: boolean;
-}) {
-  return (
-    <Card className={emphasize ? "border-primary/20 shadow-sm" : undefined}>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">
-          {t("dashboard.overview.continueTitle")}
-        </CardTitle>
-        <CardDescription>{t("dashboard.overview.continueDesc")}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {CONTINUE_LINKS.map((link) => {
-            const Icon = link.icon;
-            return (
-              <Button
-                key={link.href}
-                asChild
-                variant="outline"
-                className="h-auto justify-start gap-2 px-4 py-3"
-              >
-                <Link href={link.href} prefetch={false}>
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {t(link.labelKey)}
-                </Link>
-              </Button>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function OnboardingSection({
-  overview,
-  isReturning,
-  allComplete,
-  t,
-}: {
-  overview: DashboardOverviewData;
-  isReturning: boolean;
-  allComplete: boolean;
-  t: (key: string) => string;
-}) {
-  if (isReturning && allComplete) {
-    return (
-      <Card className="border-muted bg-muted/20">
-        <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-muted-foreground">
-            {t("dashboard.overview.onboardingAllComplete")}
-          </p>
-          <Button asChild size="sm" variant="outline">
-            <Link href="/dashboard/usage" prefetch={false}>
-              {t("dashboard.overview.recentActivityViewUsage")}
-            </Link>
-          </Button>
+          </div>
         </CardContent>
       </Card>
-    );
-  }
 
-  const incompleteSteps = ONBOARDING_STEPS.filter(
-    (step) => !isOnboardingStepComplete(step, overview)
-  );
-  const stepsToShow =
-    isReturning && incompleteSteps.length > 0
-      ? incompleteSteps
-      : ONBOARDING_STEPS;
+      {/* 3. Get started */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">
+            {t("dashboard.overview.continueTitle")}
+          </CardTitle>
+          <CardDescription>
+            {t("dashboard.overview.continueDesc")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <StartAction
+              href="/dashboard/playground"
+              icon={Terminal}
+              label={t("dashboard.overview.startChat")}
+            />
+            <StartAction
+              href="/dashboard/image-playground"
+              icon={ImageIcon}
+              label={t("dashboard.overview.startImage")}
+            />
+            <StartAction
+              href="/dashboard/docs#cherry-studio"
+              icon={Sparkles}
+              label={t("dashboard.overview.startCherry")}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-  return (
-    <Card className={isReturning ? "border-muted bg-muted/20" : undefined}>
-      <CardHeader>
-        <CardTitle className={isReturning ? "text-base" : undefined}>
-          {t(
-            isReturning
-              ? "dashboard.overview.onboardingTitleReturning"
-              : "dashboard.overview.onboardingTitle"
-          )}
-        </CardTitle>
-        <CardDescription>
-          {t(
-            isReturning
-              ? "dashboard.overview.onboardingDescReturning"
-              : "dashboard.overview.onboardingDesc"
-          )}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        {stepsToShow.map((item) => (
-          <OnboardingStep
-            key={item.step}
-            item={item}
-            overview={overview}
-            t={t}
-          />
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
+      {/* 4. Recent usage */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("dashboard.overview.recentUsageTitle")}</CardTitle>
+          <CardDescription>
+            {t("dashboard.overview.recentUsageDesc")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RecentUsageTable overview={safeOverview} t={t} />
+        </CardContent>
+      </Card>
 
-function StatCards({
-  statCards,
-  t,
-}: {
-  statCards: ReadonlyArray<{
-    labelKey: string;
-    subKey: string;
-    value: string;
-    href: string;
-    icon: LucideIcon;
-  }>;
-  t: (key: string) => string;
-}) {
-  const items = Array.isArray(statCards) ? statCards : [];
-
-  return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {items.map((stat) => {
-        const Icon = stat.icon;
-        return (
-          <Card key={stat.labelKey}>
-            <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-              <CardDescription>{t(stat.labelKey)}</CardDescription>
-              <Icon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-semibold tracking-tight">
-                {stat.value}
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {t(stat.subKey)}
-              </p>
-              <Button
-                asChild
-                variant="ghost"
-                size="sm"
-                className="mt-3 -ml-2 h-7 px-2 text-xs"
-              >
-                <Link href={stat.href} prefetch={false}>
-                  {t("common.open")}
-                  <ArrowUpRight className="h-3 w-3" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        );
-      })}
+      {/* Light announcements footer */}
+      {safeAnnouncements.length > 0 ? (
+        <div className="border-t pt-6">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <p className="text-sm font-medium text-muted-foreground">
+              {t("dashboard.overview.announcementsHint")}
+            </p>
+            <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
+              <Link href="/dashboard/announcements" prefetch={false}>
+                {t("dashboard.overview.viewAllAnnouncements")}
+              </Link>
+            </Button>
+          </div>
+          <DashboardAnnouncementsOverview announcements={safeAnnouncements} />
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function RecentActivityCard({
+function StartAction({
+  href,
+  icon: Icon,
+  label,
+}: {
+  href: string;
+  icon: LucideIcon;
+  label: string;
+}) {
+  return (
+    <Button
+      asChild
+      variant="outline"
+      className="h-auto justify-start gap-3 px-4 py-4 text-left"
+    >
+      <Link href={href} prefetch={false}>
+        <Icon className="h-5 w-5 shrink-0" />
+        <span className="text-sm font-medium">{label}</span>
+      </Link>
+    </Button>
+  );
+}
+
+function RecentUsageTable({
   overview,
   t,
 }: {
   overview: DashboardOverviewData;
   t: (key: string) => string;
 }) {
-  const safeRecentActivity = Array.isArray(overview.recentActivity)
+  const rows = Array.isArray(overview.recentActivity)
     ? overview.recentActivity
     : [];
-  const hasSuccessfulActivity = safeRecentActivity.some(
-    (row) => dashboardUsageStatusTone(row.status) === "success"
-  );
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("dashboard.overview.recentActivityTitle")}</CardTitle>
-        <CardDescription>
-          {t("dashboard.overview.recentActivityDesc")}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {safeRecentActivity.length > 0 ? (
-          <div className="flex flex-col gap-4">
-            <RecentActivityTable rows={safeRecentActivity} t={t} />
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button asChild size="sm" variant="outline">
-                <Link href="/dashboard/usage" prefetch={false}>
-                  {t("dashboard.overview.recentActivityViewUsage")}
-                </Link>
-              </Button>
-              {hasSuccessfulActivity ? (
-                <Button asChild size="sm" variant="outline">
-                  <Link href="/dashboard/credits" prefetch={false}>
-                    {t("dashboard.overview.recentActivityViewCredits")}
-                  </Link>
-                </Button>
-              ) : null}
-              <Button asChild size="sm" variant="ghost">
-                <Link href="/dashboard/usage" prefetch={false}>
-                  {t("dashboard.overview.viewAllUsage")}
-                </Link>
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-3 rounded-md border border-dashed bg-muted/30 px-4 py-8 text-center">
-            <p className="max-w-md text-sm text-muted-foreground">
-              {t("dashboard.overview.recentActivityEmpty")}
-            </p>
-            <div className="flex flex-wrap justify-center gap-2">
-              <Button asChild size="sm">
-                <Link href="/dashboard/playground" prefetch={false}>{t("common.chatPlayground")}</Link>
-              </Button>
-              <Button asChild size="sm" variant="outline">
-                <Link href="/dashboard/image-playground" prefetch={false}>
-                  {t("common.imagePlayground")}
-                </Link>
-              </Button>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function OnboardingStep({
-  item,
-  overview,
-  t,
-}: {
-  item: OnboardingStepConfig;
-  overview: DashboardOverviewData;
-  t: (key: string) => string;
-}) {
-  const Icon = item.icon;
-  const status = getOnboardingStepStatus(item, overview);
-  const completed = status === "completed";
-
-  return (
-    <div
-      className={`flex min-w-0 flex-col gap-4 rounded-md border bg-card p-4 sm:flex-row sm:items-start ${
-        status === "current"
-          ? "border-primary/40 ring-1 ring-primary/10"
-          : status === "completed"
-            ? "opacity-80"
-            : ""
-      }`}
-    >
-      <div className="flex items-start gap-4 sm:flex-1">
-        <div
-          className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-semibold ${
-            completed
-              ? "bg-emerald-500/10 text-emerald-700"
-              : status === "current"
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground"
-          }`}
-        >
-          {completed ? (
-            <CheckCircle2 className="h-4 w-4" aria-hidden />
-          ) : (
-            item.step
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
-            <Icon className="h-4 w-4 text-muted-foreground" />
-            {t(item.titleKey)}
-            {status === "completed" ? (
-              <Badge variant="success" className="font-normal">
-                {t("dashboard.overview.stepCompleted")}
-              </Badge>
-            ) : status === "current" ? (
-              <Badge variant="default" className="font-normal">
-                {t("dashboard.overview.stepCurrent")}
-              </Badge>
-            ) : (
-              <Badge variant="secondary" className="font-normal">
-                {t("dashboard.overview.stepNext")}
-              </Badge>
-            )}
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">{t(item.bodyKey)}</p>
+  if (rows.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-md border border-dashed bg-muted/30 px-4 py-8 text-center">
+        <p className="max-w-md text-sm text-muted-foreground">
+          {t("dashboard.overview.recentActivityEmpty")}
+        </p>
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button asChild size="sm">
+            <Link href="/dashboard/playground" prefetch={false}>
+              {t("dashboard.overview.startChat")}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/image-playground" prefetch={false}>
+              {t("dashboard.overview.startImage")}
+            </Link>
+          </Button>
         </div>
       </div>
-      <div className="flex shrink-0 sm:mt-0.5">
-        <Button
-          asChild
-          size="sm"
-          variant={status === "current" ? "default" : "outline"}
-          className="w-full sm:w-auto"
-        >
-          <Link href={item.href} prefetch={false}>{t(item.buttonKey)}</Link>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="-mx-1 overflow-x-auto rounded-md border px-1">
+        <table className="w-full min-w-[640px] text-sm">
+          <thead>
+            <tr className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
+              <th className="px-4 py-3 font-medium">
+                {t("dashboard.usage.colWhen")}
+              </th>
+              <th className="px-4 py-3 font-medium">
+                {t("dashboard.usage.colModel")}
+              </th>
+              <th className="px-4 py-3 font-medium">
+                {t("dashboard.overview.colType")}
+              </th>
+              <th className="px-4 py-3 font-medium">
+                {t("dashboard.usage.colCredits")}
+              </th>
+              <th className="px-4 py-3 font-medium">
+                {t("dashboard.overview.colRequestId")}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr
+                key={row.id || `activity-row-${index}`}
+                className="border-b last:border-0"
+              >
+                <td className="px-4 py-3 font-mono text-xs">
+                  {dashboardFormatDate(row.created_at)}
+                </td>
+                <td className="px-4 py-3 font-mono text-xs">
+                  {dashboardGetModelLabel(row.model)}
+                </td>
+                <td className="px-4 py-3">
+                  <Badge variant="secondary" className="font-normal">
+                    {row.kind === "image"
+                      ? t("dashboard.overview.typeImage")
+                      : t("dashboard.overview.typeChat")}
+                  </Badge>
+                </td>
+                <td className="px-4 py-3 font-mono text-xs">
+                  {dashboardFormatCreditsWithSuffix(row.credits_charged)}
+                </td>
+                <td className="px-4 py-3 font-mono text-xs">
+                  {row.request_id ?? "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex justify-end">
+        <Button asChild size="sm" variant="outline">
+          <Link href="/dashboard/usage" prefetch={false}>
+            {t("dashboard.overview.viewAllUsage")}
+          </Link>
         </Button>
       </div>
     </div>
   );
-}
-
-function RecentActivityTable({
-  rows,
-  t,
-}: {
-  rows: DashboardOverviewData["recentActivity"];
-  t: (key: string) => string;
-}) {
-  const safeRows = Array.isArray(rows) ? rows : [];
-
-  return (
-    <div className="-mx-1 overflow-x-auto rounded-md border px-1">
-      <table className="w-full min-w-[640px] text-sm">
-        <thead>
-          <tr className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
-            <th className="px-4 py-3 font-medium">
-              {t("dashboard.usage.colWhen")}
-            </th>
-            <th className="px-4 py-3 font-medium">
-              {t("dashboard.usage.colModel")}
-            </th>
-            <th className="px-4 py-3 font-medium">
-              {t("dashboard.usage.colStatus")}
-            </th>
-            <th className="px-4 py-3 font-medium">
-              {t("dashboard.usage.colTotal")}
-            </th>
-            <th className="px-4 py-3 font-medium">
-              {t("dashboard.usage.colCredits")}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {safeRows.map((row, index) => (
-            <tr key={row.id || `activity-row-${index}`} className="border-b last:border-0">
-              <td className="px-4 py-3 font-mono text-xs">
-                {dashboardFormatDate(row.created_at)}
-              </td>
-              <td className="px-4 py-3 font-mono text-xs">
-                {dashboardGetModelLabel(row.model)}
-              </td>
-              <td className="px-4 py-3">
-                <StatusBadge status={row.status} t={t} />
-              </td>
-              <td className="px-4 py-3 font-mono text-xs">
-                {dashboardFormatTokens(row.total_tokens)}
-              </td>
-              <td className="px-4 py-3 font-mono text-xs">
-                {formatActivityCredits(row)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function StatusBadge({
-  status,
-  t,
-}: {
-  status: string | null | undefined;
-  t: (key: string) => string;
-}) {
-  const safeStatus = typeof status === "string" ? status : null;
-  const tone = dashboardUsageStatusTone(safeStatus);
-  const label = dashboardUsageStatusLabel(safeStatus, t);
-
-  return (
-    <Badge
-      variant={
-        tone === "success"
-          ? "success"
-          : tone === "destructive"
-            ? "destructive"
-            : "secondary"
-      }
-    >
-      {label}
-    </Badge>
-  );
-}
-
-function formatActivityCredits(
-  row: DashboardOverviewData["recentActivity"][number]
-): string {
-  return dashboardFormatCreditsWithSuffix(row.credits_charged);
 }

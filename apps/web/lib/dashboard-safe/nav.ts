@@ -1,4 +1,4 @@
-/** Dashboard nav config — dashboard-safe contract layer. */
+/** Dashboard nav config — consumer-facing simplified navigation. */
 
 import type { LucideIcon } from "lucide-react";
 import {
@@ -9,11 +9,8 @@ import {
   ImageIcon,
   KeyRound,
   LayoutDashboard,
-  Layers,
-  LifeBuoy,
   Megaphone,
   Terminal,
-  Wrench,
 } from "lucide-react";
 
 export interface DashboardNavItem {
@@ -40,36 +37,6 @@ export const DASHBOARD_NAV_SECTIONS: DashboardNavSection[] = [
         labelKey: "nav.overview",
         icon: LayoutDashboard,
         exact: true,
-        prefetch: false,
-      },
-      {
-        href: "/dashboard/api-keys",
-        labelKey: "nav.apiKeys",
-        icon: KeyRound,
-        prefetch: false,
-      },
-      {
-        href: "/dashboard/integration-workbench",
-        labelKey: "nav.integrationWorkbench",
-        icon: Wrench,
-        prefetch: false,
-      },
-      {
-        href: "/dashboard/troubleshooting",
-        labelKey: "nav.troubleshooting",
-        icon: LifeBuoy,
-        prefetch: false,
-      },
-      {
-        href: "/dashboard/starter-templates",
-        labelKey: "nav.starterTemplates",
-        icon: Layers,
-        prefetch: false,
-      },
-      {
-        href: "/dashboard/payload-builder",
-        labelKey: "nav.payloadBuilder",
-        icon: Boxes,
         prefetch: false,
       },
       {
@@ -109,6 +76,12 @@ export const DASHBOARD_NAV_SECTIONS: DashboardNavSection[] = [
     id: "service",
     labelKey: "nav.sectionService",
     items: [
+      {
+        href: "/dashboard/api-keys",
+        labelKey: "nav.apiKeys",
+        icon: KeyRound,
+        prefetch: false,
+      },
       { href: "/dashboard/docs", labelKey: "nav.docs", icon: BookOpen, prefetch: false },
       {
         href: "/dashboard/announcements",
