@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Check, Loader2, Upload, X } from "lucide-react";
+import { Copy, Check, Loader2, RotateCw, Upload, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -23,10 +23,10 @@ import {
 } from "@/lib/dashboard-safe/chat-api";
 import {
   buildEcommerceVisionPrompt,
-  ECOMMERCE_USE_CASES,
-  pickEcommerceVisionModel,
+  defaultUseCaseForMode,
   ecommerceUseCaseLabel,
-  type EcommerceUseCaseId,
+  pickEcommerceVisionModel,
+  useCasesForMode,
 } from "@/lib/dashboard-safe/ecommerce-image-analysis";
 import {
   ensurePlaygroundApiKey,
@@ -61,6 +61,26 @@ function toKeyOption(key: ImagePlaygroundApiKeyOption) {
   };
 }
 
+function isTimeoutLikeError(err: unknown): boolean {
+  if (err instanceof DmitApiError) {
+    const code = (err.code ?? "").toLowerCase();
+    const message = (err.message ?? "").toLowerCase();
+    return (
+      err.status === 504 ||
+      err.status === 408 ||
+      code.includes("timeout") ||
+      code.includes("upstream_timeout") ||
+      message.includes("timeout") ||
+      message.includes("超时")
+    );
+  }
+  if (err instanceof Error) {
+    const message = err.message.toLowerCase();
+    return message.includes("timeout") || message.includes("超时");
+  }
+  return false;
+}
+
 export function EcommerceVisionTab({
   mode,
   accessToken,
@@ -77,6 +97,7 @@ export function EcommerceVisionTab({
   const { t, locale } = useImagePlaygroundLabels();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isCopyMode = mode === "product_copy";
 
   const [localKeys, setLocalKeys] = useState(activeKeys);
   const [resolvedSecret, setResolvedSecret] = useState<string | null>(null);
@@ -87,18 +108,27 @@ export function EcommerceVisionTab({
   const [keyError, setKeyError] = useState<string | null>(null);
   const [needsCreate, setNeedsCreate] = useState(() => activeKeys.length === 0);
 
-  const [useCase, setUseCase] = useState<EcommerceUseCaseId>("taobao_pdd");
+  const [useCase, setUseCase] = useState(() => defaultUseCaseForMode(mode));
   const [extraNeed, setExtraNeed] = useState("");
   const [images, setImages] = useState<UploadItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [technicalError, setTechnicalError] = useState<string | null>(null);
   const [result, setResult] = useState<ChatCompletionResponse | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const useCaseOptions = useCasesForMode(mode);
   const readyUrls = images
     .filter((item) => item.status === "ready" && item.url)
     .map((item) => item.url);
   const visionModel = pickEcommerceVisionModel();
+
+  useEffect(() => {
+    setUseCase(defaultUseCaseForMode(mode));
+    setResult(null);
+    setError(null);
+    setTechnicalError(null);
+  }, [mode]);
 
   useEffect(() => {
     setLocalKeys(activeKeys);
@@ -177,6 +207,7 @@ export function EcommerceVisionTab({
     async (files: File[]) => {
       if (!files.length) return;
       setError(null);
+      setTechnicalError(null);
       const file = files[0];
       try {
         validatePlaygroundImageFile(file);
@@ -236,9 +267,10 @@ export function EcommerceVisionTab({
     [t]
   );
 
-  async function handleAnalyze() {
+  async function handleRun() {
     if (loading) return;
     setError(null);
+    setTechnicalError(null);
     setResult(null);
 
     if (readyUrls.length === 0) {
@@ -274,13 +306,22 @@ export function EcommerceVisionTab({
       setResult(res);
       router.refresh();
     } catch (err) {
-      setError(
+      const technical =
         err instanceof DmitApiError
-          ? err.message
+          ? `${err.code ?? "error"} · ${err.message}`
           : err instanceof Error
             ? err.message
+            : t("dashboard.imageWorkbench.analyzeFailed");
+      setTechnicalError(technical);
+      if (isTimeoutLikeError(err)) {
+        setError(t("dashboard.imageWorkbench.timeoutFriendly"));
+      } else {
+        setError(
+          isCopyMode
+            ? t("dashboard.imageWorkbench.copyFailed")
             : t("dashboard.imageWorkbench.analyzeFailed")
-      );
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -301,18 +342,39 @@ export function EcommerceVisionTab({
     }
   }
 
-  const titleKey =
-    mode === "product_copy"
-      ? "dashboard.imageWorkbench.copyTitle"
-      : "dashboard.imageWorkbench.analysisTitle";
-  const descKey =
-    mode === "product_copy"
-      ? "dashboard.imageWorkbench.copyDesc"
-      : "dashboard.imageWorkbench.analysisDesc";
-  const ctaKey =
-    mode === "product_copy"
-      ? "dashboard.imageWorkbench.startCopy"
-      : "dashboard.imageWorkbench.startAnalyze";
+  const titleKey = isCopyMode
+    ? "dashboard.imageWorkbench.copyTitle"
+    : "dashboard.imageWorkbench.analysisTitle";
+  const descKey = isCopyMode
+    ? "dashboard.imageWorkbench.copyDesc"
+    : "dashboard.imageWorkbench.analysisDesc";
+  const ctaKey = isCopyMode
+    ? "dashboard.imageWorkbench.startCopy"
+    : "dashboard.imageWorkbench.startAnalyze";
+  const useCaseLabelKey = isCopyMode
+    ? "dashboard.imageWorkbench.copyUseCaseLabel"
+    : "dashboard.imageWorkbench.useCaseLabel";
+  const extraPlaceholderKey = isCopyMode
+    ? "dashboard.imageWorkbench.copyExtraPlaceholder"
+    : "dashboard.imageWorkbench.extraNeedPlaceholder";
+  const loadingKey = isCopyMode
+    ? "dashboard.imageWorkbench.copying"
+    : "dashboard.imageWorkbench.analyzing";
+  const loadingHintKey = isCopyMode
+    ? "dashboard.imageWorkbench.copyingHint"
+    : "dashboard.imageWorkbench.analyzingHint";
+  const resultTitleKey = isCopyMode
+    ? "dashboard.imageWorkbench.copyResultTitle"
+    : "dashboard.imageWorkbench.analysisResultTitle";
+  const resultDescKey = isCopyMode
+    ? "dashboard.imageWorkbench.copyResultDesc"
+    : "dashboard.imageWorkbench.analysisResultDesc";
+  const resultEmptyKey = isCopyMode
+    ? "dashboard.imageWorkbench.copyResultEmpty"
+    : "dashboard.imageWorkbench.analysisResultEmpty";
+  const copyBtnKey = isCopyMode
+    ? "dashboard.imageWorkbench.copyAllCopy"
+    : "dashboard.imageWorkbench.copyResult";
 
   return (
     <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
@@ -402,19 +464,17 @@ export function EcommerceVisionTab({
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="ecommerce-use-case">
-              {t("dashboard.imageWorkbench.useCaseLabel")}
-            </Label>
+            <Label htmlFor="ecommerce-use-case">{t(useCaseLabelKey)}</Label>
             <select
               id="ecommerce-use-case"
               value={useCase}
               disabled={loading}
-              onChange={(e) => setUseCase(e.target.value as EcommerceUseCaseId)}
+              onChange={(e) => setUseCase(e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             >
-              {ECOMMERCE_USE_CASES.map((item) => (
+              {useCaseOptions.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {ecommerceUseCaseLabel(item.id, locale)}
+                  {ecommerceUseCaseLabel(item.id, locale, mode)}
                 </option>
               ))}
             </select>
@@ -430,7 +490,7 @@ export function EcommerceVisionTab({
               value={extraNeed}
               disabled={loading}
               onChange={(e) => setExtraNeed(e.target.value)}
-              placeholder={t("dashboard.imageWorkbench.extraNeedPlaceholder")}
+              placeholder={t(extraPlaceholderKey)}
               className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             />
           </div>
@@ -449,13 +509,13 @@ export function EcommerceVisionTab({
           <Button
             type="button"
             disabled={loading || readyUrls.length === 0}
-            onClick={() => void handleAnalyze()}
+            onClick={() => void handleRun()}
             className="w-full"
           >
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {t("dashboard.imageWorkbench.analyzing")}
+                {t(loadingKey)}
               </>
             ) : (
               t(ctaKey)
@@ -466,12 +526,8 @@ export function EcommerceVisionTab({
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">
-            {t("dashboard.imageWorkbench.resultTitle")}
-          </CardTitle>
-          <CardDescription>
-            {t("dashboard.imageWorkbench.resultDesc")}
-          </CardDescription>
+          <CardTitle className="text-base">{t(resultTitleKey)}</CardTitle>
+          <CardDescription>{t(resultDescKey)}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {error ? (
@@ -483,13 +539,13 @@ export function EcommerceVisionTab({
           {loading ? (
             <div className="flex min-h-[240px] flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-6 w-6 animate-spin" />
-              {t("dashboard.imageWorkbench.analyzingHint")}
+              {t(loadingHintKey)}
             </div>
           ) : null}
 
           {!loading && !resultText && !error ? (
             <div className="flex min-h-[240px] items-center justify-center rounded-md border border-dashed bg-muted/20 px-4 text-center text-sm text-muted-foreground">
-              {t("dashboard.imageWorkbench.resultEmpty")}
+              {t(resultEmptyKey)}
             </div>
           ) : null}
 
@@ -508,9 +564,19 @@ export function EcommerceVisionTab({
                   ) : (
                     <>
                       <Copy className="h-3.5 w-3.5" />
-                      {t("dashboard.imageWorkbench.copyResult")}
+                      {t(copyBtnKey)}
                     </>
                   )}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={loading}
+                  onClick={() => void handleRun()}
+                >
+                  <RotateCw className="h-3.5 w-3.5" />
+                  {t("dashboard.imageWorkbench.regenerate")}
                 </Button>
                 <Button asChild type="button" size="sm" variant="outline">
                   <a href="/dashboard/usage">
@@ -518,29 +584,26 @@ export function EcommerceVisionTab({
                   </a>
                 </Button>
               </div>
-              <details className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                <summary className="cursor-pointer select-none font-medium text-foreground">
-                  {t("dashboard.imageWorkbench.advancedInfo")}
-                </summary>
-                <div className="mt-2 space-y-1 font-mono">
-                  <p>
-                    {t("dashboard.imageWorkbench.modelLabel")}: {visionModel}
-                  </p>
-                  <p>
-                    {t("dashboard.imageWorkbench.useCaseLabel")}:{" "}
-                    {ecommerceUseCaseLabel(useCase, locale)}
-                  </p>
-                  {creditsCharged != null ? (
-                    <p>
-                      {t("dashboard.imageWorkbench.chargedLabel")}:{" "}
-                      {dashboardFormatCreditsWithSuffix(creditsCharged)}
-                    </p>
-                  ) : null}
-                  {requestId ? <p>request_id: {requestId}</p> : null}
-                </div>
-              </details>
             </>
           ) : null}
+
+          {(resultText || technicalError) && (
+            <details className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+              <summary className="cursor-pointer select-none font-medium text-foreground">
+                {t("dashboard.imageWorkbench.advancedInfo")}
+              </summary>
+              <div className="mt-2 space-y-1 font-mono">
+                {creditsCharged != null ? (
+                  <p>
+                    {t("dashboard.imageWorkbench.chargedLabel")}:{" "}
+                    {dashboardFormatCreditsWithSuffix(creditsCharged)}
+                  </p>
+                ) : null}
+                {requestId ? <p>request_id: {requestId}</p> : null}
+                {technicalError ? <p>error: {technicalError}</p> : null}
+              </div>
+            </details>
+          )}
         </CardContent>
       </Card>
     </div>

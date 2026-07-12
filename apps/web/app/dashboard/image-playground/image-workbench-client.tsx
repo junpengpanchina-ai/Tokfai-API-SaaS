@@ -26,13 +26,27 @@ export function ImagePlaygroundClient({
   creditsLoaded?: boolean;
 }) {
   const { t } = useImagePlaygroundLabels();
-  const [tab, setTab] = useState<WorkbenchTab>("analysis");
+  const [tab, setTab] = useState<WorkbenchTab>("copy");
 
-  const tabs: Array<{ id: WorkbenchTab; labelKey: string }> = [
-    { id: "analysis", labelKey: "dashboard.imageWorkbench.tabAnalysis" },
-    { id: "copy", labelKey: "dashboard.imageWorkbench.tabCopy" },
-    { id: "generate", labelKey: "dashboard.imageWorkbench.tabGenerate" },
+  const tabs: Array<{ id: WorkbenchTab; labelKey: string; descKey: string }> = [
+    {
+      id: "analysis",
+      labelKey: "dashboard.imageWorkbench.tabAnalysis",
+      descKey: "dashboard.imageWorkbench.tabAnalysisDesc",
+    },
+    {
+      id: "copy",
+      labelKey: "dashboard.imageWorkbench.tabCopy",
+      descKey: "dashboard.imageWorkbench.tabCopyDesc",
+    },
+    {
+      id: "generate",
+      labelKey: "dashboard.imageWorkbench.tabGenerate",
+      descKey: "dashboard.imageWorkbench.tabGenerateDesc",
+    },
   ];
+
+  const activeTab = tabs.find((item) => item.id === tab) ?? tabs[1];
 
   return (
     <div className="flex min-w-0 flex-col gap-5 overflow-x-hidden">
@@ -45,18 +59,21 @@ export function ImagePlaygroundClient({
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b pb-3">
-        {tabs.map((item) => (
-          <Button
-            key={item.id}
-            type="button"
-            size="sm"
-            variant={tab === item.id ? "default" : "outline"}
-            onClick={() => setTab(item.id)}
-          >
-            {t(item.labelKey)}
-          </Button>
-        ))}
+      <div className="flex flex-col gap-2 border-b pb-3">
+        <div className="flex flex-wrap gap-2">
+          {tabs.map((item) => (
+            <Button
+              key={item.id}
+              type="button"
+              size="sm"
+              variant={tab === item.id ? "default" : "outline"}
+              onClick={() => setTab(item.id)}
+            >
+              {t(item.labelKey)}
+            </Button>
+          ))}
+        </div>
+        <p className="text-sm text-muted-foreground">{t(activeTab.descKey)}</p>
       </div>
 
       {tab === "analysis" ? (

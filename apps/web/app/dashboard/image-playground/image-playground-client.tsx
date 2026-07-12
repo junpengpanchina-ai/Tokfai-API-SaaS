@@ -706,7 +706,7 @@ export function ImageGeneratePanel({
       <div className="flex flex-col gap-2">
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-semibold tracking-tight">
-            {t("dashboard.imagePlayground.title")}
+            {t("dashboard.imageWorkbench.tabGenerate")}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {t("dashboard.imagePlayground.toolbenchSubtitle")}
