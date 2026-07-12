@@ -178,9 +178,11 @@ export function mapUpstreamError(
     }
     return {
       status: 400,
-      code: "model_not_available",
+      code: "model_not_supported",
       type: "validation_error",
-      publicMessage: "当前模型暂不可用或未注册，请切换推荐模型。",
+      publicMessage: modelHint
+        ? `Unsupported model: ${modelHint}. Model is not registered upstream.`
+        : "Unsupported model. Model is not registered upstream.",
     };
   }
 

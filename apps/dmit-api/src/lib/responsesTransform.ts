@@ -18,6 +18,7 @@ export const ResponsesRequestSchema = z
     input: z.union([z.string(), z.array(z.unknown()).min(1), z.record(z.unknown())]),
     stream: z.boolean().optional(),
     temperature: z.number().optional(),
+    top_p: z.number().optional(),
     max_tokens: z.number().int().positive().optional(),
     max_output_tokens: z.number().int().positive().optional(),
     instructions: z.string().optional(),

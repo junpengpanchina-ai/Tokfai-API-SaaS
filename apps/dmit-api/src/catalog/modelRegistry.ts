@@ -1,5 +1,5 @@
 import { getModelConfig } from "../upstream/modelCatalog.js";
-import { MODEL_ALIAS_IDS } from "../upstream/modelAliases.js";
+import { CATALOG_ALIAS_IDS } from "../upstream/modelAliases.js";
 
 /** Hidden from /v1/models and blocked for customer API calls. */
 export const HIDDEN_INTERNAL_MODEL_IDS = new Set([
@@ -55,7 +55,7 @@ export function listStaticSuggestedChatModelIds(): string[] {
   const concrete = STATIC_CHAT_MODEL_IDS.filter(
     (id) => !isHiddenInternalModel(id) && !isSlowExperimentalChatModel(id)
   );
-  return [...MODEL_ALIAS_IDS, ...concrete];
+  return [...CATALOG_ALIAS_IDS, ...concrete];
 }
 
 export function listStaticSuggestedImageModelIds(): string[] {

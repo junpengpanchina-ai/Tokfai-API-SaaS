@@ -65,8 +65,8 @@ batchRoutes.post("/v1/batches/chat", async (c) => {
     return c.json(
       {
         error: {
-          message: "当前模型暂不可用或未注册，请切换推荐模型",
-          code: "model_not_available",
+          message: `Unsupported model: ${model}. Supported models: ${suggestedModels.join(", ")}`,
+          code: "model_not_supported",
           type: "invalid_request_error",
         },
         suggestedModels,

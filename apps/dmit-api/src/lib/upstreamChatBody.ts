@@ -17,6 +17,9 @@ export function buildUpstreamChatBody(
   if (body.temperature !== undefined) {
     upstream.temperature = body.temperature;
   }
+  if (body.top_p !== undefined) {
+    upstream.top_p = body.top_p;
+  }
   if (body.max_tokens !== undefined) {
     upstream.max_tokens = body.max_tokens;
   }

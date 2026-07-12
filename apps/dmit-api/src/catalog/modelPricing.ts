@@ -1,7 +1,10 @@
 import { log } from "../logger.js";
 import { supabase } from "../supabase.js";
 import { getModelConfig } from "../upstream/modelCatalog.js";
-import { isModelAlias, listAliasModelsForCatalog } from "../upstream/modelAliases.js";
+import {
+  listAliasModelsForCatalog,
+  resolveChatModel,
+} from "../upstream/modelAliases.js";
 import { priceFor } from "../upstream/pricing.js";
 import {
   DEFAULT_IMAGE_MODEL_ID,
@@ -319,13 +322,14 @@ export async function priceCreditsForImage(model: string): Promise<number> {
 }
 
 export async function isModelAllowedForChat(model: string): Promise<boolean> {
-  if (isHiddenInternalModel(model)) return false;
-  if (isModelAlias(model)) return true;
+  const resolved = resolveChatModel(model);
+  if (isHiddenInternalModel(resolved.canonicalId)) return false;
+  if (resolved.isAlias) return true;
 
-  const fromDb = await isModelAllowedFromDb(model, "chat");
+  const fromDb = await isModelAllowedFromDb(resolved.canonicalId, "chat");
   if (fromDb !== null) return fromDb;
 
-  const config = getModelConfig(model);
+  const config = getModelConfig(resolved.canonicalId);
   return Boolean(config?.enabled && config.kind === "chat");
 }
 

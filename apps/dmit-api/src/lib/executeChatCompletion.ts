@@ -14,7 +14,10 @@ import {
   priceCreditsFor,
 } from "../catalog/modelCatalog.js";
 import { providerFetch, isChatFallbackEligible } from "../upstream/grsai.js";
-import { resolveModelAttempts } from "../upstream/modelAliases.js";
+import {
+  formatSupportedChatModelsMessage,
+  resolveChatModel,
+} from "../upstream/modelAliases.js";
 import { resolveProviderAttempts } from "../upstream/providers.js";
 import {
   filterAttemptsByCircuitBreaker,
@@ -44,6 +47,7 @@ export const ChatCompletionRequestSchema = z
     model: z.string().min(1).optional(),
     messages: z.array(ChatMessageSchema).min(1),
     temperature: z.number().optional(),
+    top_p: z.number().optional(),
     max_tokens: z.number().int().positive().optional(),
     stream: z.boolean().optional(),
   })
@@ -119,25 +123,46 @@ export async function executeChatCompletion(
   const route = input.route ?? "/v1/chat/completions";
   const limitKey = input.limitKey ?? caller.apiKeyId ?? `user:${caller.userId}`;
 
-  const requestedModel = input.body.model || env.BOT_MODEL;
+  const requestedRaw = (input.body.model || env.BOT_MODEL).trim();
+  const resolvedRequest = resolveChatModel(requestedRaw);
+  const requestedModel = resolvedRequest.canonicalId;
+
+  if (
+    requestedRaw !== requestedModel ||
+    resolvedRequest.normalized !== requestedModel
+  ) {
+    log.info("model_resolved", {
+      route,
+      requestId,
+      requestedModel: requestedRaw,
+      normalizedModel: resolvedRequest.normalized,
+      resolvedModel: requestedModel,
+      isAlias: resolvedRequest.isAlias,
+      attempts: resolvedRequest.attempts,
+    });
+  }
 
   if (!(await isModelAllowedForChat(requestedModel))) {
     const suggestedModels = await listAvailableChatModelIds();
-    const isGeminiClientId =
-      requestedModel.startsWith("gemini-") ||
-      requestedModel.startsWith("models/gemini-");
-    const errorCode = isGeminiClientId
-      ? "model_not_supported"
-      : "model_not_available";
-    const errorMessage = isGeminiClientId
-      ? `Unsupported model: ${requestedModel.replace(/^models\//, "")}. Supported models: gemini-2.5-flash, gemini-2.5-pro, gemini-3-flash, gemini-3-pro`
-      : "当前模型暂不可用或未注册，请切换推荐模型";
+    const supported = formatSupportedChatModelsMessage(suggestedModels);
+    const errorCode = "model_not_supported";
+    const errorMessage = `Unsupported model: ${requestedRaw}. Supported models: ${supported}`;
+
+    log.warn("model_not_supported", {
+      code: "model_not_supported",
+      route,
+      requestId,
+      requestedModel: requestedRaw,
+      normalizedModel: resolvedRequest.normalized,
+      resolvedModel: requestedModel,
+      supportedModels: suggestedModels,
+    });
 
     await writeUsageLog(
       failedUsageLog({
         user_id: caller.userId,
         api_key_id: caller.apiKeyId,
-        model: requestedModel,
+        model: requestedRaw,
         status: "failed",
         request_id: requestId,
         error_code: errorCode,
@@ -157,7 +182,8 @@ export async function executeChatCompletion(
     };
   }
 
-  const { isAlias, attempts: rawAttempts } = resolveModelAttempts(requestedModel);
+  const isAlias = resolvedRequest.isAlias;
+  const rawAttempts = resolvedRequest.attempts;
   let attempts = isAlias
     ? await filterAttemptsByCircuitBreaker(rawAttempts)
     : rawAttempts;

@@ -243,7 +243,10 @@ function chatCompletionBody(body) {
 
 function responsesBody(body) {
   const requestedModel = typeof body.model === "string" ? body.model : "auto-fast";
-  const resolvedModel = "gemini-3-flash";
+  const resolvedModel =
+    typeof requestedModel === "string" && requestedModel.startsWith("gpt-")
+      ? "gpt-5.5"
+      : "gemini-3-flash";
   const meta = tokfaiMeta(requestedModel, resolvedModel);
   return {
     id: `resp_${meta.request_id}`,
@@ -262,6 +265,97 @@ function responsesBody(body) {
     usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
     ...meta,
   };
+}
+
+function responsesToSse(response) {
+  const responseId = response.id ?? `resp_mock`;
+  const model = response.model ?? "gemini-3-flash";
+  const messageId = `msg_${String(responseId).replace(/^resp_/, "")}`;
+  const outputText =
+    typeof response.output_text === "string" && response.output_text.length > 0
+      ? response.output_text
+      : "ok";
+  const event = (name, payload) =>
+    `event: ${name}\ndata: ${JSON.stringify(payload)}\n\n`;
+  return [
+    event("response.created", {
+      type: "response.created",
+      response: {
+        id: responseId,
+        object: "response",
+        status: "in_progress",
+        model,
+      },
+    }),
+    event("response.output_item.added", {
+      type: "response.output_item.added",
+      output_index: 0,
+      item: {
+        id: messageId,
+        type: "message",
+        status: "in_progress",
+        role: "assistant",
+        content: [],
+      },
+    }),
+    event("response.content_part.added", {
+      type: "response.content_part.added",
+      item_id: messageId,
+      output_index: 0,
+      content_index: 0,
+      part: { type: "output_text", text: "" },
+    }),
+    event("response.output_text.delta", {
+      type: "response.output_text.delta",
+      item_id: messageId,
+      output_index: 0,
+      content_index: 0,
+      delta: outputText,
+    }),
+    event("response.output_text.done", {
+      type: "response.output_text.done",
+      item_id: messageId,
+      output_index: 0,
+      content_index: 0,
+      text: outputText,
+    }),
+    event("response.content_part.done", {
+      type: "response.content_part.done",
+      item_id: messageId,
+      output_index: 0,
+      content_index: 0,
+      part: { type: "output_text", text: outputText },
+    }),
+    event("response.output_item.done", {
+      type: "response.output_item.done",
+      output_index: 0,
+      item: {
+        id: messageId,
+        type: "message",
+        status: "completed",
+        role: "assistant",
+        content: [{ type: "output_text", text: outputText }],
+      },
+    }),
+    event("response.completed", {
+      type: "response.completed",
+      response: {
+        id: responseId,
+        object: "response",
+        status: "completed",
+        model,
+        output: [
+          {
+            type: "message",
+            role: "assistant",
+            content: [{ type: "output_text", text: outputText }],
+          },
+        ],
+        output_text: outputText,
+      },
+    }),
+    "data: [DONE]\n\n",
+  ].join("");
 }
 
 function geminiGenerateContentBody(body, modelId = "gemini-2.5-flash") {
@@ -582,7 +676,11 @@ export function startMockGateway(options = {}) {
         if (!slot.ok) return sendJson(res, slot.response.status, slot.response.body);
         try {
           const body = await readJsonBody(req);
-          return sendJson(res, 200, responsesBody(body));
+          const response = responsesBody(body);
+          if (body?.stream === true) {
+            return sendSse(res, responsesToSse(response));
+          }
+          return sendJson(res, 200, response);
         } finally {
           slot.release?.();
         }

@@ -133,6 +133,31 @@ function assertSseOk(res, label) {
   );
 }
 
+function assertResponsesSseOk(res, label) {
+  const contentType = res.headers.get("content-type") ?? "";
+  const text = res.text ?? "";
+  const hasEventStream = contentType.includes("text/event-stream");
+  const hasDeltaEvent = /event:\s*response\.output_text\.delta/.test(text);
+  const hasDeltaField = /"delta"\s*:/.test(text);
+  const hasCompleted = /event:\s*response\.completed/.test(text);
+  const hasDone = /data:\s*\[DONE\]/.test(text);
+  const notPlainJson =
+    !text.trimStart().startsWith("{") || text.includes("event:");
+  const ok =
+    res.status === 200 &&
+    hasEventStream &&
+    hasDeltaEvent &&
+    hasDeltaField &&
+    hasCompleted &&
+    hasDone &&
+    notPlainJson;
+  if (ok) return pass(label);
+  return fail(
+    label,
+    `HTTP ${res.status}, content-type=${contentType}, deltaEvent=${hasDeltaEvent}, completed=${hasCompleted}, done=${hasDone}, preview=${JSON.stringify(text.slice(0, 200))}`
+  );
+}
+
 async function run() {
   if (!LIVE) {
     printOfflineDefaultHint(SCRIPT);
@@ -231,6 +256,34 @@ async function run() {
       assertResponsesOk(
         res,
         "POST /v1/responses model=gpt-5 (alias) + max_output_tokens"
+      ) && ok;
+  }
+
+  // --- Responses API stream=true (OpenAI Responses SSE) ---
+  {
+    const res = await postJson("/v1/responses", {
+      model: "gpt-5.4",
+      input: "Say OK in one short sentence.",
+      stream: true,
+    });
+    ok =
+      assertResponsesSseOk(
+        res,
+        "POST /v1/responses stream=true gpt-5.4 (Responses SSE + [DONE])"
+      ) && ok;
+  }
+
+  {
+    const res = await postJson("/v1/responses", {
+      model: "gpt-5.5",
+      input: [{ role: "user", content: "Say ok only." }],
+      stream: true,
+      max_output_tokens: 64,
+    });
+    ok =
+      assertResponsesSseOk(
+        res,
+        "POST /v1/responses stream=true gpt-5.5 input=array"
       ) && ok;
   }
 

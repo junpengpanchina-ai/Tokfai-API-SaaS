@@ -18,6 +18,7 @@ import {
 import { respondExecuteChatCompletionFailure } from "../lib/handleExecuteChatCompletionResult.js";
 import { parseIdempotencyKey } from "../lib/idempotency.js";
 import { readJsonBodyWithLimit } from "../lib/readJsonBodyWithLimit.js";
+import { responsesToSseBody } from "../lib/responsesSse.js";
 import {
   chatCompletionResponseToResponses,
   isResponsesFormatResponse,
@@ -31,6 +32,9 @@ import { logGatewayRejection } from "./chatGatewayLogs.js";
  *
  * Converts Responses `input` to chat `messages` and reuses executeChatCompletion
  * for auth, billing, routing, and upstream handling.
+ *
+ * stream=false → JSON object=response
+ * stream=true  → OpenAI Responses SSE (synthesized from completed response)
  */
 export const responsesRoutes = new Hono();
 
@@ -67,6 +71,7 @@ responsesRoutes.post("/v1/responses", async (c) => {
     );
   }
 
+  const wantsStream = parsed.data.stream === true;
   const chatBody = responsesBodyToChatBody(parsed.data);
   if (
     !chatBody.messages?.length ||
@@ -80,7 +85,10 @@ responsesRoutes.post("/v1/responses", async (c) => {
       "invalid_request_error"
     );
   }
-  const chatParsed = ChatCompletionRequestSchema.safeParse(chatBody);
+  const chatParsed = ChatCompletionRequestSchema.safeParse({
+    ...chatBody,
+    stream: false,
+  });
   if (!chatParsed.success) {
     throw ApiError.badRequest(
       "Invalid responses request.",
@@ -114,6 +122,20 @@ responsesRoutes.post("/v1/responses", async (c) => {
   const response = isResponsesFormatResponse(result.response)
     ? result.response
     : chatCompletionResponseToResponses(result.response, result.requestId);
+
+  if (wantsStream) {
+    const sseBody = responsesToSseBody(response);
+    return c.newResponse(sseBody, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+        "X-Request-Id": result.requestId,
+      },
+    });
+  }
 
   return c.json(response);
 });

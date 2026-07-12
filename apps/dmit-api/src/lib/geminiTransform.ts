@@ -86,7 +86,12 @@ export function resolveGeminiCompatModelId(raw: string): {
   resolved: string;
 } {
   const requested = normalizeGeminiModelId(raw);
-  const resolved = GEMINI_MODEL_ALIASES[requested] ?? requested;
+  // Also accept openai/ / case / spacing variants via shared normalizer keys.
+  const normalizedKey = requested.toLowerCase().replace(/[_\s]+/g, "-");
+  const resolved =
+    GEMINI_MODEL_ALIASES[requested] ??
+    GEMINI_MODEL_ALIASES[normalizedKey] ??
+    requested;
   return { requested, resolved };
 }
 
@@ -99,11 +104,13 @@ export type GeminiModelAction =
   | "streamGenerateContent";
 
 export function normalizeGeminiModelId(raw: string): string {
-  const trimmed = decodeURIComponent(raw.trim());
-  if (trimmed.startsWith("models/")) {
-    return trimmed.slice("models/".length);
+  // Reuse OpenAI client normalization (prefix strip + case), then keep Gemini ids.
+  try {
+    const decoded = decodeURIComponent(raw.trim());
+    return decoded.replace(/^models\//i, "").trim();
+  } catch {
+    return raw.trim().replace(/^models\//i, "");
   }
-  return trimmed;
 }
 
 export function toGeminiModelName(modelId: string): string {
