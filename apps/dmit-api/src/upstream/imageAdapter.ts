@@ -7,8 +7,13 @@ import {
   type ImageUrlResolveSource,
 } from "./imageUrlResolver.js";
 
+/**
+ * Prompt is only an auxiliary constraint.
+ * Real subject binding comes from the upstream `images` array.
+ * Never enter reference-edit when images_count = 0.
+ */
 const IMAGE_TO_IMAGE_PROMPT_PREFIX =
-  "You are editing a reference image. Strictly preserve the same person/product subject: same face or product identity, proportions, pose, camera angle, and subject count. Do not invent a new person/product. Do not create dual-person, side-by-side comparison, or multi-version collage. Only change what the user explicitly requests. Output a single complete image.";
+  "You are editing the attached reference image(s). Strictly preserve the same person/product subject: same face or product identity, proportions, pose, camera angle, and subject count. Do not invent a new person/product. Do not create dual-person, side-by-side comparison, or multi-version collage. Only change what the user explicitly requests. Output a single complete image.";
 
 const BASE = env.GRSAI_BASE_URL.replace(/\/+$/, "");
 
@@ -20,7 +25,7 @@ export type GrsaiImageInputMode =
   | "referenceImages"
   | "images_data_url";
 
-export type GrsaiAdapterMode = GrsaiImageInputMode | "legacy_draw";
+export type GrsaiAdapterMode = GrsaiImageInputMode | "legacy_draw" | "images";
 
 export interface ImageGenerateRequest {
   model: string;
@@ -43,6 +48,7 @@ export interface ImageGenerateDebugInfo {
   image_url_sources: ImageUrlResolveSource[];
   upstream_payload_keys: string[];
   adapter_mode: GrsaiAdapterMode;
+  upstream_images_count?: number;
 }
 
 export interface ImageGenerateResult {
@@ -93,6 +99,10 @@ export function buildImageGenerationPrompt(
   return `${IMAGE_TO_IMAGE_PROMPT_PREFIX}\n\n${prompt}`;
 }
 
+/**
+ * Build GRSai /v1/api/generate body.
+ * Upstream contract requires `images: string[]` (never leave refs only in image_urls).
+ */
 export async function buildGrsaiImagePayload(
   params: BuildGrsaiImagePayloadParams
 ): Promise<GrsaiImagePayloadResult> {
@@ -116,50 +126,60 @@ export async function buildGrsaiImagePayload(
     };
   }
 
-  switch (mode) {
-    case "images_url":
-      return finishPayload(base, "images_url", {
-        images: resolvedImageUrls,
-      }, resolvedImageUrls);
+  // Prefer closed-loop data URLs so upstream does not need to fetch remote hosts.
+  const preparedImages = await prepareImagesForUpstream(resolvedImageUrls, mode);
+  const adapterMode: GrsaiAdapterMode =
+    preparedImages.every((url) => url.startsWith("data:"))
+      ? "images_data_url"
+      : mode === "images_url"
+        ? "images_url"
+        : "images";
 
-    case "image_url":
-      return finishPayload(base, "image_url", {
-        image: resolvedImageUrls[0],
-      }, resolvedImageUrls);
+  // Always map to upstream `images` — Tokfai may accept image_urls externally.
+  return finishPayload(
+    base,
+    adapterMode,
+    { images: preparedImages },
+    preparedImages
+  );
+}
 
-    case "imageUrl":
-      return finishPayload(base, "imageUrl", {
-        imageUrl: resolvedImageUrls[0],
-      }, resolvedImageUrls);
-
-    case "input_image":
-      return finishPayload(base, "input_image", {
-        input_image: resolvedImageUrls[0],
-      }, resolvedImageUrls);
-
-    case "referenceImages":
-      return finishPayload(base, "referenceImages", {
-        referenceImages: resolvedImageUrls,
-      }, resolvedImageUrls);
-
-    case "images_data_url": {
-      const dataUrls: string[] = [];
-      for (const imageUrl of resolvedImageUrls) {
-        dataUrls.push(await fetchImageAsDataUrl(imageUrl));
+async function prepareImagesForUpstream(
+  resolvedImageUrls: string[],
+  mode: GrsaiImageInputMode
+): Promise<string[]> {
+  const out: string[] = [];
+  for (const imageRef of resolvedImageUrls) {
+    if (imageRef.startsWith("data:image/")) {
+      out.push(imageRef);
+      continue;
+    }
+    // Convert remote URLs to data URLs when configured, or always when possible
+    // so GRSai cannot silently ignore unreachable public storage links.
+    if (
+      mode === "images_data_url" ||
+      mode === "images_url" ||
+      mode === "image_url" ||
+      mode === "imageUrl" ||
+      mode === "input_image" ||
+      mode === "referenceImages"
+    ) {
+      try {
+        out.push(await fetchImageAsDataUrl(imageRef));
+        continue;
+      } catch (err) {
+        // Fall back to passing the URL in `images` if fetch fails.
+        log.warn("image_upstream_data_url_fallback", {
+          hint: sanitizeImageUrlForLog(imageRef),
+          code: err instanceof ApiError ? err.code : "image_fetch_failed",
+        });
+        out.push(imageRef);
+        continue;
       }
-      return finishPayload(base, "images_data_url", {
-        images: dataUrls,
-      }, dataUrls);
     }
-
-    default: {
-      const _exhaustive: never = mode;
-      throw ApiError.internal(
-        `Unsupported GRSAI_IMAGE_INPUT_MODE: ${String(_exhaustive)}`,
-        "server_error"
-      );
-    }
+    out.push(imageRef);
   }
+  return out;
 }
 
 function finishPayload(

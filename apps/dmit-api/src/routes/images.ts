@@ -26,6 +26,14 @@ import {
 } from "../upstream/imageAdapter.js";
 import { resolveImageModelId } from "../upstream/imageModelAliases.js";
 import {
+  normalizeImageInputs,
+  primaryImageSourceType,
+  resolveImageRequestMode,
+  resolvePromptMode,
+  summarizeImageInputsForLog,
+  type NormalizedImageInput,
+} from "../upstream/normalizeImageInputs.js";
+import {
   resolveImageInputUrls,
   sanitizeImageUrlForLog,
   type ImageUrlResolveSource,
@@ -38,29 +46,14 @@ const ImageGenerationRequestSchema = z
     n: z.number().int().positive().optional(),
     size: z.string().optional(),
     response_format: z.string().optional(),
-    image_urls: z
-      .array(
-        z
-          .string()
-          .url()
-          .max(2048)
-          .refine(isHttpOrHttpsUrl, {
-            message: "Each image URL must use http or https.",
-          })
-      )
-      .max(4)
-      .optional(),
+    mode: z.string().optional(),
+    // Image fields are normalized separately (images / image_urls / …).
+    images: z.array(z.string()).max(4).optional(),
+    image_urls: z.array(z.string()).max(4).optional(),
+    reference_images: z.array(z.string()).max(4).optional(),
+    input_images: z.array(z.string()).max(4).optional(),
   })
   .passthrough();
-
-function isHttpOrHttpsUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
 
 const UPSTREAM_ERROR_CODES = new Set([
   "upstream_auth_error",
@@ -100,7 +93,29 @@ imageRoutes.post("/v1/images/generations", async (c) => {
   const prompt = parsed.data.prompt?.trim();
   const n = parsed.data.n ?? 1;
   const responseFormat = parsed.data.response_format ?? "url";
-  const imageUrls = parsed.data.image_urls ?? [];
+
+  const normalized = normalizeImageInputs(body);
+  const mode = resolveImageRequestMode({
+    bodyMode: parsed.data.mode,
+    prompt: prompt ?? "",
+    imagesCount: normalized.imagesCount,
+  });
+  const promptMode = resolvePromptMode({
+    mode,
+    prompt: prompt ?? "",
+  });
+  const imageSourceType = primaryImageSourceType(normalized);
+
+  log.info("image_generation_requested", {
+    requestId,
+    model: resolvedModel,
+    mode,
+    imagesCount: normalized.imagesCount,
+    upstreamImagesCount: null,
+    imageSourceTypes: normalized.imageSourceTypes,
+    promptMode,
+    hasBlobBlocked: normalized.hasBlobBlocked,
+  });
 
   if (!prompt) {
     await writeUsageLog(
@@ -117,6 +132,41 @@ imageRoutes.post("/v1/images/generations", async (c) => {
     );
 
     throw ApiError.badRequest("Prompt is required.", "invalid_prompt");
+  }
+
+  if (mode === "reference_edit" && normalized.imagesCount === 0) {
+    await writeUsageLog(
+      failedUsageLog({
+        user_id: caller.userId,
+        api_key_id: caller.apiKeyId,
+        model: resolvedModel,
+        status: "failed",
+        request_id: requestId,
+        error_code: "reference_image_missing",
+        error_message: "需要上传参考图后才能进行保留主体改图。",
+        latency_ms: Date.now() - startedAt,
+      })
+    );
+
+    log.warn("image_generation_failed", {
+      requestId,
+      route: "/v1/images/generations",
+      status: 400,
+      code: "reference_image_missing",
+      mode,
+      imagesCount: 0,
+      upstreamImagesCount: 0,
+      imageSourceTypes: normalized.imageSourceTypes,
+      promptMode,
+      hasBlobBlocked: normalized.hasBlobBlocked,
+    });
+
+    throw new ApiError({
+      status: 400,
+      message: "需要上传参考图后才能进行保留主体改图。",
+      code: "reference_image_missing",
+      type: "validation_error",
+    });
   }
 
   if (n > 1) {
@@ -211,12 +261,13 @@ imageRoutes.post("/v1/images/generations", async (c) => {
 
   let resolvedImageUrls: string[] = [];
   let imageUrlSources: ImageUrlResolveSource[] = [];
+  let upstreamImagesCount = 0;
 
   try {
-    if (imageUrls.length > 0) {
-      const resolved = await resolveImageInputUrls(imageUrls);
-      resolvedImageUrls = resolved.map((item) => item.url);
-      imageUrlSources = resolved.map((item) => item.source);
+    if (normalized.imagesCount > 0) {
+      const prepared = await prepareResolvedImages(normalized.images);
+      resolvedImageUrls = prepared.urls;
+      imageUrlSources = prepared.sources;
     }
 
     await assertHasCredits(caller.userId);
@@ -230,7 +281,15 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       imageSize,
       imageUrls: resolvedImageUrls,
       imageUrlSources,
+      mode,
+      promptMode,
     });
+
+    upstreamImagesCount =
+      debug.upstream_images_count ??
+      (debug.upstream_payload_keys.includes("images")
+        ? resolvedImageUrls.length
+        : 0);
 
     const creditsCharged = await priceCreditsForImage(resolvedModel);
 
@@ -261,13 +320,20 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       status: 200,
       code: "succeeded",
       message: "Image generation succeeded.",
-      has_input_images: imageUrls.length > 0,
-      input_images_count: imageUrls.length,
+      mode,
+      promptMode,
+      has_input_images: normalized.imagesCount > 0,
+      imagesCount: normalized.imagesCount,
+      input_images_count: normalized.imagesCount,
       resolved_images_count: resolvedImageUrls.length,
+      upstreamImagesCount,
+      imageSourceTypes: normalized.imageSourceTypes,
+      image_source_type: imageSourceType,
+      hasBlobBlocked: normalized.hasBlobBlocked,
       image_url_sources: imageUrlSources,
       upstream_payload_keys: debug.upstream_payload_keys,
       adapter_mode: debug.adapter_mode,
-      input_image_url_hints: imageUrls.map(sanitizeImageUrlForLog),
+      input_image_hints: summarizeImageInputsForLog(normalized),
     });
 
     return c.json({
@@ -277,8 +343,14 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       request_id: requestId,
       upstream_id: upstreamId,
       credits_charged: creditsCharged,
-      input_images_count: imageUrls.length,
+      mode,
+      prompt_mode: promptMode,
+      reference_image_included: normalized.imagesCount > 0,
+      images_count: normalized.imagesCount,
+      input_images_count: normalized.imagesCount,
       resolved_images_count: resolvedImageUrls.length,
+      upstream_images_count: upstreamImagesCount,
+      image_source_type: imageSourceType,
       image_url_sources: imageUrlSources,
       ...(env.NODE_ENV !== "production"
         ? {
@@ -287,6 +359,7 @@ imageRoutes.post("/v1/images/generations", async (c) => {
               image_url_sources: debug.image_url_sources,
               upstream_payload_keys: debug.upstream_payload_keys,
               adapter_mode: debug.adapter_mode,
+              upstream_images_count: upstreamImagesCount,
             },
           }
         : {}),
@@ -314,11 +387,18 @@ imageRoutes.post("/v1/images/generations", async (c) => {
         status: err.status,
         code: err.code ?? "failed",
         message: err.publicMessage,
-        has_input_images: imageUrls.length > 0,
-        input_images_count: imageUrls.length,
+        mode,
+        promptMode,
+        has_input_images: normalized.imagesCount > 0,
+        imagesCount: normalized.imagesCount,
+        input_images_count: normalized.imagesCount,
         resolved_images_count: resolvedImageUrls.length,
+        upstreamImagesCount,
+        imageSourceTypes: normalized.imageSourceTypes,
+        image_source_type: imageSourceType,
+        hasBlobBlocked: normalized.hasBlobBlocked,
         image_url_sources: imageUrlSources,
-        input_image_url_hints: imageUrls.map(sanitizeImageUrlForLog),
+        input_image_hints: summarizeImageInputsForLog(normalized),
       });
 
       throw err;
@@ -343,11 +423,17 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       status: 500,
       code: "server_error",
       message: "Internal error.",
-      has_input_images: imageUrls.length > 0,
-      input_images_count: imageUrls.length,
+      mode,
+      promptMode,
+      has_input_images: normalized.imagesCount > 0,
+      imagesCount: normalized.imagesCount,
+      input_images_count: normalized.imagesCount,
       resolved_images_count: resolvedImageUrls.length,
+      upstreamImagesCount,
+      imageSourceTypes: normalized.imageSourceTypes,
+      image_source_type: imageSourceType,
+      hasBlobBlocked: normalized.hasBlobBlocked,
       image_url_sources: imageUrlSources,
-      input_image_url_hints: imageUrls.map(sanitizeImageUrlForLog),
     });
 
     throw ApiError.internal(
@@ -356,6 +442,40 @@ imageRoutes.post("/v1/images/generations", async (c) => {
     );
   }
 });
+
+async function prepareResolvedImages(
+  inputs: NormalizedImageInput[]
+): Promise<{ urls: string[]; sources: ImageUrlResolveSource[] }> {
+  const urls: string[] = [];
+  const sources: ImageUrlResolveSource[] = [];
+
+  const httpUrls: string[] = [];
+  const httpIndexes: number[] = [];
+
+  for (let i = 0; i < inputs.length; i += 1) {
+    const item = inputs[i]!;
+    if (item.sourceType === "data_url") {
+      urls[i] = item.value;
+      sources[i] = "data_url";
+    } else {
+      httpUrls.push(item.value);
+      httpIndexes.push(i);
+      urls[i] = item.value;
+      sources[i] = "direct";
+    }
+  }
+
+  if (httpUrls.length > 0) {
+    const resolved = await resolveImageInputUrls(httpUrls);
+    for (let j = 0; j < resolved.length; j += 1) {
+      const index = httpIndexes[j]!;
+      urls[index] = resolved[j]!.url;
+      sources[index] = resolved[j]!.source;
+    }
+  }
+
+  return { urls, sources };
+}
 
 async function readJsonBody(bodyPromise: Promise<unknown>): Promise<unknown> {
   try {
@@ -515,6 +635,8 @@ type GrsaiUpstreamCallParams = {
   imageSize: string;
   imageUrls: string[];
   imageUrlSources: ImageUrlResolveSource[];
+  mode: "reference_edit" | "text_to_image";
+  promptMode: "subject_preserve" | "normal";
 };
 
 type ParsedImageExtraction = {
@@ -737,16 +859,30 @@ async function callGrsaiImageUpstream(
       resolvedImageUrls: params.imageUrls,
     });
 
+  const upstreamImages = Array.isArray(payload.images)
+    ? (payload.images as unknown[]).filter((item) => typeof item === "string")
+    : [];
+  const upstreamImagesCount = upstreamImages.length;
+
   log.info("image_generation_upstream_request", {
     requestId: params.requestId,
     model: params.resolvedModel,
     requestedModel: params.requestedModel,
+    mode: params.mode,
+    promptMode: params.promptMode,
     has_input_images: params.imageUrls.length > 0,
+    imagesCount: params.imageUrls.length,
     input_images_count: params.imageUrls.length,
+    upstreamImagesCount,
     image_url_sources: params.imageUrlSources,
     upstream_payload_keys: upstreamPayloadKeys,
     adapter_mode: adapterMode,
     prompt_prefix: upstreamPrompt.slice(0, 120),
+    input_image_url_hints: params.imageUrls.map((url) =>
+      url.startsWith("data:")
+        ? `data_url(len=${url.length})`
+        : sanitizeImageUrlForLog(url)
+    ),
   });
 
   let response: Response;
@@ -942,6 +1078,7 @@ async function callGrsaiImageUpstream(
     image_url_sources: params.imageUrlSources,
     upstream_payload_keys: upstreamPayloadKeys,
     adapter_mode: adapterMode,
+    upstream_images_count: upstreamImagesCount,
   };
 
   return {

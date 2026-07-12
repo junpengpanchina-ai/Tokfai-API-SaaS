@@ -415,13 +415,77 @@ function imageGenerationBody(body) {
     typeof body.model === "string" ? body.model : "gpt-image-2";
   const resolvedModel = requestedModel;
   const meta = tokfaiMeta(requestedModel, resolvedModel);
+
+  const images = collectMockImages(body);
+  const prompt = typeof body.prompt === "string" ? body.prompt : "";
+  const wantsReference =
+    body.mode === "reference_edit" ||
+    /保留人物|保留主体|不要换人|参考图|换成|替换成/i.test(prompt);
+
+  if (wantsReference && images.length === 0) {
+    return {
+      __status: 400,
+      error: {
+        message: "需要上传参考图后才能进行保留主体改图。",
+        code: "reference_image_missing",
+        type: "validation_error",
+      },
+      request_id: meta.request_id,
+    };
+  }
+
+  const hasDataUrl = images.some((url) => String(url).startsWith("data:image/"));
+  const hasBlob = images.some((url) => /^blob:/i.test(String(url)));
+  if (hasBlob) {
+    return {
+      __status: 400,
+      error: {
+        message: "Browser blob URLs cannot be used as reference images.",
+        code: "invalid_image_url",
+        type: "validation_error",
+      },
+      request_id: meta.request_id,
+    };
+  }
+
+  const mode = images.length > 0 || wantsReference ? "reference_edit" : "text_to_image";
   return {
     created: Math.floor(Date.now() / 1000),
     data: [{ url: "https://example.com/mock-image.png" }],
     model: resolvedModel,
+    mode,
+    prompt_mode: wantsReference || images.length > 0 ? "subject_preserve" : "normal",
+    reference_image_included: images.length > 0,
+    images_count: images.length,
+    input_images_count: images.length,
+    resolved_images_count: images.length,
+    upstream_images_count: images.length,
+    image_source_type: hasDataUrl
+      ? "data_url"
+      : images.length > 0
+        ? "https_url"
+        : "none",
     ...meta,
   };
 }
+
+function collectMockImages(body) {
+  const buckets = [
+    body?.images,
+    body?.image_urls,
+    body?.reference_images,
+    body?.input_images,
+  ];
+  const out = [];
+  for (const bucket of buckets) {
+    if (!Array.isArray(bucket)) continue;
+    for (const item of bucket) {
+      if (typeof item === "string" && item.trim()) out.push(item.trim());
+    }
+  }
+  return out.slice(0, 4);
+}
+
 
 function createBatch(body) {
   const requestedModel = typeof body.model === "string" ? body.model : "auto-fast";
@@ -693,7 +757,10 @@ export function startMockGateway(options = {}) {
         if (!slot.ok) return sendJson(res, slot.response.status, slot.response.body);
         try {
           const body = await readJsonBody(req);
-          return sendJson(res, 200, imageGenerationBody(body));
+          const payload = imageGenerationBody(body);
+          const status = payload.__status ?? 200;
+          if (payload.__status) delete payload.__status;
+          return sendJson(res, status, payload);
         } finally {
           slot.release?.();
         }

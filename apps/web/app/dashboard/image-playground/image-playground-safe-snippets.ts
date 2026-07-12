@@ -8,6 +8,8 @@ export interface ImageGenerationCurlParams {
   size: string;
   n?: number;
   response_format?: "url";
+  mode?: "text_to_image" | "reference_edit";
+  images?: string[];
   image_urls?: string[];
 }
 
@@ -20,7 +22,13 @@ function imageApiCurlBody(params: ImageGenerationCurlParams): Record<string, unk
     response_format: params.response_format ?? "url",
   };
 
-  if (params.image_urls && params.image_urls.length > 0) {
+  if (params.mode) {
+    body.mode = params.mode;
+  }
+
+  if (params.images && params.images.length > 0) {
+    body.images = params.images;
+  } else if (params.image_urls && params.image_urls.length > 0) {
     body.image_urls = params.image_urls;
   }
 

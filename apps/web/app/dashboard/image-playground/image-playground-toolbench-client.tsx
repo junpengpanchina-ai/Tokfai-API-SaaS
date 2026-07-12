@@ -890,22 +890,38 @@ export function ImagePlaygroundResultArea({
                     <div className="mt-2 space-y-1 font-mono">
                       <p>
                         mode:{" "}
-                        {requestMode ??
+                        {result?.mode ??
+                          requestMode ??
                           (referenceImageIncluded
                             ? "reference_edit"
                             : "text_to_image")}
                       </p>
                       <p>
                         reference_image_included:{" "}
-                        {referenceImageIncluded ||
+                        {result?.reference_image_included === true ||
+                        referenceImageIncluded ||
                         (typeof inputImagesCount === "number" &&
                           inputImagesCount > 0)
-                          ? "yes"
-                          : "no"}
+                          ? "true"
+                          : "false"}
                       </p>
                       <p>
                         images_count:{" "}
-                        {inputImagesCount != null ? inputImagesCount : 0}
+                        {result?.images_count ??
+                          (inputImagesCount != null ? inputImagesCount : 0)}
+                      </p>
+                      <p>
+                        image_source_type:{" "}
+                        {result?.image_source_type ?? "unknown"}
+                      </p>
+                      <p>
+                        upstream_images_count:{" "}
+                        {result?.upstream_images_count ??
+                          result?.resolved_images_count ??
+                          0}
+                      </p>
+                      <p>
+                        prompt_mode: {result?.prompt_mode ?? "unknown"}
                       </p>
                       {resolvedModel ? (
                         <p>

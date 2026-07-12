@@ -1,7 +1,11 @@
 /**
  * Image Playground prompt helpers — text-to-image vs reference-image edit mode.
  * Client-only prompt shaping; does not change DMIT Image API contracts.
- * Upstream field for reference images remains `image_urls` (not `images`).
+ *
+ * IMPORTANT:
+ * Prompt is only an auxiliary constraint.
+ * Real subject binding comes from the request `images` array sent to DMIT/upstream.
+ * If images_count = 0, do not enter reference_edit — block submit instead.
  */
 
 /** Explicit edit / preserve intent — used to require a reference image. */
@@ -11,6 +15,10 @@ const REFERENCE_EDIT_INTENT_PATTERN =
 /** Softer hints that still benefit from subject-preserve wrapping when images exist. */
 const EDIT_HINT_PATTERN =
   /保留|替换|换成|改成|变成|参考|保持|主体|脸|人物|衣服|背景|西装|中山装|服装|发型|姿态|构图|龙袍|商品|白底/;
+
+/** Clothing-swap intent — keep edit local; do not reinvent identity/scene. */
+const CLOTHING_SWAP_PATTERN =
+  /换龙袍|换衣服|换西装|换服装|穿上|把衣服换成|把西装换成|把西服换成|替换成.+袍|换成.+袍|换成.+装/;
 
 export type ImagePlaygroundMode = "text_to_image" | "reference_edit";
 
@@ -33,19 +41,26 @@ export function shouldEnhanceReferenceEditPrompt(prompt: string): boolean {
   return EDIT_HINT_PATTERN.test(prompt) || promptImpliesReferenceEdit(prompt);
 }
 
-function extractClothingChange(prompt: string): string | null {
+export function isClothingSwapPrompt(prompt: string): boolean {
+  return CLOTHING_SWAP_PATTERN.test(prompt.trim());
+}
+
+function extractClothingTarget(prompt: string): string | null {
   const match = prompt.match(
     /(?:把|将)?(.{0,12}?)(?:西装|西服|外套|衣服|服装|上衣|裙子|礼服|T恤|衬衫|裤子|鞋子)?(?:换成|替换成|改成|变成)(.{1,40}?)(?:[，。,.！!？?\n]|$)/
   );
-  if (!match) return null;
-  const from = (match[1] || match[0]).trim();
-  const to = match[2]?.trim();
-  if (!to) return null;
-  if (/西装|西服|外套|衣服|服装/.test(prompt) || from) {
-    const polishedTo = /龙袍/.test(to) && !/中式/.test(to) ? `精致的中式${to}` : to;
-    return `只把他/她身上的服装替换成：${polishedTo}。不要改脸、发型、体型、姿态或人物身份。`;
+  if (match?.[2]?.trim()) return match[2].trim();
+
+  const wearMatch = prompt.match(/穿上(.{1,40}?)(?:[，。,.！!？?\n]|$)/);
+  if (wearMatch?.[1]?.trim()) return wearMatch[1].trim();
+
+  const swapMatch = prompt.match(
+    /换(?:成)?(.{1,40}?)(?:[，。,.！!？?\n]|$)/
+  );
+  if (swapMatch?.[1]?.trim() && /袍|装|服|裙|衣/.test(swapMatch[1])) {
+    return swapMatch[1].trim();
   }
-  return `只按要求替换服装为：${to}。不要改脸、发型、体型、姿态或人物身份。`;
+  return null;
 }
 
 function extractBackgroundChange(prompt: string): string | null {
@@ -71,9 +86,34 @@ function extractProductPreserve(prompt: string): boolean {
   return /保留商品|商品主体|白底电商|电商主图/.test(prompt);
 }
 
+function buildClothingSwapPrompt(userPrompt: string, strengthen: boolean): string {
+  const target = extractClothingTarget(userPrompt) ?? "用户指定的服装";
+  const strengthenLines = strengthen
+    ? [
+        "请更严格锁定参考图中的同一张脸与同一人物身份。",
+        "若服装替换与保脸冲突，优先保脸、保发型、保体型、保姿态。",
+      ]
+    : [];
+
+  return [
+    "基于参考图进行同一人物局部改衣。",
+    "严格保留参考图中的同一个人物：脸部五官、发型、发际线、年龄感、肤色、体型、肩颈比例、姿态、镜头角度、人物数量都保持一致。",
+    `只把原来的衣服替换成：${target}。`,
+    "不要改变人物身份，不要改变脸，不要改变年龄，不要改变体型，不要改变姿态。",
+    "不要生成另一个人，不要生成双人，不要左右对比，不要拼图。",
+    "背景尽量保持原图或仅轻微优化，不要改成新的复杂场景。",
+    "不要自动生成宫殿、皇帝、朝代场景或重新扮演身份；只做服装替换，不是人物重新扮演。",
+    "只输出一张图片。",
+    `用户原始修改需求：${userPrompt.trim()}`,
+    ...strengthenLines,
+  ].join("\n");
+}
+
 /**
  * Wrap user prompt for reference-image edit so the model edits locally
  * instead of inventing a new subject.
+ *
+ * Prompt only assists; the `images` array is the real reference constraint.
  */
 export function buildReferenceEditPrompt(
   userPrompt: string,
@@ -83,7 +123,11 @@ export function buildReferenceEditPrompt(
   if (!trimmed) return trimmed;
 
   const strengthen = options.strengthen === true;
-  const clothing = extractClothingChange(trimmed);
+
+  if (isClothingSwapPrompt(trimmed)) {
+    return buildClothingSwapPrompt(trimmed, strengthen);
+  }
+
   const background = extractBackgroundChange(trimmed);
   const style = extractStyleChange(trimmed);
   const productMode = extractProductPreserve(trimmed);
@@ -109,7 +153,6 @@ export function buildReferenceEditPrompt(
       ];
 
   const changeLines: string[] = [];
-  if (clothing) changeLines.push(clothing);
   if (background) changeLines.push(background);
   if (style) changeLines.push(style);
 
@@ -176,15 +219,75 @@ export const REFERENCE_EDIT_PREFERRED_MODELS = [
 
 export const TEXT_TO_IMAGE_DEFAULT_MODEL = "nano-banana-fast";
 
+export type ImageModelCapability = {
+  supportsReferenceImage: boolean;
+  supportsSubjectPreserve: boolean;
+  recommendedFor: Array<
+    "text_to_image" | "reference_edit" | "ecommerce_product"
+  >;
+};
+
+export const IMAGE_MODEL_CAPABILITIES: Record<string, ImageModelCapability> = {
+  "nano-banana-fast": {
+    supportsReferenceImage: true,
+    supportsSubjectPreserve: false,
+    recommendedFor: ["text_to_image"],
+  },
+  "nano-banana": {
+    supportsReferenceImage: true,
+    supportsSubjectPreserve: true,
+    recommendedFor: ["reference_edit", "text_to_image"],
+  },
+  "nano-banana-2": {
+    supportsReferenceImage: true,
+    supportsSubjectPreserve: true,
+    recommendedFor: ["reference_edit", "ecommerce_product", "text_to_image"],
+  },
+  "nano-banana-pro": {
+    supportsReferenceImage: true,
+    supportsSubjectPreserve: true,
+    recommendedFor: ["reference_edit", "ecommerce_product"],
+  },
+  "gpt-image-2": {
+    supportsReferenceImage: true,
+    supportsSubjectPreserve: false,
+    recommendedFor: ["text_to_image", "ecommerce_product"],
+  },
+};
+
+export function getImageModelCapability(
+  modelId: string
+): ImageModelCapability {
+  return (
+    IMAGE_MODEL_CAPABILITIES[modelId] ?? {
+      supportsReferenceImage: true,
+      supportsSubjectPreserve: false,
+      recommendedFor: ["text_to_image"],
+    }
+  );
+}
+
 export function pickPreferredImageModel(options: {
   hasReferenceImages: boolean;
   availableModelIds: string[];
   currentModel: string;
-}): { model: string; switched: boolean; warnFastForEdit: boolean } {
-  const { hasReferenceImages, availableModelIds, currentModel } = options;
+  wantsSubjectPreserve?: boolean;
+}): {
+  model: string;
+  switched: boolean;
+  warnFastForEdit: boolean;
+  blockSubjectPreserve: boolean;
+} {
+  const {
+    hasReferenceImages,
+    availableModelIds,
+    currentModel,
+    wantsSubjectPreserve = false,
+  } = options;
   const available = new Set(availableModelIds);
+  const needsPreserve = hasReferenceImages || wantsSubjectPreserve;
 
-  if (!hasReferenceImages) {
+  if (!needsPreserve) {
     return {
       model: available.has(currentModel)
         ? currentModel
@@ -193,24 +296,48 @@ export function pickPreferredImageModel(options: {
           : currentModel,
       switched: false,
       warnFastForEdit: false,
+      blockSubjectPreserve: false,
     };
   }
 
   const preferred = REFERENCE_EDIT_PREFERRED_MODELS.find((id) =>
     available.has(id)
   );
+  const currentCapability = getImageModelCapability(currentModel);
+  const blockSubjectPreserve =
+    wantsSubjectPreserve && !currentCapability.supportsSubjectPreserve;
 
   if (preferred && currentModel === TEXT_TO_IMAGE_DEFAULT_MODEL) {
-    return { model: preferred, switched: true, warnFastForEdit: false };
+    return {
+      model: preferred,
+      switched: true,
+      warnFastForEdit: false,
+      blockSubjectPreserve: false,
+    };
+  }
+
+  if (preferred && blockSubjectPreserve) {
+    return {
+      model: preferred,
+      switched: preferred !== currentModel,
+      warnFastForEdit: false,
+      blockSubjectPreserve: true,
+    };
   }
 
   if (preferred && !available.has(currentModel)) {
-    return { model: preferred, switched: true, warnFastForEdit: false };
+    return {
+      model: preferred,
+      switched: true,
+      warnFastForEdit: false,
+      blockSubjectPreserve: false,
+    };
   }
 
   const warnFastForEdit =
     currentModel === TEXT_TO_IMAGE_DEFAULT_MODEL ||
-    currentModel.includes("-fast");
+    currentModel.includes("-fast") ||
+    !currentCapability.supportsSubjectPreserve;
 
   return {
     model: available.has(currentModel)
@@ -218,5 +345,6 @@ export function pickPreferredImageModel(options: {
       : preferred ?? currentModel,
     switched: !available.has(currentModel) && Boolean(preferred),
     warnFastForEdit,
+    blockSubjectPreserve,
   };
 }

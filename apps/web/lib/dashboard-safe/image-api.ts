@@ -10,6 +10,10 @@ export interface ImageGenerationRequest {
   size?: string;
   n?: number;
   response_format?: "url";
+  mode?: "text_to_image" | "reference_edit";
+  /** Preferred field — data URLs or http(s) URLs for upstream `images`. */
+  images?: string[];
+  /** Legacy alias still accepted by DMIT. */
   image_urls?: string[];
 }
 
@@ -20,6 +24,7 @@ export interface ImageGenerationDataItem {
 
 export type ImageUrlResolveSource =
   | "direct"
+  | "data_url"
   | "google_imgres"
   | "html_og_image"
   | "html_twitter_image"
@@ -32,8 +37,14 @@ export interface ImageGenerationResponse {
   request_id?: string;
   upstream_id?: string;
   credits_charged?: number;
+  mode?: "text_to_image" | "reference_edit";
+  prompt_mode?: "subject_preserve" | "normal";
+  reference_image_included?: boolean;
+  images_count?: number;
   input_images_count?: number;
   resolved_images_count?: number;
+  upstream_images_count?: number;
+  image_source_type?: "data_url" | "https_url" | "blob_blocked" | "none";
   image_url_sources?: ImageUrlResolveSource[];
 }
 

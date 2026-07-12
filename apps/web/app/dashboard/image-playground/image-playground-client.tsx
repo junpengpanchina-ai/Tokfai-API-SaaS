@@ -38,11 +38,17 @@ import {
   PlaygroundKeyError,
 } from "@/lib/dashboard-safe/playground-default-key";
 import {
+  getImageModelCapability,
   getImagePlaygroundMode,
   pickPreferredImageModel,
   promptImpliesReferenceEdit,
   resolveImagePromptForRequest,
 } from "@/lib/dashboard-safe/image-edit-prompt";
+import {
+  fileToDataUrl,
+  isBlobUrl,
+  pickApiImageSource,
+} from "@/lib/dashboard-safe/file-to-data-url";
 import {
   imagePlaygroundErrorMessage,
   resolveImageCreatedAt,
@@ -122,10 +128,17 @@ type ImageInputStatus = "uploading" | "resolving" | "ready" | "error";
 
 interface ImageInputItem {
   id: string;
-  url: string;
+  /** UI preview only — may be a blob: URL. Never send to DMIT. */
+  previewUrl: string;
+  /** Original file as data URL for API closed-loop reference edits. */
+  sourceDataUrl?: string;
+  /** Public http(s) URL (upload or pasted). Safe for API. */
+  sourceUrl?: string;
   label: string;
   source: ImageInputSource;
   status: ImageInputStatus;
+  mimeType?: string;
+  sizeBytes?: number;
   error?: string;
   previewError?: string;
 }
@@ -134,12 +147,26 @@ function resolveUploadedImageInput(
   entry: { id: string; item: ImageInputItem },
   uploadStatus: "ready" | "error",
   publicUrl: string,
-  errorMessage: string
+  errorMessage: string,
+  sourceDataUrl?: string
 ): ImageInputItem {
+  const nextDataUrl = sourceDataUrl || entry.item.sourceDataUrl;
   if (uploadStatus === "ready" && publicUrl) {
     return {
       ...entry.item,
-      url: publicUrl,
+      previewUrl: entry.item.previewUrl || publicUrl,
+      sourceUrl: publicUrl,
+      sourceDataUrl: nextDataUrl,
+      status: nextDataUrl || publicUrl ? "ready" : "error",
+      error: undefined,
+    };
+  }
+
+  if (nextDataUrl) {
+    return {
+      ...entry.item,
+      sourceDataUrl: nextDataUrl,
+      previewUrl: entry.item.previewUrl || nextDataUrl,
       status: "ready",
       error: undefined,
     };
@@ -147,7 +174,8 @@ function resolveUploadedImageInput(
 
   return {
     ...entry.item,
-    url: "",
+    previewUrl: entry.item.previewUrl,
+    sourceUrl: undefined,
     status: "error",
     error: errorMessage,
   };
@@ -168,8 +196,20 @@ function mergeImageInputUploadResult(
 
 function getReadyImageUrls(items: ImageInputItem[]): string[] {
   return items
-    .filter((item) => item.status === "ready" && item.url)
-    .map((item) => item.url);
+    .map((item) =>
+      item.status === "ready"
+        ? pickApiImageSource({
+            sourceDataUrl: item.sourceDataUrl,
+            sourceUrl: item.sourceUrl,
+            previewUrl: item.previewUrl,
+          })
+        : null
+    )
+    .filter((url): url is string => Boolean(url) && !isBlobUrl(url));
+}
+
+function getDisplayUrl(item: ImageInputItem): string {
+  return item.previewUrl || item.sourceDataUrl || item.sourceUrl || "";
 }
 
 function isFileDragEvent(dataTransfer: DataTransfer): boolean {
@@ -264,7 +304,13 @@ export function ImageGeneratePanel({
     if (initialReferenceImageUrl) {
       const item: ImageInputItem = {
         id: `handoff-${handoffKey}`,
-        url: initialReferenceImageUrl,
+        previewUrl: initialReferenceImageUrl,
+        sourceUrl: initialReferenceImageUrl.startsWith("http")
+          ? initialReferenceImageUrl
+          : undefined,
+        sourceDataUrl: initialReferenceImageUrl.startsWith("data:image/")
+          ? initialReferenceImageUrl
+          : undefined,
         label: initialReferenceImageLabel || "reference",
         source: "url",
         status: "ready",
@@ -284,6 +330,9 @@ export function ImageGeneratePanel({
 
   const readyImageUrls = getReadyImageUrls(imageInputs);
   const imageMode = getImagePlaygroundMode(readyImageUrls.length > 0);
+  const selectedCapability = getImageModelCapability(model);
+  const subjectPreserveHonesty =
+    imageMode === "reference_edit" && !selectedCapability.supportsSubjectPreserve;
 
   useEffect(() => {
     setLocalKeys(activeKeys);
@@ -323,11 +372,13 @@ export function ImageGeneratePanel({
     const hasReference = readyImageUrls.length > 0;
     const enteredReference = hasReference && !prevHadReferenceRef.current;
     prevHadReferenceRef.current = hasReference;
+    const wantsPreserve = promptImpliesReferenceEdit(prompt);
 
     const picked = pickPreferredImageModel({
       hasReferenceImages: hasReference,
       availableModelIds: IMAGE_PLAYGROUND_MODEL_IDS,
       currentModel: model,
+      wantsSubjectPreserve: wantsPreserve,
     });
 
     if (enteredReference && picked.switched && picked.model !== model) {
@@ -336,8 +387,16 @@ export function ImageGeneratePanel({
       return;
     }
 
-    setWarnFastForEdit(hasReference && picked.warnFastForEdit);
-  }, [readyImageUrls.length, model]);
+    if (wantsPreserve && picked.blockSubjectPreserve && picked.switched) {
+      setModel(picked.model);
+    }
+
+    setWarnFastForEdit(
+      hasReference &&
+        (picked.warnFastForEdit ||
+          !getImageModelCapability(model).supportsSubjectPreserve)
+    );
+  }, [readyImageUrls.length, model, prompt]);
 
   const selectedModelEntry = getImageModelOptionById(model);
   const isModelComingSoon = selectedModelEntry?.status === "coming_soon";
@@ -431,7 +490,16 @@ export function ImageGeneratePanel({
       const trimmed = rawUrl.trim();
       if (!trimmed) return;
 
-      if (!isValidImageUrl(trimmed)) {
+      if (isBlobUrl(trimmed)) {
+        setError({
+          status: 0,
+          code: "blob_url_blocked",
+          message: t("dashboard.imagePlayground.errors.blobUrlBlocked"),
+        });
+        return;
+      }
+
+      if (!isValidImageUrl(trimmed) && !trimmed.startsWith("data:image/")) {
         setError({
           status: 0,
           code: "invalid_image_url",
@@ -449,25 +517,35 @@ export function ImageGeneratePanel({
           });
           return current;
         }
-        if (current.some((item) => item.url === trimmed)) {
+        if (
+          current.some(
+            (item) =>
+              item.sourceUrl === trimmed ||
+              item.sourceDataUrl === trimmed ||
+              item.previewUrl === trimmed
+          )
+        ) {
           return current;
         }
 
         setError(null);
+        const isData = trimmed.startsWith("data:image/");
         return [
           ...current,
           {
             id: crypto.randomUUID(),
-            url: trimmed,
+            previewUrl: trimmed,
+            sourceUrl: isData ? undefined : trimmed,
+            sourceDataUrl: isData ? trimmed : undefined,
             label: formatUrlLabel(trimmed),
             source: "url",
-            status: "resolving",
+            status: isData ? "ready" : "resolving",
           },
         ];
       });
       setImageUrlDraft("");
     },
-    []
+    [t]
   );
 
   const uploadFiles = useCallback(async (files: FileList | File[]) => {
@@ -490,15 +568,18 @@ export function ImageGeneratePanel({
 
     const entries = slice.map((file) => {
       const id = crypto.randomUUID();
+      const previewUrl = URL.createObjectURL(file);
       return {
         id,
         file,
         item: {
           id,
-          url: "",
+          previewUrl,
           label: file.name,
           source: "upload" as const,
           status: "uploading" as const,
+          mimeType: file.type,
+          sizeBytes: file.size,
         },
       };
     });
@@ -518,20 +599,45 @@ export function ImageGeneratePanel({
         let uploadStatus: "ready" | "error" = "error";
         let publicUrl = "";
         let errorMessage = "Upload failed.";
+        let sourceDataUrl = "";
 
         try {
           validatePlaygroundImageFile(entry.file);
+          sourceDataUrl = await fileToDataUrl(entry.file);
+
+          // Prefer dataURL readiness for API closed-loop; public URL is optional backup.
+          setImageInputs((currentItems) => {
+            const next = currentItems.map((item) =>
+              item.id === entry.id
+                ? {
+                    ...item,
+                    sourceDataUrl,
+                    status: "ready" as const,
+                    error: undefined,
+                  }
+                : item
+            );
+            imageInputsRef.current = next;
+            return next;
+          });
+
           const formData = new FormData();
           formData.set("file", entry.file);
           const uploadResult = await uploadPlaygroundImageAction(formData);
-          if (!uploadResult.ok) {
-            throw new PlaygroundImageUploadError(
-              uploadResult.message,
-              uploadResult.code
-            );
+          if (uploadResult.ok) {
+            publicUrl = uploadResult.publicUrl;
+            uploadStatus = "ready";
+          } else {
+            // Data URL is enough for generation; keep ready if we have it.
+            uploadStatus = sourceDataUrl ? "ready" : "error";
+            errorMessage = uploadResult.message;
+            if (!sourceDataUrl) {
+              throw new PlaygroundImageUploadError(
+                uploadResult.message,
+                uploadResult.code
+              );
+            }
           }
-          publicUrl = uploadResult.publicUrl;
-          uploadStatus = "ready";
         } catch (err) {
           errorMessage =
             err instanceof PlaygroundImageUploadError
@@ -540,20 +646,23 @@ export function ImageGeneratePanel({
                 ? err.message
                 : "Upload failed.";
           console.error("[image-upload] failed", err);
-          setError({
-            status: 0,
-            code:
-              err instanceof PlaygroundImageUploadError
-                ? err.code
-                : "upload_failed",
-            message: errorMessage,
-          });
+          if (!sourceDataUrl) {
+            setError({
+              status: 0,
+              code:
+                err instanceof PlaygroundImageUploadError
+                  ? err.code
+                  : "upload_failed",
+              message: errorMessage,
+            });
+          }
         } finally {
           const resolved = resolveUploadedImageInput(
             entry,
             uploadStatus,
             publicUrl,
-            errorMessage
+            errorMessage,
+            sourceDataUrl || undefined
           );
 
           setImageInputs((currentItems) => {
@@ -572,6 +681,10 @@ export function ImageGeneratePanel({
 
   const removeImageInput = useCallback((id: string) => {
     setImageInputs((current) => {
+      const target = current.find((item) => item.id === id);
+      if (target?.previewUrl && isBlobUrl(target.previewUrl)) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
       const next = current.filter((item) => item.id !== id);
       imageInputsRef.current = next;
       return next;
@@ -622,7 +735,8 @@ export function ImageGeneratePanel({
         size,
         n: 1,
         response_format: "url",
-        image_urls: readyImageUrls.length > 0 ? readyImageUrls : undefined,
+        mode: readyImageUrls.length > 0 ? "reference_edit" : "text_to_image",
+        images: readyImageUrls.length > 0 ? readyImageUrls : undefined,
       },
       resolveApiKeyForCopy()
     );
@@ -697,6 +811,37 @@ export function ImageGeneratePanel({
       return;
     }
 
+    if (
+      (wantsReferenceEdit || hasReferenceImages) &&
+      currentInputs.some((item) => item.status === "ready") &&
+      imageUrlsForRequest.length === 0
+    ) {
+      setError({
+        status: 0,
+        code: "reference_image_unreadable",
+        message: t("dashboard.imagePlayground.errors.referenceImageUnreadable"),
+      });
+      pulseResultAttention();
+      focusResultPanel("onComplete");
+      return;
+    }
+
+    const capability = getImageModelCapability(model);
+    if (
+      wantsReferenceEdit &&
+      hasReferenceImages &&
+      !capability.supportsSubjectPreserve
+    ) {
+      setError({
+        status: 0,
+        code: "model_not_for_subject_preserve",
+        message: t("dashboard.imagePlayground.errors.modelNotForSubjectPreserve"),
+      });
+      pulseResultAttention();
+      focusResultPanel("onComplete");
+      return;
+    }
+
     let resolvedKey: string;
     try {
       resolvedKey = await resolveApiKey();
@@ -715,25 +860,45 @@ export function ImageGeneratePanel({
     focusResultPanel("onStart");
     setLoading(true);
     try {
-      // DMIT contract uses `image_urls` (http/https). Do not send empty arrays.
       const finalPrompt = resolveImagePromptForRequest({
         prompt: trimmedPrompt,
         hasReferenceImages,
         strengthen: useStrengthen,
       });
       const requestMode = getImagePlaygroundMode(hasReferenceImages);
+      const httpsOnly = imageUrlsForRequest.filter((url) =>
+        /^https?:\/\//i.test(url)
+      );
       const payload: Parameters<typeof imageGenerations>[1] = {
         model,
         prompt: finalPrompt,
         size,
         n: 1,
         response_format: "url",
-        image_urls: hasReferenceImages ? imageUrlsForRequest : undefined,
+        mode: requestMode,
+        images: hasReferenceImages ? imageUrlsForRequest : undefined,
+        image_urls:
+          hasReferenceImages && httpsOnly.length > 0 ? httpsOnly : undefined,
       };
 
       setLastRequestInputCount(imageUrlsForRequest.length);
       setLastRequestMode(requestMode);
       const res = await imageGenerations(resolvedKey, payload);
+
+      if (
+        requestMode === "reference_edit" &&
+        res.reference_image_included === false
+      ) {
+        setError({
+          status: 0,
+          code: "reference_image_missing",
+          message: t("dashboard.imagePlayground.errors.referenceImageMissing"),
+          requestId: res.request_id,
+        });
+        setResult(null);
+        return;
+      }
+
       setResult(res);
       setCompletedAt(
         resolveImageCreatedAt(res) ?? new Date().toISOString()
@@ -837,6 +1002,11 @@ export function ImageGeneratePanel({
                       : t("dashboard.imagePlayground.modeText")}
                   </Badge>
                 </div>
+                {subjectPreserveHonesty || warnFastForEdit ? (
+                  <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                    {t("dashboard.imagePlayground.subjectPreserveHonesty")}
+                  </p>
+                ) : null}
               </CardHeader>
               <CardContent
                 className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex flex-col gap-2.5`}
@@ -942,10 +1112,13 @@ export function ImageGeneratePanel({
               result={result}
               completedAt={completedAt}
               inputImagesCount={
-                result?.input_images_count ?? lastRequestInputCount
+                result?.images_count ??
+                result?.input_images_count ??
+                lastRequestInputCount
               }
-              requestMode={lastRequestMode}
+              requestMode={result?.mode ?? lastRequestMode}
               referenceImageIncluded={
+                result?.reference_image_included === true ||
                 lastRequestMode === "reference_edit" ||
                 (lastRequestInputCount != null && lastRequestInputCount > 0)
               }
@@ -1244,8 +1417,12 @@ function ImageInputThumbnail({
   onPreviewError: (message: string) => void;
   onPreviewReady: () => void;
 }) {
+  const displayUrl = getDisplayUrl(item);
   const showPreview =
-    item.status === "ready" && item.url && !item.previewError;
+    (item.status === "ready" || item.status === "uploading") &&
+    Boolean(displayUrl) &&
+    !item.previewError &&
+    item.status === "ready";
 
   const referenceMessage = getInputReferenceMessage(item);
 
@@ -1255,7 +1432,7 @@ function ImageInputThumbnail({
         {showPreview ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={item.url}
+            src={displayUrl}
             alt={item.label}
             className="h-full w-full object-cover"
             onError={() =>
@@ -1263,9 +1440,19 @@ function ImageInputThumbnail({
             }
           />
         ) : item.status === "uploading" ? (
-          <div className="flex h-full flex-col items-center justify-center gap-1 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span className="text-[10px]">Uploading…</span>
+          <div className="relative h-full">
+            {displayUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={displayUrl}
+                alt={item.label}
+                className="h-full w-full object-cover opacity-60"
+              />
+            ) : null}
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-background/50 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span className="text-[10px]">Preparing…</span>
+            </div>
           </div>
         ) : item.status === "resolving" ? (
           <>
@@ -1273,10 +1460,10 @@ function ImageInputThumbnail({
               <Loader2 className="h-5 w-5 animate-spin" />
               <span className="text-[10px]">Resolving…</span>
             </div>
-            {item.url ? (
+            {displayUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={item.url}
+                src={displayUrl}
                 alt=""
                 className="hidden"
                 onLoad={() => onPreviewReady()}

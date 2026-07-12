@@ -2,6 +2,7 @@ import { ApiError } from "../errors.js";
 
 export type ImageUrlResolveSource =
   | "direct"
+  | "data_url"
   | "google_imgres"
   | "html_og_image"
   | "html_twitter_image"
