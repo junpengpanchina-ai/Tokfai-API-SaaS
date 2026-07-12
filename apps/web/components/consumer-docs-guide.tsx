@@ -95,29 +95,86 @@ export function ConsumerDocsGuide({
         title={zh ? "2. Cherry Studio 接入" : "2. Cherry Studio"}
         description={
           zh
-            ? "推荐优先使用 OpenAI Provider；需要 Gemini 供应商时使用 Gemini Provider。"
-            : "Prefer the OpenAI Provider; use the Gemini Provider when you need Gemini-native client mode."
+            ? "必须新建 Tokfai Provider，不要选 Cherry 里自带的 garsai / GRSAI 供应商。"
+            : "Add a Tokfai Provider. Do not use Cherry’s built-in garsai / GRSAI provider."
         }
       >
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 text-sm">
+          <p className="font-medium text-foreground">
+            {zh ? "重要：不要选错供应商" : "Important: use Tokfai, not garsai"}
+          </p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+            <li>
+              {zh
+                ? "不要选择 Cherry 里旧的 garsai / GRSAI Provider。"
+                : "Do not select Cherry’s legacy garsai / GRSAI Provider."}
+            </li>
+            <li>
+              {zh ? (
+                <>
+                  若模型名后缀是{" "}
+                  <code className="text-foreground">| garsai</code>
+                  ，说明请求没有走 Tokfai。
+                </>
+              ) : (
+                <>
+                  If the model label ends with{" "}
+                  <code className="text-foreground">| garsai</code>, the
+                  request is not going through Tokfai.
+                </>
+              )}
+            </li>
+            <li>
+              {zh ? (
+                <>
+                  正确路径是{" "}
+                  <code className="text-foreground">{TOKFAI_API_ORIGIN}</code>
+                  ，不是{" "}
+                  <code className="text-foreground">https://grsaiapi.com</code>
+                  。
+                </>
+              ) : (
+                <>
+                  Correct host is{" "}
+                  <code className="text-foreground">{TOKFAI_API_ORIGIN}</code>
+                  , not{" "}
+                  <code className="text-foreground">https://grsaiapi.com</code>
+                  .
+                </>
+              )}
+            </li>
+          </ul>
+        </div>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle className="text-base">
-                {zh ? "A. 推荐：OpenAI Provider" : "A. Recommended: OpenAI Provider"}
+                {zh ? "A. OpenAI Provider（推荐）" : "A. OpenAI Provider (recommended)"}
               </CardTitle>
               <CardDescription>
                 {zh
-                  ? "API 地址：https://api.tokfai.com"
-                  : "API host: https://api.tokfai.com"}
+                  ? "在 Cherry 新增 OpenAI Compatible / Custom OpenAI 供应商"
+                  : "Add an OpenAI Compatible / Custom OpenAI provider in Cherry"}
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm text-muted-foreground">
-              <p>
-                {zh ? "可用模型：" : "Models: "}
-                <code className="text-foreground">gpt-5.5</code>、
-                <code className="text-foreground">gemini-2.5-flash</code>、
-                <code className="text-foreground">auto-fast</code>
-              </p>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <CopyRow label="Base URL" value={TOKFAI_API_ORIGIN} />
+              <CopyRow label="API Key" value={TOKFAI_API_KEY_PLACEHOLDER} />
+              <div>
+                <p className="font-medium text-foreground">
+                  {zh ? "可用模型（model id）" : "Available model ids"}
+                </p>
+                <p className="mt-1 font-mono text-xs leading-relaxed text-foreground">
+                  gpt-5.4 · gpt-5.5 · gpt-5 · gpt-5-chat · gpt-5-pro ·
+                  gpt-5.4-pro · gpt-5.5-pro
+                </p>
+                <p className="mt-2 text-xs">
+                  {zh
+                    ? "也可用 auto-fast / auto-pro / auto-cheap，以及 Gemini 文本模型（OpenAI 路径）。"
+                    : "You can also use auto-fast / auto-pro / auto-cheap and Gemini chat models on the OpenAI path."}
+                </p>
+              </div>
             </CardContent>
           </Card>
           <Card>
@@ -127,23 +184,66 @@ export function ConsumerDocsGuide({
               </CardTitle>
               <CardDescription>
                 {zh
-                  ? "API 地址：https://api.tokfai.com"
-                  : "API host: https://api.tokfai.com"}
+                  ? "仅在需要 Gemini 原生客户端时使用（/v1beta）"
+                  : "Use only for Gemini-native clients (/v1beta)"}
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm text-muted-foreground">
-              <p>
-                {zh ? "可用模型：" : "Models: "}
-                <code className="text-foreground">gemini-2.5-flash</code>、
-                <code className="text-foreground">gemini-2.5-pro</code>
-              </p>
-              <p>
-                {zh
-                  ? "用于 Cherry Studio 的 Gemini 供应商兼容（/v1beta）。"
-                  : "Gemini provider compatibility for Cherry Studio (/v1beta)."}
-              </p>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <CopyRow label="Base URL" value={TOKFAI_API_ORIGIN} />
+              <CopyRow label="API Key" value={TOKFAI_API_KEY_PLACEHOLDER} />
+              <div>
+                <p className="font-medium text-foreground">
+                  {zh ? "可用模型（model id）" : "Available model ids"}
+                </p>
+                <p className="mt-1 font-mono text-xs leading-relaxed text-foreground">
+                  gemini-2.5-flash · gemini-2.5-pro · gemini-3-flash ·
+                  gemini-3-pro
+                </p>
+                <p className="mt-2 text-xs">
+                  {zh
+                    ? "展示名可写 Gemini 3 Flash / Gemini 3 Pro，但 id 必须是 gemini-3-flash / gemini-3-pro。"
+                    : "Display names may be Gemini 3 Flash / Gemini 3 Pro; ids must stay gemini-3-flash / gemini-3-pro."}
+                </p>
+              </div>
             </CardContent>
           </Card>
+        </div>
+
+        <div className="mt-4 rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+          <p className="font-medium text-foreground">
+            {zh ? "排障：model not register" : "Troubleshooting: model not register"}
+          </p>
+          <ol className="mt-2 list-decimal space-y-1 pl-5">
+            <li>
+              {zh
+                ? "若报错类似 model not register: xxx，先检查 Cherry 当前选中的模型是否属于你新建的 Tokfai Provider。"
+                : "If you see model not register: xxx, first check that the selected model belongs to your Tokfai Provider."}
+            </li>
+            <li>
+              {zh ? (
+                <>
+                  打开网络 / 日志：若请求路径是{" "}
+                  <code className="text-foreground">grsaiapi.com</code>
+                  ，说明选错了供应商，请改回{" "}
+                  <code className="text-foreground">{TOKFAI_API_ORIGIN}</code>
+                  。
+                </>
+              ) : (
+                <>
+                  Check the request URL: if it hits{" "}
+                  <code className="text-foreground">grsaiapi.com</code>, you
+                  picked the wrong provider — switch to{" "}
+                  <code className="text-foreground">{TOKFAI_API_ORIGIN}</code>
+                  .
+                </>
+              )}
+            </li>
+            <li>
+              {zh
+                ? "确认 model id 使用上文列表（例如 gpt-5.4、gemini-3-flash），不要用 Cherry 自带的 garsai 模型条目。"
+                : "Use a model id from the lists above (e.g. gpt-5.4, gemini-3-flash), not Cherry’s built-in garsai model entries."}
+            </li>
+          </ol>
         </div>
       </DocSection>
 

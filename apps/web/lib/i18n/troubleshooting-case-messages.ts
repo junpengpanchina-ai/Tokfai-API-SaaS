@@ -258,13 +258,13 @@ export const troubleshootingCaseMessagesEn: Record<string, string> = {
   "integration.troubleshooting.case.cherry_connection_failed.title":
     "Cherry Studio — connection failed",
   "integration.troubleshooting.case.cherry_connection_failed.likelyCause":
-    "OpenAI-compatible provider settings missing Base URL or full API Key.",
+    "Wrong provider (garsai) or missing Tokfai Base URL / API Key.",
   "integration.troubleshooting.case.cherry_connection_failed.action1":
-    "Base URL https://api.tokfai.com/v1 and full sk-tokfai_… key.",
+    "Use Tokfai Provider — Base URL https://api.tokfai.com, not grsaiapi.com.",
   "integration.troubleshooting.case.cherry_connection_failed.action2":
-    "Verify one-line curl in terminal first.",
+    "If the model label ends with “| garsai”, switch away from the garsai provider.",
   "integration.troubleshooting.case.cherry_connection_failed.action3":
-    "Copy Cherry Studio config from Workbench or Docs.",
+    "Copy Cherry Studio config from Docs → Cherry Studio.",
 
   "integration.troubleshooting.case.sdk_base_url_wrong.title": "SDK — wrong base URL",
   "integration.troubleshooting.case.sdk_base_url_wrong.likelyCause":
@@ -524,13 +524,13 @@ export const troubleshootingCaseMessagesZh: Record<string, string> = {
   "integration.troubleshooting.case.cherry_connection_failed.title":
     "Cherry Studio — 连接失败",
   "integration.troubleshooting.case.cherry_connection_failed.likelyCause":
-    "OpenAI 兼容 Provider 缺少 Base URL 或完整 API Key。",
+    "选错了 garsai 供应商，或 Tokfai Base URL / API Key 未填全。",
   "integration.troubleshooting.case.cherry_connection_failed.action1":
-    "Base URL https://api.tokfai.com/v1 与完整 sk-tokfai_… 密钥。",
+    "使用 Tokfai Provider — Base URL https://api.tokfai.com，不要用 grsaiapi.com。",
   "integration.troubleshooting.case.cherry_connection_failed.action2":
-    "先在终端验证单行 curl。",
+    "若模型名后缀是「| garsai」，说明没走 Tokfai，请切换供应商。",
   "integration.troubleshooting.case.cherry_connection_failed.action3":
-    "从工作台或文档复制 Cherry Studio 配置。",
+    "从文档 → Cherry Studio 复制正确配置。",
 
   "integration.troubleshooting.case.sdk_base_url_wrong.title": "SDK — Base URL 错误",
   "integration.troubleshooting.case.sdk_base_url_wrong.likelyCause":

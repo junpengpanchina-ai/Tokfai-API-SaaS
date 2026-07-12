@@ -7,6 +7,11 @@ export type PlaygroundChatModelOption = {
 /** Concrete chat models shown in Playground (consumer curated). */
 const PLAYGROUND_CHAT_MODELS: PlaygroundChatModelOption[] = [
   {
+    id: "gpt-5.4",
+    displayName: "GPT 5.4",
+    description: "GPT 5.4 chat model for OpenAI-compatible workloads.",
+  },
+  {
     id: "gpt-5.5",
     displayName: "GPT 5.5",
     description: "Premium GPT 5.5 chat model for demanding applications.",

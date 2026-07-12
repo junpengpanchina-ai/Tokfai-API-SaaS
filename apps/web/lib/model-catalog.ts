@@ -180,14 +180,17 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     id: "gemini-3.5-flash",
     displayName: "Gemini 3.5 Flash",
     type: "chat",
-    status: "available",
+    status: "coming_soon",
     billingUnit: CHAT_BILLING_UNIT,
-    description: "Latest Gemini 3.5 flash tier for responsive chat workloads.",
+    description: "Not yet verified for consumer display — hidden from sellable catalog.",
     pricing: chatPricing(1.2, 2.4, 10, 20),
     traits: { speed: "high", quality: "medium", cost: "medium" },
     tags: ["Flash"],
-    categories: ["fast"],
-    catalogMeta: catalogMeta(),
+    categories: ["coming_soon"],
+    catalogMeta: {
+      ...catalogMeta(),
+      adminDisplayOverride: { enabled: false, note: "Unverified — hide from consumers" },
+    },
   },
   {
     id: "gemini-2.5-flash",
@@ -206,14 +209,17 @@ export const CHAT_MODELS: ModelCatalogEntry[] = [
     id: "gemini-3.1-pro",
     displayName: "Gemini 3.1 Pro",
     type: "chat",
-    status: "available",
+    status: "coming_soon",
     billingUnit: CHAT_BILLING_UNIT,
-    description: "Slow/experimental premium chat — explicit use only; may timeout.",
+    description: "Experimental / unverified — not shown on consumer model lists.",
     pricing: chatPricing(1.5, 3, 7, 14),
     traits: { speed: "low", quality: "high", cost: "medium" },
     tags: ["Experimental", "Slow"],
-    categories: ["high_quality"],
-    catalogMeta: catalogMeta(),
+    categories: ["coming_soon"],
+    catalogMeta: {
+      ...catalogMeta(),
+      adminDisplayOverride: { enabled: false, note: "Unverified — hide from consumers" },
+    },
   },
   {
     id: "gemini-3-pro",
@@ -505,6 +511,7 @@ export const ALL_CATALOG_MODELS: ModelCatalogEntry[] = [
  * shown separately on Models / Playground — not duplicated here.
  */
 export const CONSUMER_CHAT_MODEL_IDS = [
+  "gpt-5.4",
   "gpt-5.5",
   "gemini-2.5-flash",
   "gemini-2.5-pro",
@@ -634,7 +641,7 @@ export const DASHBOARD_USE_CASES: DashboardUseCaseEntry[] = [
   },
   {
     id: "fast_low_cost_chat",
-    recommendedModelIds: ["auto-cheap", "gemini-3-flash", "gemini-3.5-flash"],
+    recommendedModelIds: ["auto-cheap", "gemini-3-flash", "gemini-2.5-flash"],
     playground: "chat",
     defaultModelId: "auto-cheap",
   },
