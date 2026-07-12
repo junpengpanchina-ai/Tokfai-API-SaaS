@@ -34,7 +34,13 @@ function main(): void {
       pass: image.includes(DEFAULT_IMAGE_MODEL_ID),
     },
     {
-      name: "auto-pro excludes gemini-3.1-pro",
+      name: "gemini-3.1 aliases map to gemini-3 chat models",
+      pass:
+        MODEL_ALIAS_CHAINS["gemini-3.1-flash"][0] === "gemini-3-flash" &&
+        MODEL_ALIAS_CHAINS["gemini-3.1-pro"][0] === "gemini-3-pro",
+    },
+    {
+      name: "auto-pro excludes gemini-3.1-pro from chain targets",
       pass: !MODEL_ALIAS_CHAINS["auto-pro"].includes("gemini-3.1-pro"),
     },
     {

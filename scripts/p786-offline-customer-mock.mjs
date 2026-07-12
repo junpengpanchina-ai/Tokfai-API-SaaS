@@ -471,7 +471,6 @@ export function startMockGateway(options = {}) {
           "gemini-2.5-pro",
           "gemini-3-flash",
           "gemini-3-pro",
-          "gemini-3.5-flash",
         ];
         return sendJson(res, 200, {
           models: ids.map((id) => ({
@@ -494,10 +493,31 @@ export function startMockGateway(options = {}) {
         const slot = acquireConcurrencySlot("chat");
         if (!slot.ok) return sendJson(res, slot.response.status, slot.response.body);
         try {
-          const modelId = decodeURIComponent(geminiActionMatch[1]).replace(
+          const GEMINI_ALIASES = {
+            "gemini-3.1-flash": "gemini-3-flash",
+            "gemini-3.1-pro": "gemini-3-pro",
+          };
+          const GEMINI_PUBLIC = new Set([
+            "gemini-2.5-flash",
+            "gemini-2.5-pro",
+            "gemini-3-flash",
+            "gemini-3-pro",
+          ]);
+          const requested = decodeURIComponent(geminiActionMatch[1]).replace(
             /^models\//,
             ""
           );
+          const modelId = GEMINI_ALIASES[requested] ?? requested;
+          if (!GEMINI_PUBLIC.has(modelId)) {
+            return sendJson(res, 400, {
+              error: {
+                message: `Unsupported model: ${requested}. Supported models: gemini-2.5-flash, gemini-2.5-pro, gemini-3-flash, gemini-3-pro`,
+                code: "model_not_supported",
+                type: "validation_error",
+              },
+              request_id: makeRequestId(),
+            });
+          }
           const action = geminiActionMatch[2];
           const body = await readJsonBody(req);
           const response = geminiGenerateContentBody(body, modelId);

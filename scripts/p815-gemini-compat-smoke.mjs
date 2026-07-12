@@ -102,6 +102,23 @@ async function run() {
           `HTTP ${res.status}, missing=${JSON.stringify(missing)}, methodsOk=${methodsOk}`
         ) && ok;
     }
+
+    const forbidden = names.filter(
+      (n) =>
+        n.includes("gemini-3.1") ||
+        n.includes("gemini-3.5") ||
+        n.includes("-image") ||
+        !REQUIRED_MODEL_NAMES.includes(n)
+    );
+    if (res.status === 200 && forbidden.length === 0 && names.length === REQUIRED_MODEL_NAMES.length) {
+      ok = pass("GET /v1beta/models only exposes curated Gemini chat models") && ok;
+    } else {
+      ok =
+        fail(
+          "GET /v1beta/models only exposes curated Gemini chat models",
+          `names=${JSON.stringify(names)}, forbidden=${JSON.stringify(forbidden)}`
+        ) && ok;
+    }
   }
 
   // --- Auth probes for generateContent ---
@@ -235,6 +252,69 @@ async function run() {
         fail(
           "POST /v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
           `HTTP ${res.status}, content-type=${contentType}, preview=${JSON.stringify(text)?.slice(0, 120)}`
+        ) && ok;
+    }
+  }
+
+  // --- gemini-3.1-flash alias → gemini-3-flash ---
+  {
+    const { res, body } = await acceptanceFetch(
+      `${BASE}/v1beta/models/gemini-3.1-flash:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": API_KEY,
+        },
+        body: JSON.stringify(geminiBody),
+        timeoutMs: TIMEOUT_MS,
+      }
+    );
+    const text = body?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (res.status === 200 && typeof text === "string" && text.length > 0) {
+      ok =
+        pass(
+          "POST /v1beta/models/gemini-3.1-flash:generateContent aliases to gemini-3-flash"
+        ) && ok;
+    } else {
+      ok =
+        fail(
+          "POST /v1beta/models/gemini-3.1-flash:generateContent aliases to gemini-3-flash",
+          `HTTP ${res.status}, code=${errorCode(body)}`
+        ) && ok;
+    }
+  }
+
+  // --- unsupported Gemini id → model_not_supported ---
+  {
+    const { res, body } = await acceptanceFetch(
+      `${BASE}/v1beta/models/gemini-2.5-flash-image:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": API_KEY,
+        },
+        body: JSON.stringify(geminiBody),
+        timeoutMs: TIMEOUT_MS,
+      }
+    );
+    const message = body?.error?.message ?? "";
+    if (
+      res.status === 400 &&
+      errorCode(body) === "model_not_supported" &&
+      String(message).includes("Unsupported model: gemini-2.5-flash-image") &&
+      String(message).includes("gemini-2.5-flash")
+    ) {
+      ok =
+        pass(
+          "unsupported Gemini model → 400 model_not_supported"
+        ) && ok;
+    } else {
+      ok =
+        fail(
+          "unsupported Gemini model → 400 model_not_supported",
+          `HTTP ${res.status}, code=${errorCode(body)}, message=${JSON.stringify(message)}`
         ) && ok;
     }
   }

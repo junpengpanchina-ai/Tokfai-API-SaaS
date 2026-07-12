@@ -77,6 +77,7 @@ const UPSTREAM_ERROR_CODES = new Set([
   "upstream_rate_limited",
   "upstream_model_busy",
   "model_not_available",
+  "model_not_supported",
   "upstream_timeout",
   "upstream_error",
   "all_upstreams_unavailable",
@@ -122,7 +123,15 @@ export async function executeChatCompletion(
 
   if (!(await isModelAllowedForChat(requestedModel))) {
     const suggestedModels = await listAvailableChatModelIds();
-    const errorMessage = "当前模型暂不可用或未注册，请切换推荐模型";
+    const isGeminiClientId =
+      requestedModel.startsWith("gemini-") ||
+      requestedModel.startsWith("models/gemini-");
+    const errorCode = isGeminiClientId
+      ? "model_not_supported"
+      : "model_not_available";
+    const errorMessage = isGeminiClientId
+      ? `Unsupported model: ${requestedModel.replace(/^models\//, "")}. Supported models: gemini-2.5-flash, gemini-2.5-pro, gemini-3-flash, gemini-3-pro`
+      : "当前模型暂不可用或未注册，请切换推荐模型";
 
     await writeUsageLog(
       failedUsageLog({
@@ -131,7 +140,7 @@ export async function executeChatCompletion(
         model: requestedModel,
         status: "failed",
         request_id: requestId,
-        error_code: "model_not_available",
+        error_code: errorCode,
         error_message: errorMessage,
         latency_ms: Date.now() - startedAt,
       }),
@@ -140,7 +149,7 @@ export async function executeChatCompletion(
 
     return {
       ok: false,
-      errorCode: "model_not_available",
+      errorCode,
       errorMessage,
       requestId,
       httpStatus: 400,

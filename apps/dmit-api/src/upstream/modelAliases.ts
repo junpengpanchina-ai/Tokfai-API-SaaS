@@ -12,6 +12,11 @@ export const MODEL_ALIAS_CHAINS = {
   "gpt-5-pro": ["gpt-5.5", "gpt-5.4"],
   "gpt-5.1": ["gpt-5.5", "gpt-5.4"],
   "gpt-5.2": ["gpt-5.5", "gpt-5.4"],
+  /**
+   * Cherry Studio / older Gemini client ids → currently available Gemini chat models.
+   */
+  "gemini-3.1-flash": ["gemini-3-flash"],
+  "gemini-3.1-pro": ["gemini-3-pro"],
 } as const;
 
 export type ModelAliasId = keyof typeof MODEL_ALIAS_CHAINS;

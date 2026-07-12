@@ -51,13 +51,48 @@ export type GeminiGenerateContentRequest = z.infer<
   typeof GeminiGenerateContentRequestSchema
 >;
 
-/** Minimum Gemini models Cherry Studio connection checks expect. */
+/** Public Gemini chat models exposed on /v1beta/models (Cherry Studio). */
 export const REQUIRED_GEMINI_MODEL_IDS = [
   "gemini-2.5-flash",
   "gemini-2.5-pro",
   "gemini-3-flash",
   "gemini-3-pro",
 ] as const;
+
+export type GeminiPublicModelId = (typeof REQUIRED_GEMINI_MODEL_IDS)[number];
+
+const GEMINI_PUBLIC_MODEL_ID_SET = new Set<string>(REQUIRED_GEMINI_MODEL_IDS);
+
+/** Older client ids → public Gemini chat models (1:1 rewrite before allowlist). */
+export const GEMINI_MODEL_ALIASES: Record<string, GeminiPublicModelId> = {
+  "gemini-3.1-flash": "gemini-3-flash",
+  "gemini-3.1-pro": "gemini-3-pro",
+};
+
+export function geminiSupportedModelsMessage(): string {
+  return REQUIRED_GEMINI_MODEL_IDS.join(", ");
+}
+
+export function isGeminiPublicModelId(modelId: string): boolean {
+  return GEMINI_PUBLIC_MODEL_ID_SET.has(modelId);
+}
+
+/**
+ * Normalize + rewrite Gemini client model ids for /v1beta generateContent.
+ * Does not list aliases on GET /v1beta/models.
+ */
+export function resolveGeminiCompatModelId(raw: string): {
+  requested: string;
+  resolved: string;
+} {
+  const requested = normalizeGeminiModelId(raw);
+  const resolved = GEMINI_MODEL_ALIASES[requested] ?? requested;
+  return { requested, resolved };
+}
+
+export function unsupportedGeminiModelMessage(requested: string): string {
+  return `Unsupported model: ${requested}. Supported models: ${geminiSupportedModelsMessage()}`;
+}
 
 export type GeminiModelAction =
   | "generateContent"
@@ -278,27 +313,18 @@ export type GeminiListModel = {
   supportedGenerationMethods: string[];
 };
 
+/** Only the curated public Gemini chat models — no experimental / image variants. */
 export function buildGeminiModelsList(
-  catalogIds: string[]
+  _catalogIds?: string[]
 ): { models: GeminiListModel[] } {
-  const ids = new Set<string>();
-  for (const required of REQUIRED_GEMINI_MODEL_IDS) {
-    ids.add(required);
-  }
-  for (const id of catalogIds) {
-    if (id.startsWith("gemini-")) ids.add(id);
-  }
-
-  const models = [...ids]
-    .sort((a, b) => a.localeCompare(b))
-    .map((id) => ({
-      name: toGeminiModelName(id),
-      displayName: id,
-      supportedGenerationMethods: [
-        "generateContent",
-        "streamGenerateContent",
-      ],
-    }));
+  const models = REQUIRED_GEMINI_MODEL_IDS.map((id) => ({
+    name: toGeminiModelName(id),
+    displayName: id,
+    supportedGenerationMethods: [
+      "generateContent",
+      "streamGenerateContent",
+    ],
+  }));
 
   return { models };
 }

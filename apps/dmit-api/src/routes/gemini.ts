@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 
-import { listAvailableChatModelIds } from "../catalog/modelCatalog.js";
 import { ApiError } from "../errors.js";
 import {
   gatewayLimitKey,
@@ -17,7 +16,10 @@ import {
   chatCompletionToGeminiSseBody,
   geminiBodyToChatBody,
   GeminiGenerateContentRequestSchema,
+  isGeminiPublicModelId,
   parseGeminiModelAction,
+  resolveGeminiCompatModelId,
+  unsupportedGeminiModelMessage,
 } from "../lib/geminiTransform.js";
 import { respondExecuteChatCompletionFailure } from "../lib/handleExecuteChatCompletionResult.js";
 import { parseIdempotencyKey } from "../lib/idempotency.js";
@@ -37,8 +39,7 @@ import { logGatewayRejection } from "./chatGatewayLogs.js";
 export const geminiRoutes = new Hono();
 
 geminiRoutes.get("/v1beta/models", async (c) => {
-  const chatIds = await listAvailableChatModelIds();
-  return c.json(buildGeminiModelsList(chatIds));
+  return c.json(buildGeminiModelsList());
 });
 
 geminiRoutes.use("/v1beta/models/:modelAction{.+}", requireGeminiAuth);
@@ -54,7 +55,18 @@ geminiRoutes.post("/v1beta/models/:modelAction{.+}", async (c) => {
     );
   }
 
-  const { modelId, action } = parsedAction;
+  const { requested, resolved } = resolveGeminiCompatModelId(
+    parsedAction.modelId
+  );
+  if (!isGeminiPublicModelId(resolved)) {
+    throw ApiError.badRequest(
+      unsupportedGeminiModelMessage(requested),
+      "model_not_supported"
+    );
+  }
+
+  const modelId = resolved;
+  const { action } = parsedAction;
   const caller = getChatCaller(c);
   const requestId = c.get("requestId" as never) as string;
   const limitKey = gatewayLimitKey(caller.apiKeyId, caller.userId);

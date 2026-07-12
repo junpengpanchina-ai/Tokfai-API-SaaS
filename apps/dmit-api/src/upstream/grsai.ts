@@ -95,9 +95,17 @@ export function isChatFallbackEligible(err: ApiError): boolean {
   return [
     "upstream_model_busy",
     "model_not_available",
+    "model_not_supported",
     "upstream_timeout",
     "upstream_rate_limited",
   ].includes(code);
+}
+
+function extractUnregisteredModelHint(combinedLower: string): string | null {
+  const match =
+    /model\s+not\s+register(?:ed)?\s*:\s*([a-z0-9._-]+)/i.exec(combinedLower) ??
+    /model\s+not\s+found\s*:\s*([a-z0-9._-]+)/i.exec(combinedLower);
+  return match?.[1]?.trim() ?? null;
 }
 
 export function mapUpstreamError(
@@ -159,6 +167,15 @@ export function mapUpstreamError(
     combined.includes("model not found") ||
     combined.includes("not registered")
   ) {
+    const modelHint = extractUnregisteredModelHint(combined);
+    if (modelHint?.startsWith("gemini-")) {
+      return {
+        status: 400,
+        code: "model_not_supported",
+        type: "validation_error",
+        publicMessage: `Unsupported model: ${modelHint}. Supported models: gemini-2.5-flash, gemini-2.5-pro, gemini-3-flash, gemini-3-pro`,
+      };
+    }
     return {
       status: 400,
       code: "model_not_available",
