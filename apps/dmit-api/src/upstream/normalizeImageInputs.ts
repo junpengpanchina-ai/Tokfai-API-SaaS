@@ -29,8 +29,8 @@ const DATA_IMAGE_RE = /^data:image\/([a-zA-Z0-9.+-]+);base64,/i;
 
 /**
  * Normalize client image inputs for /v1/images/generations.
- * Accepts images / image_urls / reference_images / input_images.
- * Allows http(s) URLs and data:image/*;base64 — never blob:.
+ * Accepts image / images / image_urls / reference_images / input_images
+ * (string or string[]). Allows http(s) URLs and data:image/*;base64 — never blob:.
  */
 export function normalizeImageInputs(body: unknown): NormalizeImageInputsResult {
   const record =
@@ -39,10 +39,11 @@ export function normalizeImageInputs(body: unknown): NormalizeImageInputsResult 
       : {};
 
   const rawCandidates = [
-    ...asStringArray(record.images),
-    ...asStringArray(record.image_urls),
-    ...asStringArray(record.reference_images),
-    ...asStringArray(record.input_images),
+    ...asStringList(record.image),
+    ...asStringList(record.images),
+    ...asStringList(record.image_urls),
+    ...asStringList(record.reference_images),
+    ...asStringList(record.input_images),
   ];
 
   const images: NormalizedImageInput[] = [];
@@ -234,7 +235,9 @@ export function resolvePromptMode(options: {
   return "normal";
 }
 
-function asStringArray(value: unknown): string[] {
+/** Accept a single string or string[] (OpenAI-compat `image` / `images`). */
+function asStringList(value: unknown): string[] {
+  if (typeof value === "string") return [value];
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string");
 }

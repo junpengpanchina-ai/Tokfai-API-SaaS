@@ -8,8 +8,6 @@
  */
 
 import {
-  chatCurlMultiline,
-  imageCurlMultiline,
   modelsCurlMultiline,
   responsesCurlOneLine,
 } from "@/lib/customer-curl-oneline";
@@ -47,15 +45,67 @@ export type PublicBetaDoc = {
   markdown: { zh: string; en: string };
 };
 
-const UPDATED_AT = "2026-07-13";
+const UPDATED_AT = "2026-07-14";
 
 const QUICKSTART_CURL = modelsCurlMultiline();
-const CHAT_CURL = chatCurlMultiline();
-const IMAGE_CURL = imageCurlMultiline();
+const IMAGE_CURL = `curl https://api.tokfai.com/v1/images/generations \\
+  -H "Authorization: Bearer ${TOKFAI_API_KEY_PLACEHOLDER}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "gpt-image-2",
+    "prompt": "生成一张简洁科技风 API 平台宣传图",
+    "image": [],
+    "size": "1024x1024",
+    "response_format": "url"
+  }'`;
 const RESPONSES_CURL = `curl -sS ${TOKFAI_API_BASE_URL}/responses \\
   -H "Authorization: Bearer ${TOKFAI_API_KEY_PLACEHOLDER}" \\
   -H "Content-Type: application/json" \\
   -d '{"model":"${TOKFAI_RECOMMENDED_MODEL}","input":"Say ok only."}'`;
+
+const CHAT_JS = `fetch("https://api.tokfai.com/v1/chat/completions", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer ${TOKFAI_API_KEY_PLACEHOLDER}",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    model: "auto-fast",
+    stream: false,
+    messages: [
+      { role: "user", content: "Say OK only." }
+    ]
+  })
+}).then((r) => r.json()).then(console.log)`;
+
+const CHAT_PY = `import requests
+
+res = requests.post(
+    "https://api.tokfai.com/v1/chat/completions",
+    headers={
+        "Authorization": "Bearer ${TOKFAI_API_KEY_PLACEHOLDER}",
+        "Content-Type": "application/json",
+    },
+    json={
+        "model": "auto-fast",
+        "stream": False,
+        "messages": [
+            {"role": "user", "content": "Say OK only."}
+        ],
+    },
+)
+print(res.json())`;
+
+const CHAT_STREAM_CURL = `curl -N https://api.tokfai.com/v1/chat/completions \\
+  -H "Authorization: Bearer ${TOKFAI_API_KEY_PLACEHOLDER}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "auto-fast",
+    "stream": true,
+    "messages": [
+      { "role": "user", "content": "Say OK only." }
+    ]
+  }'`;
 
 const RESPONSES_GPT55_CURL = `curl https://api.tokfai.com/v1/responses \\
   -H "Authorization: Bearer sk-tokfai_xxx" \\
@@ -115,11 +165,12 @@ const IMAGE_JS = `fetch("https://api.tokfai.com/v1/images/generations", {
   },
   body: JSON.stringify({
     model: "gpt-image-2",
-    prompt: "生成一张边牧与古牧正在直播间带货的电商主图",
+    prompt: "生成一张简洁科技风 API 平台宣传图",
+    image: [],
     size: "1024x1024",
     response_format: "url"
   })
-})`;
+}).then((r) => r.json()).then(console.log)`;
 
 const IMAGE_PY = `import requests
 
@@ -131,7 +182,8 @@ res = requests.post(
     },
     json={
         "model": "gpt-image-2",
-        "prompt": "生成一张边牧与古牧正在直播间带货的电商主图",
+        "prompt": "生成一张简洁科技风 API 平台宣传图",
+        "image": [],
         "size": "1024x1024",
         "response_format": "url"
     }
@@ -144,10 +196,29 @@ const IMAGE_REF_CURL = `curl https://api.tokfai.com/v1/images/generations \\
   -d '{
     "model": "gpt-image-2",
     "prompt": "保留主体，换成直播间带货主图风格",
-    "images": ["https://example.com/your-reference-image.jpg"],
+    "image": ["https://example.com/your-reference-image.jpg"],
     "size": "1024x1024",
     "response_format": "url"
   }'`;
+
+const IMAGE_SUCCESS_JSON = `{
+  "created": 1710000000,
+  "data": [
+    { "url": "https://example.com/generated.png" }
+  ],
+  "usage": {
+    "credits_charged": 1000
+  },
+  "id": "req_xxx",
+  "object": "image.generation",
+  "model": "gpt-image-2",
+  "status": "succeeded",
+  "tokfai": {
+    "request_id": "req_xxx",
+    "mode": "text_to_image"
+  },
+  "request_id": "req_xxx"
+}`;
 
 export const PUBLIC_BETA_DOCS: PublicBetaDoc[] = [
   {
@@ -300,33 +371,132 @@ Authorization: Bearer sk-tokfai_xxx
   },
   {
     slug: "chat-completions",
-    title: { zh: "文本对话 API", en: "Chat Completions" },
+    title: {
+      zh: "文本对话 API / OpenAI Chat Completions 兼容",
+      en: "Chat Completions / OpenAI-compatible",
+    },
     audience: "developer",
     category: "chat",
     language: "zh",
     apiPaths: ["POST /v1/chat/completions"],
     updatedAt: UPDATED_AT,
     markdown: {
-      zh: `# 文本对话 API
+      zh: `# 文本对话 API / OpenAI Chat Completions 兼容
 
-路径：\`POST ${TOKFAI_API_BASE_URL}/chat/completions\`  
-推荐起步模型：\`${TOKFAI_RECOMMENDED_MODEL}\`
+Endpoint：\`POST https://api.tokfai.com/v1/chat/completions\`  
+Auth：\`Authorization: Bearer sk-tokfai_xxx\`
+
+**API Key 不绑定模型**——每次请求通过 body 的 \`model\` 指定。
+
+推荐模型：
+- \`auto-fast\`：日常快速
+- \`gpt-5.5\`：强推理 / Agent / Codex / Responses 推荐
+- \`gemini-3-pro\`：Gemini 系列
+
+## Body 字段
+
+| 字段 | 说明 |
+|---|---|
+| \`model\` | 模型 ID |
+| \`messages\` | OpenAI 风格文本消息数组 |
+| \`stream\` | \`false\` 返回 JSON；\`true\` 返回 SSE 流 |
+
+当前文档示例覆盖**文本消息**。多模态图片提问能力未在本页承诺。
+
+## Shell（stream=false → JSON）
 
 \`\`\`bash
-${CHAT_CURL}
+curl https://api.tokfai.com/v1/chat/completions \\
+  -H "Authorization: Bearer sk-tokfai_xxx" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "auto-fast",
+    "stream": false,
+    "messages": [
+      { "role": "user", "content": "Say OK only." }
+    ]
+  }'
 \`\`\`
 
-OpenAI 兼容；按用量扣算力积分。模型能力与单价见模型页 / 定价页，不要在此处混入价格表。`,
-      en: `# Chat Completions
-
-Path: \`POST ${TOKFAI_API_BASE_URL}/chat/completions\`  
-Recommended starter model: \`${TOKFAI_RECOMMENDED_MODEL}\`
+## Shell（stream=true → SSE）
 
 \`\`\`bash
-${CHAT_CURL}
+${CHAT_STREAM_CURL}
 \`\`\`
 
-OpenAI-compatible. Charged in compute credits by usage. See Models / Pricing for capabilities and rates — keep prices off this page.`,
+\`stream=true\` 时响应为 \`text/event-stream\`（SSE），按行读取 \`data:\` 事件直至 \`[DONE]\`。
+
+## JavaScript
+
+\`\`\`javascript
+${CHAT_JS}
+\`\`\`
+
+## Python
+
+\`\`\`python
+${CHAT_PY}
+\`\`\`
+
+OpenAI Chat Completions 兼容；按用量扣算力积分。模型能力与单价见模型页 / 定价页。`,
+      en: `# Chat Completions / OpenAI-compatible
+
+Endpoint: \`POST https://api.tokfai.com/v1/chat/completions\`  
+Auth: \`Authorization: Bearer sk-tokfai_xxx\`
+
+**The API key is not bound to a model** — set \`model\` in each request body.
+
+Recommended models:
+- \`auto-fast\`: everyday / fast
+- \`gpt-5.5\`: stronger reasoning / Agent / Codex / Responses
+- \`gemini-3-pro\`: Gemini family
+
+## Body fields
+
+| Field | Notes |
+|---|---|
+| \`model\` | model id |
+| \`messages\` | OpenAI-style text messages |
+| \`stream\` | \`false\` → JSON; \`true\` → SSE |
+
+Examples here cover **text messages** only. Multimodal image-in-chat is not promised on this page.
+
+## Shell (stream=false → JSON)
+
+\`\`\`bash
+curl https://api.tokfai.com/v1/chat/completions \\
+  -H "Authorization: Bearer sk-tokfai_xxx" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "auto-fast",
+    "stream": false,
+    "messages": [
+      { "role": "user", "content": "Say OK only." }
+    ]
+  }'
+\`\`\`
+
+## Shell (stream=true → SSE)
+
+\`\`\`bash
+${CHAT_STREAM_CURL}
+\`\`\`
+
+With \`stream=true\`, the response is \`text/event-stream\` (SSE). Read \`data:\` lines until \`[DONE]\`.
+
+## JavaScript
+
+\`\`\`javascript
+${CHAT_JS}
+\`\`\`
+
+## Python
+
+\`\`\`python
+${CHAT_PY}
+\`\`\`
+
+OpenAI Chat Completions compatible. Charged in compute credits by usage. See Models / Pricing for capabilities and rates.`,
     },
   },
   {
@@ -535,36 +705,52 @@ For multi-turn chat, use \`POST /v1/chat/completions\` with a \`messages\` array
   },
   {
     slug: "image-api",
-    title: { zh: "图片生成 API", en: "Image Generation API" },
+    title: {
+      zh: "图片生成 API / OpenAI Images Generations 兼容",
+      en: "Image Generation / OpenAI Images compatible",
+    },
     audience: "developer",
     category: "image",
     language: "zh",
     apiPaths: [
       "POST /v1/images/generations",
       "GET /v1/images/generations/{id}",
+      "GET /v1/api/result",
     ],
     updatedAt: UPDATED_AT,
     markdown: {
-      zh: `# 图片生成 API
+      zh: `# 图片生成 API / OpenAI Images Generations 兼容
 
 Base URL：\`https://api.tokfai.com\`  
-Endpoint：\`POST /v1/images/generations\`  
+Endpoint：\`POST https://api.tokfai.com/v1/images/generations\`  
 Auth：\`Authorization: Bearer sk-tokfai_xxx\`
 
-## 三种用法（同一公开接口）
+推荐模型：\`gpt-image-2\`
 
-| 场景 | 怎么区分 |
+## Body 字段（OpenAI Images 兼容）
+
+| 字段 | 说明 |
 |---|---|
-| 文生图 | \`images\` 为空或不传 |
-| 参考图改图 | \`images\` / \`image_urls\` 非空 |
-| 电商图生成 | 文生图或带商品参考图；用电商场景 prompt（控制台 Image Playground 也有电商模板） |
+| \`model\` | 图片模型 ID |
+| \`prompt\` | 提示词（必填） |
+| \`image\` | 参考图列表；文生图传 \`[]\` |
+| \`size\` | 如 \`1024x1024\` |
+| \`response_format\` | 目前仅支持 \`url\`（传 \`b64_json\` 会返回 \`unsupported_response_format\`） |
+| \`n\` | 目前仅支持 \`1\` |
 
-兼容字段：\`model\`、\`prompt\`、\`images\`、\`size\`、\`aspect_ratio\`、\`aspectRatio\`、\`response_format\`
+兼容归一化：\`image\`、\`images\`、\`image_urls\`、\`reference_images\`、\`input_images\` 都会合并为参考图列表。  
+任一参考图字段非空，或 \`mode: "reference_edit"\`，走参考图改图；全部为空则走文生图。
 
-## Shell
+## 文生图（image: []）
 
 \`\`\`bash
 ${IMAGE_CURL}
+\`\`\`
+
+## 参考图改图
+
+\`\`\`bash
+${IMAGE_REF_CURL}
 \`\`\`
 
 ## JavaScript
@@ -579,34 +765,59 @@ ${IMAGE_JS}
 ${IMAGE_PY}
 \`\`\`
 
-## 成功响应（Tokfai 格式）
+## 成功响应
 
-返回字段包括：\`id\`、\`object\`、\`created\`、\`model\`、\`status\`、\`data\`、\`usage\`、\`tokfai\`。  
-成功才扣费；失败通常不扣费（以 Usage / Credits 为准）。
+对齐 OpenAI Images 常见字段，并可能附带 Tokfai 扩展：
+
+\`\`\`json
+${IMAGE_SUCCESS_JSON}
+\`\`\`
+
+核心字段：\`created\`、\`data: [{ url }]\`、\`usage\`。  
+额外可能返回：\`id\` / \`object\` / \`model\` / \`status\` / \`tokfai\` / \`request_id\`。
+
+成功才扣费；失败请求通常不扣费，以 Usage / Credits 为准。
 
 ## 异步查询（beta）
 
-\`GET /v1/images/generations/{id}\` 可按 \`request_id\` 查询状态。公测阶段为 beta：图片 URL 以 POST 成功响应为准，查询接口主要返回状态与计费字段。`,
-      en: `# Image Generation API
+任选其一（同一 \`request_id\`）：
+
+- \`GET https://api.tokfai.com/v1/images/generations/{id}\`
+- \`GET https://api.tokfai.com/v1/api/result?id=<request_id>\`
+
+公测阶段图片 URL 以 POST 成功响应为准；查询接口主要返回状态与计费字段（\`results\` / \`data\` 可能为空）。`,
+      en: `# Image Generation / OpenAI Images compatible
 
 Base URL: \`https://api.tokfai.com\`  
-Endpoint: \`POST /v1/images/generations\`  
+Endpoint: \`POST https://api.tokfai.com/v1/images/generations\`  
 Auth: \`Authorization: Bearer sk-tokfai_xxx\`
 
-## Three modes (one public endpoint)
+Recommended model: \`gpt-image-2\`
 
-| Mode | How to tell |
+## Body fields (OpenAI Images compatible)
+
+| Field | Notes |
 |---|---|
-| Text-to-image | omit \`images\` or pass \`[]\` |
-| Reference edit | non-empty \`images\` / \`image_urls\` |
-| Ecommerce image | text-to-image or product reference + ecommerce prompt (also in Image Playground) |
+| \`model\` | image model id |
+| \`prompt\` | required |
+| \`image\` | reference list; use \`[]\` for text-to-image |
+| \`size\` | e.g. \`1024x1024\` |
+| \`response_format\` | \`url\` only for now (\`b64_json\` → \`unsupported_response_format\`) |
+| \`n\` | \`1\` only for now |
 
-Compatible fields: \`model\`, \`prompt\`, \`images\`, \`size\`, \`aspect_ratio\`, \`aspectRatio\`, \`response_format\`
+Normalization: \`image\`, \`images\`, \`image_urls\`, \`reference_images\`, and \`input_images\` merge into one reference list.  
+Any non-empty reference field, or \`mode: "reference_edit"\`, selects reference edit; all empty → text-to-image.
 
-## Shell
+## Text-to-image (image: [])
 
 \`\`\`bash
 ${IMAGE_CURL}
+\`\`\`
+
+## Reference edit
+
+\`\`\`bash
+${IMAGE_REF_CURL}
 \`\`\`
 
 ## JavaScript
@@ -621,14 +832,27 @@ ${IMAGE_JS}
 ${IMAGE_PY}
 \`\`\`
 
-## Success response (Tokfai shape)
+## Success response
 
-Fields include: \`id\`, \`object\`, \`created\`, \`model\`, \`status\`, \`data\`, \`usage\`, \`tokfai\`.  
+OpenAI Images-shaped fields plus optional Tokfai extensions:
+
+\`\`\`json
+${IMAGE_SUCCESS_JSON}
+\`\`\`
+
+Core: \`created\`, \`data: [{ url }]\`, \`usage\`.  
+May also include: \`id\` / \`object\` / \`model\` / \`status\` / \`tokfai\` / \`request_id\`.
+
 Credits are charged only on success; failures usually are not billed (see Usage / Credits).
 
 ## Async lookup (beta)
 
-\`GET /v1/images/generations/{id}\` looks up status by \`request_id\`. Beta during public preview: use the POST success body for the image URL; GET mainly returns status and billing fields.`,
+Either path (same \`request_id\`):
+
+- \`GET https://api.tokfai.com/v1/images/generations/{id}\`
+- \`GET https://api.tokfai.com/v1/api/result?id=<request_id>\`
+
+During public preview, use the POST success body for the image URL; GET mainly returns status and billing fields (\`results\` / \`data\` may be empty).`,
     },
   },
   {
@@ -644,13 +868,12 @@ Credits are charged only on success; failures usually are not billed (see Usage 
 
 同一路径：\`POST https://api.tokfai.com/v1/images/generations\`
 
-在请求体中传入参考图（\`images\` 或 \`image_urls\`）。支持：
+在请求体中传入参考图。\`image\`、\`images\`、\`image_urls\`、\`reference_images\`、\`input_images\` 都会归一化为参考图列表。支持：
 
-- 公网 \`https://…\` 图片 URL  
+- 公网 \`https://…\` / \`http://…\` 图片 URL  
 - \`data:image/…;base64,…\`  
-- 已上传到 Tokfai 存储后的 URL  
 
-**不支持** \`blob:\`、\`file:\`、\`localhost\`。
+**不支持** \`blob:\`、\`file:\`、\`localhost\` 与私有网段。
 
 \`\`\`bash
 ${IMAGE_REF_CURL}
@@ -672,13 +895,12 @@ ${IMAGE_REF_CURL}
 
 Same path: \`POST https://api.tokfai.com/v1/images/generations\`
 
-Pass reference images via \`images\` or \`image_urls\`. Supported:
+Pass reference images via \`image\`, \`images\`, \`image_urls\`, \`reference_images\`, or \`input_images\` (all normalized to one list). Supported:
 
-- public \`https://…\` image URLs  
+- public \`https://…\` / \`http://…\` image URLs  
 - \`data:image/…;base64,…\`  
-- Tokfai storage URLs after upload  
 
-**Not supported:** \`blob:\`, \`file:\`, \`localhost\`.
+**Not supported:** \`blob:\`, \`file:\`, \`localhost\`, private networks.
 
 \`\`\`bash
 ${IMAGE_REF_CURL}
@@ -927,7 +1149,7 @@ Example:
 \`POST /v1/images/generations\`（不是其它历史路径）
 
 ## 文生图和改图是不是两个接口？
-不是。同一公开接口；有无 \`images\` 区分模式。
+不是。同一公开接口；\`image\` / \`images\` / \`image_urls\` 等参考图字段是否为空区分模式。
 
 ## 失败会扣费吗？
 通常不扣；以 Usage / Credits 为准。用 \`request_id\` 对账。
@@ -952,7 +1174,7 @@ Yes. MATLAB calls Tokfai over HTTP JSON; for GPT-5.5 and similar workloads, pref
 \`POST /v1/images/generations\` (not other legacy paths)
 
 ## Are text-to-image and edit separate APIs?
-No. One public endpoint; presence of \`images\` selects the mode.
+No. One public endpoint; presence of \`image\` / \`images\` / \`image_urls\` (etc.) selects the mode.
 
 ## Are failures billed?
 Usually not — Usage / Credits are authoritative. Reconcile with \`request_id\`.

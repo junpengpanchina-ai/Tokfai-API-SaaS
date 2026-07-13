@@ -44,7 +44,8 @@ const ImageGenerationRequestSchema = z
     aspectRatio: z.string().optional(),
     response_format: z.string().optional(),
     mode: z.string().optional(),
-    // Image fields are normalized separately (images / image_urls / …).
+    // Image fields are normalized separately (image / images / image_urls / …).
+    image: z.union([z.string(), z.array(z.string()).max(4)]).optional(),
     images: z.array(z.string()).max(4).optional(),
     image_urls: z.array(z.string()).max(4).optional(),
     reference_images: z.array(z.string()).max(4).optional(),
@@ -456,12 +457,50 @@ imageRoutes.get("/v1/images/generations/:id", async (c) => {
     throw ApiError.badRequest("Generation id is required.", "invalid_request_error");
   }
 
+  const row = await loadImageGenerationUsageRow(caller.userId, id);
+  return c.json(buildImageGenerationStatusResponse(row, requestId));
+});
+
+/**
+ * GET /v1/api/result?id=<request_id> — OpenAI-compat async poll alias.
+ * Reuses the same usage_logs lookup as GET /v1/images/generations/:id.
+ * Does not expose upstream hosts or provider details.
+ */
+imageRoutes.use("/v1/api/result", requireApiKeyOrSupabaseJwt);
+imageRoutes.get("/v1/api/result", async (c) => {
+  const caller = getChatCaller(c);
+  const requestId = c.get("requestId" as never) as string;
+  const id = c.req.query("id")?.trim();
+
+  if (!id) {
+    throw ApiError.badRequest("Query parameter id is required.", "invalid_request_error");
+  }
+
+  const row = await loadImageGenerationUsageRow(caller.userId, id);
+  return c.json(buildImageApiResultResponse(row, requestId));
+});
+
+type ImageGenerationUsageRow = {
+  request_id: string;
+  model: string | null;
+  status: string | null;
+  credits_charged: string | number | null;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string | null;
+  latency_ms: number | null;
+};
+
+async function loadImageGenerationUsageRow(
+  userId: string,
+  id: string
+): Promise<ImageGenerationUsageRow> {
   const { data, error } = await supabase()
     .from("usage_logs")
     .select(
       "request_id, model, status, credits_charged, error_code, error_message, created_at, latency_ms"
     )
-    .eq("user_id", caller.userId)
+    .eq("user_id", userId)
     .eq("request_id", id)
     .maybeSingle();
 
@@ -476,21 +515,32 @@ imageRoutes.get("/v1/images/generations/:id", async (c) => {
     throw ApiError.notFound("Image generation not found.", "not_found");
   }
 
+  return data as ImageGenerationUsageRow;
+}
+
+function mapImageGenerationPublicStatus(
+  status: string | null
+): "succeeded" | "running" | "failed" {
+  if (status === "succeeded") return "succeeded";
+  if (status === "pending" || status === "running" || status === "processing") {
+    return "running";
+  }
+  if (status === "failed" || status === "rate_limited") return "failed";
+  return "failed";
+}
+
+function buildImageGenerationStatusResponse(
+  data: ImageGenerationUsageRow,
+  requestId: string
+): Record<string, unknown> {
   const createdAt =
     typeof data.created_at === "string"
       ? Math.floor(new Date(data.created_at).getTime() / 1000)
       : Math.floor(Date.now() / 1000);
 
-  const status =
-    data.status === "succeeded"
-      ? "succeeded"
-      : data.status === "rate_limited"
-        ? "failed"
-        : data.status === "failed"
-          ? "failed"
-          : String(data.status ?? "unknown");
+  const status = mapImageGenerationPublicStatus(data.status);
 
-  return c.json({
+  return {
     id: data.request_id,
     object: "image.generation",
     created: Number.isFinite(createdAt) ? createdAt : Math.floor(Date.now() / 1000),
@@ -510,9 +560,33 @@ imageRoutes.get("/v1/images/generations/:id", async (c) => {
       error_code: data.error_code ?? null,
     },
     request_id: requestId,
-  });
-});
+  };
+}
 
+function buildImageApiResultResponse(
+  data: ImageGenerationUsageRow,
+  requestId: string
+): Record<string, unknown> {
+  const status = mapImageGenerationPublicStatus(data.status);
+  return {
+    id: data.request_id,
+    status,
+    results: [],
+    usage: {
+      credits_charged: data.credits_charged ?? 0,
+    },
+    request_id: data.request_id,
+    tokfai: {
+      request_id: data.request_id,
+      beta: true,
+      result_available: false,
+      note:
+        "Async result polling is beta. Image URLs are not persisted; use the original POST response for the image URL.",
+      poll_request_id: requestId,
+      error_code: data.error_code ?? null,
+    },
+  };
+}
 async function prepareResolvedImages(
   inputs: NormalizedImageInput[]
 ): Promise<{ urls: string[]; sources: ImageUrlResolveSource[] }> {
