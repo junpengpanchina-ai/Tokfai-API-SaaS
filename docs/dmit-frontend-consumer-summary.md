@@ -6,6 +6,18 @@
 
 ---
 
+## 0. 公测状态（内部）
+
+**DMIT 主链路公测可用。**
+
+Tokfai 公测前核心链路验收通过。
+OpenAI Compatible Chat、Responses 非流式、Responses 流式、Gemini native / Cherry Studio 路径均已跑通。
+消费者侧文档与前端已完成上游信息脱敏，Admin 后台支持公测运营所需的用户查询、Key 管理、用量查看、积分调账与错误日志定位。
+
+详见后端汇总 §0：`docs/dmit-api-backend-summary.md`。
+
+---
+
 ## 1. 概览
 
 `apps/web` 是 Vercel 前端：营销页、Supabase Auth、消费者控制台。只持 `NEXT_PUBLIC_*` + anon key；所有 secrets、计费写入、Key 哈希、上游 LLM 调用都在 DMIT。
@@ -300,7 +312,9 @@ CI：`npm run check:dashboard-imports` 检查 dashboard-safe 导入边界。
 
 ## 12. 成熟度与缺口
 
-**已具备：** 营销 + Auth（邮箱/Google）、Dashboard（Keys / Playground / Image / Models / Usage / Credits）、Stripe Checkout 闭环、i18n EN/ZH、fail-open SSR、集成文案工具链。
+**公测主链路：** 接入文档（Key 不绑模型、GPT-5.5 → Responses、Codex/Agent、MATLAB）、Models 推荐接口、上游脱敏 — **已定为公测可用**（见 §0）。
+
+**已具备：** 营销 + Auth（邮箱/Google）、Dashboard（Keys / Playground / Image / Models / Usage / Credits / Docs）、Stripe Checkout 闭环、i18n EN/ZH、fail-open SSR、集成文案工具链。
 
 | 项 | 状态 |
 |---|---|
@@ -308,7 +322,7 @@ CI：`npm run check:dashboard-imports` 检查 dashboard-safe 导入边界。
 | Stripe Customer Portal | 无（后端也无） |
 | Usage 高级筛选 | DMIT summary 组件未挂页 |
 | Credits/Usage 双路径 | 页走 Supabase；DMIT `/v1/me/*` helper 闲置 |
-| Embeddings / Streaming | 后端未提供；前端不调 |
-| Batch / Responses | 仅文档 snippet |
+| Embeddings | 后端未提供；前端不调 |
+| Chat Completions SSE | 非公测主推；Responses 流式由客户端直连 DMIT |
 
-相关文档：`docs/dmit-api-backend-summary.md`、`docs/admin-backend-summary.md`、`docs/dmit-frontend-consumer-summary.md`、`AGENTS.md`。
+相关文档：`docs/dmit-api-backend-summary.md`、`docs/admin-backend-summary.md`、`AGENTS.md`。

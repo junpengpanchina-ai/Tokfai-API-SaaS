@@ -4,6 +4,18 @@
 
 ---
 
+## 0. 公测状态（内部）
+
+**DMIT 主链路公测可用。**
+
+Tokfai 公测前核心链路验收通过。
+OpenAI Compatible Chat、Responses 非流式、Responses 流式、Gemini native / Cherry Studio 路径均已跑通。
+消费者侧文档与前端已完成上游信息脱敏，Admin 后台支持公测运营所需的用户查询、Key 管理、用量查看、积分调账与错误日志定位。
+
+配套：`docs/dmit-frontend-consumer-summary.md`、`docs/admin-backend-summary.md`。
+
+---
+
 ## 1. 概览
 
 **DMIT** 是 Tokfai 的唯一后端：OpenAI 兼容网关、Dashboard 写操作、Stripe 入账、Admin API。前端只持 anon key；所有 secrets 与敏感表写入都在这里。
@@ -201,14 +213,16 @@ apps/dmit-api/src/
 
 ## 10. 成熟度与缺口
 
+**公测主链路：** OpenAI Compatible Chat、Responses（非流式 + 流式）、Gemini native / Cherry Studio、Images、积分计费、Dashboard + Admin 运营读写 — **已定为公测可用**（见 §0）。
+
 **已具备生产级 MVP：** chat/responses/images/models/batch、积分幂等计费、Stripe 闭环、Dashboard + Admin、Docker/PM2。
 
-**已知缺口：**
+**已知缺口（不阻塞公测主链路）：**
 
 | 项 | 状态 |
 |---|---|
 | Embeddings | 未实现 |
-| Streaming | 拒绝 |
+| Chat Completions SSE 流式 | 非公测主推；Responses 流式已跑通 |
 | Stripe Portal | 无 |
 | Admin channels/settings | 进程内 overlay，重启丢失 |
 | Redis 默认关 | 多实例限流不共享 |

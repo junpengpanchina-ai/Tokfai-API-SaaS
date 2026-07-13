@@ -5,6 +5,18 @@
 
 ---
 
+## 0. 公测状态（内部）
+
+**DMIT 主链路公测可用。**
+
+Tokfai 公测前核心链路验收通过。
+OpenAI Compatible Chat、Responses 非流式、Responses 流式、Gemini native / Cherry Studio 路径均已跑通。
+消费者侧文档与前端已完成上游信息脱敏，Admin 后台支持公测运营所需的用户查询、Key 管理、用量查看、积分调账与错误日志定位。
+
+详见后端汇总 §0：`docs/dmit-api-backend-summary.md`。
+
+---
+
 ## 1. 概览
 
 Admin 是运营控制台：读全站用户/用量/订单，写模型、套餐、公告、API Key 撤销、人工调账等。架构是两层：
@@ -256,6 +268,8 @@ Channels / settings 的 runtime overlay **无对应持久化表**（当前缺口
 
 ## 10. 成熟度与缺口
 
+**公测运营能力：** 用户查询、Key 管理、用量查看、积分调账、错误日志定位 — **已定为公测可用**（见 §0）。
+
 **已具备：** 双门鉴权、仪表盘、用户/用量/订单只读、模型与套餐/公告写、Key revoke、人工调账 + 幂等、写审计、Admin smoke/load scripts。
 
 | 项 | 状态 |
@@ -265,6 +279,6 @@ Channels / settings 的 runtime overlay **无对应持久化表**（当前缺口
 | 审计日志只读 API / UI | 有写入，无完整 `GET /audit-logs` 运营页 |
 | Usage 分页 / 导出 | 近期固定条数，非完整检索 |
 | UI vs API allowlist 分离 | 两套邮箱列表需运维对齐 |
-| Embeddings / Streaming | 与网关相同，Admin 不涉及 |
+| Embeddings | 与网关相同，Admin 不涉及 |
 
 相关文档：`docs/admin-v2-new-api-parity-plan.md`、`docs/admin-v2-acceptance-gates.md`、`docs/dmit-api-backend-summary.md`。
