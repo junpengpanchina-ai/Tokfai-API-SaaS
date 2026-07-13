@@ -23,7 +23,11 @@ export type AdminCreditAdjustPurpose =
   | "public_beta_invite"
   | "manual_topup"
   | "customer_compensation"
+  | "correction"
+  | "offline_payment"
+  /** @deprecated prefer correction */
   | "manual_deduct"
+  /** @deprecated prefer offline_payment */
   | "offline_payment_topup";
 
 export type AdminCreditsAdjustBody = {
@@ -191,6 +195,7 @@ export type AdminDashboardModelTopRow = {
 export type AdminDashboardRecentError = {
   id: string;
   request_id: string | null;
+  route?: string | null;
   model: string | null;
   status: string | null;
   error_code: string | null;
@@ -222,6 +227,8 @@ export type AdminDashboardSummary = {
 
   today_requests: number | null;
   today_credits_consumed: number | null;
+  last_7d_requests?: number | null;
+  last_7d_credits_consumed?: number | null;
   today_revenue_cents: number;
   active_users_7d: number | null;
   total_api_keys: number | null;
@@ -246,10 +253,21 @@ export type AdminApiKeyRow = {
   total_usage: number;
 };
 
+export type AdminApiKeyMutationResult = {
+  id: string;
+  user_id: string;
+  name: string;
+  prefix: string;
+  status: "active" | "revoked";
+  revoked_at: string | null;
+};
+
 export type AdminChannelRow = {
   id: string;
   provider_name: string;
+  /** Always empty in list responses — use base_url_masked. */
   base_url: string;
+  base_url_masked?: string;
   status: "active" | "disabled";
   priority: number;
   weight: number;
@@ -486,10 +504,19 @@ export type AdminUserSummary = {
   total_credits_used: number;
   created_at: string | null;
   updated_at: string | null;
+  key_count?: number;
+  last_used_at?: string | null;
 };
 
-export async function fetchAdminUsers(): Promise<AdminUserSummary[]> {
-  const res = await fetchAdminApi<{ data?: AdminUserSummary[] }>("/admin/users");
+export async function fetchAdminUsers(
+  email?: string
+): Promise<AdminUserSummary[]> {
+  const params = new URLSearchParams();
+  if (email?.trim()) params.set("email", email.trim());
+  const qs = params.toString();
+  const res = await fetchAdminApi<{ data?: AdminUserSummary[] }>(
+    `/admin/users${qs ? `?${qs}` : ""}`
+  );
   return Array.isArray(res.data) ? res.data : [];
 }
 
@@ -698,6 +725,32 @@ function buildAdminCreditOrdersQuery(
 
   const query = params.toString();
   return query ? `?${query}` : "";
+}
+
+export async function revokeAdminApiKey(
+  id: string
+): Promise<AdminApiKeyMutationResult> {
+  const res = await fetchAdminApi<{ data: AdminApiKeyMutationResult }>(
+    `/admin/api-keys/${encodeURIComponent(id)}/revoke`,
+    {
+      method: "POST",
+      json: {},
+    }
+  );
+  return res.data;
+}
+
+export async function restoreAdminApiKey(
+  id: string
+): Promise<AdminApiKeyMutationResult> {
+  const res = await fetchAdminApi<{ data: AdminApiKeyMutationResult }>(
+    `/admin/api-keys/${encodeURIComponent(id)}/restore`,
+    {
+      method: "POST",
+      json: {},
+    }
+  );
+  return res.data;
 }
 
 export async function fetchAdminCreditOrders(

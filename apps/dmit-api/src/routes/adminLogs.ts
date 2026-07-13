@@ -49,6 +49,12 @@ function inferRoute(model: string | null): string | null {
   ) {
     return "/v1/images/generations";
   }
+  if (id.includes("gemini") || id.includes("generatecontent")) {
+    return "/v1beta/models";
+  }
+  if (id.includes("response")) {
+    return "/v1/responses";
+  }
   return "/v1/chat/completions";
 }
 
@@ -59,10 +65,20 @@ function isErrorStatus(status: string | null | undefined): boolean {
 
 export async function listAdminErrorLogs(query: {
   request_id?: string;
+  route?: string;
+  status?: string;
+  code?: string;
+  since?: string;
+  until?: string;
   limit?: string;
 }): Promise<AdminErrorLogRow[]> {
   const limit = parseLimit(query.limit);
   const requestIdFilter = query.request_id?.trim();
+  const routeFilter = query.route?.trim().toLowerCase() ?? "";
+  const statusFilter = query.status?.trim().toLowerCase() ?? "";
+  const codeFilter = query.code?.trim().toLowerCase() ?? "";
+  const since = query.since?.trim();
+  const until = query.until?.trim();
 
   let builder = supabase()
     .from("usage_logs")
@@ -70,10 +86,22 @@ export async function listAdminErrorLogs(query: {
       "id, user_id, created_at, model, status, request_id, error_code, error_message, upstream_status, latency_ms"
     )
     .order("created_at", { ascending: false })
-    .limit(limit * 3);
+    .limit(Math.min(limit * 5, MAX_LIMIT * 3));
 
   if (requestIdFilter) {
     builder = builder.ilike("request_id", `%${requestIdFilter}%`);
+  }
+  if (statusFilter) {
+    builder = builder.ilike("status", `%${statusFilter}%`);
+  }
+  if (codeFilter) {
+    builder = builder.ilike("error_code", `%${codeFilter}%`);
+  }
+  if (since) {
+    builder = builder.gte("created_at", since);
+  }
+  if (until) {
+    builder = builder.lte("created_at", until);
   }
 
   const { data, error } = await builder;
@@ -82,12 +110,19 @@ export async function listAdminErrorLogs(query: {
     throw new Error(`Failed to list admin error logs: ${error.message}`);
   }
 
-  const rows = ((data ?? []) as UsageErrorRow[]).filter(
+  let rows = ((data ?? []) as UsageErrorRow[]).filter(
     (row) =>
       isErrorStatus(row.status) ||
       Boolean(row.error_code?.trim()) ||
       Boolean(row.error_message?.trim())
   );
+
+  if (routeFilter) {
+    rows = rows.filter((row) => {
+      const route = inferRoute(row.model)?.toLowerCase() ?? "";
+      return route.includes(routeFilter);
+    });
+  }
 
   const limited = rows.slice(0, limit);
   const userIds = [...new Set(limited.map((row) => row.user_id))];

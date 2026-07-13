@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 import { AdminDebugCard } from "@/components/admin/admin-debug-card";
 import { AdminUserDetailPanel } from "@/components/admin/admin-user-detail-panel";
@@ -14,8 +14,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { AdminUserSummary } from "@/lib/admin/client";
+import { fetchAdminUsers } from "@/lib/admin/client";
 import type { AdminDebug } from "@/lib/admin/server";
+import { adminCreditsAdjustHref } from "@/lib/admin/user-links";
 import {
   formatCredits,
   formatDateTime,
@@ -35,12 +39,57 @@ export function AdminUsersPanel({
 }) {
   const { t } = useI18n();
   const [users, setUsers] = useState(initialUsers);
+  const [emailSearch, setEmailSearch] = useState("");
+  const [serverUsers, setServerUsers] = useState<AdminUserRow[] | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
 
   useEffect(() => {
     setUsers(initialUsers);
   }, [initialUsers]);
+
+  useEffect(() => {
+    const trimmed = emailSearch.trim();
+    if (!trimmed) {
+      setServerUsers(null);
+      setSearchLoading(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    const timer = window.setTimeout(() => {
+      void fetchAdminUsers(trimmed)
+        .then((rows) => {
+          setServerUsers(rows);
+        })
+        .catch(() => {
+          setServerUsers([]);
+        })
+        .finally(() => {
+          setSearchLoading(false);
+        });
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [emailSearch]);
+
+  const displayUsers = useMemo(() => {
+    const query = emailSearch.trim().toLowerCase();
+    if (!query) {
+      return users;
+    }
+
+    if (serverUsers) {
+      return serverUsers;
+    }
+
+    return users.filter((row) =>
+      (row.email ?? "").toLowerCase().includes(query)
+    );
+  }, [emailSearch, serverUsers, users]);
 
   function toggleUserDetails(userId: string) {
     setExpandedUserId((current) => (current === userId ? null : userId));
@@ -84,60 +133,72 @@ export function AdminUsersPanel({
           <CardTitle>{t("admin.users.userProfiles")}</CardTitle>
           <CardDescription>
             {formatMessage(t("admin.users.userProfilesDesc"), {
-              count: formatInt(users.length),
+              count: formatInt(displayUsers.length),
             })}
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          {users.length > 0 ? (
+        <CardContent className="space-y-4">
+          <div className="max-w-md">
+            <Label htmlFor="admin-users-email-search">
+              {t("admin.users.searchUserByEmail")}
+            </Label>
+            <Input
+              id="admin-users-email-search"
+              type="search"
+              value={emailSearch}
+              onChange={(event) => setEmailSearch(event.target.value)}
+              placeholder={t("admin.users.searchEmailPlaceholder")}
+              className="mt-1.5"
+            />
+            {searchLoading ? (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {t("admin.users.searchingUsers")}
+              </p>
+            ) : null}
+          </div>
+
+          {displayUsers.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[64rem] text-sm">
+              <table className="w-full min-w-[56rem] text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
                     <th className="py-2 pr-4 font-medium">{t("admin.users.email")}</th>
-                    <th className="py-2 pr-4 font-medium">{t("admin.users.userId")}</th>
                     <th className="py-2 pr-4 text-right font-medium">
                       {t("admin.users.creditsBalance")}
                     </th>
+                    <th className="py-2 pr-4 font-medium">{t("admin.users.createdAt")}</th>
+                    <th className="py-2 pr-4 font-medium">{t("admin.users.lastUsedAt")}</th>
                     <th className="py-2 pr-4 text-right font-medium">
-                      {t("admin.users.totalCreditsPurchased")}
+                      {t("admin.users.apiKeysCount")}
                     </th>
                     <th className="py-2 pr-4 text-right font-medium">
                       {t("admin.users.totalCreditsUsed")}
                     </th>
-                    <th className="py-2 pr-4 font-medium">{t("admin.users.createdAt")}</th>
-                    <th className="py-2 pr-4 font-medium">{t("admin.users.updatedAt")}</th>
                     <th className="py-2 pr-4 font-medium">{t("admin.users.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((row) => {
+                  {displayUsers.map((row) => {
                     const isExpanded = expandedUserId === row.id;
 
                     return (
                       <Fragment key={row.id}>
                         <tr className="border-b last:border-0">
                           <td className="py-2 pr-4">{row.email ?? "—"}</td>
-                          <td
-                            className="max-w-[12rem] truncate py-2 pr-4 font-mono text-xs text-muted-foreground"
-                            title={row.id}
-                          >
-                            {row.id}
-                          </td>
                           <td className="py-2 pr-4 text-right font-mono text-xs">
                             {formatCredits(row.credits_balance)}
-                          </td>
-                          <td className="py-2 pr-4 text-right font-mono text-xs">
-                            {formatCredits(row.total_credits_purchased)}
-                          </td>
-                          <td className="py-2 pr-4 text-right font-mono text-xs">
-                            {formatCredits(row.total_credits_used)}
                           </td>
                           <td className="py-2 pr-4 text-muted-foreground">
                             {formatDateTime(row.created_at)}
                           </td>
                           <td className="py-2 pr-4 text-muted-foreground">
-                            {formatDateTime(row.updated_at)}
+                            {formatDateTime(row.last_used_at)}
+                          </td>
+                          <td className="py-2 pr-4 text-right font-mono text-xs">
+                            {formatInt(row.key_count ?? 0)}
+                          </td>
+                          <td className="py-2 pr-4 text-right font-mono text-xs">
+                            {formatCredits(row.total_credits_used)}
                           </td>
                           <td className="py-2 pr-4">
                             <div className="flex flex-wrap items-center gap-2">
@@ -170,13 +231,21 @@ export function AdminUsersPanel({
                                 </Link>
                               ) : null}
                               <Link
-                                href={`/admin/credits-adjust?user_id=${encodeURIComponent(row.id)}&direction=add`}
+                                href={adminCreditsAdjustHref({
+                                  userId: row.id,
+                                  email: row.email,
+                                  direction: "add",
+                                })}
                                 className="text-xs font-medium text-primary underline-offset-4 hover:underline"
                               >
                                 {t("admin.users.addCredits")}
                               </Link>
                               <Link
-                                href={`/admin/credits-adjust?user_id=${encodeURIComponent(row.id)}&direction=deduct`}
+                                href={adminCreditsAdjustHref({
+                                  userId: row.id,
+                                  email: row.email,
+                                  direction: "deduct",
+                                })}
                                 className="text-xs font-medium text-destructive underline-offset-4 hover:underline"
                               >
                                 {t("admin.users.deductCredits")}
@@ -186,7 +255,7 @@ export function AdminUsersPanel({
                         </tr>
                         {isExpanded ? (
                           <tr className="border-b last:border-0">
-                            <td colSpan={8} className="py-3 pr-4">
+                            <td colSpan={7} className="py-3 pr-4">
                               <AdminUserDetailPanel user={row} />
                             </td>
                           </tr>
@@ -199,7 +268,9 @@ export function AdminUsersPanel({
             </div>
           ) : (
             <div className="rounded-md border border-dashed py-10 text-center text-sm text-muted-foreground">
-              {t("admin.users.noUsers")}
+              {emailSearch.trim()
+                ? t("admin.users.noSearchResults")
+                : t("admin.users.noUsers")}
             </div>
           )}
         </CardContent>

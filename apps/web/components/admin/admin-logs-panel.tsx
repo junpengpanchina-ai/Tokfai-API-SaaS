@@ -19,26 +19,74 @@ import type { AdminDebug } from "@/lib/admin/server";
 import { formatDateTime, formatInt } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 
+type LogFilters = {
+  request_id: string;
+  route: string;
+  status: string;
+  code: string;
+};
+
+function buildLogsQuery(filters: LogFilters): string {
+  const params = new URLSearchParams();
+  const requestId = filters.request_id.trim();
+  const route = filters.route.trim();
+  const status = filters.status.trim();
+  const code = filters.code.trim();
+
+  if (requestId) params.set("request_id", requestId);
+  if (route) params.set("route", route);
+  if (status) params.set("status", status);
+  if (code) params.set("code", code);
+
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
 export function AdminLogsPanel({
   logs,
   debug,
-  initialRequestIdFilter = "",
+  initialFilters = {
+    request_id: "",
+    route: "",
+    status: "",
+    code: "",
+  },
 }: {
   logs: AdminErrorLogRow[];
   debug: AdminDebug | null;
-  initialRequestIdFilter?: string;
+  initialFilters?: LogFilters;
 }) {
   const { t } = useI18n();
   const router = useRouter();
-  const [requestId, setRequestId] = useState(initialRequestIdFilter);
+  const [filters, setFilters] = useState<LogFilters>(initialFilters);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  function patchFilters(patch: Partial<LogFilters>) {
+    setFilters((current) => ({ ...current, ...patch }));
+  }
 
   function applyFilter() {
-    const trimmed = requestId.trim();
-    if (!trimmed) {
-      router.push("/admin/logs");
-      return;
+    router.push(`/admin/logs${buildLogsQuery(filters)}`);
+  }
+
+  function clearFilters() {
+    setFilters({
+      request_id: "",
+      route: "",
+      status: "",
+      code: "",
+    });
+    router.push("/admin/logs");
+  }
+
+  async function copyRequestId(requestId: string, rowId: string) {
+    try {
+      await navigator.clipboard.writeText(requestId);
+      setCopiedId(rowId);
+      window.setTimeout(() => setCopiedId(null), 1500);
+    } catch {
+      // ignore clipboard failures
     }
-    router.push(`/admin/logs?request_id=${encodeURIComponent(trimmed)}`);
   }
 
   return (
@@ -62,13 +110,34 @@ export function AdminLogsPanel({
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           <Input
-            value={requestId}
-            onChange={(event) => setRequestId(event.target.value)}
+            value={filters.request_id}
+            onChange={(event) => patchFilters({ request_id: event.target.value })}
             placeholder={t("admin.logs.requestIdPlaceholder")}
-            className="max-w-sm"
+            className="max-w-xs"
+          />
+          <Input
+            value={filters.route}
+            onChange={(event) => patchFilters({ route: event.target.value })}
+            placeholder={t("admin.logs.routePlaceholder")}
+            className="max-w-xs"
+          />
+          <Input
+            value={filters.status}
+            onChange={(event) => patchFilters({ status: event.target.value })}
+            placeholder={t("admin.logs.statusPlaceholder")}
+            className="max-w-[10rem]"
+          />
+          <Input
+            value={filters.code}
+            onChange={(event) => patchFilters({ code: event.target.value })}
+            placeholder={t("admin.logs.codePlaceholder")}
+            className="max-w-[10rem]"
           />
           <Button type="button" variant="secondary" onClick={applyFilter}>
             {t("admin.logs.applyFilter")}
+          </Button>
+          <Button type="button" variant="outline" onClick={clearFilters}>
+            {t("admin.logs.clearFilters")}
           </Button>
         </CardContent>
       </Card>
@@ -103,21 +172,33 @@ export function AdminLogsPanel({
                       {t("admin.logs.colMessage")}
                     </th>
                     <th className="py-2 pr-4 font-medium">
-                      {t("admin.logs.colUpstream")}
-                    </th>
-                    <th className="py-2 pr-4 font-medium">
-                      {t("admin.logs.colLatency")}
-                    </th>
-                    <th className="py-2 pr-4 font-medium">
                       {t("admin.logs.colCreated")}
                     </th>
+                    <th className="py-2 font-medium" />
                   </tr>
                 </thead>
                 <tbody>
                   {logs.map((row) => (
                     <tr key={row.id} className="border-b last:border-0">
                       <td className="py-2 pr-4 font-mono text-xs">
-                        {row.request_id ?? "—"}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>{row.request_id ?? "—"}</span>
+                          {row.request_id ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              onClick={() =>
+                                copyRequestId(row.request_id!, row.id)
+                              }
+                            >
+                              {copiedId === row.id
+                                ? t("dashboard.apiKeys.copied")
+                                : t("admin.logs.copyRequestId")}
+                            </Button>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="py-2 pr-4">{row.route ?? "—"}</td>
                       <td className="py-2 pr-4">{row.code ?? "—"}</td>
@@ -125,15 +206,26 @@ export function AdminLogsPanel({
                         {row.message ?? "—"}
                       </td>
                       <td className="py-2 pr-4">
-                        {row.upstream_status ?? "—"}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {row.latency_ms != null
-                          ? `${formatInt(row.latency_ms)} ms`
-                          : "—"}
-                      </td>
-                      <td className="py-2 pr-4">
                         {formatDateTime(row.created_at)}
+                      </td>
+                      <td className="py-2">
+                        <details className="text-xs">
+                          <summary className="cursor-pointer select-none text-muted-foreground hover:text-foreground">
+                            {t("admin.logs.technicalDetails")}
+                          </summary>
+                          <div className="mt-2 space-y-1 font-mono text-muted-foreground">
+                            <p>
+                              {t("admin.logs.colUpstream")}:{" "}
+                              {row.upstream_status ?? "—"}
+                            </p>
+                            <p>
+                              {t("admin.logs.colLatency")}:{" "}
+                              {row.latency_ms != null
+                                ? `${formatInt(row.latency_ms)} ms`
+                                : "—"}
+                            </p>
+                          </div>
+                        </details>
                       </td>
                     </tr>
                   ))}

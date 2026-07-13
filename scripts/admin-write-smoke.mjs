@@ -380,6 +380,83 @@ async function runLive() {
       }
     }
 
+    // Credits adjust add → large add → deduct (requires TOKFAI_SMOKE_TARGET_USER_ID)
+    {
+      const targetUserId = (process.env.TOKFAI_SMOKE_TARGET_USER_ID ?? "").trim();
+      if (!targetUserId) {
+        record(
+          "live.credits.adjust",
+          "SKIP",
+          "set TOKFAI_SMOKE_TARGET_USER_ID to exercise add/deduct +300000"
+        );
+      } else {
+        const addSmall = await adminFetch("POST", "/credits/adjust", {
+          body: {
+            user_id: targetUserId,
+            amount: 10000,
+            direction: "add",
+            reason: `${SMOKE_PREFIX} add 10000 ${RUN_ID}`,
+            purpose: "manual_topup",
+          },
+          idempotencyKey: `${SMOKE_PREFIX}-credits-add-10k-${RUN_ID}`,
+        });
+        if (expectStatus("live.credits.adjust.add_10000", addSmall, [200])) {
+          const after = addSmall.body?.balance_after;
+          if (typeof after === "number") {
+            record(
+              "live.credits.adjust.add_10000.balance",
+              "PASS",
+              `balance_after=${after}`
+            );
+          }
+        }
+
+        const addLarge = await adminFetch("POST", "/credits/adjust", {
+          body: {
+            user_id: targetUserId,
+            amount: 300000,
+            direction: "add",
+            reason: `${SMOKE_PREFIX} add 300000 ${RUN_ID}`,
+            purpose: "public_beta_invite",
+          },
+          idempotencyKey: `${SMOKE_PREFIX}-credits-add-300k-${RUN_ID}`,
+        });
+        expectStatus("live.credits.adjust.add_300000", addLarge, [200]);
+
+        const deduct = await adminFetch("POST", "/credits/adjust", {
+          body: {
+            user_id: targetUserId,
+            amount: 1000,
+            direction: "deduct",
+            reason: `${SMOKE_PREFIX} deduct 1000 ${RUN_ID}`,
+            purpose: "correction",
+          },
+          idempotencyKey: `${SMOKE_PREFIX}-credits-deduct-1k-${RUN_ID}`,
+        });
+        expectStatus("live.credits.adjust.deduct_1000", deduct, [200]);
+
+        const overDeduct = await adminFetch("POST", "/credits/adjust", {
+          body: {
+            user_id: targetUserId,
+            amount: 9_999_999_999,
+            direction: "deduct",
+            reason: `${SMOKE_PREFIX} over-deduct ${RUN_ID}`,
+            purpose: "correction",
+          },
+          idempotencyKey: `${SMOKE_PREFIX}-credits-overdeduct-${RUN_ID}`,
+        });
+        const overOk =
+          overDeduct.status === 400 &&
+          (overDeduct.body?.error === "insufficient_credits_for_deduct" ||
+            overDeduct.body?.error === "insufficient_credits");
+        record(
+          "live.credits.adjust.over_deduct",
+          overOk ? "PASS" : "FAIL",
+          `status=${overDeduct.status} error=${overDeduct.body?.error ?? "?"}`
+        );
+      }
+    }
+
     // Pricing: dry validation against missing model (no real price change)
     {
       const patch = await adminFetch(

@@ -54,18 +54,18 @@ const PURPOSE_OPTIONS: {
     defaultReason: "customer_compensation",
   },
   {
-    value: "manual_deduct",
+    value: "correction",
     labelKey: "admin.adjust.purposeManualDeduct",
     direction: "deduct",
     defaultAmount: "1000",
-    defaultReason: "manual_deduct",
+    defaultReason: "correction",
   },
   {
-    value: "offline_payment_topup",
+    value: "offline_payment",
     labelKey: "admin.adjust.purposeOfflinePayment",
     direction: "add",
     defaultAmount: "100000",
-    defaultReason: "offline_payment_topup",
+    defaultReason: "offline_payment",
   },
 ];
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -23,6 +23,7 @@ import {
   filterLedgerEntriesByBucket,
   summarizeLedgerEntries,
 } from "@/lib/admin/ledger";
+import { adminCreditsAdjustHref } from "@/lib/admin/user-links";
 import { formatCredits, formatDateTime } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
@@ -103,6 +104,28 @@ export function AdminCreditsAccountPanel({
                 className="font-medium text-foreground underline-offset-4 hover:underline"
               >
                 {t("admin.credits.viewUsageLogs")}
+              </Link>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href={adminCreditsAdjustHref({
+                  userId: data.profile.id,
+                  email: data.profile.email,
+                  direction: "add",
+                })}
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {t("admin.credits.addCredits")}
+              </Link>
+              <Link
+                href={adminCreditsAdjustHref({
+                  userId: data.profile.id,
+                  email: data.profile.email,
+                  direction: "deduct",
+                })}
+                className="font-medium text-destructive underline-offset-4 hover:underline"
+              >
+                {t("admin.credits.deductCredits")}
               </Link>
             </div>
           </div>
@@ -205,10 +228,7 @@ export function AdminCreditsAccountPanel({
         </CardHeader>
         <CardContent>
           {data.ledger.length > 0 ? (
-            <AdminCreditsLedgerTable
-              entries={data.ledger}
-              profileEmail={profileEmail}
-            />
+            <AdminCreditsLedgerTable entries={data.ledger} />
           ) : (
             <div className="rounded-md border border-dashed py-10 text-center text-sm text-muted-foreground">
               {t("admin.credits.noLedgerEntries")}
@@ -222,40 +242,49 @@ export function AdminCreditsAccountPanel({
 
 function AdminCreditsLedgerTable({
   entries,
-  profileEmail,
 }: {
   entries: AdminCreditLedgerEntry[];
-  profileEmail: string;
 }) {
   const { t } = useI18n();
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full min-w-[48rem] text-sm">
         <thead>
           <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-            <th className="py-2 pr-4 font-medium">{t("admin.credits.email")}</th>
-            <th className="py-2 pr-4 font-medium">{t("admin.credits.colType")}</th>
+            <th className="py-2 pr-4 font-medium">{t("admin.credits.colCreated")}</th>
+            <th className="py-2 pr-4 font-medium">{t("admin.credits.colDirection")}</th>
             <th className="py-2 pr-4 text-right font-medium">
               {t("admin.credits.colAmount")}
+            </th>
+            <th className="py-2 pr-4 text-right font-medium">
+              {t("admin.credits.colBalanceBefore")}
             </th>
             <th className="py-2 pr-4 text-right font-medium">
               {t("admin.credits.colBalanceAfter")}
             </th>
             <th className="py-2 pr-4 font-medium">{t("admin.credits.colReason")}</th>
             <th className="py-2 pr-4 font-medium">{t("admin.credits.colReference")}</th>
-            <th className="py-2 pr-4 font-medium">{t("admin.credits.colCreated")}</th>
+            <th className="py-2 pr-4 font-medium">{t("admin.credits.colActions")}</th>
           </tr>
         </thead>
         <tbody>
           {entries.map((entry) => (
             <tr key={entry.id} className="border-b last:border-0">
-              <td className="py-2 pr-4">{profileEmail ?? "—"}</td>
+              <td className="py-2 pr-4 text-muted-foreground">
+                {formatDateTime(entry.created_at)}
+              </td>
               <td className="py-2 pr-4">
-                <TypeBadge type={entry.type} />
+                <DirectionBadge amount={entry.amount} />
               </td>
               <td className="py-2 pr-4 text-right font-mono text-xs">
                 <AmountCell amount={entry.amount} />
+              </td>
+              <td className="py-2 pr-4 text-right font-mono text-xs">
+                <BalanceBeforeCell
+                  amount={entry.amount}
+                  balanceAfter={entry.balance_after}
+                />
               </td>
               <td className="py-2 pr-4 text-right font-mono text-xs">
                 {formatCredits(entry.balance_after)}
@@ -269,14 +298,75 @@ function AdminCreditsLedgerTable({
               >
                 {entry.reference_id ?? "—"}
               </td>
-              <td className="py-2 pr-4 text-muted-foreground">
-                {formatDateTime(entry.created_at)}
+              <td className="py-2 pr-4">
+                <CopyReferenceButton referenceId={entry.reference_id} />
               </td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
+  );
+}
+
+function DirectionBadge({ amount }: { amount: number | null }) {
+  const { t } = useI18n();
+  if (amount == null) {
+    return <Badge variant="outline">{t("admin.common.unknown")}</Badge>;
+  }
+  if (amount >= 0) {
+    return <Badge variant="success">{t("admin.credits.directionIn")}</Badge>;
+  }
+  return <Badge variant="destructive">{t("admin.credits.directionOut")}</Badge>;
+}
+
+function BalanceBeforeCell({
+  amount,
+  balanceAfter,
+}: {
+  amount: number | null;
+  balanceAfter: number | null;
+}) {
+  if (amount == null || balanceAfter == null) {
+    return <>—</>;
+  }
+  return <>{formatCredits(balanceAfter - amount)}</>;
+}
+
+function CopyReferenceButton({
+  referenceId,
+}: {
+  referenceId: string | null;
+}) {
+  const { t } = useI18n();
+  const [copied, setCopied] = useState(false);
+
+  if (!referenceId) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+
+  const value = referenceId;
+
+  async function copyReference() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard may be unavailable; ignore.
+    }
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="h-7 text-xs"
+      onClick={() => void copyReference()}
+    >
+      {copied ? t("admin.credits.requestIdCopied") : t("admin.credits.copyRequestId")}
+    </Button>
   );
 }
 
@@ -320,23 +410,3 @@ function LedgerReason({ reason }: { reason: string | null | undefined }) {
   return <>{reason}</>;
 }
 
-function TypeBadge({ type }: { type: string | null | undefined }) {
-  const { t } = useI18n();
-  if (!type) return <Badge variant="outline">{t("admin.common.unknown")}</Badge>;
-  const normalized = type.toLowerCase();
-  if (
-    normalized === "purchase" ||
-    normalized === "topup" ||
-    normalized === "grant" ||
-    normalized === "refund"
-  ) {
-    return <Badge variant="success">{type}</Badge>;
-  }
-  if (normalized === "debit") {
-    return <Badge variant="destructive">{type}</Badge>;
-  }
-  if (normalized === "adjustment") {
-    return <Badge variant="warning">{type}</Badge>;
-  }
-  return <Badge variant="outline">{type}</Badge>;
-}

@@ -26,7 +26,7 @@ function channelDisplayName(
   if (index === 1 || row.priority === 2) {
     return t("admin.channels.backupChannel");
   }
-  return t("admin.channels.channelRole").replace("{n}", String(index + 1));
+  return t("admin.channels.privateChannel");
 }
 
 function maskBaseUrl(value: string | null | undefined): string {
@@ -91,23 +91,9 @@ export function AdminChannelsPanel({
                       {t("admin.channels.colChannel")}
                     </th>
                     <th className="py-2 pr-4 font-medium">
-                      {t("admin.channels.colStatus")}
-                    </th>
-                    <th className="py-2 pr-4 font-medium">
-                      {t("admin.channels.colPriority")}
-                    </th>
-                    <th className="py-2 pr-4 font-medium">
-                      {t("admin.channels.colWeight")}
-                    </th>
-                    <th className="py-2 pr-4 font-medium">
-                      {t("admin.channels.colTimeout")}
-                    </th>
-                    <th className="py-2 pr-4 font-medium">
                       {t("admin.channels.colSuccessRate")}
                     </th>
-                    <th className="py-2 pr-4 font-medium">
-                      {t("admin.channels.colLastError")}
-                    </th>
+                    <th className="py-2 font-medium" />
                   </tr>
                 </thead>
                 <tbody>
@@ -117,62 +103,50 @@ export function AdminChannelsPanel({
                         {channelDisplayName(row, index, t)}
                       </td>
                       <td className="py-2 pr-4">
-                        <Badge
-                          variant={row.enabled ? "default" : "secondary"}
-                        >
-                          {row.enabled
-                            ? t("admin.channels.statusActive")
-                            : t("admin.channels.statusDisabled")}
-                        </Badge>
-                      </td>
-                      <td className="py-2 pr-4">{row.priority}</td>
-                      <td className="py-2 pr-4">{row.weight}</td>
-                      <td className="py-2 pr-4">
-                        {row.timeout_ms != null
-                          ? `${formatInt(row.timeout_ms)} ms`
-                          : "—"}
-                      </td>
-                      <td className="py-2 pr-4">
                         {row.success_rate != null
                           ? `${row.success_rate}%`
                           : "—"}
                       </td>
-                      <td className="py-2 pr-4">{row.last_error ?? "—"}</td>
+                      <td className="py-2">
+                        <details className="text-xs">
+                          <summary className="cursor-pointer select-none text-muted-foreground hover:text-foreground">
+                            {t("admin.channels.technicalDetails")}
+                          </summary>
+                          <div className="mt-2 space-y-1 font-mono text-muted-foreground">
+                            <p>id: {row.id}</p>
+                            <p>
+                              {t("admin.channels.colStatus")}:{" "}
+                              {row.enabled
+                                ? t("admin.channels.statusActive")
+                                : t("admin.channels.statusDisabled")}
+                            </p>
+                            <p>
+                              {t("admin.channels.colPriority")}: {row.priority}
+                            </p>
+                            <p>
+                              {t("admin.channels.colWeight")}: {row.weight}
+                            </p>
+                            <p>
+                              {t("admin.channels.colTimeout")}:{" "}
+                              {row.timeout_ms != null
+                                ? `${formatInt(row.timeout_ms)} ms`
+                                : "—"}
+                            </p>
+                            <p>
+                              {t("admin.channels.colBaseUrl")}:{" "}
+                              {row.base_url_masked ||
+                                maskBaseUrl(row.base_url) ||
+                                "—"}
+                            </p>
+                          </div>
+                        </details>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
           </div>
-
-          {sorted.length > 0 ? (
-            <details className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-              <summary className="cursor-pointer select-none font-medium text-foreground">
-                {t("admin.channels.technicalDetails")}
-              </summary>
-              <div className="mt-3 space-y-3">
-                <Badge variant="outline">internal-only</Badge>
-                {sorted.map((row, index) => (
-                  <div
-                    key={`tech-${row.id}`}
-                    className="rounded border bg-background px-3 py-2 font-mono"
-                  >
-                    <p>{channelDisplayName(row, index, t)}</p>
-                    <p>
-                      {t("admin.channels.colTimeout")}:{" "}
-                      {row.timeout_ms != null
-                        ? `${formatInt(row.timeout_ms)} ms`
-                        : "—"}
-                    </p>
-                    <p>
-                      {t("admin.channels.colBaseUrl")}:{" "}
-                      {maskBaseUrl(row.base_url)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </details>
-          ) : null}
         </CardContent>
       </Card>
     </>

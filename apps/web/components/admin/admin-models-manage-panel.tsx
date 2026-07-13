@@ -25,10 +25,6 @@ import {
   type AdminModelListItem,
 } from "@/lib/admin/client";
 import {
-  formatAdminModelPricePreview,
-  formatAdminModelPricingSummary,
-} from "@/lib/admin/model-pricing-preview";
-import {
   adminModelToFormValues,
   emptyAdminModelFormValues,
   filterAdminModels,
@@ -64,7 +60,7 @@ function formatModelError(error: unknown, t: (key: string) => string) {
 }
 
 export function AdminModelsManagePanel() {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const [models, setModels] = useState<AdminModelListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -394,11 +390,6 @@ export function AdminModelsManagePanel() {
                     <th className="py-2 pr-4 font-medium">{t("admin.models.tableModelId")}</th>
                     <th className="py-2 pr-4 font-medium">{t("admin.models.tableType")}</th>
                     <th className="py-2 pr-4 font-medium">{t("admin.models.tableStatus")}</th>
-                    <th className="py-2 pr-4 font-medium">{t("admin.models.manage.tableBilling")}</th>
-                    <th className="py-2 pr-4 font-medium">{t("admin.models.manage.tablePricing")}</th>
-                    <th className="py-2 pr-4 font-medium">
-                      {t("admin.models.manage.tablePricePreview")}
-                    </th>
                     <th className="py-2 pr-4 font-medium">{t("admin.models.manage.tableUpdated")}</th>
                     <th className="py-2 pr-4 font-medium">{t("admin.users.actions")}</th>
                   </tr>
@@ -409,21 +400,28 @@ export function AdminModelsManagePanel() {
                       <td className="py-3 pr-4 font-medium">
                         {model.display_name ?? "—"}
                       </td>
-                      <td className="py-3 pr-4 font-mono text-xs text-muted-foreground">
-                        {model.id}
+                      <td className="py-3 pr-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono text-xs text-muted-foreground">
+                            {model.id}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              void navigator.clipboard.writeText(model.id).catch(
+                                () => undefined
+                              );
+                            }}
+                          >
+                            {t("admin.models.copyModelId")}
+                          </Button>
+                        </div>
                       </td>
                       <td className="py-3 pr-4">{model.model_type ?? "—"}</td>
                       <td className="py-3 pr-4">
                         <StatusBadge status={model.status} t={t} />
-                      </td>
-                      <td className="py-3 pr-4 font-mono text-xs">
-                        {model.billing_type ?? "—"}
-                      </td>
-                      <td className="py-3 pr-4 font-mono text-xs">
-                        {formatAdminModelPricingSummary(model, locale)}
-                      </td>
-                      <td className="py-3 pr-4 text-xs text-muted-foreground">
-                        {formatAdminModelPricePreview(model, locale) ?? "—"}
                       </td>
                       <td className="py-3 pr-4 text-muted-foreground">
                         {formatDateTime(model.updated_at)}

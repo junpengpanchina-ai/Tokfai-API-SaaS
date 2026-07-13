@@ -254,6 +254,18 @@ export function AdminOverviewPanel({
               }
             />
             <AdminStatCard
+              label={t("admin.overview.last7dRequests")}
+              value={formatCount(summary.last_7d_requests)}
+            />
+            <AdminStatCard
+              label={t("admin.overview.last7dCredits")}
+              value={
+                summary.last_7d_credits_consumed != null
+                  ? formatCreditsPrecise(summary.last_7d_credits_consumed)
+                  : "—"
+              }
+            />
+            <AdminStatCard
               label={t("admin.overview.todayRevenue")}
               value={formatCny(summary.today_revenue_cents)}
             />
@@ -262,6 +274,49 @@ export function AdminOverviewPanel({
               value={formatCount(summary.active_users_7d)}
             />
           </div>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">
+                {t("admin.overview.quickLinksTitle")}
+              </CardTitle>
+              <CardDescription>{t("admin.overview.quickLinksDesc")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/admin/users"
+                  className="text-sm text-primary hover:underline"
+                >
+                  {t("admin.nav.users")}
+                </Link>
+                <Link
+                  href="/admin/logs"
+                  className="text-sm text-primary hover:underline"
+                >
+                  {t("admin.nav.errorLogs")}
+                </Link>
+                <Link
+                  href="/admin/credits-adjust"
+                  className="text-sm text-primary hover:underline"
+                >
+                  {t("admin.nav.creditsAdjust")}
+                </Link>
+                <Link
+                  href="/admin/usage"
+                  className="text-sm text-primary hover:underline"
+                >
+                  {t("admin.nav.usageLogs")}
+                </Link>
+                <Link
+                  href="/admin/pricing"
+                  className="text-sm text-primary hover:underline"
+                >
+                  {t("admin.nav.pricing")}
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <AdminStatCard
@@ -382,31 +437,44 @@ export function AdminOverviewPanel({
                     <thead>
                       <tr className="border-b text-left text-muted-foreground">
                         <th className="pb-2 pr-3 font-medium">
-                          {t("admin.overview.colRequestId")}
+                          {t("admin.overview.colCreated")}
                         </th>
                         <th className="pb-2 pr-3 font-medium">
-                          {t("admin.overview.colModel")}
+                          {t("admin.overview.colRoute")}
                         </th>
                         <th className="pb-2 pr-3 font-medium">
-                          {t("admin.overview.colError")}
+                          {t("admin.overview.colStatus")}
+                        </th>
+                        <th className="pb-2 pr-3 font-medium">
+                          {t("admin.overview.colCode")}
                         </th>
                         <th className="pb-2 font-medium">
-                          {t("admin.overview.colCreated")}
+                          {t("admin.overview.colRequestId")}
                         </th>
                       </tr>
                     </thead>
                     <tbody>
                       {summary.recent_errors.map((row) => (
                         <tr key={row.id} className="border-b last:border-0">
-                          <td className="py-2 pr-3 font-mono text-xs">
-                            {row.request_id ?? "—"}
-                          </td>
-                          <td className="py-2 pr-3">{row.model ?? "—"}</td>
-                          <td className="max-w-[280px] truncate py-2 pr-3">
-                            {row.error_message ?? row.error_code ?? row.status ?? "—"}
-                          </td>
-                          <td className="py-2">
+                          <td className="py-2 pr-3">
                             {formatDateTime(row.created_at)}
+                          </td>
+                          <td className="py-2 pr-3 font-mono text-xs">
+                            {row.route ?? "—"}
+                          </td>
+                          <td className="py-2 pr-3">{row.status ?? "—"}</td>
+                          <td className="py-2 pr-3">{row.error_code ?? "—"}</td>
+                          <td className="py-2 font-mono text-xs">
+                            {row.request_id ? (
+                              <Link
+                                href={`/admin/logs?request_id=${encodeURIComponent(row.request_id)}`}
+                                className="text-primary hover:underline"
+                              >
+                                {row.request_id}
+                              </Link>
+                            ) : (
+                              "—"
+                            )}
                           </td>
                         </tr>
                       ))}

@@ -82,7 +82,10 @@ function applyOverlay(
   if (!overlay) {
     return {
       ...channel,
+      // Never ship the real upstream host to the Admin browser.
+      base_url: "",
       base_url_masked: maskBaseUrl(channel.base_url),
+      last_error: null,
     };
   }
 
@@ -110,10 +113,9 @@ function applyOverlay(
     status,
     priority: overlay.priority ?? channel.priority,
     weight: overlay.weight ?? channel.weight,
-    // Admin list keeps effective URL for ops; masked field is always present.
-    // Upstream API keys are never included in this payload.
-    base_url: effectiveBase,
+    base_url: "",
     base_url_masked: maskBaseUrl(effectiveBase),
+    last_error: null,
     updated_at: overlay.updated_at,
   };
 }

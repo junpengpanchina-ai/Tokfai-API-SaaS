@@ -18,6 +18,8 @@ export type AdminCreditAdjustPurpose =
   | "public_beta_invite"
   | "manual_topup"
   | "customer_compensation"
+  | "correction"
+  | "offline_payment"
   | "manual_deduct"
   | "offline_payment_topup";
 
@@ -78,6 +80,8 @@ const PURPOSES: readonly AdminCreditAdjustPurpose[] = [
   "public_beta_invite",
   "manual_topup",
   "customer_compensation",
+  "correction",
+  "offline_payment",
   "manual_deduct",
   "offline_payment_topup",
 ] as const;

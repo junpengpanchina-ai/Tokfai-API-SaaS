@@ -17,10 +17,33 @@ type LogsResponse = {
   data?: AdminErrorLogRow[];
 };
 
+type LogsSearchParams = {
+  request_id?: string;
+  route?: string;
+  status?: string;
+  code?: string;
+};
+
+function buildLogsQuery(searchParams: LogsSearchParams): string {
+  const params = new URLSearchParams();
+  const requestId = (searchParams.request_id ?? "").trim();
+  const route = (searchParams.route ?? "").trim();
+  const status = (searchParams.status ?? "").trim();
+  const code = (searchParams.code ?? "").trim();
+
+  if (requestId) params.set("request_id", requestId);
+  if (route) params.set("route", route);
+  if (status) params.set("status", status);
+  if (code) params.set("code", code);
+
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
 export default async function AdminLogsPage({
   searchParams,
 }: {
-  searchParams: { request_id?: string };
+  searchParams: LogsSearchParams;
 }) {
   noStore();
   const supabase = createClient();
@@ -47,10 +70,13 @@ export default async function AdminLogsPage({
     redirect("/login?redirect=/admin/logs");
   }
 
-  const requestId = (searchParams.request_id ?? "").trim();
-  const query = requestId
-    ? `?request_id=${encodeURIComponent(requestId)}`
-    : "";
+  const initialFilters = {
+    request_id: (searchParams.request_id ?? "").trim(),
+    route: (searchParams.route ?? "").trim(),
+    status: (searchParams.status ?? "").trim(),
+    code: (searchParams.code ?? "").trim(),
+  };
+  const query = buildLogsQuery(searchParams);
 
   let logs: AdminErrorLogRow[] = [];
   let debug = null;
@@ -73,7 +99,7 @@ export default async function AdminLogsPage({
     <AdminLogsPanel
       logs={logs}
       debug={debug}
-      initialRequestIdFilter={requestId}
+      initialFilters={initialFilters}
     />
   );
 }

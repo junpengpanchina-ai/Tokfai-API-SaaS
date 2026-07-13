@@ -34,6 +34,7 @@ export type AdminDashboardModelTopRow = {
 export type AdminDashboardRecentError = {
   id: string;
   request_id: string | null;
+  route: string | null;
   model: string | null;
   status: string | null;
   error_code: string | null;
@@ -75,6 +76,8 @@ export type AdminDashboardSummary = {
 
   today_requests: number | null;
   today_credits_consumed: number | null;
+  last_7d_requests: number | null;
+  last_7d_credits_consumed: number | null;
   today_revenue_cents: number;
   active_users_7d: number | null;
   total_api_keys: number | null;
@@ -656,6 +659,22 @@ async function buildModelTop10(): Promise<{
   }
 }
 
+function inferDashboardRoute(model: string | null): string | null {
+  if (!model) return null;
+  const id = model.toLowerCase();
+  if (
+    id.startsWith("nano-banana") ||
+    id.startsWith("gpt-image") ||
+    id.includes("image")
+  ) {
+    return "/v1/images/generations";
+  }
+  if (id.includes("gemini") || id.includes("generatecontent")) {
+    return "/v1beta/models";
+  }
+  return "/v1/chat/completions";
+}
+
 async function fetchRecentErrors(): Promise<{
   errors: AdminDashboardRecentError[];
   warning?: string;
@@ -671,14 +690,35 @@ async function fetchRecentErrors(): Promise<{
       return { errors: [], warning: `recent errors: ${error.message}` };
     }
 
-    const errors = ((data ?? []) as AdminDashboardRecentError[]).filter(
+    const rows = (
+      (data ?? []) as Array<{
+        id: string;
+        request_id: string | null;
+        model: string | null;
+        status: string | null;
+        error_code: string | null;
+        error_message: string | null;
+        created_at: string;
+      }>
+    ).filter(
       (row) =>
         !USAGE_SUCCESS_STATUSES.includes((row.status ?? "").toLowerCase()) ||
         Boolean(row.error_code?.trim()) ||
         Boolean(row.error_message?.trim())
     );
 
-    return { errors: errors.slice(0, 10) };
+    return {
+      errors: rows.slice(0, 10).map((row) => ({
+        id: row.id,
+        request_id: row.request_id,
+        route: inferDashboardRoute(row.model),
+        model: row.model,
+        status: row.status,
+        error_code: row.error_code,
+        error_message: row.error_message,
+        created_at: row.created_at,
+      })),
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { errors: [], warning: `recent errors: ${message}` };
@@ -719,6 +759,8 @@ export async function buildAdminDashboardSummary(): Promise<{
     recentUsersResult,
     todayRequests,
     todayCredits,
+    last7dRequests,
+    last7dCredits,
     todayRevenue,
     activeUsers7d,
     totalApiKeys,
@@ -742,6 +784,8 @@ export async function buildAdminDashboardSummary(): Promise<{
     fetchRecentUsers(),
     countUsageSince(sinceToday),
     sumUsageCreditsSince(sinceToday),
+    countUsageSince(since7d),
+    sumUsageCreditsSince(since7d),
     sumPaidOrdersAmountSince(sinceToday),
     countActiveUsersSince(since7d),
     safeCount("api_keys", (q) => q.is("revoked_at", null)),
@@ -773,6 +817,8 @@ export async function buildAdminDashboardSummary(): Promise<{
   collectWarning(warnings, recentUsersResult);
   collectWarning(warnings, todayRequests);
   collectWarning(warnings, todayCredits);
+  collectWarning(warnings, last7dRequests);
+  collectWarning(warnings, last7dCredits);
   collectWarning(warnings, todayRevenue);
   collectWarning(warnings, activeUsers7d);
   collectWarning(warnings, totalApiKeys);
@@ -808,6 +854,8 @@ export async function buildAdminDashboardSummary(): Promise<{
 
       today_requests: todayRequests.value,
       today_credits_consumed: todayCredits.value,
+      last_7d_requests: last7dRequests.value,
+      last_7d_credits_consumed: last7dCredits.value,
       today_revenue_cents: todayRevenue.value,
       active_users_7d: activeUsers7d.value,
       total_api_keys: totalApiKeys.value,

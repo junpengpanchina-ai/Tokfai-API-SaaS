@@ -22,14 +22,12 @@ import {
 } from "@/lib/admin/client";
 import type { AdminDebug } from "@/lib/admin/server";
 import { formatCreditsPrecise } from "@/lib/format";
-import { formatApproxYuanFromCredits } from "@/lib/credits-units";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 
 type PricingDraft = {
   input_credits_per_million_tokens: string;
   output_credits_per_million_tokens: string;
   image_credits_per_generation: string;
-  markup_ratio: string;
 };
 
 type RowError = {
@@ -37,28 +35,17 @@ type RowError = {
   request_id: string | null;
 };
 
-function formatPriceWithYuan(
-  value: number | null,
-  locale: "en" | "zh",
-  opts?: { imagePerGeneration?: boolean }
-): ReactNode {
+function formatCreditsPrice(value: number | null): ReactNode {
   if (value == null) return "—";
-  const credits = formatCreditsPrecise(value);
-  const yuan = formatApproxYuanFromCredits(value, locale);
-  const unit = opts?.imagePerGeneration
-    ? locale === "zh"
-      ? "算力积分 / 次"
-      : "credits / generation"
-    : "";
-  return (
-    <div>
-      <div className="font-mono text-xs">
-        {credits}
-        {unit ? ` ${unit}` : ""}
-      </div>
-      <div className="text-xs text-muted-foreground">{yuan}</div>
-    </div>
-  );
+  return <span className="font-mono text-xs">{formatCreditsPrecise(value)}</span>;
+}
+
+function modalityLabel(
+  modality: string | null,
+  t: (key: string) => string
+): string {
+  if (modality === "image") return t("admin.pricing.modalityImage");
+  return t("admin.pricing.modalityTokens");
 }
 
 function isImageModality(modality: string | null): boolean {
@@ -73,8 +60,6 @@ function rowToDraft(row: AdminPricingRow): PricingDraft {
       row.output_price == null ? "" : String(row.output_price),
     image_credits_per_generation:
       row.image_price == null ? "" : String(row.image_price),
-    markup_ratio:
-      row.credits_multiplier == null ? "" : String(row.credits_multiplier),
   };
 }
 
@@ -114,17 +99,6 @@ function buildUpdateBody(
     body.output_credits_per_million_tokens = output;
   }
 
-  const multiplier = parseOptionalNumber(draft.markup_ratio);
-  if (multiplier === undefined) {
-    return { error: "invalid_multiplier" };
-  }
-  if (multiplier != null) {
-    if (multiplier <= 0) {
-      return { error: "invalid_multiplier" };
-    }
-    body.markup_ratio = multiplier;
-  }
-
   return { body };
 }
 
@@ -139,8 +113,6 @@ function validationMessage(
       return t("admin.pricing.invalidOutputCredits");
     case "invalid_image_credits":
       return t("admin.pricing.invalidImageCredits");
-    case "invalid_multiplier":
-      return t("admin.pricing.invalidMultiplier");
     default:
       return t("admin.pricing.invalidFields");
   }
@@ -153,7 +125,7 @@ export function AdminPricingPanel({
   pricing: AdminPricingRow[];
   debug: AdminDebug | null;
 }) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const [rows, setRows] = useState<AdminPricingRow[]>(initialPricing);
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
   const [draft, setDraft] = useState<PricingDraft | null>(null);
@@ -337,9 +309,6 @@ export function AdminPricingPanel({
                       {t("admin.pricing.colModel")}
                     </th>
                     <th className="py-2 pr-4 font-medium">
-                      {t("admin.pricing.colProvider")}
-                    </th>
-                    <th className="py-2 pr-4 font-medium">
                       {t("admin.pricing.colModality")}
                     </th>
                     <th className="py-2 pr-4 font-medium">
@@ -350,12 +319,6 @@ export function AdminPricingPanel({
                     </th>
                     <th className="py-2 pr-4 font-medium">
                       {t("admin.pricing.colImage")}
-                    </th>
-                    <th className="py-2 pr-4 font-medium">
-                      {t("admin.pricing.colMultiplier")}
-                    </th>
-                    <th className="py-2 pr-4 font-medium">
-                      {t("admin.pricing.colMinCharge")}
                     </th>
                     <th className="py-2 pr-4 font-medium">
                       {t("admin.pricing.colStatus")}
@@ -383,30 +346,19 @@ export function AdminPricingPanel({
                               {row.model_id}
                             </div>
                           </td>
-                          <td className="py-2 pr-4">{row.provider ?? "—"}</td>
-                          <td className="py-2 pr-4">{row.modality ?? "—"}</td>
                           <td className="py-2 pr-4">
-                            {isImage
-                              ? "—"
-                              : formatPriceWithYuan(row.input_price, locale)}
+                            {modalityLabel(row.modality, t)}
+                          </td>
+                          <td className="py-2 pr-4">
+                            {isImage ? "—" : formatCreditsPrice(row.input_price)}
+                          </td>
+                          <td className="py-2 pr-4">
+                            {isImage ? "—" : formatCreditsPrice(row.output_price)}
                           </td>
                           <td className="py-2 pr-4">
                             {isImage
-                              ? "—"
-                              : formatPriceWithYuan(row.output_price, locale)}
-                          </td>
-                          <td className="py-2 pr-4">
-                            {isImage
-                              ? formatPriceWithYuan(row.image_price, locale, {
-                                  imagePerGeneration: true,
-                                })
+                              ? formatCreditsPrice(row.image_price)
                               : "—"}
-                          </td>
-                          <td className="py-2 pr-4">
-                            {row.credits_multiplier ?? "—"}
-                          </td>
-                          <td className="py-2 pr-4">
-                            {row.minimum_charge ?? "—"}
                           </td>
                           <td className="py-2 pr-4">
                             <Badge
@@ -473,7 +425,7 @@ export function AdminPricingPanel({
                         </tr>
                         {editing && draft ? (
                           <tr className="border-b bg-muted/20 last:border-0">
-                            <td colSpan={10} className="px-3 py-4">
+                            <td colSpan={7} className="px-3 py-4">
                               <form
                                 className="space-y-4"
                                 onSubmit={(event) => handleSave(event, row)}
@@ -557,26 +509,6 @@ export function AdminPricingPanel({
                                       </div>
                                     </>
                                   )}
-                                  <div className="space-y-2">
-                                    <Label
-                                      htmlFor={`pricing-multiplier-${row.model_id}`}
-                                    >
-                                      {t("admin.pricing.fieldMultiplier")}
-                                    </Label>
-                                    <Input
-                                      id={`pricing-multiplier-${row.model_id}`}
-                                      type="number"
-                                      min={0}
-                                      step="any"
-                                      disabled={submitting}
-                                      value={draft.markup_ratio}
-                                      onChange={(event) =>
-                                        patchDraft({
-                                          markup_ratio: event.target.value,
-                                        })
-                                      }
-                                    />
-                                  </div>
                                 </div>
 
                                 {rowError ? (

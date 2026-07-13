@@ -11,6 +11,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  groupAdminDocs,
+  type AdminDocsGroupId,
+} from "@/lib/admin/docs-groups";
+import {
   PUBLIC_BETA_DOCS,
   type PublicBetaDoc,
 } from "@/lib/docs/public-beta-docs-registry";
@@ -24,9 +28,21 @@ function pickTitle(doc: PublicBetaDoc, locale: string): string {
   return locale === "zh" ? doc.title.zh : doc.title.en;
 }
 
+const GROUP_LABEL_KEYS: Record<AdminDocsGroupId, string> = {
+  quickstart: "admin.docs.groupQuickstart",
+  chat: "admin.docs.groupChat",
+  responses: "admin.docs.groupResponses",
+  image: "admin.docs.groupImage",
+  "cherry-studio": "admin.docs.groupCherryStudio",
+  billing: "admin.docs.groupBilling",
+  errors: "admin.docs.groupErrors",
+  faq: "admin.docs.groupFaq",
+};
+
 export function AdminDocsPanel() {
   const { t, locale } = useI18n();
   const docs = PUBLIC_BETA_DOCS;
+  const groupedDocs = useMemo(() => groupAdminDocs(docs), [docs]);
   const [selectedSlug, setSelectedSlug] = useState(docs[0]?.slug ?? "");
   const selected = useMemo(
     () => docs.find((doc) => doc.slug === selectedSlug) ?? docs[0] ?? null,
@@ -55,27 +71,36 @@ export function AdminDocsPanel() {
             <CardTitle className="text-base">{t("admin.docs.listTitle")}</CardTitle>
             <CardDescription>{t("admin.docs.listDesc")}</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-1">
-            {docs.map((doc) => {
-              const active = doc.slug === selected?.slug;
-              return (
-                <button
-                  key={doc.slug}
-                  type="button"
-                  onClick={() => setSelectedSlug(doc.slug)}
-                  className={`flex w-full flex-col rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                    active
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                  }`}
-                >
-                  <span className="font-medium">{pickTitle(doc, locale)}</span>
-                  <span className="mt-0.5 font-mono text-[11px] opacity-80">
-                    {doc.slug}
-                  </span>
-                </button>
-              );
-            })}
+          <CardContent className="space-y-4">
+            {groupedDocs.map((group) => (
+              <div key={group.id}>
+                <p className="mb-1 px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t(GROUP_LABEL_KEYS[group.id])}
+                </p>
+                <div className="space-y-1">
+                  {group.docs.map((doc) => {
+                    const active = doc.slug === selected?.slug;
+                    return (
+                      <button
+                        key={doc.slug}
+                        type="button"
+                        onClick={() => setSelectedSlug(doc.slug)}
+                        className={`flex w-full flex-col rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                          active
+                            ? "bg-muted text-foreground"
+                            : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                        }`}
+                      >
+                        <span className="font-medium">{pickTitle(doc, locale)}</span>
+                        <span className="mt-0.5 font-mono text-[11px] opacity-80">
+                          {doc.slug}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
 

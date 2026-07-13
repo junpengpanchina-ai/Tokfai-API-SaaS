@@ -546,18 +546,62 @@ protectedAdminRoutes.get("/summary", async (c) => {
 });
 
 protectedAdminRoutes.get("/users", async (c) => {
-  const profiles = await listAllProfiles();
+  const emailQuery = (c.req.query("email") ?? "").trim().toLowerCase();
+  let profiles = await listAllProfiles();
+  if (emailQuery) {
+    profiles = profiles.filter((row) =>
+      (row.email ?? "").toLowerCase().includes(emailQuery)
+    );
+  }
+
+  const keyStats = new Map<
+    string,
+    { key_count: number; last_used_at: string | null }
+  >();
+
+  try {
+    const { data: keyRows } = await supabase()
+      .from("api_keys")
+      .select("user_id, last_used_at, revoked_at");
+    for (const row of (keyRows ?? []) as Array<{
+      user_id: string;
+      last_used_at: string | null;
+      revoked_at: string | null;
+    }>) {
+      const current = keyStats.get(row.user_id) ?? {
+        key_count: 0,
+        last_used_at: null as string | null,
+      };
+      if (!row.revoked_at) {
+        current.key_count += 1;
+      }
+      if (
+        row.last_used_at &&
+        (!current.last_used_at || row.last_used_at > current.last_used_at)
+      ) {
+        current.last_used_at = row.last_used_at;
+      }
+      keyStats.set(row.user_id, current);
+    }
+  } catch {
+    // Enrichment is best-effort; list still returns profiles.
+  }
 
   return c.json({
-    data: profiles.map((row) => ({
-      id: row.id,
-      email: row.email,
-      credits_balance: toNumber(row.credits_balance),
-      total_credits_purchased: toNumber(row.total_credits_purchased),
-      total_credits_used: toNumber(row.total_credits_used),
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-    })),
+    data: profiles.map((row) => {
+      const stats = keyStats.get(row.id);
+      return {
+        id: row.id,
+        email: row.email,
+        credits_balance: toNumber(row.credits_balance),
+        total_credits_purchased: toNumber(row.total_credits_purchased),
+        total_credits_used: toNumber(row.total_credits_used),
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        key_count: stats?.key_count ?? 0,
+        last_used_at: stats?.last_used_at ?? null,
+      };
+    }),
   });
 });
 
@@ -675,6 +719,11 @@ protectedAdminRoutes.patch("/pricing/:modelId", async (c) => {
 protectedAdminRoutes.get("/logs", async (c) => {
   const logs = await listAdminErrorLogs({
     request_id: c.req.query("request_id"),
+    route: c.req.query("route"),
+    status: c.req.query("status"),
+    code: c.req.query("code"),
+    since: c.req.query("since"),
+    until: c.req.query("until"),
     limit: c.req.query("limit"),
   });
   return c.json({ data: logs });

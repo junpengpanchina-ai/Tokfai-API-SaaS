@@ -92,18 +92,18 @@ const PURPOSE_OPTIONS: {
     defaultReason: "customer_compensation",
   },
   {
-    value: "manual_deduct",
+    value: "correction",
     labelKey: "admin.adjust.purposeManualDeduct",
     direction: "deduct",
     defaultAmount: "1000",
-    defaultReason: "manual_deduct",
+    defaultReason: "correction",
   },
   {
-    value: "offline_payment_topup",
+    value: "offline_payment",
     labelKey: "admin.adjust.purposeOfflinePayment",
     direction: "add",
     defaultAmount: "100000",
-    defaultReason: "offline_payment_topup",
+    defaultReason: "offline_payment",
   },
 ];
 
@@ -144,9 +144,11 @@ function parsePositiveAmount(raw: string): number | null {
 
 export function CreditsAdjustClient({
   initialUserId = "",
+  initialEmail = "",
   initialDirection = "add",
 }: {
   initialUserId?: string;
+  initialEmail?: string;
   initialDirection?: AdjustDirection;
 }) {
   const { t } = useI18n();
@@ -238,6 +240,13 @@ export function CreditsAdjustClient({
     },
     [t]
   );
+
+  useEffect(() => {
+    const trimmedEmail = initialEmail.trim();
+    if (!trimmedEmail) return;
+    setLedgerEmail(trimmedEmail);
+    void loadCreditsByEmail(trimmedEmail);
+  }, [initialEmail, loadCreditsByEmail]);
 
   async function resolveEmailForUser(
     targetUserId: string
@@ -459,6 +468,73 @@ export function CreditsAdjustClient({
       </div>
 
       <section className="space-y-4 rounded-lg border bg-background p-4">
+        <div>
+          <h2 className="text-sm font-semibold">
+            {t("admin.credits.searchByEmail")}
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {t("admin.adjust.subtitle")}
+          </p>
+        </div>
+
+        <form
+          className="flex flex-wrap items-end gap-3"
+          onSubmit={handleLedgerSearch}
+        >
+          <div className="min-w-[16rem] flex-1 space-y-2">
+            <Label htmlFor="credits-adjust-primary-email">
+              {t("admin.credits.email")}
+            </Label>
+            <Input
+              id="credits-adjust-primary-email"
+              type="email"
+              value={ledgerEmail}
+              onChange={(event) => setLedgerEmail(event.target.value)}
+              placeholder="user@example.com"
+              disabled={ledgerLoading}
+              required
+            />
+          </div>
+          <Button type="submit" size="sm" disabled={ledgerLoading}>
+            {ledgerLoading
+              ? t("admin.credits.searching")
+              : t("admin.credits.search")}
+          </Button>
+        </form>
+
+        {ledgerError ? (
+          <div
+            className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+            role="alert"
+          >
+            {ledgerError}
+          </div>
+        ) : null}
+
+        {creditsData ? (
+          <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
+            <p>
+              {t("admin.adjust.confirmUser")}:{" "}
+              <span className="font-medium">
+                {creditsData.profile.email ?? "—"}
+              </span>
+            </p>
+            <p className="mt-1">
+              {t("admin.adjust.confirmBalance")}:{" "}
+              <span className="font-mono font-medium">
+                {formatCredits(creditsData.profile.credits_balance)}
+              </span>
+            </p>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">
+              user_id: {creditsData.profile.id}
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            {t("admin.adjust.balanceUnknown")}
+          </p>
+        )}
+
         <form className="grid gap-4" onSubmit={openConfirm}>
           <div className="space-y-2">
             <Label>{t("admin.adjust.purpose")}</Label>
@@ -469,7 +545,7 @@ export function CreditsAdjustClient({
                   type="button"
                   size="sm"
                   variant={purpose === option.value ? "default" : "outline"}
-                  disabled={submitting}
+                  disabled={submitting || !userId.trim()}
                   onClick={() => applyPurpose(option.value)}
                 >
                   {t(option.labelKey)}
@@ -478,19 +554,7 @@ export function CreditsAdjustClient({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="credits-adjust-user-id">
-              {t("admin.adjust.userId")}
-            </Label>
-            <Input
-              id="credits-adjust-user-id"
-              value={userId}
-              onChange={(event) => setUserId(event.target.value)}
-              placeholder="uuid"
-              className="font-mono text-xs"
-              required
-            />
-          </div>
+          <input type="hidden" value={userId} readOnly />
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -500,6 +564,7 @@ export function CreditsAdjustClient({
               <select
                 id="credits-adjust-direction"
                 value={direction}
+                disabled={!userId.trim()}
                 onChange={(event) =>
                   setDirection(event.target.value as AdjustDirection)
                 }
@@ -522,6 +587,7 @@ export function CreditsAdjustClient({
                 step="any"
                 inputMode="decimal"
                 value={amount}
+                disabled={!userId.trim()}
                 onChange={(event) => {
                   setAmount(event.target.value);
                   setAmountPreset("custom");
@@ -540,7 +606,7 @@ export function CreditsAdjustClient({
                   type="button"
                   size="sm"
                   variant={amountPreset === preset ? "default" : "outline"}
-                  disabled={submitting}
+                  disabled={submitting || !userId.trim()}
                   onClick={() => {
                     setAmount(String(preset));
                     setAmountPreset(preset);
@@ -553,13 +619,22 @@ export function CreditsAdjustClient({
                 type="button"
                 size="sm"
                 variant={amountPreset === "custom" ? "default" : "outline"}
-                disabled={submitting}
+                disabled={submitting || !userId.trim()}
                 onClick={() => setAmountPreset("custom")}
               >
                 {t("admin.adjust.presetCustom")}
               </Button>
             </div>
           </div>
+
+          {parsedAmount != null && parsedAmount > 300_000 ? (
+            <div
+              className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-100"
+              role="status"
+            >
+              {t("admin.adjust.largeAmountWarning")}
+            </div>
+          ) : null}
 
           <div className="space-y-2">
             <Label htmlFor="credits-adjust-reason">
@@ -568,37 +643,19 @@ export function CreditsAdjustClient({
             <Input
               id="credits-adjust-reason"
               value={reason}
+              disabled={!userId.trim()}
               onChange={(event) => setReason(event.target.value)}
               maxLength={200}
               required
             />
           </div>
 
-          {balanceBefore != null ? (
-            <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
-              <p>
-                {t("admin.adjust.confirmBalance")}:{" "}
-                <span className="font-mono font-medium">
-                  {formatCredits(balanceBefore)}
-                </span>
-              </p>
-              {balanceAfter != null ? (
-                <p className="mt-1">
-                  {t("admin.adjust.confirmAfter")}:{" "}
-                  <span className="font-mono font-medium">
-                    {formatCredits(balanceAfter)}
-                  </span>
-                </p>
-              ) : null}
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              {t("admin.adjust.balanceUnknown")}
-            </p>
-          )}
-
           <div>
-            <Button type="submit" size="sm" disabled={submitting}>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={submitting || !userId.trim()}
+            >
               {submitting
                 ? t("admin.adjust.submitting")
                 : t("admin.adjust.submit")}
@@ -673,6 +730,11 @@ export function CreditsAdjustClient({
                 <dd className="inline">{actorEmail ?? "—"}</dd>
               </div>
             </dl>
+            {confirmSummary.amount != null && confirmSummary.amount > 300_000 ? (
+              <p className="mt-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-xs">
+                {t("admin.adjust.largeAmountWarning")}
+              </p>
+            ) : null}
             <div className="mt-3 flex flex-wrap gap-2">
               <Button
                 type="button"
@@ -702,20 +764,27 @@ export function CreditsAdjustClient({
             className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm"
             role="alert"
           >
-            <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-xs text-destructive">
-              {JSON.stringify(
-                {
-                  status: error.status,
-                  error: {
-                    code: error.code,
-                    message: error.message,
+            <p className="font-medium text-destructive">{error.message}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{error.code}</p>
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs text-muted-foreground">
+                Technical details
+              </summary>
+              <pre className="mt-1 overflow-x-auto whitespace-pre-wrap font-mono text-xs text-destructive">
+                {JSON.stringify(
+                  {
+                    status: error.status,
+                    error: {
+                      code: error.code,
+                      message: error.message,
+                    },
+                    request_id: error.request_id,
                   },
-                  request_id: error.request_id,
-                },
-                null,
-                2
-              )}
-            </pre>
+                  null,
+                  2
+                )}
+              </pre>
+            </details>
           </div>
         ) : null}
 
@@ -745,64 +814,15 @@ export function CreditsAdjustClient({
       <section className="space-y-4 rounded-lg border bg-background p-4">
         <div>
           <h2 className="text-sm font-semibold">
-            {t("admin.credits.searchByEmail")}
+            {t("admin.credits.currentBalance")}
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
             {t("admin.credits.searchByEmailDesc")}
           </p>
         </div>
 
-        <form
-          className="flex flex-wrap items-end gap-3"
-          onSubmit={handleLedgerSearch}
-        >
-          <div className="min-w-[16rem] flex-1 space-y-2">
-            <Label htmlFor="credits-adjust-ledger-email">
-              {t("admin.credits.email")}
-            </Label>
-            <Input
-              id="credits-adjust-ledger-email"
-              type="email"
-              value={ledgerEmail}
-              onChange={(event) => setLedgerEmail(event.target.value)}
-              placeholder="user@example.com"
-              disabled={ledgerLoading}
-              required
-            />
-          </div>
-          <Button type="submit" size="sm" variant="outline" disabled={ledgerLoading}>
-            {ledgerLoading
-              ? t("admin.credits.searching")
-              : t("admin.credits.search")}
-          </Button>
-        </form>
-
-        {ledgerError ? (
-          <div
-            className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-            role="alert"
-          >
-            {ledgerError}
-          </div>
-        ) : null}
-
         {creditsData ? (
           <div className="space-y-4">
-            <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
-              <p>
-                {t("admin.credits.currentBalance")}:{" "}
-                <span className="font-mono font-medium">
-                  {formatCredits(creditsData.profile.credits_balance)}
-                </span>
-              </p>
-              <p className="mt-1 text-muted-foreground">
-                {t("admin.credits.email")}: {creditsData.profile.email ?? "—"}
-              </p>
-              <p className="mt-1 font-mono text-xs text-muted-foreground">
-                user_id: {creditsData.profile.id}
-              </p>
-            </div>
-
             {creditsData.ledger.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -853,7 +873,11 @@ export function CreditsAdjustClient({
               />
             )}
           </div>
-        ) : null}
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {t("admin.adjust.balanceUnknown")}
+          </p>
+        )}
       </section>
 
       <section className="space-y-4 rounded-lg border bg-background p-4">
