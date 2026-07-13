@@ -3492,11 +3492,11 @@ export const messages = {
       imageApiErrorInvalidImageUrl:
         "invalid_image_url — image_urls entry is missing, blocked, or not a valid http/https URL.",
       imageApiErrorUpstreamTimeout:
-        "upstream_timeout — upstream image provider timed out. Retry later or switch models.",
+        "upstream_timeout — image service timed out. Retry later or switch models.",
       imageApiErrorRequestTooLarge:
         "request_body_too_large — JSON body exceeds the gateway limit. Reduce payload size.",
       imageApiErrorUpstreamError:
-        "upstream_error / upstream_rate_limited — upstream provider failed or rate-limited. Retry with backoff.",
+        "upstream_error / upstream_rate_limited — service unavailable or rate-limited. Retry with backoff.",
       imageApiBody:
         "Send prompt, model, and size from your backend. Successful generations debit credits; failed calls are usually not charged.",
       imageApiChapterPurpose:
@@ -3738,7 +3738,7 @@ export const messages = {
       cherryChapterFailure:
         "invalid_token or model_not_available — verify host and model id.",
       cherryGatewayNote:
-        "Cherry Studio connects to Tokfai via an OpenAI-compatible / OpenAI-style provider. Base URL: https://api.tokfai.com/v1. API Key: sk-tokfai_xxx. Recommended model: auto-fast. Use auto-pro for quality-first routing and auto-cheap for low-cost batch workloads. One Tokfai Key covers multiple models — no need to manage separate upstream vendors.",
+        "Cherry Studio connects to Tokfai via an OpenAI-compatible / OpenAI-style provider. Base URL: https://api.tokfai.com. API Key: sk-tokfai_xxx. Recommended model: auto-fast. Use auto-pro for quality-first routing and auto-cheap for low-cost batch workloads. One Tokfai Key covers Chat Completions, Responses, and selected Gemini aliases — no need to manage separate service configs.",
       cherryCurlFirstNote:
         "If Cherry Studio fails, copy the one-line Chat curl below and run it in any terminal. HTTP 200 confirms the API Key — then fix Cherry provider settings.",
       cherryNotAgencyNote:
@@ -4527,8 +4527,8 @@ export const messages = {
           where: "Usage",
         },
         upstream_error: {
-          meaning: "Upstream provider failed.",
-          cause: "External API error or bad upstream response.",
+          meaning: "Service temporarily unavailable.",
+          cause: "Temporary service error.",
           action: "Retry with backoff; switch to auto-fast if persistent.",
           charged: "Usually not charged",
           where: "Usage (request_id) / support",
@@ -4602,8 +4602,24 @@ export const messages = {
         creditsLedger: "Credits ledger",
         creditsAdjust: "Credits adjust",
         announcements: "Announcements",
+        docs: "Docs",
         backToDashboard: "Back to dashboard",
         sections: "Admin sections",
+        groupOps: "Operations",
+        groupCatalog: "Catalog",
+        groupContent: "Content",
+        groupSystem: "System",
+      },
+      docs: {
+        title: "Docs registry",
+        subtitle:
+          "Public-beta docs are published from code config. Preview markdown and API paths here — online editing is not enabled.",
+        configPublishedNotice:
+          "Public beta: docs are config-published. Change content in the docs registry and redeploy. There is no online Save.",
+        listTitle: "Documents",
+        listDesc: "Consumer and developer guides used by /docs.",
+        updatedAt: "Updated",
+        noApiPath: "No production API path for this chapter.",
       },
       rechargePlans: {
         title: "Recharge plans",
@@ -4715,6 +4731,8 @@ export const messages = {
       common: {
         adminTools: "Admin tools",
         readOnlyPhase: "Read-only in this phase",
+        readOnlySnapshot: "Read-only snapshot",
+        readOnlyConfig: "Read-only config",
         comingSoon: "Coming soon",
         nextPhase: "Available in the next phase",
         accessDenied: "Admin access denied",
@@ -4756,10 +4774,22 @@ export const messages = {
       },
       overview: {
         title: "Tokfai Admin",
-        subtitle: "Internal operations dashboard. Read-only controls in this phase.",
+        subtitle: "Internal operations dashboard for public beta.",
         dashboardTitle: "Operations overview",
         dashboardSubtitle:
-          "Key metrics from DMIT Admin API. Read-only in this phase.",
+          "Key metrics from DMIT Admin API for public-beta operations.",
+        betaStatusTitle: "Public beta ops status",
+        betaStatusDesc:
+          "At-a-glance health for API, catalog, packs, traffic, and image service.",
+        betaApiStatus: "API status",
+        betaModelsAvailable: "Available models",
+        betaRechargePlans: "Recharge packs",
+        betaRequests24h: "Requests (today)",
+        betaRecentErrors: "Recent errors",
+        betaImageStatus: "Image service",
+        betaStatusOk: "Healthy",
+        betaStatusDown: "Unavailable",
+        betaStatusUnknown: "Unknown",
         partialLoadTitle: "Some metrics could not be loaded",
         partialLoadDesc:
           "Failed queries show as —; remaining data is still available.",
@@ -4829,12 +4859,15 @@ export const messages = {
       },
       apiKeys: {
         title: "API Keys",
-        subtitle: "All platform API keys. Read-only in this phase.",
+        subtitle: "All platform API keys. Read-only snapshot in public beta.",
         filtersTitle: "Filters",
         filtersDesc: "Filter by owner email, prefix, or user ID.",
         searchPlaceholder: "Search by email or prefix",
         tableTitle: "API keys",
         showingCount: "Showing {count} keys.",
+        readonlyTitle: "Read-only snapshot",
+        readonlyBody:
+          "Online revoke is not available in public beta. Ask the account owner to revoke from their dashboard, or handle revocation via ops process.",
         empty: "No API keys found.",
         statusActive: "Active",
         statusRevoked: "Revoked",
@@ -4848,16 +4881,25 @@ export const messages = {
       },
       channels: {
         title: "Channels",
-        subtitle: "Upstream provider channels. Read-only snapshot from configuration.",
+        subtitle:
+          "Routing channels. Read-only snapshot — online edits are not supported in public beta.",
         tableTitle: "Channels",
-        tableDesc: "Configured upstream endpoints and routing weights.",
+        tableDesc: "Configured routing endpoints and weights.",
+        readonlyTitle: "Read-only snapshot",
+        readonlyBody:
+          "Channel enable/disable and live tests are not available online. Changes require deployment configuration.",
         empty: "No channels configured.",
         statusActive: "Active",
         statusDisabled: "Disabled",
         toggleChannel: "Enable / disable",
         testChannel: "Test channel",
-        colProvider: "Provider",
+        colChannel: "Channel",
+        colProvider: "Internal id",
         colBaseUrl: "Base URL",
+        technicalDetails: "Technical details (internal only)",
+        primaryChannel: "Primary Channel",
+        backupChannel: "Backup Channel",
+        channelRole: "Channel {n}",
         colStatus: "Status",
         colPriority: "Priority",
         colWeight: "Weight",
@@ -4925,9 +4967,13 @@ export const messages = {
       },
       settings: {
         title: "Settings",
-        subtitle: "Platform settings snapshot. Writes coming in a later phase.",
+        subtitle:
+          "Platform settings snapshot. Online edits are not supported — change via deployment config.",
         panelTitle: "Site configuration",
         panelDesc: "Read-only values; no secrets are exposed.",
+        readonlyTitle: "Read-only config",
+        readonlyBody:
+          "There is no Save button in public beta. Update site flags through deployment configuration, then redeploy.",
         loadFailed: "Settings could not be loaded.",
         saveSettings: "Save settings",
         siteName: "Site name",
@@ -6812,7 +6858,7 @@ export const messages = {
       commonErrorsDesc:
         "以下状态码覆盖大多数接入问题。详情可查看 JSON 响应中的 error.code 字段。",
       otherErrorsTitle: "其他 error code",
-      errorCodesDesc: "图像校验与上游失败相关的其他 error.code。",
+      errorCodesDesc: "图像校验与服务失败相关的其他 error.code。",
       httpColumn: "HTTP",
       codeColumn: "Code",
       meaningColumn: "含义",
@@ -8567,11 +8613,11 @@ export const messages = {
       imageApiErrorInvalidImageUrl:
         "invalid_image_url — image_urls 条目缺失、被拦截或不是有效的 http/https URL。",
       imageApiErrorUpstreamTimeout:
-        "upstream_timeout — 上游图像服务超时。请稍后重试或换模型。",
+        "upstream_timeout — 图像服务超时。请稍后重试或换模型。",
       imageApiErrorRequestTooLarge:
         "request_body_too_large — JSON 请求体超过网关限制。请减小 payload。",
       imageApiErrorUpstreamError:
-        "upstream_error / upstream_rate_limited — 上游失败或限流。请退避重试。",
+        "upstream_error / upstream_rate_limited — 服务暂不可用或限流。请退避重试。",
       imageApiBody:
         "从你的后端提交 prompt、model、size。成功生成扣算力积分；失败通常不扣费。",
       imageApiChapterPurpose:
@@ -8766,7 +8812,7 @@ export const messages = {
       cursorReconcileResolvedModel: "tokfai.resolved_model 显示实际上游模型。",
       cursorBillingTitle: "扣费说明",
       cursorBillingSuccess: "成功请求会扣 credits。",
-      cursorBillingFailed: "失败、鉴权错误、上游失败通常不扣费。",
+      cursorBillingFailed: "失败、鉴权错误、服务失败通常不扣费。",
       cursorBillingVerify: "以 Usage 与 Credits 页面为准。",
       cursorErrorsTitle: "错误处理",
       cursorErrorMissingToken:
@@ -8794,7 +8840,7 @@ export const messages = {
       cherryChapterFailure:
         "invalid_token 或 model_not_available — 检查 Host 与模型 id。",
       cherryGatewayNote:
-        "Cherry Studio 通过 OpenAI 兼容 / OpenAI-style Provider 接入 Tokfai。Base URL：https://api.tokfai.com/v1。API Key：sk-tokfai_xxx。推荐模型 auto-fast。高质量可用 auto-pro，批量低成本可用 auto-cheap。一个 Tokfai Key 可接入多个模型，无需管理多个上游供应商。",
+        "Cherry Studio 通过 OpenAI 兼容 / OpenAI-style Provider 接入 Tokfai。Base URL：https://api.tokfai.com。API Key：sk-tokfai_xxx。推荐模型 auto-fast。高质量可用 auto-pro，批量低成本可用 auto-cheap。一个 Tokfai Key 可兼容 Chat Completions、Responses 与部分 Gemini 别名，无需维护多套旧配置。",
       cherryCurlFirstNote:
         "若 Cherry Studio 失败，复制下方单行 Chat curl 在任意终端运行。HTTP 200 说明 API Key 正确——再修正 Cherry 配置。",
       cherryNotAgencyNote:
@@ -8814,7 +8860,7 @@ export const messages = {
       cherryPathStep1: "登录 Tokfai Dashboard。",
       cherryPathStep2: "在 API Keys 创建 API Key。",
       cherryPathStep3: "立即复制完整 sk-tokfai_… secret。",
-      cherryPathStep4: "打开 Cherry Studio 模型 / 供应商设置。",
+      cherryPathStep4: "打开 Cherry Studio 模型 / 服务设置。",
       cherryPathStep5: "新增 OpenAI 兼容 / Custom OpenAI Provider。",
       cherryPathStepStream:
         "若测试失败，先在 Cherry Studio 关闭 stream，再用 auto-fast 重试。",
@@ -8842,7 +8888,7 @@ export const messages = {
       cherryBillingTitle: "扣费说明",
       cherryBillingSuccess: "HTTP 200 成功响应才扣 credits。",
       cherryBillingFailed:
-        "鉴权失败、余额不足、模型错误、上游失败通常不扣费。",
+        "鉴权失败、余额不足、模型错误、服务失败通常不扣费。",
       cherryBillingVerify: "以 Usage 与 Credits 页面为准。",
       cherryErrorsTitle: "错误处理",
       cherryTroubleshootTitle: "常见修复",
@@ -9597,8 +9643,24 @@ export const messages = {
         creditsLedger: "算力积分账本",
         creditsAdjust: "算力积分调账",
         announcements: "公告管理",
+        docs: "文档",
         backToDashboard: "返回控制台",
         sections: "Admin 导航",
+        groupOps: "运营",
+        groupCatalog: "商品",
+        groupContent: "内容",
+        groupSystem: "系统",
+      },
+      docs: {
+        title: "文档管理",
+        subtitle:
+          "公测阶段文档由代码配置发布。这里可预览 Markdown 与真实 API path，不支持在线保存。",
+        configPublishedNotice:
+          "公测说明：文档由配置发布。修改 docs registry 后重新部署即可，页面上没有保存按钮。",
+        listTitle: "文档列表",
+        listDesc: "供 /docs 使用的消费者与开发者文档。",
+        updatedAt: "更新时间",
+        noApiPath: "本章节不对应生产 API path。",
       },
       rechargePlans: {
         title: "充值套餐",
@@ -9706,6 +9768,8 @@ export const messages = {
       common: {
         adminTools: "Admin 工具",
         readOnlyPhase: "本阶段只读",
+        readOnlySnapshot: "只读快照",
+        readOnlyConfig: "只读配置",
         comingSoon: "即将开放",
         nextPhase: "下一阶段开放",
         accessDenied: "无 Admin 权限",
@@ -9747,9 +9811,20 @@ export const messages = {
       },
       overview: {
         title: "Tokfai Admin",
-        subtitle: "内部运营后台。本阶段控件均为只读。",
+        subtitle: "公测阶段内部运营后台。",
         dashboardTitle: "运营概览",
-        dashboardSubtitle: "来自 DMIT Admin API 的核心指标。本阶段只读。",
+        dashboardSubtitle: "来自 DMIT Admin API 的公测运营核心指标。",
+        betaStatusTitle: "公测运营状态",
+        betaStatusDesc: "一眼查看 API、模型、套餐、流量与图片服务状态。",
+        betaApiStatus: "API 状态",
+        betaModelsAvailable: "可用模型数",
+        betaRechargePlans: "充值套餐数",
+        betaRequests24h: "今日请求量",
+        betaRecentErrors: "最近错误数",
+        betaImageStatus: "图片服务状态",
+        betaStatusOk: "正常",
+        betaStatusDown: "不可用",
+        betaStatusUnknown: "未知",
         partialLoadTitle: "部分指标未能加载",
         partialLoadDesc: "失败的查询显示为 —，其余数据仍可用。",
         todayRequests: "今日请求数",
@@ -9818,12 +9893,15 @@ export const messages = {
       },
       apiKeys: {
         title: "API 密钥",
-        subtitle: "平台全部 API 密钥。本阶段只读。",
+        subtitle: "平台全部 API 密钥。公测阶段为只读快照。",
         filtersTitle: "筛选",
         filtersDesc: "按所有者邮箱、前缀或 user_id 筛选。",
         searchPlaceholder: "搜索邮箱或前缀",
         tableTitle: "API 密钥列表",
         showingCount: "共 {count} 条。",
+        readonlyTitle: "只读快照",
+        readonlyBody:
+          "公测阶段不支持后台在线吊销。请让用户在自己的控制台吊销，或走运营流程处理。",
         empty: "暂无 API 密钥。",
         statusActive: "有效",
         statusRevoked: "已吊销",
@@ -9837,16 +9915,24 @@ export const messages = {
       },
       channels: {
         title: "渠道",
-        subtitle: "上游提供商渠道。来自配置的只读快照。",
+        subtitle: "路由渠道。只读快照 — 公测阶段不支持在线修改。",
         tableTitle: "渠道列表",
-        tableDesc: "已配置的上游端点与路由权重。",
+        tableDesc: "已配置的路由端点与权重。",
+        readonlyTitle: "只读快照",
+        readonlyBody:
+          "渠道启停与在线测试暂不支持。如需变更，请走部署配置后重新发布。",
         empty: "暂无渠道配置。",
         statusActive: "启用",
         statusDisabled: "禁用",
         toggleChannel: "启用 / 禁用",
         testChannel: "测试渠道",
-        colProvider: "提供商",
+        colChannel: "渠道",
+        colProvider: "内部 ID",
         colBaseUrl: "Base URL",
+        technicalDetails: "技术详情（仅内部）",
+        primaryChannel: "主渠道",
+        backupChannel: "备用渠道",
+        channelRole: "渠道 {n}",
         colStatus: "状态",
         colPriority: "优先级",
         colWeight: "权重",
@@ -9914,9 +10000,12 @@ export const messages = {
       },
       settings: {
         title: "设置",
-        subtitle: "平台设置快照。写入功能后续开放。",
+        subtitle: "平台设置快照。不支持在线修改 — 变更需走部署配置。",
         panelTitle: "站点配置",
         panelDesc: "只读值；不暴露任何密钥。",
+        readonlyTitle: "只读配置",
+        readonlyBody:
+          "公测阶段没有保存按钮。如需修改站点开关，请更新部署配置后重新发布。",
         loadFailed: "无法加载设置。",
         saveSettings: "保存设置",
         siteName: "站点名称",

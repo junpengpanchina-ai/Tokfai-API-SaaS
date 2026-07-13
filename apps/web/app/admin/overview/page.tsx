@@ -77,6 +77,9 @@ export default async function AdminOverviewPage() {
   let warnings: string[] = [];
   let debug: AdminDebug | null = null;
   let health: ApiHealth | null = null;
+  let availableModelsCount: number | null = null;
+  let rechargePlansCount: number | null = null;
+  let imageServiceOk: boolean | null = null;
 
   health = await fetchApiHealth(dmitBaseUrl);
 
@@ -113,6 +116,52 @@ export default async function AdminOverviewPage() {
 
         summary = summaryRes.data;
         warnings = Array.isArray(summaryRes.warnings) ? summaryRes.warnings : [];
+
+        try {
+          const modelsRes = await fetchDmitAdmin<{
+            data?: Array<{ enabled?: boolean; visible?: boolean; status?: string }>;
+          }>(`${dmitBaseUrl}/admin/models`, accessToken);
+          const models = Array.isArray(modelsRes.data) ? modelsRes.data : [];
+          availableModelsCount = models.filter((model) => {
+            if (model.enabled === false || model.visible === false) return false;
+            const status = (model.status ?? "").toLowerCase();
+            return status !== "archived" && status !== "disabled";
+          }).length;
+        } catch {
+          availableModelsCount = null;
+        }
+
+        try {
+          const plansRes = await fetchDmitAdmin<{
+            data?: Array<{ enabled?: boolean; archived?: boolean }>;
+          }>(`${dmitBaseUrl}/admin/recharge-plans`, accessToken);
+          const plans = Array.isArray(plansRes.data) ? plansRes.data : [];
+          rechargePlansCount = plans.filter(
+            (plan) => plan.enabled !== false && plan.archived !== true
+          ).length;
+        } catch {
+          rechargePlansCount = null;
+        }
+
+        try {
+          const channelsRes = await fetchDmitAdmin<{
+            data?: Array<{ enabled?: boolean; modalities?: string[] }>;
+          }>(`${dmitBaseUrl}/admin/channels`, accessToken);
+          const channels = Array.isArray(channelsRes.data)
+            ? channelsRes.data
+            : [];
+          imageServiceOk = channels.some(
+            (channel) =>
+              channel.enabled !== false &&
+              Array.isArray(channel.modalities) &&
+              channel.modalities.includes("image")
+          );
+          if (channels.length === 0) {
+            imageServiceOk = health?.ok === true;
+          }
+        } catch {
+          imageServiceOk = health?.ok === true ? true : null;
+        }
       }
     } catch (error) {
       debug = toAdminDebug(error, {
@@ -129,6 +178,9 @@ export default async function AdminOverviewPage() {
       warnings={warnings}
       health={health}
       debug={debug}
+      availableModelsCount={availableModelsCount}
+      rechargePlansCount={rechargePlansCount}
+      imageServiceOk={imageServiceOk}
     />
   );
 }

@@ -22,7 +22,7 @@ export function yuanToCredits(yuan: number): number {
 
 /**
  * If a stored rate looks like a fractional CNY price (&lt; 1), convert to
- * compute credits. Integer GRSAI-scale rates (tens–tens of thousands) pass
+ * compute credits. Integer gateway-scale rates (tens–tens of thousands) pass
  * through unchanged — e.g. gemini-2.5-flash input 45, nano-banana 1400.
  */
 export function normalizeCreditsAmount(

@@ -130,11 +130,17 @@ export function AdminOverviewPanel({
   warnings,
   health,
   debug,
+  availableModelsCount = null,
+  rechargePlansCount = null,
+  imageServiceOk = null,
 }: {
   summary: AdminDashboardSummary | null;
   warnings: string[];
   health: ApiHealth | null;
   debug: AdminDebug | null;
+  availableModelsCount?: number | null;
+  rechargePlansCount?: number | null;
+  imageServiceOk?: boolean | null;
 }) {
   const { t } = useI18n();
   const healthOk = health?.ok === true;
@@ -145,6 +151,13 @@ export function AdminOverviewPanel({
       ? t("admin.overview.recentAdminUsers")
       : t("admin.overview.recentEndUsers");
   const noTokenData = t("admin.overview.noTokenData");
+  const recentErrorCount = summary?.recent_errors?.length ?? null;
+  const imageLabel =
+    imageServiceOk == null
+      ? t("admin.overview.betaStatusUnknown")
+      : imageServiceOk
+        ? t("admin.overview.betaStatusOk")
+        : t("admin.overview.betaStatusDown");
 
   return (
     <>
@@ -159,6 +172,51 @@ export function AdminOverviewPanel({
       </div>
 
       {debug ? <AdminDebugCard debug={debug} /> : null}
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">
+            {t("admin.overview.betaStatusTitle")}
+          </CardTitle>
+          <CardDescription>{t("admin.overview.betaStatusDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <AdminStatCard
+              label={t("admin.overview.betaApiStatus")}
+              value={
+                health
+                  ? healthOk
+                    ? t("admin.overview.betaStatusOk")
+                    : t("admin.overview.betaStatusDown")
+                  : t("admin.overview.betaStatusUnknown")
+              }
+            />
+            <AdminStatCard
+              label={t("admin.overview.betaModelsAvailable")}
+              value={formatCount(availableModelsCount)}
+            />
+            <AdminStatCard
+              label={t("admin.overview.betaRechargePlans")}
+              value={formatCount(rechargePlansCount)}
+            />
+            <AdminStatCard
+              label={t("admin.overview.betaRequests24h")}
+              value={formatCount(summary?.today_requests)}
+            />
+            <AdminStatCard
+              label={t("admin.overview.betaRecentErrors")}
+              value={formatCount(
+                recentErrorCount ?? summary?.failed_requests ?? null
+              )}
+            />
+            <AdminStatCard
+              label={t("admin.overview.betaImageStatus")}
+              value={imageLabel}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {warnings.length > 0 ? (
         <Card className="border-amber-500/40 bg-amber-500/5">

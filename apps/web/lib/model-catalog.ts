@@ -51,9 +51,10 @@ export type ImageModelPricing = {
 
 export type ModelPricing = ChatModelPricing | ImageModelPricing;
 
-/** Reserved for future admin price management — display-only today. */
+/** Display metadata for catalog cards — never expose upstream vendor brands. */
 export type CatalogAdminMeta = {
-  upstreamSource: "grsai";
+  /** Consumer-facing ownership label. */
+  ownedBy: "tokfai";
   /** ISO date when catalog display prices were last updated. */
   priceSyncedAt: string;
   /** Reserved: admin can override catalog display without changing billing logic. */
@@ -86,7 +87,7 @@ export interface ModelCatalogEntry {
 const CATALOG_PRICE_UPDATED_AT = "2026-05-26";
 
 const catalogMeta = (): CatalogAdminMeta => ({
-  upstreamSource: "grsai",
+  ownedBy: "tokfai",
   priceSyncedAt: CATALOG_PRICE_UPDATED_AT,
 });
 
@@ -524,6 +525,7 @@ export const CONSUMER_IMAGE_MODEL_IDS = [
   "gpt-image-2",
   "nano-banana-fast",
   "nano-banana",
+  "nano-banana-2",
 ] as const;
 
 const CONSUMER_CHAT_ID_SET = new Set<string>(CONSUMER_CHAT_MODEL_IDS);

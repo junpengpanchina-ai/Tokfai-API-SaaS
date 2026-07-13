@@ -1,7 +1,7 @@
 "use client";
 
 import { AdminDebugCard } from "@/components/admin/admin-debug-card";
-import { AdminDisabledWriteActions } from "@/components/admin/admin-disabled-write-actions";
+import { AdminReadonlyNotice } from "@/components/admin/admin-readonly-notice";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -46,13 +46,14 @@ export function AdminSettingsPanel({
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-center gap-2">
             <CardTitle className="text-base">{t("admin.settings.panelTitle")}</CardTitle>
-            <Badge variant="secondary">{t("admin.common.readOnlyPhase")}</Badge>
+            <Badge variant="secondary">{t("admin.common.readOnlyConfig")}</Badge>
           </div>
           <CardDescription>{t("admin.settings.panelDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <AdminDisabledWriteActions
-            actionKeys={["admin.settings.saveSettings"]}
+          <AdminReadonlyNotice
+            titleKey="admin.settings.readonlyTitle"
+            bodyKey="admin.settings.readonlyBody"
           />
 
           {settings ? (

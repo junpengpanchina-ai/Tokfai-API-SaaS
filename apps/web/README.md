@@ -32,6 +32,6 @@ Configure **only** `NEXT_PUBLIC_*` variables in the Vercel project:
 - `NEXT_PUBLIC_DMIT_API_BASE`
 - `NEXT_PUBLIC_SITE_URL`
 
-Do **not** add server-only secrets to Vercel (`SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, `TOKEN_PEPPER`, `GRSAI_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, etc.). Those belong in `apps/dmit-api` on DMIT.
+Do **not** add server-only secrets to Vercel (`SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, `TOKEN_PEPPER`, upstream provider API keys, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, etc.). Those belong in `apps/dmit-api` on DMIT.
 
 See `.env.local.example` for local development values.

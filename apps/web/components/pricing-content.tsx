@@ -33,8 +33,6 @@ import {
   TOKFAI_API_BASE_URL,
   TOKFAI_API_KEY_FORMAT,
   TOKFAI_BILLING_POLICY,
-  TOKFAI_PLAYGROUND_POLICY,
-  TOKFAI_STARTER_PLAN,
 } from "@/lib/tokfai-api";
 
 const CREDIT_PLAN_IDS = new Set([
@@ -74,6 +72,7 @@ export function PricingContent({
   isLoggedIn?: boolean;
 }) {
   const { t, locale } = useI18n();
+  const zh = locale === "zh";
   const dashHref = (path: string) => dashboardCtaHref(path, isLoggedIn);
   const visiblePlans = plans.filter((plan) => CREDIT_PLAN_IDS.has(plan.plan_id));
 
@@ -138,39 +137,22 @@ export function PricingContent({
     },
   ];
 
-  const devItems = [
-    { label: t("pricing.devLabelBaseUrl"), value: TOKFAI_API_BASE_URL },
-    { label: t("pricing.devLabelApiKeyFormat"), value: TOKFAI_API_KEY_FORMAT },
-    { label: t("pricing.devLabelStarter"), value: TOKFAI_STARTER_PLAN },
-    { label: t("pricing.devLabelBilling"), value: TOKFAI_BILLING_POLICY },
-    { label: t("pricing.devLabelPayment"), value: t("pricing.paymentMethods") },
-    { label: t("pricing.devLabelPlayground"), value: TOKFAI_PLAYGROUND_POLICY },
+  const splitLinks = [
     {
-      label: t("pricing.devLabelModels"),
-      value: "/dashboard/models",
       href: dashHref("/dashboard/models"),
+      title: zh ? "模型能力" : "Model capabilities",
+      desc: zh
+        ? "模型 ID、适合场景、Stream / Responses / 图片输入能力"
+        : "Model ids, use cases, Stream / Responses / image-input support",
     },
     {
-      label: t("pricing.devLabelChatPlayground"),
-      value: "/dashboard/playground",
-      href: dashHref("/dashboard/playground"),
-    },
-    {
-      label: t("pricing.devLabelImagePlayground"),
-      value: "/dashboard/image-playground",
-      href: dashHref("/dashboard/image-playground"),
-    },
-    {
-      label: t("pricing.devLabelApiKeys"),
-      value: "/dashboard/api-keys",
-      href: dashHref("/dashboard/api-keys"),
-    },
-    {
-      label: t("pricing.devLabelDocs"),
-      value: isLoggedIn ? "/dashboard/docs" : "/docs",
       href: isLoggedIn ? "/dashboard/docs" : "/docs",
+      title: zh ? "接入文档" : "Integration docs",
+      desc: zh
+        ? "Quickstart、Chat、Responses、Image、Cherry Studio 示例"
+        : "Quickstart, Chat, Responses, Image, and Cherry Studio examples",
     },
-  ] as const;
+  ];
 
   return (
     <>
@@ -181,6 +163,11 @@ export function PricingContent({
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-balance text-base text-muted-foreground sm:text-lg">
             {t("pricing.heroDesc")}
+          </p>
+          <p className="mx-auto mt-3 max-w-2xl text-balance text-sm text-muted-foreground">
+            {zh
+              ? "本页只讲价格与扣费。模型能力请看模型页，接入示例请看文档页。"
+              : "This page covers pricing only. Capabilities live on Models; curl examples live on Docs."}
           </p>
           <p className="mx-auto mt-3 max-w-2xl text-balance text-sm text-muted-foreground">
             {t("pricing.budgetNote")}
@@ -352,37 +339,35 @@ export function PricingContent({
         <div className="container py-16 md:py-20">
           <div className="mx-auto max-w-3xl">
             <h2 className="text-2xl font-semibold tracking-tight">
-              {t("pricing.forDevelopersTitle")}
+              {zh ? "相关页面" : "Related pages"}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              {t("pricing.forDevelopersDesc")}
+              {zh
+                ? "定价页不混入接入教程。请按需要跳转到模型或文档。"
+                : "Pricing stays separate from integration tutorials. Jump to Models or Docs as needed."}
             </p>
-            <Card className="mt-8">
-              <CardContent className="divide-y p-0">
-                {devItems.map((item) => (
-                  <div
-                    key={item.label}
-                    className="flex flex-col gap-1 px-6 py-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <span className="text-sm font-medium text-foreground">
-                      {item.label}
-                    </span>
-                    {"href" in item && item.href ? (
-                      <Link
-                        href={item.href}
-                        className="break-all font-mono text-sm text-primary underline-offset-4 hover:underline sm:text-right"
-                      >
-                        {item.value}
+            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+              {splitLinks.map((item) => (
+                <Card key={item.href}>
+                  <CardHeader>
+                    <CardTitle className="text-base">{item.title}</CardTitle>
+                    <CardDescription>{item.desc}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={item.href}>
+                        {zh ? "打开" : "Open"}
+                        <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                       </Link>
-                    ) : (
-                      <code className="break-all font-mono text-sm text-muted-foreground sm:text-right">
-                        {item.value}
-                      </code>
-                    )}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <p className="mt-6 text-xs text-muted-foreground">
+              Base URL: <code>{TOKFAI_API_BASE_URL}</code> · Key:{" "}
+              <code>{TOKFAI_API_KEY_FORMAT}</code> · {TOKFAI_BILLING_POLICY}
+            </p>
           </div>
         </div>
       </section>

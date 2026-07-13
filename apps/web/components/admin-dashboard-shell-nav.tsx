@@ -8,6 +8,7 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
 import {
   ADMIN_NAV_ITEMS,
+  adminNavItemsByGroup,
   isAdminNavActive,
   type AdminNavItem,
 } from "@/lib/admin-nav";
@@ -121,28 +122,22 @@ export function AdminDashboardSidebar({
         aria-label={t("admin.nav.sections")}
         className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-3"
       >
-        <div className="flex flex-col gap-0.5">
-          {ADMIN_NAV_ITEMS.filter((item) => !item.backLink).map((item, index, arr) => {
-            const prev = arr[index - 1];
-            const showDivider =
-              item.section === "secondary" && prev?.section === "primary";
-
-            return (
-              <div key={item.href}>
-                {showDivider ? (
-                  <div
-                    className="my-2 border-t border-border/60"
-                    aria-hidden
-                  />
-                ) : null}
+        <div className="flex flex-col gap-3">
+          {adminNavItemsByGroup().map((group) => (
+            <div key={group.group} className="flex flex-col gap-0.5">
+              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {t(group.labelKey)}
+              </p>
+              {group.items.map((item) => (
                 <AdminDashboardNavLink
+                  key={item.href}
                   item={item}
                   active={isAdminNavActive(pathname, item)}
                   t={t}
                 />
-              </div>
-            );
-          })}
+              ))}
+            </div>
+          ))}
         </div>
       </nav>
 

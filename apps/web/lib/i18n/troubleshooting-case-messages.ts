@@ -258,11 +258,11 @@ export const troubleshootingCaseMessagesEn: Record<string, string> = {
   "integration.troubleshooting.case.cherry_connection_failed.title":
     "Cherry Studio — connection failed",
   "integration.troubleshooting.case.cherry_connection_failed.likelyCause":
-    "Wrong provider (garsai) or missing Tokfai Base URL / API Key.",
+    "Tokfai Provider misconfigured, or Base URL / API Key is incomplete.",
   "integration.troubleshooting.case.cherry_connection_failed.action1":
-    "Use Tokfai Provider — Base URL https://api.tokfai.com, not grsaiapi.com.",
+    "Use Tokfai service settings — Base URL https://api.tokfai.com and an sk-tokfai_… key.",
   "integration.troubleshooting.case.cherry_connection_failed.action2":
-    "If the model label ends with “| garsai”, switch away from the garsai provider.",
+    "Confirm the model id comes from the Tokfai model list, and you are not reusing another service’s old config.",
   "integration.troubleshooting.case.cherry_connection_failed.action3":
     "Copy Cherry Studio config from Docs → Cherry Studio.",
 
@@ -524,11 +524,11 @@ export const troubleshootingCaseMessagesZh: Record<string, string> = {
   "integration.troubleshooting.case.cherry_connection_failed.title":
     "Cherry Studio — 连接失败",
   "integration.troubleshooting.case.cherry_connection_failed.likelyCause":
-    "选错了 garsai 供应商，或 Tokfai Base URL / API Key 未填全。",
+    "Tokfai Provider 配置错误，或 Base URL / API Key 未填全。",
   "integration.troubleshooting.case.cherry_connection_failed.action1":
-    "使用 Tokfai Provider — Base URL https://api.tokfai.com，不要用 grsaiapi.com。",
+    "使用 Tokfai 服务配置 — Base URL https://api.tokfai.com，API Key 以 sk-tokfai_ 开头。",
   "integration.troubleshooting.case.cherry_connection_failed.action2":
-    "若模型名后缀是「| garsai」，说明没走 Tokfai，请切换供应商。",
+    "确认模型 ID 来自 Tokfai 模型列表，且没有误用其它服务商的旧配置。",
   "integration.troubleshooting.case.cherry_connection_failed.action3":
     "从文档 → Cherry Studio 复制正确配置。",
 

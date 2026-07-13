@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { AdminDebugCard } from "@/components/admin/admin-debug-card";
-import { AdminDisabledWriteActions } from "@/components/admin/admin-disabled-write-actions";
+import { AdminReadonlyNotice } from "@/components/admin/admin-readonly-notice";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -88,7 +88,7 @@ export function AdminApiKeysPanel({
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-center gap-2">
             <CardTitle className="text-base">{t("admin.apiKeys.tableTitle")}</CardTitle>
-            <Badge variant="secondary">{t("admin.common.readOnlyPhase")}</Badge>
+            <Badge variant="secondary">{t("admin.common.readOnlySnapshot")}</Badge>
           </div>
           <CardDescription>
             {t("admin.apiKeys.showingCount").replace(
@@ -97,9 +97,12 @@ export function AdminApiKeysPanel({
             )}
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <AdminDisabledWriteActions actionKeys={["admin.apiKeys.revokeKey"]} />
-          <div className="mt-4 overflow-x-auto">
+        <CardContent className="space-y-4">
+          <AdminReadonlyNotice
+            titleKey="admin.apiKeys.readonlyTitle"
+            bodyKey="admin.apiKeys.readonlyBody"
+          />
+          <div className="overflow-x-auto">
             {filtered.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {t("admin.apiKeys.empty")}
