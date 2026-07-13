@@ -143,8 +143,8 @@ Authorization: Bearer ${apiKey}`;
 export function buildCherryConfigSnippet(
   apiKey = TOKFAI_API_KEY_PLACEHOLDER
 ): string {
-  return `Provider name: Tokfai
-Provider type: OpenAI compatible / Custom OpenAI
+  return `Name: Tokfai
+Type: OpenAI compatible / Custom OpenAI
 Base URL: ${TOKFAI_API_BASE_URL}
 API Key: ${apiKey}
 Model: auto-fast

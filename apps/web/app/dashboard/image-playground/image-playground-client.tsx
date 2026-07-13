@@ -119,6 +119,9 @@ interface PlaygroundError {
   code?: string;
   message: string;
   requestId?: string;
+  model?: string;
+  elapsedMs?: number;
+  retryCount?: number;
 }
 
 type ImageInputSource = "upload" | "url";
@@ -853,6 +856,7 @@ export function ImageGeneratePanel({
     pulseResultAttention();
     focusResultPanel("onStart");
     setLoading(true);
+    const generateStartedAt = Date.now();
     try {
       const finalPrompt = resolveImagePromptForRequest({
         prompt: trimmedPrompt,
@@ -888,6 +892,9 @@ export function ImageGeneratePanel({
           code: "reference_image_missing",
           message: t("dashboard.imagePlayground.errors.referenceImageMissing"),
           requestId: res.request_id,
+          model,
+          elapsedMs: Date.now() - generateStartedAt,
+          retryCount: 0,
         });
         setResult(null);
         return;
@@ -900,7 +907,19 @@ export function ImageGeneratePanel({
       router.refresh();
     } catch (err) {
       setCompletedAt(new Date().toISOString());
-      setError(toPlaygroundError(err, t));
+      const base = toPlaygroundError(err, t);
+      setError({
+        ...base,
+        model,
+        elapsedMs: Date.now() - generateStartedAt,
+        // Gateway may retry timeout/busy once server-side; client cannot observe count.
+        retryCount:
+          base.code === "image_generation_timeout" ||
+          base.code === "upstream_timeout" ||
+          base.code === "upstream_model_busy"
+            ? 1
+            : 0,
+      });
     } finally {
       setLoading(false);
       pulseResultAttention();

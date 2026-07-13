@@ -119,6 +119,17 @@ function checkRoutesAndAdapter() {
         provider.includes("IMAGE_PROVIDER_API_KEY"),
     ],
     [
+      "timeout defaults >= 180s",
+      /return Math\.max\(requestTimeoutMs\(\),\s*180_000\)/.test(provider) ||
+        provider.includes("180_000"),
+    ],
+    [
+      "timeout/busy retry once",
+      provider.includes("isRetryableImageError") &&
+        provider.includes("retryDelayMs") &&
+        provider.includes("image_generation_retrying"),
+    ],
+    [
       "friendly timeout",
       provider.includes("image_generation_timeout") &&
         provider.includes("图片生成时间较长"),

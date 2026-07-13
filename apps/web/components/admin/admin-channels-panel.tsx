@@ -157,11 +157,12 @@ export function AdminChannelsPanel({
                     key={`tech-${row.id}`}
                     className="rounded border bg-background px-3 py-2 font-mono"
                   >
+                    <p>{channelDisplayName(row, index, t)}</p>
                     <p>
-                      {channelDisplayName(row, index, t)} · id: {row.id}
-                    </p>
-                    <p>
-                      {t("admin.channels.colProvider")}: {row.provider_name}
+                      {t("admin.channels.colTimeout")}:{" "}
+                      {row.timeout_ms != null
+                        ? `${formatInt(row.timeout_ms)} ms`
+                        : "—"}
                     </p>
                     <p>
                       {t("admin.channels.colBaseUrl")}:{" "}

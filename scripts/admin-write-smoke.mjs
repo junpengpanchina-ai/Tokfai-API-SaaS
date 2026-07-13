@@ -168,7 +168,7 @@ async function runDryRun() {
     {
       id: "validation.channels.empty",
       method: "PATCH",
-      path: "/channels/grsai-primary",
+      path: "/channels/primary-channel",
       body: {},
       allowed: [400],
     },
@@ -292,7 +292,7 @@ async function runLive() {
 
     // Channel overlay enable/disable (restore enabled)
     {
-      const patch = await adminFetch("PATCH", "/channels/grsai-primary", {
+      const patch = await adminFetch("PATCH", "/channels/primary-channel", {
         body: { priority: 1, enabled: true },
         idempotencyKey: `${SMOKE_PREFIX}-channel-${RUN_ID}`,
       });

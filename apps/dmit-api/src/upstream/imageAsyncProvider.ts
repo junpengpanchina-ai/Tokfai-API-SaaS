@@ -57,7 +57,11 @@ function pollIntervalMs(): number {
 function maxPollMs(): number {
   const fromEnv = Number(process.env.IMAGE_PROVIDER_MAX_POLL_MS);
   if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv;
-  return Math.max(requestTimeoutMs(), 120_000);
+  return Math.max(requestTimeoutMs(), 180_000);
+}
+
+function retryDelayMs(): number {
+  return 1_500 + Math.floor(Math.random() * 1_501);
 }
 
 function sleep(ms: number): Promise<void> {
@@ -67,6 +71,21 @@ function sleep(ms: number): Promise<void> {
 function isTimeoutError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   return err.name === "TimeoutError" || err.name === "AbortError";
+}
+
+function isRetryableImageError(err: unknown): boolean {
+  if (!(err instanceof ApiError)) return false;
+  if (
+    err.code === "image_generation_timeout" ||
+    err.code === "upstream_timeout" ||
+    err.code === "upstream_model_busy"
+  ) {
+    return true;
+  }
+  if (err.upstreamStatus === 429 || err.upstreamStatus === 503) {
+    return true;
+  }
+  return false;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -131,14 +150,20 @@ function friendlyTimeoutError(): ApiError {
   });
 }
 
-function friendlyUpstreamFailed(detail?: string): ApiError {
+function friendlyUpstreamFailed(
+  detail?: string,
+  upstreamStatus = 502
+): ApiError {
+  const busy = upstreamStatus === 429 || upstreamStatus === 503;
   return new ApiError({
-    status: 502,
-    message: detail ? `Image upstream failed: ${detail}` : "Image upstream failed.",
-    code: "upstream_error",
+    status: busy ? (upstreamStatus === 429 ? 429 : 503) : 502,
+    message: detail ? `Image channel failed: ${detail}` : "Image channel failed.",
+    code: busy ? "upstream_model_busy" : "upstream_error",
     type: "upstream_error",
-    publicMessage: "图片生成失败，请稍后重试或更换模型。",
-    upstreamStatus: 502,
+    publicMessage: busy
+      ? "图片生成服务繁忙，请稍后重试或更换模型。"
+      : "图片生成失败，请稍后重试或更换模型。",
+    upstreamStatus,
     upstreamErrorSnippet: detail ? detail.slice(0, 200) : undefined,
   });
 }
@@ -278,7 +303,7 @@ export async function createImageGenerationTask(
   });
 
   if (!res.ok) {
-    throw friendlyUpstreamFailed(`http_${res.status}`);
+    throw friendlyUpstreamFailed(`http_${res.status}`, res.status);
   }
 
   if (parsed === null) {
@@ -368,7 +393,7 @@ export async function pollImageGenerationTask(args: {
   });
 
   if (!res.ok) {
-    throw friendlyUpstreamFailed(`poll_http_${res.status}`);
+    throw friendlyUpstreamFailed(`poll_http_${res.status}`, res.status);
   }
   if (parsed === null) {
     throw friendlyUpstreamFailed("poll_invalid_json");
@@ -396,9 +421,67 @@ export async function pollImageGenerationTask(args: {
 }
 
 /**
- * Create an image task and, when upstream is async, poll until success / fail / timeout.
+ * Create an image task and, when the private channel is async, poll until
+ * success / fail / timeout. Retries once on timeout / busy.
  */
 export async function runImageGenerationWithPolling(
+  params: CreateImageTaskParams
+): Promise<ImageGenerateResult> {
+  const startedAt = Date.now();
+  let retryCount = 0;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const result = await runImageGenerationAttempt(params);
+      if (retryCount > 0) {
+        log.info("image_generation_retry_succeeded", {
+          requestId: params.requestId,
+          providerId: PROVIDER_ID,
+          model: params.resolvedModel,
+          retryCount,
+          elapsedMs: Date.now() - startedAt,
+        });
+      }
+      return result;
+    } catch (err) {
+      lastError = err;
+      if (attempt === 0 && isRetryableImageError(err)) {
+        retryCount = 1;
+        const delay = retryDelayMs();
+        log.warn("image_generation_retrying", {
+          requestId: params.requestId,
+          providerId: PROVIDER_ID,
+          model: params.resolvedModel,
+          retryCount,
+          delayMs: delay,
+          elapsedMs: Date.now() - startedAt,
+          code: err instanceof ApiError ? err.code : undefined,
+        });
+        await sleep(delay);
+        continue;
+      }
+      break;
+    }
+  }
+
+  if (lastError instanceof ApiError) {
+    log.warn("image_generation_failed_after_retries", {
+      requestId: params.requestId,
+      providerId: PROVIDER_ID,
+      model: params.resolvedModel,
+      retryCount,
+      elapsedMs: Date.now() - startedAt,
+      code: lastError.code,
+    });
+    throw lastError;
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Image generation failed.");
+}
+
+async function runImageGenerationAttempt(
   params: CreateImageTaskParams
 ): Promise<ImageGenerateResult> {
   const created = await createImageGenerationTask(params);

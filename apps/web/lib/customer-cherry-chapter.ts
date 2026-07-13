@@ -16,8 +16,8 @@ export type CherryCopyField = {
 export function buildCherryConfigSnippet(
   apiKey = TOKFAI_API_KEY_PLACEHOLDER
 ): string {
-  return `Provider name: ${CHERRY_PROVIDER_NAME}
-Provider type: ${CHERRY_PROVIDER_TYPE}
+  return `Name: ${CHERRY_PROVIDER_NAME}
+Type: ${CHERRY_PROVIDER_TYPE}
 Base URL: ${TOKFAI_API_BASE_URL}
 API Key: ${apiKey}
 Model: ${CHERRY_DEFAULT_MODEL}

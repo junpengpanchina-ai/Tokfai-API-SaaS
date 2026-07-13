@@ -609,6 +609,9 @@ interface PlaygroundErrorState {
   code?: string;
   message: string;
   requestId?: string;
+  model?: string;
+  elapsedMs?: number;
+  retryCount?: number;
 }
 
 export function ImagePlaygroundResultArea({
@@ -768,12 +771,15 @@ export function ImagePlaygroundResultArea({
               </summary>
               <div className="mt-2 space-y-2">
                 <div className="space-y-1 font-mono">
-                  {!isClientValidation && error?.message ? (
-                    <p>{error.message}</p>
-                  ) : null}
-                  {error?.code ? <p>code: {error.code}</p> : null}
                   {error?.requestId ? (
                     <p>request_id: {error.requestId}</p>
+                  ) : null}
+                  {error?.model ? <p>model: {error.model}</p> : null}
+                  {typeof error?.elapsedMs === "number" ? (
+                    <p>elapsedMs: {error.elapsedMs}</p>
+                  ) : null}
+                  {typeof error?.retryCount === "number" ? (
+                    <p>retryCount: {error.retryCount}</p>
                   ) : null}
                 </div>
                 {error?.requestId ? (

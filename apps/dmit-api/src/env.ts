@@ -65,7 +65,7 @@ const Schema = z
     .number()
     .int()
     .positive()
-    .default(120_000),
+    .default(180_000),
   GRSAI_CHAT_TIMEOUT_MS: z.coerce
     .number()
     .int()

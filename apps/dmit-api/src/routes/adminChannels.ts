@@ -58,8 +58,9 @@ function maskBaseUrl(url: string): string {
 function baseChannel(): AdminChannelRow {
   const baseUrl = env.GRSAI_BASE_URL;
   return {
-    id: "grsai-primary",
-    provider_name: "GRSAI",
+    // Public admin label only — never expose real supplier brand/id to the UI.
+    id: "primary-channel",
+    provider_name: "Tokfai private channel",
     base_url: baseUrl,
     base_url_masked: maskBaseUrl(baseUrl),
     status: "active",
@@ -117,7 +118,7 @@ function applyOverlay(
   };
 }
 
-/** Read-only channel view derived from configured upstream (GRSAI) + overlays. */
+/** Read-only channel view derived from configured private channel + overlays. */
 export function listAdminChannels(): AdminChannelRow[] {
   const channel = baseChannel();
   return [applyOverlay(channel, channelOverlays.get(channel.id))];
