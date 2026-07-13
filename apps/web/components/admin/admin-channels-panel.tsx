@@ -29,6 +29,18 @@ function channelDisplayName(
   return t("admin.channels.channelRole").replace("{n}", String(index + 1));
 }
 
+function maskBaseUrl(value: string | null | undefined): string {
+  if (!value) return "—";
+  try {
+    const url = new URL(value);
+    const host = url.hostname;
+    if (host.length <= 4) return `${url.protocol}//***`;
+    return `${url.protocol}//${host.slice(0, 2)}***${host.slice(-3)}${url.port ? `:${url.port}` : ""}`;
+  } catch {
+    return "***";
+  }
+}
+
 export function AdminChannelsPanel({
   channels,
   debug,
@@ -151,8 +163,9 @@ export function AdminChannelsPanel({
                     <p>
                       {t("admin.channels.colProvider")}: {row.provider_name}
                     </p>
-                    <p className="break-all">
-                      {t("admin.channels.colBaseUrl")}: {row.base_url}
+                    <p>
+                      {t("admin.channels.colBaseUrl")}:{" "}
+                      {maskBaseUrl(row.base_url)}
                     </p>
                   </div>
                 ))}

@@ -47,8 +47,8 @@ export function ConsumerDocsGuide({
         </h1>
         <p className="mt-3 text-muted-foreground">
           {zh
-            ? "只讲怎么接：Quickstart、Chat、Responses、Image、Cherry Studio、Gemini 兼容与排障。模型能力看模型页，价格看定价页。"
-            : "Integration only: Quickstart, Chat, Responses, Image, Cherry Studio, Gemini compatibility, and troubleshooting. Capabilities live on Models; rates live on Pricing."}
+            ? "快速开始、认证、文本对话、Responses、图片生成、参考图改图、Cherry Studio、模型与价格入口、错误码与常见问题。模型能力看模型页，价格看定价页。"
+            : "Quickstart, auth, chat, Responses, image generation, reference edit, Cherry Studio, models/pricing links, error codes, and FAQ. Capabilities on Models; rates on Pricing."}
         </p>
         <div className="mt-4 rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
           <p>

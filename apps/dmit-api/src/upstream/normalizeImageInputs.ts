@@ -62,11 +62,18 @@ export function normalizeImageInputs(body: unknown): NormalizeImageInputsResult 
 
     if (seen.has(trimmed)) continue;
 
-    if (/^blob:/i.test(trimmed)) {
+    if (/^blob:/i.test(trimmed) || /^file:/i.test(trimmed)) {
       hasBlobBlocked = true;
       rejectedCount += 1;
       imageSourceTypes.push("blob_blocked");
-      continue;
+      throw new ApiError({
+        status: 400,
+        message: "blob: and file: URLs are not supported.",
+        code: "invalid_image_url",
+        type: "validation_error",
+        publicMessage:
+          "不支持 blob: 或本地文件地址，请先上传图片，再使用 https 或 data URL。",
+      });
     }
 
     if (DATA_IMAGE_RE.test(trimmed)) {
@@ -118,6 +125,25 @@ export function normalizeImageInputs(body: unknown): NormalizeImageInputsResult 
         "Each image must be an http(s) URL or a data:image/*;base64 value.",
         "invalid_image_url"
       );
+    }
+
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "::1" ||
+      host.endsWith(".localhost")
+    ) {
+      rejectedCount += 1;
+      imageSourceTypes.push("invalid");
+      throw new ApiError({
+        status: 400,
+        message: "localhost image URLs are not supported.",
+        code: "invalid_image_url",
+        type: "validation_error",
+        publicMessage:
+          "不支持 localhost 图片地址，请先上传图片，再使用可公网访问的 https URL。",
+      });
     }
 
     if (trimmed.length > MAX_HTTP_URL_CHARS) {

@@ -5,7 +5,7 @@ const API_ROOT = "https://api.tokfai.com/v1";
 export const IMAGE_API_DEFAULT_MODEL = "gpt-image-2";
 export const IMAGE_API_DEFAULT_SIZE = "1024x1024";
 export const IMAGE_API_DEFAULT_PROMPT =
-  "Create a clean product-style image of a futuristic API dashboard.";
+  "生成一张边牧与古牧正在直播间带货的电商主图";
 export const IMAGE_API_REFERENCE_URL_EXAMPLE =
   "https://example.com/your-reference-image.jpg";
 

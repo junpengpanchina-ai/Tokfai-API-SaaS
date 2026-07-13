@@ -80,12 +80,17 @@ function checkDocsRegistry() {
   const registry = read("apps/web/lib/docs/public-beta-docs-registry.ts");
   const requiredSlugs = [
     "quickstart",
+    "authentication",
     "chat-completions",
     "responses-api",
     "image-api",
+    "image-reference-edit",
     "cherry-studio",
+    "models-and-pricing",
     "gemini-native",
     "billing",
+    "error-codes",
+    "faq",
     "troubleshooting",
   ];
   const missing = requiredSlugs.filter(

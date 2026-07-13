@@ -7,6 +7,7 @@ export const PUBLIC_SUPPORTED_ENDPOINTS = [
   "POST /v1beta/models/:model:generateContent",
   "POST /v1beta/models/:model:streamGenerateContent",
   "POST /v1/images/generations",
+  "GET /v1/images/generations/:id",
   "POST /v1/batches/chat",
 ] as const;
 

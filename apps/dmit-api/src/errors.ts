@@ -20,6 +20,7 @@ export interface ApiErrorPayload {
   message: string;
   code?: string;
   type?: ErrorType;
+  request_id?: string;
 }
 
 /** Stable gateway guard codes — must not be remapped to generic 502. */
@@ -38,6 +39,7 @@ export const STATUS_BY_ERROR_CODE: Record<string, number> = {
   gateway_overloaded: 503,
   request_body_too_large: 413,
   upstream_timeout: 504,
+  image_generation_timeout: 504,
 };
 
 export function shouldIncludeRequestIdInError(status: number): boolean {
@@ -49,6 +51,10 @@ export function buildClientErrorBody(
   requestId?: string
 ): { error: ApiErrorPayload; request_id?: string } {
   const body = err.toJSON();
+  if (requestId) {
+    body.error.request_id = requestId;
+  }
+  // Keep top-level request_id for gateway / timeout statuses (existing clients).
   if (requestId && shouldIncludeRequestIdInError(err.status)) {
     return { ...body, request_id: requestId };
   }

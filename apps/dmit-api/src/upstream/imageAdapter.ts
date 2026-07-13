@@ -288,7 +288,7 @@ export async function generateImage(
         message: "GRSAI image generation timed out.",
         code: "upstream_timeout",
         type: "upstream_error",
-        publicMessage: "Upstream provider timed out.",
+        publicMessage: "图片生成时间较长，请稍后重试或更换模型。",
       });
     }
 
@@ -308,7 +308,9 @@ export async function generateImage(
       message: `GRSAI returned ${res.status}.`,
       code: "upstream_error",
       type: "upstream_error",
-      publicMessage: truncate(text, 200) || "Upstream provider failed.",
+      publicMessage: "图片生成失败，请稍后重试或更换模型。",
+      upstreamStatus: res.status,
+      upstreamErrorSnippet: truncate(text, 200),
     });
   }
 
@@ -321,7 +323,7 @@ export async function generateImage(
       message: "GRSAI returned invalid JSON.",
       code: "upstream_invalid_response",
       type: "upstream_error",
-      publicMessage: "Upstream provider returned an invalid response.",
+      publicMessage: "图片生成失败，请稍后重试或更换模型。",
     });
   }
 
@@ -334,7 +336,7 @@ export async function generateImage(
       message: "GRSAI image response missing image URL.",
       code: "upstream_invalid_response",
       type: "upstream_error",
-      publicMessage: "Upstream provider returned an invalid response.",
+      publicMessage: "图片生成失败，请稍后重试或更换模型。",
     });
   }
 
