@@ -57,6 +57,56 @@ const RESPONSES_CURL = `curl -sS ${TOKFAI_API_BASE_URL}/responses \\
   -H "Content-Type: application/json" \\
   -d '{"model":"${TOKFAI_RECOMMENDED_MODEL}","input":"Say ok only."}'`;
 
+const RESPONSES_GPT55_CURL = `curl https://api.tokfai.com/v1/responses \\
+  -H "Authorization: Bearer sk-tokfai_xxx" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "gpt-5.5",
+    "input": "Say OK in one short sentence."
+  }'`;
+
+const RESPONSES_EXAMPLE_JSON = `{
+  "id": "resp_xxx",
+  "object": "response",
+  "status": "completed",
+  "model": "gpt-5.5",
+  "output_text": "OK."
+}`;
+
+const MATLAB_RESPONSES_WEBWRITE = `url = "https://api.tokfai.com/v1/responses";
+apiKey = "sk-tokfai_xxx";
+body = struct("model", "gpt-5.5", "input", "Say OK in one short sentence.");
+options = weboptions( ...
+    "HeaderFields", { ...
+        "Authorization", "Bearer " + apiKey; ...
+        "Content-Type", "application/json" ...
+    }, ...
+    "MediaType", "application/json" ...
+);
+response = webwrite(url, body, options);
+disp(response);`;
+
+const MATLAB_RESPONSES_REQUEST_MESSAGE = `apiKey = "sk-tokfai_xxx";
+url = "https://api.tokfai.com/v1/responses";
+
+headers = [
+    matlab.net.http.field.AuthorizationField("Bearer " + apiKey)
+    matlab.net.http.field.ContentTypeField("application/json")
+];
+
+body = struct;
+body.model = "gpt-5.5";
+body.input = "Say OK in one short sentence.";
+
+request = matlab.net.http.RequestMessage( ...
+    "POST", ...
+    headers, ...
+    matlab.net.http.MessageBody(jsonencode(body)) ...
+);
+
+response = request.send(url);
+disp(response.Body.Data)`;
+
 const IMAGE_JS = `fetch("https://api.tokfai.com/v1/images/generations", {
   method: "POST",
   headers: {
@@ -106,7 +156,13 @@ export const PUBLIC_BETA_DOCS: PublicBetaDoc[] = [
     audience: "consumer",
     category: "quickstart",
     language: "zh",
-    apiPaths: ["GET /v1/models", "POST /v1/chat/completions"],
+    apiPaths: [
+      "GET /v1/models",
+      "POST /v1/chat/completions",
+      "POST /v1/responses",
+      "POST /v1/images/generations",
+      "POST /v1beta/models/{model}:generateContent",
+    ],
     updatedAt: UPDATED_AT,
     markdown: {
       zh: `# 快速开始
@@ -114,37 +170,97 @@ export const PUBLIC_BETA_DOCS: PublicBetaDoc[] = [
 官网：https://www.tokfai.com  
 API Base URL：\`${TOKFAI_API_ORIGIN}\`（完整路径前缀 \`${TOKFAI_API_BASE_URL}\`）
 
-1. 在官网注册并登录  
-2. 充值算力积分（Compute credits）  
-3. 在控制台创建 \`sk-tokfai_…\` API Key  
-4. 用下方 curl 验证连通性
+注册并充值算力积分后，按下面三步接入 Tokfai API。
+
+## 三步接入
+
+### 步骤 1：创建 API Key
+
+在控制台创建 \`sk-tokfai_xxx\` API Key。**API Key 不绑定模型**——Key 只负责鉴权，模型在每次请求的 body 里指定。
+
+### 步骤 2：选择接口
+
+| 场景 | 接口 |
+|---|---|
+| 普通聊天 | \`POST https://api.tokfai.com/v1/chat/completions\` |
+| GPT-5.5 / 工具调用 / Codex 类场景 | \`POST https://api.tokfai.com/v1/responses\` |
+| 图片生成 | \`POST https://api.tokfai.com/v1/images/generations\` |
+| Gemini 原生格式 | \`POST https://api.tokfai.com/v1beta/models/{model}:generateContent\` |
+
+### 步骤 3：在请求中选择模型
+
+API Key 不绑定模型。每次请求通过 \`model\` 参数选择模型。
+
+\`\`\`json
+{
+  "model": "gpt-5.5",
+  "input": "Say OK in one short sentence."
+}
+\`\`\`
+
+> Chat Completions 使用 \`messages\` 字段；Gemini 原生走 \`/v1beta/models/{model}:generateContent\`。详见各接口文档。
+
+## 验证连通性
 
 \`\`\`bash
 ${QUICKSTART_CURL}
 \`\`\`
 
 说明：
-- 请使用独立的 Tokfai API Key  
-- 成功请求按用量扣算力积分；失败请求通常不扣费，以 Usage / Credits 记录为准  
-- Base URL 必须是 \`https://api.tokfai.com\``,
+- Base URL 必须是 \`https://api.tokfai.com\`
+- 成功请求按用量扣算力积分；失败通常不扣费，以 Usage / Credits 为准
+
+## MATLAB 用户
+
+MATLAB 可通过 HTTP JSON 接入 Tokfai。GPT-5.5 等复杂推理、工具调用场景推荐 \`/v1/responses\`——详见 [MATLAB 接入](/docs/matlab) 或 [Responses API](/docs/responses-api)。`,
       en: `# Quickstart
 
 Website: https://www.tokfai.com  
 API Base URL: \`${TOKFAI_API_ORIGIN}\` (paths under \`${TOKFAI_API_BASE_URL}\`)
 
-1. Sign up and sign in  
-2. Top up compute credits  
-3. Create an \`sk-tokfai_…\` API key in the dashboard  
-4. Verify connectivity with the curl below
+After sign-up and topping up compute credits, integrate in three steps.
+
+## Three-step integration
+
+### Step 1: Create an API Key
+
+Create an \`sk-tokfai_xxx\` API key in the dashboard. **The API key is not bound to a model** — it only authenticates; pick the model in each request body.
+
+### Step 2: Choose an endpoint
+
+| Use case | Endpoint |
+|---|---|
+| Chat | \`POST https://api.tokfai.com/v1/chat/completions\` |
+| GPT-5.5 / tools / Codex-like agents | \`POST https://api.tokfai.com/v1/responses\` |
+| Image generation | \`POST https://api.tokfai.com/v1/images/generations\` |
+| Gemini native | \`POST https://api.tokfai.com/v1beta/models/{model}:generateContent\` |
+
+### Step 3: Select the model in the request
+
+API keys are not bound to a model. Pass \`model\` on every request.
+
+\`\`\`json
+{
+  "model": "gpt-5.5",
+  "input": "Say OK in one short sentence."
+}
+\`\`\`
+
+> Chat Completions uses \`messages\`; Gemini native uses \`/v1beta/models/{model}:generateContent\`. See each API doc for details.
+
+## Verify connectivity
 
 \`\`\`bash
 ${QUICKSTART_CURL}
 \`\`\`
 
 Notes:
-- Use your own Tokfai API key  
-- Successful calls debit compute credits; failed calls are usually not charged — Usage / Credits are authoritative  
-- Base URL must be \`https://api.tokfai.com\``,
+- Base URL must be \`https://api.tokfai.com\`
+- Successful calls debit compute credits; failures are usually not charged — Usage / Credits are authoritative
+
+## MATLAB users
+
+MATLAB can call Tokfai over HTTP JSON. For GPT-5.5 and complex reasoning / tool use, prefer \`/v1/responses\` — see [MATLAB integration](/docs/matlab) or [Responses API](/docs/responses-api).`,
     },
   },
   {
@@ -224,7 +340,8 @@ OpenAI-compatible. Charged in compute credits by usage. See Models / Pricing for
     markdown: {
       zh: `# Responses API
 
-路径：\`POST ${TOKFAI_API_BASE_URL}/responses\`
+路径：\`POST ${TOKFAI_API_BASE_URL}/responses\`  
+Auth：\`Authorization: Bearer sk-tokfai_xxx\`
 
 \`\`\`bash
 ${RESPONSES_CURL}
@@ -236,10 +353,61 @@ ${RESPONSES_CURL}
 ${responsesCurlOneLine()}
 \`\`\`
 
-适合需要 Responses 语义的客户端。计费仍按算力积分，以 Usage 为准。`,
+## GPT-5.5 推荐接入方式
+
+**GPT-5.5 及复杂场景优先使用 \`/v1/responses\`**，包括：
+
+- 复杂推理与长上下文
+- 工具调用（function / tool calling）
+- Agent / Codex 类代码自动化与工作流
+
+简单多轮聊天仍可用 \`POST /v1/chat/completions\`；需要 Responses 语义、工具链或 Agent 客户端时，请切到本接口。
+
+API Key **不绑定模型**——在 body 里指定 \`model\` 即可。
+
+### GPT-5.5 标准 curl
+
+\`\`\`bash
+${RESPONSES_GPT55_CURL}
+\`\`\`
+
+### 响应示例
+
+\`\`\`json
+${RESPONSES_EXAMPLE_JSON}
+\`\`\`
+
+## Codex / Agent 工具调用场景
+
+Tokfai 提供 OpenAI 兼容 API 网关。Codex、Agent、IDE 插件等需要工具调用的客户端，**优先配置 \`POST /v1/responses\`**：
+
+- Base URL：\`https://api.tokfai.com\`
+- API Key：\`sk-tokfai_xxx\`
+- 推荐模型：\`gpt-5.5\`、\`gpt-5.5-pro\`、\`gpt-5-pro\`
+
+按客户端要求传入 \`tools\`、\`tool_choice\` 等 Responses 字段；计费仍按算力积分，以 Usage 为准。
+
+## MATLAB
+
+MATLAB 可通过 HTTP JSON 调用 \`/v1/responses\`。任选 \`webwrite\` 或 \`RequestMessage\`：
+
+### webwrite
+
+\`\`\`matlab
+${MATLAB_RESPONSES_WEBWRITE}
+\`\`\`
+
+### RequestMessage（R2016b+）
+
+\`\`\`matlab
+${MATLAB_RESPONSES_REQUEST_MESSAGE}
+\`\`\`
+
+更多说明见 [MATLAB 接入](/docs/matlab)。`,
       en: `# Responses API
 
-Path: \`POST ${TOKFAI_API_BASE_URL}/responses\`
+Path: \`POST ${TOKFAI_API_BASE_URL}/responses\`  
+Auth: \`Authorization: Bearer sk-tokfai_xxx\`
 
 \`\`\`bash
 ${RESPONSES_CURL}
@@ -251,7 +419,118 @@ One-line variant:
 ${responsesCurlOneLine()}
 \`\`\`
 
-Use this when your client expects the Responses surface. Billing still uses compute credits; Usage is authoritative.`,
+## Recommended path for GPT-5.5
+
+**Prefer \`/v1/responses\` for GPT-5.5 and advanced workloads**, including:
+
+- Complex reasoning and long context
+- Tool calling (function / tool calling)
+- Agent / Codex-style code automation and workflows
+
+Simple multi-turn chat can still use \`POST /v1/chat/completions\`. Switch here when your client expects the Responses surface, tool chains, or Agent integrations.
+
+**The API key is not bound to a model** — set \`model\` in the request body.
+
+### Standard curl for GPT-5.5
+
+\`\`\`bash
+${RESPONSES_GPT55_CURL}
+\`\`\`
+
+### Response example
+
+\`\`\`json
+${RESPONSES_EXAMPLE_JSON}
+\`\`\`
+
+## Codex / Agent tool-calling
+
+Tokfai exposes an OpenAI-compatible API gateway. For Codex, Agents, IDE plugins, and other tool-calling clients, **prefer \`POST /v1/responses\`**:
+
+- Base URL: \`https://api.tokfai.com\`
+- API Key: \`sk-tokfai_xxx\`
+- Recommended models: \`gpt-5.5\`, \`gpt-5.5-pro\`, \`gpt-5-pro\`
+
+Pass \`tools\`, \`tool_choice\`, and other Responses fields as your client requires. Billing still uses compute credits; Usage is authoritative.
+
+## MATLAB
+
+MATLAB can call \`/v1/responses\` over HTTP JSON. Use either \`webwrite\` or \`RequestMessage\`:
+
+### webwrite
+
+\`\`\`matlab
+${MATLAB_RESPONSES_WEBWRITE}
+\`\`\`
+
+### RequestMessage (R2016b+)
+
+\`\`\`matlab
+${MATLAB_RESPONSES_REQUEST_MESSAGE}
+\`\`\`
+
+See also [MATLAB integration](/docs/matlab).`,
+    },
+  },
+  {
+    slug: "matlab",
+    title: { zh: "MATLAB 接入", en: "MATLAB integration" },
+    audience: "developer",
+    category: "quickstart",
+    language: "zh",
+    apiPaths: ["POST /v1/responses", "POST /v1/chat/completions"],
+    updatedAt: UPDATED_AT,
+    markdown: {
+      zh: `# MATLAB 接入
+
+Tokfai API 可通过 HTTP JSON 从 MATLAB 调用。Base URL：\`https://api.tokfai.com\`；鉴权：\`Authorization: Bearer sk-tokfai_xxx\`。
+
+**API Key 不绑定模型**——在请求 body 里指定 \`model\` 即可。
+
+## 推荐：GPT-5.5 + Responses
+
+复杂推理、长上下文、工具调用、Agent / Codex 场景优先使用 \`POST /v1/responses\`。完整说明见 [Responses API](/docs/responses-api)。
+
+### webwrite
+
+\`\`\`matlab
+${MATLAB_RESPONSES_WEBWRITE}
+\`\`\`
+
+### RequestMessage（R2016b+）
+
+\`\`\`matlab
+${MATLAB_RESPONSES_REQUEST_MESSAGE}
+\`\`\`
+
+## 简单对话：Chat Completions
+
+多轮聊天可用 \`POST /v1/chat/completions\`，body 使用 \`messages\` 字段。详见 [文本对话 API](/docs/chat-completions)。`,
+      en: `# MATLAB integration
+
+Call the Tokfai API from MATLAB over HTTP JSON. Base URL: \`https://api.tokfai.com\`; auth: \`Authorization: Bearer sk-tokfai_xxx\`.
+
+**The API key is not bound to a model** — set \`model\` in each request body.
+
+## Recommended: GPT-5.5 + Responses
+
+For complex reasoning, long context, tool calling, and Agent / Codex workloads, prefer \`POST /v1/responses\`. Full details: [Responses API](/docs/responses-api).
+
+### webwrite
+
+\`\`\`matlab
+${MATLAB_RESPONSES_WEBWRITE}
+\`\`\`
+
+### RequestMessage (R2016b+)
+
+\`\`\`matlab
+${MATLAB_RESPONSES_REQUEST_MESSAGE}
+\`\`\`
+
+## Simple chat: Chat Completions
+
+For multi-turn chat, use \`POST /v1/chat/completions\` with a \`messages\` array. See [Chat Completions](/docs/chat-completions).`,
     },
   },
   {
@@ -635,6 +914,15 @@ Example:
 ## Base URL 填什么？
 \`https://api.tokfai.com\`
 
+## API Key 会绑定模型吗？
+**不会。** API Key 只用于鉴权；每次请求在 body 里指定 \`model\` 即可切换模型。
+
+## GPT-5.5 应该用哪个接口？
+推荐 \`POST /v1/responses\`（复杂推理、长上下文、工具调用、Agent / Codex）。简单聊天仍可用 \`/v1/chat/completions\`。
+
+## MATLAB 能接入吗？
+可以。MATLAB 通过 HTTP JSON 调用 Tokfai API；GPT-5.5 等场景推荐 \`/v1/responses\`。详见 [MATLAB 接入](/docs/matlab)。
+
 ## 图片接口路径是什么？
 \`POST /v1/images/generations\`（不是其它历史路径）
 
@@ -650,6 +938,15 @@ Example:
 
 ## What Base URL should I use?
 \`https://api.tokfai.com\`
+
+## Is the API key bound to a model?
+**No.** The key only authenticates; set \`model\` in each request body to switch models.
+
+## Which endpoint should I use for GPT-5.5?
+Prefer \`POST /v1/responses\` (complex reasoning, long context, tool calling, Agent / Codex). Simple chat can still use \`/v1/chat/completions\`.
+
+## Can I integrate from MATLAB?
+Yes. MATLAB calls Tokfai over HTTP JSON; for GPT-5.5 and similar workloads, prefer \`/v1/responses\`. See [MATLAB integration](/docs/matlab).
 
 ## What is the image endpoint?
 \`POST /v1/images/generations\` (not other legacy paths)

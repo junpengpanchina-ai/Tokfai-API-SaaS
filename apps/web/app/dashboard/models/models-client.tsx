@@ -13,6 +13,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  DashboardCopyConfigAction,
+  useDashboardCopyToClipboard,
+} from "@/lib/dashboard-safe/copy-block";
+import {
   CONSUMER_MODEL_GROUPS,
   type ConsumerModelCapabilityTag,
   type ConsumerModelCard,
@@ -33,9 +37,93 @@ const TAG_LABELS: Record<
   alias: { zh: "别名", en: "Alias" },
 };
 
+type LocalizedText = { zh: string; en: string };
+
+function isGpt55Family(id: string): boolean {
+  return (
+    id === "gpt-5.5" ||
+    id === "gpt-5.5-pro" ||
+    id === "gpt-5-pro" ||
+    id.startsWith("gpt-5.5")
+  );
+}
+
+function recommendedEndpointForModel(model: ConsumerModelCard): LocalizedText {
+  if (model.kind === "image") {
+    return { zh: "/v1/images/generations", en: "/v1/images/generations" };
+  }
+  if (isGpt55Family(model.id)) {
+    return { zh: "/v1/responses", en: "/v1/responses" };
+  }
+  if (model.id === "gpt-5.4" || model.id === "gpt-5.4-pro") {
+    return {
+      zh: "/v1/chat/completions 或 /v1/responses",
+      en: "/v1/chat/completions or /v1/responses",
+    };
+  }
+  if (model.id.startsWith("gemini")) {
+    return {
+      zh: "/v1/chat/completions 或 /v1beta",
+      en: "/v1/chat/completions or /v1beta",
+    };
+  }
+  if (model.kind === "alias" || model.id.startsWith("auto-")) {
+    return {
+      zh: "/v1/chat/completions 或 /v1/responses",
+      en: "/v1/chat/completions or /v1/responses",
+    };
+  }
+  return {
+    zh: "/v1/chat/completions 或 /v1/responses",
+    en: "/v1/chat/completions or /v1/responses",
+  };
+}
+
+function suitabilityForModel(model: ConsumerModelCard): LocalizedText {
+  if (model.kind === "image") {
+    return {
+      zh: "文生图、参考图改图",
+      en: "Text-to-image and reference edits",
+    };
+  }
+  if (isGpt55Family(model.id)) {
+    return {
+      zh: "复杂推理、代码、工具调用、Agent / Codex",
+      en: "Complex reasoning, code, tools, Agent / Codex",
+    };
+  }
+  if (model.id === "gpt-5.4" || model.id === "gpt-5.4-pro") {
+    return {
+      zh: "通用对话与文本任务",
+      en: "General chat and text tasks",
+    };
+  }
+  if (model.id.startsWith("gemini")) {
+    return {
+      zh: "长文本、多模态输入",
+      en: "Long text and multimodal input",
+    };
+  }
+  if (
+    model.kind === "alias" ||
+    model.id.startsWith("auto-") ||
+    model.id.startsWith("gpt-5")
+  ) {
+    return {
+      zh: "智能路由与通用对话",
+      en: "Smart routing and general chat",
+    };
+  }
+  return {
+    zh: "通用对话与文本任务",
+    en: "General chat and text tasks",
+  };
+}
+
 function docAnchorForModel(model: ConsumerModelCard): string {
   if (model.kind === "image") return "/docs#image-api";
   if (model.id.startsWith("gemini")) return "/docs#gemini-native";
+  if (isGpt55Family(model.id)) return "/docs#responses-api";
   return "/docs#chat-completions";
 }
 
@@ -57,6 +145,11 @@ export function ModelsClient({
           {zh
             ? "只讲模型能力与适合场景。价格请看定价页，接入方式请看文档页。"
             : "Capabilities and use cases only. Rates live on Pricing; integration lives on Docs."}
+        </p>
+        <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+          {zh
+            ? "API Key 不绑定模型。请在请求体的 model 字段中填写模型 ID。"
+            : "API keys are not bound to a model. Set the model ID in the request body's model field."}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button asChild size="sm" variant="outline">
@@ -133,6 +226,12 @@ function ModelCapabilityCard({
   model: ConsumerModelCard;
   zh: boolean;
 }) {
+  const { t } = useDashboardLabels();
+  const { copiedId, copyText } = useDashboardCopyToClipboard();
+  const copyId = `model-id-${model.id}`;
+  const endpoint = recommendedEndpointForModel(model);
+  const suitability = suitabilityForModel(model);
+
   return (
     <Card className="min-w-0">
       <CardHeader className="pb-3">
@@ -141,9 +240,19 @@ function ModelCapabilityCard({
             <CardTitle className="text-base">
               {zh ? model.displayName.zh : model.displayName.en}
             </CardTitle>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">
-              {model.id}
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <p className="font-mono text-xs text-muted-foreground">
+                {model.id}
+              </p>
+              <DashboardCopyConfigAction
+                id={copyId}
+                value={model.id}
+                copiedId={copiedId}
+                onCopy={copyText}
+                label={t("dashboard.models.copyModelId")}
+                copiedLabel={t("dashboard.models.copied")}
+              />
+            </div>
           </div>
           <Badge variant="outline">{model.kind}</Badge>
         </div>
@@ -165,6 +274,18 @@ function ModelCapabilityCard({
       </CardHeader>
       <CardContent className="space-y-3 text-sm text-muted-foreground">
         <ul className="space-y-1">
+          <li>
+            {zh ? "推荐 Endpoint" : "Recommended endpoint"}:{" "}
+            <code className="text-foreground">
+              {zh ? endpoint.zh : endpoint.en}
+            </code>
+          </li>
+          <li>
+            {zh ? "适合场景" : "Best for"}:{" "}
+            <span className="text-foreground">
+              {zh ? suitability.zh : suitability.en}
+            </span>
+          </li>
           <li>
             Chat Completions:{" "}
             <span className="text-foreground">

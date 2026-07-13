@@ -282,6 +282,15 @@ export function ApiKeysClient({
               {creating ? t("dashboard.apiKeys.creating") : t("dashboard.apiKeys.createApiKey")}
             </Button>
           </form>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {t("dashboard.apiKeys.apiKeyAfterCreateHint")}{" "}
+            <Link
+              href="/dashboard/docs#quickstart"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              {t("dashboard.apiKeys.viewIntegrationDocs")}
+            </Link>
+          </p>
           {createError ? (
             <ActionErrorAlert error={createError} className="mt-4" />
           ) : null}
@@ -360,9 +369,23 @@ function ApiKeyUnderstandingGuide({ t }: { t: (key: string) => string }) {
           <BookOpen className="h-4 w-4 shrink-0" />
           {t("dashboard.apiKeys.apiKeyUnderstandingTitle")}
         </CardTitle>
-        <CardDescription>{t("dashboard.apiKeys.apiKeyUnderstandingDesc")}</CardDescription>
+        <CardDescription>
+          {t("dashboard.apiKeys.apiKeyUnderstandingDesc")}
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
+        <p className="text-sm font-medium text-foreground">
+          {t("dashboard.apiKeys.apiKeyReadyHint")}
+        </p>
+        <div className="rounded-md border bg-background px-3 py-2">
+          <p className="text-xs font-medium text-muted-foreground">
+            {t("dashboard.apiKeys.apiKeyModelExamplesLabel")}
+          </p>
+          <pre className="mt-1 overflow-x-auto font-mono text-xs text-foreground">{`model: "gpt-5.5"
+model: "gpt-5.4"
+model: "gemini-3-pro"
+model: "nano-banana-fast"`}</pre>
+        </div>
         <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
           <li>{t("integration.apiKeyBulletAuthHeader")}</li>
           <li>{t("integration.apiKeyBulletOneTime")}</li>
@@ -379,6 +402,12 @@ function ApiKeyUnderstandingGuide({ t }: { t: (key: string) => string }) {
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/dashboard/docs#quickstart">
+              {t("dashboard.apiKeys.viewIntegrationDocs")}
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+          <Button type="button" variant="outline" size="sm" asChild>
             <Link href="/dashboard/docs#api-key">
               {t("dashboard.apiKeys.viewApiKeyDocs")}
               <ExternalLink className="h-3.5 w-3.5" />
@@ -387,11 +416,6 @@ function ApiKeyUnderstandingGuide({ t }: { t: (key: string) => string }) {
           <Button type="button" variant="outline" size="sm" asChild>
             <Link href="/dashboard/integration-workbench">
               {t("dashboard.apiKeys.integrationWorkbench")}
-            </Link>
-          </Button>
-          <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/dashboard/docs#quick-start">
-              {t("dashboard.apiKeys.quickStartDocs")}
             </Link>
           </Button>
           <Button type="button" variant="outline" size="sm" asChild>
