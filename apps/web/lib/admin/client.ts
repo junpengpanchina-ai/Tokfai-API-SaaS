@@ -19,24 +19,41 @@ export type AdminMe = {
   auth_source: string | null;
 };
 
+export type AdminCreditAdjustPurpose =
+  | "public_beta_invite"
+  | "manual_topup"
+  | "customer_compensation"
+  | "manual_deduct"
+  | "offline_payment_topup";
+
 export type AdminCreditsAdjustBody = {
   user_id: string;
   direction: "add" | "deduct";
   amount: number;
   reason: string;
+  purpose?: AdminCreditAdjustPurpose;
 };
 
 export type AdminCreditsAdjustSuccess = {
   ok: true;
   user_id: string;
-  previous_credits: number;
+  direction: "add" | "deduct";
+  amount: number;
   delta: number;
-  credits: number;
+  balance_before: number;
   balance_after: number;
+  ledger_id: string;
+  request_id: string;
+  /** @deprecated prefer balance_before */
+  previous_credits: number;
+  /** @deprecated prefer balance_after */
+  credits: number;
   reason: string;
   reference_id: string;
+  /** @deprecated prefer ledger_id */
   credit_ledger_id: string;
   admin_audit_log_id: string | null;
+  purpose?: AdminCreditAdjustPurpose | null;
   idempotent_replay?: boolean;
 };
 
@@ -45,6 +62,7 @@ export type AdminCreditsAdjustErrorBody = {
   current_credits?: number;
   requested_amount?: number;
   idempotent_replay?: boolean;
+  request_id?: string;
 };
 
 export type AdminModelStatus =
@@ -440,9 +458,11 @@ export async function fetchAdminMe(): Promise<AdminMe> {
 
 export function createAdminAdjustIdempotencyKey(
   userId: string,
-  direction: "add" | "deduct"
+  direction: "add" | "deduct",
+  amount?: number
 ): string {
-  return `admin-adjust-${userId}-${direction}-${Date.now()}`;
+  const amt = amount != null && Number.isFinite(amount) ? String(amount) : "x";
+  return `admin-adjust:${userId}:${direction}:${amt}:${Date.now()}`;
 }
 
 export async function adjustAdminCredits(
@@ -454,7 +474,7 @@ export async function adjustAdminCredits(
     json: body,
     idempotencyKey:
       idempotencyKey ??
-      createAdminAdjustIdempotencyKey(body.user_id, body.direction),
+      createAdminAdjustIdempotencyKey(body.user_id, body.direction, body.amount),
   });
 }
 

@@ -110,6 +110,7 @@ export function AdminCreditsAccountPanel({
           <AdminCreditsAdjustForm
             userId={data.profile.id}
             userEmail={data.profile.email}
+            currentBalance={data.profile.credits_balance}
             disabled={isBusy}
             onSuccess={() => {
               onCreditsAdjusted?.();

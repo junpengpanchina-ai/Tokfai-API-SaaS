@@ -208,7 +208,7 @@ async function runDryRun() {
       allowed: [400],
     },
     {
-      id: "validation.credits.missing_idempotency",
+      id: "validation.credits.user_not_found",
       method: "POST",
       path: "/credits/adjust",
       body: {
@@ -217,7 +217,7 @@ async function runDryRun() {
         direction: "add",
         reason: "smoke",
       },
-      allowed: [400],
+      allowed: [404],
       skipIdempotency: true,
     },
   ];

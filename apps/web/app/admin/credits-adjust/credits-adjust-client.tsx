@@ -1,18 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { AdminLedgerMiniTable } from "@/components/admin/admin-ledger-mini-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatAdminAdjustError } from "@/lib/admin/adjust-errors";
 import {
   AdminApiError,
   adjustAdminCredits,
   createAdminAdjustIdempotencyKey,
   fetchAdminApi,
+  fetchAdminMe,
   fetchAdminUsers,
   type AdminApiKeyRow,
+  type AdminCreditAdjustPurpose,
   type AdminCreditsAdjustSuccess,
 } from "@/lib/admin/client";
 import { formatCredits, formatDateTime } from "@/lib/format";
@@ -53,8 +56,56 @@ type CreditsLookupData = {
   ledger: LedgerEntry[];
 };
 
-const DEFAULT_AMOUNT = "300000";
-const DEFAULT_REASON = "pre-demo credits top-up";
+const AMOUNT_PRESETS = [10_000, 100_000, 300_000, 1_000_000] as const;
+
+const PURPOSE_OPTIONS: {
+  value: AdminCreditAdjustPurpose;
+  labelKey:
+    | "admin.adjust.purposePublicBetaInvite"
+    | "admin.adjust.purposeManualTopup"
+    | "admin.adjust.purposeCustomerCompensation"
+    | "admin.adjust.purposeManualDeduct"
+    | "admin.adjust.purposeOfflinePayment";
+  direction: AdjustDirection;
+  defaultAmount: string;
+  defaultReason: string;
+}[] = [
+  {
+    value: "public_beta_invite",
+    labelKey: "admin.adjust.purposePublicBetaInvite",
+    direction: "add",
+    defaultAmount: "300000",
+    defaultReason: "public_beta_invite",
+  },
+  {
+    value: "manual_topup",
+    labelKey: "admin.adjust.purposeManualTopup",
+    direction: "add",
+    defaultAmount: "100000",
+    defaultReason: "manual_topup",
+  },
+  {
+    value: "customer_compensation",
+    labelKey: "admin.adjust.purposeCustomerCompensation",
+    direction: "add",
+    defaultAmount: "10000",
+    defaultReason: "customer_compensation",
+  },
+  {
+    value: "manual_deduct",
+    labelKey: "admin.adjust.purposeManualDeduct",
+    direction: "deduct",
+    defaultAmount: "1000",
+    defaultReason: "manual_deduct",
+  },
+  {
+    value: "offline_payment_topup",
+    labelKey: "admin.adjust.purposeOfflinePayment",
+    direction: "add",
+    defaultAmount: "100000",
+    defaultReason: "offline_payment_topup",
+  },
+];
 
 function matchApiKeyPrefix(
   rows: AdminApiKeyRow[],
@@ -76,6 +127,21 @@ function matchApiKeyPrefix(
     }));
 }
 
+function parsePositiveAmount(raw: string): number | null {
+  const amount = Number(raw);
+  if (!Number.isFinite(amount) || Number.isNaN(amount) || amount <= 0) {
+    return null;
+  }
+  const decimals = (() => {
+    if (Number.isInteger(amount)) return 0;
+    const text = String(raw).trim();
+    const part = text.includes(".") ? text.split(".")[1] ?? "" : "";
+    return part.replace(/0+$/, "").length;
+  })();
+  if (decimals > 6) return null;
+  return amount;
+}
+
 export function CreditsAdjustClient({
   initialUserId = "",
   initialDirection = "add",
@@ -86,10 +152,15 @@ export function CreditsAdjustClient({
   const { t } = useI18n();
 
   const [userId, setUserId] = useState(initialUserId);
-  const [amount, setAmount] = useState(DEFAULT_AMOUNT);
+  const [amount, setAmount] = useState("10000");
+  const [amountPreset, setAmountPreset] = useState<number | "custom">(10_000);
   const [direction, setDirection] = useState<AdjustDirection>(initialDirection);
-  const [reason, setReason] = useState(DEFAULT_REASON);
+  const [purpose, setPurpose] =
+    useState<AdminCreditAdjustPurpose>("public_beta_invite");
+  const [reason, setReason] = useState("public_beta_invite");
   const [submitting, setSubmitting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [actorEmail, setActorEmail] = useState<string | null>(null);
   const [success, setSuccess] = useState<AdminCreditsAdjustSuccess | null>(
     null
   );
@@ -112,44 +183,65 @@ export function CreditsAdjustClient({
     setDirection(initialDirection);
   }, [initialUserId, initialDirection]);
 
-  const loadCreditsByEmail = useCallback(async (email: string) => {
-    const trimmed = email.trim();
-    if (!trimmed) {
-      setLedgerError(t("admin.credits.enterEmail"));
-      setCreditsData(null);
-      return;
-    }
-
-    setLedgerLoading(true);
-    setLedgerError(null);
-
-    try {
-      const params = new URLSearchParams({
-        email: trimmed,
-        limit: "50",
+  useEffect(() => {
+    let cancelled = false;
+    void fetchAdminMe()
+      .then((me) => {
+        if (!cancelled) setActorEmail(me.email);
+      })
+      .catch(() => {
+        if (!cancelled) setActorEmail(null);
       });
-      const body = await fetchAdminApi<{ data?: CreditsLookupData }>(
-        `/admin/credits?${params.toString()}`
-      );
-      setCreditsData(body.data ?? null);
-      if (!body.data) {
-        setLedgerError(`No profile found for ${trimmed}.`);
-      }
-    } catch (err) {
-      setCreditsData(null);
-      setLedgerError(
-        err instanceof AdminApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : "Failed to load credits data."
-      );
-    } finally {
-      setLedgerLoading(false);
-    }
-  }, [t]);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  async function resolveEmailForUser(targetUserId: string): Promise<string | null> {
+  const loadCreditsByEmail = useCallback(
+    async (email: string) => {
+      const trimmed = email.trim();
+      if (!trimmed) {
+        setLedgerError(t("admin.credits.enterEmail"));
+        setCreditsData(null);
+        return;
+      }
+
+      setLedgerLoading(true);
+      setLedgerError(null);
+
+      try {
+        const params = new URLSearchParams({
+          email: trimmed,
+          limit: "50",
+        });
+        const body = await fetchAdminApi<{ data?: CreditsLookupData }>(
+          `/admin/credits?${params.toString()}`
+        );
+        setCreditsData(body.data ?? null);
+        if (!body.data) {
+          setLedgerError(`No profile found for ${trimmed}.`);
+        } else {
+          setUserId(body.data.profile.id);
+        }
+      } catch (err) {
+        setCreditsData(null);
+        setLedgerError(
+          err instanceof AdminApiError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : "Failed to load credits data."
+        );
+      } finally {
+        setLedgerLoading(false);
+      }
+    },
+    [t]
+  );
+
+  async function resolveEmailForUser(
+    targetUserId: string
+  ): Promise<string | null> {
     try {
       const users = await fetchAdminUsers();
       const match = users.find((user) => user.id === targetUserId);
@@ -159,7 +251,50 @@ export function CreditsAdjustClient({
     }
   }
 
-  async function handleAdjust(event: FormEvent<HTMLFormElement>) {
+  function applyPurpose(next: AdminCreditAdjustPurpose) {
+    const option = PURPOSE_OPTIONS.find((item) => item.value === next);
+    if (!option) return;
+    setPurpose(next);
+    setDirection(option.direction);
+    setAmount(option.defaultAmount);
+    setAmountPreset(
+      AMOUNT_PRESETS.includes(Number(option.defaultAmount) as never)
+        ? (Number(option.defaultAmount) as (typeof AMOUNT_PRESETS)[number])
+        : "custom"
+    );
+    setReason(option.defaultReason);
+  }
+
+  const parsedAmount = parsePositiveAmount(amount);
+  const balanceBefore =
+    creditsData && creditsData.profile.id === userId.trim()
+      ? creditsData.profile.credits_balance
+      : null;
+  const balanceAfter =
+    parsedAmount != null && balanceBefore != null
+      ? direction === "add"
+        ? balanceBefore + parsedAmount
+        : balanceBefore - parsedAmount
+      : null;
+
+  const confirmSummary = useMemo(() => {
+    const email = creditsData?.profile.email?.trim() || ledgerEmail.trim();
+    return {
+      userLabel: email || userId.trim() || "—",
+      balanceBefore,
+      balanceAfter,
+      amount: parsedAmount,
+    };
+  }, [
+    balanceAfter,
+    balanceBefore,
+    creditsData?.profile.email,
+    ledgerEmail,
+    parsedAmount,
+    userId,
+  ]);
+
+  function openConfirm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting) return;
 
@@ -175,8 +310,7 @@ export function CreditsAdjustClient({
       return;
     }
 
-    const parsedAmount = Number(amount);
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+    if (parsedAmount == null) {
       setError({
         status: null,
         code: "invalid_amount",
@@ -199,6 +333,16 @@ export function CreditsAdjustClient({
       return;
     }
 
+    setError(null);
+    setConfirmOpen(true);
+  }
+
+  async function submitAdjust() {
+    if (submitting) return;
+    const trimmedUserId = userId.trim();
+    const trimmedReason = reason.trim();
+    if (!trimmedUserId || parsedAmount == null || !trimmedReason) return;
+
     setSubmitting(true);
     setError(null);
     setSuccess(null);
@@ -210,10 +354,16 @@ export function CreditsAdjustClient({
           amount: parsedAmount,
           direction,
           reason: trimmedReason,
+          purpose,
         },
-        createAdminAdjustIdempotencyKey(trimmedUserId, direction)
+        createAdminAdjustIdempotencyKey(
+          trimmedUserId,
+          direction,
+          parsedAmount
+        )
       );
       setSuccess(result);
+      setConfirmOpen(false);
 
       const email =
         ledgerEmail.trim() ||
@@ -224,28 +374,14 @@ export function CreditsAdjustClient({
         await loadCreditsByEmail(email);
       }
     } catch (err) {
-      if (err instanceof AdminApiError) {
-        setError({
-          status: err.status,
-          code: err.code ?? "unknown_error",
-          message: err.message,
-          request_id: err.requestId,
-        });
-      } else if (err instanceof Error) {
-        setError({
-          status: null,
-          code: "unknown_error",
-          message: err.message,
-          request_id: null,
-        });
-      } else {
-        setError({
-          status: null,
-          code: "unknown_error",
-          message: t("admin.adjust.failed"),
-          request_id: null,
-        });
-      }
+      const formatted = formatAdminAdjustError(err, t);
+      setError({
+        status: err instanceof AdminApiError ? err.status : null,
+        code: formatted.code,
+        message: formatted.message,
+        request_id: err instanceof AdminApiError ? err.requestId : null,
+      });
+      setConfirmOpen(false);
     } finally {
       setSubmitting(false);
     }
@@ -315,22 +451,33 @@ export function CreditsAdjustClient({
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">
-          Credits adjust
+          {t("admin.adjust.title")}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Minimal demo tool — POST /admin/credits/adjust via DMIT.
+          {t("admin.adjust.subtitle")}
         </p>
       </div>
 
       <section className="space-y-4 rounded-lg border bg-background p-4">
-        <div>
-          <h2 className="text-sm font-semibold">{t("admin.adjust.title")}</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {t("admin.adjust.subtitle")}
-          </p>
-        </div>
+        <form className="grid gap-4" onSubmit={openConfirm}>
+          <div className="space-y-2">
+            <Label>{t("admin.adjust.purpose")}</Label>
+            <div className="flex flex-wrap gap-2">
+              {PURPOSE_OPTIONS.map((option) => (
+                <Button
+                  key={option.value}
+                  type="button"
+                  size="sm"
+                  variant={purpose === option.value ? "default" : "outline"}
+                  disabled={submitting}
+                  onClick={() => applyPurpose(option.value)}
+                >
+                  {t(option.labelKey)}
+                </Button>
+              ))}
+            </div>
+          </div>
 
-        <form className="grid gap-4" onSubmit={handleAdjust}>
           <div className="space-y-2">
             <Label htmlFor="credits-adjust-user-id">
               {t("admin.adjust.userId")}
@@ -346,21 +493,6 @@ export function CreditsAdjustClient({
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="credits-adjust-amount">
-                {t("admin.adjust.amount")}
-              </Label>
-              <Input
-                id="credits-adjust-amount"
-                type="number"
-                min="1"
-                step="1"
-                inputMode="numeric"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                required
-              />
-            </div>
             <div className="space-y-2">
               <Label htmlFor="credits-adjust-direction">
                 {t("admin.adjust.direction")}
@@ -379,6 +511,54 @@ export function CreditsAdjustClient({
                 </option>
               </select>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="credits-adjust-amount">
+                {t("admin.adjust.amount")}
+              </Label>
+              <Input
+                id="credits-adjust-amount"
+                type="number"
+                min="0.000001"
+                step="any"
+                inputMode="decimal"
+                value={amount}
+                onChange={(event) => {
+                  setAmount(event.target.value);
+                  setAmountPreset("custom");
+                }}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t("admin.adjust.presets")}</Label>
+            <div className="flex flex-wrap gap-2">
+              {AMOUNT_PRESETS.map((preset) => (
+                <Button
+                  key={preset}
+                  type="button"
+                  size="sm"
+                  variant={amountPreset === preset ? "default" : "outline"}
+                  disabled={submitting}
+                  onClick={() => {
+                    setAmount(String(preset));
+                    setAmountPreset(preset);
+                  }}
+                >
+                  +{preset.toLocaleString("en-US")}
+                </Button>
+              ))}
+              <Button
+                type="button"
+                size="sm"
+                variant={amountPreset === "custom" ? "default" : "outline"}
+                disabled={submitting}
+                onClick={() => setAmountPreset("custom")}
+              >
+                {t("admin.adjust.presetCustom")}
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -394,6 +574,29 @@ export function CreditsAdjustClient({
             />
           </div>
 
+          {balanceBefore != null ? (
+            <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
+              <p>
+                {t("admin.adjust.confirmBalance")}:{" "}
+                <span className="font-mono font-medium">
+                  {formatCredits(balanceBefore)}
+                </span>
+              </p>
+              {balanceAfter != null ? (
+                <p className="mt-1">
+                  {t("admin.adjust.confirmAfter")}:{" "}
+                  <span className="font-mono font-medium">
+                    {formatCredits(balanceAfter)}
+                  </span>
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {t("admin.adjust.balanceUnknown")}
+            </p>
+          )}
+
           <div>
             <Button type="submit" size="sm" disabled={submitting}>
               {submitting
@@ -402,6 +605,97 @@ export function CreditsAdjustClient({
             </Button>
           </div>
         </form>
+
+        {confirmOpen ? (
+          <div
+            className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-3 text-sm"
+            role="dialog"
+            aria-label={t("admin.adjust.confirmTitle")}
+          >
+            <h3 className="font-semibold">{t("admin.adjust.confirmTitle")}</h3>
+            <dl className="mt-2 grid gap-1 text-sm">
+              <div>
+                <dt className="inline text-muted-foreground">
+                  {t("admin.adjust.confirmUser")}:{" "}
+                </dt>
+                <dd className="inline">{confirmSummary.userLabel}</dd>
+              </div>
+              <div>
+                <dt className="inline text-muted-foreground">
+                  {t("admin.adjust.confirmBalance")}:{" "}
+                </dt>
+                <dd className="inline font-mono">
+                  {confirmSummary.balanceBefore != null
+                    ? formatCredits(confirmSummary.balanceBefore)
+                    : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="inline text-muted-foreground">
+                  {t("admin.adjust.confirmOperation")}:{" "}
+                </dt>
+                <dd className="inline">
+                  {direction === "add"
+                    ? t("admin.adjust.directionAdd")
+                    : t("admin.adjust.directionDeduct")}
+                </dd>
+              </div>
+              <div>
+                <dt className="inline text-muted-foreground">
+                  {t("admin.adjust.confirmAmount")}:{" "}
+                </dt>
+                <dd className="inline font-mono">
+                  {confirmSummary.amount != null
+                    ? formatCredits(confirmSummary.amount)
+                    : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="inline text-muted-foreground">
+                  {t("admin.adjust.confirmAfter")}:{" "}
+                </dt>
+                <dd className="inline font-mono">
+                  {confirmSummary.balanceAfter != null
+                    ? formatCredits(confirmSummary.balanceAfter)
+                    : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="inline text-muted-foreground">
+                  {t("admin.adjust.confirmReason")}:{" "}
+                </dt>
+                <dd className="inline">{reason.trim()}</dd>
+              </div>
+              <div>
+                <dt className="inline text-muted-foreground">
+                  {t("admin.adjust.confirmActor")}:{" "}
+                </dt>
+                <dd className="inline">{actorEmail ?? "—"}</dd>
+              </div>
+            </dl>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                disabled={submitting}
+                onClick={() => void submitAdjust()}
+              >
+                {submitting
+                  ? t("admin.adjust.submitting")
+                  : t("admin.adjust.confirmSubmit")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={submitting}
+                onClick={() => setConfirmOpen(false)}
+              >
+                {t("admin.adjust.confirmCancel")}
+              </Button>
+            </div>
+          </div>
+        ) : null}
 
         {error ? (
           <div
@@ -430,10 +724,15 @@ export function CreditsAdjustClient({
             <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-xs text-emerald-800 dark:text-emerald-300">
               {JSON.stringify(
                 {
-                  balance_after: success.balance_after,
+                  ok: true,
+                  user_id: success.user_id,
+                  direction: success.direction,
+                  amount: success.amount,
                   delta: success.delta,
-                  reference_id: success.reference_id,
-                  reason: success.reason,
+                  balance_before: success.balance_before,
+                  balance_after: success.balance_after,
+                  ledger_id: success.ledger_id ?? success.credit_ledger_id,
+                  request_id: success.request_id,
                 },
                 null,
                 2
