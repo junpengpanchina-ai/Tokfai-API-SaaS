@@ -45,6 +45,21 @@ import {
   restoreAdminRechargePlan,
   updateAdminRechargePlan,
 } from "./adminRechargePlans.js";
+import {
+  addAdminTenantAdmin,
+  addAdminTenantDomain,
+  createAdminTenant,
+  getAdminTenant,
+  getAdminTenantEconomics,
+  getAdminTenantUsage,
+  getAdminTenantUsers,
+  listAdminTenants,
+  removeAdminTenantAdmin,
+  updateAdminTenant,
+  updateAdminTenantDomain,
+  upsertAdminTenantModelSetting,
+  upsertAdminTenantPricingRule,
+} from "./adminTenants.js";
 import type { AdminUserContext } from "../middleware/requireAdminV1.js";
 
 const SUCCESS_STATUSES = ["succeeded", "success", "ok"];
@@ -1130,6 +1145,111 @@ protectedAdminRoutes.post("/models/:id/restore", async (c) => {
 protectedAdminRoutes.get("/usage", async (c) => {
   const usageLogs = await listAdminUsageLogs();
   return c.json({ data: usageLogs });
+});
+
+protectedAdminRoutes.get("/tenants", async (c) => {
+  const data = await listAdminTenants();
+  return c.json({ data });
+});
+
+protectedAdminRoutes.post("/tenants", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const data = await createAdminTenant(body, adminModelWriteContext(c));
+  return c.json({ data }, 201);
+});
+
+protectedAdminRoutes.get("/tenants/:id", async (c) => {
+  const data = await getAdminTenant(c.req.param("id").trim());
+  return c.json({ data });
+});
+
+protectedAdminRoutes.patch("/tenants/:id", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const data = await updateAdminTenant(
+    c.req.param("id").trim(),
+    body,
+    adminModelWriteContext(c)
+  );
+  return c.json({ data });
+});
+
+protectedAdminRoutes.post("/tenants/:id/domains", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const data = await addAdminTenantDomain(
+    c.req.param("id").trim(),
+    body,
+    adminModelWriteContext(c)
+  );
+  return c.json({ data }, 201);
+});
+
+protectedAdminRoutes.patch("/tenants/:id/domains/:domainId", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const data = await updateAdminTenantDomain(
+    c.req.param("id").trim(),
+    c.req.param("domainId").trim(),
+    body,
+    adminModelWriteContext(c)
+  );
+  return c.json({ data });
+});
+
+protectedAdminRoutes.put("/tenants/:id/model-settings", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const data = await upsertAdminTenantModelSetting(
+    c.req.param("id").trim(),
+    body,
+    adminModelWriteContext(c)
+  );
+  return c.json({ data });
+});
+
+protectedAdminRoutes.put("/tenants/:id/pricing-rules", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const data = await upsertAdminTenantPricingRule(
+    c.req.param("id").trim(),
+    body,
+    adminModelWriteContext(c)
+  );
+  return c.json({ data });
+});
+
+protectedAdminRoutes.post("/tenants/:id/admins", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const data = await addAdminTenantAdmin(
+    c.req.param("id").trim(),
+    body,
+    adminModelWriteContext(c)
+  );
+  return c.json({ data }, 201);
+});
+
+protectedAdminRoutes.delete("/tenants/:id/admins/:adminId", async (c) => {
+  const data = await removeAdminTenantAdmin(
+    c.req.param("id").trim(),
+    c.req.param("adminId").trim(),
+    adminModelWriteContext(c)
+  );
+  return c.json({ data });
+});
+
+protectedAdminRoutes.get("/tenants/:id/users", async (c) => {
+  const data = await getAdminTenantUsers(c.req.param("id").trim());
+  return c.json({ data });
+});
+
+protectedAdminRoutes.get("/tenants/:id/usage", async (c) => {
+  const limit = Number(c.req.query("limit") ?? "100");
+  const data = await getAdminTenantUsage(
+    c.req.param("id").trim(),
+    Number.isFinite(limit) ? limit : 100
+  );
+  return c.json({ data });
+});
+
+protectedAdminRoutes.get("/tenants/:id/economics", async (c) => {
+  const data = await getAdminTenantEconomics(c.req.param("id").trim());
+  return c.json({ data });
 });
 
 protectedAdminRoutes.get("/credits", async (c) => {

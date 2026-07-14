@@ -17,6 +17,7 @@ export const CORS_ALLOW_HEADERS = [
   "Content-Type",
   "Idempotency-Key",
   "X-Request-Id",
+  "X-Tokfai-Host",
   "Stripe-Signature",
 ] as const;
 
@@ -30,12 +31,25 @@ function allowedOrigins(): Set<string> {
   return new Set([...BASELINE_ORIGINS, ...fromEnv]);
 }
 
+function isTokfaiSubdomainOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    const host = url.hostname.toLowerCase();
+    return host === "tokfai.com" || host.endsWith(".tokfai.com");
+  } catch {
+    return false;
+  }
+}
+
 export const corsMiddleware = cors({
   origin: (origin) => {
     if (!origin) return null;
 
     const allowed = allowedOrigins();
-    return allowed.has(origin) ? origin : null;
+    if (allowed.has(origin)) return origin;
+    // Allow tokfai.com subdomains for tenant sites (custom domains via env).
+    if (isTokfaiSubdomainOrigin(origin)) return origin;
+    return null;
   },
   allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
   allowHeaders: [...CORS_ALLOW_HEADERS],

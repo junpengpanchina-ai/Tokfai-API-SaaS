@@ -9,6 +9,7 @@ import {
   loadCheckoutRechargePlan,
   type AdminRechargePlanListItem,
 } from "./adminRechargePlans.js";
+import { resolveTenantIdFromRequestHeaders } from "./adminTenants.js";
 import { supabase } from "../supabase.js";
 import type { AuthedUser } from "../types.js";
 
@@ -201,6 +202,7 @@ function buildCreditOrderInsert(args: {
   userId: string;
   email: string | null;
   plan: AdminRechargePlanListItem;
+  tenantId?: string | null;
 }): Record<string, unknown> {
   const amountCny = Math.max(1, Math.round(args.plan.amount_cents / 100));
 
@@ -214,6 +216,7 @@ function buildCreditOrderInsert(args: {
     amount_cny: amountCny,
     amount_cents: args.plan.amount_cents,
     credits: args.plan.credits,
+    tenant_id: args.tenantId ?? null,
   };
 }
 
@@ -538,6 +541,10 @@ async function createCheckoutSession(c: Context) {
     throw stripeCheckoutError(err, "billing_checkout_failed");
   }
 
+  const tenantId = await resolveTenantIdFromRequestHeaders({
+    get: (name) => c.req.header(name),
+  });
+
   const { data: order, error: orderError } = await sb
     .from("credit_orders")
     .insert(
@@ -545,6 +552,7 @@ async function createCheckoutSession(c: Context) {
         userId: user.id,
         email: profileEmail,
         plan,
+        tenantId,
       })
     )
     .select("id")

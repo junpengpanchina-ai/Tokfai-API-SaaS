@@ -898,3 +898,216 @@ function toAdminApiError(
     requestId: requestId ?? null,
   });
 }
+
+// ---------------------------------------------------------------------------
+// Tenants / 分站
+// ---------------------------------------------------------------------------
+
+export type AdminTenantListItem = {
+  id: string;
+  name: string;
+  slug: string;
+  status: "active" | "disabled";
+  logo_url: string | null;
+  primary_domain: string | null;
+  default_locale: string;
+  base_price_multiplier: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminTenantDomain = {
+  id: string;
+  tenant_id: string;
+  domain: string;
+  domain_type: "tokfai_subdomain" | "custom_domain";
+  status: "pending" | "active" | "disabled";
+  ssl_status: "pending" | "active" | "failed";
+  dns_status: "pending" | "active" | "failed";
+  created_at: string;
+  updated_at: string;
+  dns_instructions?: {
+    cname_target: string;
+    record_type: string;
+    note: string;
+  };
+};
+
+export type AdminTenantDetail = {
+  tenant: AdminTenantListItem;
+  domains: AdminTenantDomain[];
+  model_settings: Array<{
+    id: string;
+    model_id: string;
+    enabled: boolean;
+  }>;
+  pricing_rules: Array<{
+    id: string;
+    model_id: string;
+    price_multiplier: number;
+  }>;
+  admins: Array<{
+    id: string;
+    email: string;
+    user_id: string | null;
+    status: string;
+  }>;
+  dns: { cname_target: string; note: string };
+};
+
+export type AdminTenantEconomics = {
+  usage_requests: number;
+  usage_credits_charged: number;
+  paid_order_credits: number;
+  paid_order_amount_cents: number;
+  base_price_multiplier: number;
+  estimated_cost_credits: number;
+  estimated_gross_margin_credits: number;
+  note: string;
+};
+
+export async function fetchAdminTenants(): Promise<AdminTenantListItem[]> {
+  const res = await fetchAdminApi<{ data?: AdminTenantListItem[] }>(
+    "/admin/tenants"
+  );
+  return Array.isArray(res.data) ? res.data : [];
+}
+
+export async function fetchAdminTenant(
+  id: string
+): Promise<AdminTenantDetail> {
+  const res = await fetchAdminApi<{ data: AdminTenantDetail }>(
+    `/admin/tenants/${encodeURIComponent(id)}`
+  );
+  return res.data;
+}
+
+export async function createAdminTenant(body: {
+  name: string;
+  slug: string;
+  base_price_multiplier?: number;
+  logo_url?: string | null;
+  default_locale?: string;
+}): Promise<AdminTenantDetail> {
+  const res = await fetchAdminApi<{ data: AdminTenantDetail }>(
+    "/admin/tenants",
+    { method: "POST", json: body }
+  );
+  return res.data;
+}
+
+export async function updateAdminTenant(
+  id: string,
+  body: Partial<{
+    name: string;
+    status: "active" | "disabled";
+    logo_url: string | null;
+    primary_domain: string | null;
+    default_locale: string;
+    base_price_multiplier: number;
+  }>
+): Promise<AdminTenantDetail> {
+  const res = await fetchAdminApi<{ data: AdminTenantDetail }>(
+    `/admin/tenants/${encodeURIComponent(id)}`,
+    { method: "PATCH", json: body }
+  );
+  return res.data;
+}
+
+export async function addAdminTenantDomain(
+  tenantId: string,
+  body: {
+    domain: string;
+    domain_type: "tokfai_subdomain" | "custom_domain";
+    status?: "pending" | "active" | "disabled";
+  }
+): Promise<AdminTenantDomain> {
+  const res = await fetchAdminApi<{ data: AdminTenantDomain }>(
+    `/admin/tenants/${encodeURIComponent(tenantId)}/domains`,
+    { method: "POST", json: body }
+  );
+  return res.data;
+}
+
+export async function updateAdminTenantDomain(
+  tenantId: string,
+  domainId: string,
+  body: Partial<{
+    status: "pending" | "active" | "disabled";
+    ssl_status: "pending" | "active" | "failed";
+    dns_status: "pending" | "active" | "failed";
+  }>
+): Promise<AdminTenantDomain> {
+  const res = await fetchAdminApi<{ data: AdminTenantDomain }>(
+    `/admin/tenants/${encodeURIComponent(tenantId)}/domains/${encodeURIComponent(domainId)}`,
+    { method: "PATCH", json: body }
+  );
+  return res.data;
+}
+
+export async function upsertAdminTenantModelSetting(
+  tenantId: string,
+  body: { model_id: string; enabled: boolean }
+) {
+  const res = await fetchAdminApi<{ data: unknown }>(
+    `/admin/tenants/${encodeURIComponent(tenantId)}/model-settings`,
+    { method: "PUT", json: body }
+  );
+  return res.data;
+}
+
+export async function upsertAdminTenantPricingRule(
+  tenantId: string,
+  body: { model_id: string; price_multiplier: number }
+) {
+  const res = await fetchAdminApi<{ data: unknown }>(
+    `/admin/tenants/${encodeURIComponent(tenantId)}/pricing-rules`,
+    { method: "PUT", json: body }
+  );
+  return res.data;
+}
+
+export async function addAdminTenantAdminUser(
+  tenantId: string,
+  body: { email: string; status?: "active" | "disabled" }
+) {
+  const res = await fetchAdminApi<{ data: unknown }>(
+    `/admin/tenants/${encodeURIComponent(tenantId)}/admins`,
+    { method: "POST", json: body }
+  );
+  return res.data;
+}
+
+export async function removeAdminTenantAdminUser(
+  tenantId: string,
+  adminId: string
+) {
+  const res = await fetchAdminApi<{ data: { ok: boolean } }>(
+    `/admin/tenants/${encodeURIComponent(tenantId)}/admins/${encodeURIComponent(adminId)}`,
+    { method: "DELETE" }
+  );
+  return res.data;
+}
+
+export async function fetchAdminTenantUsers(tenantId: string) {
+  const res = await fetchAdminApi<{ data: unknown[] }>(
+    `/admin/tenants/${encodeURIComponent(tenantId)}/users`
+  );
+  return Array.isArray(res.data) ? res.data : [];
+}
+
+export async function fetchAdminTenantUsage(tenantId: string) {
+  const res = await fetchAdminApi<{ data: unknown[] }>(
+    `/admin/tenants/${encodeURIComponent(tenantId)}/usage`
+  );
+  return Array.isArray(res.data) ? res.data : [];
+}
+
+export async function fetchAdminTenantEconomics(
+  tenantId: string
+): Promise<AdminTenantEconomics> {
+  const res = await fetchAdminApi<{ data: AdminTenantEconomics }>(
+    `/admin/tenants/${encodeURIComponent(tenantId)}/economics`
+  );
+  return res.data;
+}

@@ -3,6 +3,7 @@
  */
 
 import { getDmitBaseUrl, isFullTokfaiApiKey } from "./constants";
+import { tokfaiHostHeaders } from "@/lib/tenant/resolve";
 
 export interface DmitErrorPayload {
   message: string;
@@ -118,6 +119,9 @@ export async function dashboardDmitFetch<T = unknown>(
     : `${getDmitBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
 
   const headers = new Headers(extraHeaders);
+  for (const [k, v] of Object.entries(tokfaiHostHeaders())) {
+    if (!headers.has(k)) headers.set(k, v);
+  }
   headers.set(
     "Authorization",
     `Bearer ${requireDashboardDmitAccessToken(accessToken)}`
@@ -156,6 +160,9 @@ export async function dashboardDmitFetchWithHeaders<T = unknown>(
     : `${getDmitBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
 
   const headers = new Headers(extraHeaders);
+  for (const [k, v] of Object.entries(tokfaiHostHeaders())) {
+    if (!headers.has(k)) headers.set(k, v);
+  }
   headers.set(
     "Authorization",
     `Bearer ${requireDashboardDmitAccessToken(accessToken)}`

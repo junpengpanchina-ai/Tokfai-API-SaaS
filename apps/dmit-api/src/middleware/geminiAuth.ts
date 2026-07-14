@@ -39,6 +39,7 @@ async function setApiKeyCaller(
   }
   const apiKey = await verifyApiKeyToken(token);
   c.set("apiKey" as never, apiKey satisfies VerifiedApiKey);
+  c.set("tenantId" as never, apiKey.tenantId);
 }
 
 /**
@@ -69,6 +70,7 @@ export const requireGeminiAuth: MiddlewareHandler = async (c, next) => {
   if (isValidApiKeyFormat(bearer)) {
     const apiKey = await verifyApiKeyToken(bearer);
     c.set("apiKey" as never, apiKey satisfies VerifiedApiKey);
+    c.set("tenantId" as never, apiKey.tenantId);
     await next();
     return;
   }
@@ -76,5 +78,15 @@ export const requireGeminiAuth: MiddlewareHandler = async (c, next) => {
   const user = await verifySupabaseJwt(bearer);
   c.set("user" as never, user satisfies AuthedUser);
   c.set("userId" as never, user.id);
+
+  const { resolveTenantByHost } = await import("../tenants/resolve.js");
+  const host =
+    c.req.header("x-tokfai-host")?.trim() ||
+    c.req.header("x-forwarded-host")?.trim() ||
+    c.req.header("host")?.trim() ||
+    null;
+  const { tenant } = await resolveTenantByHost(host);
+  c.set("tenantId" as never, tenant?.id ?? null);
+
   await next();
 };

@@ -131,6 +131,7 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       failedUsageLog({
         user_id: caller.userId,
         api_key_id: caller.apiKeyId,
+        tenant_id: caller.tenantId,
         model: resolvedModel,
         status: "failed",
         request_id: requestId,
@@ -148,6 +149,7 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       failedUsageLog({
         user_id: caller.userId,
         api_key_id: caller.apiKeyId,
+        tenant_id: caller.tenantId,
         model: resolvedModel,
         status: "failed",
         request_id: requestId,
@@ -184,6 +186,7 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       failedUsageLog({
         user_id: caller.userId,
         api_key_id: caller.apiKeyId,
+        tenant_id: caller.tenantId,
         model: resolvedModel,
         status: "failed",
         request_id: requestId,
@@ -201,6 +204,7 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       failedUsageLog({
         user_id: caller.userId,
         api_key_id: caller.apiKeyId,
+        tenant_id: caller.tenantId,
         model: resolvedModel,
         status: "failed",
         request_id: requestId,
@@ -224,6 +228,7 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       failedUsageLog({
         user_id: caller.userId,
         api_key_id: caller.apiKeyId,
+        tenant_id: caller.tenantId,
         model: resolvedModel,
         status: "failed",
         request_id: requestId,
@@ -260,6 +265,7 @@ imageRoutes.post("/v1/images/generations", async (c) => {
         failedUsageLog({
           user_id: caller.userId,
           api_key_id: caller.apiKeyId,
+          tenant_id: caller.tenantId,
           model: resolvedModel,
           status: "failed",
           request_id: requestId,
@@ -307,11 +313,15 @@ imageRoutes.post("/v1/images/generations", async (c) => {
         ? resolvedImageUrls.length
         : 0);
 
-    const creditsCharged = await priceCreditsForImage(resolvedModel);
+    const creditsCharged = await priceCreditsForImage(
+      resolvedModel,
+      caller.tenantId
+    );
 
     await recordImageUsageAndDebit({
       user_id: caller.userId,
       api_key_id: caller.apiKeyId,
+      tenant_id: caller.tenantId,
       model: resolvedModel,
       status: "succeeded",
       prompt_tokens: null,
@@ -371,6 +381,7 @@ imageRoutes.post("/v1/images/generations", async (c) => {
         failedUsageLog({
           user_id: caller.userId,
           api_key_id: caller.apiKeyId,
+          tenant_id: caller.tenantId,
           model: resolvedModel,
           status:
             err.code === "upstream_rate_limited" ? "rate_limited" : "failed",
@@ -409,6 +420,7 @@ imageRoutes.post("/v1/images/generations", async (c) => {
       failedUsageLog({
         user_id: caller.userId,
         api_key_id: caller.apiKeyId,
+        tenant_id: caller.tenantId,
         model: resolvedModel,
         status: "failed",
         request_id: requestId,
@@ -658,6 +670,7 @@ type FailedUsageLogFields = Pick<
   UsageLogInsert,
   | "user_id"
   | "api_key_id"
+  | "tenant_id"
   | "model"
   | "status"
   | "request_id"
@@ -715,6 +728,7 @@ async function recordImageUsageAndDebit(
       p_amount: creditsCharged,
       p_reason: IMAGE_LEDGER_REASON,
       p_reference_id: entry.request_id,
+      p_tenant_id: entry.tenant_id ?? null,
     });
 
     if (debitError) {

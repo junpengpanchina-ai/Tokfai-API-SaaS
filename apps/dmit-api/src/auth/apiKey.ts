@@ -94,6 +94,26 @@ function deriveKeyIdFromModernToken(rawToken: string): string | null {
 async function fetchActiveKeyByHash(
   candidate: string
 ): Promise<ApiKeyAuthRow | null> {
+  const primary = await supabaseAdmin()
+    .from("api_keys")
+    .select<string, ApiKeyAuthRow>(
+      "id, user_id, name, key_id, prefix, hash, tenant_id, created_at, last_used_at, revoked_at"
+    )
+    .eq("hash", candidate)
+    .maybeSingle();
+
+  if (!primary.error) {
+    return primary.data;
+  }
+
+  const msg = primary.error.message.toLowerCase();
+  if (!(msg.includes("tenant_id") && msg.includes("does not exist"))) {
+    throw ApiError.internal(
+      `Key lookup failed: ${primary.error.message}`,
+      "key_lookup_failed"
+    );
+  }
+
   const { data, error } = await supabaseAdmin()
     .from("api_keys")
     .select<string, ApiKeyAuthRow>(
@@ -114,6 +134,29 @@ async function fetchActiveKeyByHash(
 async function fetchActiveKeyByKeyId(
   keyId: string
 ): Promise<ApiKeyAuthRow | null> {
+  const primary = await supabaseAdmin()
+    .from("api_keys")
+    .select<string, ApiKeyAuthRow>(
+      "id, user_id, name, key_id, prefix, hash, tenant_id, created_at, last_used_at, revoked_at"
+    )
+    .eq("key_id", keyId)
+    .is("revoked_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!primary.error) {
+    return primary.data;
+  }
+
+  const msg = primary.error.message.toLowerCase();
+  if (!(msg.includes("tenant_id") && msg.includes("does not exist"))) {
+    throw ApiError.internal(
+      `Key lookup failed: ${primary.error.message}`,
+      "key_lookup_failed"
+    );
+  }
+
   const { data, error } = await supabaseAdmin()
     .from("api_keys")
     .select<string, ApiKeyAuthRow>(
@@ -159,6 +202,7 @@ function toVerifiedApiKey(data: ApiKeyAuthRow): VerifiedApiKey {
     name: data.name,
     keyId: data.key_id,
     prefix: data.prefix,
+    tenantId: data.tenant_id ?? null,
   };
 }
 
@@ -168,6 +212,7 @@ export interface VerifiedApiKey {
   name: string;
   keyId: string;
   prefix: string;
+  tenantId: string | null;
 }
 
 async function verifyModernApiKey(rawToken: string): Promise<VerifiedApiKey> {

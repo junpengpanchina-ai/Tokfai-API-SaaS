@@ -22,6 +22,7 @@ import { imageRoutes } from "./routes/images.js";
 import { adminRoutes } from "./routes/admin.js";
 import { announcementRoutes } from "./routes/announcements.js";
 import { meRoutes } from "./routes/me.js";
+import { tenantRoutes } from "./routes/tenant.js";
 import { registerDebugRoutes } from "./routes/debug.js";
 
 export function buildApp() {
@@ -31,6 +32,7 @@ export function buildApp() {
   app.use("*", corsMiddleware);
 
   app.route("/", healthRoutes);
+  app.route("/", tenantRoutes);
   app.route("/", keyRoutes);
   app.route("/v1/me", meRoutes);
   app.route("/", billingRoutes);

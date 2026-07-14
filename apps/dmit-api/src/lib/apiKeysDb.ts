@@ -131,12 +131,14 @@ export interface ApiKeyInsertPayload {
   hash: string;
   encrypted_secret: string | null;
   can_reveal: boolean;
+  tenant_id?: string | null;
 }
 
 export function buildApiKeyInsertPayload(
   userId: string,
   name: string,
-  material: NewApiKeyMaterial
+  material: NewApiKeyMaterial,
+  tenantId?: string | null
 ): ApiKeyInsertPayload {
   const encryptedSecret = encryptSecretIfConfigured(material.fullKey);
   return {
@@ -147,6 +149,7 @@ export function buildApiKeyInsertPayload(
     hash: material.hash,
     encrypted_secret: encryptedSecret,
     can_reveal: Boolean(encryptedSecret),
+    tenant_id: tenantId ?? null,
   };
 }
 
@@ -170,6 +173,25 @@ export async function insertApiKeyRow(
 
   if (!withCanReveal.error) {
     return withCanReveal;
+  }
+
+  const msg = withCanReveal.error.message.toLowerCase();
+  if (msg.includes("tenant_id") && msg.includes("does not exist")) {
+    const { tenant_id: _tenantId, ...withoutTenant } = payload;
+    const retry = await sb
+      .from("api_keys")
+      .insert(withoutTenant)
+      .select("id, name, prefix, created_at, last_used_at, revoked_at")
+      .single();
+    if (!retry.error || !isMissingCanRevealColumn(retry.error)) {
+      return retry;
+    }
+    const { can_reveal: _canReveal, ...legacyPayload } = withoutTenant;
+    return sb
+      .from("api_keys")
+      .insert(legacyPayload)
+      .select("id, name, prefix, created_at, last_used_at, revoked_at")
+      .single();
   }
 
   if (!isMissingCanRevealColumn(withCanReveal.error)) {

@@ -75,6 +75,7 @@ export async function recordSuccessfulUsageAndDebit(
     p_idempotency_key: args.idempotencyKey ?? null,
     p_endpoint: args.endpoint,
     p_response_snapshot: args.responseSnapshot ?? null,
+    p_tenant_id: entry.tenant_id ?? null,
   });
 
   if (error) {

@@ -16,6 +16,13 @@ type CookieToSet = {
 function nextWithPathname(request: NextRequest, pathname: string) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-pathname", pathname);
+  const host =
+    request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ||
+    request.headers.get("host") ||
+    "";
+  if (host) {
+    requestHeaders.set("x-tokfai-host", host);
+  }
   return NextResponse.next({
     request: { headers: requestHeaders },
   });

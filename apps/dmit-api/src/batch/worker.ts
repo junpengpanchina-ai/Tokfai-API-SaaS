@@ -103,9 +103,21 @@ async function processBatch(batchId: string): Promise<void> {
     return;
   }
 
+  let tenantId: string | null = null;
+  if (batch.api_key_id) {
+    const { data: keyRow } = await supabase()
+      .from("api_keys")
+      .select("tenant_id")
+      .eq("id", batch.api_key_id)
+      .maybeSingle();
+    tenantId =
+      typeof keyRow?.tenant_id === "string" ? keyRow.tenant_id : null;
+  }
+
   const caller: ChatCaller = {
     userId: batch.user_id,
     apiKeyId: batch.api_key_id,
+    tenantId,
   };
 
   const pendingItems = (items as ChatBatchItemRow[]).filter(

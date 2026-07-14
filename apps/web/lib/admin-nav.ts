@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft,
   BookOpen,
+  Building2,
   Coins,
   Cpu,
   FileWarning,
@@ -104,6 +105,13 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     prefetch: false,
     group: "ops",
   },
+  {
+    href: "/admin/tenants",
+    labelKey: "admin.nav.tenants",
+    icon: Building2,
+    prefetch: true,
+    group: "ops",
+  },
   // 商品
   {
     href: "/admin/models",
@@ -172,6 +180,7 @@ export const ADMIN_TAB_ITEMS = ADMIN_NAV_ITEMS.filter(
     [
       "/admin/overview",
       "/admin/users",
+      "/admin/tenants",
       "/admin/models",
       "/admin/pricing",
       "/admin/recharge-plans",

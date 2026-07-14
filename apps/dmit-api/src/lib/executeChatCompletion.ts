@@ -13,6 +13,7 @@ import {
   listAvailableChatModelIds,
   priceCreditsFor,
 } from "../catalog/modelCatalog.js";
+import { isModelEnabledForTenant } from "../tenants/resolve.js";
 import { providerFetch, isChatFallbackEligible } from "../upstream/grsai.js";
 import {
   formatSupportedChatModelsMessage,
@@ -162,6 +163,7 @@ export async function executeChatCompletion(
       failedUsageLog({
         user_id: caller.userId,
         api_key_id: caller.apiKeyId,
+        tenant_id: caller.tenantId,
         model: requestedRaw,
         status: "failed",
         request_id: requestId,
@@ -179,6 +181,34 @@ export async function executeChatCompletion(
       requestId,
       httpStatus: 400,
       suggestedModels,
+    };
+  }
+
+  if (!(await isModelEnabledForTenant(caller.tenantId, requestedModel))) {
+    const errorCode = "model_disabled_for_tenant";
+    const errorMessage = `Model is not available on this site: ${requestedRaw}`;
+
+    await writeUsageLog(
+      failedUsageLog({
+        user_id: caller.userId,
+        api_key_id: caller.apiKeyId,
+        tenant_id: caller.tenantId,
+        model: requestedRaw,
+        status: "failed",
+        request_id: requestId,
+        error_code: errorCode,
+        error_message: errorMessage,
+        latency_ms: Date.now() - startedAt,
+      }),
+      route
+    );
+
+    return {
+      ok: false,
+      errorCode,
+      errorMessage,
+      requestId,
+      httpStatus: 403,
     };
   }
 
@@ -341,7 +371,11 @@ export async function executeChatCompletion(
 
           const usage = normalizeUsage(data.usage);
           const resolvedModel = data.model ?? attemptModel;
-          const creditsCharged = await calculateCreditsCharged(resolvedModel, usage);
+          const creditsCharged = await calculateCreditsCharged(
+            resolvedModel,
+            usage,
+            caller.tenantId
+          );
 
           const response: Record<string, unknown> = {
             ...data,
@@ -363,6 +397,7 @@ export async function executeChatCompletion(
             {
               user_id: caller.userId,
               api_key_id: caller.apiKeyId,
+              tenant_id: caller.tenantId,
               model: resolvedModel,
               status: "succeeded",
               prompt_tokens: usage.promptTokens,
@@ -507,6 +542,7 @@ export async function executeChatCompletion(
       failedUsageLog({
         user_id: caller.userId,
         api_key_id: caller.apiKeyId,
+        tenant_id: caller.tenantId,
         model: requestedModel,
         status: "failed",
         request_id: requestId,
@@ -601,12 +637,14 @@ async function assertHasCredits(userId: string): Promise<void> {
 
 async function calculateCreditsCharged(
   model: string,
-  usage: ReturnType<typeof normalizeUsage>
+  usage: ReturnType<typeof normalizeUsage>,
+  tenantId?: string | null
 ): Promise<number> {
   const raw = await priceCreditsFor(
     model,
     usage.promptTokens ?? 0,
-    usage.completionTokens ?? 0
+    usage.completionTokens ?? 0,
+    tenantId
   );
   return roundCreditAmount(raw);
 }
@@ -631,6 +669,7 @@ type FailedUsageLogFields = Pick<
   UsageLogInsert,
   | "user_id"
   | "api_key_id"
+  | "tenant_id"
   | "model"
   | "status"
   | "request_id"
@@ -736,6 +775,7 @@ async function logChatFailure(args: {
     failedUsageLog({
       user_id: caller.userId,
       api_key_id: caller.apiKeyId,
+      tenant_id: caller.tenantId,
       model: requestedModel,
       status:
         err.code === "upstream_rate_limited" ||

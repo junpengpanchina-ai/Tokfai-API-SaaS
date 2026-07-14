@@ -303,22 +303,36 @@ export function priceImageCreditsFromConfig(config: ModelPricingConfig): number 
 export async function priceCreditsFor(
   model: string,
   inputTokens: number,
-  outputTokens: number
+  outputTokens: number,
+  tenantId?: string | null
 ): Promise<number> {
   const fromDb = await getModelPricing(model);
+  let base: number;
   if (fromDb?.billingType === "chat") {
-    return priceChatCreditsFromConfig(fromDb, inputTokens, outputTokens);
+    base = priceChatCreditsFromConfig(fromDb, inputTokens, outputTokens);
+  } else {
+    base = priceFor(model, inputTokens, outputTokens);
   }
-  return priceFor(model, inputTokens, outputTokens);
+  if (!tenantId || !(base > 0)) return base;
+  const { applyTenantPriceMultiplier } = await import("../tenants/resolve.js");
+  return applyTenantPriceMultiplier(base, tenantId, model);
 }
 
 /** Fixed per-image credit cost — DB pricing first, then static catalog. */
-export async function priceCreditsForImage(model: string): Promise<number> {
+export async function priceCreditsForImage(
+  model: string,
+  tenantId?: string | null
+): Promise<number> {
   const fromDb = await getModelPricing(model);
+  let base: number;
   if (fromDb?.billingType === "image") {
-    return priceImageCreditsFromConfig(fromDb);
+    base = priceImageCreditsFromConfig(fromDb);
+  } else {
+    base = DEFAULT_IMAGE_MODEL_CREDITS[model] ?? 0;
   }
-  return DEFAULT_IMAGE_MODEL_CREDITS[model] ?? 0;
+  if (!tenantId || !(base > 0)) return base;
+  const { applyTenantPriceMultiplier } = await import("../tenants/resolve.js");
+  return applyTenantPriceMultiplier(base, tenantId, model);
 }
 
 export async function isModelAllowedForChat(model: string): Promise<boolean> {

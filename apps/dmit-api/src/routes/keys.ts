@@ -16,6 +16,7 @@ import {
   revealApiKey,
   revokeApiKey,
 } from "./apiKeyActions.js";
+import { resolveTenantIdFromRequestHeaders } from "./adminTenants.js";
 import type { AuthedUser } from "../types.js";
 
 const MAX_NAME_LEN = 64;
@@ -82,7 +83,15 @@ keyRoutes.post("/v1/keys", async (c) => {
   }
 
   const material = generateApiKey();
-  const insertPayload = buildApiKeyInsertPayload(user.id, name, material);
+  const tenantId = await resolveTenantIdFromRequestHeaders({
+    get: (name) => c.req.header(name),
+  });
+  const insertPayload = buildApiKeyInsertPayload(
+    user.id,
+    name,
+    material,
+    tenantId
+  );
   const { data, error } = await insertApiKeyRow(insertPayload);
 
   if (error || !data) {

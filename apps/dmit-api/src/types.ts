@@ -26,6 +26,7 @@ export interface ApiKeyRow {
   hash: string;
   encrypted_secret: string | null;
   can_reveal: boolean;
+  tenant_id?: string | null;
   created_at: string;
   last_used_at: string | null;
   revoked_at: string | null;
@@ -34,6 +35,7 @@ export interface ApiKeyRow {
 export interface UsageLogInsert {
   user_id: string;
   api_key_id: string | null;
+  tenant_id?: string | null;
   model: string | null;
   status: string;
   prompt_tokens: number | null;

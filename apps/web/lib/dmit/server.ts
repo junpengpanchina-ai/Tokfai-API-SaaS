@@ -1,4 +1,5 @@
 import { resolveTokfaiApiBaseUrl } from "@/lib/tokfai-api";
+import { tokfaiHostHeaders } from "@/lib/tenant/resolve";
 
 export class DmitServerError extends Error {
   readonly status: number;
@@ -21,9 +22,13 @@ export function getDmitBaseUrl(): string {
 
 export async function dmitServerFetch<T>(
   path: string,
-  accessToken: string | null
+  accessToken: string | null,
+  options?: { host?: string | null }
 ): Promise<T> {
-  const headers: HeadersInit = {};
+  const headers: Record<string, string> = {
+    ...tokfaiHostHeaders(options?.host),
+  };
+
   if (accessToken !== null) {
     headers.Authorization = `Bearer ${accessToken}`;
   }

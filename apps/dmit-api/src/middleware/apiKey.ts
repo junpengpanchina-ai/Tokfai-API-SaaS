@@ -24,5 +24,6 @@ export const requireApiKey: MiddlewareHandler = async (c, next) => {
   }
   const apiKey = await verifyApiKeyToken(token);
   c.set("apiKey" as never, apiKey satisfies VerifiedApiKey);
+  c.set("tenantId" as never, apiKey.tenantId);
   await next();
 };
