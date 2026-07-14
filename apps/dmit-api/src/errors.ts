@@ -9,6 +9,7 @@
 export type ErrorType =
   | "auth_error"
   | "validation_error"
+  | "invalid_request_error"
   | "rate_limit_error"
   | "billing_error"
   | "not_found"
@@ -75,6 +76,7 @@ function isErrorType(value: unknown): value is ErrorType {
   return (
     value === "auth_error" ||
     value === "validation_error" ||
+    value === "invalid_request_error" ||
     value === "rate_limit_error" ||
     value === "billing_error" ||
     value === "not_found" ||
@@ -195,12 +197,12 @@ export class ApiError extends Error {
     return new ApiError({ status: 404, message, code, type: "not_found" });
   }
 
-  static badRequest(message: string, code = "bad_request") {
+  static badRequest(message: string, code = "invalid_request_error") {
     return new ApiError({
       status: 400,
       message,
       code,
-      type: "validation_error",
+      type: "invalid_request_error",
     });
   }
 

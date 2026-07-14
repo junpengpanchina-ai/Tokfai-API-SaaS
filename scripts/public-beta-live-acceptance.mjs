@@ -154,6 +154,24 @@ function validateSuccessEnvelope(label, res, body, text) {
     return false;
   }
 
+  if (label.includes("responses") && !label.includes("stream")) {
+    if (body?.object !== "response") {
+      fail(label, `expected object=response got ${body?.object ?? "missing"}`);
+      return false;
+    }
+    if (body?.status !== "completed") {
+      fail(label, `expected status=completed got ${body?.status ?? "missing"}`);
+      return false;
+    }
+    const hasText =
+      (typeof body?.output_text === "string" && body.output_text.length > 0) ||
+      (Array.isArray(body?.output) && body.output.length > 0);
+    if (!hasText) {
+      fail(label, "missing output_text / output");
+      return false;
+    }
+  }
+
   const credits = extractCredits(body);
   const needsUsage =
     label.includes("chat") ||
@@ -266,11 +284,32 @@ async function probeChatStream(model) {
 
 async function probeResponses(model) {
   const label = `responses non-stream ${model}`;
-  const { res, body, text } = await api("POST", "/v1/responses", {
+  // Official Responses shape: string `input` + stream flag only.
+  const payload = {
     model,
     input: PROMPT,
     stream: false,
-  });
+  };
+  const { res, body, text } = await api("POST", "/v1/responses", payload);
+
+  // Completed Responses JSON with a non-2xx status is a gateway/proxy bug,
+  // but still prove the payload path worked — classify via success validator.
+  if (
+    !res.ok &&
+    body &&
+    typeof body === "object" &&
+    body.object === "response" &&
+    body.status === "completed"
+  ) {
+    fail(
+      label,
+      `got HTTP ${res.status} with completed response body (proxy/status bug)`
+    );
+    // Still require standard error envelope when status is wrong without treating
+    // completed body as success — surface protocol issue clearly.
+    return;
+  }
+
   if (!res.ok) {
     classifyProbeError(label, res, body, text);
     return;

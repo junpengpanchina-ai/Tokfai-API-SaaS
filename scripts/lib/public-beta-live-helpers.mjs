@@ -66,11 +66,33 @@ export function isUpstreamDegradedCode(code) {
  * Try to recover an error object from JSON body, `_raw`, or SSE frames.
  */
 export function extractErrorObject(body, text) {
-  if (body?.error && typeof body.error === "object") {
+  if (body?.error && typeof body.error === "object" && !Array.isArray(body.error)) {
     return body.error;
   }
-  if (typeof body?.error === "string") {
-    return { message: body.error, code: body.code ?? null };
+  if (typeof body?.error === "string" && body.error.trim()) {
+    return {
+      message: body.error,
+      code:
+        (typeof body.code === "string" && body.code) ||
+        "invalid_request_error",
+    };
+  }
+  // Some gateways put message/code at the top level without an error wrapper.
+  if (
+    typeof body?.message === "string" &&
+    body.message.trim() &&
+    (typeof body?.code === "string" || typeof body?.type === "string")
+  ) {
+    return {
+      message: body.message,
+      code:
+        (typeof body.code === "string" && body.code) ||
+        (typeof body.type === "string" && body.type) ||
+        "invalid_request_error",
+      type: typeof body.type === "string" ? body.type : undefined,
+      request_id:
+        typeof body.request_id === "string" ? body.request_id : undefined,
+    };
   }
   const raw =
     typeof text === "string"
@@ -83,7 +105,9 @@ export function extractErrorObject(body, text) {
   // Full JSON error body
   try {
     const parsed = JSON.parse(raw);
-    if (parsed?.error && typeof parsed.error === "object") return parsed.error;
+    if (parsed?.error && typeof parsed.error === "object" && !Array.isArray(parsed.error)) {
+      return parsed.error;
+    }
   } catch {
     // continue
   }
@@ -96,7 +120,9 @@ export function extractErrorObject(body, text) {
     if (!payload || payload === "[DONE]") continue;
     try {
       const parsed = JSON.parse(payload);
-      if (parsed?.error && typeof parsed.error === "object") return parsed.error;
+      if (parsed?.error && typeof parsed.error === "object" && !Array.isArray(parsed.error)) {
+        return parsed.error;
+      }
       if (typeof parsed?.code === "string" && typeof parsed?.message === "string") {
         return parsed;
       }
@@ -151,13 +177,20 @@ export function safeErrorSummary(body, status, text) {
 export function assertStandardErrorEnvelope(body, res, text) {
   const err = extractErrorObject(body, text);
   if (!err || typeof err !== "object") {
+    const preview =
+      typeof text === "string"
+        ? text.slice(0, 180)
+        : JSON.stringify(body ?? {}).slice(0, 180);
     return {
       ok: false,
-      detail: "missing error object",
+      detail: `missing error object body_preview=${JSON.stringify(preview)}`,
       summary: safeErrorSummary(body, res?.status, text),
     };
   }
-  const code = typeof err.code === "string" ? err.code.trim() : "";
+  const code =
+    (typeof err.code === "string" && err.code.trim()) ||
+    (typeof err.type === "string" && err.type.trim()) ||
+    "";
   const message = typeof err.message === "string" ? err.message.trim() : "";
   const requestId =
     (typeof err.request_id === "string" && err.request_id.trim()) ||

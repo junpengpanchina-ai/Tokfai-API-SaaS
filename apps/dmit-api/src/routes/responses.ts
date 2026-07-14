@@ -63,10 +63,34 @@ responsesRoutes.post("/v1/responses", async (c) => {
     throw err;
   }
 
+  // Reject chat-shaped payloads that accidentally send messages instead of input.
+  if (
+    body &&
+    typeof body === "object" &&
+    !Array.isArray(body) &&
+    !("input" in (body as Record<string, unknown>)) &&
+    "messages" in (body as Record<string, unknown>)
+  ) {
+    throw ApiError.badRequest(
+      "Invalid responses request: use `input` (string or message array), not `messages`.",
+      "invalid_request_error"
+    );
+  }
+
   const parsed = ResponsesRequestSchema.safeParse(body);
   if (!parsed.success) {
     throw ApiError.badRequest(
       "Invalid responses request.",
+      "invalid_request_error"
+    );
+  }
+
+  if (
+    typeof parsed.data.model !== "string" ||
+    !parsed.data.model.trim()
+  ) {
+    throw ApiError.badRequest(
+      "Invalid responses request: model is required.",
       "invalid_request_error"
     );
   }
@@ -123,6 +147,18 @@ responsesRoutes.post("/v1/responses", async (c) => {
     ? result.response
     : chatCompletionResponseToResponses(result.response, result.requestId);
 
+  // Never return an empty / non-response payload on the success path.
+  if (
+    !response ||
+    typeof response !== "object" ||
+    response.object !== "response"
+  ) {
+    throw ApiError.internal(
+      "Failed to build responses payload.",
+      "server_error"
+    );
+  }
+
   if (wantsStream) {
     const sseBody = responsesToSseBody(response);
     return c.newResponse(sseBody, {
@@ -137,5 +173,6 @@ responsesRoutes.post("/v1/responses", async (c) => {
     });
   }
 
+  c.header("X-Request-Id", result.requestId);
   return c.json(response);
 });

@@ -39,6 +39,7 @@ const OFFLINE = [
   "scripts/p821-docs-leak-smoke.mjs",
   "scripts/public-model-registry-smoke.mjs",
   "scripts/docs-or-ui-en-no-chinese-smoke.mjs",
+  "scripts/responses-nonstream-envelope-smoke.mjs",
   "scripts/public-beta-final-qa-suite.mjs",
   "scripts/public-beta-light-load-smoke.mjs",
 ];
