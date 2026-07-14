@@ -13,6 +13,45 @@ Tokfai 公测前核心链路验收通过。
 OpenAI Compatible Chat、Responses 非流式、Responses 流式、Gemini native / Cherry Studio 路径均已跑通。
 消费者侧文档与前端已完成上游信息脱敏，Admin 后台支持公测运营所需的用户查询、Key 管理、用量查看、积分调账与错误日志定位。
 
+### Public Beta 上线前验收命令
+
+本地 / 离线（不打生产、不消耗额度）：
+
+```bash
+node scripts/public-beta-ready-all.mjs
+```
+
+线上真实小额（需 `TOKFAI_API_KEY`）：
+
+```bash
+TOKFAI_API_KEY=sk-tokfai_xxx node scripts/public-beta-live-acceptance.mjs
+```
+
+线上图片（显式开启）：
+
+```bash
+TOKFAI_API_KEY=sk-tokfai_xxx TOKFAI_LIVE_IMAGE_SMOKE=1 node scripts/public-beta-live-image-smoke.mjs
+```
+
+线上真实轻压（显式开启）：
+
+```bash
+TOKFAI_API_KEY=sk-tokfai_xxx TOKFAI_LIVE_LOAD=1 \
+  TOKFAI_LOAD_CONCURRENCY=10 TOKFAI_LOAD_DURATION_SEC=60 \
+  node scripts/public-beta-live-load.mjs
+```
+
+一键离线 + 可选线上（有 Key 才跑 live；图片/轻压另开 flag）：
+
+```bash
+cd apps/dmit-api && npm run typecheck && npm run build
+cd ../web && npm run typecheck && npm run build
+cd ../..
+node scripts/public-beta-ready-all.mjs
+```
+
+脚本不得打印完整 API Key、上游供应商、上游域名、上游 Key。
+
 详见后端汇总 §0：`docs/dmit-api-backend-summary.md`。
 
 ---
