@@ -23,7 +23,11 @@ export function getDmitBaseUrl(): string {
 export async function dmitServerFetch<T>(
   path: string,
   accessToken: string | null,
-  options?: { host?: string | null }
+  options?: {
+    host?: string | null;
+    method?: string;
+    json?: unknown;
+  }
 ): Promise<T> {
   const headers: Record<string, string> = {
     ...tokfaiHostHeaders(options?.host),
@@ -33,20 +37,69 @@ export async function dmitServerFetch<T>(
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
+  let body: string | undefined;
+  if (options?.json !== undefined) {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(options.json);
+  }
+
   const res = await fetch(`${getDmitBaseUrl()}${path}`, {
-    method: "GET",
+    method: options?.method ?? "GET",
     headers,
+    body,
     cache: "no-store",
   });
 
   const text = await res.text();
-  const body = parseJson(text);
+  const parsed = parseJson(text);
 
   if (!res.ok) {
-    throw toDmitServerError(res.status, body);
+    throw toDmitServerError(res.status, parsed);
   }
 
-  return body as T;
+  return parsed as T;
+}
+
+/** Next.js server → DMIT with API-key Bearer (image/chat proxy). Host from request. */
+export async function dmitServerFetchWithHeaders<T>(
+  path: string,
+  apiKey: string,
+  options?: {
+    host?: string | null;
+    method?: string;
+    json?: unknown;
+  }
+): Promise<{ data: T; headers: Headers }> {
+  const headers: Record<string, string> = {
+    ...tokfaiHostHeaders(options?.host),
+    Authorization: `Bearer ${apiKey}`,
+  };
+
+  let body: string | undefined;
+  if (options?.json !== undefined) {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(options.json);
+  }
+
+  const res = await fetch(`${getDmitBaseUrl()}${path}`, {
+    method: options?.method ?? "GET",
+    headers,
+    body,
+    cache: "no-store",
+  });
+
+  if (res.status === 204) {
+    return { data: undefined as T, headers: res.headers };
+  }
+
+  const text = await res.text();
+  const parsed = parseJson(text);
+
+  if (!res.ok) {
+    throw toDmitServerError(res.status, parsed);
+  }
+
+  return { data: parsed as T, headers: res.headers };
 }
 
 function parseJson(text: string): unknown {

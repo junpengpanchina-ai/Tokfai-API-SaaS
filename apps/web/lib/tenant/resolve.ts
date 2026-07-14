@@ -22,18 +22,26 @@ export const MAIN_TENANT: PublicTenantConfig = {
   is_main: true,
 };
 
+/**
+ * Prefer an explicit host from the Next.js request (middleware / headers()).
+ * Do not call this from browser → DMIT fetches — that triggers CORS preflight
+ * failures when `X-Tokfai-Host` is not allowed.
+ */
 export function getBrowserTokfaiHost(): string | null {
   if (typeof window === "undefined") return null;
   return window.location.host || null;
 }
 
+/** Server → DMIT only. Pass `host` from request Host / x-tokfai-host. */
 export function tokfaiHostHeaders(
   host?: string | null
 ): Record<string, string> {
   const value =
     (host && host.trim()) ||
-    getBrowserTokfaiHost() ||
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/^https?:\/\//, "") ||
+    // Server fallback only — never rely on window for outbound DMIT calls.
+    (typeof window === "undefined"
+      ? process.env.NEXT_PUBLIC_SITE_URL?.replace(/^https?:\/\//, "") || ""
+      : "") ||
     "";
   if (!value) return {};
   return { "X-Tokfai-Host": value.split("/")[0] ?? value };

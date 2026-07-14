@@ -6,7 +6,7 @@ import { getDmitBaseUrl } from "./constants";
 import {
   assertFullApiKeySecret,
   DashboardDmitApiError,
-  dashboardDmitFetch,
+  developerDmitFetch,
 } from "./dmit-fetch";
 
 export { DashboardDmitApiError as DmitApiError };
@@ -128,7 +128,7 @@ export async function createApiKey(
   input: { name?: string },
   auth: DashboardSessionAuth
 ): Promise<CreateApiKeyResponse> {
-  const raw = await dashboardDmitFetch<unknown>(ME_API_KEYS_PATH, {
+  const raw = await developerDmitFetch<unknown>(ME_API_KEYS_PATH, {
     method: "POST",
     json: input,
     accessToken: auth.accessToken,
@@ -184,7 +184,7 @@ export async function revokeApiKey(
   const requestMethod = "POST";
 
   try {
-    const raw = await dashboardDmitFetch<unknown>(path, {
+    const raw = await developerDmitFetch<unknown>(path, {
       method: requestMethod,
       json: { id },
       accessToken: auth.accessToken,
@@ -218,7 +218,7 @@ export async function revealMeApiKey(
   auth: DashboardSessionAuth
 ): Promise<string> {
   const path = ME_API_KEYS_REVEAL_PATH;
-  const raw = await dashboardDmitFetch<RevealMeApiKeyResponse>(path, {
+  const raw = await developerDmitFetch<RevealMeApiKeyResponse>(path, {
     method: "POST",
     json: { id },
     accessToken: auth.accessToken,

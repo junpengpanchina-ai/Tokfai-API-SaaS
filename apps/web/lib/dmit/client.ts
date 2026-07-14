@@ -15,7 +15,6 @@
 
 import { createClient as createBrowserSupabase } from "@/lib/supabase/client";
 import { isFullTokfaiApiKey, resolveTokfaiApiBaseUrl } from "@/lib/tokfai-api";
-import { tokfaiHostHeaders } from "@/lib/tenant/resolve";
 
 export function getDmitBaseUrl(): string {
   return resolveTokfaiApiBaseUrl(
@@ -120,10 +119,8 @@ export async function dmitFetch<T = unknown>(
     : `${getDmitBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
 
   const headers = new Headers(extraHeaders);
-  const hostHeaders = tokfaiHostHeaders();
-  for (const [k, v] of Object.entries(hostHeaders)) {
-    if (!headers.has(k)) headers.set(k, v);
-  }
+  // Do not attach X-Tokfai-Host from the browser — CORS preflight rejects it
+  // on some deployments, and tenant/host must be derived server-side.
 
   if (accessToken === null) {
     // Public endpoint (e.g. /v1/health) — no Authorization header.
@@ -733,10 +730,7 @@ async function dmitFetchWithHeaders<T = unknown>(
     : `${getDmitBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
 
   const headers = new Headers(extraHeaders);
-  const hostHeaders = tokfaiHostHeaders();
-  for (const [k, v] of Object.entries(hostHeaders)) {
-    if (!headers.has(k)) headers.set(k, v);
-  }
+  // Do not attach X-Tokfai-Host from the browser (see dmitFetch).
 
   if (accessToken === null) {
     // Public endpoint (e.g. /v1/health) — no Authorization header.

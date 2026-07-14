@@ -30,12 +30,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   DmitApiError,
-  imageGenerationsWithProgress,
   type ImageGenerationResponse,
 } from "@/lib/dashboard-safe/image-api";
 import {
-  ensurePlaygroundApiKey,
-} from "@/lib/dashboard-safe/playground-default-key";
+  consumerImageGenerationsWithProgress,
+} from "@/lib/dashboard-safe/consumer-workbench-api";
 import {
   getImageModelCapability,
   getImagePlaygroundMode,
@@ -65,7 +64,6 @@ import { buildImageGenerationCurlOneLine } from "./image-playground-safe-snippet
 import { formatImagePlaygroundLabel } from "./image-playground-labels";
 import { useImagePlaygroundLabels } from "./use-image-playground-labels";
 import {
-  isFullTokfaiApiKey,
   IMAGE_PLAYGROUND_IMAGE_TO_IMAGE_PLACEHOLDER,
   IMAGE_PLAYGROUND_TEXT_TO_IMAGE_PLACEHOLDER,
 } from "@/lib/dashboard-safe/constants";
@@ -93,25 +91,6 @@ function resolveInitialModel(initialModel?: string): ImagePlaygroundModelId {
     return initialModel;
   }
   return DEFAULT_MODEL;
-}
-
-function toPlaygroundKeyOption(
-  key: ImagePlaygroundApiKeyOption
-): { id: string; name: string; prefix: string; can_reveal: boolean } {
-  return {
-    id: key.id,
-    name: key.name,
-    prefix: key.prefix,
-    can_reveal: key.can_reveal !== false,
-  };
-}
-
-export interface ImagePlaygroundApiKeyOption {
-  id: string;
-  name: string;
-  prefix: string;
-  status: "active" | "revoked" | string;
-  can_reveal?: boolean;
 }
 
 interface PlaygroundError {
@@ -235,7 +214,6 @@ function getDroppedFiles(dataTransfer: DataTransfer): File[] {
 
 export function ImageGeneratePanel({
   accessToken,
-  activeKeys,
   initialModel,
   initialCreditsBalance = null,
   creditsLoaded = false,
@@ -245,7 +223,6 @@ export function ImageGeneratePanel({
   initialPromptHint,
 }: {
   accessToken: string;
-  activeKeys: ImagePlaygroundApiKeyOption[];
   initialModel?: string;
   initialCreditsBalance?: number | null;
   creditsLoaded?: boolean;
@@ -263,17 +240,6 @@ export function ImageGeneratePanel({
     null
   );
 
-  const [localKeys, setLocalKeys] =
-    useState<ImagePlaygroundApiKeyOption[]>(activeKeys);
-  const [resolvedSecret, setResolvedSecret] = useState<string | null>(null);
-  const [preferredKeyId, setPreferredKeyId] = useState<string | null>(
-    activeKeys[0]?.id ?? null
-  );
-  const [preparingKey, setPreparingKey] = useState(false);
-  const [createKeyError, setCreateKeyError] = useState<string | null>(null);
-  const [needsManualCreate, setNeedsManualCreate] = useState(
-    () => activeKeys.length === 0
-  );
   const [warnFastForEdit, setWarnFastForEdit] = useState(false);
 
   const [model, setModel] = useState(() => resolveInitialModel(initialModel));
@@ -342,14 +308,6 @@ export function ImageGeneratePanel({
     imageMode === "reference_edit" && !selectedCapability.supportsSubjectPreserve;
 
   useEffect(() => {
-    setLocalKeys(activeKeys);
-    if (activeKeys.length > 0) {
-      setNeedsManualCreate(false);
-      setPreferredKeyId((prev) => prev ?? activeKeys[0].id);
-    }
-  }, [activeKeys]);
-
-  useEffect(() => {
     return () => {
       if (resultAttentionTimeoutRef.current) {
         clearTimeout(resultAttentionTimeoutRef.current);
@@ -416,71 +374,6 @@ export function ImageGeneratePanel({
       : t("dashboard.imagePlayground.modeTextHint");
 
   const selectedModelCredits = getImageModelCreditsPerRequest(model);
-
-  async function prepareDefaultKey(forceCreate = false) {
-    if (!accessToken || preparingKey) return;
-    setPreparingKey(true);
-    setCreateKeyError(null);
-    try {
-      const ensured = await ensurePlaygroundApiKey({
-        accessToken,
-        activeKeys: forceCreate ? [] : localKeys.map(toPlaygroundKeyOption),
-        preferredKeyId,
-        sessionSecrets:
-          resolvedSecret && preferredKeyId
-            ? { [preferredKeyId]: resolvedSecret }
-            : {},
-      });
-      setResolvedSecret(ensured.secret);
-      setPreferredKeyId(ensured.keyId);
-      setLocalKeys((prev) => {
-        const next: ImagePlaygroundApiKeyOption = {
-          id: ensured.key.id,
-          name: ensured.key.name,
-          prefix: ensured.key.prefix,
-          status: "active",
-          can_reveal: ensured.key.can_reveal,
-        };
-        const without = prev.filter((row) => row.id !== next.id);
-        return [next, ...without];
-      });
-      setNeedsManualCreate(false);
-      if (ensured.created) router.refresh();
-    } catch {
-      setNeedsManualCreate(true);
-      setCreateKeyError(t("dashboard.imagePlayground.noKeyBody"));
-    } finally {
-      setPreparingKey(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!accessToken || resolvedSecret) return;
-    void prepareDefaultKey(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount / token only
-  }, [accessToken]);
-
-  async function resolveApiKey(): Promise<string> {
-    if (resolvedSecret && isFullTokfaiApiKey(resolvedSecret)) {
-      return resolvedSecret;
-    }
-    if (!accessToken) {
-      throw new PlaygroundValidationError(
-        t("dashboard.imagePlayground.errors.unknown"),
-        "missing_access_token"
-      );
-    }
-    const ensured = await ensurePlaygroundApiKey({
-      accessToken,
-      activeKeys: localKeys.map(toPlaygroundKeyOption),
-      preferredKeyId,
-    });
-    setResolvedSecret(ensured.secret);
-    setPreferredKeyId(ensured.keyId);
-    setNeedsManualCreate(false);
-    if (ensured.created) router.refresh();
-    return ensured.secret;
-  }
 
   const hasUploadingImages = imageInputs.some(
     (item) => item.status === "uploading" || item.status === "resolving"
@@ -718,13 +611,6 @@ export function ImageGeneratePanel({
     });
   }, []);
 
-  function resolveApiKeyForCopy(): string | undefined {
-    if (resolvedSecret && isFullTokfaiApiKey(resolvedSecret)) {
-      return resolvedSecret;
-    }
-    return undefined;
-  }
-
   async function handleCopyApiRequest() {
     const trimmedPrompt = prompt.trim() || IMAGE_PLAYGROUND_DEFAULT_PROMPT;
     const curl = buildImageGenerationCurlOneLine(
@@ -736,8 +622,7 @@ export function ImageGeneratePanel({
         response_format: "url",
         mode: readyImageUrls.length > 0 ? "reference_edit" : "text_to_image",
         images: readyImageUrls.length > 0 ? readyImageUrls : undefined,
-      },
-      resolveApiKeyForCopy()
+      }
     );
 
     try {
@@ -843,11 +728,32 @@ export function ImageGeneratePanel({
       return;
     }
 
-    let resolvedKey: string;
-    try {
-      resolvedKey = await resolveApiKey();
-    } catch (err) {
-      setError(toPlaygroundError(err, t));
+    if (!accessToken) {
+      setError({
+        status: 401,
+        code: "not_authenticated",
+        message: t("dashboard.imageWorkbench.loginRequired"),
+      });
+      pulseResultAttention();
+      focusResultPanel("onComplete");
+      return;
+    }
+    if (!creditsLoaded) {
+      setError({
+        status: 0,
+        code: "checking_account",
+        message: t("dashboard.imageWorkbench.checkingAccount"),
+      });
+      pulseResultAttention();
+      focusResultPanel("onComplete");
+      return;
+    }
+    if ((initialCreditsBalance ?? 0) <= 0) {
+      setError({
+        status: 402,
+        code: "insufficient_credits",
+        message: t("dashboard.imageWorkbench.insufficientCredits"),
+      });
       pulseResultAttention();
       focusResultPanel("onComplete");
       return;
@@ -871,7 +777,7 @@ export function ImageGeneratePanel({
       const httpsOnly = imageUrlsForRequest.filter((url) =>
         /^https?:\/\//i.test(url)
       );
-      const payload: Parameters<typeof imageGenerationsWithProgress>[1] = {
+      const payload: Parameters<typeof consumerImageGenerationsWithProgress>[0] = {
         model,
         prompt: finalPrompt,
         size,
@@ -885,7 +791,7 @@ export function ImageGeneratePanel({
 
       setLastRequestInputCount(imageUrlsForRequest.length);
       setLastRequestMode(requestMode);
-      const res = await imageGenerationsWithProgress(resolvedKey, payload, {
+      const res = await consumerImageGenerationsWithProgress(payload, {
         onProgress: (state) => {
           if (state.status) setProgressStatus(state.status);
           if (typeof state.progress === "number") {
@@ -1001,37 +907,33 @@ export function ImageGeneratePanel({
       <div className={IMAGE_PLAYGROUND_TOOLBENCH.shell}>
         <div className={IMAGE_PLAYGROUND_TOOLBENCH.grid}>
           <div className="order-1 min-w-0 lg:col-start-2 lg:row-start-1">
-            {(needsManualCreate || createKeyError || preparingKey) && !resolvedSecret ? (
-              <div className="mb-3 flex flex-col gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-                <p className="text-sm text-muted-foreground">
-                  {createKeyError ?? t("dashboard.imagePlayground.noKeyBody")}
-                </p>
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={preparingKey || loading || !accessToken}
-                  onClick={() => void prepareDefaultKey(true)}
-                >
-                  {preparingKey
-                    ? t("dashboard.imagePlayground.creatingKey")
-                    : t("dashboard.imagePlayground.createExperienceKey")}
-                </Button>
+            {!accessToken ? (
+              <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-muted-foreground">
+                {t("dashboard.imageWorkbench.loginRequired")}
+              </div>
+            ) : !creditsLoaded ? (
+              <div className="mb-3 rounded-md border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+                {t("dashboard.imageWorkbench.checkingAccount")}
+              </div>
+            ) : (initialCreditsBalance ?? 0) <= 0 ? (
+              <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-muted-foreground">
+                {t("dashboard.imageWorkbench.insufficientCredits")}
               </div>
             ) : null}
             <ImagePlaygroundRunSettingsPanel
               hideApiKeyUi
               keyPanelView="select"
-              localKeys={localKeys}
-              selectedKey={localKeys[0] ?? null}
-              selectedKeyId={preferredKeyId ?? ""}
+              localKeys={[]}
+              selectedKey={null}
+              selectedKeyId=""
               apiKey=""
               showApiKey={false}
-              creatingKey={preparingKey}
-              createKeyError={createKeyError}
+              creatingKey={false}
+              createKeyError={null}
               createdSecret={null}
               createdBannerKeyId={null}
               loading={loading}
-              onCreateTestKey={() => void prepareDefaultKey(true)}
+              onCreateTestKey={() => {}}
               onKeyPanelViewChange={() => {}}
               onSelectedKeyChange={() => {}}
               onApiKeyChange={() => {}}
@@ -1138,6 +1040,11 @@ export function ImageGeneratePanel({
                     loading={loading}
                     hasUploadingImages={hasUploadingImages}
                     isModelComingSoon={isModelComingSoon}
+                    accountBlocked={
+                      !accessToken ||
+                      !creditsLoaded ||
+                      (initialCreditsBalance ?? 0) <= 0
+                    }
                     copyRequestStatus={copyRequestStatus}
                     generateLabel={
                       imageMode === "reference_edit"
@@ -1157,6 +1064,11 @@ export function ImageGeneratePanel({
               loading={loading}
               hasUploadingImages={hasUploadingImages}
               isModelComingSoon={isModelComingSoon}
+              accountBlocked={
+                !accessToken ||
+                !creditsLoaded ||
+                (initialCreditsBalance ?? 0) <= 0
+              }
               copyRequestStatus={copyRequestStatus}
               layout="stack"
               generateLabel={
@@ -1644,11 +1556,46 @@ function toPlaygroundError(
   }
   if (err instanceof DmitApiError) {
     const code = err.code?.toLowerCase();
-    if (code === "key_reveal_timeout") {
+    if (
+      code === "insufficient_credits" ||
+      code === "payment_required"
+    ) {
       return {
         status: err.status,
         code: err.code,
-        message: err.message,
+        message: t("dashboard.imageWorkbench.insufficientCredits"),
+      };
+    }
+    if (
+      code === "not_authenticated" ||
+      code === "missing_access_token"
+    ) {
+      return {
+        status: err.status,
+        code: err.code,
+        message: t("dashboard.imageWorkbench.loginRequired"),
+      };
+    }
+    if (
+      code === "service_unavailable" ||
+      code === "upstream_model_busy" ||
+      code === "model_busy"
+    ) {
+      return {
+        status: err.status,
+        code: err.code,
+        message: t("dashboard.imageWorkbench.serviceBusy"),
+      };
+    }
+    if (
+      code === "workbench_init_failed" ||
+      code === "invalid_create_secret" ||
+      code === "key_reveal_timeout"
+    ) {
+      return {
+        status: err.status,
+        code: err.code,
+        message: t("dashboard.imageWorkbench.initFailed"),
       };
     }
     if (

@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
-  chatCompletions,
   DmitApiError,
   extractChatAssistantText,
   extractChatCreditsCharged,
@@ -22,16 +21,15 @@ import {
   type ChatCompletionResponse,
 } from "@/lib/dashboard-safe/chat-api";
 import {
+  consumerChatCompletions,
+} from "@/lib/dashboard-safe/consumer-workbench-api";
+import {
   buildEcommerceVisionPrompt,
   defaultUseCaseForMode,
   ecommerceUseCaseLabel,
   pickEcommerceVisionModel,
   useCasesForMode,
 } from "@/lib/dashboard-safe/ecommerce-image-analysis";
-import {
-  ensurePlaygroundApiKey,
-} from "@/lib/dashboard-safe/playground-default-key";
-import { isFullTokfaiApiKey } from "@/lib/dashboard-safe/constants";
 import {
   PlaygroundImageUploadError,
   validatePlaygroundImageFile,
@@ -42,7 +40,6 @@ import {
 } from "@/lib/dashboard-safe/display-helpers";
 import { uploadPlaygroundImageAction } from "./upload-playground-image-action";
 import { useImagePlaygroundLabels } from "./use-image-playground-labels";
-import type { ImagePlaygroundApiKeyOption } from "./image-playground-client";
 import {
   distillCopyToImagePrompt,
   summarizeRecognitionForCopy,
@@ -58,15 +55,6 @@ type UploadItem = {
   status: "uploading" | "ready" | "error";
   error?: string;
 };
-
-function toKeyOption(key: ImagePlaygroundApiKeyOption) {
-  return {
-    id: key.id,
-    name: key.name,
-    prefix: key.prefix,
-    can_reveal: key.can_reveal !== false,
-  };
-}
 
 function isTimeoutLikeError(err: unknown): boolean {
   if (err instanceof DmitApiError) {
@@ -91,7 +79,6 @@ function isTimeoutLikeError(err: unknown): boolean {
 export function EcommerceVisionTab({
   mode,
   accessToken,
-  activeKeys,
   initialCreditsBalance = null,
   creditsLoaded = false,
   handoffKey = 0,
@@ -103,7 +90,6 @@ export function EcommerceVisionTab({
 }: {
   mode: VisionMode;
   accessToken: string;
-  activeKeys: ImagePlaygroundApiKeyOption[];
   initialCreditsBalance?: number | null;
   creditsLoaded?: boolean;
   handoffKey?: number;
@@ -126,15 +112,6 @@ export function EcommerceVisionTab({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isCopyMode = mode === "product_copy";
 
-  const [localKeys, setLocalKeys] = useState(activeKeys);
-  const [resolvedSecret, setResolvedSecret] = useState<string | null>(null);
-  const [preferredKeyId, setPreferredKeyId] = useState<string | null>(
-    activeKeys[0]?.id ?? null
-  );
-  const [preparingKey, setPreparingKey] = useState(false);
-  const [keyError, setKeyError] = useState<string | null>(null);
-  const [needsCreate, setNeedsCreate] = useState(() => activeKeys.length === 0);
-
   const [useCase, setUseCase] = useState(() => defaultUseCaseForMode(mode));
   const [extraNeed, setExtraNeed] = useState(initialExtraNeed ?? "");
   const [images, setImages] = useState<UploadItem[]>([]);
@@ -149,6 +126,16 @@ export function EcommerceVisionTab({
     .filter((item) => item.status === "ready" && item.url)
     .map((item) => item.url);
   const visionModel = pickEcommerceVisionModel();
+  const signedIn = Boolean(accessToken);
+  const balance = initialCreditsBalance ?? 0;
+  const insufficientCredits = creditsLoaded && balance <= 0;
+  const checkingAccount = signedIn && !creditsLoaded;
+  const runDisabled =
+    loading ||
+    readyUrls.length === 0 ||
+    !signedIn ||
+    checkingAccount ||
+    insufficientCredits;
 
   useEffect(() => {
     setUseCase(defaultUseCaseForMode(mode));
@@ -173,75 +160,6 @@ export function EcommerceVisionTab({
       setExtraNeed(initialExtraNeed);
     }
   }, [handoffKey, initialImageUrl, initialImageLabel, initialExtraNeed]);
-
-  useEffect(() => {
-    setLocalKeys(activeKeys);
-    if (activeKeys.length > 0) {
-      setNeedsCreate(false);
-      setPreferredKeyId((prev) => prev ?? activeKeys[0].id);
-    }
-  }, [activeKeys]);
-
-  async function prepareKey(forceCreate = false) {
-    if (!accessToken || preparingKey) return;
-    setPreparingKey(true);
-    setKeyError(null);
-    try {
-      const ensured = await ensurePlaygroundApiKey({
-        accessToken,
-        activeKeys: forceCreate ? [] : localKeys.map(toKeyOption),
-        preferredKeyId,
-        sessionSecrets:
-          resolvedSecret && preferredKeyId
-            ? { [preferredKeyId]: resolvedSecret }
-            : {},
-      });
-      setResolvedSecret(ensured.secret);
-      setPreferredKeyId(ensured.keyId);
-      setLocalKeys((prev) => {
-        const next: ImagePlaygroundApiKeyOption = {
-          id: ensured.key.id,
-          name: ensured.key.name,
-          prefix: ensured.key.prefix,
-          status: "active",
-          can_reveal: ensured.key.can_reveal,
-        };
-        return [next, ...prev.filter((row) => row.id !== next.id)];
-      });
-      setNeedsCreate(false);
-      if (ensured.created) router.refresh();
-    } catch {
-      setNeedsCreate(true);
-      setKeyError(t("dashboard.imageWorkbench.keyPrepareFailed"));
-    } finally {
-      setPreparingKey(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!accessToken || resolvedSecret) return;
-    void prepareKey(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken]);
-
-  async function resolveKey(): Promise<string> {
-    if (resolvedSecret && isFullTokfaiApiKey(resolvedSecret)) {
-      return resolvedSecret;
-    }
-    if (!accessToken) {
-      throw new Error(t("dashboard.imageWorkbench.keyPrepareFailed"));
-    }
-    const ensured = await ensurePlaygroundApiKey({
-      accessToken,
-      activeKeys: localKeys.map(toKeyOption),
-      preferredKeyId,
-    });
-    setResolvedSecret(ensured.secret);
-    setPreferredKeyId(ensured.keyId);
-    setNeedsCreate(false);
-    if (ensured.created) router.refresh();
-    return ensured.secret;
-  }
 
   const uploadFiles = useCallback(
     async (files: File[]) => {
@@ -306,6 +224,18 @@ export function EcommerceVisionTab({
     setTechnicalError(null);
     setResult(null);
 
+    if (!signedIn) {
+      setError(t("dashboard.imageWorkbench.loginRequired"));
+      return;
+    }
+    if (checkingAccount) {
+      setError(t("dashboard.imageWorkbench.checkingAccount"));
+      return;
+    }
+    if (insufficientCredits) {
+      setError(t("dashboard.imageWorkbench.insufficientCredits"));
+      return;
+    }
     if (readyUrls.length === 0) {
       setError(t("dashboard.imageWorkbench.needImage"));
       return;
@@ -313,14 +243,13 @@ export function EcommerceVisionTab({
 
     setLoading(true);
     try {
-      const apiKey = await resolveKey();
       const prompt = buildEcommerceVisionPrompt({
         mode,
         useCase,
         extraNeed,
       });
 
-      const res = await chatCompletions(apiKey, {
+      const res = await consumerChatCompletions({
         model: visionModel,
         stream: false,
         messages: [
@@ -339,6 +268,8 @@ export function EcommerceVisionTab({
       setResult(res);
       router.refresh();
     } catch (err) {
+      const code =
+        err instanceof DmitApiError ? (err.code ?? "").toLowerCase() : "";
       const technical =
         err instanceof DmitApiError
           ? `${err.code ?? "error"} · ${err.message}`
@@ -346,7 +277,15 @@ export function EcommerceVisionTab({
             ? err.message
             : t("dashboard.imageWorkbench.analyzeFailed");
       setTechnicalError(technical);
-      if (isTimeoutLikeError(err)) {
+      if (code === "insufficient_credits" || code === "payment_required") {
+        setError(t("dashboard.imageWorkbench.insufficientCredits"));
+      } else if (code === "not_authenticated" || code === "missing_access_token") {
+        setError(t("dashboard.imageWorkbench.loginRequired"));
+      } else if (code.includes("busy") || code === "service_unavailable") {
+        setError(t("dashboard.imageWorkbench.serviceBusy"));
+      } else if (code === "workbench_init_failed" || code === "invalid_create_secret") {
+        setError(t("dashboard.imageWorkbench.initFailed"));
+      } else if (isTimeoutLikeError(err)) {
         setError(t("dashboard.imageWorkbench.timeoutFriendly"));
       } else {
         setError(
@@ -436,22 +375,17 @@ export function EcommerceVisionTab({
           <CardDescription>{t(descKey)}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          {(needsCreate || keyError || preparingKey) && !resolvedSecret ? (
-            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-3">
-              <p className="text-sm text-muted-foreground">
-                {keyError ?? t("dashboard.imageWorkbench.noKeyBody")}
-              </p>
-              <Button
-                type="button"
-                size="sm"
-                className="mt-2"
-                disabled={preparingKey || !accessToken}
-                onClick={() => void prepareKey(true)}
-              >
-                {preparingKey
-                  ? t("dashboard.imageWorkbench.creatingKey")
-                  : t("dashboard.imageWorkbench.createKey")}
-              </Button>
+          {!signedIn ? (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-3 text-sm text-muted-foreground">
+              {t("dashboard.imageWorkbench.loginRequired")}
+            </div>
+          ) : checkingAccount ? (
+            <div className="rounded-md border bg-muted/20 px-3 py-3 text-sm text-muted-foreground">
+              {t("dashboard.imageWorkbench.checkingAccount")}
+            </div>
+          ) : insufficientCredits ? (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-3 text-sm text-muted-foreground">
+              {t("dashboard.imageWorkbench.insufficientCredits")}
             </div>
           ) : null}
 
@@ -560,7 +494,7 @@ export function EcommerceVisionTab({
 
           <Button
             type="button"
-            disabled={loading || readyUrls.length === 0}
+            disabled={runDisabled}
             onClick={() => void handleRun()}
             className="w-full"
           >

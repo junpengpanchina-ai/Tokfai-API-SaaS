@@ -527,6 +527,8 @@ export interface ImagePlaygroundGenerateActionsProps {
   loading: boolean;
   hasUploadingImages: boolean;
   isModelComingSoon: boolean;
+  /** Session/balance gate — true when login missing, checking, or no credits. */
+  accountBlocked?: boolean;
   copyRequestStatus: "idle" | "copied";
   layout?: "row" | "stack";
   generateLabel?: string;
@@ -540,6 +542,7 @@ export function ImagePlaygroundGenerateActions({
   loading,
   hasUploadingImages,
   isModelComingSoon,
+  accountBlocked = false,
   copyRequestStatus,
   layout = "row",
   generateLabel,
@@ -559,7 +562,9 @@ export function ImagePlaygroundGenerateActions({
     <div className={layoutClass}>
       <Button
         type="submit"
-        disabled={loading || hasUploadingImages || isModelComingSoon}
+        disabled={
+          loading || hasUploadingImages || isModelComingSoon || accountBlocked
+        }
         className={`w-full font-medium shadow-sm sm:w-auto ${layout === "stack" ? "h-10" : IMAGE_PLAYGROUND_TOOLBENCH.control}`}
       >
         {loading ? (

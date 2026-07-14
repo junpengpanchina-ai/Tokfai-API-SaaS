@@ -45,12 +45,20 @@ const EN: Record<string, string> = {
   "dashboard.imageWorkbench.uploadFailed": "Image upload failed. Try again.",
   "dashboard.imageWorkbench.analyzeFailed":
     "This attempt did not complete. Failed calls are usually not charged. Try simplifying the request and retry.",
+  "dashboard.imageWorkbench.checkingAccount": "Checking account status…",
+  "dashboard.imageWorkbench.insufficientCredits":
+    "Not enough credits. Please top up first.",
+  "dashboard.imageWorkbench.serviceBusy":
+    "The service is busy right now. Please try again shortly.",
+  "dashboard.imageWorkbench.initFailed":
+    "Image service failed to start. Please refresh and retry.",
+  "dashboard.imageWorkbench.loginRequired": "Please sign in to continue.",
   "dashboard.imageWorkbench.noKeyBody":
-    "We're preparing your experience key. Refresh or try again in a moment.",
+    "Image service failed to start. Please refresh and retry.",
   "dashboard.imageWorkbench.createKey": "Try again",
   "dashboard.imageWorkbench.creatingKey": "Preparing…",
   "dashboard.imageWorkbench.keyPrepareFailed":
-    "We're preparing your experience key. Refresh or try again in a moment.",
+    "Image service failed to start. Please refresh and retry.",
   "dashboard.imageWorkbench.tabAnalysisDesc":
     "Understand the image — product type, audience, selling points, risks, and platform suggestions. Does not generate images.",
   "dashboard.imageWorkbench.tabCopyDesc":
@@ -140,7 +148,7 @@ const EN: Record<string, string> = {
   "dashboard.playground.copySecret": "Copy secret",
   "dashboard.playground.copied": "Copied",
   "dashboard.playground.apiKeyLoadTimedOut":
-    "We're preparing your experience key. Refresh or try again in a moment.",
+    "Image service failed to start. Please refresh and retry.",
 
   "dashboard.imagePlayground.title": "Create or edit images",
   "dashboard.imagePlayground.toolbenchSubtitle":
@@ -248,7 +256,7 @@ const EN: Record<string, string> = {
   "dashboard.imagePlayground.createExperienceKey": "Try again",
   "dashboard.imagePlayground.creatingKey": "Preparing…",
   "dashboard.imagePlayground.noKeyBody":
-    "We're preparing your experience key. Refresh or try again in a moment.",
+    "Image service failed to start. Please refresh and retry.",
   "dashboard.imagePlayground.continueGenerate": "Generate again",
   "dashboard.imagePlayground.technicalDetails": "Details",
   "dashboard.imagePlayground.presetProduct": "Product shot",
@@ -264,13 +272,13 @@ const EN: Record<string, string> = {
   "dashboard.imagePlayground.presetPosterPrompt":
     "Create a modern promotional poster with bold composition, clean typography space, premium commercial style.",
   "dashboard.imagePlayground.errors.missingToken":
-    "We're preparing your experience key. Refresh or try again in a moment.",
+    "Please sign in to continue.",
   "dashboard.imagePlayground.errors.invalidToken":
-    "We're preparing your experience key. Refresh or try again in a moment.",
+    "Please sign in again, then retry.",
   "dashboard.imagePlayground.errors.invalidOrMissingToken":
-    "We're preparing your experience key. Refresh or try again in a moment.",
+    "Please sign in again, then retry.",
   "dashboard.imagePlayground.errors.insufficientCredits":
-    "Not enough credits. Add credits first.",
+    "Not enough credits. Please top up first.",
   "dashboard.imagePlayground.errors.upstreamTimeout":
     "This attempt did not complete. Failed calls are usually not charged. Try simplifying the request and retry.",
   "dashboard.imagePlayground.errors.upstreamError":
@@ -279,7 +287,7 @@ const EN: Record<string, string> = {
     "This attempt did not complete. Failed calls are usually not charged. Try simplifying the request and retry.",
   "dashboard.imagePlayground.errors.missingPrompt": "Please enter a prompt.",
   "dashboard.imagePlayground.errors.keyNotRetrievable":
-    "We're preparing your experience key. Refresh or try again in a moment.",
+    "Image service failed to start. Please refresh and retry.",
   "dashboard.imagePlayground.errors.unknown":
     "This attempt did not complete. Failed calls are usually not charged. Try simplifying the request and retry.",
   "dashboard.imagePlayground.errors.pageImageNotFound":
@@ -332,12 +340,16 @@ const ZH: Record<string, string> = {
   "dashboard.imageWorkbench.uploadFailed": "图片上传失败，请重试。",
   "dashboard.imageWorkbench.analyzeFailed":
     "这次没有成功，通常不会扣费。你可以简化需求后重试。",
-  "dashboard.imageWorkbench.noKeyBody":
-    "系统正在准备体验密钥，请刷新或稍后重试。",
+  "dashboard.imageWorkbench.checkingAccount": "正在检查账户状态",
+  "dashboard.imageWorkbench.insufficientCredits": "余额不足，请先充值",
+  "dashboard.imageWorkbench.serviceBusy": "服务暂时繁忙，请稍后重试",
+  "dashboard.imageWorkbench.initFailed": "图片服务初始化失败，请刷新重试",
+  "dashboard.imageWorkbench.loginRequired": "请先登录后再使用图片工作台",
+  "dashboard.imageWorkbench.noKeyBody": "图片服务初始化失败，请刷新重试",
   "dashboard.imageWorkbench.createKey": "重试",
   "dashboard.imageWorkbench.creatingKey": "准备中…",
   "dashboard.imageWorkbench.keyPrepareFailed":
-    "系统正在准备体验密钥，请刷新或稍后重试。",
+    "图片服务初始化失败，请刷新重试",
   "dashboard.imageWorkbench.tabAnalysisDesc":
     "理解图片内容、商品类型、人群、卖点、风险与平台建议。不生成图片。",
   "dashboard.imageWorkbench.tabCopyDesc":
@@ -424,7 +436,7 @@ const ZH: Record<string, string> = {
   "dashboard.playground.copySecret": "复制密钥",
   "dashboard.playground.copied": "已复制",
   "dashboard.playground.apiKeyLoadTimedOut":
-    "系统正在准备体验密钥，请刷新或稍后重试。",
+    "图片服务初始化失败，请刷新重试",
 
   "dashboard.imagePlayground.title": "生成 / 改图",
   "dashboard.imagePlayground.toolbenchSubtitle":
@@ -528,8 +540,7 @@ const ZH: Record<string, string> = {
   "dashboard.imagePlayground.resolvingShort": "解析中…",
   "dashboard.imagePlayground.createExperienceKey": "重试",
   "dashboard.imagePlayground.creatingKey": "准备中…",
-  "dashboard.imagePlayground.noKeyBody":
-    "系统正在准备体验密钥，请刷新或稍后重试。",
+  "dashboard.imagePlayground.noKeyBody": "图片服务初始化失败，请刷新重试",
   "dashboard.imagePlayground.continueGenerate": "再生成一次",
   "dashboard.imagePlayground.technicalDetails": "详情",
   "dashboard.imagePlayground.presetProduct": "产品图",
@@ -544,14 +555,10 @@ const ZH: Record<string, string> = {
     "生成一张精致的电商主图，产品在极简棚拍背景上，商业级布光。",
   "dashboard.imagePlayground.presetPosterPrompt":
     "生成一张现代宣传海报，构图醒目，预留清晰排版空间，高级商业风格。",
-  "dashboard.imagePlayground.errors.missingToken":
-    "系统正在准备体验密钥，请刷新或稍后重试。",
-  "dashboard.imagePlayground.errors.invalidToken":
-    "系统正在准备体验密钥，请刷新或稍后重试。",
-  "dashboard.imagePlayground.errors.invalidOrMissingToken":
-    "系统正在准备体验密钥，请刷新或稍后重试。",
-  "dashboard.imagePlayground.errors.insufficientCredits":
-    "余额不足，请先充值算力积分。",
+  "dashboard.imagePlayground.errors.missingToken": "请先登录后再使用图片工作台",
+  "dashboard.imagePlayground.errors.invalidToken": "请重新登录后再试",
+  "dashboard.imagePlayground.errors.invalidOrMissingToken": "请重新登录后再试",
+  "dashboard.imagePlayground.errors.insufficientCredits": "余额不足，请先充值",
   "dashboard.imagePlayground.errors.upstreamTimeout":
     "这次没有成功，通常不会扣费。你可以简化需求后重试。",
   "dashboard.imagePlayground.errors.upstreamError":
@@ -560,7 +567,7 @@ const ZH: Record<string, string> = {
     "这次没有成功，通常不会扣费。你可以简化需求后重试。",
   "dashboard.imagePlayground.errors.missingPrompt": "请输入描述。",
   "dashboard.imagePlayground.errors.keyNotRetrievable":
-    "系统正在准备体验密钥，请刷新或稍后重试。",
+    "图片服务初始化失败，请刷新重试",
   "dashboard.imagePlayground.errors.unknown":
     "这次没有成功，通常不会扣费。你可以简化需求后重试。",
   "dashboard.imagePlayground.errors.pageImageNotFound":

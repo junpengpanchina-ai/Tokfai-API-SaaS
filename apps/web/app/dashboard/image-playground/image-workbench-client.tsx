@@ -3,10 +3,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import {
-  ImageGeneratePanel,
-  type ImagePlaygroundApiKeyOption,
-} from "./image-playground-client";
+import { ImageGeneratePanel } from "./image-playground-client";
 import { EcommerceVisionTab } from "./ecommerce-vision-tab";
 import { useImagePlaygroundLabels } from "./use-image-playground-labels";
 
@@ -22,13 +19,11 @@ export type WorkbenchHandoff = {
 
 export function ImagePlaygroundClient({
   accessToken,
-  activeKeys,
   initialModel,
   initialCreditsBalance = null,
   creditsLoaded = false,
 }: {
   accessToken: string;
-  activeKeys: ImagePlaygroundApiKeyOption[];
   initialModel?: string;
   initialCreditsBalance?: number | null;
   creditsLoaded?: boolean;
@@ -96,7 +91,6 @@ export function ImagePlaygroundClient({
         <EcommerceVisionTab
           mode="ecommerce_image_analysis"
           accessToken={accessToken}
-          activeKeys={activeKeys}
           initialCreditsBalance={initialCreditsBalance}
           creditsLoaded={creditsLoaded}
           onGoToCopy={(payload) => {
@@ -121,7 +115,6 @@ export function ImagePlaygroundClient({
         <EcommerceVisionTab
           mode="product_copy"
           accessToken={accessToken}
-          activeKeys={activeKeys}
           initialCreditsBalance={initialCreditsBalance}
           creditsLoaded={creditsLoaded}
           handoffKey={handoff.key}
@@ -142,7 +135,6 @@ export function ImagePlaygroundClient({
       {tab === "generate" ? (
         <ImageGeneratePanel
           accessToken={accessToken}
-          activeKeys={activeKeys}
           initialModel={initialModel}
           initialCreditsBalance={initialCreditsBalance}
           creditsLoaded={creditsLoaded}
@@ -155,5 +147,3 @@ export function ImagePlaygroundClient({
     </div>
   );
 }
-
-export type { ImagePlaygroundApiKeyOption };
