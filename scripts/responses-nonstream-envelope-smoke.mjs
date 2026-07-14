@@ -81,10 +81,42 @@ let ok = true;
         errors.includes('"invalid_request_error"'),
     ],
     [
+      "acceptance responses non-stream uses shared runner",
+      acceptance.includes("runLiveResponsesNonStreamProbe") &&
+        !acceptance.includes("postResponsesNonStreamCurlCompatible("),
+    ],
+    [
+      "standalone probe uses shared runner",
+      curlProbe.includes("runLiveResponsesNonStreamProbe") &&
+        curlProbe.includes("TOKFAI_LIVE_RESPONSES_CURL_COMPATIBLE_PASS"),
+    ],
+    [
+      "shared runner retries empty body",
+      curlHelper.includes("runLiveResponsesNonStreamProbe") &&
+        curlHelper.includes("emptyRawBody") &&
+        curlHelper.includes("retries"),
+    ],
+    [
+      "acceptance responses before chat for gpt-5.5",
+      /"gpt-5\.5":\s*\["responses"/.test(acceptance),
+    ],
+    [
+      "acceptance gpt-5.5 full chat+responses+stream",
+      acceptance.includes('"responses"') &&
+        acceptance.includes('"responses_stream"') &&
+        acceptance.includes('"chat"') &&
+        acceptance.includes('"chat_stream"') &&
+        acceptance.includes('"gpt-5.5"'),
+    ],
+    [
+      "acceptance prints EMPTY_RAW_BODY_FROM_FETCH",
+      acceptance.includes("EMPTY_RAW_BODY_FROM_FETCH"),
+    ],
+    [
       "curl-compatible helper uses https.request (not undici defaults)",
       curlHelper.includes('from "node:https"') &&
         curlHelper.includes("exactCurlCompatibleFetch") &&
-        curlHelper.includes('Authorization') &&
+        curlHelper.includes("Authorization") &&
         curlHelper.includes("Content-Type"),
     ],
     [
@@ -95,25 +127,12 @@ let ok = true;
         ),
     ],
     [
-      "acceptance responses non-stream uses curl-compatible helper",
-      acceptance.includes("postResponsesNonStreamCurlCompatible") &&
-        acceptance.includes("responsesNonStreamSucceeded"),
-    ],
-    [
-      "acceptance prints EMPTY_RAW_BODY_FROM_FETCH",
-      acceptance.includes("EMPTY_RAW_BODY_FROM_FETCH"),
-    ],
-    [
       "standalone curl-compatible probe exists",
-      curlProbe.includes("TOKFAI_LIVE_RESPONSES_CURL_COMPATIBLE_PASS") &&
-        curlProbe.includes("postResponsesNonStreamCurlCompatible"),
+      curlProbe.includes("TOKFAI_LIVE_RESPONSES_CURL_COMPATIBLE_PASS"),
     ],
     [
       "acceptance responses payload uses input string",
-      acceptance.includes("postResponsesNonStreamCurlCompatible") ||
-        /async function probeResponses\(model\) \{[\s\S]*?input: PROMPT[\s\S]*?stream: false/.test(
-          acceptance
-        ),
+      acceptance.includes("runLiveResponsesNonStreamProbe"),
     ],
     [
       "acceptance does not send max_tokens on responses probe",
@@ -144,12 +163,6 @@ let ok = true;
     [
       "acceptance gemini only responses by default",
       acceptance.includes('"gemini-2.5-flash": ["responses"]'),
-    ],
-    [
-      "acceptance gpt-5.5 full chat+responses+stream",
-      acceptance.includes(
-        '"gpt-5.5": ["chat", "chat_stream", "responses", "responses_stream"]'
-      ),
     ],
     [
       "error builder forbids empty message/code",

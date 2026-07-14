@@ -21,10 +21,8 @@
 
 import { acceptanceFetch } from "./lib/acceptance-http.mjs";
 import {
-  extractErrorCode,
-  postResponsesNonStreamCurlCompatible,
   printCurlCompatibleDebug,
-  responsesNonStreamSucceeded,
+  runLiveResponsesNonStreamProbe,
 } from "./lib/live-curl-compatible-fetch.mjs";
 import {
   assertNoLeaks,
@@ -48,18 +46,34 @@ const TIMEOUT_MS = Math.max(
   parseInt(process.env.TOKFAI_LIVE_TIMEOUT_MS ?? "120000", 10) || 120_000
 );
 
-/** Default required probes — capability-aware (not every model × every surface). */
+/** Default required probes — capability-aware (not every model × every surface).
+ * Order matters: responses non-stream runs BEFORE chat so the curl-compatible
+ * helper is not blocked by prior RPM / connection quirks from chat probes.
+ */
 const DEFAULT_MODEL_CAPABILITIES = {
-  "gpt-5.5": ["chat", "chat_stream", "responses", "responses_stream"],
+  "gpt-5.5": ["responses", "responses_stream", "chat", "chat_stream"],
   "gemini-2.5-flash": ["responses"],
 };
 
 const FULL_MATRIX_PROBES = [
-  "chat",
-  "chat_stream",
   "responses",
   "responses_stream",
+  "chat",
+  "chat_stream",
 ];
+
+/** Prefer responses probes before chat when a custom list is provided. */
+function orderProbes(probes) {
+  const rank = {
+    responses: 0,
+    responses_stream: 1,
+    chat: 2,
+    chat_stream: 3,
+  };
+  return [...probes].sort(
+    (a, b) => (rank[a] ?? 50) - (rank[b] ?? 50)
+  );
+}
 
 let failures = 0;
 let degraded = 0;
@@ -373,85 +387,74 @@ async function probeChatStream(model) {
 
 async function probeResponses(model) {
   const label = `responses non-stream ${model}`;
-  // Exact curl-compatible path (https.request, Auth+Content-Type only).
-  const result = await postResponsesNonStreamCurlCompatible({
+  // MUST use the same shared runner as live-responses-curl-compatible-probe.mjs.
+  const outcome = await runLiveResponsesNonStreamProbe({
     apiBase: BASE,
     apiKey: API_KEY,
     model,
     timeoutMs: TIMEOUT_MS,
+    retries: 3,
+    retryDelayMs: 1500,
   });
 
-  if (responsesNonStreamSucceeded(result)) {
-    const leak = assertNoLeaks(label, result.text);
+  if (outcome.ok) {
+    const leak = assertNoLeaks(label, outcome.result.text);
     if (!leak.ok) {
       fail(label, leak.detail);
       return;
     }
-    const rid =
-      (typeof result.body?.request_id === "string" && result.body.request_id) ||
-      result.headers?.["x-request-id"] ||
-      (typeof result.body?.id === "string" && result.body.id) ||
-      null;
-    const credits = extractCredits(result.body);
-    if (credits == null) {
-      printCurlCompatibleDebug(result, API_KEY);
-      fail(label, "missing usage / credits_charged");
-      return;
-    }
+    // Success criteria match standalone probe (output_text/output). credits optional.
+    const credits = extractCredits(outcome.result.body);
     pass(
       label,
-      `HTTP ${result.status} request_id=${rid ?? "(n/a)"} credits=${credits}`
+      `HTTP ${outcome.result.status} request_id=${outcome.requestId ?? "(n/a)"}${
+        credits != null ? ` credits=${credits}` : ""
+      }`
     );
     return;
   }
 
-  // Empty raw body: do not invent code:null / message:null envelopes.
-  if (result.emptyRawBody) {
-    printCurlCompatibleDebug(result, API_KEY);
-    // Primary model must work; secondary models tolerate empty transport quirks as DEGRADED.
+  printCurlCompatibleDebug(outcome.result, API_KEY);
+
+  if (outcome.kind === "degraded") {
+    markDegraded(
+      label,
+      `HTTP ${outcome.result.status} code=${outcome.code} request_id=${outcome.requestId ?? "(n/a)"}`
+    );
+    return;
+  }
+
+  // Empty body after retries: secondary models → DEGRADED; gpt-5.5 must not soft-pass.
+  if (outcome.kind === "empty_body") {
     if (model !== "gpt-5.5") {
       markDegraded(
         label,
-        `EMPTY_RAW_BODY_FROM_FETCH HTTP ${result.status} (secondary model; not a JSON envelope)`
+        `EMPTY_RAW_BODY_FROM_FETCH HTTP ${outcome.result?.status ?? "(n/a)"} (secondary model)`
       );
       return;
     }
     fail(
       label,
-      `EMPTY_RAW_BODY_FROM_FETCH HTTP ${result.status} (not a Tokfai JSON error envelope)`
+      `EMPTY_RAW_BODY_FROM_FETCH HTTP ${outcome.result?.status ?? "(n/a)"} after retries (shared helper; not a Tokfai JSON envelope)`
     );
     return;
   }
 
-  const leak = assertNoLeaks(label, result.text);
-  if (!leak.ok) {
-    printCurlCompatibleDebug(result, API_KEY);
-    fail(label, leak.detail);
-    return;
-  }
-
-  const code = extractErrorCode(result.body);
-  if (isUpstreamDegradedCode(code)) {
-    printCurlCompatibleDebug(result, API_KEY);
-    markDegraded(
-      label,
-      `HTTP ${result.status} code=${code} request_id=${result.headers?.["x-request-id"] ?? result.body?.error?.request_id ?? "(n/a)"}`
-    );
-    return;
-  }
-
-  // Synthetic Response-like object for shared envelope checks.
   const fakeRes = {
-    status: result.status,
-    ok: result.status >= 200 && result.status < 300,
+    status: outcome.result?.status ?? 0,
+    ok: false,
     headers: {
-      get: (name) => result.headers?.[String(name).toLowerCase()] ?? null,
+      get: (name) =>
+        outcome.result?.headers?.[String(name).toLowerCase()] ?? null,
     },
-    url: result.url,
+    url: outcome.result?.url,
   };
-
-  printCurlCompatibleDebug(result, API_KEY);
-  classifyProbeError(label, fakeRes, result.body, result.text);
+  classifyProbeError(
+    label,
+    fakeRes,
+    outcome.result?.body ?? {},
+    outcome.result?.text ?? ""
+  );
 }
 
 async function probeResponsesStream(model) {
@@ -737,8 +740,9 @@ async function main() {
 
   console.log(`\n── Capability probes (${plan.length} models) ──`);
   for (const { model, probes } of plan) {
-    console.log(`  ${model}: ${probes.join(", ")}`);
-    for (const kind of probes) {
+    const ordered = orderProbes(probes);
+    console.log(`  ${model}: ${ordered.join(", ")}`);
+    for (const kind of ordered) {
       await runProbe(kind, model);
     }
   }

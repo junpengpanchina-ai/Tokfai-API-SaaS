@@ -2,6 +2,9 @@
 /**
  * Node probe that replicates verified curl for POST /v1/responses (non-stream).
  *
+ * Uses the SAME shared runner as public-beta-live-acceptance.mjs:
+ *   runLiveResponsesNonStreamProbe()
+ *
  * Usage:
  *   TOKFAI_API_KEY=sk-tokfai_xxx node scripts/live-responses-curl-compatible-probe.mjs
  *
@@ -12,9 +15,8 @@
 import {
   LIVE_RESPONSES_PROMPT,
   maskApiKeyShort,
-  postResponsesNonStreamCurlCompatible,
   printCurlCompatibleDebug,
-  responsesNonStreamSucceeded,
+  runLiveResponsesNonStreamProbe,
 } from "./lib/live-curl-compatible-fetch.mjs";
 import { normalizeApiBase } from "./lib/public-beta-live-helpers.mjs";
 
@@ -39,34 +41,30 @@ async function main() {
     process.exit(1);
   }
 
-  const result = await postResponsesNonStreamCurlCompatible({
+  const outcome = await runLiveResponsesNonStreamProbe({
     apiBase: BASE,
     apiKey: API_KEY,
     model: MODEL,
     timeoutMs: TIMEOUT_MS,
+    retries: 3,
   });
 
-  if (responsesNonStreamSucceeded(result)) {
+  if (outcome.ok) {
     const outputText =
-      typeof result.body?.output_text === "string"
-        ? result.body.output_text.slice(0, 80)
+      typeof outcome.result.body?.output_text === "string"
+        ? outcome.result.body.output_text.slice(0, 80)
         : "(output present)";
-    const rid =
-      result.body?.request_id ??
-      result.headers?.["x-request-id"] ??
-      result.body?.id ??
-      "(n/a)";
     console.log(
-      `PASS  responses non-stream ${MODEL} — HTTP ${result.status} request_id=${rid} output_text=${JSON.stringify(outputText)}`
+      `PASS  responses non-stream ${MODEL} — HTTP ${outcome.result.status} request_id=${outcome.requestId ?? "(n/a)"} output_text=${JSON.stringify(outputText)}`
     );
     console.log("TOKFAI_LIVE_RESPONSES_CURL_COMPATIBLE_PASS");
     process.exit(0);
   }
 
-  printCurlCompatibleDebug(result, API_KEY);
+  printCurlCompatibleDebug(outcome.result, API_KEY);
   console.error(
-    `\nFAIL  responses non-stream ${MODEL} — HTTP ${result.status}` +
-      (result.emptyRawBody ? " EMPTY_RAW_BODY_FROM_FETCH" : "")
+    `\nFAIL  responses non-stream ${MODEL} — kind=${outcome.kind} HTTP ${outcome.result?.status ?? "(n/a)"}` +
+      (outcome.result?.emptyRawBody ? " EMPTY_RAW_BODY_FROM_FETCH" : "")
   );
   process.exit(1);
 }
