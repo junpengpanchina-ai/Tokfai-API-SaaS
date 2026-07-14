@@ -6,10 +6,20 @@ import { formatIsoDateTimeUtc } from "./format-helpers";
 type DashboardSemanticTone = "success" | "destructive" | "warning" | "muted";
 
 const INTEGER = new Intl.NumberFormat("en-US");
+/** Usage / ledger amounts — up to 6 decimal places, trim trailing zeros. */
 const CREDITS_DECIMAL = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 0,
   maximumFractionDigits: 6,
 });
+/** Balance cards — up to 2 decimal places. */
+const CREDITS_BALANCE = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
+
+function creditsUnitForLocale(locale: "en" | "zh"): string {
+  return locale === "zh" ? "算力积分" : "compute credits";
+}
 
 const USAGE_IMAGE_MODEL_IDS = new Set([
   "gpt-image-2",
@@ -106,24 +116,23 @@ export function dashboardFormatDateTime(iso: string | null | undefined): string 
   return formatIsoDateTimeUtc(iso, iso ?? "—");
 }
 
-/** Balance card style — matches format.ts formatCredits output. */
+/** Balance / summary cards — max 2 decimal places + locale unit. */
 export function dashboardFormatBalanceCredits(
   value: number | null | undefined,
   locale: "en" | "zh" = "en"
 ): string {
-  const amount = CREDITS_DECIMAL.format(value ?? 0);
-  void locale;
-  return `${amount} 算力积分`;
+  const amount = CREDITS_BALANCE.format(value ?? 0);
+  return `${amount} ${creditsUnitForLocale(locale)}`;
 }
 
+/** Usage / charged amounts — max 6 decimal places + locale unit. */
 export function dashboardFormatCreditsWithSuffix(
   value: number | string | null | undefined,
   locale: "en" | "zh" = "en"
 ): string {
   const amount = dashboardFormatCreditsDecimal(value);
   if (amount === "—") return "—";
-  void locale;
-  return `${amount} 算力积分`;
+  return `${amount} ${creditsUnitForLocale(locale)}`;
 }
 
 export function dashboardFormatDate(iso: string | null | undefined): string {
@@ -213,11 +222,12 @@ export function dashboardGetUsageKind(
 
 export function dashboardFormatUsageCredits(
   row: DashboardUsageLogRow,
-  _kind: DashboardUsageKind
+  _kind: DashboardUsageKind,
+  locale: "en" | "zh" = "en"
 ): string {
   const n = dashboardSafeNumber(row.credits_charged);
   if (n == null) return "—";
-  return dashboardFormatCreditsWithSuffix(n);
+  return dashboardFormatCreditsWithSuffix(n, locale);
 }
 
 export function dashboardFormatUsageTokenCell(

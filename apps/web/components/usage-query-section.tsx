@@ -73,7 +73,7 @@ export function UsageQuerySection({
 }: {
   apiKeys: UsageApiKeyOption[];
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const defaults = useMemo(() => defaultDateRange(), []);
 
   const [startDate, setStartDate] = useState(defaults.startDate);
@@ -242,6 +242,7 @@ export function UsageQuerySection({
             result={queryState.result}
             requestIdFilter={requestId.trim()}
             t={t}
+            locale={locale}
           />
         ) : null}
       </CardContent>
@@ -253,10 +254,12 @@ function QueryResults({
   result,
   requestIdFilter,
   t,
+  locale,
 }: {
   result: MeUsageSummaryResponse;
   requestIdFilter: string;
   t: (key: string) => string;
+  locale: "en" | "zh";
 }) {
   const { summary, data } = result;
   const filteredData = requestIdFilter
@@ -284,7 +287,10 @@ function QueryResults({
         />
         <AdminStatCard
           label={t("dashboard.usage.creditsCharged")}
-          value={dashboardFormatCreditsWithSuffix(summary.total_credits_charged)}
+          value={dashboardFormatCreditsWithSuffix(
+            summary.total_credits_charged,
+            locale
+          )}
         />
       </div>
 
@@ -296,7 +302,7 @@ function QueryResults({
       </div>
 
       {filteredData.length > 0 ? (
-        <UsageQueryTable logs={filteredData} t={t} />
+        <UsageQueryTable logs={filteredData} t={t} locale={locale} />
       ) : (
         <p className="rounded-md border border-dashed py-10 text-center text-sm text-muted-foreground">
           {requestIdFilter
@@ -311,9 +317,11 @@ function QueryResults({
 function UsageQueryTable({
   logs,
   t,
+  locale,
 }: {
   logs: MeUsageLogEntry[];
   t: (key: string) => string;
+  locale: "en" | "zh";
 }) {
   return (
     <div className="overflow-x-auto -mx-1 px-1">
@@ -361,7 +369,15 @@ function UsageQueryTable({
         <tbody>
           {logs.map((row) => {
             const kind = dashboardGetUsageKind(row.model);
-            return <UsageQueryRow key={row.id} row={row} kind={kind} t={t} />;
+            return (
+              <UsageQueryRow
+                key={row.id}
+                row={row}
+                kind={kind}
+                t={t}
+                locale={locale}
+              />
+            );
           })}
         </tbody>
       </table>
@@ -373,10 +389,12 @@ function UsageQueryRow({
   row,
   kind,
   t,
+  locale,
 }: {
   row: MeUsageLogEntry;
   kind: DashboardUsageKind;
   t: (key: string) => string;
+  locale: "en" | "zh";
 }) {
   const tone = dashboardUsageStatusTone(row.status);
   const statusLabel = dashboardUsageStatusLabel(row.status, t);
@@ -424,7 +442,7 @@ function UsageQueryRow({
           : dashboardFormatUsageTokenCell(kind, row.total_tokens, "total")}
       </td>
       <td className="py-2.5 pr-3 text-right text-xs whitespace-nowrap">
-        {dashboardFormatUsageCredits(row, kind)}
+        {dashboardFormatUsageCredits(row, kind, locale)}
       </td>
       <td
         className="hidden max-w-[10rem] truncate py-2.5 pr-3 font-mono text-xs text-muted-foreground xl:table-cell"

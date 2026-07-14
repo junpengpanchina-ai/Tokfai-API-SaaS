@@ -92,8 +92,11 @@ export function formatIntSafe(value: number | null | undefined): string {
 }
 
 export function formatCreditsWithSuffixSafe(
-  value: number | string | null | undefined
+  value: number | string | null | undefined,
+  locale: "en" | "zh" = "en"
 ): string {
   const amount = formatCreditsSafe(value);
-  return amount === "—" ? "—" : `${amount} credits`;
+  if (amount === "—") return "—";
+  const unit = locale === "zh" ? "算力积分" : "compute credits";
+  return `${amount} ${unit}`;
 }

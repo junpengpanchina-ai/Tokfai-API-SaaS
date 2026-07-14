@@ -56,7 +56,7 @@ import {
   PlaygroundKeyError,
 } from "@/lib/dashboard-safe/playground-default-key";
 import { resolvePlaygroundRiskMessage } from "@/lib/dashboard-safe/playground-errors";
-import { dashboardFormatCreditsWithSuffix } from "@/lib/dashboard-safe/display-helpers";
+import { dashboardFormatBalanceCredits } from "@/lib/dashboard-safe/display-helpers";
 
 const DEFAULT_MODEL = TOKFAI_RECOMMENDED_MODEL;
 const MODEL_OPTIONS = PLAYGROUND_CHAT_MODEL_IDS;
@@ -124,7 +124,7 @@ export function PlaygroundClient({
   initialCreditsBalance?: number | null;
   creditsLoaded?: boolean;
 }) {
-  const { t, formatMessage } = usePlaygroundLabels();
+  const { t, formatMessage, locale } = usePlaygroundLabels();
   const router = useRouter();
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const { copiedId, copyText } = usePlaygroundCopyToClipboard();
@@ -362,7 +362,7 @@ export function PlaygroundClient({
               </p>
               <p className="mt-1 font-mono text-sm font-semibold tabular-nums">
                 {creditsLoaded
-                  ? dashboardFormatCreditsWithSuffix(initialCreditsBalance ?? 0)
+                  ? dashboardFormatBalanceCredits(initialCreditsBalance ?? 0, locale)
                   : "—"}
               </p>
             </div>

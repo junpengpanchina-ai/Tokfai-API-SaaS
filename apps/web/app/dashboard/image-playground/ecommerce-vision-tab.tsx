@@ -36,7 +36,10 @@ import {
   PlaygroundImageUploadError,
   validatePlaygroundImageFile,
 } from "@/lib/dashboard-safe/upload-validation";
-import { dashboardFormatCreditsWithSuffix } from "@/lib/dashboard-safe/display-helpers";
+import {
+  dashboardFormatBalanceCredits,
+  dashboardFormatCreditsWithSuffix,
+} from "@/lib/dashboard-safe/display-helpers";
 import { uploadPlaygroundImageAction } from "./upload-playground-image-action";
 import { useImagePlaygroundLabels } from "./use-image-playground-labels";
 import type { ImagePlaygroundApiKeyOption } from "./image-playground-client";
@@ -550,7 +553,7 @@ export function EcommerceVisionTab({
             </span>
             <span className="font-mono font-semibold tabular-nums">
               {creditsLoaded
-                ? dashboardFormatCreditsWithSuffix(initialCreditsBalance ?? 0)
+                ? dashboardFormatBalanceCredits(initialCreditsBalance ?? 0, locale)
                 : "—"}
             </span>
           </div>
@@ -695,7 +698,7 @@ export function EcommerceVisionTab({
                 {creditsCharged != null ? (
                   <p>
                     {t("dashboard.imageWorkbench.chargedLabel")}:{" "}
-                    {dashboardFormatCreditsWithSuffix(creditsCharged)}
+                    {dashboardFormatCreditsWithSuffix(creditsCharged, locale)}
                   </p>
                 ) : null}
                 {requestId ? <p>request_id: {requestId}</p> : null}

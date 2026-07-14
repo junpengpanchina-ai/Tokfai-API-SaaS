@@ -20,6 +20,7 @@ import {
   normalizePublicAnnouncements,
 } from "@/lib/dashboard-safe/normalize-dashboard-data";
 import {
+  dashboardFormatBalanceCredits,
   dashboardFormatCreditsWithSuffix,
   dashboardFormatDate,
   dashboardFormatInt,
@@ -44,20 +45,21 @@ export function DashboardOverviewContent({
   overview: DashboardOverviewData | null | undefined;
   announcements?: PublicAnnouncement[] | unknown;
 }) {
-  const { t } = useDashboardLabels();
+  const { t, locale } = useDashboardLabels();
   const safeOverview = normalizeDashboardOverview(overview);
   const safeAnnouncements = normalizePublicAnnouncements(announcements);
 
   const statCards = [
     {
       labelKey: "dashboard.overview.creditsBalance",
-      value: dashboardFormatCreditsWithSuffix(safeOverview.creditsBalance),
+      value: dashboardFormatBalanceCredits(safeOverview.creditsBalance, locale),
       icon: CreditCard,
     },
     {
       labelKey: "dashboard.overview.creditsConsumedLast7Days",
       value: dashboardFormatCreditsWithSuffix(
-        safeOverview.creditsConsumedLast7Days
+        safeOverview.creditsConsumedLast7Days,
+        locale
       ),
       icon: Coins,
     },
@@ -174,7 +176,7 @@ export function DashboardOverviewContent({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <RecentUsageTable overview={safeOverview} t={t} />
+          <RecentUsageTable overview={safeOverview} t={t} locale={locale} />
         </CardContent>
       </Card>
 
@@ -224,9 +226,11 @@ function StartAction({
 function RecentUsageTable({
   overview,
   t,
+  locale,
 }: {
   overview: DashboardOverviewData;
   t: (key: string) => string;
+  locale: "en" | "zh";
 }) {
   const rows = Array.isArray(overview.recentActivity)
     ? overview.recentActivity
@@ -297,7 +301,7 @@ function RecentUsageTable({
                   </Badge>
                 </td>
                 <td className="px-4 py-3 font-mono text-xs">
-                  {dashboardFormatCreditsWithSuffix(row.credits_charged)}
+                  {dashboardFormatCreditsWithSuffix(row.credits_charged, locale)}
                 </td>
                 <td className="px-4 py-3 font-mono text-xs">
                   {row.request_id ?? "—"}

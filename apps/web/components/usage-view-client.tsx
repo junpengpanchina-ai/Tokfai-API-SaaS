@@ -37,7 +37,7 @@ import type { UsagePageLog, UsagePageState } from "@/lib/dashboard-safe/dtos/usa
 import { normalizeUsagePageState } from "@/lib/dashboard-safe/normalize-dashboard-data";
 
 export function UsageViewClient({ state }: { state: UsagePageState | null | undefined }) {
-  const { t } = useDashboardLabels();
+  const { t, locale } = useDashboardLabels();
   const { copiedId, copyText } = useDashboardCopyToClipboard();
   const safeState = normalizeUsagePageState(state);
 
@@ -68,7 +68,10 @@ export function UsageViewClient({ state }: { state: UsagePageState | null | unde
           />
           <AdminStatCard
             label={t("dashboard.usage.statCredits7d")}
-            value={dashboardFormatCreditsWithSuffix(safeState.stats.creditsLast7Days)}
+            value={dashboardFormatCreditsWithSuffix(
+              safeState.stats.creditsLast7Days,
+              locale
+            )}
           />
         </div>
       ) : null}
@@ -117,6 +120,7 @@ export function UsageViewClient({ state }: { state: UsagePageState | null | unde
               copiedId={copiedId}
               onCopy={copyText}
               t={t}
+              locale={locale}
             />
           ) : safeState.status === "ready" ? (
             <EmptyState t={t} />
@@ -150,11 +154,13 @@ function UsageTable({
   copiedId,
   onCopy,
   t,
+  locale,
 }: {
   logs: UsagePageLog[];
   copiedId: string | null;
   onCopy: (id: string, value: string) => void;
   t: (key: string) => string;
+  locale: "en" | "zh";
 }) {
   const safeLogs = Array.isArray(logs) ? logs : [];
 
@@ -206,6 +212,7 @@ function UsageTable({
                 copiedId={copiedId}
                 onCopy={onCopy}
                 t={t}
+                locale={locale}
               />
             );
           })}
@@ -221,12 +228,14 @@ function UsageRow({
   copiedId,
   onCopy,
   t,
+  locale,
 }: {
   row: UsagePageLog;
   kind: DashboardUsageKind;
   copiedId: string | null;
   onCopy: (id: string, value: string) => void;
   t: (key: string) => string;
+  locale: "en" | "zh";
 }) {
   const copyId = `usage-request-id-${row.id}`;
 
@@ -260,7 +269,7 @@ function UsageRow({
           : dashboardFormatUsageTokenCell(kind, row.total_tokens, "total")}
       </td>
       <td className="py-2.5 pr-3 text-right text-xs whitespace-nowrap">
-        {dashboardFormatUsageCredits(row, kind)}
+        {dashboardFormatUsageCredits(row, kind, locale)}
       </td>
       <td className="py-2.5 pr-0">
         {row.request_id ? (

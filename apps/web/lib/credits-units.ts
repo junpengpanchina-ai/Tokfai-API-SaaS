@@ -8,6 +8,11 @@
 export const CREDITS_PER_YUAN = 10_000;
 export const YUAN_PER_CREDIT = 1 / CREDITS_PER_YUAN;
 
+/** Locale-aware customer-facing unit label. */
+export function creditsUnitLabel(locale: "en" | "zh"): string {
+  return locale === "zh" ? "算力积分" : "compute credits";
+}
+
 /** Convert compute credits → CNY at the retail base rate. */
 export function creditsToYuan(credits: number): number {
   if (!Number.isFinite(credits)) return 0;
