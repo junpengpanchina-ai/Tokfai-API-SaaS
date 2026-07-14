@@ -53,6 +53,17 @@ const EN: Record<string, string> = {
   "dashboard.imageWorkbench.initFailed":
     "Image service failed to start. Please refresh and retry.",
   "dashboard.imageWorkbench.loginRequired": "Please sign in to continue.",
+  "dashboard.imageWorkbench.copyNoImageHint":
+    "No image uploaded — copy will be based on your text notes. Add a product photo for image-grounded copy.",
+  "dashboard.imageWorkbench.copyNeedsTextOrImage":
+    "Upload an image or enter copy requirements first.",
+  "dashboard.imageWorkbench.generatePurposeLabel": "Purpose",
+  "dashboard.imageWorkbench.generateStyleLabel": "Style",
+  "dashboard.imageWorkbench.generateExtraLabel": "Extra details",
+  "dashboard.imageWorkbench.generateExtraPlaceholder":
+    "e.g. red silk scarf, highlight soft sheen for Taobao main image",
+  "dashboard.imageWorkbench.generateExtraPlaceholderEdit":
+    "e.g. keep the person, change outfit to a navy suit, white background",
   "dashboard.imageWorkbench.noKeyBody":
     "Image service failed to start. Please refresh and retry.",
   "dashboard.imageWorkbench.createKey": "Try again",
@@ -264,13 +275,13 @@ const EN: Record<string, string> = {
   "dashboard.imagePlayground.presetEcommerce": "E-commerce hero",
   "dashboard.imagePlayground.presetPoster": "Poster",
   "dashboard.imagePlayground.presetProductPrompt":
-    "Create a clean product-style image of a futuristic API dashboard, soft lighting, minimal background.",
+    "Clean white-background product shot, sharp edges, soft studio lighting, ready for a listing main image.",
   "dashboard.imagePlayground.presetAvatarPrompt":
-    "Create a friendly professional avatar portrait, soft lighting, neutral background, high detail.",
+    "Friendly professional portrait photo, soft lighting, neutral background, high detail.",
   "dashboard.imagePlayground.presetEcommercePrompt":
-    "Create a polished e-commerce hero image with a product on a minimal studio background, commercial lighting.",
+    "Polished e-commerce hero shot with the product on a minimal studio background, commercial lighting.",
   "dashboard.imagePlayground.presetPosterPrompt":
-    "Create a modern promotional poster with bold composition, clean typography space, premium commercial style.",
+    "Modern promotional poster with bold composition, clean typography space, premium commercial style.",
   "dashboard.imagePlayground.errors.missingToken":
     "Please sign in to continue.",
   "dashboard.imagePlayground.errors.invalidToken":
@@ -285,7 +296,10 @@ const EN: Record<string, string> = {
     "This attempt did not complete. Failed calls are usually not charged. Try simplifying the request and retry.",
   "dashboard.imagePlayground.errors.imageGenerationFailed":
     "This attempt did not complete. Failed calls are usually not charged. Try simplifying the request and retry.",
-  "dashboard.imagePlayground.errors.missingPrompt": "Please enter a prompt.",
+  "dashboard.imagePlayground.errors.missingPrompt":
+    "Enter purpose details or upload a reference image first.",
+  "dashboard.imagePlayground.errors.smokePromptBlocked":
+    "Please describe your real product or edit need — demo/test prompts are not allowed.",
   "dashboard.imagePlayground.errors.keyNotRetrievable":
     "Image service failed to start. Please refresh and retry.",
   "dashboard.imagePlayground.errors.unknown":
@@ -345,6 +359,17 @@ const ZH: Record<string, string> = {
   "dashboard.imageWorkbench.serviceBusy": "服务暂时繁忙，请稍后重试",
   "dashboard.imageWorkbench.initFailed": "图片服务初始化失败，请刷新重试",
   "dashboard.imageWorkbench.loginRequired": "请先登录后再使用图片工作台",
+  "dashboard.imageWorkbench.copyNoImageHint":
+    "未上传图片，以下将基于文字需求生成。上传商品图可让文案更贴合真实元素。",
+  "dashboard.imageWorkbench.copyNeedsTextOrImage":
+    "请先上传图片，或填写文案需求。",
+  "dashboard.imageWorkbench.generatePurposeLabel": "用途",
+  "dashboard.imageWorkbench.generateStyleLabel": "风格",
+  "dashboard.imageWorkbench.generateExtraLabel": "补充需求",
+  "dashboard.imageWorkbench.generateExtraPlaceholder":
+    "例如：红色丝巾，突出光泽，适合淘宝主图",
+  "dashboard.imageWorkbench.generateExtraPlaceholderEdit":
+    "例如：保留人物，把衣服换成深蓝西装，背景改白底",
   "dashboard.imageWorkbench.noKeyBody": "图片服务初始化失败，请刷新重试",
   "dashboard.imageWorkbench.createKey": "重试",
   "dashboard.imageWorkbench.creatingKey": "准备中…",
@@ -548,13 +573,13 @@ const ZH: Record<string, string> = {
   "dashboard.imagePlayground.presetEcommerce": "电商主图",
   "dashboard.imagePlayground.presetPoster": "海报图",
   "dashboard.imagePlayground.presetProductPrompt":
-    "生成一张干净的产品风格图片，柔和光线，极简背景。",
+    "干净白底商品主图，边缘清晰，柔和棚拍光，适合上架主图。",
   "dashboard.imagePlayground.presetAvatarPrompt":
-    "生成一张干净专业的头像肖像，柔和光线，中性背景，高细节。",
+    "干净专业的头像肖像，柔和光线，中性背景，高细节。",
   "dashboard.imagePlayground.presetEcommercePrompt":
-    "生成一张精致的电商主图，产品在极简棚拍背景上，商业级布光。",
+    "精致电商主图，产品在极简棚拍背景上，商业级布光。",
   "dashboard.imagePlayground.presetPosterPrompt":
-    "生成一张现代宣传海报，构图醒目，预留清晰排版空间，高级商业风格。",
+    "现代宣传海报，构图醒目，预留清晰排版空间，高级商业风格。",
   "dashboard.imagePlayground.errors.missingToken": "请先登录后再使用图片工作台",
   "dashboard.imagePlayground.errors.invalidToken": "请重新登录后再试",
   "dashboard.imagePlayground.errors.invalidOrMissingToken": "请重新登录后再试",
@@ -565,7 +590,10 @@ const ZH: Record<string, string> = {
     "这次没有成功，通常不会扣费。你可以简化需求后重试。",
   "dashboard.imagePlayground.errors.imageGenerationFailed":
     "这次没有成功，通常不会扣费。你可以简化需求后重试。",
-  "dashboard.imagePlayground.errors.missingPrompt": "请输入描述。",
+  "dashboard.imagePlayground.errors.missingPrompt":
+    "请先填写补充需求，或上传参考图。",
+  "dashboard.imagePlayground.errors.smokePromptBlocked":
+    "请填写真实商品或改图需求，不能使用演示/测试文案。",
   "dashboard.imagePlayground.errors.keyNotRetrievable":
     "图片服务初始化失败，请刷新重试",
   "dashboard.imagePlayground.errors.unknown":

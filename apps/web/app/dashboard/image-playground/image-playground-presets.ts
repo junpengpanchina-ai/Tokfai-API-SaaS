@@ -11,8 +11,8 @@ export const IMAGE_PLAYGROUND_PRESET_IDS: ImagePlaygroundPresetId[] = [
   "poster",
 ];
 
-export const IMAGE_PLAYGROUND_DEFAULT_PROMPT =
-  "Create a clean product-style image of a futuristic API dashboard, soft lighting, minimal background.";
+/** Empty by default — never prefill smoke/demo prompts into consumer requests. */
+export const IMAGE_PLAYGROUND_DEFAULT_PROMPT = "";
 
 export function imagePlaygroundPresetLabelKey(
   id: ImagePlaygroundPresetId

@@ -40,8 +40,16 @@ import {
   getImagePlaygroundMode,
   pickPreferredImageModel,
   promptImpliesReferenceEdit,
-  resolveImagePromptForRequest,
 } from "@/lib/dashboard-safe/image-edit-prompt";
+import {
+  buildImageWorkbenchGeneratePrompt,
+  defaultGeneratePurpose,
+  IMAGE_GENERATE_PURPOSES,
+  IMAGE_GENERATE_STYLES,
+  type ImageGeneratePurposeId,
+  type ImageGenerateStyleId,
+} from "@/lib/dashboard-safe/image-workbench-generate-prompt";
+import { isImageWorkbenchSmokePrompt } from "@/lib/dashboard-safe/ecommerce-image-analysis";
 import {
   fileToDataUrl,
   isBlobUrl,
@@ -245,6 +253,10 @@ export function ImageGeneratePanel({
   const [model, setModel] = useState(() => resolveInitialModel(initialModel));
   const [size, setSize] = useState<ImagePlaygroundSize>(DEFAULT_SIZE);
   const [prompt, setPrompt] = useState(IMAGE_PLAYGROUND_DEFAULT_PROMPT);
+  const [generatePurpose, setGeneratePurpose] =
+    useState<ImageGeneratePurposeId>("taobao_main");
+  const [generateStyle, setGenerateStyle] =
+    useState<ImageGenerateStyleId>("white_bg");
   const [loading, setLoading] = useState(false);
   const [progressStatus, setProgressStatus] = useState<string | null>(null);
   const [progressPercent, setProgressPercent] = useState<number | null>(null);
@@ -291,6 +303,9 @@ export function ImageGeneratePanel({
     if (initialPromptHint?.trim()) {
       setPrompt(initialPromptHint.trim());
     }
+    if (initialReferenceImageUrl) {
+      setGeneratePurpose("reference_edit");
+    }
   }, [
     handoffKey,
     initialReferenceImageUrl,
@@ -300,6 +315,18 @@ export function ImageGeneratePanel({
 
   const readyImageUrls = getReadyImageUrls(imageInputs);
   const imageMode = getImagePlaygroundMode(readyImageUrls.length > 0);
+
+  useEffect(() => {
+    setGeneratePurpose((prev) =>
+      readyImageUrls.length > 0
+        ? prev === "taobao_main" || prev === "general"
+          ? "reference_edit"
+          : prev
+        : prev === "reference_edit"
+          ? defaultGeneratePurpose(false)
+          : prev
+    );
+  }, [readyImageUrls.length]);
   const selectedCapability = getImageModelCapability(model);
   const wantsSubjectPreserve = promptImpliesReferenceEdit(prompt);
   const showSubjectPreserveExpectation =
@@ -368,10 +395,8 @@ export function ImageGeneratePanel({
 
   const hasInputImages = imageInputs.some((item) => item.status !== "error");
   const isImageToImage = hasInputImages;
-  const promptPlaceholder =
-    imageMode === "reference_edit"
-      ? t("dashboard.imagePlayground.modeReferenceHint")
-      : t("dashboard.imagePlayground.modeTextHint");
+  const generateInputBlocked =
+    readyImageUrls.length === 0 && !prompt.trim();
 
   const selectedModelCredits = getImageModelCreditsPerRequest(model);
 
@@ -612,11 +637,18 @@ export function ImageGeneratePanel({
   }, []);
 
   async function handleCopyApiRequest() {
-    const trimmedPrompt = prompt.trim() || IMAGE_PLAYGROUND_DEFAULT_PROMPT;
+    const assembled = buildImageWorkbenchGeneratePrompt({
+      purpose: generatePurpose,
+      style: generateStyle,
+      extraNeed: prompt,
+      hasReferenceImages: readyImageUrls.length > 0,
+    });
+    const curlPrompt = assembled?.prompt?.trim();
+    if (!curlPrompt) return;
     const curl = buildImageGenerationCurlOneLine(
       {
         model,
-        prompt: trimmedPrompt,
+        prompt: curlPrompt,
         size,
         n: 1,
         response_format: "url",
@@ -655,18 +687,6 @@ export function ImageGeneratePanel({
       return;
     }
 
-    const trimmedPrompt = prompt.trim();
-    if (!trimmedPrompt) {
-      setError({
-        status: 0,
-        code: "missing_prompt",
-        message: t("dashboard.imagePlayground.errors.missingPrompt"),
-      });
-      pulseResultAttention();
-      focusResultPanel("onComplete");
-      return;
-    }
-
     const currentInputs = imageInputsRef.current;
     const uploadingNow = currentInputs.some(
       (item) => item.status === "uploading" || item.status === "resolving"
@@ -684,7 +704,32 @@ export function ImageGeneratePanel({
 
     const imageUrlsForRequest = getReadyImageUrls(currentInputs);
     const hasReferenceImages = imageUrlsForRequest.length > 0;
-    const wantsReferenceEdit = promptImpliesReferenceEdit(trimmedPrompt);
+    const userNotes = prompt.trim();
+    const wantsReferenceEdit =
+      promptImpliesReferenceEdit(userNotes) ||
+      generatePurpose === "reference_edit";
+
+    if (!hasReferenceImages && !userNotes) {
+      setError({
+        status: 0,
+        code: "missing_prompt",
+        message: t("dashboard.imagePlayground.errors.missingPrompt"),
+      });
+      pulseResultAttention();
+      focusResultPanel("onComplete");
+      return;
+    }
+
+    if (isImageWorkbenchSmokePrompt(userNotes)) {
+      setError({
+        status: 0,
+        code: "smoke_prompt_blocked",
+        message: t("dashboard.imagePlayground.errors.smokePromptBlocked"),
+      });
+      pulseResultAttention();
+      focusResultPanel("onComplete");
+      return;
+    }
 
     if (wantsReferenceEdit && !hasReferenceImages) {
       setError({
@@ -761,18 +806,33 @@ export function ImageGeneratePanel({
 
     const useStrengthen = strengthenNext;
     setStrengthenNext(false);
-    setLastUserPrompt(trimmedPrompt);
+
+    const assembled = buildImageWorkbenchGeneratePrompt({
+      purpose: generatePurpose,
+      style: generateStyle,
+      extraNeed: userNotes,
+      hasReferenceImages,
+      strengthen: useStrengthen,
+    });
+    if (!assembled) {
+      setError({
+        status: 0,
+        code: "missing_prompt",
+        message: t("dashboard.imagePlayground.errors.missingPrompt"),
+      });
+      pulseResultAttention();
+      focusResultPanel("onComplete");
+      return;
+    }
+
+    setLastUserPrompt(assembled.userVisibleSummary);
 
     pulseResultAttention();
     focusResultPanel("onStart");
     setLoading(true);
     const generateStartedAt = Date.now();
     try {
-      const finalPrompt = resolveImagePromptForRequest({
-        prompt: trimmedPrompt,
-        hasReferenceImages,
-        strengthen: useStrengthen,
-      });
+      const finalPrompt = assembled.prompt;
       const requestMode = getImagePlaygroundMode(hasReferenceImages);
       const httpsOnly = imageUrlsForRequest.filter((url) =>
         /^https?:\/\//i.test(url)
@@ -980,6 +1040,49 @@ export function ImageGeneratePanel({
               <CardContent
                 className={`${IMAGE_PLAYGROUND_TOOLBENCH.cardContent} flex flex-col gap-2.5`}
               >
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="generate-purpose" className="text-xs text-muted-foreground">
+                      {t("dashboard.imageWorkbench.generatePurposeLabel")}
+                    </Label>
+                    <select
+                      id="generate-purpose"
+                      value={generatePurpose}
+                      disabled={loading}
+                      onChange={(e) =>
+                        setGeneratePurpose(e.target.value as ImageGeneratePurposeId)
+                      }
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      {IMAGE_GENERATE_PURPOSES.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {locale === "zh" ? item.labelZh : item.labelEn}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="generate-style" className="text-xs text-muted-foreground">
+                      {t("dashboard.imageWorkbench.generateStyleLabel")}
+                    </Label>
+                    <select
+                      id="generate-style"
+                      value={generateStyle}
+                      disabled={loading}
+                      onChange={(e) =>
+                        setGenerateStyle(e.target.value as ImageGenerateStyleId)
+                      }
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      {IMAGE_GENERATE_STYLES.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {locale === "zh" ? item.labelZh : item.labelEn}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 <PromptPresets
                   loading={loading}
                   onSelect={(presetId) =>
@@ -987,15 +1090,21 @@ export function ImageGeneratePanel({
                   }
                   t={t}
                 />
+                <Label htmlFor="prompt" className="text-xs text-muted-foreground">
+                  {t("dashboard.imageWorkbench.generateExtraLabel")}
+                </Label>
                 <textarea
                   ref={promptRef}
                   id="prompt"
                   rows={3}
-                  required
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   disabled={loading}
-                  placeholder={promptPlaceholder}
+                  placeholder={
+                    imageMode === "reference_edit"
+                      ? t("dashboard.imageWorkbench.generateExtraPlaceholderEdit")
+                      : t("dashboard.imageWorkbench.generateExtraPlaceholder")
+                  }
                   className="flex h-28 min-h-[7rem] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                 />
 
@@ -1043,7 +1152,8 @@ export function ImageGeneratePanel({
                     accountBlocked={
                       !accessToken ||
                       !creditsLoaded ||
-                      (initialCreditsBalance ?? 0) <= 0
+                      (initialCreditsBalance ?? 0) <= 0 ||
+                      generateInputBlocked
                     }
                     copyRequestStatus={copyRequestStatus}
                     generateLabel={
@@ -1067,7 +1177,8 @@ export function ImageGeneratePanel({
               accountBlocked={
                 !accessToken ||
                 !creditsLoaded ||
-                (initialCreditsBalance ?? 0) <= 0
+                (initialCreditsBalance ?? 0) <= 0 ||
+                generateInputBlocked
               }
               copyRequestStatus={copyRequestStatus}
               layout="stack"

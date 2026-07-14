@@ -14,6 +14,7 @@ import type {
   ChatCompletionRequest,
   ChatCompletionResponse,
 } from "./chat-api";
+import { isImageWorkbenchSmokePrompt } from "./ecommerce-image-analysis";
 import type {
   ImageGenerationRequest,
   ImageGenerationResponse,
@@ -277,6 +278,15 @@ export async function consumerImageGenerationsAction(
   body: ImageGenerationRequest
 ): Promise<ConsumerWorkbenchOk<ImageGenerationResponse> | ConsumerWorkbenchErrorPayload> {
   try {
+    if (typeof body.prompt === "string" && isImageWorkbenchSmokePrompt(body.prompt)) {
+      return {
+        ok: false,
+        status: 400,
+        message:
+          "Please describe your real product or edit need — demo/test prompts are not allowed.",
+        code: "smoke_prompt_blocked",
+      };
+    }
     const apiKey = await resolveWorkbenchApiKey();
     const host = requestHost();
     const res = await dmitServerFetchWithHeaders<ImageGenerationResponse>(

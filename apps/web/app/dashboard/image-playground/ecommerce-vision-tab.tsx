@@ -125,14 +125,18 @@ export function EcommerceVisionTab({
   const readyUrls = images
     .filter((item) => item.status === "ready" && item.url)
     .map((item) => item.url);
+  const hasImage = readyUrls.length > 0;
   const visionModel = pickEcommerceVisionModel();
   const signedIn = Boolean(accessToken);
   const balance = initialCreditsBalance ?? 0;
   const insufficientCredits = creditsLoaded && balance <= 0;
   const checkingAccount = signedIn && !creditsLoaded;
+  const copyNeedsText = isCopyMode && !hasImage && !extraNeed.trim();
+  const analysisNeedsImage = !isCopyMode && !hasImage;
   const runDisabled =
     loading ||
-    readyUrls.length === 0 ||
+    analysisNeedsImage ||
+    copyNeedsText ||
     !signedIn ||
     checkingAccount ||
     insufficientCredits;
@@ -236,8 +240,12 @@ export function EcommerceVisionTab({
       setError(t("dashboard.imageWorkbench.insufficientCredits"));
       return;
     }
-    if (readyUrls.length === 0) {
+    if (!isCopyMode && readyUrls.length === 0) {
       setError(t("dashboard.imageWorkbench.needImage"));
+      return;
+    }
+    if (isCopyMode && readyUrls.length === 0 && !extraNeed.trim()) {
+      setError(t("dashboard.imageWorkbench.copyNeedsTextOrImage"));
       return;
     }
 
@@ -247,7 +255,16 @@ export function EcommerceVisionTab({
         mode,
         useCase,
         extraNeed,
+        hasImage: readyUrls.length > 0,
       });
+
+      const content: Array<
+        | { type: "text"; text: string }
+        | { type: "image_url"; image_url: { url: string } }
+      > = [{ type: "text", text: prompt }];
+      for (const url of readyUrls) {
+        content.push({ type: "image_url", image_url: { url } });
+      }
 
       const res = await consumerChatCompletions({
         model: visionModel,
@@ -255,13 +272,7 @@ export function EcommerceVisionTab({
         messages: [
           {
             role: "user",
-            content: [
-              { type: "text", text: prompt },
-              ...readyUrls.map((url) => ({
-                type: "image_url" as const,
-                image_url: { url },
-              })),
-            ],
+            content,
           },
         ],
       });
@@ -386,6 +397,12 @@ export function EcommerceVisionTab({
           ) : insufficientCredits ? (
             <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-3 text-sm text-muted-foreground">
               {t("dashboard.imageWorkbench.insufficientCredits")}
+            </div>
+          ) : null}
+
+          {isCopyMode && !hasImage ? (
+            <div className="rounded-md border bg-muted/20 px-3 py-3 text-sm text-muted-foreground">
+              {t("dashboard.imageWorkbench.copyNoImageHint")}
             </div>
           ) : null}
 

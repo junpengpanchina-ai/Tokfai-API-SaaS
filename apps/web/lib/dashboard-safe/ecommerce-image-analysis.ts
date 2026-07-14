@@ -94,15 +94,16 @@ export const COPYWRITING_USE_CASES: Array<{
 export const ECOMMERCE_USE_CASES = IMAGE_UNDERSTAND_USE_CASES;
 
 const UNDERSTAND_HINT: Record<ImageUnderstandUseCaseId, string> = {
-  taobao_pdd: "关注淘宝/拼多多主图与详情页适用场景。",
-  xiaohongshu: "关注小红书种草内容场景。",
-  tiktok_shop: "关注短视频带货与 TikTok Shop 场景。",
-  dtc_detail: "关注独立站详情页与转化场景。",
-  amazon: "关注 Amazon 商品图与 listing 场景。",
-  livestream: "关注直播讲解与逼单场景。",
-  private_domain: "关注私域朋友圈种草与转发场景。",
-  portrait_formal: "关注人物形象、职业照、正装/商务人设场景。",
-  general: "按通用电商素材识别。",
+  taobao_pdd:
+    "淘宝/拼多多商品图：关注主图卖点、价格感、人群、详情页转化与平台合规风险。",
+  xiaohongshu: "小红书种草图：关注生活方式、真实感、种草钩子与标签方向。",
+  tiktok_shop: "TikTok Shop：关注短视频封面/素材钩子、节奏与转化卖点。",
+  dtc_detail: "独立站详情页：关注品牌感、信任背书与转化段落方向。",
+  amazon: "Amazon listing：关注白底/场景图规范、属性卖点与合规措辞。",
+  livestream: "直播带货：关注讲解话术切入点、逼单卖点与演示印象。",
+  private_domain: "私域朋友圈：关注口语化种草与转发动机。",
+  portrait_formal: "人物形象/职业照：关注着装、气质、场景与人设卖点。",
+  general: "通用电商素材：围绕图片真实内容做识别与售卖建议。",
 };
 
 const COPY_HINT: Record<CopywritingUseCaseId, string> = {
@@ -110,15 +111,32 @@ const COPY_HINT: Record<CopywritingUseCaseId, string> = {
   product_bullets: "重点输出清晰可勾选的商品卖点 bullet。",
   xiaohongshu: "重点输出小红书种草口吻：标题、正文、标签。",
   tiktok_shop: "重点输出 TikTok Shop 短视频钩子与转化文案。",
-  amazon_dtc: "重点输出 Amazon / 独立站标题、bullet points 与详情页段落（可用中英对照）。",
+  amazon_dtc: "重点输出 Amazon / 独立站标题、bullet points 与详情页段落。",
   feed_ads: "重点输出信息流广告主文案、CTA 与多套 A/B。",
   livestream: "重点输出直播开场钩子、讲解与逼单话术。",
   private_domain: "重点输出私域朋友圈文案，口语自然可转发。",
   general: "按通用电商运营文案输出。",
 };
 
+/** Smoke / demo strings that must never ship in consumer workbench requests. */
+export const IMAGE_WORKBENCH_SMOKE_PROMPT_MARKERS = [
+  "futuristic API dashboard",
+  "API dashboard",
+  "clean product-style image of a futuristic",
+  "Tokfai API integration smoke",
+] as const;
+
+export function isImageWorkbenchSmokePrompt(prompt: string): boolean {
+  const normalized = prompt.trim().toLowerCase();
+  if (!normalized) return false;
+  return IMAGE_WORKBENCH_SMOKE_PROMPT_MARKERS.some((marker) =>
+    normalized.includes(marker.toLowerCase())
+  );
+}
+
 function buildUnderstandPrompt(options: {
   useCase: ImageUnderstandUseCaseId;
+  useCaseLabel: string;
   extraNeed?: string;
 }): string {
   const hint = UNDERSTAND_HINT[options.useCase];
@@ -126,60 +144,98 @@ function buildUnderstandPrompt(options: {
 
   return [
     "你是一名电商图片识别专家。",
-    "请基于用户上传的图片做内容识别与电商分析。图片只是输入素材，不要生成或修改图片。",
+    "用户已上传一张真实图片。你必须先看图，再围绕该图片本身输出分析。",
+    "图片是唯一事实来源：只描述你在图片中实际看到的内容，禁止编造未出现的商品、颜色、材质、人物或场景。",
+    "不要生成或修改图片。不要输出与图片无关的泛文案、通用营销模板或测试文案。",
     "",
-    "只输出以下结构：",
-    "1. 图片主体",
-    "2. 商品/人物/场景判断",
-    "3. 适合售卖方向",
-    "4. 可提炼卖点",
-    "5. 适合平台",
-    "6. 可生成的文案方向",
-    "7. 下一步建议（可提示去「商品文案生成」；不要给换图/改图/生成图指令）",
+    "只输出以下结构（全部必须紧扣图片）：",
+    "1. 图片内容（主体、颜色、材质、构图、可见文字/包装）",
+    "2. 商品类型 / 人物 / 场景判断",
+    "3. 目标人群",
+    "4. 可提炼卖点（必须能从图片证据推出）",
+    "5. 风险与注意事项（合规、误导、画质、侵权等）",
+    "6. 平台建议（结合当前用途）",
+    "7. 下一步建议（可提示去「写商品文案」；不要给换图/改图/生成图指令）",
     "",
     "禁止：",
-    "- 不要输出长篇营销正文、标题矩阵、广告短句全集",
+    "- 不要输出与图片无关的长篇营销正文或标题矩阵",
     "- 不要建议换背景、换服装、生成新图、改图",
-    "- 不要写技术解释",
+    "- 不要写 API、模型、接口或技术解释",
+    "- 不要使用任何默认测试 prompt 或演示文案",
     "",
-    "输出要求：用中文，分段清晰；图片不清晰时说明不确定点。",
+    "输出要求：用中文，分段清晰；看不清时明确写“不确定”。",
     "",
-    `当前用途：${hint}`,
-    extra ? `用户补充说明：${extra}` : "用户未补充额外说明。",
+    `当前用途（必须对齐）：${options.useCaseLabel}`,
+    `用途说明：${hint}`,
+    extra
+      ? `用户补充说明（必须纳入分析）：${extra}`
+      : "用户未补充额外说明。",
   ].join("\n");
 }
 
 function buildCopywritingPrompt(options: {
   useCase: CopywritingUseCaseId;
+  useCaseLabel: string;
   extraNeed?: string;
+  hasImage: boolean;
 }): string {
   const hint = COPY_HINT[options.useCase];
   const extra = options.extraNeed?.trim();
 
+  if (!options.hasImage) {
+    return [
+      "你是一名电商文案与内容运营专家。",
+      "未上传图片，以下基于文字需求生成。",
+      "请在结果开头第一行明确写：【未上传图片，以下基于文字需求生成】",
+      "不要假装看过图片，不要编造图片细节。",
+      "",
+      "严格遵守：",
+      "1. 只输出文案结果",
+      "2. 必须服从用户用途与补充需求",
+      "3. 不要建议换图/改图/生成图，除非用户明确要求",
+      "4. 不要写技术解释",
+      "",
+      "输出结构：",
+      "- 标题 5 条",
+      "- 核心卖点 5 条",
+      "- 正文文案 3 版",
+      "- 短视频口播 1 版",
+      "- 广告短句 10 条",
+      "- 适合平台建议",
+      "",
+      `当前文案用途：${options.useCaseLabel}`,
+      `用途说明：${hint}`,
+      extra
+        ? `用户文字需求（必须优先服从）：${extra}`
+        : "用户未补充文字需求。请基于用途给出可落地的电商文案框架，并提示用户补充商品信息。",
+    ].join("\n");
+  }
+
   return [
     "你是一名电商文案与内容运营专家。",
-    "用户会上传商品图、人物图或电商素材图，并说明想要生成的文案用途。",
-    "你的任务不是修改图片，也不是生成图片，而是基于图片信息和用户需求，直接输出可复制使用的电商文案。",
+    "用户上传了真实图片。你必须先基于图片做结构化理解，再写文案。",
+    "",
+    "第一步（内心完成，不要单独输出长报告）：识别图片中的主体、颜色、材质、包装/文字、场景、人物着装等真实元素。",
+    "第二步：结合用途与补充需求，直接输出可复制的商品文案。",
     "",
     "严格遵守：",
-    "1. 只输出文案结果",
-    "2. 不要输出图片拆解报告",
-    "3. 不要建议用户换图、改图、生成图，除非用户明确要求",
-    "4. 如果用户说“做西装文案”，就围绕西装、正装、职业形象、面试、商务、会议等场景写文案",
-    "5. 如果图片是人物图，也要根据用户需求判断是服装文案、形象照文案、职业人设文案还是广告文案",
-    "6. 文案必须能直接复制给运营使用",
-    "7. 不要解释模型、接口或技术细节",
+    "1. 文案必须引用图片里的真实元素（颜色、款式、材质、场景、人物气质等至少 3 处）",
+    "2. 不要输出与图片无关的泛泛而谈",
+    "3. 不要编造图片中不存在的卖点",
+    "4. 只输出文案结果，不要输出冗长图片拆解报告",
+    "5. 不要建议换图、改图、生成图，除非用户明确要求",
+    "6. 不要写技术解释",
     "",
     "输出结构：",
-    "- 标题 5 条",
-    "- 核心卖点 5 条",
+    "- 标题 5 条（贴合用途与图片）",
+    "- 核心卖点 5 条（每条能对应图片证据）",
     "- 正文文案 3 版",
     "- 短视频口播 1 版",
     "- 广告短句 10 条",
     "- 适合平台建议",
-    "- 可直接复制版本",
     "",
-    `当前文案用途：${hint}`,
+    `当前文案用途：${options.useCaseLabel}`,
+    `用途说明：${hint}`,
     extra
       ? `用户补充需求（必须优先服从）：${extra}`
       : "用户未补充额外需求。",
@@ -190,15 +246,31 @@ export function buildEcommerceVisionPrompt(options: {
   mode: "ecommerce_image_analysis" | "product_copy";
   useCase: string;
   extraNeed?: string;
+  /** When false in product_copy mode, generate from text only. */
+  hasImage?: boolean;
 }): string {
   if (options.mode === "product_copy") {
+    const useCase =
+      (options.useCase as CopywritingUseCaseId) || "xiaohongshu";
+    const label =
+      COPYWRITING_USE_CASES.find((item) => item.id === useCase)?.labelZh ??
+      useCase;
     return buildCopywritingPrompt({
-      useCase: (options.useCase as CopywritingUseCaseId) || "xiaohongshu",
+      useCase,
+      useCaseLabel: label,
       extraNeed: options.extraNeed,
+      hasImage: options.hasImage !== false,
     });
   }
+
+  const useCase =
+    (options.useCase as ImageUnderstandUseCaseId) || "general";
+  const label =
+    IMAGE_UNDERSTAND_USE_CASES.find((item) => item.id === useCase)?.labelZh ??
+    useCase;
   return buildUnderstandPrompt({
-    useCase: (options.useCase as ImageUnderstandUseCaseId) || "general",
+    useCase,
+    useCaseLabel: label,
     extraNeed: options.extraNeed,
   });
 }
