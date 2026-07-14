@@ -252,6 +252,50 @@ for (const rel of [
   }
 }
 
+// --- 5) Image progress bar EN status copy ---
+{
+  const labels = readFileSync(
+    join(WEB, "app/dashboard/image-playground/image-playground-labels.ts"),
+    "utf8"
+  );
+  const progressUi = readFileSync(
+    join(WEB, "app/dashboard/image-playground/workbench-progress.tsx"),
+    "utf8"
+  );
+
+  const enStart = labels.indexOf("const EN");
+  const zhStart = labels.indexOf("const ZH");
+  const enBody = labels.slice(enStart, zhStart > 0 ? zhStart : undefined);
+
+  const requiredEn = [
+    ["Validating request", /statusValidating[^:]*:\s*"Validating request"/],
+    ["Checking credits", /statusBillingCheck[^:]*:\s*"Checking credits"/],
+    ["Sending request", /statusRequestingModel[^:]*:\s*"Sending request"/],
+    ["Generating image", /statusGenerating[^:]*:\s*"Generating image"/],
+    ["Saving result", /statusSavingResult[^:]*:\s*"Saving result"/],
+    ["Completed", /statusCompleted[^:]*:\s*"Completed"/],
+    ["Failed", /statusFailed[^:]*:\s*"Failed"/],
+  ];
+
+  for (const [name, re] of requiredEn) {
+    if (!re.test(enBody)) {
+      ok = fail(`image progress EN: ${name}`, "missing or wrong EN status copy") && ok;
+    }
+  }
+
+  if (CJK_RE.test(enBody.match(/statusBillingCheck[^:]*:\s*"[^"]*"/)?.[0] ?? "")) {
+    ok = fail("image progress EN billing_check", "CJK in EN statusBillingCheck") && ok;
+  }
+
+  if (!progressUi.includes('role="progressbar"')) {
+    ok = fail("image progress bar markup", "expected role=progressbar") && ok;
+  } else if (!progressUi.includes("statusValidating") && !progressUi.includes("statusBillingCheck")) {
+    ok = fail("image progress status map", "expected status label keys") && ok;
+  } else {
+    pass("image progress bar + EN status copy");
+  }
+}
+
 if (!ok) {
   console.error("\ndocs-or-ui-en-no-chinese-smoke: FAILED");
   process.exit(1);

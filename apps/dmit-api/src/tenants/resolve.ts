@@ -119,6 +119,36 @@ export function isPrimaryHost(host: string): boolean {
   return false;
 }
 
+/** Slugs that must never be registered as tenant subsites. */
+export const RESERVED_TENANT_SLUGS = new Set([
+  "www",
+  "api",
+  "cname",
+  "tokfai",
+  "admin",
+  "app",
+  "dashboard",
+  "docs",
+  "static",
+  "assets",
+  "mail",
+  "smtp",
+  "ftp",
+  "cdn",
+  "status",
+  "support",
+  "help",
+  "billing",
+  "stripe",
+  "webhook",
+  "webhooks",
+]);
+
+export function isReservedTenantSlug(slug: string): boolean {
+  const normalized = slug.trim().toLowerCase();
+  return RESERVED_TENANT_SLUGS.has(normalized);
+}
+
 function subdomainSlug(host: string): string | null {
   const base = parseTenantBaseDomain();
   const normalized = normalizeHost(host);
@@ -126,7 +156,7 @@ function subdomainSlug(host: string): string | null {
   if (!normalized.endsWith(`.${base}`)) return null;
   const slug = normalized.slice(0, -(base.length + 1));
   if (!slug || slug.includes(".")) return null;
-  if (slug === "www" || slug === "api" || slug === "cname") return null;
+  if (isReservedTenantSlug(slug)) return null;
   return slug;
 }
 

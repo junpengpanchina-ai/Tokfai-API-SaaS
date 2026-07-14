@@ -623,6 +623,8 @@ export function ImagePlaygroundResultArea({
   requestMode = null,
   referenceImageIncluded = false,
   attention = false,
+  progressStatus = null,
+  progressPercent = null,
   onRetry,
   onSimplifyRetry,
   onStrengthenSubjectRetry,
@@ -636,6 +638,8 @@ export function ImagePlaygroundResultArea({
   requestMode?: "text_to_image" | "reference_edit" | null;
   referenceImageIncluded?: boolean;
   attention?: boolean;
+  progressStatus?: string | null;
+  progressPercent?: number | null;
   onRetry?: () => void;
   onSimplifyRetry?: () => void;
   onStrengthenSubjectRetry?: () => void;
@@ -717,6 +721,8 @@ export function ImagePlaygroundResultArea({
             locale={locale}
             title={t("dashboard.imageWorkbench.imageProgressTitle")}
             patienceHint={t("dashboard.imageWorkbench.progressPatienceImage")}
+            serverStatus={progressStatus}
+            serverProgress={progressPercent}
           />
         ) : null}
 

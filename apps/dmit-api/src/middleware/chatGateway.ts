@@ -9,7 +9,11 @@ import {
   releaseKeyConcurrency,
   tryAcquireKeyConcurrency,
 } from "../gateway/concurrency.js";
-import { checkRateLimit } from "../gateway/rateLimit.js";
+import {
+  checkApiKeyRateLimit,
+  checkIpRateLimit,
+  checkTenantRateLimit,
+} from "../gateway/rateLimit.js";
 import { getChatCaller } from "./chatAuth.js";
 import { respondApiError } from "./error.js";
 import { logGatewayRejection } from "../routes/chatGatewayLogs.js";
@@ -27,6 +31,14 @@ function assertBodySizeWithinLimit(contentLengthHeader: string | undefined): voi
   if (contentLength > env.TOKFAI_CHAT_BODY_MAX_BYTES) {
     throw bodyTooLargeError();
   }
+}
+
+function clientIp(c: Parameters<MiddlewareHandler>[0]): string {
+  const forwarded = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
+  if (forwarded) return forwarded;
+  const realIp = c.req.header("x-real-ip")?.trim();
+  if (realIp) return realIp;
+  return "unknown";
 }
 
 async function rejectGatewayGuard(
@@ -53,8 +65,9 @@ async function rejectGatewayGuard(
 }
 
 /**
- * Per-key RPM limit, per-key concurrency cap, and Content-Length body guard.
- * Runs after auth on /v1/chat/completions only.
+ * Per-key RPM, per-IP RPM, per-tenant RPM, per-key concurrency, body size guard.
+ * Runs after auth on chat / responses / gemini gateways.
+ * 429 rejections are logged as non-billable (no charge).
  */
 export const chatGatewayMiddleware: MiddlewareHandler = async (c, next) => {
   const caller = getChatCaller(c);
@@ -70,7 +83,27 @@ export const chatGatewayMiddleware: MiddlewareHandler = async (c, next) => {
     throw err;
   }
 
-  const rate = await checkRateLimit(limitKey);
+  const ipRate = await checkIpRateLimit(clientIp(c));
+  if (!ipRate.allowed) {
+    return rejectGatewayGuard(c, {
+      caller,
+      requestId,
+      err: ApiError.tooManyRequests(),
+      limitKey,
+    });
+  }
+
+  const tenantRate = await checkTenantRateLimit(caller.tenantId);
+  if (!tenantRate.allowed) {
+    return rejectGatewayGuard(c, {
+      caller,
+      requestId,
+      err: ApiError.tooManyRequests(),
+      limitKey,
+    });
+  }
+
+  const rate = await checkApiKeyRateLimit(limitKey);
   c.header("X-RateLimit-Limit", String(rate.limit));
   c.header("X-RateLimit-Remaining", String(rate.remaining));
   c.header("X-RateLimit-Reset", String(Math.ceil(rate.resetAt / 1000)));

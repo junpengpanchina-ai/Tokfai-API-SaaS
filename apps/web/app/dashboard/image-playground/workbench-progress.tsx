@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import {
@@ -8,15 +8,7 @@ import {
   imagePlaygroundLabel,
   type ImagePlaygroundLocale,
 } from "./image-playground-labels";
-
-const IMAGE_STAGE_KEYS = [
-  "dashboard.imageWorkbench.imageStage1",
-  "dashboard.imageWorkbench.imageStage2",
-  "dashboard.imageWorkbench.imageStage3",
-  "dashboard.imageWorkbench.imageStage4",
-  "dashboard.imageWorkbench.imageStage5",
-  "dashboard.imageWorkbench.imageStage6",
-] as const;
+import type { ImageGenerationTaskStatus } from "@/lib/dashboard-safe/image-api";
 
 const VISION_STAGE_KEYS = [
   "dashboard.imageWorkbench.visionStage1",
@@ -26,62 +18,157 @@ const VISION_STAGE_KEYS = [
   "dashboard.imageWorkbench.visionStage5",
 ] as const;
 
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  queued: "dashboard.imageWorkbench.statusQueued",
+  validating: "dashboard.imageWorkbench.statusValidating",
+  billing_check: "dashboard.imageWorkbench.statusBillingCheck",
+  requesting_model: "dashboard.imageWorkbench.statusRequestingModel",
+  generating: "dashboard.imageWorkbench.statusGenerating",
+  saving_result: "dashboard.imageWorkbench.statusSavingResult",
+  completed: "dashboard.imageWorkbench.statusCompleted",
+  failed: "dashboard.imageWorkbench.statusFailed",
+  retryable_timeout: "dashboard.imageWorkbench.statusFailed",
+  succeeded: "dashboard.imageWorkbench.statusCompleted",
+  running: "dashboard.imageWorkbench.statusGenerating",
+};
+
+/** Time-based estimate: 0→80 over ESTIMATE_MS; 80–95 waits for real result. */
+const ESTIMATE_MS = 45_000;
+
 export type WorkbenchProgressKind = "vision" | "image_generate";
+
+function mergeProgress(
+  elapsedMs: number,
+  serverProgress: number | null
+): number {
+  const timeEstimate = Math.min(80, (elapsedMs / ESTIMATE_MS) * 80);
+
+  if (serverProgress == null) {
+    if (elapsedMs >= ESTIMATE_MS) {
+      return Math.min(95, 80 + ((elapsedMs - ESTIMATE_MS) / 60_000) * 15);
+    }
+    return timeEstimate;
+  }
+
+  if (serverProgress >= 100) return 95;
+  if (serverProgress >= 80) {
+    return Math.min(95, Math.max(80, Math.max(timeEstimate, serverProgress)));
+  }
+  return Math.max(timeEstimate, Math.min(80, serverProgress));
+}
 
 export function WorkbenchProgressPanel({
   kind,
   locale,
   title,
   patienceHint,
+  serverStatus,
+  serverProgress,
 }: {
   kind: WorkbenchProgressKind;
   locale: ImagePlaygroundLocale;
   title: string;
   patienceHint: string;
+  serverStatus?: ImageGenerationTaskStatus | string | null;
+  serverProgress?: number | null;
 }) {
-  const stageKeys =
-    kind === "image_generate" ? IMAGE_STAGE_KEYS : VISION_STAGE_KEYS;
-  const stillRunningKey =
-    kind === "image_generate"
-      ? "dashboard.imageWorkbench.imageStageStillRunning"
-      : "dashboard.imageWorkbench.visionStageStillRunning";
-
   const [elapsedSec, setElapsedSec] = useState(0);
   const [stageIndex, setStageIndex] = useState(0);
+  const [displayProgress, setDisplayProgress] = useState(0);
+  const serverProgressRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    serverProgressRef.current =
+      typeof serverProgress === "number" && Number.isFinite(serverProgress)
+        ? Math.max(0, Math.min(100, serverProgress))
+        : null;
+  }, [serverProgress]);
 
   useEffect(() => {
     setElapsedSec(0);
     setStageIndex(0);
+    setDisplayProgress(0);
+    const started = Date.now();
     const tick = window.setInterval(() => {
-      setElapsedSec((n) => n + 1);
-    }, 1000);
-    const stage = window.setInterval(() => {
-      setStageIndex((i) => (i + 1) % stageKeys.length);
-    }, 4500);
+      const elapsed = Date.now() - started;
+      setElapsedSec(Math.floor(elapsed / 1000));
+      if (kind === "image_generate") {
+        setDisplayProgress(
+          Math.round(mergeProgress(elapsed, serverProgressRef.current))
+        );
+      }
+    }, 250);
+
+    const stage =
+      kind === "vision"
+        ? window.setInterval(() => {
+            setStageIndex((i) => (i + 1) % VISION_STAGE_KEYS.length);
+          }, 4500)
+        : 0;
+
     return () => {
       window.clearInterval(tick);
-      window.clearInterval(stage);
+      if (stage) window.clearInterval(stage);
     };
-  }, [stageKeys.length]);
+  }, [kind]);
 
-  const stageText = imagePlaygroundLabel(stageKeys[stageIndex], locale);
   const waitedLabel = formatImagePlaygroundLabel(
     imagePlaygroundLabel("dashboard.imageWorkbench.waitedSeconds", locale),
     { seconds: elapsedSec }
   );
+
+  let statusText: string;
+  if (kind === "image_generate") {
+    const key =
+      (serverStatus && STATUS_LABEL_KEYS[serverStatus]) ||
+      "dashboard.imageWorkbench.statusGenerating";
+    statusText = imagePlaygroundLabel(key, locale);
+  } else {
+    statusText = imagePlaygroundLabel(VISION_STAGE_KEYS[stageIndex], locale);
+  }
+
   const longWait =
     elapsedSec >= 30
-      ? imagePlaygroundLabel(stillRunningKey, locale)
+      ? imagePlaygroundLabel(
+          kind === "image_generate"
+            ? "dashboard.imageWorkbench.imageStageStillRunning"
+            : "dashboard.imageWorkbench.visionStageStillRunning",
+          locale
+        )
       : patienceHint;
+
+  const percentLabel = formatImagePlaygroundLabel(
+    imagePlaygroundLabel("dashboard.imageWorkbench.progressPercent", locale),
+    { percent: displayProgress }
+  );
 
   return (
     <div className="flex min-h-[240px] flex-col items-center justify-center gap-4 px-4 py-8 text-center">
-      <div className="h-24 w-full max-w-xs animate-pulse rounded-md bg-muted/50" />
+      {kind === "image_generate" ? (
+        <div className="w-full max-w-xs space-y-2">
+          <div
+            className="h-2 w-full overflow-hidden rounded-full bg-muted"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={displayProgress}
+            aria-label={percentLabel}
+          >
+            <div
+              className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+              style={{ width: `${displayProgress}%` }}
+            />
+          </div>
+          <p className="text-xs tabular-nums text-muted-foreground">{percentLabel}</p>
+        </div>
+      ) : (
+        <div className="h-24 w-full max-w-xs animate-pulse rounded-md bg-muted/50" />
+      )}
       <div className="flex items-center gap-2 text-sm font-medium text-foreground">
         <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
         {title}
       </div>
-      <p className="max-w-sm text-sm text-muted-foreground">{stageText}</p>
+      <p className="max-w-sm text-sm text-muted-foreground">{statusText}</p>
       <p className="text-xs tabular-nums text-muted-foreground">{waitedLabel}</p>
       <p className="max-w-sm text-xs text-muted-foreground">{longWait}</p>
     </div>

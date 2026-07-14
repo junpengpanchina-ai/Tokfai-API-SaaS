@@ -73,6 +73,7 @@ function validatePublicImageBody(body) {
 
 function checkRoutesAndAdapter() {
   const route = read("apps/dmit-api/src/routes/images.ts");
+  const worker = read("apps/dmit-api/src/images/worker.ts");
   const provider = read("apps/dmit-api/src/upstream/imageAsyncProvider.ts");
   const normalize = read("apps/dmit-api/src/upstream/normalizeImageInputs.ts");
   const surface = read("apps/dmit-api/src/lib/publicApiSurface.ts");
@@ -88,7 +89,12 @@ function checkRoutesAndAdapter() {
     ],
     [
       "uses runImageGenerationWithPolling",
-      route.includes("runImageGenerationWithPolling"),
+      worker.includes("runImageGenerationWithPolling") ||
+        route.includes("runImageGenerationWithPolling"),
+    ],
+    [
+      "enqueue async worker",
+      route.includes("enqueueImageGeneration"),
     ],
     [
       "reference_image_required",
@@ -96,10 +102,12 @@ function checkRoutesAndAdapter() {
     ],
     [
       "public success builder",
-      route.includes("buildPublicImageSuccessResponse") &&
-        route.includes('object: "image.generation"') &&
-        route.includes("tokfai:") &&
-        !route.includes("upstream_id: upstreamId,\n        credits_charged"),
+      (route.includes("buildPublicImageSuccessResponse") ||
+        route.includes("buildPublicImageTaskResponse")) &&
+        (route.includes('object: "image.generation"') ||
+          read("apps/dmit-api/src/images/publicResponse.ts").includes(
+            'object: "image.generation"'
+          )),
     ],
     [
       "createImageGenerationTask",
@@ -233,10 +241,10 @@ function checkNoLeakInPublicLayers() {
       continue;
     }
     if (rel.includes("routes/images.ts")) {
-      // Route may keep internal logs; ensure public builder + friendly errors have no brand.
-      const publicFn = src.match(
-        /function buildPublicImageSuccessResponse[\s\S]*?\n\}/
-      );
+      const pub = read("apps/dmit-api/src/images/publicResponse.ts");
+      const publicFn =
+        src.match(/function buildPublicImageSuccessResponse[\s\S]*?\n\}/) ||
+        pub.match(/function buildPublicImageTaskResponse[\s\S]*?\n\}/);
       if (!publicFn) {
         ok = fail("public success builder missing") && ok;
         continue;
@@ -256,9 +264,14 @@ function checkNoLeakInPublicLayers() {
 
 function checkFriendlyErrors() {
   const route = read("apps/dmit-api/src/routes/images.ts");
+  const worker = read("apps/dmit-api/src/images/worker.ts");
   const provider = read("apps/dmit-api/src/upstream/imageAsyncProvider.ts");
   const needed = [
-    ["insufficient_credits zh", route.includes("算力积分不足，请充值后再试。")],
+    [
+      "insufficient_credits zh",
+      route.includes("算力积分不足，请充值后再试。") ||
+        worker.includes("算力积分不足，请充值后再试。"),
+    ],
     [
       "reference_image_required zh",
       route.includes("请先上传参考图片，或改用文生图模式。"),

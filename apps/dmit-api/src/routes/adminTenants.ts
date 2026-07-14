@@ -7,6 +7,7 @@ import { supabaseAdmin, isSupabaseAdminConfigured } from "../supabase.js";
 import {
   DOMAIN_SELECT,
   TENANT_SELECT,
+  isReservedTenantSlug,
   tenantCnameTarget,
   type TenantDomainRow,
   type TenantRow,
@@ -224,6 +225,14 @@ export async function createAdminTenant(body: unknown, ctx: WriteCtx) {
 
   const sb = requireDb();
   const slug = normalizeSlug(parsed.data.slug);
+  if (isReservedTenantSlug(slug)) {
+    throw new ApiError({
+      status: 400,
+      message: "This slug is reserved and cannot be registered.",
+      code: "reserved_tenant_slug",
+      type: "validation_error",
+    });
+  }
   const now = new Date().toISOString();
   const primaryDomain =
     parsed.data.primary_domain?.trim() ||

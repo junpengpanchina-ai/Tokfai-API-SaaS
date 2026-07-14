@@ -30,7 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   DmitApiError,
-  imageGenerations,
+  imageGenerationsWithProgress,
   type ImageGenerationResponse,
 } from "@/lib/dashboard-safe/image-api";
 import {
@@ -280,6 +280,8 @@ export function ImageGeneratePanel({
   const [size, setSize] = useState<ImagePlaygroundSize>(DEFAULT_SIZE);
   const [prompt, setPrompt] = useState(IMAGE_PLAYGROUND_DEFAULT_PROMPT);
   const [loading, setLoading] = useState(false);
+  const [progressStatus, setProgressStatus] = useState<string | null>(null);
+  const [progressPercent, setProgressPercent] = useState<number | null>(null);
   const [result, setResult] = useState<ImageGenerationResponse | null>(null);
   const [completedAt, setCompletedAt] = useState<string | null>(null);
   const [error, setError] = useState<PlaygroundError | null>(null);
@@ -754,6 +756,8 @@ export function ImageGeneratePanel({
     setError(null);
     setResult(null);
     setCompletedAt(null);
+    setProgressStatus(null);
+    setProgressPercent(null);
 
     if (isModelComingSoon) {
       setError({
@@ -867,7 +871,7 @@ export function ImageGeneratePanel({
       const httpsOnly = imageUrlsForRequest.filter((url) =>
         /^https?:\/\//i.test(url)
       );
-      const payload: Parameters<typeof imageGenerations>[1] = {
+      const payload: Parameters<typeof imageGenerationsWithProgress>[1] = {
         model,
         prompt: finalPrompt,
         size,
@@ -881,7 +885,21 @@ export function ImageGeneratePanel({
 
       setLastRequestInputCount(imageUrlsForRequest.length);
       setLastRequestMode(requestMode);
-      const res = await imageGenerations(resolvedKey, payload);
+      const res = await imageGenerationsWithProgress(resolvedKey, payload, {
+        onProgress: (state) => {
+          if (state.status) setProgressStatus(state.status);
+          if (typeof state.progress === "number") {
+            setProgressPercent(state.progress);
+          }
+        },
+      });
+
+      const resolvedMode =
+        res.mode ??
+        (res.tokfai?.mode === "reference_edit" ||
+        res.tokfai?.mode === "text_to_image"
+          ? res.tokfai.mode
+          : requestMode);
 
       if (
         requestMode === "reference_edit" &&
@@ -900,9 +918,27 @@ export function ImageGeneratePanel({
         return;
       }
 
-      setResult(res);
+      const normalized: ImageGenerationResponse = {
+        ...res,
+        created: res.created ?? Math.floor(Date.now() / 1000),
+        credits_charged:
+          res.credits_charged ?? res.usage?.credits_charged ?? undefined,
+        mode: resolvedMode,
+        prompt_mode:
+          res.prompt_mode ??
+          (res.tokfai?.prompt_mode === "subject_preserve" ||
+          res.tokfai?.prompt_mode === "normal"
+            ? res.tokfai.prompt_mode
+            : undefined),
+        reference_image_included:
+          res.reference_image_included ?? resolvedMode === "reference_edit",
+      };
+
+      setResult(normalized);
+      setProgressPercent(100);
+      setProgressStatus("completed");
       setCompletedAt(
-        resolveImageCreatedAt(res) ?? new Date().toISOString()
+        resolveImageCreatedAt(normalized) ?? new Date().toISOString()
       );
       router.refresh();
     } catch (err) {
@@ -1130,6 +1166,8 @@ export function ImageGeneratePanel({
               error={error}
               result={result}
               completedAt={completedAt}
+              progressStatus={progressStatus}
+              progressPercent={progressPercent}
               inputImagesCount={
                 result?.images_count ??
                 result?.input_images_count ??

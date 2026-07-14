@@ -281,6 +281,22 @@ function assertFetchableUrl(url: URL): void {
   }
 }
 
+/** Exported for security smoke / unit checks — blocks SSRF targets. */
+export function isBlockedImageHostname(hostname: string): boolean {
+  return isBlockedHostname(hostname);
+}
+
+/** Exported for security smoke — rejects non-http(s) and private hosts. */
+export function assertImageUrlNotSsrf(rawUrl: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl.trim());
+  } catch {
+    throw resolveError("invalid_image_url", "Image URL must be a valid URL.");
+  }
+  assertFetchableUrl(parsed);
+}
+
 function isBlockedHostname(hostname: string): boolean {
   const host = hostname.trim().toLowerCase().replace(/\.$/, "");
   if (!host) return true;

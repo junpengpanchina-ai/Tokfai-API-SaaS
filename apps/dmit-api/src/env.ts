@@ -87,6 +87,8 @@ const Schema = z
     .positive()
     .default(1_048_576),
   TOKFAI_RATE_LIMIT_RPM: z.coerce.number().int().positive().default(60),
+  TOKFAI_RATE_LIMIT_IP_RPM: z.coerce.number().int().positive().default(120),
+  TOKFAI_RATE_LIMIT_TENANT_RPM: z.coerce.number().int().positive().default(600),
   TOKFAI_RATE_LIMIT_WINDOW_MS: z.coerce
     .number()
     .int()

@@ -17,11 +17,15 @@ interface WindowState {
 /** Process-local fallback when Redis is disabled or unavailable. */
 const windows = new Map<string, WindowState>();
 
-export async function checkRateLimit(limitKey: string): Promise<RateLimitResult> {
+export async function checkRateLimit(
+  limitKey: string,
+  limitOverride?: number
+): Promise<RateLimitResult> {
+  const limit = limitOverride ?? env.TOKFAI_RATE_LIMIT_RPM;
   const redis = getRedisClient();
   if (redis) {
     try {
-      return await checkRateLimitRedis(redis, limitKey);
+      return await checkRateLimitRedis(redis, limitKey, limit);
     } catch (err) {
       log.warn("redis_rate_limit_fallback", {
         message: err instanceof Error ? err.message : String(err),
@@ -29,12 +33,40 @@ export async function checkRateLimit(limitKey: string): Promise<RateLimitResult>
     }
   }
 
-  return checkRateLimitMemory(limitKey);
+  return checkRateLimitMemory(limitKey, limit);
 }
 
-function checkRateLimitMemory(limitKey: string): RateLimitResult {
+/** Per API key / caller identity RPM. */
+export function checkApiKeyRateLimit(limitKey: string): Promise<RateLimitResult> {
+  return checkRateLimit(limitKey, env.TOKFAI_RATE_LIMIT_RPM);
+}
+
+/** Per client IP RPM (short-window abuse guard). */
+export function checkIpRateLimit(ip: string): Promise<RateLimitResult> {
+  const key = `ip:${ip.trim() || "unknown"}`;
+  return checkRateLimit(key, env.TOKFAI_RATE_LIMIT_IP_RPM);
+}
+
+/** Per tenant RPM (shared quota across keys on a subsite). */
+export function checkTenantRateLimit(
+  tenantId: string | null | undefined
+): Promise<RateLimitResult> {
+  if (!tenantId) {
+    return Promise.resolve({
+      allowed: true,
+      limit: env.TOKFAI_RATE_LIMIT_TENANT_RPM,
+      remaining: env.TOKFAI_RATE_LIMIT_TENANT_RPM,
+      resetAt: Date.now() + env.TOKFAI_RATE_LIMIT_WINDOW_MS,
+    });
+  }
+  return checkRateLimit(`tenant:${tenantId}`, env.TOKFAI_RATE_LIMIT_TENANT_RPM);
+}
+
+function checkRateLimitMemory(
+  limitKey: string,
+  limit: number
+): RateLimitResult {
   const windowMs = env.TOKFAI_RATE_LIMIT_WINDOW_MS;
-  const limit = env.TOKFAI_RATE_LIMIT_RPM;
   const now = Date.now();
 
   let state = windows.get(limitKey);
@@ -60,10 +92,10 @@ function checkRateLimitMemory(limitKey: string): RateLimitResult {
 
 async function checkRateLimitRedis(
   redis: NonNullable<ReturnType<typeof getRedisClient>>,
-  limitKey: string
+  limitKey: string,
+  limit: number
 ): Promise<RateLimitResult> {
   const windowMs = env.TOKFAI_RATE_LIMIT_WINDOW_MS;
-  const limit = env.TOKFAI_RATE_LIMIT_RPM;
   const now = Date.now();
   const windowBucket = Math.floor(now / windowMs);
   const key = redisKey("rate", limitKey, String(windowBucket));

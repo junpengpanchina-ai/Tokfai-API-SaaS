@@ -194,3 +194,60 @@ export interface ChatBatchItemRow {
   started_at: string | null;
   completed_at: string | null;
 }
+
+export type ImageGenerationTaskStatus =
+  | "queued"
+  | "validating"
+  | "billing_check"
+  | "requesting_model"
+  | "generating"
+  | "saving_result"
+  | "completed"
+  | "failed"
+  | "retryable_timeout";
+
+export interface ImageGenerationTaskRow {
+  id: string;
+  request_id: string;
+  user_id: string;
+  api_key_id: string | null;
+  tenant_id: string | null;
+  model: string;
+  status: ImageGenerationTaskStatus;
+  progress: number;
+  message_en: string | null;
+  message_zh: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  result_data: unknown | null;
+  usage: unknown | null;
+  credits_charged: string | number;
+  billing_status: string;
+  idempotency_key: string | null;
+  endpoint: string;
+  input_snapshot: unknown;
+  upstream_id: string | null;
+  mode: string | null;
+  prompt_mode: string | null;
+  created_at: string;
+  updated_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface ImageGenerationTaskInputSnapshot {
+  prompt: string;
+  aspectRatio: string;
+  imageSize: string;
+  imageUrls: string[];
+  imageUrlSources: string[];
+  mode: "text_to_image" | "reference_edit";
+  promptMode: "subject_preserve" | "normal";
+  imagesCount: number;
+  imageSourceType: string;
+  imageSourceTypes: string[];
+  hasBlobBlocked: boolean;
+  n: number;
+  responseFormat: string;
+  requestedModel: string;
+}
