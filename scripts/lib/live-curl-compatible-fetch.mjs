@@ -1,14 +1,18 @@
 /**
- * Exact curl-compatible HTTPS POST for live Responses probes.
+ * Exact curl-compatible HTTPS POST for live Responses / Chat probes.
  *
  * Uses Node `https`/`http` (not undici fetch) so no automatic Accept /
  * Accept-Encoding / User-Agent headers are injected — matching:
  *
  *   curl -H "Authorization: Bearer …" -H "Content-Type: application/json" -d '…'
  *
- * Single shared entrypoint for:
+ * Shared runners:
+ *   - runLiveResponsesNonStreamProbe()
+ *   - runLiveChatCompletionsNonStreamProbe()
+ *
+ * Used by:
  *   - scripts/live-responses-curl-compatible-probe.mjs
- *   - scripts/public-beta-live-acceptance.mjs (responses non-stream only)
+ *   - scripts/public-beta-live-acceptance.mjs (responses + chat non-stream)
  *
  * Never logs full API keys.
  */
@@ -18,6 +22,7 @@ import https from "node:https";
 import { URL } from "node:url";
 
 export const LIVE_RESPONSES_PROMPT = "Say OK in one short sentence.";
+export const LIVE_CHAT_PROMPT = LIVE_RESPONSES_PROMPT;
 
 export function maskApiKeyShort(key) {
   if (!key || typeof key !== "string") return "(missing)";
@@ -29,6 +34,14 @@ export function buildResponsesNonStreamPayload(model) {
   return {
     model,
     input: LIVE_RESPONSES_PROMPT,
+    stream: false,
+  };
+}
+
+export function buildChatCompletionsNonStreamPayload(model) {
+  return {
+    model,
+    messages: [{ role: "user", content: LIVE_CHAT_PROMPT }],
     stream: false,
   };
 }
@@ -169,6 +182,52 @@ export function responsesNonStreamSucceeded(result) {
   return Array.isArray(body.output) && body.output.length > 0;
 }
 
+/**
+ * One-shot POST /v1/chat/completions non-stream with curl-identical headers + body.
+ */
+export async function postChatCompletionsNonStreamCurlCompatible(args) {
+  const {
+    apiBase,
+    apiKey,
+    model,
+    timeoutMs = 120_000,
+  } = args;
+
+  const base = String(apiBase || "").replace(/\/+$/, "");
+  const url = `${base}/v1/chat/completions`;
+  const payload = buildChatCompletionsNonStreamPayload(model);
+  const bodyJson = JSON.stringify(payload);
+
+  const result = await exactCurlCompatibleFetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: bodyJson,
+    timeoutMs,
+  });
+
+  return {
+    ...result,
+    payload,
+    bodyJson,
+    model,
+    stream: false,
+    method: "POST",
+    route: "/v1/chat/completions",
+    url,
+  };
+}
+
+export function chatCompletionsNonStreamSucceeded(result) {
+  if (result.status < 200 || result.status >= 300) return false;
+  const body = result.body;
+  if (!body || typeof body !== "object") return false;
+  if (Array.isArray(body.choices) && body.choices.length > 0) return true;
+  return body.object === "chat.completion";
+}
+
 export function extractErrorCode(body) {
   if (!body || typeof body !== "object") return null;
   const err = body.error;
@@ -190,49 +249,65 @@ export function extractRequestIdFromResult(result) {
   );
 }
 
+function isUpstreamDegradedCode(code) {
+  return (
+    code === "upstream_timeout" ||
+    code === "upstream_model_busy" ||
+    code === "image_generation_timeout" ||
+    code === "retryable_timeout"
+  );
+}
+
 /**
  * Redacted debug fingerprint. Never prints full API key.
  */
-export function printCurlCompatibleDebug(result, apiKey) {
-  const preview = (result.text ?? "").slice(0, 500);
+export function printCurlCompatibleDebug(result, apiKey, extra = {}) {
+  const preview = (result?.text ?? "").slice(0, 500);
+  const payload = result?.payload ?? {};
+  const payloadKeys =
+    payload && typeof payload === "object"
+      ? Object.keys(payload).sort().join(",")
+      : "(none)";
   console.error("DEBUG  exactCurlCompatibleFetch fingerprint (redacted)");
-  console.error(`      route=${result.route ?? "/v1/responses"}`);
-  console.error(`      url=${result.url}`);
-  console.error(`      method=${result.method ?? "POST"}`);
+  console.error(`      route=${result?.route ?? "(n/a)"}`);
+  console.error(`      method=${result?.method ?? "POST"}`);
+  console.error(`      model=${result?.model ?? "(n/a)"}`);
+  console.error(`      stream=${Boolean(result?.stream)}`);
+  console.error(`      payload_keys=${payloadKeys}`);
   console.error(
-    `      headers_keys=${(result.headerKeys ?? []).join(",") || "(none)"}`
+    `      payload_json=${result?.bodyJson ?? JSON.stringify(payload)}`
   );
-  console.error(`      model=${result.model ?? "(n/a)"}`);
-  console.error(`      stream=${Boolean(result.stream)}`);
   console.error(
-    `      payload_json=${result.bodyJson ?? JSON.stringify(result.payload ?? {})}`
+    `      headers_keys=${(result?.headerKeys ?? []).join(",") || "(none)"}`
   );
-  console.error(`      status=${result.status}`);
+  console.error(`      status=${result?.status ?? "(n/a)"}`);
   console.error(
-    `      content_type=${result.headers?.["content-type"] ?? "(n/a)"}`
+    `      content_type=${result?.headers?.["content-type"] ?? "(n/a)"}`
   );
-  console.error(`      request_id=${extractRequestIdFromResult(result) ?? "(n/a)"}`);
-  console.error(`      raw_body_length=${(result.text ?? "").length}`);
-  if (result.emptyRawBody) {
+  console.error(
+    `      request_id=${
+      result ? extractRequestIdFromResult(result) ?? "(n/a)" : "(n/a)"
+    }`
+  );
+  console.error(`      raw_body_length=${(result?.text ?? "").length}`);
+  console.error(`      body_preview=${JSON.stringify(preview)}`);
+  console.error(`      final_url=${result?.url ?? "(n/a)"}`);
+  if (result?.emptyRawBody) {
     console.error("      EMPTY_RAW_BODY_FROM_FETCH");
   }
-  console.error(`      raw_body_preview=${JSON.stringify(preview)}`);
+  if (extra.runnerMismatch) {
+    console.error(`      runner_mismatch=${extra.runnerMismatch}`);
+  }
   console.error(`      api_key=${maskApiKeyShort(apiKey)}`);
-  if (typeof result.attempt === "number") {
+  if (typeof result?.attempt === "number") {
     console.error(`      attempt=${result.attempt}`);
   }
 }
 
 /**
- * Shared runner used by BOTH the standalone probe and live acceptance.
- * Retries empty-body / transport quirks so suite order (chat first) cannot
- * falsely fail a path that works in isolation.
- *
- * Success criteria match standalone probe: HTTP 2xx + output_text/output.
- * credits_charged is returned when present but is NOT required for success
- * (matches live-responses-curl-compatible-probe.mjs).
+ * Shared empty-body / degraded classification for curl-compatible runners.
  */
-export async function runLiveResponsesNonStreamProbe(args) {
+async function runCurlCompatibleNonStreamProbe(args, postOnce, succeeded) {
   const {
     apiBase,
     apiKey,
@@ -242,11 +317,10 @@ export async function runLiveResponsesNonStreamProbe(args) {
     retryDelayMs = 1500,
   } = args;
 
-  /** @type {Awaited<ReturnType<typeof postResponsesNonStreamCurlCompatible>> | null} */
   let last = null;
 
   for (let attempt = 1; attempt <= retries; attempt += 1) {
-    const result = await postResponsesNonStreamCurlCompatible({
+    const result = await postOnce({
       apiBase,
       apiKey,
       model,
@@ -255,7 +329,7 @@ export async function runLiveResponsesNonStreamProbe(args) {
     result.attempt = attempt;
     last = result;
 
-    if (responsesNonStreamSucceeded(result)) {
+    if (succeeded(result)) {
       return {
         ok: true,
         kind: "pass",
@@ -264,7 +338,6 @@ export async function runLiveResponsesNonStreamProbe(args) {
       };
     }
 
-    // Empty body 400/etc. is a transport quirk — retry (do not treat as backend FAIL yet).
     const shouldRetry =
       result.emptyRawBody ||
       result.status === 0 ||
@@ -276,13 +349,14 @@ export async function runLiveResponsesNonStreamProbe(args) {
     }
 
     const code = extractErrorCode(result.body);
-    if (
-      code === "upstream_timeout" ||
-      code === "upstream_model_busy" ||
-      code === "image_generation_timeout" ||
-      code === "retryable_timeout"
-    ) {
-      return { ok: false, kind: "degraded", result, code, requestId: extractRequestIdFromResult(result) };
+    if (isUpstreamDegradedCode(code)) {
+      return {
+        ok: false,
+        kind: "degraded",
+        result,
+        code,
+        requestId: extractRequestIdFromResult(result),
+      };
     }
 
     if (result.emptyRawBody) {
@@ -309,4 +383,28 @@ export async function runLiveResponsesNonStreamProbe(args) {
     result: last,
     requestId: last ? extractRequestIdFromResult(last) : null,
   };
+}
+
+/**
+ * Shared runner for POST /v1/responses non-stream (standalone + acceptance).
+ * Success: HTTP 2xx + output_text/output. credits optional.
+ */
+export async function runLiveResponsesNonStreamProbe(args) {
+  return runCurlCompatibleNonStreamProbe(
+    args,
+    postResponsesNonStreamCurlCompatible,
+    responsesNonStreamSucceeded
+  );
+}
+
+/**
+ * Shared runner for POST /v1/chat/completions non-stream (acceptance).
+ * Success: HTTP 2xx + choices[] / chat.completion. credits optional at runner layer.
+ */
+export async function runLiveChatCompletionsNonStreamProbe(args) {
+  return runCurlCompatibleNonStreamProbe(
+    args,
+    postChatCompletionsNonStreamCurlCompatible,
+    chatCompletionsNonStreamSucceeded
+  );
 }

@@ -22,6 +22,7 @@
 import { acceptanceFetch } from "./lib/acceptance-http.mjs";
 import {
   printCurlCompatibleDebug,
+  runLiveChatCompletionsNonStreamProbe,
   runLiveResponsesNonStreamProbe,
 } from "./lib/live-curl-compatible-fetch.mjs";
 import {
@@ -111,6 +112,7 @@ function printProbeDebug(args) {
     res,
     body,
     text,
+    headersKeys,
   } = args;
   const keys =
     payload && typeof payload === "object"
@@ -127,11 +129,23 @@ function printProbeDebug(args) {
   console.error(`      model=${model ?? "(n/a)"}`);
   console.error(`      stream=${stream}`);
   console.error(`      payload_keys=${keys}`);
+  console.error(
+    `      payload_json=${payload ? JSON.stringify(payload) : "(n/a)"}`
+  );
+  console.error(
+    `      headers_keys=${
+      Array.isArray(headersKeys)
+        ? headersKeys.join(",")
+        : "Authorization,Content-Type"
+    }`
+  );
   console.error(`      status=${res?.status ?? "(n/a)"}`);
   console.error(`      content_type=${res?.headers?.get?.("content-type") ?? "(n/a)"}`);
   console.error(`      request_id=${rid ?? "(n/a)"}`);
-  console.error(`      final_url=${res?.url ?? "(n/a)"}`);
+  console.error(`      raw_body_length=${typeof text === "string" ? text.length : 0}`);
   console.error(`      body_preview=${JSON.stringify(preview)}`);
+  console.error(`      final_url=${res?.url ?? "(n/a)"}`);
+  console.error(`      api_key=${maskApiKey(API_KEY)}`);
 }
 
 /**
@@ -310,33 +324,88 @@ function resolveProbePlan(listedIds) {
 
 async function probeChat(model) {
   const label = `chat non-stream ${model}`;
-  const payload = {
+  // MUST use curl-compatible https.request runner (not undici fetch).
+  const outcome = await runLiveChatCompletionsNonStreamProbe({
+    apiBase: BASE,
+    apiKey: API_KEY,
     model,
-    messages: [{ role: "user", content: PROMPT }],
-    stream: false,
-  };
-  const { res, body, text } = await api("POST", "/v1/chat/completions", payload);
-  const debugCtx = {
-    route: "/v1/chat/completions",
-    method: "POST",
-    model,
-    stream: false,
-    payload,
-    res,
-    body,
-    text,
-  };
-  if (!res.ok) {
-    classifyProbeError(label, res, body, text, debugCtx);
+    timeoutMs: TIMEOUT_MS,
+    retries: 3,
+    retryDelayMs: 1500,
+  });
+
+  if (outcome.ok) {
+    const body = outcome.result.body;
+    const text = outcome.result.text;
+    const fakeRes = {
+      status: outcome.result.status,
+      ok: true,
+      headers: {
+        get: (name) =>
+          outcome.result.headers?.[String(name).toLowerCase()] ?? null,
+      },
+      url: outcome.result.url,
+    };
+    const leak = assertNoLeaks(label, text);
+    if (!leak.ok) {
+      fail(label, leak.detail);
+      return;
+    }
+    const trace = extractModelTrace(body);
+    if (!(trace.model || trace.requested_model || trace.resolved_model)) {
+      printCurlCompatibleDebug(outcome.result, API_KEY);
+      fail(label, "missing model trace fields");
+      return;
+    }
+    validateSuccessEnvelope(label, fakeRes, body, text);
     return;
   }
-  const trace = extractModelTrace(body);
-  if (!(trace.model || trace.requested_model || trace.resolved_model)) {
-    printProbeDebug(debugCtx);
-    fail(label, "missing model trace fields");
+
+  printCurlCompatibleDebug(outcome.result, API_KEY, {
+    runnerMismatch:
+      outcome.kind === "empty_body"
+        ? "chat_nonstream_curl_compatible"
+        : undefined,
+  });
+
+  if (outcome.kind === "degraded") {
+    markDegraded(
+      label,
+      `HTTP ${outcome.result.status} code=${outcome.code} request_id=${outcome.requestId ?? "(n/a)"}`
+    );
     return;
   }
-  validateSuccessEnvelope(label, res, body, text);
+
+  if (outcome.kind === "empty_body") {
+    if (model !== "gpt-5.5") {
+      markDegraded(
+        label,
+        `EMPTY_RAW_BODY_FROM_FETCH HTTP ${outcome.result?.status ?? "(n/a)"} runner mismatch (secondary)`
+      );
+      return;
+    }
+    fail(
+      label,
+      `EMPTY_RAW_BODY_FROM_FETCH HTTP ${outcome.result?.status ?? "(n/a)"} runner mismatch (not a Tokfai JSON envelope; code/message not forged)`
+    );
+    return;
+  }
+
+  const fakeRes = {
+    status: outcome.result?.status ?? 0,
+    ok: false,
+    headers: {
+      get: (name) =>
+        outcome.result?.headers?.[String(name).toLowerCase()] ?? null,
+    },
+    url: outcome.result?.url,
+  };
+  classifyProbeError(
+    label,
+    fakeRes,
+    outcome.result?.body ?? {},
+    outcome.result?.text ?? ""
+  );
 }
 
 async function probeChatStream(model) {

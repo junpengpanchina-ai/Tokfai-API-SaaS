@@ -86,6 +86,53 @@ let ok = true;
         !acceptance.includes("postResponsesNonStreamCurlCompatible("),
     ],
     [
+      "acceptance chat non-stream uses shared runner",
+      acceptance.includes("runLiveChatCompletionsNonStreamProbe") &&
+        (() => {
+          const start = acceptance.indexOf("async function probeChat(model)");
+          const end = acceptance.indexOf("async function probeChatStream", start);
+          const block = acceptance.slice(start, end > 0 ? end : undefined);
+          return (
+            block.includes("runLiveChatCompletionsNonStreamProbe") &&
+            !block.includes("acceptanceFetch") &&
+            !block.includes('api("POST", "/v1/chat/completions"')
+          );
+        })(),
+    ],
+    [
+      "shared chat runner uses https.request + fixed payload",
+      curlHelper.includes("runLiveChatCompletionsNonStreamProbe") &&
+        curlHelper.includes("buildChatCompletionsNonStreamPayload") &&
+        curlHelper.includes("postChatCompletionsNonStreamCurlCompatible") &&
+        /messages:\s*\[\s*\{\s*role:\s*"user",\s*content:\s*LIVE_CHAT_PROMPT/.test(
+          curlHelper
+        ) &&
+        !/buildChatCompletionsNonStreamPayload[\s\S]*max_tokens/.test(
+          curlHelper.slice(
+            curlHelper.indexOf("buildChatCompletionsNonStreamPayload"),
+            curlHelper.indexOf("buildChatCompletionsNonStreamPayload") + 400
+          )
+        ),
+    ],
+    [
+      "acceptance chat probe does not send max_tokens",
+      (() => {
+        const start = acceptance.indexOf("async function probeChat(model)");
+        const end = acceptance.indexOf("async function probeChatStream", start);
+        const block = acceptance.slice(start, end > 0 ? end : undefined);
+        return (
+          !/\bmax_tokens\b/.test(block) &&
+          !/\bmax_completion_tokens\b/.test(block) &&
+          !/\bmax_output_tokens\b/.test(block)
+        );
+      })(),
+    ],
+    [
+      "acceptance empty chat body marks runner mismatch",
+      acceptance.includes("runner mismatch") &&
+        acceptance.includes("chat_nonstream_curl_compatible"),
+    ],
+    [
       "standalone probe uses shared runner",
       curlProbe.includes("runLiveResponsesNonStreamProbe") &&
         curlProbe.includes("TOKFAI_LIVE_RESPONSES_CURL_COMPATIBLE_PASS"),
