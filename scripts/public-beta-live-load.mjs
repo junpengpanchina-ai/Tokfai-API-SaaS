@@ -4,8 +4,8 @@
  *
  * Modes (TOKFAI_LOAD_MODE):
  *   rate-limit  (default) — abuse / RPM guard proof.
- *     Many 429s are OK. Requires 5xx=0, timeout=0, 429 does not charge.
- *     Banner: TOKFAI_PUBLIC_BETA_RATE_LIMIT_PASS
+ *     Must observe real 429s. Non-429 4xx / 5xx / timeout / other_errors fail.
+ *     429 must not charge. Banner: TOKFAI_PUBLIC_BETA_RATE_LIMIT_PASS
  *
  *   throughput — real success under concurrency.
  *     Requires success_rate >= 95% and 429_rate <= 5%.
@@ -72,6 +72,7 @@ const RATE_429_MAX = Math.min(
   Math.max(0, parseFloat(process.env.TOKFAI_LOAD_429_RATE_MAX ?? "0.05") || 0.05)
 );
 const PROMPT = "Say OK in one short sentence.";
+const MAX_FAILURE_SAMPLES = 5;
 
 /** @type {number[]} */
 const latencies = [];
@@ -88,25 +89,90 @@ const creditsSamples = [];
 let chargedOn429 = false;
 let leakOnError = false;
 
+/** @type {Array<Record<string, unknown>>} */
+const failureSamples4xx = [];
+
 function pct(n, d) {
   if (!d) return "0.00%";
   return `${((n / d) * 100).toFixed(2)}%`;
 }
 
+function routePath() {
+  return ROUTE === "chat" ? "/v1/chat/completions" : "/v1/responses";
+}
+
+function extractErrorCode(json) {
+  const err = json?.error;
+  if (err && typeof err === "object" && typeof err.code === "string") {
+    return err.code;
+  }
+  if (typeof json?.code === "string") return json.code;
+  return null;
+}
+
+function extractErrorMessage(json, text) {
+  const err = json?.error;
+  if (err && typeof err === "object" && typeof err.message === "string") {
+    return err.message;
+  }
+  if (typeof err === "string" && err.trim()) return err;
+  if (typeof json?.message === "string") return json.message;
+  if (typeof text === "string" && text.trim()) return text.slice(0, 200);
+  return null;
+}
+
+function maybeRecord4xxSample({ status, json, text, path, url, elapsedMs, res }) {
+  if (failureSamples4xx.length >= MAX_FAILURE_SAMPLES) return;
+  failureSamples4xx.push({
+    status,
+    code: extractErrorCode(json),
+    message: extractErrorMessage(json, text),
+    request_id: extractRequestId(json, res),
+    route: path,
+    model: MODEL,
+    final_url: url,
+    body_preview: (typeof text === "string" ? text : "").slice(0, 500),
+    elapsed_ms: elapsedMs,
+  });
+}
+
+function printFailureSamples() {
+  if (!failureSamples4xx.length) return;
+  console.error("\n=== Failure samples (4xx excluding 429, max 5) ===");
+  for (let i = 0; i < failureSamples4xx.length; i += 1) {
+    const s = failureSamples4xx[i];
+    console.error(`--- sample ${i + 1} ---`);
+    console.error(`      status=${s.status}`);
+    console.error(`      code=${s.code ?? "(n/a)"}`);
+    console.error(`      message=${s.message ?? "(n/a)"}`);
+    console.error(`      request_id=${s.request_id ?? "(n/a)"}`);
+    console.error(`      route=${s.route}`);
+    console.error(`      model=${s.model}`);
+    console.error(`      final_url=${s.final_url}`);
+    console.error(`      body_preview=${JSON.stringify(s.body_preview)}`);
+    console.error(`      elapsed_ms=${s.elapsed_ms}`);
+  }
+}
+
+function chargeCheckLabel() {
+  if (status429 === 0) return "n/a (no 429)";
+  if (chargedOn429) return "CHARGED (bad)";
+  return "no_charge (ok)";
+}
+
 async function oneShot() {
   const started = Date.now();
+  const path = routePath();
+  const url = `${BASE}${path}`;
   try {
-    let path;
     let body;
     if (ROUTE === "chat") {
-      path = "/v1/chat/completions";
       body = {
         model: MODEL,
         messages: [{ role: "user", content: PROMPT }],
         stream: false,
       };
     } else {
-      path = "/v1/responses";
       body = {
         model: MODEL,
         input: PROMPT,
@@ -114,7 +180,7 @@ async function oneShot() {
       };
     }
 
-    const { res, body: json, text } = await acceptanceFetch(`${BASE}${path}`, {
+    const { res, body: json, text } = await acceptanceFetch(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${API_KEY}`,
@@ -122,6 +188,7 @@ async function oneShot() {
       },
       body: JSON.stringify(body),
       timeoutMs: TIMEOUT_MS,
+      curlCompatible: true,
     });
 
     const ms = Date.now() - started;
@@ -149,6 +216,15 @@ async function oneShot() {
 
     if (res.status >= 400) {
       status4xxExcluding429 += 1;
+      maybeRecord4xxSample({
+        status: res.status,
+        json,
+        text,
+        path,
+        url: res.url || url,
+        elapsedMs: ms,
+        res,
+      });
       const leak = assertNoLeaks("4xx body", text);
       if (!leak.ok) leakOnError = true;
       return;
@@ -214,26 +290,53 @@ function printResults({
     }`
   );
   console.log(`sample_request_id=${sampleRequestId ?? "(none)"}`);
-  console.log(
-    `429_charge_check=${
-      status429 === 0
-        ? "n/a (no 429)"
-        : chargedOn429
-          ? "CHARGED (bad)"
-          : "no_charge (ok)"
-    }`
-  );
+  console.log(`429_charge_check=${chargeCheckLabel()}`);
 }
 
+/**
+ * Rate-limit mode must prove real RPM 429s — not pass on unrelated 4xx.
+ */
 function evaluateRateLimit({ p95 }) {
   /** @type {string[]} */
   const fails = [];
 
-  if (requests === 0) fails.push("no requests completed");
+  if (requests === 0) {
+    fails.push("no requests completed");
+  }
+
+  if (success === 0 && status429 === 0) {
+    fails.push(
+      "no valid authenticated request observed (success=0 and 429=0)"
+    );
+  }
+
+  if (status429 === 0) {
+    fails.push(
+      "no 429 observed in rate-limit mode — check API key / auth / endpoint / script headers"
+    );
+  }
+
+  if (status4xxExcluding429 > 0) {
+    fails.push(
+      `4xx_excluding_429=${status4xxExcluding429} (must be 0; non-429 4xx is not rate-limit proof)`
+    );
+  }
+
   if (status5xx > 0) fails.push(`5xx=${status5xx} (must be 0)`);
   if (timeouts > 0) fails.push(`timeout=${timeouts} (must be 0)`);
-  if (chargedOn429) fails.push("429 response reported credits_charged > 0");
+  if (otherErrors > 0) {
+    fails.push(`other_errors=${otherErrors} (must be 0)`);
+  }
+
+  const charge = chargeCheckLabel();
+  if (status429 > 0 && chargedOn429) {
+    fails.push("429_charge_check=CHARGED (bad) — 429 must be no_charge");
+  } else if (status429 > 0 && charge !== "no_charge (ok)") {
+    fails.push(`429_charge_check=${charge} (must be no_charge or ok)`);
+  }
+
   if (leakOnError) fails.push("body leaked stack or upstream material");
+
   // p95 optional soft check for rate-limit (mostly 429s are fast); still flag extreme hangs
   if (p95 > P95_MAX_MS * 2) {
     fails.push(`p95 ${p95}ms extreme (> ${P95_MAX_MS * 2}ms)`);
@@ -275,7 +378,7 @@ async function main() {
   );
   console.log(
     MODE_RAW === "rate-limit"
-      ? "purpose: verify abuse resistance (429 expected under pressure)"
+      ? "purpose: verify abuse resistance (must observe real 429; non-429 4xx fails)"
       : MODE_RAW === "throughput"
         ? "purpose: verify real throughput (needs high RPM key / tenant)"
         : "purpose: (unknown mode)"
@@ -323,13 +426,18 @@ async function main() {
   if (fails.length) {
     console.error("\n=== Failures ===");
     for (const f of fails) console.error(`FAIL  ${f}`);
+    if (MODE === "rate-limit" && status4xxExcluding429 > 0) {
+      printFailureSamples();
+    }
     console.error("\npublic-beta-live-load: FAILED");
     process.exit(1);
   }
 
   console.log("\npublic-beta-live-load: OK");
   if (MODE === "rate-limit") {
-    console.log("PASS  rate-limit mode (429 allowed; no 5xx / timeout / charge)");
+    console.log(
+      "PASS  rate-limit mode (429>0; 4xx_excluding_429=0; no 5xx/timeout/other_errors/charge)"
+    );
     console.log("TOKFAI_PUBLIC_BETA_RATE_LIMIT_PASS");
   } else {
     console.log(
