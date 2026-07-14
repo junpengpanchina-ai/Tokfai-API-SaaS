@@ -51,11 +51,21 @@ export function buildClientErrorBody(
   requestId?: string
 ): { error: ApiErrorPayload; request_id?: string } {
   const body = err.toJSON();
+  // Always expose a non-empty code for client / acceptance envelopes.
+  if (!body.error.code) {
+    body.error.code =
+      err.status >= 500
+        ? "server_error"
+        : err.status === 401 || err.status === 403
+          ? "unauthorized"
+          : "bad_request";
+  }
   if (requestId) {
     body.error.request_id = requestId;
   }
-  // Keep top-level request_id for gateway / timeout statuses (existing clients).
-  if (requestId && shouldIncludeRequestIdInError(err.status)) {
+  // Top-level request_id for gateway statuses; also for all 4xx/5xx so
+  // clients never see request_id:null in the standard envelope lookup path.
+  if (requestId && (shouldIncludeRequestIdInError(err.status) || err.status >= 400)) {
     return { ...body, request_id: requestId };
   }
   return body;

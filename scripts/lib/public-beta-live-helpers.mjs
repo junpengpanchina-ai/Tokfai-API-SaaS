@@ -8,6 +8,14 @@ export const LEAK_RE =
 
 export const FULL_KEY_RE = /sk-tokfai_[a-f0-9]{48}/i;
 
+/** Upstream capacity / latency — gateway OK, model degraded. */
+export const UPSTREAM_DEGRADED_CODES = new Set([
+  "upstream_timeout",
+  "upstream_model_busy",
+  "image_generation_timeout",
+  "retryable_timeout",
+]);
+
 export function maskApiKey(key) {
   if (!key || typeof key !== "string") return "(missing)";
   if (key.length < 16) return "(redacted)";
@@ -38,6 +46,7 @@ export function extractModelTrace(body) {
   };
 }
 
+/** Numeric credits only — never return a raw usage object. */
 export function extractCredits(body) {
   if (typeof body?.credits_charged === "number") return body.credits_charged;
   if (typeof body?.usage?.credits_charged === "number") {
@@ -46,7 +55,55 @@ export function extractCredits(body) {
   if (typeof body?.tokfai?.credits_charged === "number") {
     return body.tokfai.credits_charged;
   }
-  if (body?.usage && typeof body.usage === "object") return body.usage;
+  return null;
+}
+
+export function isUpstreamDegradedCode(code) {
+  return typeof code === "string" && UPSTREAM_DEGRADED_CODES.has(code);
+}
+
+/**
+ * Try to recover an error object from JSON body, `_raw`, or SSE frames.
+ */
+export function extractErrorObject(body, text) {
+  if (body?.error && typeof body.error === "object") {
+    return body.error;
+  }
+  if (typeof body?.error === "string") {
+    return { message: body.error, code: body.code ?? null };
+  }
+  const raw =
+    typeof text === "string"
+      ? text
+      : typeof body?._raw === "string"
+        ? body._raw
+        : "";
+  if (!raw) return null;
+
+  // Full JSON error body
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed?.error && typeof parsed.error === "object") return parsed.error;
+  } catch {
+    // continue
+  }
+
+  // SSE: data: {"error":{...}}
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) continue;
+    const payload = trimmed.slice(5).trim();
+    if (!payload || payload === "[DONE]") continue;
+    try {
+      const parsed = JSON.parse(payload);
+      if (parsed?.error && typeof parsed.error === "object") return parsed.error;
+      if (typeof parsed?.code === "string" && typeof parsed?.message === "string") {
+        return parsed;
+      }
+    } catch {
+      // continue
+    }
+  }
   return null;
 }
 
@@ -68,16 +125,67 @@ export function assertNoLeaks(label, payload) {
   return { ok: true };
 }
 
-export function safeErrorSummary(body, status) {
-  const code = body?.error?.code ?? body?.code ?? null;
+export function safeErrorSummary(body, status, text) {
+  const err = extractErrorObject(body, text) ?? {};
+  const code =
+    (typeof err.code === "string" && err.code) ||
+    (typeof body?.code === "string" && body.code) ||
+    null;
   const message =
-    typeof body?.error?.message === "string"
-      ? body.error.message.slice(0, 160)
+    typeof err.message === "string"
+      ? err.message.slice(0, 160)
       : typeof body?.error === "string"
         ? body.error.slice(0, 160)
         : null;
-  const requestId = extractRequestId(body, null);
+  const requestId =
+    (typeof err.request_id === "string" && err.request_id) ||
+    extractRequestId(body, null);
   return { status, code, message, request_id: requestId };
+}
+
+/**
+ * Standard Tokfai error envelope for 4xx/5xx:
+ *   { error: { code, message, request_id } }
+ * request_id may also appear top-level or in x-request-id.
+ */
+export function assertStandardErrorEnvelope(body, res, text) {
+  const err = extractErrorObject(body, text);
+  if (!err || typeof err !== "object") {
+    return {
+      ok: false,
+      detail: "missing error object",
+      summary: safeErrorSummary(body, res?.status, text),
+    };
+  }
+  const code = typeof err.code === "string" ? err.code.trim() : "";
+  const message = typeof err.message === "string" ? err.message.trim() : "";
+  const requestId =
+    (typeof err.request_id === "string" && err.request_id.trim()) ||
+    extractRequestId(body, res) ||
+    "";
+
+  if (!code || !message || !requestId) {
+    return {
+      ok: false,
+      detail: `incomplete envelope code=${code || "null"} message=${message ? "ok" : "null"} request_id=${requestId || "null"}`,
+      summary: {
+        status: res?.status ?? null,
+        code: code || null,
+        message: message ? message.slice(0, 160) : null,
+        request_id: requestId || null,
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    summary: {
+      status: res?.status ?? null,
+      code,
+      message: message.slice(0, 160),
+      request_id: requestId,
+    },
+  };
 }
 
 export function percentile(sorted, p) {

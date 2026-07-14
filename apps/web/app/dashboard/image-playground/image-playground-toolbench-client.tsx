@@ -681,19 +681,36 @@ export function ImagePlaygroundResultArea({
   // show that as the primary message. Upstream/API failures stay generic;
   // raw upstream text only appears inside collapsed Details.
   const isClientValidation = error?.status === 0;
+  const isRetryableTimeout =
+    error?.code === "retryable_timeout" ||
+    error?.code === "image_generation_timeout" ||
+    error?.code === "upstream_timeout" ||
+    Boolean(error?.code?.toLowerCase().includes("timeout")) ||
+    Boolean(error?.message?.toLowerCase().includes("timeout")) ||
+    Boolean(error?.message?.includes("超时")) ||
+    Boolean(error?.message?.includes("未扣费"));
+
   const friendlyError = isClientValidation && error?.message
     ? error.message
-    : error?.code?.toLowerCase().includes("timeout") ||
-        error?.message?.toLowerCase().includes("timeout") ||
-        error?.message?.includes("超时")
+    : isRetryableTimeout
       ? t("dashboard.imageWorkbench.imageTimeoutFriendly")
       : t("dashboard.imageWorkbench.imageFailFriendly");
 
   const billingHint = isClientValidation
     ? null
-    : error?.code === "no_charge" || error?.code === "not_charged"
+    : isRetryableTimeout ||
+        error?.code === "no_charge" ||
+        error?.code === "not_charged"
       ? t("dashboard.imageWorkbench.noChargeHint")
       : t("dashboard.imageWorkbench.billingUnknownHint");
+
+  const focusModelSelect = () => {
+    const el = document.getElementById("toolbench-model");
+    if (el instanceof HTMLElement) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.focus();
+    }
+  };
 
   return (
     <Card className={cardClass}>
@@ -746,10 +763,23 @@ export function ImagePlaygroundResultArea({
                   onClick={onRetry}
                 >
                   <RotateCw className="h-4 w-4" />
-                  {t("dashboard.imagePlayground.toolbenchRetry")}
+                  {isRetryableTimeout
+                    ? t("dashboard.imageWorkbench.regenerate")
+                    : t("dashboard.imagePlayground.toolbenchRetry")}
                 </Button>
               ) : null}
-              {onSimplifyRetry ? (
+              {isRetryableTimeout ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className={IMAGE_PLAYGROUND_TOOLBENCH.control}
+                  onClick={focusModelSelect}
+                >
+                  {t("dashboard.imageWorkbench.switchModel")}
+                </Button>
+              ) : null}
+              {onSimplifyRetry && !isRetryableTimeout ? (
                 <Button
                   type="button"
                   size="sm"

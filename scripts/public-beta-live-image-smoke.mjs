@@ -6,8 +6,11 @@
  *   TOKFAI_API_KEY=sk-tokfai_... node scripts/public-beta-live-image-smoke.mjs
  *   TOKFAI_API_KEY=... TOKFAI_OTHER_API_KEY=... node scripts/public-beta-live-image-smoke.mjs
  *
+ * Optional faster-model acceptance:
+ *   TOKFAI_API_KEY=... TOKFAI_IMAGE_MODEL=nano-banana-fast node scripts/public-beta-live-image-smoke.mjs
+ *
  * Env:
- *   TOKFAI_IMAGE_MODEL   default gpt-image-2
+ *   TOKFAI_IMAGE_MODEL   default gpt-image-2 (try nano-banana-fast for faster runs)
  *   TOKFAI_IMAGE_PROMPT  default clean dashboard illustration
  *   TOKFAI_IMAGE_SIZE    default 1024x1024
  *   TOKFAI_IMAGE_POLL_MS default 180000
@@ -72,6 +75,51 @@ function isTerminal(status) {
   );
 }
 
+function assertTimeoutNoCharge(latest, taskId) {
+  const progress =
+    typeof latest.progress === "number" ? latest.progress : null;
+  if (progress == null || progress >= 100) {
+    fail(
+      "progress under retryable_timeout must be < 100",
+      `progress=${progress}`
+    );
+  } else {
+    pass(
+      "progress under retryable_timeout must be < 100",
+      `progress=${progress}`
+    );
+  }
+
+  const charged = Number(
+    latest.credits_charged ?? latest.usage?.credits_charged ?? 0
+  );
+  if (!Number.isFinite(charged) || charged !== 0) {
+    fail("timeout 不扣费", `credits_charged=${charged}`);
+  } else {
+    pass("timeout 不扣费", "credits_charged=0");
+  }
+
+  const url =
+    latest?.data?.[0]?.url ?? latest?.results?.[0]?.url ?? null;
+  if (url) {
+    fail(
+      "result url only on completed",
+      "url present on retryable_timeout"
+    );
+  } else {
+    pass("result url only on completed", "no url on timeout");
+  }
+
+  const err = latest.error && typeof latest.error === "object" ? latest.error : {};
+  const code = err.code ?? latest.status;
+  const message =
+    typeof err.message === "string" ? err.message.slice(0, 160) : null;
+  pass(
+    "image retryable_timeout (friendly only)",
+    `code=${code} message=${message ?? "(none)"} request_id=${taskId}`
+  );
+}
+
 async function main() {
   console.log("=== Tokfai Public Beta Live Image Smoke ===");
   console.log(`base: ${BASE}`);
@@ -113,7 +161,12 @@ async function main() {
     `HTTP ${res.status} id=${taskId} status=${body?.status ?? "n/a"}`
   );
 
-  if (body?.status && body.status !== "queued" && body.status !== "completed" && body.status !== "succeeded") {
+  if (
+    body?.status &&
+    body.status !== "queued" &&
+    body.status !== "completed" &&
+    body.status !== "succeeded"
+  ) {
     // validating / generating etc. is fine mid-flight if sync somehow returned early
     pass("initial status", String(body.status));
   } else if (body?.status === "queued" || res.status === 202) {
@@ -147,21 +200,48 @@ async function main() {
       fail("progress range", `progress=${progress}`);
       break;
     }
+    // Only completed may report 100 while in-flight / terminal non-complete.
+    if (
+      progress === 100 &&
+      latest.status !== "completed" &&
+      latest.status !== "succeeded"
+    ) {
+      fail(
+        "progress=100 only when completed",
+        `status=${latest.status} progress=${progress}`
+      );
+      break;
+    }
     process.stdout.write(
       `  … status=${latest.status} progress=${progress ?? "?"}\n`
     );
   }
 
-  if (latest?.status === "failed" || latest?.status === "retryable_timeout") {
+  if (latest?.status === "retryable_timeout") {
+    assertTimeoutNoCharge(latest, taskId);
+    const blob = JSON.stringify(latest);
+    const leak = assertNoLeaks("timeout image body", blob);
+    if (!leak.ok) fail("timeout body no upstream", leak.detail);
+  } else if (latest?.status === "failed") {
     const err = latest.error && typeof latest.error === "object" ? latest.error : {};
     const code = err.code ?? latest.status;
     const message =
       typeof err.message === "string" ? err.message.slice(0, 160) : null;
-    // Friendly only — never dump raw upstream
     pass(
       "image failed (friendly only)",
       `code=${code} message=${message ?? "(none)"} request_id=${taskId}`
     );
+    const credits = extractCredits(latest);
+    if (typeof credits === "number" && credits > 0) {
+      fail("failed must not charge", `credits_charged=${credits}`);
+    } else {
+      pass("failed 不扣费", String(credits ?? 0));
+    }
+    const progress =
+      typeof latest.progress === "number" ? latest.progress : null;
+    if (progress != null && progress >= 100) {
+      fail("failed progress < 100", `progress=${progress}`);
+    }
     const blob = JSON.stringify(latest);
     const leak = assertNoLeaks("failed image body", blob);
     if (!leak.ok) fail("failed body no upstream", leak.detail);

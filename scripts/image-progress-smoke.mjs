@@ -90,6 +90,26 @@ let ok = true;
     ["Validating request EN", msgs.includes("Validating request")],
     ["Checking credits EN", msgs.includes("Checking credits")],
     ["Generating image EN", msgs.includes("Generating image")],
+    [
+      "timeout copy EN",
+      msgs.includes("No credits were charged") &&
+        msgs.includes("faster image model"),
+    ],
+    [
+      "timeout copy ZH",
+      msgs.includes("未扣费") && msgs.includes("更快的图片模型"),
+    ],
+    [
+      "retryable_timeout progress < 100",
+      /retryable_timeout:\s*9[05]/.test(msgs) &&
+        !/retryable_timeout:\s*100/.test(msgs),
+    ],
+    ["completed progress 100", /completed:\s*100/.test(msgs)],
+    [
+      "publicProgress clamps non-completed",
+      pub.includes("publicProgressForStatus") &&
+        pub.includes('status === "completed"'),
+    ],
   ];
 
   const failed = checks.filter(([, v]) => !v).map(([n]) => n);
@@ -127,7 +147,12 @@ let ok = true;
     "statusSavingResult",
     "statusCompleted",
     "statusFailed",
+    "statusRetryableTimeout",
     "progressPercent",
+    "imageTimeoutFriendly",
+    "noChargeHint",
+    "regenerate",
+    "switchModel",
   ];
   const missing = requiredKeys.filter(
     (k) => !labels.includes(`dashboard.imageWorkbench.${k}`)
@@ -162,10 +187,28 @@ let ok = true;
     ["0-80 estimate", progressUi.includes("ESTIMATE_MS") || progressUi.includes("80")],
     ["poll helper", imageApi.includes("imageGenerationsWithProgress")],
     ["GET status helper", imageApi.includes("getImageGenerationStatus")],
+    ["timeout throws retryable_timeout", imageApi.includes('"retryable_timeout"')],
   ];
   const uiFail = uiChecks.filter(([, v]) => !v).map(([n]) => n);
   if (uiFail.length) ok = fail("frontend progress UI", uiFail.join(", ")) && ok;
   else pass("frontend progress UI");
+
+  const toolbench = read(
+    "apps/web/app/dashboard/image-playground/image-playground-toolbench-client.tsx"
+  );
+  if (
+    !toolbench.includes("dashboard.imageWorkbench.regenerate") ||
+    !toolbench.includes("dashboard.imageWorkbench.switchModel") ||
+    !toolbench.includes("dashboard.imageWorkbench.noChargeHint")
+  ) {
+    ok =
+      fail(
+        "timeout UX actions",
+        "expected regenerate / switchModel / noChargeHint wiring"
+      ) && ok;
+  } else {
+    pass("timeout UX actions (regenerate / switch model / 未扣费)");
+  }
 }
 
 if (!ok) {

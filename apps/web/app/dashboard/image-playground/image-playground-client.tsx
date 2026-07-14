@@ -889,7 +889,11 @@ export function ImageGeneratePanel({
         onProgress: (state) => {
           if (state.status) setProgressStatus(state.status);
           if (typeof state.progress === "number") {
-            setProgressPercent(state.progress);
+            const capped =
+              state.status === "completed" || state.status === "succeeded"
+                ? state.progress
+                : Math.min(state.progress, 95);
+            setProgressPercent(capped);
           }
         },
       });
@@ -944,17 +948,25 @@ export function ImageGeneratePanel({
     } catch (err) {
       setCompletedAt(new Date().toISOString());
       const base = toPlaygroundError(err, t);
+      const isTimeout =
+        base.code === "retryable_timeout" ||
+        base.code === "image_generation_timeout" ||
+        base.code === "upstream_timeout";
+      // Never show 100% / success chrome on timeout or failure.
+      if (isTimeout) {
+        setProgressStatus("retryable_timeout");
+        setProgressPercent((prev) =>
+          typeof prev === "number" ? Math.min(prev, 95) : 95
+        );
+      }
+      setResult(null);
       setError({
         ...base,
         model,
         elapsedMs: Date.now() - generateStartedAt,
         // Gateway may retry timeout/busy once server-side; client cannot observe count.
         retryCount:
-          base.code === "image_generation_timeout" ||
-          base.code === "upstream_timeout" ||
-          base.code === "upstream_model_busy"
-            ? 1
-            : 0,
+          isTimeout || base.code === "upstream_model_busy" ? 1 : 0,
       });
     } finally {
       setLoading(false);
@@ -1637,6 +1649,18 @@ function toPlaygroundError(
         status: err.status,
         code: err.code,
         message: err.message,
+      };
+    }
+    if (
+      code === "retryable_timeout" ||
+      code === "image_generation_timeout" ||
+      code === "upstream_timeout"
+    ) {
+      return {
+        status: err.status,
+        code: "retryable_timeout",
+        message: t("dashboard.imageWorkbench.imageTimeoutFriendly"),
+        requestId: extractDmitRequestId(err.body),
       };
     }
     if (code && IMAGE_PAGE_RESOLVE_ERROR_CODES.has(code)) {

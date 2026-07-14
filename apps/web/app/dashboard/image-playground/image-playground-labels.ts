@@ -73,7 +73,7 @@ const EN: Record<string, string> = {
   "dashboard.imageWorkbench.analysisResultEmpty":
     "Upload an image and click Analyze to see results here.",
   "dashboard.imageWorkbench.copyAllCopy": "Copy all",
-  "dashboard.imageWorkbench.regenerate": "Try again",
+  "dashboard.imageWorkbench.tryAgain": "Try again",
   "dashboard.imageWorkbench.copyFailed":
     "This attempt did not complete. Failed calls are usually not charged. Try simplifying the request and retry.",
   "dashboard.imageWorkbench.timeoutFriendly":
@@ -88,13 +88,15 @@ const EN: Record<string, string> = {
     "Image generation usually takes 20–60 seconds. Please keep this page open…",
   "dashboard.imageWorkbench.imageProgressTitle": "Creating your image",
   "dashboard.imageWorkbench.imageTimeoutFriendly":
-    "This attempt did not complete. Failed calls are usually not charged. Try simplifying the request and retry.",
+    "Image generation took longer than expected. No credits were charged. Please retry later or use a faster image model.",
   "dashboard.imageWorkbench.imageFailFriendly":
     "This attempt did not complete. Failed calls are usually not charged. Try simplifying the request and retry.",
   "dashboard.imageWorkbench.noChargeHint":
-    "This attempt did not succeed and usually will not use credits.",
+    "No credits were charged for this attempt.",
   "dashboard.imageWorkbench.billingUnknownHint":
     "Billing follows your usage records. Open Details if you need support info.",
+  "dashboard.imageWorkbench.regenerate": "Regenerate",
+  "dashboard.imageWorkbench.switchModel": "Switch model",
   "dashboard.imageWorkbench.goToCopy": "Write product copy",
   "dashboard.imageWorkbench.goToGenerate": "Create or edit with this image",
   "dashboard.imageWorkbench.goToGenerateFromCopy": "Create image from this copy",
@@ -120,6 +122,8 @@ const EN: Record<string, string> = {
   "dashboard.imageWorkbench.statusSavingResult": "Saving result",
   "dashboard.imageWorkbench.statusCompleted": "Completed",
   "dashboard.imageWorkbench.statusFailed": "Failed",
+  "dashboard.imageWorkbench.statusRetryableTimeout":
+    "Image generation took longer than expected",
   "dashboard.imageWorkbench.progressPercent": "{percent}%",
   "dashboard.imageWorkbench.visionStage1": "Reading your image...",
   "dashboard.imageWorkbench.visionStage2": "Understanding your request...",
@@ -355,7 +359,7 @@ const ZH: Record<string, string> = {
   "dashboard.imageWorkbench.analysisResultEmpty":
     "上传图片并点击开始分析，结果会显示在这里。",
   "dashboard.imageWorkbench.copyAllCopy": "复制全部",
-  "dashboard.imageWorkbench.regenerate": "再试一次",
+  "dashboard.imageWorkbench.tryAgain": "再试一次",
   "dashboard.imageWorkbench.copyFailed":
     "这次没有成功，通常不会扣费。你可以简化需求后重试。",
   "dashboard.imageWorkbench.timeoutFriendly":
@@ -370,12 +374,14 @@ const ZH: Record<string, string> = {
     "图片生成通常需要 20–60 秒，请保持页面打开…",
   "dashboard.imageWorkbench.imageProgressTitle": "正在生成图片",
   "dashboard.imageWorkbench.imageTimeoutFriendly":
-    "这次没有成功，通常不会扣费。你可以简化需求后重试。",
+    "图片生成时间较长，未扣费。你可以稍后重试，或切换更快的图片模型。",
   "dashboard.imageWorkbench.imageFailFriendly":
     "这次没有成功，通常不会扣费。你可以简化需求后重试。",
-  "dashboard.imageWorkbench.noChargeHint": "本次未成功，通常不会扣除算力积分。",
+  "dashboard.imageWorkbench.noChargeHint": "未扣费",
   "dashboard.imageWorkbench.billingUnknownHint":
     "扣费以用量记录为准。如需排查，可在详情中查看。",
+  "dashboard.imageWorkbench.regenerate": "重新生成",
+  "dashboard.imageWorkbench.switchModel": "切换模型",
   "dashboard.imageWorkbench.goToCopy": "去写商品文案",
   "dashboard.imageWorkbench.goToGenerate": "用这张图生成 / 改图",
   "dashboard.imageWorkbench.goToGenerateFromCopy": "用这份文案生成图",
@@ -401,6 +407,7 @@ const ZH: Record<string, string> = {
   "dashboard.imageWorkbench.statusSavingResult": "正在保存结果",
   "dashboard.imageWorkbench.statusCompleted": "已完成",
   "dashboard.imageWorkbench.statusFailed": "失败",
+  "dashboard.imageWorkbench.statusRetryableTimeout": "图片生成时间较长",
   "dashboard.imageWorkbench.progressPercent": "{percent}%",
   "dashboard.imageWorkbench.visionStage1": "正在读取图片...",
   "dashboard.imageWorkbench.visionStage2": "正在理解你的需求...",

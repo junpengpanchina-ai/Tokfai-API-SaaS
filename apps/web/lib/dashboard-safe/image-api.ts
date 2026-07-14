@@ -70,7 +70,12 @@ export interface ImageGenerationResponse {
   upstream_images_count?: number;
   image_source_type?: "data_url" | "https_url" | "blob_blocked" | "none";
   image_url_sources?: ImageUrlResolveSource[];
-  error?: { code?: string; message?: string } | null;
+  error?: {
+    code?: string;
+    message?: string;
+    message_en?: string;
+    message_zh?: string;
+  } | null;
   tokfai?: {
     request_id?: string;
     mode?: string | null;
@@ -202,17 +207,25 @@ export async function imageGenerationsWithProgress(
   }
 
   if (latest.status === "failed" || latest.status === "retryable_timeout") {
-    const code = latest.error?.code ?? latest.status;
-    const message =
-      latest.error?.message ??
-      (typeof latest.message === "string"
+    const code =
+      latest.status === "retryable_timeout"
+        ? "retryable_timeout"
+        : (latest.error?.code ?? latest.status);
+    const msgObj =
+      latest.message && typeof latest.message === "object"
         ? latest.message
-        : latest.message?.en) ??
+        : null;
+    const message =
+      latest.error?.message_en ??
+      latest.error?.message ??
+      (typeof latest.message === "string" ? latest.message : undefined) ??
+      msgObj?.en ??
       "Image generation failed.";
     throw new DashboardDmitApiError({
       status: latest.status === "retryable_timeout" ? 504 : 502,
       message,
       code,
+      body: latest,
     });
   }
 

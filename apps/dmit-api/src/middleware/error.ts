@@ -74,7 +74,9 @@ export const errorHandler: ErrorHandler = (err, c) => {
         message: "Internal error.",
         code: "server_error",
         type: "server_error",
+        ...(requestId ? { request_id: requestId } : {}),
       },
+      ...(requestId ? { request_id: requestId } : {}),
     },
     500
   );
@@ -82,13 +84,16 @@ export const errorHandler: ErrorHandler = (err, c) => {
 
 /** 404 handler when no route matches. */
 export function notFoundHandler(c: Context) {
+  const requestId = getRequestId(c);
   return c.json(
     {
       error: {
         message: `No route for ${c.req.method} ${c.req.path}.`,
         code: "route_not_found",
         type: "not_found",
+        ...(requestId ? { request_id: requestId } : {}),
       },
+      ...(requestId ? { request_id: requestId } : {}),
     },
     404
   );

@@ -48,8 +48,8 @@ const STATUS_MESSAGES: Record<ImageTaskStatus, ProgressMessagePair> = {
     zh: "失败",
   },
   retryable_timeout: {
-    en: "Timed out — you can retry",
-    zh: "超时，可重试",
+    en: "Image generation took longer than expected. No credits were charged. Please retry later or use a faster image model.",
+    zh: "图片生成时间较长，未扣费。你可以稍后重试，或切换更快的图片模型。",
   },
 };
 
@@ -60,9 +60,10 @@ export const STATUS_PROGRESS: Record<ImageTaskStatus, number> = {
   requesting_model: 28,
   generating: 55,
   saving_result: 90,
+  /** Only completed may report 100 to clients. */
   completed: 100,
-  failed: 100,
-  retryable_timeout: 100,
+  failed: 95,
+  retryable_timeout: 95,
 };
 
 export function messagesForStatus(status: ImageTaskStatus): ProgressMessagePair {

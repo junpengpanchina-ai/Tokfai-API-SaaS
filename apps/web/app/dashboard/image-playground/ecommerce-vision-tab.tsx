@@ -597,7 +597,7 @@ export function EcommerceVisionTab({
                   onClick={() => void handleRun()}
                 >
                   <RotateCw className="h-3.5 w-3.5" />
-                  {t("dashboard.imageWorkbench.regenerate")}
+                  {t("dashboard.imageWorkbench.tryAgain")}
                 </Button>
                 <Button
                   type="button"
@@ -661,7 +661,7 @@ export function EcommerceVisionTab({
                   onClick={() => void handleRun()}
                 >
                   <RotateCw className="h-3.5 w-3.5" />
-                  {t("dashboard.imageWorkbench.regenerate")}
+                  {t("dashboard.imageWorkbench.tryAgain")}
                 </Button>
                 {!isCopyMode && onGoToCopy ? (
                   <Button type="button" size="sm" onClick={handleGoToCopy}>

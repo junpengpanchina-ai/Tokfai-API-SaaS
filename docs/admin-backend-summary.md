@@ -25,6 +25,8 @@ node scripts/public-beta-ready-all.mjs
 
 ```bash
 TOKFAI_API_KEY=sk-tokfai_xxx node scripts/public-beta-live-acceptance.mjs
+# 默认：gpt-5.5 chat+responses+stream；gemini-2.5-flash 仅 responses non-stream
+# 扩矩阵：TOKFAI_LIVE_FULL_MATRIX=1（上游 timeout/busy → DEGRADED，仍可 LIVE_READY）
 ```
 
 线上图片（显式开启）：

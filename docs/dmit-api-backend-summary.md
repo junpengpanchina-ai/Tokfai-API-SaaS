@@ -17,7 +17,7 @@ OpenAI Compatible Chat、Responses 非流式、Responses 流式、Gemini native 
 | 脚本 | 用途 |
 |---|---|
 | `scripts/public-beta-ready-all.mjs` | 离线 suite +（有 Key 时）live acceptance |
-| `scripts/public-beta-live-acceptance.mjs` | 真实 Chat / Responses / Stream 矩阵 |
+| `scripts/public-beta-live-acceptance.mjs` | 真实 Chat / Responses / Stream（默认 gpt-5.5 全量 + gemini responses；`TOKFAI_LIVE_FULL_MATRIX=1` 扩矩阵；上游 timeout→DEGRADED） |
 | `scripts/public-beta-live-image-smoke.mjs` | 真实图片 queued→completed |
 | `scripts/public-beta-live-load.mjs` | 真实轻压（默认 10×60s） |
 

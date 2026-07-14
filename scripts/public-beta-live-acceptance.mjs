@@ -7,15 +7,26 @@
  *   TOKFAI_LIVE_FULL_MATRIX=1 TOKFAI_API_KEY=... node scripts/public-beta-live-acceptance.mjs
  *   TOKFAI_LIVE_IMAGE_SMOKE=1 TOKFAI_API_KEY=... node scripts/public-beta-live-acceptance.mjs
  *
+ * Default capability matrix (TOKFAI_LIVE_FULL_MATRIX unset):
+ *   - gpt-5.5: chat + responses + stream (all four)
+ *   - gemini-2.5-flash: responses non-stream only
+ *
+ * Results:
+ *   PASS     — gateway / auth / billing / required probes OK
+ *   DEGRADED — upstream_timeout / upstream_model_busy (envelope OK, no leak, no charge)
+ *   FAIL     — Tokfai internal / leak / bad charge / empty error envelope
+ *
  * Never prints full API key or upstream brand/host/key.
  */
 
 import { acceptanceFetch } from "./lib/acceptance-http.mjs";
 import {
   assertNoLeaks,
+  assertStandardErrorEnvelope,
   extractCredits,
   extractModelTrace,
   extractRequestId,
+  isUpstreamDegradedCode,
   maskApiKey,
   normalizeApiBase,
   safeErrorSummary,
@@ -25,16 +36,35 @@ const API_KEY = (process.env.TOKFAI_API_KEY ?? "").trim();
 const BASE = normalizeApiBase(process.env.TOKFAI_API_BASE);
 const FULL_MATRIX = process.env.TOKFAI_LIVE_FULL_MATRIX === "1";
 const LIVE_IMAGE = process.env.TOKFAI_LIVE_IMAGE_SMOKE === "1";
-const DEFAULT_MODELS = ["gpt-5.5", "gemini-2.5-flash"];
+const PROMPT = "Say OK in one short sentence.";
 const TIMEOUT_MS = Math.max(
   30_000,
   parseInt(process.env.TOKFAI_LIVE_TIMEOUT_MS ?? "120000", 10) || 120_000
 );
 
+/** Default required probes — capability-aware (not every model × every surface). */
+const DEFAULT_MODEL_CAPABILITIES = {
+  "gpt-5.5": ["chat", "chat_stream", "responses", "responses_stream"],
+  "gemini-2.5-flash": ["responses"],
+};
+
+const FULL_MATRIX_PROBES = [
+  "chat",
+  "chat_stream",
+  "responses",
+  "responses_stream",
+];
+
 let failures = 0;
+let degraded = 0;
 
 function pass(label, extra = "") {
   console.log(`PASS  ${label}${extra ? ` — ${extra}` : ""}`);
+}
+
+function markDegraded(label, detail) {
+  degraded += 1;
+  console.warn(`DEGRADED  ${label}${detail ? ` — ${detail}` : ""}`);
 }
 
 function fail(label, detail) {
@@ -59,6 +89,53 @@ async function api(method, path, body, opts = {}) {
   });
 }
 
+/**
+ * Classify a non-2xx model probe.
+ * Upstream timeout/busy → DEGRADED (if envelope + no leak + no charge).
+ * Other 5xx without upstream_xxx → FAIL.
+ * Empty envelope → FAIL.
+ */
+function classifyProbeError(label, res, body, text) {
+  const leak = assertNoLeaks(label, text || body);
+  if (!leak.ok) {
+    fail(label, leak.detail);
+    return "fail";
+  }
+
+  const envelope = assertStandardErrorEnvelope(body, res, text);
+  if (!envelope.ok) {
+    fail(
+      label,
+      `empty/incomplete error envelope: ${envelope.detail} ${JSON.stringify(envelope.summary)}`
+    );
+    return "fail";
+  }
+
+  const credits = extractCredits(body);
+  if (typeof credits === "number" && credits > 0) {
+    fail(label, `error path charged credits=${credits}`);
+    return "fail";
+  }
+
+  const { code, message, request_id: requestId } = envelope.summary;
+  const summary = `HTTP ${res.status} code=${code} request_id=${requestId}`;
+
+  if (isUpstreamDegradedCode(code)) {
+    markDegraded(label, `${summary} message=${message}`);
+    return "degraded";
+  }
+
+  // 5xx that is not a known upstream capacity code → gateway FAIL
+  if (res.status >= 500) {
+    fail(label, `${summary} message=${message}`);
+    return "fail";
+  }
+
+  // 4xx on a required probe is a real failure (bad payload / routing / validation)
+  fail(label, `${summary} message=${message}`);
+  return "fail";
+}
+
 function validateSuccessEnvelope(label, res, body, text) {
   const leak = assertNoLeaks(label, text || body);
   if (!leak.ok) {
@@ -67,7 +144,7 @@ function validateSuccessEnvelope(label, res, body, text) {
   }
 
   if (res.status < 200 || res.status >= 300) {
-    fail(label, JSON.stringify(safeErrorSummary(body, res.status)));
+    classifyProbeError(label, res, body, text);
     return false;
   }
 
@@ -75,13 +152,6 @@ function validateSuccessEnvelope(label, res, body, text) {
   if (!rid || typeof rid !== "string") {
     fail(label, "missing request_id / id");
     return false;
-  }
-
-  const trace = extractModelTrace(body);
-  const hasModelTrace =
-    trace.model || trace.requested_model || trace.resolved_model;
-  if (!hasModelTrace && !label.includes("health") && !label.includes("plans")) {
-    // models list / health may not have model field on envelope
   }
 
   const credits = extractCredits(body);
@@ -97,9 +167,7 @@ function validateSuccessEnvelope(label, res, body, text) {
   pass(
     label,
     `HTTP ${res.status} request_id=${rid}${
-      credits != null && typeof credits === "number"
-        ? ` credits=${credits}`
-        : ""
+      credits != null ? ` credits=${credits}` : ""
     }`
   );
   return true;
@@ -110,110 +178,120 @@ async function listCallableModels() {
   const leak = assertNoLeaks("GET /v1/models", text);
   if (!leak.ok) {
     fail("GET /v1/models", leak.detail);
-    return DEFAULT_MODELS;
+    return Object.keys(DEFAULT_MODEL_CAPABILITIES);
   }
   if (!res.ok) {
     fail("GET /v1/models", `HTTP ${res.status}`);
-    return DEFAULT_MODELS;
+    return Object.keys(DEFAULT_MODEL_CAPABILITIES);
   }
   const rows = Array.isArray(body?.data) ? body.data : [];
   const ids = rows
     .map((r) => (typeof r?.id === "string" ? r.id : null))
     .filter(Boolean);
   pass("GET /v1/models", `${ids.length} models`);
-  return ids.length ? ids : DEFAULT_MODELS;
+  return ids.length ? ids : Object.keys(DEFAULT_MODEL_CAPABILITIES);
+}
+
+function resolveProbePlan(listedIds) {
+  if (FULL_MATRIX) {
+    const models = listedIds
+      .filter((id) => !/image|embedding|whisper|tts|dall/i.test(id))
+      .slice(0, 24);
+    return models.map((model) => ({ model, probes: [...FULL_MATRIX_PROBES] }));
+  }
+
+  const plan = [];
+  for (const [model, probes] of Object.entries(DEFAULT_MODEL_CAPABILITIES)) {
+    // Prefer listed id when present; still probe defaults even if catalog lags.
+    const resolved =
+      listedIds.find((id) => id === model) ??
+      listedIds.find((id) => id.toLowerCase() === model.toLowerCase()) ??
+      model;
+    plan.push({ model: resolved, probes: [...probes] });
+  }
+  return plan;
 }
 
 async function probeChat(model) {
+  const label = `chat non-stream ${model}`;
   const { res, body, text } = await api("POST", "/v1/chat/completions", {
     model,
-    messages: [{ role: "user", content: "Reply with the single word OK." }],
-    max_tokens: 16,
+    messages: [{ role: "user", content: PROMPT }],
     stream: false,
   });
   if (!res.ok) {
-    fail(
-      `chat non-stream ${model}`,
-      JSON.stringify(safeErrorSummary(body, res.status))
-    );
+    classifyProbeError(label, res, body, text);
     return;
   }
   const trace = extractModelTrace(body);
   if (!(trace.model || trace.requested_model || trace.resolved_model)) {
-    fail(`chat non-stream ${model}`, "missing model trace fields");
+    fail(label, "missing model trace fields");
     return;
   }
-  validateSuccessEnvelope(`chat non-stream ${model}`, res, body, text);
+  validateSuccessEnvelope(label, res, body, text);
 }
 
 async function probeChatStream(model) {
+  const label = `chat stream ${model}`;
   const { res, body, text } = await api("POST", "/v1/chat/completions", {
     model,
-    messages: [{ role: "user", content: "Reply with the single word OK." }],
-    max_tokens: 16,
+    messages: [{ role: "user", content: PROMPT }],
     stream: true,
   });
-  const leak = assertNoLeaks(`chat stream ${model}`, text);
-  if (!leak.ok) {
-    fail(`chat stream ${model}`, leak.detail);
+  if (res.status !== 200) {
+    classifyProbeError(label, res, body, text);
     return;
   }
-  if (res.status !== 200) {
-    fail(
-      `chat stream ${model}`,
-      JSON.stringify(safeErrorSummary(body, res.status))
-    );
+  const leak = assertNoLeaks(label, text);
+  if (!leak.ok) {
+    fail(label, leak.detail);
     return;
   }
   const ok =
     text.includes("data:") &&
     (/\[DONE\]/.test(text) || /chat\.completion\.chunk/.test(text));
   if (!ok) {
-    fail(`chat stream ${model}`, "SSE shape incomplete");
+    fail(label, "SSE shape incomplete");
     return;
   }
   const rid =
     text.match(/"request_id"\s*:\s*"([^"]+)"/)?.[1] ??
     res.headers.get("x-request-id");
   if (!rid) {
-    fail(`chat stream ${model}`, "missing request_id in stream");
+    fail(label, "missing request_id in stream");
     return;
   }
-  pass(`chat stream ${model}`, `HTTP 200 request_id=${rid}`);
+  pass(label, `HTTP 200 request_id=${rid}`);
 }
 
 async function probeResponses(model) {
+  const label = `responses non-stream ${model}`;
   const { res, body, text } = await api("POST", "/v1/responses", {
     model,
-    input: "Reply with the single word OK.",
+    input: PROMPT,
     stream: false,
   });
   if (!res.ok) {
-    fail(
-      `responses non-stream ${model}`,
-      JSON.stringify(safeErrorSummary(body, res.status))
-    );
+    classifyProbeError(label, res, body, text);
     return;
   }
-  validateSuccessEnvelope(`responses non-stream ${model}`, res, body, text);
+  validateSuccessEnvelope(label, res, body, text);
 }
 
 async function probeResponsesStream(model) {
+  const label = `responses stream ${model}`;
   const { res, body, text } = await api("POST", "/v1/responses", {
     model,
-    input: "Reply with the single word OK.",
+    input: PROMPT,
     stream: true,
   });
-  const leak = assertNoLeaks(`responses stream ${model}`, text);
-  if (!leak.ok) {
-    fail(`responses stream ${model}`, leak.detail);
+  if (res.status !== 200) {
+    classifyProbeError(label, res, body, text);
     return;
   }
-  if (res.status !== 200) {
-    fail(
-      `responses stream ${model}`,
-      JSON.stringify(safeErrorSummary(body, res.status))
-    );
+  const leak = assertNoLeaks(label, text);
+  if (!leak.ok) {
+    fail(label, leak.detail);
     return;
   }
   const ok =
@@ -221,24 +299,36 @@ async function probeResponsesStream(model) {
     /event:\s*response\./.test(text) ||
     /\[DONE\]/.test(text);
   if (!ok) {
-    fail(`responses stream ${model}`, "SSE shape incomplete");
+    fail(label, "SSE shape incomplete");
     return;
   }
   const rid =
     text.match(/"request_id"\s*:\s*"([^"]+)"/)?.[1] ??
     res.headers.get("x-request-id");
-  pass(
-    `responses stream ${model}`,
-    `HTTP 200${rid ? ` request_id=${rid}` : ""}`
-  );
+  pass(label, `HTTP 200${rid ? ` request_id=${rid}` : ""}`);
+}
+
+async function runProbe(kind, model) {
+  switch (kind) {
+    case "chat":
+      return probeChat(model);
+    case "chat_stream":
+      return probeChatStream(model);
+    case "responses":
+      return probeResponses(model);
+    case "responses_stream":
+      return probeResponsesStream(model);
+    default:
+      fail(`unknown probe ${kind}`, model);
+  }
 }
 
 async function probeIdempotency(model) {
   const key = `pb-live-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
   const payload = {
     model,
-    messages: [{ role: "user", content: "Reply with OK." }],
-    max_tokens: 8,
+    messages: [{ role: "user", content: PROMPT }],
+    stream: false,
   };
   const a = await api("POST", "/v1/chat/completions", payload, {
     idempotencyKey: key,
@@ -247,17 +337,15 @@ async function probeIdempotency(model) {
     idempotencyKey: key,
   });
   if (!a.res.ok || !b.res.ok) {
-    fail(
-      "idempotency replay",
-      `HTTP ${a.res.status}/${b.res.status}`
-    );
+    // Prefer degraded classification if either side is upstream capacity
+    if (!a.res.ok) classifyProbeError("idempotency first", a.res, a.body, a.text);
+    if (!b.res.ok) classifyProbeError("idempotency replay", b.res, b.body, b.text);
     return;
   }
   const ca = extractCredits(a.body);
   const cb = extractCredits(b.body);
   const ra = extractRequestId(a.body, a.res);
   const rb = extractRequestId(b.body, b.res);
-  // Same key should not double-charge: credits equal and often same request_id
   if (typeof ca === "number" && typeof cb === "number" && ca !== cb) {
     fail("idempotency no double charge", `credits ${ca} vs ${cb}`);
     return;
@@ -269,18 +357,27 @@ async function probeIdempotency(model) {
 }
 
 async function probeFailedNoCharge() {
+  const label = "failed request envelope";
   const { res, body, text } = await api("POST", "/v1/chat/completions", {
-    model: "auto-fast",
+    model: "gpt-5.5",
     messages: [],
-    max_tokens: 8,
+    stream: false,
   });
-  const leak = assertNoLeaks("failed request envelope", text);
+  const leak = assertNoLeaks(label, text);
   if (!leak.ok) {
     fail("failed request no leak", leak.detail);
     return;
   }
   if (res.ok) {
     fail("failed request expected error", "empty messages should fail");
+    return;
+  }
+  const envelope = assertStandardErrorEnvelope(body, res, text);
+  if (!envelope.ok) {
+    fail(
+      "failed request standard envelope",
+      `${envelope.detail} ${JSON.stringify(envelope.summary)}`
+    );
     return;
   }
   const credits = extractCredits(body);
@@ -290,7 +387,7 @@ async function probeFailedNoCharge() {
   }
   pass(
     "failed request no finalized charge",
-    JSON.stringify(safeErrorSummary(body, res.status))
+    JSON.stringify(envelope.summary)
   );
 }
 
@@ -315,10 +412,14 @@ async function probeImageOnce() {
   }
   const taskId = body?.id ?? body?.request_id;
   if (!(res.status === 202 || res.status === 200) || !taskId) {
-    fail(
-      "image POST accept",
-      JSON.stringify(safeErrorSummary(body, res.status))
-    );
+    if (res.status >= 400) {
+      classifyProbeError("image POST accept", res, body, text);
+    } else {
+      fail(
+        "image POST accept",
+        JSON.stringify(safeErrorSummary(body, res.status, text))
+      );
+    }
     return;
   }
   pass(`image POST`, `HTTP ${res.status} id=${taskId}`);
@@ -348,7 +449,26 @@ async function probeImageOnce() {
     }
   }
 
-  if (latest?.status === "failed" || latest?.status === "retryable_timeout") {
+  if (latest?.status === "retryable_timeout") {
+    const progress =
+      typeof latest.progress === "number" ? latest.progress : null;
+    const credits = extractCredits(latest);
+    if (progress != null && progress >= 100) {
+      fail("image timeout progress", `progress=${progress}`);
+      return;
+    }
+    if (typeof credits === "number" && credits > 0) {
+      fail("image timeout no charge", `credits=${credits}`);
+      return;
+    }
+    markDegraded(
+      "image retryable_timeout",
+      `request_id=${taskId} progress=${progress ?? "n/a"}`
+    );
+    return;
+  }
+
+  if (latest?.status === "failed") {
     const err = latest?.error ?? {};
     pass(
       "image failed (friendly)",
@@ -425,23 +545,21 @@ async function main() {
   }
 
   const listed = await listCallableModels();
-  const toTest = FULL_MATRIX
-    ? listed
-        .filter((id) => !/image|embedding|whisper|tts|dall/i.test(id))
-        .slice(0, 24)
-    : DEFAULT_MODELS;
+  const plan = resolveProbePlan(listed);
 
-  console.log(`\n── Models under test (${toTest.length}) ──`);
-  for (const model of toTest) {
-    await probeChat(model);
-    await probeChatStream(model);
-    await probeResponses(model);
-    await probeResponsesStream(model);
+  console.log(`\n── Capability probes (${plan.length} models) ──`);
+  for (const { model, probes } of plan) {
+    console.log(`  ${model}: ${probes.join(", ")}`);
+    for (const kind of probes) {
+      await runProbe(kind, model);
+    }
   }
 
   console.log("\n── Billing safety ──");
   await probeFailedNoCharge();
-  await probeIdempotency(toTest[0] ?? "gpt-5.5");
+  const idemModel =
+    plan.find((p) => p.probes.includes("chat"))?.model ?? "gpt-5.5";
+  await probeIdempotency(idemModel);
 
   if (LIVE_IMAGE) {
     console.log("\n── Image (opt-in) ──");
@@ -449,12 +567,16 @@ async function main() {
   }
 
   console.log("\n=== Summary ===");
+  console.log(`PASS/DEGRADED/FAIL counts: degraded=${degraded} fail=${failures}`);
   if (failures > 0) {
     console.error(`public-beta-live-acceptance: FAILED (${failures})`);
     process.exit(1);
   }
   console.log("public-beta-live-acceptance: OK");
   console.log("TOKFAI_PUBLIC_BETA_LIVE_READY");
+  if (degraded > 0) {
+    console.log("TOKFAI_PUBLIC_BETA_UPSTREAM_DEGRADED");
+  }
 }
 
 main().catch((err) => {

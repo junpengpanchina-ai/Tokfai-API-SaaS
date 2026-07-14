@@ -9,6 +9,7 @@ import type {
 } from "../types.js";
 import { runImageGenerationWithPolling } from "../upstream/imageAsyncProvider.js";
 import type { ImageUrlResolveSource } from "../upstream/imageUrlResolver.js";
+import { messagesForStatus } from "./progressMessages.js";
 import {
   finalizeImageTaskFailure,
   finalizeImageTaskSuccess,
@@ -205,9 +206,19 @@ async function handleGenerationError(
     const isTimeout =
       err.code === "image_generation_timeout" ||
       err.code === "upstream_timeout";
-    const status = isTimeout ? "retryable_timeout" : "failed";
+    if (isTimeout) {
+      const msgs = messagesForStatus("retryable_timeout");
+      await failTask(
+        task,
+        "retryable_timeout",
+        msgs.en,
+        startedAt,
+        "retryable_timeout"
+      );
+      return;
+    }
     const code = err.code ?? "upstream_error";
-    await failTask(task, code, safePublicMessage(err), startedAt, status);
+    await failTask(task, code, safePublicMessage(err), startedAt, "failed");
     return;
   }
 

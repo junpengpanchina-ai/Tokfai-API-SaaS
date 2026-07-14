@@ -237,15 +237,18 @@ export async function finalizeImageTaskFailure(args: {
 }): Promise<void> {
   const now = new Date().toISOString();
   const msgs = messagesForStatus(args.status);
+  const progress = STATUS_PROGRESS[args.status];
   const { error } = await supabase()
     .from("image_generation_tasks")
     .update({
       status: args.status,
-      progress: 100,
+      progress,
       message_en: msgs.en,
       message_zh: msgs.zh,
       error_code: args.errorCode,
-      error_message: args.errorMessage,
+      error_message: args.errorMessage || msgs.en,
+      credits_charged: 0,
+      usage: { credits_charged: 0 },
       billing_status: "not_billable",
       completed_at: now,
       updated_at: now,
