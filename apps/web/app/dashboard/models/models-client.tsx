@@ -24,107 +24,32 @@ import {
 import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 import type { ModelsClientData } from "@/lib/dashboard-safe/dtos/models";
 
-const TAG_LABELS: Record<
-  ConsumerModelCapabilityTag,
-  { zh: string; en: string }
-> = {
-  recommended: { zh: "推荐", en: "Recommended" },
-  fast: { zh: "Fast", en: "Fast" },
-  best_quality: { zh: "高质量", en: "Best quality" },
-  low_cost: { zh: "低成本", en: "Low cost" },
-  image: { zh: "图片", en: "Image" },
-  vision: { zh: "视觉", en: "Vision" },
-  alias: { zh: "别名", en: "Alias" },
+const TAG_LABEL_KEYS: Record<ConsumerModelCapabilityTag, string> = {
+  recommended: "dashboard.models.tagRecommended",
+  fast: "dashboard.models.tagFast",
+  best_quality: "dashboard.models.tagBestQuality",
+  low_cost: "dashboard.models.tagLowCost",
+  image: "dashboard.models.tagImage",
+  vision: "dashboard.models.tagVision",
+  alias: "dashboard.models.tagAlias",
 };
-
-type LocalizedText = { zh: string; en: string };
-
-function isGpt55Family(id: string): boolean {
-  return (
-    id === "gpt-5.5" ||
-    id === "gpt-5.5-pro" ||
-    id === "gpt-5-pro" ||
-    id.startsWith("gpt-5.5")
-  );
-}
-
-function recommendedEndpointForModel(model: ConsumerModelCard): LocalizedText {
-  if (model.kind === "image") {
-    return { zh: "/v1/images/generations", en: "/v1/images/generations" };
-  }
-  if (isGpt55Family(model.id)) {
-    return { zh: "/v1/responses", en: "/v1/responses" };
-  }
-  if (model.id === "gpt-5.4" || model.id === "gpt-5.4-pro") {
-    return {
-      zh: "/v1/chat/completions 或 /v1/responses",
-      en: "/v1/chat/completions or /v1/responses",
-    };
-  }
-  if (model.id.startsWith("gemini")) {
-    return {
-      zh: "/v1/chat/completions 或 /v1beta",
-      en: "/v1/chat/completions or /v1beta",
-    };
-  }
-  if (model.kind === "alias" || model.id.startsWith("auto-")) {
-    return {
-      zh: "/v1/chat/completions 或 /v1/responses",
-      en: "/v1/chat/completions or /v1/responses",
-    };
-  }
-  return {
-    zh: "/v1/chat/completions 或 /v1/responses",
-    en: "/v1/chat/completions or /v1/responses",
-  };
-}
-
-function suitabilityForModel(model: ConsumerModelCard): LocalizedText {
-  if (model.kind === "image") {
-    return {
-      zh: "文生图、参考图改图",
-      en: "Text-to-image and reference edits",
-    };
-  }
-  if (isGpt55Family(model.id)) {
-    return {
-      zh: "复杂推理、代码、工具调用、Agent / Codex",
-      en: "Complex reasoning, code, tools, Agent / Codex",
-    };
-  }
-  if (model.id === "gpt-5.4" || model.id === "gpt-5.4-pro") {
-    return {
-      zh: "通用对话与文本任务",
-      en: "General chat and text tasks",
-    };
-  }
-  if (model.id.startsWith("gemini")) {
-    return {
-      zh: "长文本、多模态输入",
-      en: "Long text and multimodal input",
-    };
-  }
-  if (
-    model.kind === "alias" ||
-    model.id.startsWith("auto-") ||
-    model.id.startsWith("gpt-5")
-  ) {
-    return {
-      zh: "智能路由与通用对话",
-      en: "Smart routing and general chat",
-    };
-  }
-  return {
-    zh: "通用对话与文本任务",
-    en: "General chat and text tasks",
-  };
-}
 
 function docAnchorForModel(model: ConsumerModelCard): string {
   if (model.kind === "image") return "/docs#image-api";
   if (model.id.startsWith("gemini")) return "/docs#gemini-native";
-  if (isGpt55Family(model.id)) return "/docs#responses-api";
+  if (model.id === "gpt-5.5" || model.id.startsWith("gpt-5.5")) {
+    return "/docs#responses-api";
+  }
   return "/docs#chat-completions";
+}
+
+function supportLabel(
+  supported: boolean,
+  t: (key: string) => string
+): string {
+  return supported
+    ? t("dashboard.models.supported")
+    : t("dashboard.models.notSupported");
 }
 
 export function ModelsClient({
@@ -132,36 +57,32 @@ export function ModelsClient({
 }: {
   modelsData: ModelsClientData;
 }) {
-  const { locale } = useDashboardLabels();
+  const { t, locale } = useDashboardLabels();
   const zh = locale === "zh";
 
   return (
     <div className="flex min-w-0 flex-col gap-6 overflow-x-hidden">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          {zh ? "模型" : "Models"}
+          {t("dashboard.models.title")}
         </h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          {zh
-            ? "只讲模型能力与适合场景。价格请看定价页，接入方式请看文档页。"
-            : "Capabilities and use cases only. Rates live on Pricing; integration lives on Docs."}
+          {t("dashboard.models.capabilitiesSubtitle")}
         </p>
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          {zh
-            ? "API Key 不绑定模型。请在请求体的 model 字段中填写模型 ID。"
-            : "API keys are not bound to a model. Set the model ID in the request body's model field."}
+          {t("dashboard.models.apiKeyNotBoundHint")}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button asChild size="sm" variant="outline">
             <Link href="/pricing">
               <Tags className="mr-1.5 h-3.5 w-3.5" />
-              {zh ? "查看定价" : "View pricing"}
+              {t("dashboard.models.viewPricing")}
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
             <Link href="/docs">
               <BookOpen className="mr-1.5 h-3.5 w-3.5" />
-              {zh ? "查看接入文档" : "View docs"}
+              {t("dashboard.models.viewDocs")}
             </Link>
           </Button>
         </div>
@@ -170,7 +91,7 @@ export function ModelsClient({
       <div className="grid gap-3 sm:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>{zh ? "可用模型" : "Available"}</CardDescription>
+            <CardDescription>{t("dashboard.models.statAvailable")}</CardDescription>
             <CardTitle className="text-2xl">
               {modelsData.stats.totalAvailable}
             </CardTitle>
@@ -178,7 +99,7 @@ export function ModelsClient({
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>{zh ? "对话 / 推理" : "Chat / reasoning"}</CardDescription>
+            <CardDescription>{t("dashboard.models.statChat")}</CardDescription>
             <CardTitle className="text-2xl">
               {modelsData.stats.chatCount}
             </CardTitle>
@@ -186,7 +107,7 @@ export function ModelsClient({
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>{zh ? "图片" : "Image"}</CardDescription>
+            <CardDescription>{t("dashboard.models.statImage")}</CardDescription>
             <CardTitle className="text-2xl">
               {modelsData.stats.imageCount}
             </CardTitle>
@@ -229,8 +150,6 @@ function ModelCapabilityCard({
   const { t } = useDashboardLabels();
   const { copiedId, copyText } = useDashboardCopyToClipboard();
   const copyId = `model-id-${model.id}`;
-  const endpoint = recommendedEndpointForModel(model);
-  const suitability = suitabilityForModel(model);
 
   return (
     <Card className="min-w-0">
@@ -262,12 +181,12 @@ function ModelCapabilityCard({
         <div className="flex flex-wrap gap-1.5 pt-1">
           {model.tags.map((tag) => (
             <Badge key={tag} variant="secondary">
-              {zh ? TAG_LABELS[tag].zh : TAG_LABELS[tag].en}
+              {t(TAG_LABEL_KEYS[tag])}
             </Badge>
           ))}
           {model.beginnerFriendly ? (
             <Badge variant="secondary">
-              {zh ? "新手推荐" : "Beginner friendly"}
+              {t("dashboard.models.beginnerRecommended")}
             </Badge>
           ) : null}
         </div>
@@ -275,83 +194,57 @@ function ModelCapabilityCard({
       <CardContent className="space-y-3 text-sm text-muted-foreground">
         <ul className="space-y-1">
           <li>
-            {zh ? "推荐 Endpoint" : "Recommended endpoint"}:{" "}
-            <code className="text-foreground">
-              {zh ? endpoint.zh : endpoint.en}
-            </code>
+            {t("dashboard.models.recommendedEndpoint")}:{" "}
+            <code className="text-foreground">{model.recommendedEndpoint}</code>
           </li>
           <li>
-            {zh ? "适合场景" : "Best for"}:{" "}
+            {t("dashboard.models.bestFor")}:{" "}
             <span className="text-foreground">
-              {zh ? suitability.zh : suitability.en}
+              {zh ? model.bestFor.zh : model.bestFor.en}
             </span>
           </li>
           <li>
             Chat Completions:{" "}
             <span className="text-foreground">
-              {model.supportsChatCompletions
-                ? zh
-                  ? "支持"
-                  : "Yes"
-                : zh
-                  ? "不支持"
-                  : "No"}
+              {supportLabel(model.supportsChatCompletions, t)}
             </span>
           </li>
           <li>
             Responses:{" "}
             <span className="text-foreground">
-              {model.supportsResponses
-                ? zh
-                  ? "支持"
-                  : "Yes"
-                : zh
-                  ? "不支持"
-                  : "No"}
+              {supportLabel(model.supportsResponses, t)}
             </span>
           </li>
           <li>
             Stream:{" "}
             <span className="text-foreground">
-              {model.supportsStream
-                ? zh
-                  ? "支持"
-                  : "Yes"
-                : zh
-                  ? "不支持"
-                  : "No"}
+              {supportLabel(model.supportsStream, t)}
             </span>
           </li>
           <li>
-            {zh ? "图片输入" : "Image input"}:{" "}
+            {t("dashboard.models.imageInput")}:{" "}
             <span className="text-foreground">
-              {model.supportsImageInput
-                ? zh
-                  ? "支持"
-                  : "Yes"
-                : zh
-                  ? "不支持"
-                  : "No"}
+              {supportLabel(model.supportsImageInput, t)}
             </span>
           </li>
           <li>
-            {zh ? "归属" : "Owned by"}:{" "}
+            {t("dashboard.models.ownedBy")}:{" "}
             <code className="text-foreground">tokfai</code>
           </li>
           {model.routesTo ? (
             <li>
-              {zh ? "路由到" : "Routes to"}:{" "}
+              {t("dashboard.models.routesTo")}:{" "}
               <code className="text-foreground">{model.routesTo}</code>
             </li>
           ) : null}
         </ul>
         <div className="flex flex-wrap gap-2">
           <Button asChild size="sm" variant="outline">
-            <Link href="/pricing">{zh ? "查看定价" : "View pricing"}</Link>
+            <Link href="/pricing">{t("dashboard.models.viewPricing")}</Link>
           </Button>
           <Button asChild size="sm" variant="outline">
             <Link href={docAnchorForModel(model)}>
-              {zh ? "查看接入示例" : "View integration example"}
+              {t("dashboard.models.viewIntegrationExample")}
             </Link>
           </Button>
         </div>

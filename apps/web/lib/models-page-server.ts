@@ -6,8 +6,9 @@ import {
 } from "@/lib/model-cost-estimate";
 import {
   buildModelsTableRows,
-  summarizeModelsCatalog,
 } from "@/lib/models-page";
+import { summarizePublicRegistryStats } from "@/lib/public-model-registry";
+import { TOKFAI_RECOMMENDED_MODEL } from "@/lib/tokfai-api";
 import { dashboardLabel, type DashboardLocale } from "@/lib/dashboard-safe/labels";
 import {
   buildFallbackModelsClientData,
@@ -25,9 +26,13 @@ export function buildModelsClientData(
   try {
     const t = (key: string) => dashboardLabel(key, locale);
     const defaultImageEntry = getDefaultAvailableImageModel();
+    const registryStats = summarizePublicRegistryStats();
 
     return {
-      stats: summarizeModelsCatalog(DASHBOARD_CATALOG_MODELS),
+      stats: {
+        ...registryStats,
+        defaultModelId: TOKFAI_RECOMMENDED_MODEL,
+      },
       rows: buildModelsTableRows(
         DASHBOARD_CATALOG_MODELS,
         catalogPricing,
