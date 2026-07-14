@@ -21,6 +21,19 @@ const VALID_KEY =
 /** @type {Map<string, { id: string; status: string; items: unknown[]; model: string }>} */
 const batches = new Map();
 
+/** @type {Map<string, {
+ *   id: string;
+ *   userKey: string;
+ *   status: string;
+ *   progress: number;
+ *   message: { en: string; zh: string };
+ *   model: string;
+ *   data: unknown[];
+ *   usage: { credits_charged: number };
+ *   error: null | { code: string; message: string };
+ * }>} */
+const imageTasks = new Map();
+
 function makeRequestId() {
   return `req_mock_${randomBytes(8).toString("hex")}`;
 }
@@ -449,23 +462,53 @@ function imageGenerationBody(body) {
   }
 
   const mode = images.length > 0 || wantsReference ? "reference_edit" : "text_to_image";
-  return {
-    created: Math.floor(Date.now() / 1000),
-    data: [{ url: "https://example.com/mock-image.png" }],
+  // Async accept (matches production POST → 202 + poll).
+  const taskId = meta.request_id;
+  imageTasks.set(taskId, {
+    id: taskId,
+    userKey: "", // filled by route
+    status: "queued",
+    progress: 0,
+    message: { en: "Queued", zh: "已排队" },
     model: resolvedModel,
+    data: [],
+    usage: { credits_charged: 0 },
+    error: null,
     mode,
-    prompt_mode: wantsReference || images.length > 0 ? "subject_preserve" : "normal",
-    reference_image_included: images.length > 0,
-    images_count: images.length,
-    input_images_count: images.length,
-    resolved_images_count: images.length,
-    upstream_images_count: images.length,
-    image_source_type: hasDataUrl
-      ? "data_url"
-      : images.length > 0
-        ? "https_url"
-        : "none",
-    ...meta,
+  });
+
+  // Complete shortly after accept so GET poll succeeds in smokes.
+  setTimeout(() => {
+    const task = imageTasks.get(taskId);
+    if (!task) return;
+    task.status = "generating";
+    task.progress = 55;
+    task.message = { en: "Generating image", zh: "正在生成图片" };
+  }, 50);
+  setTimeout(() => {
+    const task = imageTasks.get(taskId);
+    if (!task) return;
+    task.status = "completed";
+    task.progress = 100;
+    task.message = { en: "Completed", zh: "已完成" };
+    task.data = [{ url: "https://example.com/mock-image.png" }];
+    task.usage = { credits_charged: meta.credits_charged };
+  }, 200);
+
+  return {
+    __status: 202,
+    id: taskId,
+    object: "image.generation",
+    created: Math.floor(Date.now() / 1000),
+    model: resolvedModel,
+    status: "queued",
+    progress: 0,
+    message: { en: "Queued", zh: "已排队" },
+    data: [],
+    usage: { credits_charged: 0 },
+    tokfai: { request_id: taskId, mode },
+    request_id: taskId,
+    mode,
   };
 }
 
@@ -592,12 +635,28 @@ export function startMockGateway(options = {}) {
     const path = url.pathname;
 
     try {
-      if (req.method === "GET" && path === "/health") {
+      if (req.method === "GET" && (path === "/health" || path === "/v1/health")) {
         return sendJson(res, 200, {
           ok: true,
           service: "dmit-api",
           env: "mock",
           timestamp: new Date().toISOString(),
+        });
+      }
+
+      if (req.method === "GET" && path === "/v1/billing/plans") {
+        return sendJson(res, 200, {
+          object: "list",
+          data: [
+            {
+              id: "mock_plan_starter",
+              name: "Starter",
+              credits: 10000,
+              price_cents: 1000,
+              currency: "usd",
+              active: true,
+            },
+          ],
         });
       }
 
@@ -760,10 +819,46 @@ export function startMockGateway(options = {}) {
           const payload = imageGenerationBody(body);
           const status = payload.__status ?? 200;
           if (payload.__status) delete payload.__status;
+          const token = parseBearer(req) ?? "";
+          if (payload.id && imageTasks.has(payload.id)) {
+            imageTasks.get(payload.id).userKey = token;
+          }
           return sendJson(res, status, payload);
         } finally {
           slot.release?.();
         }
+      }
+
+      const imageGetMatch = path.match(/^\/v1\/images\/generations\/([^/]+)$/);
+      if (req.method === "GET" && imageGetMatch) {
+        const authErr = checkAuth(req, validKey);
+        if (authErr) return sendJson(res, authErr.status, authErr.body);
+        const id = decodeURIComponent(imageGetMatch[1]);
+        const task = imageTasks.get(id);
+        const token = parseBearer(req) ?? "";
+        if (!task || (task.userKey && task.userKey !== token)) {
+          return sendJson(res, 404, {
+            error: {
+              message: "Image generation not found.",
+              code: "not_found",
+              type: "invalid_request_error",
+            },
+            request_id: makeRequestId(),
+          });
+        }
+        return sendJson(res, 200, {
+          id: task.id,
+          object: "image.generation",
+          model: task.model,
+          status: task.status,
+          progress: task.progress,
+          message: task.message,
+          data: task.data,
+          usage: task.usage,
+          error: task.error,
+          tokfai: { request_id: task.id, mode: task.mode },
+          request_id: task.id,
+        });
       }
 
       if (req.method === "POST" && path === "/v1/batches/chat") {
