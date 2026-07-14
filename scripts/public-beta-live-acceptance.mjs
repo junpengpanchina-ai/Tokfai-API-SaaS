@@ -73,6 +73,51 @@ function fail(label, detail) {
   if (detail) console.error(`      ${detail}`);
 }
 
+/** True for responses non-stream probes (not the streaming variant). */
+function isResponsesNonStreamLabel(label) {
+  return label.startsWith("responses non-stream");
+}
+
+/**
+ * Redacted debug dump on probe failure. Never prints API key material.
+ */
+function printProbeDebug(args) {
+  const {
+    route,
+    method,
+    model,
+    stream,
+    payload,
+    res,
+    body,
+    text,
+  } = args;
+  const keys =
+    payload && typeof payload === "object"
+      ? Object.keys(payload).sort().join(",")
+      : "(none)";
+  const rid = extractRequestId(body, res);
+  const preview =
+    typeof text === "string"
+      ? text.slice(0, 240)
+      : JSON.stringify(body ?? {}).slice(0, 240);
+  console.error("DEBUG  probe failure (redacted)");
+  console.error(`      route=${route}`);
+  console.error(`      method=${method}`);
+  console.error(`      model=${model ?? "(n/a)"}`);
+  console.error(`      stream=${stream}`);
+  console.error(`      payload_keys=${keys}`);
+  console.error(`      status=${res?.status ?? "(n/a)"}`);
+  console.error(`      content_type=${res?.headers?.get?.("content-type") ?? "(n/a)"}`);
+  console.error(`      request_id=${rid ?? "(n/a)"}`);
+  console.error(`      final_url=${res?.url ?? "(n/a)"}`);
+  console.error(`      body_preview=${JSON.stringify(preview)}`);
+}
+
+/**
+ * Live probes match plain curl: Authorization + Content-Type only.
+ * (X-Tokfai-Acceptance headers are for offline/mock tooling, not production curl parity.)
+ */
 async function api(method, path, body, opts = {}) {
   const headers = {
     Authorization: `Bearer ${API_KEY}`,
@@ -86,6 +131,7 @@ async function api(method, path, body, opts = {}) {
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
     timeoutMs: opts.timeoutMs ?? TIMEOUT_MS,
+    curlCompatible: true,
   });
 }
 
@@ -95,7 +141,9 @@ async function api(method, path, body, opts = {}) {
  * Other 5xx without upstream_xxx → FAIL.
  * Empty envelope → FAIL.
  */
-function classifyProbeError(label, res, body, text) {
+function classifyProbeError(label, res, body, text, debugCtx) {
+  if (debugCtx) printProbeDebug(debugCtx);
+
   const leak = assertNoLeaks(label, text || body);
   if (!leak.ok) {
     fail(label, leak.detail);
@@ -154,7 +202,7 @@ function validateSuccessEnvelope(label, res, body, text) {
     return false;
   }
 
-  if (label.includes("responses") && !label.includes("stream")) {
+  if (isResponsesNonStreamLabel(label)) {
     if (body?.object !== "response") {
       fail(label, `expected object=response got ${body?.object ?? "missing"}`);
       return false;
@@ -232,17 +280,29 @@ function resolveProbePlan(listedIds) {
 
 async function probeChat(model) {
   const label = `chat non-stream ${model}`;
-  const { res, body, text } = await api("POST", "/v1/chat/completions", {
+  const payload = {
     model,
     messages: [{ role: "user", content: PROMPT }],
     stream: false,
-  });
+  };
+  const { res, body, text } = await api("POST", "/v1/chat/completions", payload);
+  const debugCtx = {
+    route: "/v1/chat/completions",
+    method: "POST",
+    model,
+    stream: false,
+    payload,
+    res,
+    body,
+    text,
+  };
   if (!res.ok) {
-    classifyProbeError(label, res, body, text);
+    classifyProbeError(label, res, body, text, debugCtx);
     return;
   }
   const trace = extractModelTrace(body);
   if (!(trace.model || trace.requested_model || trace.resolved_model)) {
+    printProbeDebug(debugCtx);
     fail(label, "missing model trace fields");
     return;
   }
@@ -251,13 +311,24 @@ async function probeChat(model) {
 
 async function probeChatStream(model) {
   const label = `chat stream ${model}`;
-  const { res, body, text } = await api("POST", "/v1/chat/completions", {
+  const payload = {
     model,
     messages: [{ role: "user", content: PROMPT }],
     stream: true,
-  });
+  };
+  const { res, body, text } = await api("POST", "/v1/chat/completions", payload);
+  const debugCtx = {
+    route: "/v1/chat/completions",
+    method: "POST",
+    model,
+    stream: true,
+    payload,
+    res,
+    body,
+    text,
+  };
   if (res.status !== 200) {
-    classifyProbeError(label, res, body, text);
+    classifyProbeError(label, res, body, text, debugCtx);
     return;
   }
   const leak = assertNoLeaks(label, text);
@@ -269,6 +340,7 @@ async function probeChatStream(model) {
     text.includes("data:") &&
     (/\[DONE\]/.test(text) || /chat\.completion\.chunk/.test(text));
   if (!ok) {
+    printProbeDebug(debugCtx);
     fail(label, "SSE shape incomplete");
     return;
   }
@@ -276,6 +348,7 @@ async function probeChatStream(model) {
     text.match(/"request_id"\s*:\s*"([^"]+)"/)?.[1] ??
     res.headers.get("x-request-id");
   if (!rid) {
+    printProbeDebug(debugCtx);
     fail(label, "missing request_id in stream");
     return;
   }
@@ -284,48 +357,53 @@ async function probeChatStream(model) {
 
 async function probeResponses(model) {
   const label = `responses non-stream ${model}`;
-  // Official Responses shape: string `input` + stream flag only.
+  // Verified curl body: model + input string + stream:false only.
   const payload = {
     model,
     input: PROMPT,
     stream: false,
   };
   const { res, body, text } = await api("POST", "/v1/responses", payload);
-
-  // Completed Responses JSON with a non-2xx status is a gateway/proxy bug,
-  // but still prove the payload path worked — classify via success validator.
-  if (
-    !res.ok &&
-    body &&
-    typeof body === "object" &&
-    body.object === "response" &&
-    body.status === "completed"
-  ) {
-    fail(
-      label,
-      `got HTTP ${res.status} with completed response body (proxy/status bug)`
-    );
-    // Still require standard error envelope when status is wrong without treating
-    // completed body as success — surface protocol issue clearly.
-    return;
-  }
+  const debugCtx = {
+    route: "/v1/responses",
+    method: "POST",
+    model,
+    stream: false,
+    payload,
+    res,
+    body,
+    text,
+  };
 
   if (!res.ok) {
-    classifyProbeError(label, res, body, text);
+    classifyProbeError(label, res, body, text, debugCtx);
     return;
   }
-  validateSuccessEnvelope(label, res, body, text);
+  if (!validateSuccessEnvelope(label, res, body, text)) {
+    printProbeDebug(debugCtx);
+  }
 }
 
 async function probeResponsesStream(model) {
   const label = `responses stream ${model}`;
-  const { res, body, text } = await api("POST", "/v1/responses", {
+  const payload = {
     model,
     input: PROMPT,
     stream: true,
-  });
+  };
+  const { res, body, text } = await api("POST", "/v1/responses", payload);
+  const debugCtx = {
+    route: "/v1/responses",
+    method: "POST",
+    model,
+    stream: true,
+    payload,
+    res,
+    body,
+    text,
+  };
   if (res.status !== 200) {
-    classifyProbeError(label, res, body, text);
+    classifyProbeError(label, res, body, text, debugCtx);
     return;
   }
   const leak = assertNoLeaks(label, text);
@@ -338,6 +416,7 @@ async function probeResponsesStream(model) {
     /event:\s*response\./.test(text) ||
     /\[DONE\]/.test(text);
   if (!ok) {
+    printProbeDebug(debugCtx);
     fail(label, "SSE shape incomplete");
     return;
   }

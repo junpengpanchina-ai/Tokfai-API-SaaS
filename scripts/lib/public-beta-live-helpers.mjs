@@ -46,14 +46,19 @@ export function extractModelTrace(body) {
   };
 }
 
-/** Numeric credits only — never return a raw usage object. */
+/** Numeric credits only — accept number or numeric string. */
 export function extractCredits(body) {
-  if (typeof body?.credits_charged === "number") return body.credits_charged;
-  if (typeof body?.usage?.credits_charged === "number") {
-    return body.usage.credits_charged;
-  }
-  if (typeof body?.tokfai?.credits_charged === "number") {
-    return body.tokfai.credits_charged;
+  const candidates = [
+    body?.credits_charged,
+    body?.usage?.credits_charged,
+    body?.tokfai?.credits_charged,
+  ];
+  for (const value of candidates) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() !== "") {
+      const n = Number(value);
+      if (Number.isFinite(n)) return n;
+    }
   }
   return null;
 }

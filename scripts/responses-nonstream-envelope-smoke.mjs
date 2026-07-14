@@ -93,7 +93,15 @@ let ok = true;
           start
         );
         const block = acceptance.slice(start, end > 0 ? end : undefined);
-        return !/\bmax_tokens\b/.test(block);
+        const payloadMatch = block.match(/const payload = \{([\s\S]*?)\};/);
+        const payload = payloadMatch?.[1] ?? "";
+        return (
+          payload.includes("input: PROMPT") &&
+          payload.includes("stream: false") &&
+          !/\bmax_tokens\b/.test(payload) &&
+          !/\bmax_output_tokens\b/.test(payload) &&
+          !/\bmessages\s*:/.test(payload)
+        );
       })(),
     ],
     [
@@ -105,7 +113,9 @@ let ok = true;
           start
         );
         const block = acceptance.slice(start, end > 0 ? end : undefined);
-        return !/\bmessages\s*:/.test(block);
+        const payloadMatch = block.match(/const payload = \{([\s\S]*?)\};/);
+        const payload = payloadMatch?.[1] ?? "";
+        return !/\bmessages\s*:/.test(payload);
       })(),
     ],
     [
@@ -117,6 +127,25 @@ let ok = true;
       acceptance.includes(
         '"gpt-5.5": ["chat", "chat_stream", "responses", "responses_stream"]'
       ),
+    ],
+    [
+      "acceptance uses curlCompatible live fetch",
+      acceptance.includes("curlCompatible: true"),
+    ],
+    [
+      "acceptance prints redacted probe debug",
+      acceptance.includes("printProbeDebug") &&
+        acceptance.includes("payload_keys="),
+    ],
+    [
+      "acceptance non-stream label helper avoids stream substring bug",
+      acceptance.includes("isResponsesNonStreamLabel") &&
+        acceptance.includes('startsWith("responses non-stream")'),
+    ],
+    [
+      "error builder forbids empty message/code",
+      errors.includes("Invalid request.") &&
+        errors.includes("invalid_request_error"),
     ],
   ];
 
@@ -232,6 +261,20 @@ let ok = true;
   } else {
     ok = fail("helper accepts standard 400 envelope", JSON.stringify(good)) && ok;
   }
+
+  const nullish = helpers.assertStandardErrorEnvelope(
+    {
+      error: {
+        message: null,
+        code: null,
+        request_id: "req_x",
+      },
+    },
+    { status: 400, headers: { get: () => "req_x" } },
+    ""
+  );
+  if (!nullish.ok) pass("helper rejects null code/message");
+  else ok = fail("helper rejects null code/message") && ok;
 }
 
 if (!ok) {

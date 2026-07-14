@@ -24,8 +24,21 @@ export function mergeAcceptanceHeaders(headers = {}) {
   return { ...getAcceptanceHeaders(), ...headers };
 }
 
+/**
+ * @param {string} url
+ * @param {{
+ *   method?: string,
+ *   headers?: Record<string, string>,
+ *   body?: string,
+ *   timeoutMs?: number,
+ *   curlCompatible?: boolean,
+ * }} [options]
+ * curlCompatible: skip X-Tokfai-* acceptance headers (match plain curl).
+ */
 export async function acceptanceFetch(url, options = {}) {
-  const headers = mergeAcceptanceHeaders(options.headers ?? {});
+  const headers = options.curlCompatible
+    ? { ...(options.headers ?? {}) }
+    : mergeAcceptanceHeaders(options.headers ?? {});
   const timeoutMs = options.timeoutMs ?? 120_000;
 
   const res = await fetch(url, {
