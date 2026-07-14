@@ -38,6 +38,8 @@ let ok = true;
   );
   const acceptance = read("scripts/public-beta-live-acceptance.mjs");
   const errors = read("apps/dmit-api/src/errors.ts");
+  const curlHelper = read("scripts/lib/live-curl-compatible-fetch.mjs");
+  const curlProbe = read("scripts/live-responses-curl-compatible-probe.mjs");
 
   const checks = [
     [
@@ -79,10 +81,39 @@ let ok = true;
         errors.includes('"invalid_request_error"'),
     ],
     [
+      "curl-compatible helper uses https.request (not undici defaults)",
+      curlHelper.includes('from "node:https"') &&
+        curlHelper.includes("exactCurlCompatibleFetch") &&
+        curlHelper.includes('Authorization') &&
+        curlHelper.includes("Content-Type"),
+    ],
+    [
+      "curl-compatible payload is model+input+stream only",
+      curlHelper.includes("buildResponsesNonStreamPayload") &&
+        /return \{\s*model,\s*input: LIVE_RESPONSES_PROMPT,\s*stream: false,/m.test(
+          curlHelper
+        ),
+    ],
+    [
+      "acceptance responses non-stream uses curl-compatible helper",
+      acceptance.includes("postResponsesNonStreamCurlCompatible") &&
+        acceptance.includes("responsesNonStreamSucceeded"),
+    ],
+    [
+      "acceptance prints EMPTY_RAW_BODY_FROM_FETCH",
+      acceptance.includes("EMPTY_RAW_BODY_FROM_FETCH"),
+    ],
+    [
+      "standalone curl-compatible probe exists",
+      curlProbe.includes("TOKFAI_LIVE_RESPONSES_CURL_COMPATIBLE_PASS") &&
+        curlProbe.includes("postResponsesNonStreamCurlCompatible"),
+    ],
+    [
       "acceptance responses payload uses input string",
-      /async function probeResponses\(model\) \{[\s\S]*?input: PROMPT[\s\S]*?stream: false/.test(
-        acceptance
-      ),
+      acceptance.includes("postResponsesNonStreamCurlCompatible") ||
+        /async function probeResponses\(model\) \{[\s\S]*?input: PROMPT[\s\S]*?stream: false/.test(
+          acceptance
+        ),
     ],
     [
       "acceptance does not send max_tokens on responses probe",
@@ -93,14 +124,8 @@ let ok = true;
           start
         );
         const block = acceptance.slice(start, end > 0 ? end : undefined);
-        const payloadMatch = block.match(/const payload = \{([\s\S]*?)\};/);
-        const payload = payloadMatch?.[1] ?? "";
         return (
-          payload.includes("input: PROMPT") &&
-          payload.includes("stream: false") &&
-          !/\bmax_tokens\b/.test(payload) &&
-          !/\bmax_output_tokens\b/.test(payload) &&
-          !/\bmessages\s*:/.test(payload)
+          !/\bmax_tokens\b/.test(block) && !/\bmax_output_tokens\b/.test(block)
         );
       })(),
     ],
@@ -113,9 +138,7 @@ let ok = true;
           start
         );
         const block = acceptance.slice(start, end > 0 ? end : undefined);
-        const payloadMatch = block.match(/const payload = \{([\s\S]*?)\};/);
-        const payload = payloadMatch?.[1] ?? "";
-        return !/\bmessages\s*:/.test(payload);
+        return !/\bmessages\s*:/.test(block);
       })(),
     ],
     [
@@ -127,20 +150,6 @@ let ok = true;
       acceptance.includes(
         '"gpt-5.5": ["chat", "chat_stream", "responses", "responses_stream"]'
       ),
-    ],
-    [
-      "acceptance uses curlCompatible live fetch",
-      acceptance.includes("curlCompatible: true"),
-    ],
-    [
-      "acceptance prints redacted probe debug",
-      acceptance.includes("printProbeDebug") &&
-        acceptance.includes("payload_keys="),
-    ],
-    [
-      "acceptance non-stream label helper avoids stream substring bug",
-      acceptance.includes("isResponsesNonStreamLabel") &&
-        acceptance.includes('startsWith("responses non-stream")'),
     ],
     [
       "error builder forbids empty message/code",

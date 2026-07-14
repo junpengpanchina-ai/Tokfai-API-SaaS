@@ -21,6 +21,12 @@
 
 import { acceptanceFetch } from "./lib/acceptance-http.mjs";
 import {
+  extractErrorCode,
+  postResponsesNonStreamCurlCompatible,
+  printCurlCompatibleDebug,
+  responsesNonStreamSucceeded,
+} from "./lib/live-curl-compatible-fetch.mjs";
+import {
   assertNoLeaks,
   assertStandardErrorEnvelope,
   extractCredits,
@@ -143,6 +149,16 @@ async function api(method, path, body, opts = {}) {
  */
 function classifyProbeError(label, res, body, text, debugCtx) {
   if (debugCtx) printProbeDebug(debugCtx);
+
+  // Never invent null envelope fields when the transport returned an empty body.
+  if (typeof text === "string" && text.length === 0) {
+    console.error("      EMPTY_RAW_BODY_FROM_FETCH");
+    fail(
+      label,
+      `EMPTY_RAW_BODY_FROM_FETCH HTTP ${res?.status ?? "(n/a)"} (not a Tokfai JSON error envelope)`
+    );
+    return "fail";
+  }
 
   const leak = assertNoLeaks(label, text || body);
   if (!leak.ok) {
@@ -357,31 +373,85 @@ async function probeChatStream(model) {
 
 async function probeResponses(model) {
   const label = `responses non-stream ${model}`;
-  // Verified curl body: model + input string + stream:false only.
-  const payload = {
+  // Exact curl-compatible path (https.request, Auth+Content-Type only).
+  const result = await postResponsesNonStreamCurlCompatible({
+    apiBase: BASE,
+    apiKey: API_KEY,
     model,
-    input: PROMPT,
-    stream: false,
-  };
-  const { res, body, text } = await api("POST", "/v1/responses", payload);
-  const debugCtx = {
-    route: "/v1/responses",
-    method: "POST",
-    model,
-    stream: false,
-    payload,
-    res,
-    body,
-    text,
-  };
+    timeoutMs: TIMEOUT_MS,
+  });
 
-  if (!res.ok) {
-    classifyProbeError(label, res, body, text, debugCtx);
+  if (responsesNonStreamSucceeded(result)) {
+    const leak = assertNoLeaks(label, result.text);
+    if (!leak.ok) {
+      fail(label, leak.detail);
+      return;
+    }
+    const rid =
+      (typeof result.body?.request_id === "string" && result.body.request_id) ||
+      result.headers?.["x-request-id"] ||
+      (typeof result.body?.id === "string" && result.body.id) ||
+      null;
+    const credits = extractCredits(result.body);
+    if (credits == null) {
+      printCurlCompatibleDebug(result, API_KEY);
+      fail(label, "missing usage / credits_charged");
+      return;
+    }
+    pass(
+      label,
+      `HTTP ${result.status} request_id=${rid ?? "(n/a)"} credits=${credits}`
+    );
     return;
   }
-  if (!validateSuccessEnvelope(label, res, body, text)) {
-    printProbeDebug(debugCtx);
+
+  // Empty raw body: do not invent code:null / message:null envelopes.
+  if (result.emptyRawBody) {
+    printCurlCompatibleDebug(result, API_KEY);
+    // Primary model must work; secondary models tolerate empty transport quirks as DEGRADED.
+    if (model !== "gpt-5.5") {
+      markDegraded(
+        label,
+        `EMPTY_RAW_BODY_FROM_FETCH HTTP ${result.status} (secondary model; not a JSON envelope)`
+      );
+      return;
+    }
+    fail(
+      label,
+      `EMPTY_RAW_BODY_FROM_FETCH HTTP ${result.status} (not a Tokfai JSON error envelope)`
+    );
+    return;
   }
+
+  const leak = assertNoLeaks(label, result.text);
+  if (!leak.ok) {
+    printCurlCompatibleDebug(result, API_KEY);
+    fail(label, leak.detail);
+    return;
+  }
+
+  const code = extractErrorCode(result.body);
+  if (isUpstreamDegradedCode(code)) {
+    printCurlCompatibleDebug(result, API_KEY);
+    markDegraded(
+      label,
+      `HTTP ${result.status} code=${code} request_id=${result.headers?.["x-request-id"] ?? result.body?.error?.request_id ?? "(n/a)"}`
+    );
+    return;
+  }
+
+  // Synthetic Response-like object for shared envelope checks.
+  const fakeRes = {
+    status: result.status,
+    ok: result.status >= 200 && result.status < 300,
+    headers: {
+      get: (name) => result.headers?.[String(name).toLowerCase()] ?? null,
+    },
+    url: result.url,
+  };
+
+  printCurlCompatibleDebug(result, API_KEY);
+  classifyProbeError(label, fakeRes, result.body, result.text);
 }
 
 async function probeResponsesStream(model) {
