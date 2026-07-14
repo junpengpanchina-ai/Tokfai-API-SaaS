@@ -38,7 +38,14 @@ TOKFAI_API_KEY=sk-tokfai_xxx TOKFAI_LIVE_IMAGE_SMOKE=1 node scripts/public-beta-
 线上真实轻压（显式开启）：
 
 ```bash
+# rate-limit（默认）：抗滥用 — 429 可大量出现，不扣费、无 5xx
 TOKFAI_API_KEY=sk-tokfai_xxx TOKFAI_LIVE_LOAD=1 \
+  TOKFAI_LOAD_MODE=rate-limit \
+  TOKFAI_LOAD_CONCURRENCY=10 TOKFAI_LOAD_DURATION_SEC=60 \
+  node scripts/public-beta-live-load.mjs
+
+# throughput：真实吞吐 — 需临时高 RPM 测试 Key / 高额度 tenant
+TOKFAI_API_KEY=sk-tokfai_xxx TOKFAI_LOAD_MODE=throughput \
   TOKFAI_LOAD_CONCURRENCY=10 TOKFAI_LOAD_DURATION_SEC=60 \
   node scripts/public-beta-live-load.mjs
 ```

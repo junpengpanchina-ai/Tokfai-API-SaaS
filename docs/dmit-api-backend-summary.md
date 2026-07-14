@@ -19,7 +19,7 @@ OpenAI Compatible Chat、Responses 非流式、Responses 流式、Gemini native 
 | `scripts/public-beta-ready-all.mjs` | 离线 suite +（有 Key 时）live acceptance |
 | `scripts/public-beta-live-acceptance.mjs` | 真实 Chat / Responses / Stream（默认 gpt-5.5 全量 + gemini responses；`TOKFAI_LIVE_FULL_MATRIX=1` 扩矩阵；上游 timeout→DEGRADED） |
 | `scripts/public-beta-live-image-smoke.mjs` | 真实图片 queued→completed |
-| `scripts/public-beta-live-load.mjs` | 真实轻压（默认 10×60s） |
+| `scripts/public-beta-live-load.mjs` | 真实轻压：`TOKFAI_LOAD_MODE=rate-limit`（默认，验证抗滥用/429）或 `throughput`（需高 RPM Key） |
 
 ```bash
 # 离线
@@ -33,7 +33,15 @@ TOKFAI_API_KEY=sk-tokfai_xxx TOKFAI_LIVE_IMAGE_SMOKE=1 \
   node scripts/public-beta-live-image-smoke.mjs
 
 # 线上轻压
+# rate-limit（默认）：验证抗滥用，429 可大量出现 → TOKFAI_PUBLIC_BETA_RATE_LIMIT_PASS
 TOKFAI_API_KEY=sk-tokfai_xxx TOKFAI_LIVE_LOAD=1 \
+  TOKFAI_LOAD_MODE=rate-limit \
+  TOKFAI_LOAD_CONCURRENCY=10 TOKFAI_LOAD_DURATION_SEC=60 \
+  node scripts/public-beta-live-load.mjs
+
+# throughput：真实吞吐（需临时高 RPM 测试 Key / 高额度 tenant）
+# → success_rate>=95% 且 429_rate<=5% → TOKFAI_PUBLIC_BETA_THROUGHPUT_PASS
+TOKFAI_API_KEY=sk-tokfai_xxx TOKFAI_LOAD_MODE=throughput \
   TOKFAI_LOAD_CONCURRENCY=10 TOKFAI_LOAD_DURATION_SEC=60 \
   node scripts/public-beta-live-load.mjs
 ```

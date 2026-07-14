@@ -12,6 +12,8 @@
  *  7. public-beta-live-acceptance        if TOKFAI_API_KEY set
  *  8. public-beta-live-image-smoke       if TOKFAI_LIVE_IMAGE_SMOKE=1
  *  9. public-beta-live-load              if TOKFAI_LIVE_LOAD=1
+ *     (default TOKFAI_LOAD_MODE=rate-limit → RATE_LIMIT_PASS;
+ *      TOKFAI_LOAD_MODE=throughput → THROUGHPUT_PASS, needs high RPM key)
  *
  * Usage:
  *   node scripts/public-beta-ready-all.mjs
