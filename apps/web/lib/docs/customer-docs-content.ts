@@ -3576,6 +3576,7 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
         items: [
           "integration.cherryTroubleshootInvalidToken",
           "integration.cherryTroubleshootModel",
+          "integration.cherryTroubleshootWrongProvider",
           "integration.cherryTroubleshootTimeout",
           "integration.cherryTroubleshootCredits",
         ],

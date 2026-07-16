@@ -26,7 +26,9 @@ curl https://api.tokfai.com/v1/models \
 说明：
 
 - 外部集成请使用独立的 Tokfai API Key（`sk-tokfai_` 前缀）
-- `GET /v1/models` **可不带鉴权**；带 Key 也可以
+- `GET /v1/models` **可不带鉴权**；带 Key 也可以；默认只返回通用文本/聊天模型（不含图片专用模型）
+- 第三方客户端必须选择 **Tokfai / `| tokfai`** 供应商下的模型
+- 图片功能请使用 Tokfai 图片工作台或 `POST /v1/images/generations`
 - 成功请求按用量扣算力积分；失败通常不扣费，以 Usage / Credits 为准
 - Base URL 必须是 `https://api.tokfai.com`
 
@@ -54,7 +56,6 @@ Authorization: Bearer sk-tokfai_<48位小写hex>
 | `POST /v1/responses` | API Key **或** 控制台登录 JWT |
 | `POST /v1/images/generations` | API Key **或** 控制台登录 JWT |
 | `GET /v1/images/generations/{id}` | API Key **或** 控制台登录 JWT |
-| `POST /v1beta/models/{model}:generateContent` | API Key（Bearer / `x-goog-api-key` / `?key=`）或 Bearer JWT |
 | `POST /v1/batches/chat` | **仅 API Key** |
 
 > 控制台 Playground 可用登录会话调用部分接口；**第三方 / 生产集成请只用 API Key**。
@@ -65,18 +66,17 @@ Authorization: Bearer sk-tokfai_<48位小写hex>
 
 | 方法 | 路径 | 用途 |
 |---|---|---|
-| `GET` | `/v1/models` | 模型列表 |
+| `GET` | `/v1/models` | 通用文本/聊天模型列表（不含图片专用模型） |
 | `POST` | `/v1/chat/completions` | 文本对话（OpenAI Chat Completions） |
 | `POST` | `/v1/responses` | Responses 形态（兼容层；见下文能力边界） |
-| `POST` | `/v1/images/generations` | 文生图 / 参考图改图 |
+| `POST` | `/v1/images/generations` | 文生图 / 参考图改图（图片工作台同路径） |
 | `GET` | `/v1/images/generations/{id}` | 图片任务状态查询（beta） |
 | `GET` | `/v1/api/result?id=` | 图片异步查询兼容 alias（beta） |
 | `POST` | `/v1/batches/chat` | 批量文本任务 |
-| `GET` | `/v1beta/models` | Gemini 原生模型列表 |
-| `POST` | `/v1beta/models/{model}:generateContent` | Gemini 原生生成 |
-| `POST` | `/v1beta/models/{model}:streamGenerateContent` | Gemini 原生流式 |
 | `GET` | `/v1/health` | 健康检查 |
 | `GET` | `/v1/status` | 公开路由清单 |
+
+> 第三方客户端请用 OpenAI Compatible + `| tokfai`。自研客户端若必须 Gemini 协议，见 §7（仅 `https://api.tokfai.com`）。
 
 没有 `/v1/embeddings`。
 
@@ -301,55 +301,48 @@ print(res.json())
 
 ---
 
-## 7. Gemini 原生兼容
+## 7. Gemini 原生兼容（高级 / 自研客户端）
 
-仅在客户端必须走 Gemini 原生协议时使用。  
-Base URL 仍是 `https://api.tokfai.com`；鉴权仍用 Tokfai Key。
+**Cherry Studio / Chatbox 等第三方客户端请用 OpenAI Compatible + `| tokfai`，不要另建 Gemini 供应商。**
 
-可用模型 ID（示例）：
+仅当自研客户端强制要求 Gemini 协议时，才使用 Tokfai 网关：
 
-- `gemini-2.5-flash`
-- `gemini-2.5-pro`
-- `gemini-3-flash`
-- `gemini-3-pro`
+- `GET https://api.tokfai.com/v1beta/models`
+- `POST https://api.tokfai.com/v1beta/models/{model}:generateContent`
+- `POST https://api.tokfai.com/v1beta/models/{model}:streamGenerateContent`
 
-路径：
+Base URL 必须是 `https://api.tokfai.com`；鉴权仍用 Tokfai `sk-tokfai_…`（Bearer / `x-goog-api-key` / `?key=`）。
 
-- `POST /v1beta/models/{model}:generateContent`
-- `POST /v1beta/models/{model}:streamGenerateContent`
-- `GET /v1beta/models`
-
-鉴权任选其一：
-
-- `Authorization: Bearer sk-tokfai_xxx`
-- `x-goog-api-key: sk-tokfai_xxx`
-- `?key=sk-tokfai_xxx`
-
-大多数场景优先用 OpenAI 兼容的 `/v1/chat/completions`。
+可用聊天模型：`gemini-2.5-flash`、`gemini-2.5-pro`、`gemini-3-flash`、`gemini-3-pro`。  
+图片专用模型请使用图片工作台或 `POST /v1/images/generations`。
 
 ---
 
 ## 8. Cherry Studio 接入
 
-新增 **OpenAI Compatible / Custom OpenAI** 服务：
+新增 **OpenAI Compatible / Custom OpenAI** 服务，并始终选择 **Tokfai / `| tokfai`** 下的模型。Chatbox 等同理。
 
 | 项 | 值 |
 |---|---|
 | 服务名称 | Tokfai |
+| 类型 | OpenAI Compatible / Custom OpenAI |
 | Base URL | `https://api.tokfai.com` |
 | API Key | `sk-tokfai_xxx` |
-| 模型 ID | 从 Tokfai 模型列表选择，如 `gpt-5.4`、`gpt-5.5`、`auto-fast`、`gemini-3-flash` |
+| 推荐模型 | `auto-fast`（首次联调） |
+| 测试 Prompt | `Say ok only.` |
 
 检查清单：
 
 - Base URL 是否为 `https://api.tokfai.com`
 - API Key 是否以 `sk-tokfai_` 开头
-- 模型 ID 是否来自 Tokfai 模型列表
-- 是否误用了其它服务的旧配置
+- 是否选中 **Tokfai / `| tokfai`**（不要选 Gemini / OpenAI 原生供应商）
+- 模型 ID 是否来自 Tokfai 聊天模型列表（`GET /v1/models` 不含图片专用模型）
+
+常见错误：若错误详情请求主机不是 `api.tokfai.com`，说明请求没有经过 Tokfai，请切回 `| tokfai`。
+
+图片功能请使用 Tokfai 图片工作台或 `POST /v1/images/generations`。
 
 验证：在 Cherry 发一条短消息，到 Tokfai Usage 确认出现记录。
-
-若必须用 Gemini Provider，请配置 `/v1beta/...` 并使用上文 Gemini 鉴权方式。
 
 ---
 

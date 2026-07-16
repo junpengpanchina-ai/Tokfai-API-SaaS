@@ -2,7 +2,7 @@
 /**
  * Public model registry smoke (offline, static).
  *
- * 1. public + visible ids ⊆ local /v1/models allowlist
+ * 1. public + visible chat ids ⊆ local /v1/models allowlist (image models excluded)
  * 2. aliases never appear in public groups
  * 3. aliases without routesTo are not consumer-visible
  * 4. internal/experimental/disabled never appear in consumer docs
@@ -79,10 +79,11 @@ function parseRegistryEntries(source) {
     const id = chunk.match(/id:\s*"([^"]+)"/)?.[1];
     if (!id) continue;
     const status = chunk.match(/status:\s*"([^"]+)"/)?.[1] ?? "";
+    const family = chunk.match(/family:\s*"([^"]+)"/)?.[1] ?? "";
     const visible = /visible:\s*true/.test(chunk);
     const group = chunk.match(/group:\s*"([^"]+)"/)?.[1] ?? "";
     const routesTo = chunk.match(/routesTo:\s*"([^"]+)"/)?.[1] ?? "";
-    entries.push({ id, status, visible, group, routesTo });
+    entries.push({ id, status, family, visible, group, routesTo });
   }
   return entries;
 }
@@ -162,19 +163,34 @@ const hiddenStatuses = entries.filter((e) =>
   ["internal", "experimental", "disabled"].includes(e.status)
 );
 
-// 1) public ⊆ allowlist
+// 1) public chat ⊆ allowlist (image models are Image Workbench / Image API only)
 {
-  const missing = publicVisible
+  const publicChatVisible = publicVisible.filter((e) => e.family !== "image");
+  const missing = publicChatVisible
     .map((e) => e.id)
     .filter((id) => !allowlist.has(id));
   if (missing.length) {
     ok =
       fail(
-        "public models ⊆ /v1/models allowlist",
+        "public chat models ⊆ /v1/models allowlist",
         missing.join(", ")
       ) && ok;
   } else {
-    pass("public models ⊆ /v1/models allowlist");
+    pass("public chat models ⊆ /v1/models allowlist");
+  }
+
+  const imageOnAllowlist = publicVisible
+    .filter((e) => e.family === "image")
+    .map((e) => e.id)
+    .filter((id) => allowlist.has(id));
+  if (imageOnAllowlist.length) {
+    ok =
+      fail(
+        "/v1/models allowlist omits image-only models",
+        imageOnAllowlist.join(", ")
+      ) && ok;
+  } else {
+    pass("/v1/models allowlist omits image-only models");
   }
 }
 

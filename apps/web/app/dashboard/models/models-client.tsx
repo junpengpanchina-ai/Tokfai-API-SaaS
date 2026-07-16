@@ -36,7 +36,6 @@ const TAG_LABEL_KEYS: Record<ConsumerModelCapabilityTag, string> = {
 
 function docAnchorForModel(model: ConsumerModelCard): string {
   if (model.kind === "image") return "/docs#image-api";
-  if (model.id.startsWith("gemini")) return "/docs#gemini-native";
   if (model.id === "gpt-5.5" || model.id.startsWith("gpt-5.5")) {
     return "/docs#responses-api";
   }

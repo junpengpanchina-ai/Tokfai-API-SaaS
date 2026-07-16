@@ -174,7 +174,11 @@ function checkSurfaceSeparation() {
   if (!docs.includes("PUBLIC_BETA_DOCS")) {
     return fail("consumer docs render from registry");
   }
-  if (!groups.includes('id: "recommended"') || !groups.includes("nano-banana-2")) {
+  if (
+    !groups.includes('"recommended"') ||
+    !groups.includes('"image"') ||
+    !groups.includes("CONSUMER_VISIBLE_IMAGE_MODEL_IDS")
+  ) {
     return fail("consumer model groups cover recommended + image models");
   }
   return pass("models / pricing / docs surfaces are separated");

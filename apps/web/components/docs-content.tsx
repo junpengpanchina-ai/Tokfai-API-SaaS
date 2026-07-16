@@ -154,7 +154,7 @@ type ClientIntegrationErrorRow = {
 function clientIntegrationErrors(
   prefix: "cherryStudio" | "cursor",
 ): ClientIntegrationErrorRow[] {
-  return [
+  const rows: ClientIntegrationErrorRow[] = [
     {
       status: "401",
       code: "invalid_token",
@@ -180,6 +180,15 @@ function clientIntegrationErrors(
       fixKey: `docs.${prefix}Error500`,
     },
   ];
+  if (prefix === "cherryStudio") {
+    rows.splice(3, 0, {
+      status: "400",
+      code: "wrong_provider",
+      meaningKey: "docs.errorWrongProvider",
+      fixKey: "docs.cherryStudioErrorWrongProvider",
+    });
+  }
+  return rows;
 }
 
 const THREE_MINUTE_SETUP_ROWS = [

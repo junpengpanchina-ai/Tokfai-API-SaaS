@@ -258,11 +258,11 @@ export const troubleshootingCaseMessagesEn: Record<string, string> = {
   "integration.troubleshooting.case.cherry_connection_failed.title":
     "Cherry Studio — connection failed",
   "integration.troubleshooting.case.cherry_connection_failed.likelyCause":
-    "Tokfai Provider misconfigured, or Base URL / API Key is incomplete.",
+    "Tokfai Provider misconfigured, wrong provider selected, or Base URL / API Key is incomplete.",
   "integration.troubleshooting.case.cherry_connection_failed.action1":
-    "Use Tokfai service settings — Base URL https://api.tokfai.com and an sk-tokfai_… key.",
+    "Use Tokfai / | tokfai only — Base URL https://api.tokfai.com and an sk-tokfai_… key.",
   "integration.troubleshooting.case.cherry_connection_failed.action2":
-    "Confirm the model id comes from the Tokfai model list, and you are not reusing another service’s old config.",
+    "If the error-detail host is not api.tokfai.com, switch back from Gemini / OpenAI / other providers to Tokfai.",
   "integration.troubleshooting.case.cherry_connection_failed.action3":
     "Copy Cherry Studio config from Docs → Cherry Studio.",
 
@@ -524,11 +524,11 @@ export const troubleshootingCaseMessagesZh: Record<string, string> = {
   "integration.troubleshooting.case.cherry_connection_failed.title":
     "Cherry Studio — 连接失败",
   "integration.troubleshooting.case.cherry_connection_failed.likelyCause":
-    "Tokfai Provider 配置错误，或 Base URL / API Key 未填全。",
+    "Tokfai Provider 配置错误、选错了供应商，或 Base URL / API Key 未填全。",
   "integration.troubleshooting.case.cherry_connection_failed.action1":
-    "使用 Tokfai 服务配置 — Base URL https://api.tokfai.com，API Key 以 sk-tokfai_ 开头。",
+    "只使用 Tokfai / | tokfai — Base URL https://api.tokfai.com，API Key 以 sk-tokfai_ 开头。",
   "integration.troubleshooting.case.cherry_connection_failed.action2":
-    "确认模型 ID 来自 Tokfai 模型列表，且没有误用其它服务商的旧配置。",
+    "若错误详情请求主机不是 api.tokfai.com，说明误选了 Gemini / OpenAI / 其它供应商，请切回 Tokfai。",
   "integration.troubleshooting.case.cherry_connection_failed.action3":
     "从文档 → Cherry Studio 复制正确配置。",
 

@@ -222,6 +222,25 @@ async function run() {
     `GET /v1/models chat=${chatIds.length} image=${imageIds.length} total=${allIds.length}`
   );
 
+  // Ordinary chat clients must not see image-only / Gemini image preview ids.
+  if (imageIds.length) {
+    ok =
+      fail(
+        "GET /v1/models omits image-only models",
+        `found: ${imageIds.join(", ")}`
+      ) && ok;
+  } else {
+    pass("GET /v1/models omits image-only models");
+  }
+  for (const bad of [
+    "gemini-2.5-flash-image-preview",
+    "gemini-2.5-flash-image",
+  ]) {
+    if (allIds.includes(bad)) {
+      ok = fail(`catalog must not list ${bad}`, `found in /v1/models`) && ok;
+    }
+  }
+
   // Listed ids must be canonical — no Cherry display-name fakes on the catalog.
   for (const bad of ["gpt-5.4-pro", "gpt-5.5-pro", "GPT 5.4 Pro"]) {
     if (allIds.includes(bad)) {

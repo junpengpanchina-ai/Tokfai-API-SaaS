@@ -1646,7 +1646,7 @@ export const messages = {
         "Text-to-image via client.images.generate. For image-to-image, pass image_urls in the request body (see curl example).",
       clientIntegrationsTitle: "Cherry Studio / Cursor / OpenAI SDK",
       clientIntegrationsDesc:
-        "Tokfai is OpenAI-compatible. Use the same base URL and API key in desktop clients and official SDKs.",
+        "Tokfai is OpenAI-compatible. Use Base URL https://api.tokfai.com, your sk-tokfai_… key, and models under the Tokfai / | tokfai provider only.",
       clientIntegrationConfigTitle: "Required settings",
       clientIntegrationErrorsTitle: "Common errors",
       clientIntegrationFixColumn: "What to check",
@@ -1665,13 +1665,15 @@ export const messages = {
         "Start with auto-fast for integration smoke tests — Tokfai auto-routes when upstream models are busy. Use auto-pro for quality workloads. Explicit gpt-5.4 / gpt-5.5 may return upstream_model_busy (HTTP 503). Do not use gpt-4o-mini; it is not registered upstream.",
       cherryStudioLabel: "Cherry Studio",
       cherryStudioSteps:
-        "Settings → Provider → OpenAI-compatible. Set API Host, API Key, and default model as below.",
+        "Settings → Provider → OpenAI-compatible. Base URL https://api.tokfai.com, API Key sk-tokfai_…, model auto-fast. Always pick models under Tokfai / | tokfai — not Gemini or OpenAI providers.",
       cherryStudioError401:
         "Paste the full sk-tokfai_… secret from Dashboard → API Keys — not your dashboard login token.",
       cherryStudioError402:
         "Top up credits in Dashboard → Credits before sending requests from Cherry Studio.",
       cherryStudioError404:
-        "Pick a Tokfai model ID such as auto-fast. Browse available IDs on the Models page.",
+        "Pick a Tokfai model ID such as auto-fast under the | tokfai provider. Image-only models are not for chat clients.",
+      cherryStudioErrorWrongProvider:
+        "If the error-detail request host is not api.tokfai.com, you selected Gemini / OpenAI / another provider — switch back to Tokfai / | tokfai.",
       cherryStudioError500:
         "The model service is temporarily unavailable — retry in a few minutes or switch models.",
       cursorLabel: "Cursor",
@@ -1708,6 +1710,8 @@ export const messages = {
       error402: "Not enough credits — top up in Dashboard → Credits",
       error404Model: "The model ID is not available or not enabled for your account",
       error404Route: "HTTP path not found on api.tokfai.com",
+      errorWrongProvider:
+        "Request did not go through Tokfai — wrong client provider selected",
       error429: "Upstream model rate limit — retry with exponential backoff",
       error500: "Model or upstream service temporarily unavailable — retry later",
       errorInvalidPrompt: "Missing or empty prompt for image generation",
@@ -3768,7 +3772,7 @@ export const messages = {
       cherryChapterFailure:
         "invalid_token or model_not_available — verify host and model id.",
       cherryGatewayNote:
-        "Cherry Studio connects to Tokfai via an OpenAI-compatible / OpenAI-style provider. Base URL: https://api.tokfai.com. API Key: sk-tokfai_xxx. Recommended model: auto-fast. Use auto-pro for quality-first routing and auto-cheap for low-cost batch workloads. One Tokfai Key covers Chat Completions, Responses, and selected Gemini aliases — no need to manage separate service configs.",
+        "Cherry Studio connects to Tokfai via an OpenAI-compatible / OpenAI-style provider. Base URL: https://api.tokfai.com. API Key: sk-tokfai_xxx. Recommended model: auto-fast. Always select models under Tokfai / | tokfai — selecting Gemini or OpenAI providers bypasses Tokfai. Image generation uses Tokfai Image Workbench or POST /v1/images/generations, not the chat model list.",
       cherryCurlFirstNote:
         "If Cherry Studio fails, copy the one-line Chat curl below and run it in any terminal. HTTP 200 confirms the API Key — then fix Cherry provider settings.",
       cherryNotAgencyNote:
@@ -3776,7 +3780,7 @@ export const messages = {
       cherryUiVersionNote:
         "Cherry Studio menu labels vary by version — Provider, Model Provider, API Provider, or Custom OpenAI. If you can fill Base URL, API Key, and Model, map the fields below. No Tokfai repository or project folder required.",
       cherryModelsNote:
-        "Model aliases: auto-fast (default), auto-pro (quality-first), auto-cheap (low-cost batch). You can switch models in Cherry Studio without creating a new API Key.",
+        "Model aliases: auto-fast (default), auto-pro (quality-first), auto-cheap (low-cost batch). Pick models under | tokfai only. GET /v1/models returns chat models — image-only models stay in Image Workbench / Image API docs.",
       cherryCopyNowTitle: "You can copy now",
       cherryCopyConfigLabel: "Cherry Studio config (all fields)",
       cherryProviderNameLabel: "Name",
@@ -3832,7 +3836,9 @@ export const messages = {
       cherryTroubleshootInvalidToken:
         "invalid_token — key wrong or revoked. Create a new key on API Keys and re-copy config.",
       cherryTroubleshootModel:
-        "model_not_available — switch to auto-fast or browse Models.",
+        "model_not_available — switch to auto-fast under | tokfai, or browse Models.",
+      cherryTroubleshootWrongProvider:
+        "Error-detail host is not api.tokfai.com — you are not on Tokfai. Switch the provider back to Tokfai / | tokfai and keep Base URL https://api.tokfai.com.",
       cherryTroubleshootTimeout:
         "upstream_timeout — retry after a short wait or switch to auto-fast.",
       cherryTroubleshootCredits:
@@ -3844,7 +3850,7 @@ export const messages = {
       cherryErrorInsufficientCredits:
         "insufficient_credits — balance too low. Top up in Credits or Pricing.",
       cherryErrorModel:
-        "model_not_available / model_not_found — model name wrong. Start with auto-fast.",
+        "model_not_available / model_not_found — model name wrong. Start with auto-fast under | tokfai.",
       cherryErrorUpstreamBusy:
         "upstream_model_busy — upstream busy. Retry or switch to auto-fast.",
       cherryErrorTimeout: "upstream_timeout — upstream slow. Retry after a short wait.",
@@ -6987,7 +6993,7 @@ export const messages = {
         "文生图可通过 client.images.generate 调用。图生图需在请求体中传入 image_urls（见 curl 示例）。",
       clientIntegrationsTitle: "Cherry Studio / Cursor / OpenAI SDK",
       clientIntegrationsDesc:
-        "Tokfai 兼容 OpenAI 接口。在桌面客户端与官方 SDK 中使用相同的 base URL 与 API Key。",
+        "Tokfai 兼容 OpenAI 接口。请使用 Base URL https://api.tokfai.com、sk-tokfai_… 密钥，并只选择 Tokfai / | tokfai 供应商下的模型。",
       clientIntegrationConfigTitle: "必填配置",
       clientIntegrationErrorsTitle: "常见错误",
       clientIntegrationFixColumn: "排查建议",
@@ -7006,13 +7012,15 @@ export const messages = {
         "首次接入建议用 auto-fast 做 smoke test — 上游繁忙时 Tokfai 会自动切换。高质量场景用 auto-pro。明确指定 gpt-5.4 / gpt-5.5 可能返回 upstream_model_busy（HTTP 503）。请勿使用 gpt-4o-mini，上游未注册。",
       cherryStudioLabel: "Cherry Studio",
       cherryStudioSteps:
-        "Settings → Provider → OpenAI-compatible。按下方表格填写 API Host、API Key 与默认 model。",
+        "Settings → Provider → OpenAI-compatible。Base URL https://api.tokfai.com，API Key sk-tokfai_…，model auto-fast。必须选择 Tokfai / | tokfai 下的模型，不要选 Gemini 或 OpenAI 供应商。",
       cherryStudioError401:
         "在 Dashboard → API Keys 复制完整 sk-tokfai_… secret — 不要使用 Dashboard 登录 token。",
       cherryStudioError402:
         "在 Cherry Studio 发请求前，先在 Dashboard → Credits 充值 credits。",
       cherryStudioError404:
-        "选择 Tokfai model ID，例如 auto-fast。完整列表见 Models 页面。",
+        "在 | tokfai 供应商下选择 Tokfai model ID（如 auto-fast）。图片专用模型不要用于聊天客户端。",
+      cherryStudioErrorWrongProvider:
+        "若错误详情请求主机不是 api.tokfai.com，说明误选了 Gemini / OpenAI / 其它供应商 — 请切回 Tokfai / | tokfai。",
       cherryStudioError500:
         "模型服务暂时不可用 — 稍后重试或切换 model。",
       cursorLabel: "Cursor",
@@ -7048,6 +7056,8 @@ export const messages = {
       error402: "credits 不足 — 请在 Dashboard → Credits 充值",
       error404Model: "model ID 不可用或未对你的账户启用",
       error404Route: "api.tokfai.com 上不存在该 HTTP 路径",
+      errorWrongProvider:
+        "请求未经过 Tokfai — 客户端选错了供应商",
       error429: "上游模型限流 — 请指数退避后重试",
       error500: "模型或上游服务暂时不可用 — 请稍后重试",
       errorInvalidPrompt: "图像生成缺少或为空 prompt",
@@ -9022,7 +9032,7 @@ export const messages = {
       cherryChapterFailure:
         "invalid_token 或 model_not_available — 检查 Host 与模型 id。",
       cherryGatewayNote:
-        "Cherry Studio 通过 OpenAI 兼容 / OpenAI-style Provider 接入 Tokfai。Base URL：https://api.tokfai.com。API Key：sk-tokfai_xxx。推荐模型 auto-fast。高质量可用 auto-pro，批量低成本可用 auto-cheap。一个 Tokfai Key 可兼容 Chat Completions、Responses 与部分 Gemini 别名，无需维护多套旧配置。",
+        "Cherry Studio 通过 OpenAI 兼容 / OpenAI-style Provider 接入 Tokfai。Base URL：https://api.tokfai.com。API Key：sk-tokfai_xxx。推荐模型 auto-fast。必须选择 Tokfai / | tokfai 下的模型——选 Gemini 或 OpenAI 供应商不会经过 Tokfai。图片请用图片工作台或 POST /v1/images/generations。",
       cherryCurlFirstNote:
         "若 Cherry Studio 失败，复制下方单行 Chat curl 在任意终端运行。HTTP 200 说明 API Key 正确——再修正 Cherry 配置。",
       cherryNotAgencyNote:
@@ -9030,7 +9040,7 @@ export const messages = {
       cherryUiVersionNote:
         "Cherry Studio 菜单因版本不同可能叫 Provider、Model Provider、API Provider 或 Custom OpenAI。只要能填 Base URL、API Key、Model，按下方字段对应填写 — 无需 Tokfai 仓库或工程目录。",
       cherryModelsNote:
-        "模型别名：auto-fast（默认）、auto-pro（质量优先）、auto-cheap（低成本批量）。在 Cherry Studio 切换模型无需新建 API Key。",
+        "模型别名：auto-fast（默认）、auto-pro（质量优先）、auto-cheap（低成本批量）。只选 | tokfai 下的模型。GET /v1/models 只返回聊天模型；图片专用模型见图片工作台 / 图片接口文档。",
       cherryCopyNowTitle: "你现在就可以复制",
       cherryCopyConfigLabel: "Cherry Studio 配置（全部字段）",
       cherryProviderNameLabel: "名称",
@@ -9077,7 +9087,9 @@ export const messages = {
       cherryTroubleshootInvalidToken:
         "invalid_token — 密钥错误或已吊销。在 API Keys 创建新密钥并重新复制配置。",
       cherryTroubleshootModel:
-        "model_not_available — 换 auto-fast 或浏览 Models。",
+        "model_not_available — 在 | tokfai 下换 auto-fast，或浏览 Models。",
+      cherryTroubleshootWrongProvider:
+        "错误详情请求主机不是 api.tokfai.com — 说明没有走 Tokfai。请切回 Tokfai / | tokfai，Base URL 保持 https://api.tokfai.com。",
       cherryTroubleshootTimeout:
         "upstream_timeout — 稍后重试或换 auto-fast。",
       cherryTroubleshootCredits:
@@ -9088,7 +9100,7 @@ export const messages = {
         "invalid_token — Key 错误、已 revoke 或不完整。在 API Keys 创建新 Key 或使用 Copy key。",
       cherryErrorInsufficientCredits: "insufficient_credits — 余额不足。在 Credits 或 Pricing 充值。",
       cherryErrorModel:
-        "model_not_available / model_not_found — 模型名错误。先用 auto-fast。",
+        "model_not_available / model_not_found — 模型名错误。先在 | tokfai 下用 auto-fast。",
       cherryErrorUpstreamBusy: "upstream_model_busy — 上游繁忙。重试或换 auto-fast。",
       cherryErrorTimeout: "upstream_timeout — 上游超时。稍后重试。",
       cherryErrorRateLimit:

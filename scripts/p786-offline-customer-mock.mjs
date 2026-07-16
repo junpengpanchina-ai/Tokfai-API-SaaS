@@ -749,6 +749,7 @@ export function startMockGateway(options = {}) {
 
       if (req.method === "GET" && path === "/v1/models") {
         const now = Math.floor(Date.now() / 1000);
+        // Chat / alias catalog only — image models are not listed on GET /v1/models.
         const ids = [
           "auto-fast",
           "auto-pro",
@@ -762,7 +763,6 @@ export function startMockGateway(options = {}) {
           "gpt-5.4",
           "gemini-2.5-flash",
           "gemini-3-flash",
-          "nano-banana-fast",
         ];
         return sendJson(res, 200, {
           object: "list",

@@ -287,7 +287,7 @@ async function run() {
       ) && ok;
   }
 
-  // --- Image generations (still covered for OpenAI-compatible clients) ---
+  // --- Image generations (Image API / Workbench — not listed on GET /v1/models) ---
   {
     const res = await postJson("/v1/images/generations", {
       model: "nano-banana-fast",
@@ -295,13 +295,16 @@ async function run() {
       n: 1,
       size: "1024x1024",
     });
-    const imageOk =
+    const syncOk =
       res.status === 200 &&
       Array.isArray(res.body?.data) &&
       res.body.data.length > 0 &&
       (typeof res.body.data[0]?.url === "string" ||
         typeof res.body.data[0]?.b64_json === "string");
-    if (imageOk) {
+    const asyncOk =
+      res.status === 202 &&
+      typeof (res.body?.id ?? res.body?.request_id) === "string";
+    if (syncOk || asyncOk) {
       ok = pass("POST /v1/images/generations model=nano-banana-fast") && ok;
     } else {
       ok =

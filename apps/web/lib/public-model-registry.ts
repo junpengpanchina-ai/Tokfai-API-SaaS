@@ -74,8 +74,9 @@ export const PUBLIC_DOC_EXAMPLE_MODELS = {
 } as const;
 
 /**
- * Local allowlist mirroring GET /v1/models expectations for offline smoke.
- * Concrete chat/image ids + CATALOG_ALIAS_IDS from dmit-api modelAliases.ts.
+ * Local allowlist mirroring GET /v1/models (chat clients).
+ * Concrete chat ids + CATALOG_ALIAS_IDS from dmit-api modelAliases.ts.
+ * Image-only models are omitted — they appear in Image Workbench / Image API docs.
  */
 export const PUBLIC_MODELS_API_ALLOWLIST = [
   // concrete chat
@@ -85,11 +86,6 @@ export const PUBLIC_MODELS_API_ALLOWLIST = [
   "gemini-2.5-pro",
   "gemini-3-flash",
   "gemini-3-pro",
-  // concrete image
-  "gpt-image-2",
-  "nano-banana-fast",
-  "nano-banana",
-  "nano-banana-2",
   // catalog aliases (listed on GET /v1/models)
   "auto-fast",
   "auto-pro",

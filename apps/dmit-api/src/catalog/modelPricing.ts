@@ -544,24 +544,22 @@ const DEFAULT_OWNED_BY = "tokfai";
 /**
  * Visible catalog for GET /v1/models.
  *
- * Only exposes models that are callable via chat/image gateways, or alias
- * fallbacks that resolve to callable targets — avoids clients picking a listed
- * id and then hitting model_not_available.
+ * OpenAI-compatible chat clients (Cherry Studio, Chatbox, etc.) only see
+ * general text/chat models and catalog aliases. Image-only models stay on
+ * Tokfai Image Workbench / POST /v1/images/generations docs — not this list.
  */
 export async function listCatalogModels(): Promise<OpenAiModelListItem[]> {
   const aliases = listAliasModelsForCatalog();
   const aliasIds = new Set(aliases.map((row) => row.id));
   const now = Math.floor(Date.now() / 1000);
 
-  const [chatIds, imageIds, fromDb] = await Promise.all([
+  const [chatIds, fromDb] = await Promise.all([
     listAvailableChatModelIds(),
-    listAvailableImageModelIds(),
     listCatalogModelsFromDb(),
   ]);
 
   const callableIds = new Set<string>([
     ...chatIds.filter((id) => !aliasIds.has(id)),
-    ...imageIds.filter((id) => !aliasIds.has(id)),
   ]);
 
   const dbById = new Map((fromDb ?? []).map((row) => [row.id, row]));
@@ -582,7 +580,7 @@ export async function listCatalogModels(): Promise<OpenAiModelListItem[]> {
     });
   }
 
-  // Preserve DB sort_order when available; otherwise keep chat-then-image order.
+  // Preserve DB sort_order when available; otherwise keep stable id order.
   if (fromDb?.length) {
     const order = new Map(fromDb.map((row, index) => [row.id, index]));
     concrete.sort((a, b) => {

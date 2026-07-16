@@ -45,7 +45,7 @@ export type PublicBetaDoc = {
   markdown: { zh: string; en: string };
 };
 
-const UPDATED_AT = "2026-07-14";
+const UPDATED_AT = "2026-07-16";
 
 const QUICKSTART_CURL = modelsCurlMultiline();
 const RESPONSES_CURL = `curl -sS ${TOKFAI_API_BASE_URL}/responses \\
@@ -126,7 +126,6 @@ export const PUBLIC_BETA_DOCS: PublicBetaDoc[] = [
       "POST /v1/chat/completions",
       "POST /v1/responses",
       "POST /v1/images/generations",
-      "POST /v1beta/models/{model}:generateContent",
     ],
     updatedAt: UPDATED_AT,
     markdown: {
@@ -149,8 +148,7 @@ API Base URL：\`${TOKFAI_API_ORIGIN}\`（完整路径前缀 \`${TOKFAI_API_BASE
 |---|---|
 | 普通聊天 | \`POST https://api.tokfai.com/v1/chat/completions\` |
 | GPT-5.5 / 工具调用 / Codex 类场景 | \`POST https://api.tokfai.com/v1/responses\` |
-| 图片生成 | \`POST https://api.tokfai.com/v1/images/generations\` |
-| Gemini 原生格式 | \`POST https://api.tokfai.com/v1beta/models/{model}:generateContent\` |
+| 图片生成 | \`POST https://api.tokfai.com/v1/images/generations\`（或 Dashboard 图片工作台） |
 
 ### 步骤 3：在请求中选择模型
 
@@ -163,7 +161,7 @@ API Key 不绑定模型。每次请求通过 \`model\` 参数选择模型。
 }
 \`\`\`
 
-> Chat Completions 使用 \`messages\` 字段；Gemini 原生走 \`/v1beta/models/{model}:generateContent\`。详见各接口文档。
+> Chat Completions 使用 \`messages\` 字段。\`GET /v1/models\` 只返回通用文本/聊天模型；图片专用模型请使用 Tokfai 图片工作台或 OpenAI-compatible 图片接口。
 
 ## 验证连通性
 
@@ -173,6 +171,7 @@ ${QUICKSTART_CURL}
 
 说明：
 - Base URL 必须是 \`https://api.tokfai.com\`
+- 第三方客户端（Cherry Studio / Chatbox 等）必须选择 **Tokfai**（界面常显示为 \`| tokfai\`）供应商下的模型
 - 成功请求按用量扣算力积分；失败通常不扣费，以 Usage / Credits 为准
 
 ## MATLAB 用户
@@ -197,8 +196,7 @@ Create an \`sk-tokfai_xxx\` API key in the dashboard. **The API key is not bound
 |---|---|
 | Chat | \`POST https://api.tokfai.com/v1/chat/completions\` |
 | GPT-5.5 / tools / Codex-like agents | \`POST https://api.tokfai.com/v1/responses\` |
-| Image generation | \`POST https://api.tokfai.com/v1/images/generations\` |
-| Gemini native | \`POST https://api.tokfai.com/v1beta/models/{model}:generateContent\` |
+| Image generation | \`POST https://api.tokfai.com/v1/images/generations\` (or Dashboard Image Workbench) |
 
 ### Step 3: Select the model in the request
 
@@ -211,7 +209,7 @@ API keys are not bound to a model. Pass \`model\` on every request.
 }
 \`\`\`
 
-> Chat Completions uses \`messages\`; Gemini native uses \`/v1beta/models/{model}:generateContent\`. See each API doc for details.
+> Chat Completions uses \`messages\`. \`GET /v1/models\` returns general text/chat models only; use Tokfai Image Workbench or the OpenAI-compatible Image API for image-only models.
 
 ## Verify connectivity
 
@@ -221,6 +219,7 @@ ${QUICKSTART_CURL}
 
 Notes:
 - Base URL must be \`https://api.tokfai.com\`
+- In third-party clients (Cherry Studio / Chatbox, etc.), always pick models under the **Tokfai** provider (often shown as \`| tokfai\`)
 - Successful calls debit compute credits; failures are usually not charged — Usage / Credits are authoritative
 
 ## MATLAB users
@@ -707,6 +706,8 @@ For multi-turn chat, use \`POST /v1/chat/completions\` with a \`messages\` array
 
 该接口兼容 OpenAI Images Generations 形态，用于文生图、参考图改图、电商主图生成等场景。
 
+> 图片专用模型**不会**出现在普通聊天客户端的 \`GET /v1/models\` 列表中。请使用 **Tokfai 图片工作台**（Dashboard）或本文档的 OpenAI-compatible 图片接口；不要在 Cherry Studio / Chatbox 里把图片模型当对话模型使用。
+
 ## 请求字段
 
 | 字段 | 类型 | 必填 | 说明 |
@@ -850,6 +851,8 @@ curl "https://api.tokfai.com/v1/api/result?id=REQUEST_ID" \\
 Path: \`POST https://api.tokfai.com/v1/images/generations\`
 
 OpenAI Images Generations compatible — text-to-image, reference edit, ecommerce creatives.
+
+> Image-only models are **not** listed on \`GET /v1/models\` for ordinary chat clients. Use **Tokfai Image Workbench** (Dashboard) or this OpenAI-compatible Image API — do not treat image models as chat models in Cherry Studio / Chatbox.
 
 ## Request fields
 
@@ -1067,44 +1070,92 @@ If edit intent is clear but no reference image is provided:
     markdown: {
       zh: `# Cherry Studio 接入
 
-在 Cherry Studio 中新增 **OpenAI Compatible / Custom OpenAI** 服务。
+在 Cherry Studio 中新增 **OpenAI Compatible / Custom OpenAI** 服务，并始终选择 **Tokfai**（界面常显示为 \`| tokfai\`）供应商下的模型。
+
+Chatbox 与其它 OpenAI-compatible 客户端使用相同配置。
 
 ## 推荐配置
 
-- 服务名称：Tokfai  
-- Base URL：\`https://api.tokfai.com\`  
-- API Key：\`sk-tokfai_xxx\`  
-- 推荐用 OpenAI Provider 接入；Tokfai 会自动兼容 Chat Completions、Responses 和部分 Gemini 模型别名  
-- 模型 ID 请从 Tokfai 模型列表选择，例如：\`gpt-5.4\`、\`gpt-5.5\`、\`auto-fast\`、\`gemini-3-flash\`
+| 项 | 值 |
+|---|---|
+| 服务名称 | Tokfai |
+| 类型 | OpenAI Compatible / Custom OpenAI |
+| Base URL / API Host | \`https://api.tokfai.com\` |
+| API Key | \`sk-tokfai_xxx\`（Dashboard → API Keys） |
+| 推荐模型 | \`auto-fast\`（首次联调）；也可用 \`auto-pro\`、\`gpt-5.5\`、\`gemini-3-flash\` |
+| 测试 Prompt | \`Say ok only.\` |
 
-## 常见问题
+## 模型选择（重要）
 
-- Base URL 是否为 \`https://api.tokfai.com\`  
-- API Key 是否以 \`sk-tokfai_\` 开头  
-- 模型 ID 是否来自 Tokfai 模型列表  
-- 是否误用了其它服务的旧配置
+- **必须**在模型选择器中选中 **Tokfai / \`| tokfai\`** 下的模型  
+- **不要**选择界面上的 Gemini、OpenAI 或其它第三方供应商条目——那些请求不会经过 Tokfai  
+- \`GET /v1/models\` 只返回通用文本/聊天模型；图片生成请使用 **Tokfai 图片工作台** 或 \`POST /v1/images/generations\`
 
-验证：在 Cherry 发送一条短消息，然后到 Tokfai Usage 确认出现记录。`,
+## 接入步骤
+
+1. 登录 Tokfai Dashboard，创建 API Key 并立即复制完整 \`sk-tokfai_…\`  
+2. Cherry Studio → 设置 → Provider → 新增 OpenAI Compatible  
+3. 填写上方表格中的 Base URL 与 API Key  
+4. 拉取 / 选择 Tokfai 模型列表中的 \`auto-fast\`  
+5. 发送测试 Prompt：\`Say ok only.\`  
+6. 到 Tokfai Usage 确认出现记录
+
+## 常见错误
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| 401 / \`invalid_token\` | Key 错误、不完整或已吊销 | 从 API Keys 重新复制完整 \`sk-tokfai_…\` |
+| 402 / \`insufficient_credits\` | 算力积分不足 | Dashboard → Credits 充值 |
+| 404 / \`model_not_found\` | 模型 ID 不在 Tokfai 列表 | 改用 \`auto-fast\` |
+| Bad Request / \`model not register\` | 选错了供应商或图片专用模型 | 切回 \`| tokfai\`；图片改用图片工作台 |
+| 错误详情请求路径主机不是 \`api.tokfai.com\` | 请求未走 Tokfai（误选 Gemini / OpenAI / 其它供应商） | 改回 Tokfai 供应商，Base URL 保持 \`https://api.tokfai.com\` |
+| Usage 无记录 | 请求打到了其它 Base URL | 核对 Provider 与 Base URL |
+
+验证：Cherry 短消息成功后，Usage 应出现对应条目。`,
       en: `# Cherry Studio
 
-In Cherry Studio, add an **OpenAI Compatible / Custom OpenAI** service.
+In Cherry Studio, add an **OpenAI Compatible / Custom OpenAI** service and always select models under the **Tokfai** provider (often shown as \`| tokfai\`).
+
+Chatbox and other OpenAI-compatible clients use the same settings.
 
 ## Recommended setup
 
-- Service name: Tokfai  
-- Base URL: \`https://api.tokfai.com\`  
-- API Key: \`sk-tokfai_xxx\`  
-- Prefer the OpenAI Provider path; Tokfai automatically supports Chat Completions, Responses, and selected Gemini model aliases  
-- Pick model ids from the Tokfai model list, e.g. \`gpt-5.4\`, \`gpt-5.5\`, \`auto-fast\`, \`gemini-3-flash\`
+| Field | Value |
+|---|---|
+| Service name | Tokfai |
+| Type | OpenAI Compatible / Custom OpenAI |
+| Base URL / API Host | \`https://api.tokfai.com\` |
+| API Key | \`sk-tokfai_xxx\` (Dashboard → API Keys) |
+| Recommended model | \`auto-fast\` (first test); also \`auto-pro\`, \`gpt-5.5\`, \`gemini-3-flash\` |
+| Test prompt | \`Say ok only.\` |
 
-## Checklist
+## Model selection (important)
 
-- Is Base URL \`https://api.tokfai.com\`?  
-- Does the API Key start with \`sk-tokfai_\`?  
-- Is the model id from the Tokfai model list?  
-- Did you accidentally reuse another service’s old config?
+- **Must** pick models under **Tokfai / \`| tokfai\`** in the model picker  
+- **Do not** select Gemini, OpenAI, or other third-party provider entries — those requests do not go through Tokfai  
+- \`GET /v1/models\` returns general text/chat models only; for images use **Tokfai Image Workbench** or \`POST /v1/images/generations\`
 
-Verify: send a short message in Cherry, then confirm a row appears in Tokfai Usage.`,
+## Setup steps
+
+1. Sign in to Tokfai Dashboard, create an API key, and copy the full \`sk-tokfai_…\` secret  
+2. Cherry Studio → Settings → Provider → add OpenAI Compatible  
+3. Paste Base URL and API Key from the table above  
+4. Pull / select \`auto-fast\` from the Tokfai model list  
+5. Send test prompt: \`Say ok only.\`  
+6. Confirm a row appears in Tokfai Usage
+
+## Common errors
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| 401 / \`invalid_token\` | Wrong, incomplete, or revoked key | Re-copy full \`sk-tokfai_…\` from API Keys |
+| 402 / \`insufficient_credits\` | Low balance | Top up in Dashboard → Credits |
+| 404 / \`model_not_found\` | Model id not on Tokfai list | Switch to \`auto-fast\` |
+| Bad Request / \`model not register\` | Wrong provider or image-only model | Switch back to \`| tokfai\`; use Image Workbench for images |
+| Error detail host is not \`api.tokfai.com\` | Request bypassed Tokfai (Gemini / OpenAI / other provider selected) | Switch back to Tokfai; keep Base URL \`https://api.tokfai.com\` |
+| No Usage row | Request hit another Base URL | Recheck provider and Base URL |
+
+Verify: after a short Cherry message succeeds, Usage should show the call.`,
     },
   },
   {
@@ -1148,28 +1199,32 @@ Do not mix price tables into API examples.`,
     markdown: {
       zh: `# Gemini 原生兼容
 
-仅在客户端必须走 Gemini 原生协议时使用。  
-Base URL 仍是 \`${TOKFAI_API_ORIGIN}\`，API Key 仍是 Tokfai \`sk-tokfai_…\`。
+**第三方客户端（Cherry Studio / Chatbox 等）请优先用 OpenAI Compatible，并选择 \`| tokfai\` 供应商。**  
+不要在客户端里另建 Gemini / OpenAI 原生供应商指向其它域名。
 
-可用模型 ID：
-- \`gemini-2.5-flash\`
-- \`gemini-2.5-pro\`
-- \`gemini-3-flash\`
-- \`gemini-3-pro\`
+仅当自研客户端强制要求 Gemini 协议时，才走 Tokfai 网关上的：
 
-大多数场景优先用 OpenAI-compatible \`/v1/chat/completions\`。`,
+- \`GET https://api.tokfai.com/v1beta/models\`
+- \`POST https://api.tokfai.com/v1beta/models/{model}:generateContent\`
+
+Base URL 必须是 \`${TOKFAI_API_ORIGIN}\`，API Key 仍是 Tokfai \`sk-tokfai_…\`。
+
+可用聊天模型 ID：\`gemini-2.5-flash\`、\`gemini-2.5-pro\`、\`gemini-3-flash\`、\`gemini-3-pro\`。  
+图片专用模型不走此接口——请使用 Tokfai 图片工作台或 \`POST /v1/images/generations\`。`,
       en: `# Gemini native compatibility
 
-Use only when your client requires Gemini-native protocol.  
-Base URL remains \`${TOKFAI_API_ORIGIN}\`. API key remains your Tokfai \`sk-tokfai_…\` key.
+**For third-party clients (Cherry Studio / Chatbox, etc.), prefer OpenAI Compatible and select the \`| tokfai\` provider.**  
+Do not add a separate Gemini / OpenAI native provider pointed at another host.
 
-Model ids:
-- \`gemini-2.5-flash\`
-- \`gemini-2.5-pro\`
-- \`gemini-3-flash\`
-- \`gemini-3-pro\`
+Only use Tokfai’s Gemini-protocol paths when your own client requires them:
 
-Prefer OpenAI-compatible \`/v1/chat/completions\` for most integrations.`,
+- \`GET https://api.tokfai.com/v1beta/models\`
+- \`POST https://api.tokfai.com/v1beta/models/{model}:generateContent\`
+
+Base URL must remain \`${TOKFAI_API_ORIGIN}\`. API key remains your Tokfai \`sk-tokfai_…\` key.
+
+Chat model ids: \`gemini-2.5-flash\`, \`gemini-2.5-pro\`, \`gemini-3-flash\`, \`gemini-3-pro\`.  
+Image-only models are not served here — use Tokfai Image Workbench or \`POST /v1/images/generations\`.`,
     },
   },
   {
@@ -1282,7 +1337,13 @@ Example:
 可以。MATLAB 通过 HTTP JSON 调用 Tokfai API；GPT-5.5 等场景推荐 \`/v1/responses\`。详见 [MATLAB 接入](/docs/matlab)。
 
 ## 图片接口路径是什么？
-\`POST /v1/images/generations\`（不是其它历史路径）
+\`POST /v1/images/generations\`（不是其它历史路径）。也可使用 Dashboard **图片工作台**。
+
+## 为什么聊天客户端看不到图片模型？
+\`GET /v1/models\` 默认只返回通用文本/聊天模型。图片功能请使用 Tokfai 图片工作台或 OpenAI-compatible 图片接口。
+
+## Cherry Studio 必须选哪个供应商？
+必须选择 **Tokfai / \`| tokfai\`**。若选 Gemini / OpenAI 等其它供应商，请求不会经过 Tokfai。
 
 ## 文生图和改图是不是两个接口？
 不是。同一公开接口；\`image\` / \`images\` / \`image_urls\` 等参考图字段是否为空区分模式。
@@ -1307,7 +1368,13 @@ Prefer \`POST /v1/responses\` (complex reasoning, long context, tool calling, Ag
 Yes. MATLAB calls Tokfai over HTTP JSON; for GPT-5.5 and similar workloads, prefer \`/v1/responses\`. See [MATLAB integration](/docs/matlab).
 
 ## What is the image endpoint?
-\`POST /v1/images/generations\` (not other legacy paths)
+\`POST /v1/images/generations\` (not other legacy paths). You can also use the Dashboard **Image Workbench**.
+
+## Why don’t chat clients list image models?
+\`GET /v1/models\` returns general text/chat models only. Use Tokfai Image Workbench or the OpenAI-compatible Image API for images.
+
+## Which provider must Cherry Studio use?
+**Tokfai / \`| tokfai\`**. Selecting Gemini / OpenAI / other providers bypasses Tokfai.
 
 ## Are text-to-image and edit separate APIs?
 No. One public endpoint; presence of \`image\` / \`images\` / \`image_urls\` (etc.) selects the mode.
@@ -1319,6 +1386,7 @@ Usually not — Usage / Credits are authoritative. Reconcile with \`request_id\`
 \`${TOKFAI_API_ORIGIN}/v1/health\``,
     },
   },
+
   {
     slug: "troubleshooting",
     title: { zh: "排障", en: "Troubleshooting" },
@@ -1336,11 +1404,16 @@ Usually not — Usage / Credits are authoritative. Reconcile with \`request_id\`
 
 ## model not found / model not register
 - 模型 ID 拼写是否正确  
-- Cherry 是否选中了 Tokfai Provider  
-- Base URL 是否为 \`${TOKFAI_API_ORIGIN}\`
+- Cherry / Chatbox 是否选中了 **Tokfai / \`| tokfai\`** 供应商（不要选 Gemini / OpenAI 原生供应商）  
+- Base URL 是否为 \`${TOKFAI_API_ORIGIN}\`  
+- 若错误详情里的请求主机不是 \`api.tokfai.com\`，说明请求没有经过 Tokfai
+
+## 图片模型在聊天客户端报错
+- 图片功能请使用 Tokfai 图片工作台或 OpenAI-compatible 图片接口  
+- \`GET /v1/models\` 默认不返回图片专用模型给普通聊天客户端
 
 ## 有调用但 Usage 无条目
-- 可能请求打到了错误的 Base URL  
+- 可能请求打到了错误的 Base URL 或错误的供应商  
 - 到 Credits / Usage 核对 request_id
 
 健康检查：\`${TOKFAI_API_ORIGIN}/v1/health\``,
@@ -1352,11 +1425,16 @@ Usually not — Usage / Credits are authoritative. Reconcile with \`request_id\`
 
 ## model not found / model not register
 - Check model id spelling  
-- In Cherry, confirm the Tokfai provider is selected  
-- Confirm Base URL is \`${TOKFAI_API_ORIGIN}\`
+- In Cherry / Chatbox, confirm **Tokfai / \`| tokfai\`** is selected (not Gemini / OpenAI native)  
+- Confirm Base URL is \`${TOKFAI_API_ORIGIN}\`  
+- If the error-detail host is not \`api.tokfai.com\`, the request did not go through Tokfai
+
+## Image model errors in chat clients
+- Use Tokfai Image Workbench or the OpenAI-compatible Image API  
+- \`GET /v1/models\` does not expose image-only models to ordinary chat clients
 
 ## Calls succeed elsewhere but Tokfai Usage is empty
-- The request may have targeted the wrong Base URL  
+- The request may have targeted the wrong Base URL or provider  
 - Cross-check request_id in Credits / Usage
 
 Health: \`${TOKFAI_API_ORIGIN}/v1/health\``,
