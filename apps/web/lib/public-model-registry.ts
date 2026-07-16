@@ -8,7 +8,7 @@
  * - `public` + `visible` → formal catalog cards
  * - `alias` + `visible` + `routesTo` → Compatibility aliases section only
  * - `internal` / `experimental` / `disabled` → never shown to consumers
- * - Rewrite-only ids (e.g. gpt-5.4-pro) are not listed on GET /v1/models → omit
+ * - Compat aliases (e.g. gpt-5.4-pro → gpt-5-pro) may be listed on GET /v1/models
  */
 
 export type PublicModelStatus =
@@ -93,6 +93,7 @@ export const PUBLIC_MODELS_API_ALLOWLIST = [
   "gpt-5",
   "gpt-5-chat",
   "gpt-5-pro",
+  "gpt-5.4-pro",
   "gpt-5.1",
   "gpt-5.2",
 ] as const;
@@ -410,7 +411,7 @@ export const PUBLIC_MODEL_REGISTRY: PublicModel[] = [
   },
   {
     id: "gpt-5-pro",
-    displayName: { zh: "gpt-5-pro", en: "gpt-5-pro" },
+    displayName: { zh: "Tokfai GPT-5 Pro", en: "Tokfai GPT-5 Pro" },
     family: "gpt",
     status: "alias",
     visible: true,
@@ -428,6 +429,27 @@ export const PUBLIC_MODEL_REGISTRY: PublicModel[] = [
     descriptionEn: "Quality-first GPT alias.",
     bestForZh: "智能路由与高质量对话",
     bestForEn: "Smart routing and higher-quality chat",
+  },
+  {
+    id: "gpt-5.4-pro",
+    displayName: { zh: "Tokfai GPT-5.4 Pro", en: "Tokfai GPT-5.4 Pro" },
+    family: "gpt",
+    status: "alias",
+    visible: true,
+    group: "aliases",
+    recommendedEndpoint: "/v1/chat/completions or /v1/responses",
+    routesTo: "gpt-5-pro",
+    supportsChatCompletions: true,
+    supportsResponses: true,
+    supportsStreaming: true,
+    supportsImageInput: false,
+    supportsImageGeneration: false,
+    beginnerFriendly: true,
+    tags: ["alias", "best_quality"],
+    descriptionZh: "Cherry Studio / Codex 常用名，兼容映射到 gpt-5-pro。",
+    descriptionEn: "Common Cherry Studio / Codex name; maps to gpt-5-pro.",
+    bestForZh: "第三方客户端兼容",
+    bestForEn: "Third-party client compatibility",
   },
 ];
 

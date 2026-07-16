@@ -26,12 +26,11 @@ import {
 } from "./lib/acceptance-config.mjs";
 import { acceptanceFetch } from "./lib/acceptance-http.mjs";
 import { ensureMockGateway } from "./lib/ensure-mock-gateway.mjs";
+import { findConsumerLeak } from "./lib/consumer-docs-leak.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LIVE = isLiveMode();
 const CJK_RE = /[\u4e00-\u9fff]/;
-const LEAK_RE =
-  /grsai|garsai|grsaiapi\.com|上游供应商|upstream\s+provider/i;
 
 let ok = true;
 let mockChild = null;
@@ -221,7 +220,7 @@ function checkStaticSecurity() {
     fail("admin reason", "credits-adjust requires reason");
   } else pass("Admin write requires reason");
 
-  // Frontend bundle leak scan (source-level proxy for next bundle)
+  // Frontend leak scan — allow wrong-provider diagnostics (bare grsaiapi.com)
   const webFiles = [
     "apps/web/lib/docs/public-beta-docs-registry.ts",
     "apps/web/components/consumer-docs-guide.tsx",
@@ -229,10 +228,9 @@ function checkStaticSecurity() {
   ];
   let leakHit = null;
   for (const rel of webFiles) {
-    const src = read(rel);
-    const m = src.match(LEAK_RE);
-    if (m) {
-      leakHit = `${rel}: ${m[0]}`;
+    const hit = findConsumerLeak(read(rel));
+    if (hit) {
+      leakHit = `${rel}: ${hit}`;
       break;
     }
   }
@@ -455,7 +453,7 @@ async function checkImageAsync(base, apiKey) {
   }
 
   const blob = JSON.stringify(latest ?? {});
-  if (LEAK_RE.test(blob) || /stack|grsaiapi/i.test(blob)) {
+  if (findConsumerLeak(blob) || /stack/i.test(blob)) {
     fail("image no upstream leak in poll", "leaked upstream token");
   } else pass("image poll has no upstream raw error");
 }

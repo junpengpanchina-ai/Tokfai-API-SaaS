@@ -320,7 +320,9 @@ Base URL 必须是 `https://api.tokfai.com`；鉴权仍用 Tokfai `sk-tokfai_…
 
 ## 8. Cherry Studio 接入
 
-对外只配置：API 地址 `https://api.tokfai.com`、Tokfai 控制台 API Key、带 `| tokfai` 后缀的模型（展示名如 `Tokfai GPT-5`）。Chatbox 等同理。
+对外只配置：API 地址 `https://api.tokfai.com`、Tokfai 控制台 API Key、带 `| tokfai` 后缀的模型（展示名如 `Tokfai GPT-5` / `Tokfai GPT-5.4 Pro`）。Chatbox / Codex 等同理。
+
+**不是选择 GPT-5 就代表正在使用 Tokfai。必须确认服务商是 Tokfai，或请求路径是 `https://api.tokfai.com`。**
 
 | 项 | 值 |
 |---|---|
@@ -328,19 +330,19 @@ Base URL 必须是 `https://api.tokfai.com`；鉴权仍用 Tokfai `sk-tokfai_…
 | 类型 | OpenAI Compatible / Custom OpenAI |
 | Base URL | `https://api.tokfai.com` |
 | API Key | Tokfai 控制台生成 |
-| 模型 id | `gpt-5` / `gpt-5-pro` / `gpt-5.5` / `gemini-3-pro` 等（不变） |
-| 展示名 | `Tokfai GPT-5`、`Tokfai GPT-5 Pro`、`Tokfai Gemini 3 Pro` |
+| 模型 id | `gpt-5` / `gpt-5-pro` / `gpt-5.4-pro` / `gpt-5.5` / `gemini-3-pro` |
+| 展示名 | `Tokfai GPT-5`、`Tokfai GPT-5 Pro`、`Tokfai GPT-5.4 Pro`、`Tokfai Gemini 3 Pro` |
 | 顶部必须显示 | `| tokfai` |
 
-正确：`GPT 5 | tokfai` 或 `Tokfai GPT-5`。  
-错误：`GPT 5 | OpenAI`、`GPT 5.4 Pro | OpenAI`、`Gemini | Google`。
+正确：`Tokfai GPT-5 | tokfai`、`Tokfai GPT-5.4 Pro | tokfai`。  
+错误：`GPT 5 | OpenAI`、`GPT 5.4 Pro | OpenAI`、`Gemini | Google`、请求路径出现 grsaiapi.com。
 
 如果出现 grsaiapi.com，说明没有走 Tokfai。  
-如果请求地址不是 `https://api.tokfai.com`，就是选错供应商。
+`gpt-5.4-pro` / `GPT 5.4 Pro` 在 Tokfai 内兼容映射到 `gpt-5-pro`。
 
 强制隔离测试：只启用 Tokfai → 关闭其它服务商 → 获取模型列表 → 新建话题 → 顶部必须 `| tokfai` → Prompt：`只回答 TOKFAI_READY，不要解释。`
 
-排查：`model not register` 且请求路径是 grsaiapi.com → 选错供应商；`model not register` 且路径是 `api.tokfai.com` → Tokfai registry 问题。
+排查：路径是 `api.tokfai.com` → 已走 Tokfai（检查模型名）；路径是 grsaiapi.com → 选错供应商。
 
 图片功能请使用 Tokfai 图片工作台或 `POST /v1/images/generations`。
 

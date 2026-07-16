@@ -7,6 +7,7 @@ import { requireApiKey } from "../middleware/apiKey.js";
 import type { VerifiedApiKey } from "../auth/apiKey.js";
 import { supabase } from "../supabase.js";
 import { isModelAllowedForChat, listAvailableChatModelIds } from "../catalog/modelCatalog.js";
+import { formatModelNotRegisteredMessage } from "../upstream/modelAliases.js";
 import { formatBatchId, parseBatchId } from "../batch/batchIds.js";
 import { finalizeBatch } from "../batch/finalize.js";
 import { enqueueBatchProcessing } from "../batch/worker.js";
@@ -65,7 +66,7 @@ batchRoutes.post("/v1/batches/chat", async (c) => {
     return c.json(
       {
         error: {
-          message: `Unsupported model: ${model}. Supported models: ${suggestedModels.join(", ")}`,
+          message: formatModelNotRegisteredMessage(model),
           code: "model_not_supported",
           type: "invalid_request_error",
         },

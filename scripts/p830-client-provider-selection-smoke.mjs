@@ -120,14 +120,16 @@ async function main() {
     const ids = rows.map((r) => r.id).filter(Boolean);
     const hasGpt = ids.some((id) => /^gpt/i.test(id));
     const hasGemini = ids.some((id) => /^gemini/i.test(id));
-    if (!hasGpt || !hasGemini) {
+    const required = ["gpt-5", "gpt-5-pro", "gpt-5.4-pro", "gemini-3-pro"];
+    const missing = required.filter((id) => !ids.includes(id));
+    if (!hasGpt || !hasGemini || missing.length) {
       ok =
         fail(
-          "GET /v1/models exposes gpt + gemini",
-          `gpt=${hasGpt} gemini=${hasGemini} ids=${ids.slice(0, 12).join(",")}`
+          "GET /v1/models exposes gpt + gemini + compat aliases",
+          `missing=${missing.join(",") || "none"} ids=${ids.slice(0, 16).join(",")}`
         ) && ok;
     } else {
-      ok = pass("GET /v1/models exposes gpt + gemini") && ok;
+      ok = pass("GET /v1/models exposes gpt + gemini + compat aliases") && ok;
     }
 
     const prefixed = rows.filter((r) => {

@@ -11,8 +11,13 @@ export const ALLOWED_WRONG_PROVIDER_DIAGNOSTICS = [
   "如果错误详情里出现 grsaiapi.com，说明没有走 Tokfai",
   "并且请求路径是 grsaiapi.com",
   "请求路径是 grsaiapi.com",
+  "请求路径出现 grsaiapi.com",
+  "错误详情请求路径是 grsaiapi.com",
   "If error details show grsaiapi.com, the request did not go through Tokfai",
   "and the request path is grsaiapi.com",
+  "request path shows grsaiapi.com",
+  "Request path is grsaiapi.com",
+  "Error path is grsaiapi.com",
 ];
 
 /**

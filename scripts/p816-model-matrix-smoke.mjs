@@ -235,17 +235,19 @@ async function run() {
   for (const bad of [
     "gemini-2.5-flash-image-preview",
     "gemini-2.5-flash-image",
+    "gpt-5.5-pro",
+    "GPT 5.4 Pro",
   ]) {
     if (allIds.includes(bad)) {
       ok = fail(`catalog must not list ${bad}`, `found in /v1/models`) && ok;
     }
   }
 
-  // Listed ids must be canonical — no Cherry display-name fakes on the catalog.
-  for (const bad of ["gpt-5.4-pro", "gpt-5.5-pro", "GPT 5.4 Pro"]) {
-    if (allIds.includes(bad)) {
-      ok = fail(`catalog must not list ${bad}`, `found in /v1/models`) && ok;
-    }
+  // Consumer compatibility alias must be listed for Cherry / Codex clients.
+  if (!allIds.includes("gpt-5.4-pro")) {
+    ok = fail("catalog lists gpt-5.4-pro compat alias", "missing") && ok;
+  } else {
+    pass("catalog lists gpt-5.4-pro compat alias");
   }
 
   console.log("");

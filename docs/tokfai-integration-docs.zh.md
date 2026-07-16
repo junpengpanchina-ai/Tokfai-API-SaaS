@@ -456,9 +456,11 @@ curl https://api.tokfai.com/v1/images/generations \
 
 - API 地址：`https://api.tokfai.com`
 - API Key：Tokfai 控制台生成的 `sk-tokfai_…`
-- 模型：选择带 `| tokfai` 后缀的模型（展示名类似 `Tokfai GPT-5`）
+- 模型：选择带 `| tokfai` 后缀的模型（展示名如 `Tokfai GPT-5` / `Tokfai GPT-5.4 Pro`）
 
-Chatbox 与其它 OpenAI-compatible 客户端使用相同规则。
+**不是选择 GPT-5 就代表正在使用 Tokfai。必须确认模型所属服务商是 Tokfai，或者请求路径是 `https://api.tokfai.com`。**
+
+Chatbox / Codex 与其它 OpenAI-compatible 客户端使用相同规则。
 
 ## 推荐配置
 
@@ -468,16 +470,18 @@ Chatbox 与其它 OpenAI-compatible 客户端使用相同规则。
 | 类型 | OpenAI Compatible / Custom OpenAI |
 | Base URL / API Host | `https://api.tokfai.com` |
 | API Key | Tokfai 控制台生成 |
-| 模型 id（请求体不变） | `gpt-5` / `gpt-5-pro` / `gpt-5.5` / `gemini-3-pro` / `gemini-2.5-flash` |
-| 界面展示名示例 | `Tokfai GPT-5`、`Tokfai GPT-5 Pro`、`Tokfai GPT-5.5`、`Tokfai Gemini 3 Pro` |
+| 推荐模型 id | `gpt-5` / `gpt-5-pro` / `gpt-5.4-pro` / `gpt-5.5` / `gemini-3-pro` / `gemini-2.5-flash` |
+| 界面展示名 | `Tokfai GPT-5`、`Tokfai GPT-5 Pro`、`Tokfai GPT-5.4 Pro`、`Tokfai Gemini 3 Pro` |
 | 顶部必须显示 | `| tokfai` |
+
+说明：`gpt-5.4-pro` / `GPT 5.4 Pro` 等会在 Tokfai 内兼容映射到 `gpt-5-pro`。
 
 ## 正确 vs 错误
 
-- **正确**：`GPT 5 | tokfai` 或展示名 `Tokfai GPT-5` → 请求走 `https://api.tokfai.com`
-- **正确**：`Gemini 3 Pro | tokfai` 或 `Tokfai Gemini 3 Pro` → 请求走 Tokfai
+- **正确**：`Tokfai GPT-5 | tokfai`、`Tokfai GPT-5.4 Pro | tokfai` → 请求走 `https://api.tokfai.com`
 - **错误**：`GPT 5 | OpenAI`、`GPT 5.4 Pro | OpenAI` → **不是 Tokfai**
-- **错误**：`Gemini | Google`、`Gemini 2.5 Pro | Gemini` → **不是 Tokfai**
+- **错误**：`Gemini | Google` → **不是 Tokfai**
+- **错误**：请求路径出现 grsaiapi.com → **没有走 Tokfai**
 
 如果出现 grsaiapi.com，说明没有走 Tokfai。  
 如果请求地址不是 `https://api.tokfai.com`，就是选错供应商。
@@ -488,19 +492,19 @@ Chatbox 与其它 OpenAI-compatible 客户端使用相同规则。
 2. 关闭 OpenAI / Gemini / 其它非 Tokfai 服务商  
 3. 在 Tokfai 服务商下点击 **获取模型列表**  
 4. **新建话题**（避免旧话题绑着错误供应商）  
-5. 确认顶部模型显示 `| tokfai`（例如 `Tokfai GPT-5 | tokfai`）  
+5. 确认顶部模型显示 `| tokfai`（例如 `Tokfai GPT-5.4 Pro | tokfai`）  
 6. 测试 Prompt：`只回答 TOKFAI_READY，不要解释。`  
 7. 到 Tokfai Usage 确认出现记录
 
 ## 错误排查
 
-- `model not register: gpt-5` / `gpt-5.4-pro`，并且请求路径是 grsaiapi.com → **选错供应商**，切回 `| tokfai`，只启用 Tokfai  
-- `model not register`，并且请求路径是 `api.tokfai.com` → **Tokfai 模型 registry 问题**，换 `auto-fast` / `gpt-5.5`，联系支持并附 `request_id`  
-- 错误详情主机不是 `api.tokfai.com` → 重新做上方隔离测试  
+- 错误详情请求路径是 `https://api.tokfai.com` → 已走 Tokfai；检查模型名（可用 `gpt-5.4-pro` 等兼容名）  
+- 错误详情请求路径是 grsaiapi.com / 其它非 Tokfai 主机 → **没有走 Tokfai**，请把供应商改回 `| tokfai`  
+- Tokfai 返回 `model not registered on Tokfai: …` → 换 `gpt-5` / `gpt-5-pro` / `gpt-5.4-pro` / `gpt-5.5`  
 - 401 / `invalid_token` → 从控制台重新复制 `sk-tokfai_…`  
 - 402 / `insufficient_credits` → Dashboard → Credits 充值  
 
-不要在客户端配置任何第三方上游真实地址；只使用 `https://api.tokfai.com`。
+不要把第三方上游真实地址写成接入地址；只使用 `https://api.tokfai.com`。
 
 ---
 

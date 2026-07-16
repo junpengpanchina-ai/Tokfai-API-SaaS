@@ -535,6 +535,8 @@ export type OpenAiModelListItem = {
   name: string;
   display_name: string;
   title: string;
+  /** Present when id is a consumer compatibility alias. */
+  alias_of?: string;
 };
 
 type ModelRow = {

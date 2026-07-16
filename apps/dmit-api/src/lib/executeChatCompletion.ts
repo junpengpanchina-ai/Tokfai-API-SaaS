@@ -16,7 +16,7 @@ import {
 import { isModelEnabledForTenant } from "../tenants/resolve.js";
 import { providerFetch, isChatFallbackEligible } from "../upstream/grsai.js";
 import {
-  formatSupportedChatModelsMessage,
+  formatModelNotRegisteredMessage,
   resolveChatModel,
 } from "../upstream/modelAliases.js";
 import { resolveProviderAttempts } from "../upstream/providers.js";
@@ -126,6 +126,7 @@ export async function executeChatCompletion(
 
   const requestedRaw = (input.body.model || env.BOT_MODEL).trim();
   const resolvedRequest = resolveChatModel(requestedRaw);
+  /** Internal catalog / alias id after consumer compatibility rewrite. */
   const requestedModel = resolvedRequest.canonicalId;
 
   if (
@@ -143,11 +144,10 @@ export async function executeChatCompletion(
     });
   }
 
-  if (!(await isModelAllowedForChat(requestedModel))) {
+  if (!(await isModelAllowedForChat(requestedRaw))) {
     const suggestedModels = await listAvailableChatModelIds();
-    const supported = formatSupportedChatModelsMessage(suggestedModels);
     const errorCode = "model_not_supported";
-    const errorMessage = `Unsupported model: ${requestedRaw}. Supported models: ${supported}`;
+    const errorMessage = formatModelNotRegisteredMessage(requestedRaw);
 
     log.warn("model_not_supported", {
       code: "model_not_supported",
@@ -370,9 +370,12 @@ export async function executeChatCompletion(
           await recordModelSuccess(attemptModel);
 
           const usage = normalizeUsage(data.usage);
-          const resolvedModel = data.model ?? attemptModel;
+          // Consumer-facing resolved id = Tokfai catalog/alias (e.g. gpt-5-pro).
+          // Bill by the concrete attempt that served the request (existing pricing path).
+          const resolvedModel = requestedModel;
+          const billableModel = attemptModel;
           const creditsCharged = await calculateCreditsCharged(
-            resolvedModel,
+            billableModel,
             usage,
             caller.tenantId
           );
@@ -387,7 +390,7 @@ export async function executeChatCompletion(
             tokfai: {
               credits_charged: creditsCharged,
               request_id: requestId,
-              requested_model: requestedModel,
+              requested_model: requestedRaw,
               resolved_model: resolvedModel,
               ...(isAlias ? { fallback_attempts: attemptIndex + 1 } : {}),
             },
@@ -398,7 +401,7 @@ export async function executeChatCompletion(
               user_id: caller.userId,
               api_key_id: caller.apiKeyId,
               tenant_id: caller.tenantId,
-              model: resolvedModel,
+              model: billableModel,
               status: "succeeded",
               prompt_tokens: usage.promptTokens,
               completion_tokens: usage.completionTokens,

@@ -17,6 +17,7 @@ const KNOWN_LABELS: Record<string, string> = {
   "gpt-5.1": "GPT-5.1",
   "gpt-5.2": "GPT-5.2",
   "gpt-5.4": "GPT-5.4",
+  "gpt-5.4-pro": "GPT-5.4 Pro",
   "gpt-5.5": "GPT-5.5",
   "gemini-2.5-flash": "Gemini 2.5 Flash",
   "gemini-2.5-pro": "Gemini 2.5 Pro",

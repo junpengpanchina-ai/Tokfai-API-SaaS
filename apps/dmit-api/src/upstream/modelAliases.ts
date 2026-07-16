@@ -40,20 +40,35 @@ export const MODEL_ALIAS_IDS = Object.keys(
 ) as ModelAliasId[];
 
 /**
- * 1:1 rewrites after normalizeClientModelId().
- * These ids are NOT listed on GET /v1/models — they only accept inbound calls.
+ * 1:1 consumer compatibility rewrites after normalizeClientModelId().
+ * Targets are Tokfai catalog / alias ids (not upstream vendor names).
+ *
+ * Listed on GET /v1/models when included in CATALOG_COMPAT_ALIAS_ENTRIES.
  */
 export const CLIENT_MODEL_REWRITES: Record<string, string> = {
-  // Cherry / OpenAI Provider GPT display-name variants
-  "gpt-5.4-pro": "gpt-5.4",
+  // Cherry / Chatbox / Codex GPT display-name variants → Tokfai aliases
+  "gpt-5.4-pro": "gpt-5-pro",
+  "gpt-5-4-pro": "gpt-5-pro",
+  "gpt5.4-pro": "gpt-5-pro",
+  "gpt-5.4pro": "gpt-5-pro",
+  "gpt5.4pro": "gpt-5-pro",
+  "gpt-5.4": "gpt-5",
+  "gpt-5-4": "gpt-5",
+  "gpt5.4": "gpt-5",
+  // GPT-5.5 "Pro" display names still mean gpt-5.5
   "gpt-5.5-pro": "gpt-5.5",
-  "gpt-5.4pro": "gpt-5.4",
-  "gpt-5.5pro": "gpt-5.5",
-  "gpt-5-4": "gpt-5.4",
-  "gpt-5-5": "gpt-5.5",
-  "gpt-5-4-pro": "gpt-5.4",
   "gpt-5-5-pro": "gpt-5.5",
+  "gpt-5.5pro": "gpt-5.5",
+  "gpt-5-5": "gpt-5.5",
 };
+
+/**
+ * Compatibility aliases advertised on GET /v1/models for third-party clients.
+ * Request still resolves via CLIENT_MODEL_REWRITES → alias_of.
+ */
+export const CATALOG_COMPAT_ALIAS_ENTRIES = [
+  { id: "gpt-5.4-pro", alias_of: "gpt-5-pro" },
+] as const;
 
 export type ResolvedChatModel = {
   /** Original client string (trimmed). */
@@ -94,6 +109,8 @@ export function normalizeClientModelId(raw: string): string {
 
   value = value.trim().toLowerCase();
   value = value.replace(/[_\s]+/g, "-");
+  // gpt5.4 / gpt5.4-pro → gpt-5.4 / gpt-5.4-pro
+  value = value.replace(/^gpt(\d)/, "gpt-$1");
   value = value.replace(/-+/g, "-");
   value = value.replace(/^-|-$/g, "");
 
@@ -158,7 +175,6 @@ export function resolveModelAttempts(
 
 /**
  * Alias ids advertised on GET /v1/models (callable smart routes only).
- * Rewrite-only Cherry aliases (gpt-5.4-pro, etc.) stay off the list.
  */
 export const CATALOG_ALIAS_IDS: ModelAliasId[] = [
   "auto-fast",
@@ -171,7 +187,7 @@ export const CATALOG_ALIAS_IDS: ModelAliasId[] = [
   "gpt-5.2",
 ];
 
-export function listAliasModelsForCatalog(): Array<{
+export type CatalogAliasListItem = {
   id: string;
   object: "model";
   created: number;
@@ -179,9 +195,12 @@ export function listAliasModelsForCatalog(): Array<{
   name: string;
   display_name: string;
   title: string;
-}> {
+  alias_of?: string;
+};
+
+export function listAliasModelsForCatalog(): CatalogAliasListItem[] {
   const now = Math.floor(Date.now() / 1000);
-  return CATALOG_ALIAS_IDS.map((id) => {
+  const smart = CATALOG_ALIAS_IDS.map((id) => {
     const label = tokfaiClientDisplayName(id);
     return {
       id,
@@ -193,14 +212,47 @@ export function listAliasModelsForCatalog(): Array<{
       title: label,
     };
   });
+
+  const compat = CATALOG_COMPAT_ALIAS_ENTRIES.map((entry) => {
+    const label = tokfaiClientDisplayName(entry.id);
+    return {
+      id: entry.id,
+      object: "model" as const,
+      created: now,
+      owned_by: "tokfai",
+      name: label,
+      display_name: label,
+      title: label,
+      alias_of: entry.alias_of,
+    };
+  });
+
+  return [...smart, ...compat];
 }
 
 /** Human-readable supported chat models for error messages. */
 export function formatSupportedChatModelsMessage(
   concreteIds: string[]
 ): string {
-  const ids = [...new Set([...CATALOG_ALIAS_IDS, ...concreteIds])].sort((a, b) =>
-    a.localeCompare(b)
-  );
+  const compatIds = CATALOG_COMPAT_ALIAS_ENTRIES.map((e) => e.id);
+  const preferred = [
+    "gpt-5",
+    "gpt-5-pro",
+    "gpt-5.4-pro",
+    "gpt-5.5",
+    "gemini-3-pro",
+    "gemini-2.5-flash",
+  ];
+  const ids = [
+    ...new Set([...preferred, ...CATALOG_ALIAS_IDS, ...compatIds, ...concreteIds]),
+  ];
   return ids.join(", ");
+}
+
+/** Friendly 400 copy when a model is unknown on Tokfai. */
+export function formatModelNotRegisteredMessage(requestedRaw: string): string {
+  return (
+    `model not registered on Tokfai: ${requestedRaw}. ` +
+    "Please choose a Tokfai model such as gpt-5, gpt-5-pro, gpt-5.4-pro, gpt-5.5, gemini-3-pro, or gemini-2.5-flash."
+  );
 }

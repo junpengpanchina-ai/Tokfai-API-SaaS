@@ -38,6 +38,28 @@ function makeRequestId() {
   return `req_mock_${randomBytes(8).toString("hex")}`;
 }
 
+/** Mirror apps/dmit-api consumer compatibility rewrites (offline mock). */
+function resolveMockCanonicalModel(raw) {
+  let value = String(raw ?? "auto-fast").trim().toLowerCase();
+  value = value.replace(/^models\//, "").replace(/^openai\//, "");
+  value = value.replace(/[_\s]+/g, "-").replace(/^gpt(\d)/, "gpt-$1");
+  value = value.replace(/-+/g, "-").replace(/^-|-$/g, "");
+  const rewrites = {
+    "gpt-5.4-pro": "gpt-5-pro",
+    "gpt-5-4-pro": "gpt-5-pro",
+    "gpt5.4-pro": "gpt-5-pro",
+    "gpt-5.4pro": "gpt-5-pro",
+    "gpt-5.4": "gpt-5",
+    "gpt-5-4": "gpt-5",
+    "gpt5.4": "gpt-5",
+    "gpt-5.5-pro": "gpt-5.5",
+    "gpt-5-5-pro": "gpt-5.5",
+    "gpt-5.5pro": "gpt-5.5",
+    "gpt-5-5": "gpt-5.5",
+  };
+  return rewrites[value] ?? value;
+}
+
 function tokfaiMeta(requestedModel = "auto-fast", resolvedModel = "gemini-3-flash") {
   const requestId = makeRequestId();
   const creditsCharged = 0.000001;
@@ -235,8 +257,13 @@ function chatCompletionToSse(completion) {
 
 function chatCompletionBody(body) {
   const requestedModel = typeof body.model === "string" ? body.model : "auto-fast";
-  const resolvedModel = "gemini-3-flash";
+  const resolvedModel = resolveMockCanonicalModel(requestedModel);
   const meta = tokfaiMeta(requestedModel, resolvedModel);
+  const content =
+    typeof body.messages?.[0]?.content === "string" &&
+    /TOKFAI_CHAT_ALIAS_READY/i.test(body.messages[0].content)
+      ? "TOKFAI_CHAT_ALIAS_READY"
+      : "ok";
   return {
     id: `chatcmpl_${meta.request_id}`,
     object: "chat.completion",
@@ -245,7 +272,7 @@ function chatCompletionBody(body) {
     choices: [
       {
         index: 0,
-        message: { role: "assistant", content: "ok" },
+        message: { role: "assistant", content },
         finish_reason: "stop",
       },
     ],
@@ -256,23 +283,29 @@ function chatCompletionBody(body) {
 
 function responsesBody(body) {
   const requestedModel = typeof body.model === "string" ? body.model : "auto-fast";
-  const resolvedModel =
-    typeof requestedModel === "string" && requestedModel.startsWith("gpt-")
-      ? "gpt-5.5"
-      : "gemini-3-flash";
+  const resolvedModel = resolveMockCanonicalModel(requestedModel);
   const meta = tokfaiMeta(requestedModel, resolvedModel);
+  const inputText =
+    typeof body.input === "string"
+      ? body.input
+      : Array.isArray(body.input)
+        ? JSON.stringify(body.input)
+        : "";
+  const outputText = /TOKFAI_ALIAS_READY/i.test(inputText)
+    ? "TOKFAI_ALIAS_READY"
+    : "ok";
   return {
     id: `resp_${meta.request_id}`,
     object: "response",
     created_at: Math.floor(Date.now() / 1000),
     status: "completed",
     model: resolvedModel,
-    output_text: "ok",
+    output_text: outputText,
     output: [
       {
         type: "message",
         role: "assistant",
-        content: [{ type: "output_text", text: "ok" }],
+        content: [{ type: "output_text", text: outputText }],
       },
     ],
     usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
@@ -757,6 +790,7 @@ export function startMockGateway(options = {}) {
           "gpt-5",
           "gpt-5-chat",
           "gpt-5-pro",
+          "gpt-5.4-pro",
           "gpt-5.1",
           "gpt-5.2",
           "gpt-5.5",
@@ -772,6 +806,7 @@ export function startMockGateway(options = {}) {
           "gpt-5": "Tokfai GPT-5",
           "gpt-5-chat": "Tokfai GPT-5 Chat",
           "gpt-5-pro": "Tokfai GPT-5 Pro",
+          "gpt-5.4-pro": "Tokfai GPT-5.4 Pro",
           "gpt-5.1": "Tokfai GPT-5.1",
           "gpt-5.2": "Tokfai GPT-5.2",
           "gpt-5.5": "Tokfai GPT-5.5",
@@ -779,6 +814,9 @@ export function startMockGateway(options = {}) {
           "gemini-2.5-flash": "Tokfai Gemini 2.5 Flash",
           "gemini-3-pro": "Tokfai Gemini 3 Pro",
           "gemini-3-flash": "Tokfai Gemini 3 Flash",
+        };
+        const aliasOf = {
+          "gpt-5.4-pro": "gpt-5-pro",
         };
         return sendJson(res, 200, {
           object: "list",
@@ -792,6 +830,7 @@ export function startMockGateway(options = {}) {
               name: label,
               display_name: label,
               title: label,
+              ...(aliasOf[id] ? { alias_of: aliasOf[id] } : {}),
             };
           }),
         });
