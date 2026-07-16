@@ -284,6 +284,12 @@ const hiddenStatuses = entries.filter((e) =>
     join(WEB, "lib", "docs", "public-beta-docs-registry.ts"),
     "utf8"
   );
+  // Allow rewrite-only ids only inside wrong-provider diagnostics
+  // (e.g. model not register: gpt-5 / gpt-5.4-pro when user picked | OpenAI).
+  const docsForBanCheck = docsSrc.replace(
+    /model not register[\s\S]{0,160}?gpt-5\.(?:4|5)-pro/gi,
+    "model not register WRONG_PROVIDER_EXAMPLE"
+  );
   const forbiddenInDocs = [
     ...hiddenStatuses.map((e) => e.id),
     "gpt-5.4-pro",
@@ -292,7 +298,7 @@ const hiddenStatuses = entries.filter((e) =>
   const hits = [];
   for (const id of forbiddenInDocs) {
     if (!id) continue;
-    if (docsSrc.includes(id)) hits.push(id);
+    if (docsForBanCheck.includes(id)) hits.push(id);
   }
   // Deduplicate
   const unique = [...new Set(hits)];

@@ -762,16 +762,38 @@ export function startMockGateway(options = {}) {
           "gpt-5.5",
           "gpt-5.4",
           "gemini-2.5-flash",
+          "gemini-3-pro",
           "gemini-3-flash",
         ];
+        const labels = {
+          "auto-fast": "Tokfai Auto Fast",
+          "auto-pro": "Tokfai Auto Pro",
+          "auto-cheap": "Tokfai Auto Cheap",
+          "gpt-5": "Tokfai GPT-5",
+          "gpt-5-chat": "Tokfai GPT-5 Chat",
+          "gpt-5-pro": "Tokfai GPT-5 Pro",
+          "gpt-5.1": "Tokfai GPT-5.1",
+          "gpt-5.2": "Tokfai GPT-5.2",
+          "gpt-5.5": "Tokfai GPT-5.5",
+          "gpt-5.4": "Tokfai GPT-5.4",
+          "gemini-2.5-flash": "Tokfai Gemini 2.5 Flash",
+          "gemini-3-pro": "Tokfai Gemini 3 Pro",
+          "gemini-3-flash": "Tokfai Gemini 3 Flash",
+        };
         return sendJson(res, 200, {
           object: "list",
-          data: ids.map((id) => ({
-            id,
-            object: "model",
-            created: now,
-            owned_by: "tokfai",
-          })),
+          data: ids.map((id) => {
+            const label = labels[id] ?? `Tokfai ${id}`;
+            return {
+              id,
+              object: "model",
+              created: now,
+              owned_by: "tokfai",
+              name: label,
+              display_name: label,
+              title: label,
+            };
+          }),
         });
       }
 

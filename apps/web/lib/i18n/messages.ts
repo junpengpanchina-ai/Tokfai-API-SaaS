@@ -1673,7 +1673,7 @@ export const messages = {
       cherryStudioError404:
         "Pick a Tokfai model ID such as auto-fast under the | tokfai provider. Image-only models are not for chat clients.",
       cherryStudioErrorWrongProvider:
-        "If the error-detail request host is not api.tokfai.com, you selected Gemini / OpenAI / another provider — switch back to Tokfai / | tokfai.",
+        "If error details show grsaiapi.com, the request did not go through Tokfai. Switch back to | tokfai (e.g. Tokfai GPT-5). Wrong: GPT 5 | OpenAI.",
       cherryStudioError500:
         "The model service is temporarily unavailable — retry in a few minutes or switch models.",
       cursorLabel: "Cursor",
@@ -3838,7 +3838,7 @@ export const messages = {
       cherryTroubleshootModel:
         "model_not_available — switch to auto-fast under | tokfai, or browse Models.",
       cherryTroubleshootWrongProvider:
-        "Error-detail host is not api.tokfai.com — you are not on Tokfai. Switch the provider back to Tokfai / | tokfai and keep Base URL https://api.tokfai.com.",
+        "If error details show grsaiapi.com, the request did not go through Tokfai. model not register on grsaiapi.com = wrong provider; on api.tokfai.com = Tokfai registry issue. Use | tokfai only.",
       cherryTroubleshootTimeout:
         "upstream_timeout — retry after a short wait or switch to auto-fast.",
       cherryTroubleshootCredits:
@@ -7020,7 +7020,7 @@ export const messages = {
       cherryStudioError404:
         "在 | tokfai 供应商下选择 Tokfai model ID（如 auto-fast）。图片专用模型不要用于聊天客户端。",
       cherryStudioErrorWrongProvider:
-        "若错误详情请求主机不是 api.tokfai.com，说明误选了 Gemini / OpenAI / 其它供应商 — 请切回 Tokfai / | tokfai。",
+        "如果出现 grsaiapi.com，说明没有走 Tokfai。请切回 | tokfai（如 Tokfai GPT-5）。错误示例：GPT 5 | OpenAI。",
       cherryStudioError500:
         "模型服务暂时不可用 — 稍后重试或切换 model。",
       cursorLabel: "Cursor",
@@ -9089,7 +9089,7 @@ export const messages = {
       cherryTroubleshootModel:
         "model_not_available — 在 | tokfai 下换 auto-fast，或浏览 Models。",
       cherryTroubleshootWrongProvider:
-        "错误详情请求主机不是 api.tokfai.com — 说明没有走 Tokfai。请切回 Tokfai / | tokfai，Base URL 保持 https://api.tokfai.com。",
+        "如果出现 grsaiapi.com，说明没有走 Tokfai。model not register 且路径是 grsaiapi.com = 选错供应商；路径是 api.tokfai.com = Tokfai registry 问题。只使用 | tokfai。",
       cherryTroubleshootTimeout:
         "upstream_timeout — 稍后重试或换 auto-fast。",
       cherryTroubleshootCredits:

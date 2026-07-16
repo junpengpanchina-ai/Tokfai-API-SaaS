@@ -16,6 +16,10 @@
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  findConsumerLeak,
+  findGrsaiapiAsIntegrationHost,
+} from "./lib/consumer-docs-leak.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -139,17 +143,17 @@ function checkNoUpstreamBrandLeak() {
     "apps/web/lib/model-catalog.ts",
     "apps/web/lib/docs/consumer-model-groups.ts",
   ];
-  const brandRe = /grsai|garsai|grsaiapi\.com/i;
   const bad = [];
   for (const rel of files) {
     const src = read(rel);
-    if (brandRe.test(src)) {
-      bad.push(rel);
-    }
+    const leak = findConsumerLeak(src);
+    if (leak) bad.push(`${rel} → ${leak}`);
+    const asHost = findGrsaiapiAsIntegrationHost(src);
+    if (asHost) bad.push(`${rel} → ${asHost}`);
   }
   if (bad.length) {
     return fail(
-      "consumer-facing sources must not mention upstream brands",
+      "consumer-facing sources must not recommend upstream hosts",
       bad.join(", ")
     );
   }

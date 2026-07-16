@@ -262,7 +262,7 @@ export const troubleshootingCaseMessagesEn: Record<string, string> = {
   "integration.troubleshooting.case.cherry_connection_failed.action1":
     "Use Tokfai / | tokfai only — Base URL https://api.tokfai.com and an sk-tokfai_… key.",
   "integration.troubleshooting.case.cherry_connection_failed.action2":
-    "If the error-detail host is not api.tokfai.com, switch back from Gemini / OpenAI / other providers to Tokfai.",
+    "If error details show grsaiapi.com, the request did not go through Tokfai — switch back to | tokfai.",
   "integration.troubleshooting.case.cherry_connection_failed.action3":
     "Copy Cherry Studio config from Docs → Cherry Studio.",
 
@@ -528,7 +528,7 @@ export const troubleshootingCaseMessagesZh: Record<string, string> = {
   "integration.troubleshooting.case.cherry_connection_failed.action1":
     "只使用 Tokfai / | tokfai — Base URL https://api.tokfai.com，API Key 以 sk-tokfai_ 开头。",
   "integration.troubleshooting.case.cherry_connection_failed.action2":
-    "若错误详情请求主机不是 api.tokfai.com，说明误选了 Gemini / OpenAI / 其它供应商，请切回 Tokfai。",
+    "如果出现 grsaiapi.com，说明没有走 Tokfai — 请切回 | tokfai。",
   "integration.troubleshooting.case.cherry_connection_failed.action3":
     "从文档 → Cherry Studio 复制正确配置。",
 

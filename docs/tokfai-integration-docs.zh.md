@@ -452,9 +452,13 @@ curl https://api.tokfai.com/v1/images/generations \
 
 # Cherry Studio 接入
 
-在 Cherry Studio 中新增 **OpenAI Compatible / Custom OpenAI** 服务，并始终选择 **Tokfai**（界面常显示为 `| tokfai`）供应商下的模型。
+对外只配置三件事：
 
-Chatbox 与其它 OpenAI-compatible 客户端使用相同配置。
+- API 地址：`https://api.tokfai.com`
+- API Key：Tokfai 控制台生成的 `sk-tokfai_…`
+- 模型：选择带 `| tokfai` 后缀的模型（展示名类似 `Tokfai GPT-5`）
+
+Chatbox 与其它 OpenAI-compatible 客户端使用相同规则。
 
 ## 推荐配置
 
@@ -463,37 +467,40 @@ Chatbox 与其它 OpenAI-compatible 客户端使用相同配置。
 | 服务名称 | Tokfai |
 | 类型 | OpenAI Compatible / Custom OpenAI |
 | Base URL / API Host | `https://api.tokfai.com` |
-| API Key | `sk-tokfai_xxx`（Dashboard → API Keys） |
-| 推荐模型 | `auto-fast`（首次联调）；也可用 `auto-pro`、`gpt-5.5`、`gemini-3-flash` |
-| 测试 Prompt | `Say ok only.` |
+| API Key | Tokfai 控制台生成 |
+| 模型 id（请求体不变） | `gpt-5` / `gpt-5-pro` / `gpt-5.5` / `gemini-3-pro` / `gemini-2.5-flash` |
+| 界面展示名示例 | `Tokfai GPT-5`、`Tokfai GPT-5 Pro`、`Tokfai GPT-5.5`、`Tokfai Gemini 3 Pro` |
+| 顶部必须显示 | `| tokfai` |
 
-## 模型选择（重要）
+## 正确 vs 错误
 
-- **必须**在模型选择器中选中 **Tokfai / `| tokfai`** 下的模型  
-- **不要**选择界面上的 Gemini、OpenAI 或其它第三方供应商条目——那些请求不会经过 Tokfai  
-- `GET /v1/models` 只返回通用文本/聊天模型；图片生成请使用 **Tokfai 图片工作台** 或 `POST /v1/images/generations`
+- **正确**：`GPT 5 | tokfai` 或展示名 `Tokfai GPT-5` → 请求走 `https://api.tokfai.com`
+- **正确**：`Gemini 3 Pro | tokfai` 或 `Tokfai Gemini 3 Pro` → 请求走 Tokfai
+- **错误**：`GPT 5 | OpenAI`、`GPT 5.4 Pro | OpenAI` → **不是 Tokfai**
+- **错误**：`Gemini | Google`、`Gemini 2.5 Pro | Gemini` → **不是 Tokfai**
 
-## 接入步骤
+如果出现 grsaiapi.com，说明没有走 Tokfai。  
+如果请求地址不是 `https://api.tokfai.com`，就是选错供应商。
 
-1. 登录 Tokfai Dashboard，创建 API Key 并立即复制完整 `sk-tokfai_…`  
-2. Cherry Studio → 设置 → Provider → 新增 OpenAI Compatible  
-3. 填写上方表格中的 Base URL 与 API Key  
-4. 拉取 / 选择 Tokfai 模型列表中的 `auto-fast`  
-5. 发送测试 Prompt：`Say ok only.`  
-6. 到 Tokfai Usage 确认出现记录
+## 强制隔离测试（必做）
 
-## 常见错误
+1. 先只启用 **Tokfai** 服务商  
+2. 关闭 OpenAI / Gemini / 其它非 Tokfai 服务商  
+3. 在 Tokfai 服务商下点击 **获取模型列表**  
+4. **新建话题**（避免旧话题绑着错误供应商）  
+5. 确认顶部模型显示 `| tokfai`（例如 `Tokfai GPT-5 | tokfai`）  
+6. 测试 Prompt：`只回答 TOKFAI_READY，不要解释。`  
+7. 到 Tokfai Usage 确认出现记录
 
-| 现象 | 原因 | 处理 |
-|---|---|---|
-| 401 / `invalid_token` | Key 错误、不完整或已吊销 | 从 API Keys 重新复制完整 `sk-tokfai_…` |
-| 402 / `insufficient_credits` | 算力积分不足 | Dashboard → Credits 充值 |
-| 404 / `model_not_found` | 模型 ID 不在 Tokfai 列表 | 改用 `auto-fast` |
-| Bad Request / `model not register` | 选错了供应商或图片专用模型 | 切回 `| tokfai`；图片改用图片工作台 |
-| 错误详情请求路径主机不是 `api.tokfai.com` | 请求未走 Tokfai（误选 Gemini / OpenAI / 其它供应商） | 改回 Tokfai 供应商，Base URL 保持 `https://api.tokfai.com` |
-| Usage 无记录 | 请求打到了其它 Base URL | 核对 Provider 与 Base URL |
+## 错误排查
 
-验证：Cherry 短消息成功后，Usage 应出现对应条目。
+- `model not register: gpt-5` / `gpt-5.4-pro`，并且请求路径是 grsaiapi.com → **选错供应商**，切回 `| tokfai`，只启用 Tokfai  
+- `model not register`，并且请求路径是 `api.tokfai.com` → **Tokfai 模型 registry 问题**，换 `auto-fast` / `gpt-5.5`，联系支持并附 `request_id`  
+- 错误详情主机不是 `api.tokfai.com` → 重新做上方隔离测试  
+- 401 / `invalid_token` → 从控制台重新复制 `sk-tokfai_…`  
+- 402 / `insufficient_credits` → Dashboard → Credits 充值  
+
+不要在客户端配置任何第三方上游真实地址；只使用 `https://api.tokfai.com`。
 
 ---
 

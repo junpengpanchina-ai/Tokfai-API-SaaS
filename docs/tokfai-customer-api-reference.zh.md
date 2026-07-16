@@ -320,29 +320,29 @@ Base URL 必须是 `https://api.tokfai.com`；鉴权仍用 Tokfai `sk-tokfai_…
 
 ## 8. Cherry Studio 接入
 
-新增 **OpenAI Compatible / Custom OpenAI** 服务，并始终选择 **Tokfai / `| tokfai`** 下的模型。Chatbox 等同理。
+对外只配置：API 地址 `https://api.tokfai.com`、Tokfai 控制台 API Key、带 `| tokfai` 后缀的模型（展示名如 `Tokfai GPT-5`）。Chatbox 等同理。
 
 | 项 | 值 |
 |---|---|
 | 服务名称 | Tokfai |
 | 类型 | OpenAI Compatible / Custom OpenAI |
 | Base URL | `https://api.tokfai.com` |
-| API Key | `sk-tokfai_xxx` |
-| 推荐模型 | `auto-fast`（首次联调） |
-| 测试 Prompt | `Say ok only.` |
+| API Key | Tokfai 控制台生成 |
+| 模型 id | `gpt-5` / `gpt-5-pro` / `gpt-5.5` / `gemini-3-pro` 等（不变） |
+| 展示名 | `Tokfai GPT-5`、`Tokfai GPT-5 Pro`、`Tokfai Gemini 3 Pro` |
+| 顶部必须显示 | `| tokfai` |
 
-检查清单：
+正确：`GPT 5 | tokfai` 或 `Tokfai GPT-5`。  
+错误：`GPT 5 | OpenAI`、`GPT 5.4 Pro | OpenAI`、`Gemini | Google`。
 
-- Base URL 是否为 `https://api.tokfai.com`
-- API Key 是否以 `sk-tokfai_` 开头
-- 是否选中 **Tokfai / `| tokfai`**（不要选 Gemini / OpenAI 原生供应商）
-- 模型 ID 是否来自 Tokfai 聊天模型列表（`GET /v1/models` 不含图片专用模型）
+如果出现 grsaiapi.com，说明没有走 Tokfai。  
+如果请求地址不是 `https://api.tokfai.com`，就是选错供应商。
 
-常见错误：若错误详情请求主机不是 `api.tokfai.com`，说明请求没有经过 Tokfai，请切回 `| tokfai`。
+强制隔离测试：只启用 Tokfai → 关闭其它服务商 → 获取模型列表 → 新建话题 → 顶部必须 `| tokfai` → Prompt：`只回答 TOKFAI_READY，不要解释。`
+
+排查：`model not register` 且请求路径是 grsaiapi.com → 选错供应商；`model not register` 且路径是 `api.tokfai.com` → Tokfai registry 问题。
 
 图片功能请使用 Tokfai 图片工作台或 `POST /v1/images/generations`。
-
-验证：在 Cherry 发一条短消息，到 Tokfai Usage 确认出现记录。
 
 ---
 

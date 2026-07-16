@@ -5,13 +5,13 @@
  * Scans only public-facing consumer surfaces under apps/web.
  * Does NOT scan repo-root docs/ (ops reports / internal investigations).
  *
- * Forbidden tokens:
- * - grsai / GRSAI / garsai / grsaiapi.com
- * - 上游供应商
- * - upstream provider
- * - provider name
- * - https://v1/api/generate
- * - /v1/api/generate
+ * Forbidden:
+ * - configuring grsai / garsai / GRSAI brands
+ * - https://grsaiapi.com as an integration Base URL
+ * - 上游供应商 / upstream provider / provider name
+ * - https://v1/api/generate / /v1/api/generate
+ *
+ * Allowed: bare grsaiapi.com inside known wrong-provider diagnostic phrases.
  *
  * Usage: node scripts/p822-public-consumer-leak-smoke.mjs
  */
@@ -19,11 +19,12 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  findConsumerLeak,
+  findGrsaiapiAsIntegrationHost,
+} from "./lib/consumer-docs-leak.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-
-const LEAK_RE =
-  /grsai|garsai|grsaiapi\.com|上游供应商|upstream\s+provider|provider\s+name|https?:\/\/v1\/api\/generate|(?<![\w/])\/v1\/api\/generate(?![\w/])/i;
 
 /** Public-facing roots only (apps/web consumer / docs UI). */
 const SCAN_ROOTS = [
@@ -89,10 +90,10 @@ function main() {
   const bad = [];
   for (const abs of files) {
     const src = readFileSync(abs, "utf8");
-    const m = src.match(LEAK_RE);
-    if (m) {
-      bad.push(`${relative(ROOT, abs)} → ${m[0]}`);
-    }
+    const leak = findConsumerLeak(src);
+    if (leak) bad.push(`${relative(ROOT, abs)} → ${leak}`);
+    const asHost = findGrsaiapiAsIntegrationHost(src);
+    if (asHost) bad.push(`${relative(ROOT, abs)} → integration host: ${asHost}`);
   }
 
   let ok = true;
@@ -115,12 +116,14 @@ function main() {
       "https://api.tokfai.com/v1/images/generations",
       "POST /v1/images/generations",
       "Authorization: Bearer",
+      "| tokfai",
+      "如果出现 grsaiapi.com，说明没有走 Tokfai",
     ];
     const missing = required.filter((s) => !registry.includes(s));
     if (missing.length) {
-      ok = fail("docs registry Tokfai image examples", missing.join(", ")) && ok;
+      ok = fail("docs registry Tokfai client guidance", missing.join(", ")) && ok;
     } else {
-      ok = pass("docs registry Tokfai image examples") && ok;
+      ok = pass("docs registry Tokfai client guidance") && ok;
     }
   } catch (err) {
     ok =

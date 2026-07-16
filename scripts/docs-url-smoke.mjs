@@ -10,6 +10,10 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  findConsumerLeak,
+  findGrsaiapiAsIntegrationHost,
+} from "./lib/consumer-docs-leak.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -34,8 +38,7 @@ const FORBIDDEN = [
   "provider name",
 ];
 
-const FORBIDDEN_RE =
-  /grsai|garsai|grsaiapi\.com|provider[_ ]?id|real base_url/i;
+const FORBIDDEN_RE = /provider[_ ]?id|real base_url/i;
 
 const REQUIRED = [
   "https://api.tokfai.com/v1/chat/completions",
@@ -97,6 +100,10 @@ function main() {
     }
     const m = src.match(FORBIDDEN_RE);
     if (m) badHits.push(`${relative(ROOT, abs)} → ${m[0]}`);
+    const leak = findConsumerLeak(src);
+    if (leak) badHits.push(`${relative(ROOT, abs)} → ${leak}`);
+    const asHost = findGrsaiapiAsIntegrationHost(src);
+    if (asHost) badHits.push(`${relative(ROOT, abs)} → ${asHost}`);
   }
 
   if (badHits.length) {

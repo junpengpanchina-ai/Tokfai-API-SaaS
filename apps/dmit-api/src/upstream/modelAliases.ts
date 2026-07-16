@@ -6,6 +6,8 @@
  * canonical ids before allowlist + upstream routing.
  */
 
+import { tokfaiClientDisplayName } from "../catalog/clientModelDisplayName.js";
+
 /** Smart routing aliases — resolved server-side with ordered fallback. */
 export const MODEL_ALIAS_CHAINS = {
   "auto-fast": ["gemini-3-flash", "gemini-2.5-flash", "gemini-3-pro"],
@@ -174,14 +176,23 @@ export function listAliasModelsForCatalog(): Array<{
   object: "model";
   created: number;
   owned_by: string;
+  name: string;
+  display_name: string;
+  title: string;
 }> {
   const now = Math.floor(Date.now() / 1000);
-  return CATALOG_ALIAS_IDS.map((id) => ({
-    id,
-    object: "model" as const,
-    created: now,
-    owned_by: "tokfai",
-  }));
+  return CATALOG_ALIAS_IDS.map((id) => {
+    const label = tokfaiClientDisplayName(id);
+    return {
+      id,
+      object: "model" as const,
+      created: now,
+      owned_by: "tokfai",
+      name: label,
+      display_name: label,
+      title: label,
+    };
+  });
 }
 
 /** Human-readable supported chat models for error messages. */

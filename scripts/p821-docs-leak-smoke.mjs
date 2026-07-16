@@ -3,9 +3,11 @@
  * P821 — Consumer docs leak smoke (offline, static).
  *
  * Ensures apps/web consumer docs / marketing surfaces do not expose:
- * - grsai / GRSAI / garsai / grsaiapi.com
- * - https://v1/api/generate
- * - /v1/api/generate as a consumer endpoint
+ * - grsai / GRSAI / garsai as brands to configure
+ * - https://grsaiapi.com as an integration Base URL
+ * - https://v1/api/generate / /v1/api/generate as consumer endpoints
+ *
+ * Bare `grsaiapi.com` is allowed only inside known wrong-provider diagnostics.
  *
  * Usage: node scripts/p821-docs-leak-smoke.mjs
  */
@@ -13,12 +15,13 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  findConsumerLeak,
+  findGrsaiapiAsIntegrationHost,
+} from "./lib/consumer-docs-leak.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const WEB = join(ROOT, "apps/web");
-
-const LEAK_RE =
-  /grsai|garsai|grsaiapi\.com|https?:\/\/v1\/api\/generate|["'`]\/v1\/api\/generate["'`]/i;
 
 const SCAN_ROOTS = [
   "apps/web/lib/docs",
@@ -76,10 +79,10 @@ function main() {
   const bad = [];
   for (const abs of files) {
     const src = readFileSync(abs, "utf8");
-    const m = src.match(LEAK_RE);
-    if (m) {
-      bad.push(`${relative(ROOT, abs)} → ${m[0]}`);
-    }
+    const leak = findConsumerLeak(src);
+    if (leak) bad.push(`${relative(ROOT, abs)} → ${leak}`);
+    const asHost = findGrsaiapiAsIntegrationHost(src);
+    if (asHost) bad.push(`${relative(ROOT, abs)} → integration host: ${asHost}`);
   }
 
   // Explicit required Tokfai paths present in registry
@@ -91,6 +94,8 @@ function main() {
     "https://api.tokfai.com/v1/images/generations",
     "POST /v1/images/generations",
     "Authorization: Bearer",
+    "| tokfai",
+    "如果出现 grsaiapi.com，说明没有走 Tokfai",
   ];
   const missing = required.filter((s) => !registry.includes(s));
 
@@ -101,9 +106,9 @@ function main() {
     ok = pass(`no upstream brand/path (${files.length} files)`);
   }
   if (missing.length) {
-    ok = fail("docs registry Tokfai image examples", missing.join(", ")) && ok;
+    ok = fail("docs registry Tokfai client guidance", missing.join(", ")) && ok;
   } else {
-    ok = pass("docs registry Tokfai image examples") && ok;
+    ok = pass("docs registry Tokfai client guidance") && ok;
   }
 
   // Broader apps/web brand scan (same tokens)
@@ -115,8 +120,10 @@ function main() {
   const webBad = [];
   for (const abs of webFiles) {
     const src = readFileSync(abs, "utf8");
-    const m = src.match(LEAK_RE);
-    if (m) webBad.push(`${relative(ROOT, abs)} → ${m[0]}`);
+    const leak = findConsumerLeak(src);
+    if (leak) webBad.push(`${relative(ROOT, abs)} → ${leak}`);
+    const asHost = findGrsaiapiAsIntegrationHost(src);
+    if (asHost) webBad.push(`${relative(ROOT, abs)} → integration host: ${asHost}`);
   }
   if (webBad.length) {
     ok = fail("apps/web brand leak scan", webBad.slice(0, 20).join("\n      ")) && ok;

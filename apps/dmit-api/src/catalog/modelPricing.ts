@@ -6,6 +6,7 @@ import {
   resolveChatModel,
 } from "../upstream/modelAliases.js";
 import { priceFor } from "../upstream/pricing.js";
+import { tokfaiClientDisplayName } from "./clientModelDisplayName.js";
 import {
   DEFAULT_IMAGE_MODEL_ID,
   isHiddenInternalModel,
@@ -530,6 +531,10 @@ export type OpenAiModelListItem = {
   object: "model";
   created: number;
   owned_by: string;
+  /** Cherry Studio / Chatbox display label (does not change request model id). */
+  name: string;
+  display_name: string;
+  title: string;
 };
 
 type ModelRow = {
@@ -537,9 +542,27 @@ type ModelRow = {
   created?: number | string | null;
   created_at?: string | null;
   owned_by?: string | null;
+  display_name?: string | null;
 };
 
 const DEFAULT_OWNED_BY = "tokfai";
+
+function withClientDisplayFields(
+  item: Omit<OpenAiModelListItem, "name" | "display_name" | "title"> & {
+    display_name?: string | null;
+  }
+): OpenAiModelListItem {
+  const label = tokfaiClientDisplayName(item.id, item.display_name);
+  return {
+    id: item.id,
+    object: "model",
+    created: item.created,
+    owned_by: item.owned_by,
+    name: label,
+    display_name: label,
+    title: label,
+  };
+}
 
 /**
  * Visible catalog for GET /v1/models.
@@ -547,6 +570,9 @@ const DEFAULT_OWNED_BY = "tokfai";
  * OpenAI-compatible chat clients (Cherry Studio, Chatbox, etc.) only see
  * general text/chat models and catalog aliases. Image-only models stay on
  * Tokfai Image Workbench / POST /v1/images/generations docs — not this list.
+ *
+ * `id` stays the callable model id; `name` / `display_name` / `title` carry a
+ * Tokfai-prefixed label so clients do not confuse Tokfai with OpenAI/Gemini.
  */
 export async function listCatalogModels(): Promise<OpenAiModelListItem[]> {
   const aliases = listAliasModelsForCatalog();
@@ -572,12 +598,14 @@ export async function listCatalogModels(): Promise<OpenAiModelListItem[]> {
       concrete.push(fromRow);
       continue;
     }
-    concrete.push({
-      id,
-      object: "model",
-      created: now,
-      owned_by: DEFAULT_OWNED_BY,
-    });
+    concrete.push(
+      withClientDisplayFields({
+        id,
+        object: "model",
+        created: now,
+        owned_by: DEFAULT_OWNED_BY,
+      })
+    );
   }
 
   // Preserve DB sort_order when available; otherwise keep stable id order.
@@ -599,7 +627,7 @@ export async function listCatalogModels(): Promise<OpenAiModelListItem[]> {
 async function listCatalogModelsFromDb(): Promise<OpenAiModelListItem[] | null> {
   const { data, error } = await supabase()
     .from("models")
-    .select("id, created, created_at, owned_by")
+    .select("id, created, created_at, owned_by, display_name")
     .eq("enabled", true)
     .eq("visible", true)
     .order("sort_order", { ascending: true });
@@ -618,7 +646,7 @@ async function listCatalogModelsFromDb(): Promise<OpenAiModelListItem[] | null> 
 }
 
 function toOpenAiModelListItem(row: ModelRow): OpenAiModelListItem {
-  return {
+  return withClientDisplayFields({
     id: row.id,
     object: "model",
     created: resolveCreatedUnix(row),
@@ -626,7 +654,8 @@ function toOpenAiModelListItem(row: ModelRow): OpenAiModelListItem {
       typeof row.owned_by === "string" && row.owned_by.length > 0
         ? row.owned_by
         : DEFAULT_OWNED_BY,
-  };
+    display_name: row.display_name,
+  });
 }
 
 function resolveCreatedUnix(row: ModelRow): number {
