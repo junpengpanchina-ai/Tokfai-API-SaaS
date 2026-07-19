@@ -115,7 +115,12 @@ export function mapUpstreamError(
 ): {
   status: number;
   code: string;
-  type: "auth_error" | "rate_limit_error" | "upstream_error" | "validation_error";
+  type:
+    | "auth_error"
+    | "rate_limit_error"
+    | "upstream_error"
+    | "validation_error"
+    | "invalid_request_error";
   publicMessage: string;
 } {
   const combined = `${parsed.message} ${parsed.type} ${parsed.code} ${bodyText}`.toLowerCase();
@@ -176,6 +181,25 @@ export function mapUpstreamError(
       type: "validation_error",
       publicMessage:
         "This model is not available on Tokfai. Please refresh model list or choose another Tokfai model.",
+    };
+  }
+
+  // Unsupported sampling / request params (e.g. temperature on some GPT models).
+  // Prefer Tokfai-side filtering; this is a safe fallback that never leaks vendor copy.
+  if (
+    status === 400 &&
+    (combined.includes("unsupported") ||
+      combined.includes("invalid_request") ||
+      combined.includes("unknown parameter") ||
+      combined.includes("does not support") ||
+      combined.includes("not supported"))
+  ) {
+    return {
+      status: 400,
+      code: "invalid_request_error",
+      type: "invalid_request_error",
+      publicMessage:
+        "Invalid chat completion request. Please retry with a simpler request body.",
     };
   }
 

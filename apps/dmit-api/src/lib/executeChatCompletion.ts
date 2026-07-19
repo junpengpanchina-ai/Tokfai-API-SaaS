@@ -60,24 +60,57 @@ const FORBIDDEN_CLIENT_BILLING_KEYS = [
   "free",
 ] as const;
 
+/** Cherry / AI SDK often send null for unset optional numbers. */
+const optionalFiniteNumber = z.preprocess(
+  (v) => (v === null || v === "" ? undefined : v),
+  z.number().finite().optional()
+);
+
+const optionalPositiveInt = z.preprocess(
+  (v) => (v === null || v === "" ? undefined : v),
+  z.number().int().positive().optional()
+);
+
+const optionalBoolean = z.preprocess((v) => {
+  if (v === null || v === "") return undefined;
+  if (v === "true" || v === 1) return true;
+  if (v === "false" || v === 0) return false;
+  return v;
+}, z.boolean().optional());
+
 export const ChatMessageSchema = z
   .object({
     role: z.string().min(1),
-    content: z.unknown(),
+    /** string | content-parts array | null — normalized before upstream. */
+    content: z.unknown().optional(),
   })
   .passthrough();
 
 export const ChatCompletionRequestSchema = z
   .object({
-    model: z.string().min(1).optional(),
+    model: z.preprocess(
+      (v) => (v === null || v === "" ? undefined : v),
+      z.string().min(1).optional()
+    ),
     messages: z.array(ChatMessageSchema).min(1),
-    temperature: z.number().optional(),
-    top_p: z.number().optional(),
-    max_tokens: z.number().int().positive().optional(),
-    max_completion_tokens: z.number().int().positive().optional(),
-    /** OpenAI SDK compat — accepted, ignored (upstream always non-stream). */
+    temperature: optionalFiniteNumber,
+    top_p: optionalFiniteNumber,
+    max_tokens: optionalPositiveInt,
+    max_completion_tokens: optionalPositiveInt,
+    presence_penalty: optionalFiniteNumber,
+    frequency_penalty: optionalFiniteNumber,
+    stop: z.unknown().optional(),
+    tools: z.unknown().optional(),
+    tool_choice: z.unknown().optional(),
+    response_format: z.unknown().optional(),
+    metadata: z.unknown().optional(),
+    user: z.preprocess(
+      (v) => (v === null || v === "" ? undefined : v),
+      z.string().optional()
+    ),
+    /** OpenAI SDK / Cherry compat — accepted, not forwarded upstream. */
     stream_options: z.unknown().optional(),
-    stream: z.boolean().optional(),
+    stream: optionalBoolean,
   })
   .passthrough();
 

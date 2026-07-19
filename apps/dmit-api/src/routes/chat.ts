@@ -12,6 +12,7 @@ import {
   getKeyInflight,
 } from "../gateway/concurrency.js";
 import { chatCompletionToSseBody } from "../lib/chatCompletionSse.js";
+import { normalizeChatMessages } from "../lib/chatCompletionCompat.js";
 import {
   ChatCompletionRequestSchema,
   executeChatCompletion,
@@ -63,6 +64,14 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     );
   }
 
+  const normalizedMessages = normalizeChatMessages(parsed.data.messages);
+  if (!normalizedMessages.ok) {
+    throw ApiError.badRequest(
+      normalizedMessages.message,
+      "invalid_request_error"
+    );
+  }
+
   const rawIdempotencyKey =
     c.req.header("idempotency-key") ?? c.req.header("Idempotency-Key");
   const idempotencyKey = parseIdempotencyKey(rawIdempotencyKey);
@@ -78,7 +87,11 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
   const result = await executeChatCompletion({
     caller,
     requestId,
-    body: { ...parsed.data, stream: false },
+    body: {
+      ...parsed.data,
+      messages: normalizedMessages.messages,
+      stream: false,
+    },
     limitKey,
     idempotencyKey,
   });
