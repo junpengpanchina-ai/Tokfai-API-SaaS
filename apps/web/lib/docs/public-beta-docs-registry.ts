@@ -1072,13 +1072,13 @@ If edit intent is clear but no reference image is provided:
 
 对外只配置三件事：
 
-- API 地址：\`https://api.tokfai.com\`
+- API 地址：\`https://api.tokfai.com/v1\`
 - API Key：Tokfai 控制台生成的 \`sk-tokfai_…\`
-- 模型：选择带 \`| tokfai\` 后缀的模型（展示名如 \`Tokfai GPT-5\` / \`Tokfai GPT-5.4 Pro\`）
+- 模型：选择带 \`| tokfai\` 后缀的模型（展示名如 \`Tokfai GPT-5\` / \`Tokfai GPT-5.4\` / \`Tokfai GPT-5.4 Pro\`）
 
-**不是选择 GPT-5 就代表正在使用 Tokfai。必须确认模型所属服务商是 Tokfai，或者请求路径是 \`https://api.tokfai.com\`。**
+**不是选择 GPT-5 就代表正在使用 Tokfai。必须确认模型所属服务商是 Tokfai，或者请求路径是 \`https://api.tokfai.com/v1\`。**
 
-Chatbox / Codex 与其它 OpenAI-compatible 客户端使用相同规则。
+Chatbox 与其它 OpenAI-compatible 客户端使用相同规则。完整矩阵见 [OpenAI Compatible 客户端](/docs/openai-compatible-clients)。
 
 ## 推荐配置
 
@@ -1086,28 +1086,25 @@ Chatbox / Codex 与其它 OpenAI-compatible 客户端使用相同规则。
 |---|---|
 | 服务名称 | Tokfai |
 | 类型 | OpenAI Compatible / Custom OpenAI |
-| Base URL / API Host | \`https://api.tokfai.com\` |
+| Base URL / API Host | \`https://api.tokfai.com/v1\` |
 | API Key | Tokfai 控制台生成 |
-| 推荐模型 id | \`gpt-5\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\` / \`gemini-3-pro\` / \`gemini-2.5-flash\` |
-| 界面展示名 | \`Tokfai GPT-5\`、\`Tokfai GPT-5 Pro\`、\`Tokfai GPT-5.4 Pro\`、\`Tokfai Gemini 3 Pro\` |
+| 推荐模型 id | \`gpt-5\` / \`gpt-5.4\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\` / \`gemini-3-pro\` / \`gemini-2.5-flash\` |
+| 界面展示名 | \`Tokfai GPT-5\`、\`Tokfai GPT-5.4\`、\`Tokfai GPT-5 Pro\`、\`Tokfai GPT-5.4 Pro\`、\`Tokfai Gemini 3 Pro\` |
 | 顶部必须显示 | \`| tokfai\` |
 
-说明：\`gpt-5.4-pro\` / \`GPT 5.4 Pro\` 等会在 Tokfai 内兼容映射到 \`gpt-5-pro\`（\`tokfai.requested_model\` 保留原值，\`tokfai.resolved_model\` 为内部 id）。
+说明：\`gpt-5.4\` 兼容映射到 \`gpt-5\`；\`gpt-5.4-pro\` / \`GPT 5.4 Pro\` 兼容映射到 \`gpt-5-pro\`（\`tokfai.requested_model\` 保留原值，\`tokfai.resolved_model\` 为内部 id）。
 
 ## 正确 vs 错误
 
-- **正确**：\`Tokfai GPT-5 | tokfai\`、\`Tokfai GPT-5.4 Pro | tokfai\` → 请求走 \`https://api.tokfai.com\`
+- **正确**：\`Tokfai GPT-5 | tokfai\`、\`Tokfai GPT-5.4 Pro | tokfai\` → 请求走 \`https://api.tokfai.com/v1\`
 - **错误**：\`GPT 5 | OpenAI\`、\`GPT 5.4 Pro | OpenAI\` → **不是 Tokfai**
 - **错误**：\`Gemini | Google\` → **不是 Tokfai**
-- **错误**：请求路径出现 grsaiapi.com → **没有走 Tokfai**
-
-如果出现 grsaiapi.com，说明没有走 Tokfai。  
-如果请求地址不是 \`https://api.tokfai.com\`，就是选错供应商。
+- **错误**：请求路径不是 \`api.tokfai.com\` → **没有走 Tokfai**
 
 ## 强制隔离测试（必做）
 
 1. 先只启用 **Tokfai** 服务商  
-2. 关闭 OpenAI / Gemini / 其它非 Tokfai 服务商  
+2. 关闭其它非 Tokfai 服务商  
 3. 在 Tokfai 服务商下点击 **获取模型列表**  
 4. **新建话题**（避免旧话题绑着错误供应商）  
 5. 确认顶部模型显示 \`| tokfai\`（例如 \`Tokfai GPT-5.4 Pro | tokfai\`）  
@@ -1116,24 +1113,26 @@ Chatbox / Codex 与其它 OpenAI-compatible 客户端使用相同规则。
 
 ## 错误排查
 
-- 错误详情请求路径是 \`https://api.tokfai.com\` → 已走 Tokfai；检查模型名（可用 \`gpt-5.4-pro\` 等兼容名）  
-- 错误详情请求路径是 grsaiapi.com / 其它非 Tokfai 主机 → **没有走 Tokfai**，请把供应商改回 \`| tokfai\`  
-- Tokfai 返回 \`model_not_available\` / "This model is not available on Tokfai…" → 换 \`gpt-5\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\`  
+- 错误详情请求路径是 \`https://api.tokfai.com/v1\` → 已走 Tokfai；检查模型名  
+- 请求路径不是 Tokfai → 把供应商改回 \`| tokfai\`，Base URL 填 \`https://api.tokfai.com/v1\`  
+- \`model_not_available\` → 换 \`gpt-5\` / \`gpt-5.4\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\` / \`gemini-3-pro\` / \`gemini-2.5-flash\`  
+- \`insufficient_credits\` → Dashboard → Credits 充值  
+- \`rate_limited\` → 降低并发后重试  
+- \`upstream_busy\` → 稍后重试或换模型  
 - 401 / \`invalid_token\` → 从控制台重新复制 \`sk-tokfai_…\`  
-- 402 / \`insufficient_credits\` → Dashboard → Credits 充值  
 
-不要把第三方上游真实地址写成接入地址；只使用 \`https://api.tokfai.com\`。`,
+只使用 \`https://api.tokfai.com/v1\` 作为接入地址。`,
       en: `# Cherry Studio
 
 Only configure three things:
 
-- API base: \`https://api.tokfai.com\`
+- API base: \`https://api.tokfai.com/v1\`
 - API Key: generated in the Tokfai console (\`sk-tokfai_…\`)
-- Model: pick entries with the \`| tokfai\` suffix (e.g. \`Tokfai GPT-5\` / \`Tokfai GPT-5.4 Pro\`)
+- Model: pick entries with the \`| tokfai\` suffix (e.g. \`Tokfai GPT-5\` / \`Tokfai GPT-5.4\` / \`Tokfai GPT-5.4 Pro\`)
 
-**Picking a GPT-5 label does not mean you are using Tokfai.** Confirm the provider is Tokfai, or that the request path is \`https://api.tokfai.com\`.
+**Picking a GPT-5 label does not mean you are using Tokfai.** Confirm the provider is Tokfai, or that the request path is \`https://api.tokfai.com/v1\`.
 
-Chatbox / Codex and other OpenAI-compatible clients follow the same rules.
+Chatbox and other OpenAI-compatible clients follow the same rules. See the [OpenAI-compatible client matrix](/docs/openai-compatible-clients).
 
 ## Recommended setup
 
@@ -1141,28 +1140,25 @@ Chatbox / Codex and other OpenAI-compatible clients follow the same rules.
 |---|---|
 | Service name | Tokfai |
 | Type | OpenAI Compatible / Custom OpenAI |
-| Base URL / API Host | \`https://api.tokfai.com\` |
+| Base URL / API Host | \`https://api.tokfai.com/v1\` |
 | API Key | From Tokfai console |
-| Recommended model ids | \`gpt-5\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\` / \`gemini-3-pro\` / \`gemini-2.5-flash\` |
-| UI display names | \`Tokfai GPT-5\`, \`Tokfai GPT-5 Pro\`, \`Tokfai GPT-5.4 Pro\`, \`Tokfai Gemini 3 Pro\` |
+| Recommended model ids | \`gpt-5\` / \`gpt-5.4\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\` / \`gemini-3-pro\` / \`gemini-2.5-flash\` |
+| UI display names | \`Tokfai GPT-5\`, \`Tokfai GPT-5.4\`, \`Tokfai GPT-5 Pro\`, \`Tokfai GPT-5.4 Pro\`, \`Tokfai Gemini 3 Pro\` |
 | Header must show | \`| tokfai\` |
 
-Note: \`gpt-5.4-pro\` / \`GPT 5.4 Pro\` are compatibility aliases that resolve to \`gpt-5-pro\` inside Tokfai (\`tokfai.requested_model\` keeps the original; \`tokfai.resolved_model\` is the internal id).
+Note: \`gpt-5.4\` maps to \`gpt-5\`; \`gpt-5.4-pro\` / \`GPT 5.4 Pro\` map to \`gpt-5-pro\` (\`tokfai.requested_model\` keeps the original; \`tokfai.resolved_model\` is the internal id).
 
 ## Correct vs incorrect
 
-- **Correct**: \`Tokfai GPT-5 | tokfai\`, \`Tokfai GPT-5.4 Pro | tokfai\` → \`https://api.tokfai.com\`
+- **Correct**: \`Tokfai GPT-5 | tokfai\`, \`Tokfai GPT-5.4 Pro | tokfai\` → \`https://api.tokfai.com/v1\`
 - **Wrong**: \`GPT 5 | OpenAI\`, \`GPT 5.4 Pro | OpenAI\` → **not Tokfai**
 - **Wrong**: \`Gemini | Google\` → **not Tokfai**
-- **Wrong**: request path shows grsaiapi.com → **not Tokfai**
-
-If error details show grsaiapi.com, the request did not go through Tokfai.  
-If the request host is not \`https://api.tokfai.com\`, you selected the wrong provider.
+- **Wrong**: request path is not \`api.tokfai.com\` → **not Tokfai**
 
 ## Forced isolation test (required)
 
 1. Enable **only** the Tokfai provider  
-2. Disable OpenAI / Gemini / every non-Tokfai provider  
+2. Disable every non-Tokfai provider  
 3. Click **Fetch models** under Tokfai  
 4. **Create a new topic** (old topics may keep a wrong provider)  
 5. Confirm the header shows \`| tokfai\` (e.g. \`Tokfai GPT-5.4 Pro | tokfai\`)  
@@ -1171,13 +1167,15 @@ If the request host is not \`https://api.tokfai.com\`, you selected the wrong pr
 
 ## Troubleshooting
 
-- Error path is \`https://api.tokfai.com\` → you hit Tokfai; check the model id (compat names like \`gpt-5.4-pro\` are OK)  
-- Error path is grsaiapi.com / another non-Tokfai host → **not Tokfai**; switch provider to \`| tokfai\`  
-- Tokfai returns \`model_not_available\` / "This model is not available on Tokfai…" → use \`gpt-5\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\`  
+- Error path is \`https://api.tokfai.com/v1\` → you hit Tokfai; check the model id  
+- Path is not Tokfai → switch provider to \`| tokfai\` and set Base URL to \`https://api.tokfai.com/v1\`  
+- \`model_not_available\` → use \`gpt-5\` / \`gpt-5.4\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\` / \`gemini-3-pro\` / \`gemini-2.5-flash\`  
+- \`insufficient_credits\` → top up in Dashboard → Credits  
+- \`rate_limited\` → reduce concurrency and retry  
+- \`upstream_busy\` → retry shortly or switch model  
 - 401 / \`invalid_token\` → re-copy \`sk-tokfai_…\` from the console  
-- 402 / \`insufficient_credits\` → top up in Dashboard → Credits  
 
-Do not configure third-party upstream hosts as the integration Base URL — only \`https://api.tokfai.com\`.`,
+Use only \`https://api.tokfai.com/v1\` as the integration Base URL.`,
     },
   },
   {
@@ -1198,148 +1196,170 @@ Do not configure third-party upstream hosts as the integration Base URL — only
     markdown: {
       zh: `# OpenAI Compatible 客户端矩阵
 
-Tokfai 是 **OpenAI-compatible API 中转聚合网关**，不是只服务某一个客户端。  
-所有客户端统一配置：
+Tokfai 是 **OpenAI-compatible API 中转聚合网关**。  
+仓库完整步骤见 \`docs/tokfai-third-party-clients.zh.md\`。
 
 | 项 | 值 |
 |---|---|
-| Base URL | \`https://api.tokfai.com\`（或 \`https://api.tokfai.com/v1\`，视客户端是否自动加 \`/v1\`） |
+| Base URL | \`https://api.tokfai.com/v1\` |
 | API Key | Tokfai 控制台 \`sk-tokfai_…\` |
-| 供应商 / Provider | **Tokfai**（界面常显示 \`| tokfai\`） |
-| 推荐模型 id | \`gpt-5\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\` / \`gemini-3-pro\` / \`gemini-2.5-flash\` |
+| 供应商 | **Tokfai**（\`| tokfai\`） |
+| 推荐模型 id | \`gpt-5\` / \`gpt-5.4\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\` / \`gemini-3-pro\` / \`gemini-2.5-flash\` |
+| 界面展示 | \`Tokfai GPT-5\`、\`Tokfai GPT-5.4\`、\`Tokfai GPT-5 Pro\`、\`Tokfai GPT-5.4 Pro\`、\`Tokfai GPT-5.5\`、\`Tokfai Gemini 3 Pro\`、\`Tokfai Gemini 2.5 Flash\` |
 
-**禁止**把 OpenAI / Google / 其它上游主机写成 Base URL。
+只填写 \`https://api.tokfai.com/v1\`，不要填写其它厂商主机。
 
-## 1) OpenAI SDK / curl
+## 模型说明
 
-- \`GET /v1/models\`
-- \`POST /v1/chat/completions\`（\`stream=false|true\`）
-- \`POST /v1/responses\`（\`stream=false|true\`）
-- 常见字段：\`max_tokens\`、\`max_completion_tokens\`、\`stream_options\`、\`temperature\`、\`top_p\`  
-  未支持字段可忽略，不应导致 500。
-
-## 2) 聊天客户端
-
-| 客户端 | 配置要点 | 真机验收 |
+| id | 展示名 | 备注 |
 |---|---|---|
-| Cherry Studio | OpenAI Compatible + \`| tokfai\`；见 Cherry 章节 | 建议真机 |
-| Chatbox | 同上 | 建议真机 |
-| NextChat | Custom OpenAI，Base = \`https://api.tokfai.com\` | OpenAI-compatible 理论兼容 |
-| LobeChat | OpenAI 兼容端点 | OpenAI-compatible 理论兼容 |
-| OpenWebUI | OpenAI API 连接 | OpenAI-compatible 理论兼容 |
-| LibreChat | OpenAI endpoint | OpenAI-compatible 理论兼容 |
+| \`gpt-5\` | Tokfai GPT-5 | 通用 |
+| \`gpt-5.4\` | Tokfai GPT-5.4 | 兼容别名 → \`gpt-5\` |
+| \`gpt-5-pro\` | Tokfai GPT-5 Pro | 高质量 |
+| \`gpt-5.4-pro\` | Tokfai GPT-5.4 Pro | 兼容别名 → \`gpt-5-pro\` |
+| \`gpt-5.5\` | Tokfai GPT-5.5 | 高推理 |
+| \`gemini-3-pro\` | Tokfai Gemini 3 Pro | Gemini |
+| \`gemini-2.5-flash\` | Tokfai Gemini 2.5 Flash | 低延迟 |
 
-## 3) 工作流 / 知识库
+## Cherry Studio
 
-| 平台 | 配置要点 | 真机验收 |
-|---|---|---|
-| Dify | 模型供应商选 OpenAI-API-compatible；API Base = \`https://api.tokfai.com/v1\` | OpenAI-compatible 理论兼容 |
-| FastGPT | OpenAI 兼容 | OpenAI-compatible 理论兼容 |
-| LangChain | \`ChatOpenAI(base_url=..., api_key=...)\` | OpenAI-compatible 理论兼容 |
-| LlamaIndex | OpenAI-like LLM | OpenAI-compatible 理论兼容 |
+1. 添加 OpenAI Compatible，名称 Tokfai  
+2. Base URL = \`https://api.tokfai.com/v1\`，Key = \`sk-tokfai_…\`  
+3. 获取模型，确认 \`| tokfai\`，新建话题测试  
 
-## 4) 编程类客户端
+详见 [Cherry Studio](/docs/cherry-studio)。
 
-| 客户端 | 配置要点 | 真机验收 |
-|---|---|---|
-| Continue | OpenAI-compatible provider | OpenAI-compatible 理论兼容 |
-| Cline | OpenAI Compatible | OpenAI-compatible 理论兼容 |
-| Roo Code | OpenAI Compatible | OpenAI-compatible 理论兼容 |
-| Codex | 优先 \`POST /v1/responses\`（Codex 只是其中一个 case） | 建议真机 |
+## Chatbox
 
-## 模型 alias（稳定）
+设置 → OpenAI Compatible：Base URL \`https://api.tokfai.com/v1\`，模型填上表 id（如 \`gpt-5.5\` / \`gemini-3-pro\`）。
 
-- \`GPT 5\` / \`gpt5\` / \`gpt-5\` → \`gpt-5\`
-- \`GPT 5 Pro\` / \`gpt5-pro\` / \`gpt-5-pro\` → \`gpt-5-pro\`
-- \`GPT 5.4 Pro\` / \`gpt-5.4-pro\` / \`gpt-5-4-pro\` → \`gpt-5-pro\`
-- \`GPT 5.5\` / \`gpt5.5\` / \`gpt-5.5\` → \`gpt-5.5\`
-- \`Gemini 3 Pro\` / \`gemini-3-pro\` → \`gemini-3-pro\`
+## NextChat
 
-响应 \`tokfai.requested_model\` / \`tokfai.resolved_model\` / \`tokfai.credits_charged\` / \`tokfai.request_id\` 由服务端填写。
+自定义 OpenAI：Base URL \`https://api.tokfai.com/v1\`，API Key \`sk-tokfai_…\`，模型 \`gpt-5\` 或 \`gemini-2.5-flash\`。
 
-## 客户端错误口径（统一）
+## OpenWebUI
 
-| 客户端词汇 | API \`error.code\`（兼容） | 含义 |
-|---|---|---|
-| \`model_not_available\` | \`model_not_available\` | 模型不可用 |
-| \`insufficient_balance\` | \`insufficient_credits\` | 余额不足 |
-| \`rate_limited\` | \`too_many_requests\` / \`upstream_rate_limited\` | 限流 |
-| \`upstream_busy\` | \`upstream_model_busy\` | 繁忙 |
-| \`invalid_request\` | \`invalid_request_error\` | 请求不合法 |
+Admin → Connections → OpenAI：API Base URL \`https://api.tokfai.com/v1\`，同步模型后选用 Tokfai 展示名 / id（含 \`gpt-5.4\`）。
 
-错误文案不得出现上游域名、上游原始 \`model not register\` 或内部 stack。`,
+## Dify
+
+模型供应商选 **OpenAI-API-compatible**，API Endpoint \`https://api.tokfai.com/v1\`，模型名填 \`gpt-5.5\` / \`gemini-3-pro\` 等。
+
+## FastGPT
+
+添加 OpenAI 兼容渠道：Base URL \`https://api.tokfai.com/v1\`，模型 \`gpt-5-pro\` / \`gemini-2.5-flash\` 等。
+
+## Continue
+
+\`apiBase: https://api.tokfai.com/v1\`，\`model: gpt-5.5\`（或其它上表 id），\`apiKey: sk-tokfai_…\`。
+
+## Cline
+
+OpenAI Compatible：Base URL \`https://api.tokfai.com/v1\`，Model ID \`gpt-5.5\` / \`gpt-5-pro\`。
+
+## Roo Code
+
+OpenAI Compatible：Base URL \`https://api.tokfai.com/v1\`，Model \`gpt-5.4-pro\` / \`gpt-5-pro\` / \`gpt-5.5\`。
+
+## Codex / LangChain / LlamaIndex
+
+- Codex 只是其中一个 case：Base URL 仍为 \`https://api.tokfai.com/v1\`，复杂工具链可优先 \`POST /v1/responses\`。
+- LangChain OpenAI-compatible：\`ChatOpenAI(base_url="https://api.tokfai.com/v1", api_key="sk-tokfai_…")\`。
+- LlamaIndex OpenAI-compatible：同样使用 \`https://api.tokfai.com/v1\` 与 Tokfai 模型 id。
+
+## 客户端错误口径
+
+只提示 Tokfai 口径：
+
+| 提示 | 含义 |
+|---|---|
+| \`model_not_available\` | 模型不可用 |
+| \`insufficient_credits\` | 算力积分不足 |
+| \`rate_limited\` | 请求过快 |
+| \`upstream_busy\` | 模型繁忙 |
+
+错误文案不得出现上游域名或上游原始错误。`,
       en: `# OpenAI-compatible client matrix
 
-Tokfai is a **universal OpenAI-compatible API gateway**, not a single-client product.  
-Configure every client the same way:
+Tokfai is a **universal OpenAI-compatible API gateway**.  
+Full steps: \`docs/tokfai-third-party-clients.zh.md\`.
 
 | Field | Value |
 |---|---|
-| Base URL | \`https://api.tokfai.com\` (or \`https://api.tokfai.com/v1\` if the client does not append \`/v1\`) |
+| Base URL | \`https://api.tokfai.com/v1\` |
 | API Key | Tokfai console \`sk-tokfai_…\` |
-| Provider | **Tokfai** (often shown as \`| tokfai\`) |
-| Recommended model ids | \`gpt-5\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\` / \`gemini-3-pro\` / \`gemini-2.5-flash\` |
+| Provider | **Tokfai** (\`| tokfai\`) |
+| Model ids | \`gpt-5\` / \`gpt-5.4\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\` / \`gemini-3-pro\` / \`gemini-2.5-flash\` |
+| Display names | \`Tokfai GPT-5\`, \`Tokfai GPT-5.4\`, \`Tokfai GPT-5 Pro\`, \`Tokfai GPT-5.4 Pro\`, \`Tokfai GPT-5.5\`, \`Tokfai Gemini 3 Pro\`, \`Tokfai Gemini 2.5 Flash\` |
 
-**Never** put OpenAI / Google / other upstream hosts as the Base URL.
+Use only \`https://api.tokfai.com/v1\` — never other vendor hosts.
 
-## 1) OpenAI SDK / curl
+## Models
 
-- \`GET /v1/models\`
-- \`POST /v1/chat/completions\` (\`stream=false|true\`)
-- \`POST /v1/responses\` (\`stream=false|true\`)
-- Common fields: \`max_tokens\`, \`max_completion_tokens\`, \`stream_options\`, \`temperature\`, \`top_p\`  
-  Unsupported fields may be ignored — they must not cause HTTP 500.
-
-## 2) Chat clients
-
-| Client | Setup | Device QA |
+| id | Display | Notes |
 |---|---|---|
-| Cherry Studio | OpenAI Compatible + \`| tokfai\` (see Cherry chapter) | Recommended |
-| Chatbox | Same | Recommended |
-| NextChat | Custom OpenAI, Base = \`https://api.tokfai.com\` | Theory-compatible |
-| LobeChat | OpenAI-compatible endpoint | Theory-compatible |
-| OpenWebUI | OpenAI API connection | Theory-compatible |
-| LibreChat | OpenAI endpoint | Theory-compatible |
+| \`gpt-5\` | Tokfai GPT-5 | General |
+| \`gpt-5.4\` | Tokfai GPT-5.4 | Alias → \`gpt-5\` |
+| \`gpt-5-pro\` | Tokfai GPT-5 Pro | Quality |
+| \`gpt-5.4-pro\` | Tokfai GPT-5.4 Pro | Alias → \`gpt-5-pro\` |
+| \`gpt-5.5\` | Tokfai GPT-5.5 | Reasoning |
+| \`gemini-3-pro\` | Tokfai Gemini 3 Pro | Gemini |
+| \`gemini-2.5-flash\` | Tokfai Gemini 2.5 Flash | Low latency |
 
-## 3) Workflow / knowledge
+## Cherry Studio
 
-| Platform | Setup | Device QA |
-|---|---|---|
-| Dify | OpenAI-API-compatible; API Base = \`https://api.tokfai.com/v1\` | Theory-compatible |
-| FastGPT | OpenAI-compatible | Theory-compatible |
-| LangChain | \`ChatOpenAI(base_url=..., api_key=...)\` | Theory-compatible |
-| LlamaIndex | OpenAI-like LLM | Theory-compatible |
+OpenAI Compatible named Tokfai; Base URL \`https://api.tokfai.com/v1\`; confirm \`| tokfai\`. See [Cherry Studio](/docs/cherry-studio).
 
-## 4) Coding clients
+## Chatbox
 
-| Client | Setup | Device QA |
-|---|---|---|
-| Continue | OpenAI-compatible provider | Theory-compatible |
-| Cline | OpenAI Compatible | Theory-compatible |
-| Roo Code | OpenAI Compatible | Theory-compatible |
-| Codex | Prefer \`POST /v1/responses\` (Codex is one case among many) | Recommended |
+OpenAI Compatible; Base URL \`https://api.tokfai.com/v1\`; model ids from the table (e.g. \`gpt-5.5\` / \`gemini-3-pro\`).
 
-## Stable model aliases
+## NextChat
 
-- \`GPT 5\` / \`gpt5\` / \`gpt-5\` → \`gpt-5\`
-- \`GPT 5 Pro\` / \`gpt5-pro\` / \`gpt-5-pro\` → \`gpt-5-pro\`
-- \`GPT 5.4 Pro\` / \`gpt-5.4-pro\` / \`gpt-5-4-pro\` → \`gpt-5-pro\`
-- \`GPT 5.5\` / \`gpt5.5\` / \`gpt-5.5\` → \`gpt-5.5\`
-- \`Gemini 3 Pro\` / \`gemini-3-pro\` → \`gemini-3-pro\`
+Custom OpenAI; Base URL \`https://api.tokfai.com/v1\`; models \`gpt-5\` or \`gemini-2.5-flash\`.
 
-\`tokfai.requested_model\` / \`tokfai.resolved_model\` / \`tokfai.credits_charged\` / \`tokfai.request_id\` are server-authored.
+## OpenWebUI
 
-## Unified client error vocabulary
+OpenAI connection; API Base URL \`https://api.tokfai.com/v1\`; pick Tokfai display names / ids (including \`gpt-5.4\`).
 
-| Client term | API \`error.code\` (compatible) | Meaning |
-|---|---|---|
-| \`model_not_available\` | \`model_not_available\` | Model unavailable |
-| \`insufficient_balance\` | \`insufficient_credits\` | Out of credits |
-| \`rate_limited\` | \`too_many_requests\` / \`upstream_rate_limited\` | Rate limited |
-| \`upstream_busy\` | \`upstream_model_busy\` | Busy |
-| \`invalid_request\` | \`invalid_request_error\` | Bad request |
+## Dify
 
-Error messages must never expose upstream hosts, raw upstream “model not register” text, or internal stacks.`,
+**OpenAI-API-compatible**; endpoint \`https://api.tokfai.com/v1\`; model \`gpt-5.5\` / \`gemini-3-pro\`.
+
+## FastGPT
+
+OpenAI-compatible channel; Base URL \`https://api.tokfai.com/v1\`; model \`gpt-5-pro\` / \`gemini-2.5-flash\`.
+
+## Continue
+
+\`apiBase: https://api.tokfai.com/v1\`, \`model: gpt-5.5\`, \`apiKey: sk-tokfai_…\`.
+
+## Cline
+
+OpenAI Compatible; Base URL \`https://api.tokfai.com/v1\`; Model ID \`gpt-5.5\` / \`gpt-5-pro\`.
+
+## Roo Code
+
+OpenAI Compatible; Base URL \`https://api.tokfai.com/v1\`; Model \`gpt-5.4-pro\` / \`gpt-5-pro\` / \`gpt-5.5\`.
+
+## Codex / LangChain / LlamaIndex
+
+- Codex is one case among many: Base URL remains \`https://api.tokfai.com/v1\`; prefer \`POST /v1/responses\` for tool-heavy flows.
+- LangChain OpenAI-compatible: \`ChatOpenAI(base_url="https://api.tokfai.com/v1", api_key="sk-tokfai_…")\`.
+- LlamaIndex OpenAI-compatible: same \`https://api.tokfai.com/v1\` and Tokfai model ids.
+
+## Client error vocabulary
+
+Tokfai-only prompts:
+
+| Code | Meaning |
+|---|---|
+| \`model_not_available\` | Model unavailable |
+| \`insufficient_credits\` | Out of credits |
+| \`rate_limited\` | Rate limited |
+| \`upstream_busy\` | Model busy |
+
+Never expose upstream hosts or raw upstream errors.`,
     },
   },
   {

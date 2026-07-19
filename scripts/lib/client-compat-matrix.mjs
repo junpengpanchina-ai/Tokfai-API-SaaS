@@ -3,16 +3,14 @@
  * Offline/mock only — never contact production without LIVE=1.
  */
 
-export const TOKFAI_BASE_URL = "https://api.tokfai.com";
+export const TOKFAI_BASE_URL = "https://api.tokfai.com/v1";
 
 /** Clients covered by docs + offline contract smokes (not all device-tested). */
 export const CHAT_CLIENTS = [
   "Cherry Studio",
   "Chatbox",
   "NextChat",
-  "LobeChat",
   "OpenWebUI",
-  "LibreChat",
 ];
 
 export const WORKFLOW_PLATFORMS = [
@@ -32,6 +30,7 @@ export const CODING_CLIENTS = [
 
 export const REQUIRED_MODEL_IDS = [
   "gpt-5",
+  "gpt-5.4",
   "gpt-5-pro",
   "gpt-5.4-pro",
   "gpt-5.5",
@@ -44,6 +43,7 @@ export const STABLE_ALIAS_CASES = [
   ["GPT 5", "gpt-5"],
   ["gpt5", "gpt-5"],
   ["gpt-5", "gpt-5"],
+  ["gpt-5.4", "gpt-5"],
   ["GPT 5 Pro", "gpt-5-pro"],
   ["gpt5-pro", "gpt-5-pro"],
   ["gpt-5-pro", "gpt-5-pro"],

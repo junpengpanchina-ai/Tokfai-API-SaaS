@@ -23,15 +23,27 @@ const DOC_FILES = [
   "apps/web/lib/docs/public-beta-docs-registry.ts",
   "docs/tokfai-integration-docs.zh.md",
   "docs/tokfai-customer-api-reference.zh.md",
+  "docs/tokfai-third-party-clients.zh.md",
 ];
 
 const REQUIRED_PHRASES = [
   "| tokfai",
   "Cherry Studio",
   "Chatbox",
-  "Codex",
-  "api.tokfai.com",
+  "NextChat",
+  "OpenWebUI",
+  "Dify",
+  "FastGPT",
+  "Continue",
+  "Cline",
+  "Roo Code",
+  "https://api.tokfai.com/v1",
+  "gpt-5.4",
+  "gpt-5.4-pro",
   "model_not_available",
+  "insufficient_credits",
+  "rate_limited",
+  "upstream_busy",
 ];
 
 function pass(label) {
