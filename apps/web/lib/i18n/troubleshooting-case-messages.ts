@@ -258,11 +258,11 @@ export const troubleshootingCaseMessagesEn: Record<string, string> = {
   "integration.troubleshooting.case.cherry_connection_failed.title":
     "Cherry Studio — connection failed",
   "integration.troubleshooting.case.cherry_connection_failed.likelyCause":
-    "Tokfai Provider misconfigured, wrong provider selected, or Base URL / API Key is incomplete.",
+    "Wrong built-in OpenAI / Gemini provider selected, Tokfai Provider misconfigured, or Base URL / API Key is incomplete.",
   "integration.troubleshooting.case.cherry_connection_failed.action1":
-    "Use Tokfai / | tokfai only — Base URL https://api.tokfai.com and an sk-tokfai_… key.",
+    "Use custom OpenAI Compatible named Tokfai only — Base URL https://api.tokfai.com/v1 and an sk-tokfai_… key. Correct: Tokfai GPT-5.4 Pro | Tokfai. Wrong: GPT 5.4 Pro | OpenAI.",
   "integration.troubleshooting.case.cherry_connection_failed.action2":
-    "If error details show grsaiapi.com, the request did not go through Tokfai — switch back to | tokfai.",
+    "If the request path is not api.tokfai.com (e.g. grsaiapi.com / openai.com / googleapis.com), the request did not go through Tokfai — wrong provider, not a Tokfai API error.",
   "integration.troubleshooting.case.cherry_connection_failed.action3":
     "Copy Cherry Studio config from Docs → Cherry Studio.",
 
@@ -524,11 +524,11 @@ export const troubleshootingCaseMessagesZh: Record<string, string> = {
   "integration.troubleshooting.case.cherry_connection_failed.title":
     "Cherry Studio — 连接失败",
   "integration.troubleshooting.case.cherry_connection_failed.likelyCause":
-    "Tokfai Provider 配置错误、选错了供应商，或 Base URL / API Key 未填全。",
+    "选错了内置 OpenAI / Gemini 供应商、Tokfai Provider 配置错误，或 Base URL / API Key 未填全。",
   "integration.troubleshooting.case.cherry_connection_failed.action1":
-    "只使用 Tokfai / | tokfai — Base URL https://api.tokfai.com，API Key 以 sk-tokfai_ 开头。",
+    "只使用自定义 OpenAI Compatible，名称 Tokfai — API 地址 https://api.tokfai.com/v1，API Key 以 sk-tokfai_ 开头。正确：Tokfai GPT-5.4 Pro | Tokfai。错误：GPT 5.4 Pro | OpenAI。",
   "integration.troubleshooting.case.cherry_connection_failed.action2":
-    "如果出现 grsaiapi.com，说明没有走 Tokfai — 请切回 | tokfai。",
+    "如果请求路径不是 api.tokfai.com（例如 grsaiapi.com / openai.com / googleapis.com），说明没有走 Tokfai——这是供应商选错，不是 Tokfai API 错误。",
   "integration.troubleshooting.case.cherry_connection_failed.action3":
     "从文档 → Cherry Studio 复制正确配置。",
 

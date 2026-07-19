@@ -1665,7 +1665,7 @@ export const messages = {
         "Start with auto-fast for integration smoke tests — Tokfai auto-routes when upstream models are busy. Use auto-pro for quality workloads. Explicit gpt-5.4 / gpt-5.5 may return upstream_model_busy (HTTP 503). Do not use gpt-4o-mini; it is not registered upstream.",
       cherryStudioLabel: "Cherry Studio",
       cherryStudioSteps:
-        "Settings → Provider → OpenAI-compatible. Base URL https://api.tokfai.com, API Key sk-tokfai_…, model auto-fast. Always pick models under Tokfai / | tokfai — not Gemini or OpenAI providers.",
+        "Settings → Provider → OpenAI Compatible (custom). Name Tokfai, Base URL https://api.tokfai.com/v1, API Key sk-tokfai_…, pick models under Tokfai only. Do not use built-in OpenAI / Gemini providers. Correct: Tokfai GPT-5.4 Pro | Tokfai. Wrong: GPT 5.4 Pro | OpenAI or Gemini 3.1 Pro Preview | Gemini.",
       cherryStudioError401:
         "Paste the full sk-tokfai_… secret from Dashboard → API Keys — not your dashboard login token.",
       cherryStudioError402:
@@ -1673,7 +1673,7 @@ export const messages = {
       cherryStudioError404:
         "Pick a Tokfai model ID such as auto-fast under the | tokfai provider. Image-only models are not for chat clients.",
       cherryStudioErrorWrongProvider:
-        "If error details show grsaiapi.com, the request did not go through Tokfai. Switch back to | tokfai (e.g. Tokfai GPT-5). Wrong: GPT 5 | OpenAI.",
+        "If the request path is not api.tokfai.com (e.g. grsaiapi.com, openai.com, googleapis.com), the request did not go through Tokfai — wrong Cherry Studio provider, not a Tokfai API error. Switch to custom OpenAI Compatible named Tokfai. Correct: Tokfai GPT-5.4 Pro | Tokfai. Wrong: GPT 5.4 Pro | OpenAI.",
       cherryStudioError500:
         "The model service is temporarily unavailable — retry in a few minutes or switch models.",
       cursorLabel: "Cursor",
@@ -3772,7 +3772,7 @@ export const messages = {
       cherryChapterFailure:
         "invalid_token or model_not_available — verify host and model id.",
       cherryGatewayNote:
-        "Cherry Studio connects to Tokfai via an OpenAI-compatible / OpenAI-style provider. Base URL: https://api.tokfai.com. API Key: sk-tokfai_xxx. Recommended model: auto-fast. Always select models under Tokfai / | tokfai — selecting Gemini or OpenAI providers bypasses Tokfai. Image generation uses Tokfai Image Workbench or POST /v1/images/generations, not the chat model list.",
+        "Cherry Studio connects to Tokfai via a custom OpenAI Compatible entry called Tokfai. Base URL: https://api.tokfai.com/v1. API Key: sk-tokfai_xxx. Always select models under Tokfai / | tokfai — do not use built-in OpenAI / Gemini / Google providers (e.g. wrong: GPT 5.4 Pro | OpenAI, Gemini 3.1 Pro Preview | Gemini). If the request path is not api.tokfai.com, the request did not go through Tokfai. Image generation uses Tokfai Image Workbench or POST /v1/images/generations, not the chat model list.",
       cherryCurlFirstNote:
         "If Cherry Studio fails, copy the one-line Chat curl below and run it in any terminal. HTTP 200 confirms the API Key — then fix Cherry provider settings.",
       cherryNotAgencyNote:
@@ -3838,7 +3838,7 @@ export const messages = {
       cherryTroubleshootModel:
         "model_not_available — switch to auto-fast under | tokfai, or browse Models.",
       cherryTroubleshootWrongProvider:
-        "If error details show grsaiapi.com, the request did not go through Tokfai. model not register on grsaiapi.com = wrong provider; on api.tokfai.com = Tokfai registry issue. Use | tokfai only.",
+        "If the request path is not api.tokfai.com (grsaiapi.com / openai.com / googleapis.com / generativelanguage.googleapis.com), the request did not go through Tokfai — wrong Cherry Studio provider, not a Tokfai API error. Switch to OpenAI Compatible named Tokfai. Correct: Tokfai GPT-5.4 Pro | Tokfai. Wrong: GPT 5.4 Pro | OpenAI or Gemini 3.1 Pro Preview | Gemini.",
       cherryTroubleshootTimeout:
         "upstream_timeout — retry after a short wait or switch to auto-fast.",
       cherryTroubleshootCredits:
@@ -7012,7 +7012,7 @@ export const messages = {
         "首次接入建议用 auto-fast 做 smoke test — 上游繁忙时 Tokfai 会自动切换。高质量场景用 auto-pro。明确指定 gpt-5.4 / gpt-5.5 可能返回 upstream_model_busy（HTTP 503）。请勿使用 gpt-4o-mini，上游未注册。",
       cherryStudioLabel: "Cherry Studio",
       cherryStudioSteps:
-        "Settings → Provider → OpenAI-compatible。Base URL https://api.tokfai.com，API Key sk-tokfai_…，model auto-fast。必须选择 Tokfai / | tokfai 下的模型，不要选 Gemini 或 OpenAI 供应商。",
+        "设置 → 服务商 → OpenAI Compatible（自定义）。名称 Tokfai，API 地址 https://api.tokfai.com/v1，API Key sk-tokfai_…，模型必须从 Tokfai 下选择。不要选择 OpenAI / Gemini 内置供应商。正确：Tokfai GPT-5.4 Pro | Tokfai。错误：GPT 5.4 Pro | OpenAI 或 Gemini 3.1 Pro Preview | Gemini。",
       cherryStudioError401:
         "在 Dashboard → API Keys 复制完整 sk-tokfai_… secret — 不要使用 Dashboard 登录 token。",
       cherryStudioError402:
@@ -7020,7 +7020,7 @@ export const messages = {
       cherryStudioError404:
         "在 | tokfai 供应商下选择 Tokfai model ID（如 auto-fast）。图片专用模型不要用于聊天客户端。",
       cherryStudioErrorWrongProvider:
-        "如果出现 grsaiapi.com，说明没有走 Tokfai。请切回 | tokfai（如 Tokfai GPT-5）。错误示例：GPT 5 | OpenAI。",
+        "如果请求路径不是 api.tokfai.com（例如 grsaiapi.com、openai.com、googleapis.com），说明没有走 Tokfai——这是 Cherry Studio 供应商选错，不是 Tokfai API 错误。请改回自定义 OpenAI Compatible，名称 Tokfai。正确：Tokfai GPT-5.4 Pro | Tokfai。错误：GPT 5.4 Pro | OpenAI。",
       cherryStudioError500:
         "模型服务暂时不可用 — 稍后重试或切换 model。",
       cursorLabel: "Cursor",
@@ -9032,7 +9032,7 @@ export const messages = {
       cherryChapterFailure:
         "invalid_token 或 model_not_available — 检查 Host 与模型 id。",
       cherryGatewayNote:
-        "Cherry Studio 通过 OpenAI 兼容 / OpenAI-style Provider 接入 Tokfai。Base URL：https://api.tokfai.com。API Key：sk-tokfai_xxx。推荐模型 auto-fast。必须选择 Tokfai / | tokfai 下的模型——选 Gemini 或 OpenAI 供应商不会经过 Tokfai。图片请用图片工作台或 POST /v1/images/generations。",
+        "Cherry Studio 通过自定义 OpenAI Compatible 供应商接入 Tokfai，名称填 Tokfai。API 地址：https://api.tokfai.com/v1。API Key：sk-tokfai_xxx。必须从 Tokfai / | tokfai 下选模型——不要选择 OpenAI / Gemini 内置供应商（错误示例：GPT 5.4 Pro | OpenAI、Gemini 3.1 Pro Preview | Gemini）。如果请求路径不是 api.tokfai.com，说明没有走 Tokfai。图片请用图片工作台或 POST /v1/images/generations。",
       cherryCurlFirstNote:
         "若 Cherry Studio 失败，复制下方单行 Chat curl 在任意终端运行。HTTP 200 说明 API Key 正确——再修正 Cherry 配置。",
       cherryNotAgencyNote:
@@ -9089,7 +9089,7 @@ export const messages = {
       cherryTroubleshootModel:
         "model_not_available — 在 | tokfai 下换 auto-fast，或浏览 Models。",
       cherryTroubleshootWrongProvider:
-        "如果出现 grsaiapi.com，说明没有走 Tokfai。model not register 且路径是 grsaiapi.com = 选错供应商；路径是 api.tokfai.com = Tokfai registry 问题。只使用 | tokfai。",
+        "如果请求路径不是 api.tokfai.com（grsaiapi.com / openai.com / googleapis.com / generativelanguage.googleapis.com），说明没有走 Tokfai——这是 Cherry Studio 供应商选错，不是 Tokfai API 错误。请改回 OpenAI Compatible，名称 Tokfai。正确：Tokfai GPT-5.4 Pro | Tokfai。错误：GPT 5.4 Pro | OpenAI 或 Gemini 3.1 Pro Preview | Gemini。",
       cherryTroubleshootTimeout:
         "upstream_timeout — 稍后重试或换 auto-fast。",
       cherryTroubleshootCredits:

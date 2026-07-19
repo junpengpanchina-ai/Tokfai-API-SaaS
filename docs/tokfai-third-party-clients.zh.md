@@ -44,16 +44,51 @@ Tokfai 是 **OpenAI-compatible API 中转聚合网关**。所有客户端只连 
 
 ## 1. Cherry Studio
 
-1. 设置 → 服务商 → 添加 **OpenAI Compatible**
-2. 服务名称：`Tokfai`
-3. API Host / Base URL：`https://api.tokfai.com/v1`
-4. API Key：粘贴 `sk-tokfai_…`
-5. 获取模型列表，只启用 Tokfai 下模型
-6. 确认顶部显示 `| tokfai`（例如 `Tokfai GPT-5.4 Pro | tokfai`）
+**只配置 Tokfai 自定义供应商，不要使用 Cherry Studio 内置 OpenAI / Gemini / Google 供应商。**
+
+### 必填配置
+
+| 项 | 值 |
+|---|---|
+| 供应商类型 | **OpenAI Compatible** / 自定义 OpenAI 兼容 |
+| 供应商名称 | `Tokfai` |
+| API 地址 / Base URL | `https://api.tokfai.com/v1` |
+| API Key | Tokfai 后台生成的 `sk-tokfai_…` |
+| 模型 | **必须从 Tokfai 供应商下选择** |
+
+### 步骤
+
+1. 设置 → 服务商 → 添加 **OpenAI Compatible**（自定义 OpenAI 兼容）
+2. 供应商名称填写：`Tokfai`
+3. API 地址填写：`https://api.tokfai.com/v1`
+4. API Key：粘贴控制台生成的 `sk-tokfai_…`
+5. 获取模型列表，只启用 **Tokfai** 下模型
+6. 确认顶部显示 `| Tokfai` / `| tokfai`（例如 `Tokfai GPT-5.4 Pro | Tokfai`）
 7. **新建话题**后发送：`只回答 TOKFAI_READY，不要解释。`
 8. 到 Tokfai Usage 核对 `request_id`
 
-隔离：关闭其它非 Tokfai 服务商，避免旧话题绑错供应商。
+隔离：关闭其它非 Tokfai 服务商，避免旧话题绑错供应商。  
+**不要选择 OpenAI / Gemini 内置供应商**里的同名模型。
+
+### 模型选择：正确 vs 错误
+
+| | 示例 | 说明 |
+|---|---|---|
+| ✅ 正确 | `Tokfai GPT-5.4 Pro \| Tokfai` | 走 Tokfai |
+| ✅ 正确 | `Tokfai GPT-5.5 \| Tokfai` | 走 Tokfai |
+| ✅ 正确 | `Tokfai Gemini 3 Pro \| Tokfai` | 走 Tokfai |
+| ❌ 错误 | `GPT 5.4 Pro \| OpenAI` | 内置 OpenAI，**绕过 Tokfai** |
+| ❌ 错误 | `Gemini 3.1 Pro Preview \| Gemini` | 内置 Gemini，**绕过 Tokfai** |
+| ❌ 错误 | `Gemini xxx \| Google` | 内置 Google，**绕过 Tokfai** |
+
+同名模型不等于走 Tokfai。选错供应商后，请求不会经过 `https://api.tokfai.com/v1`。
+
+### 错误排查（供应商选错）
+
+如果错误详情里的请求路径**不是** `https://api.tokfai.com/v1`（而是其它厂商主机），说明请求没有经过 Tokfai。  
+**如果请求路径不是 api.tokfai.com，说明没有走 Tokfai**——这不是 Tokfai API 错误，而是 Cherry Studio 供应商选错。
+
+处理：改回自定义 **OpenAI Compatible** 供应商 `Tokfai`，Base URL 填 `https://api.tokfai.com/v1`，并从 Tokfai 下重选模型；**新建话题**后再测。
 
 ---
 

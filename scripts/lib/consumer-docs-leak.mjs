@@ -13,11 +13,19 @@ export const ALLOWED_WRONG_PROVIDER_DIAGNOSTICS = [
   "请求路径是 grsaiapi.com",
   "请求路径出现 grsaiapi.com",
   "错误详情请求路径是 grsaiapi.com",
+  "如果请求路径不是 api.tokfai.com（例如 grsaiapi.com、openai.com、googleapis.com）",
+  "如果请求路径不是 api.tokfai.com（grsaiapi.com / openai.com / googleapis.com / generativelanguage.googleapis.com）",
+  "如果请求路径不是 api.tokfai.com（例如 grsaiapi.com / openai.com / googleapis.com）",
+  "请求路径是 grsaiapi.com / openai.com / googleapis.com / generativelanguage.googleapis.com",
   "If error details show grsaiapi.com, the request did not go through Tokfai",
   "and the request path is grsaiapi.com",
   "request path shows grsaiapi.com",
   "Request path is grsaiapi.com",
   "Error path is grsaiapi.com",
+  "If the request path is not api.tokfai.com (e.g. grsaiapi.com, openai.com, googleapis.com)",
+  "If the request path is not api.tokfai.com (grsaiapi.com / openai.com / googleapis.com / generativelanguage.googleapis.com)",
+  "If the request path is not api.tokfai.com (e.g. grsaiapi.com / openai.com / googleapis.com)",
+  "Request path is grsaiapi.com / openai.com / googleapis.com / generativelanguage.googleapis.com",
 ];
 
 /**

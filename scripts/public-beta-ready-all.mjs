@@ -52,6 +52,7 @@ const OFFLINE = [
   "scripts/p914-client-error-copy-smoke.mjs",
   "scripts/p915-model-registry-contract-smoke.mjs",
   "scripts/p920-cherry-studio-client-smoke.mjs",
+  "scripts/p929-cherry-studio-guidance-smoke.mjs",
   "scripts/p921-chatbox-client-smoke.mjs",
   "scripts/p922-nextchat-client-smoke.mjs",
   "scripts/p923-openwebui-client-smoke.mjs",

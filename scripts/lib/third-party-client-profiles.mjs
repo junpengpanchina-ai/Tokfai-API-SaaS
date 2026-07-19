@@ -51,9 +51,13 @@ export const THIRD_PARTY_CLIENT_PROFILES = {
     failToken: "TOKFAI_P920_CHERRY_STUDIO_CLIENT_FAIL",
     docPhrases: [
       "Cherry Studio",
+      "OpenAI Compatible",
       TOKFAI_API_V1,
       "| tokfai",
       "Tokfai GPT-5",
+      "Tokfai GPT-5.4 Pro | Tokfai",
+      "不要选择 OpenAI / Gemini 内置供应商",
+      "如果请求路径不是 api.tokfai.com，说明没有走 Tokfai",
       "gpt-5.4-pro",
       "gpt-5.4",
       "model_not_available",
