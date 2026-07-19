@@ -14,10 +14,10 @@
  */
 
 import {
-  DEFAULT_MOCK_KEY,
   isLiveMode,
-  resolveApiBaseUrl,
   printOfflineDefaultHint,
+  resolveAcceptanceApiKey,
+  resolveApiBaseUrl,
 } from "./lib/acceptance-config.mjs";
 import { acceptanceFetch } from "./lib/acceptance-http.mjs";
 import { ensureMockGateway } from "./lib/ensure-mock-gateway.mjs";
@@ -25,16 +25,19 @@ import { ensureMockGateway } from "./lib/ensure-mock-gateway.mjs";
 const SCRIPT = "scripts/p831-model-alias-compat-smoke.mjs";
 const LIVE = isLiveMode();
 let mockChild = null;
+let BASE;
+let API_KEY;
 
 if (!LIVE) {
   const mock = await ensureMockGateway();
-  mockChild = mock.child;
+  mockChild = mock.child ?? null;
+  // Always use the mock's own base + key (never TOKFAI_API_KEY / TOKFAI_API_BASE).
+  BASE = mock.baseUrl.replace(/\/v1$/, "");
+  API_KEY = resolveAcceptanceApiKey(false, mock.apiKey);
+} else {
+  BASE = resolveApiBaseUrl(true).replace(/\/v1$/, "");
+  API_KEY = resolveAcceptanceApiKey(true);
 }
-
-const BASE = resolveApiBaseUrl(LIVE).replace(/\/v1$/, "");
-const API_KEY = LIVE
-  ? process.env.TOKFAI_API_KEY ?? ""
-  : process.env.TOKFAI_API_KEY ?? process.env.MOCK_API_KEY ?? DEFAULT_MOCK_KEY;
 
 const TIMEOUT_MS = Math.max(
   1000,
@@ -52,7 +55,22 @@ function fail(label, detail) {
   return false;
 }
 
+function assertAuthOk(res, label) {
+  if (res.status === 401 || res.status === 403) {
+    return fail(
+      label,
+      `HTTP ${res.status} auth failed — offline must use mock key from ensureMockGateway()`
+    );
+  }
+  return true;
+}
+
 async function postJson(path, body) {
+  if (!API_KEY || !API_KEY.startsWith("sk-tokfai_")) {
+    throw new Error(
+      `Missing valid API key for ${LIVE ? "LIVE" : "offline mock"} mode`
+    );
+  }
   return acceptanceFetch(`${BASE}${path}`, {
     method: "POST",
     headers: {
@@ -67,39 +85,56 @@ async function postJson(path, body) {
 async function run() {
   if (!LIVE) printOfflineDefaultHint(SCRIPT);
   console.log(LIVE ? `live: ${BASE}` : `offline mock: ${BASE}`);
+  console.log(`api_key: ${API_KEY.slice(0, 14)}… (len=${API_KEY.length})`);
   console.log("");
+
+  if (!API_KEY.startsWith("sk-tokfai_")) {
+    console.error("FAIL  API key missing or invalid format");
+    if (mockChild) mockChild.kill();
+    process.exit(1);
+  }
 
   let ok = true;
 
   {
     const { res, body } = await acceptanceFetch(`${BASE}/v1/models`, {
-      headers: { Authorization: `Bearer ${API_KEY}` },
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        "Content-Type": "application/json",
+      },
       timeoutMs: TIMEOUT_MS,
     });
-    const ids = Array.isArray(body?.data)
-      ? body.data.map((r) => r.id).filter(Boolean)
-      : [];
-    const row = Array.isArray(body?.data)
-      ? body.data.find((r) => r.id === "gpt-5.4-pro")
-      : null;
-    const label = row?.display_name || row?.name || row?.title || "";
-    const required = ["gpt-5", "gpt-5-pro", "gpt-5.4-pro", "gemini-3-pro"];
-    const missing = required.filter((id) => !ids.includes(id));
-    if (res.status !== 200 || missing.length) {
-      ok =
-        fail(
-          "GET /v1/models alias catalog",
-          `HTTP ${res.status} missing=${missing.join(",") || "none"}`
-        ) && ok;
-    } else if (!/^Tokfai\s+/i.test(label)) {
-      ok =
-        fail(
-          "gpt-5.4-pro Tokfai display_name",
-          `label=${JSON.stringify(label)}`
-        ) && ok;
+    if (!assertAuthOk(res, "GET /v1/models auth")) {
+      ok = false;
     } else {
-      ok = pass("GET /v1/models includes gpt-5 / gpt-5-pro / gpt-5.4-pro / gemini-3-pro") && ok;
-      ok = pass(`gpt-5.4-pro display_name=${label}`) && ok;
+      const ids = Array.isArray(body?.data)
+        ? body.data.map((r) => r.id).filter(Boolean)
+        : [];
+      const row = Array.isArray(body?.data)
+        ? body.data.find((r) => r.id === "gpt-5.4-pro")
+        : null;
+      const label = row?.display_name || row?.name || row?.title || "";
+      const required = ["gpt-5", "gpt-5-pro", "gpt-5.4-pro", "gemini-3-pro"];
+      const missing = required.filter((id) => !ids.includes(id));
+      if (res.status !== 200 || missing.length) {
+        ok =
+          fail(
+            "GET /v1/models alias catalog",
+            `HTTP ${res.status} missing=${missing.join(",") || "none"}`
+          ) && ok;
+      } else if (!/^Tokfai\s+/i.test(label)) {
+        ok =
+          fail(
+            "gpt-5.4-pro Tokfai display_name",
+            `label=${JSON.stringify(label)}`
+          ) && ok;
+      } else {
+        ok =
+          pass(
+            "GET /v1/models includes gpt-5 / gpt-5-pro / gpt-5.4-pro / gemini-3-pro"
+          ) && ok;
+        ok = pass(`gpt-5.4-pro display_name=${label}`) && ok;
+      }
     }
   }
 
@@ -109,25 +144,31 @@ async function run() {
       input: "Return exactly: TOKFAI_ALIAS_READY",
       stream: false,
     });
-    const text = String(body?.output_text ?? "");
-    const requested = body?.tokfai?.requested_model;
-    const resolved = body?.tokfai?.resolved_model;
-    if (
-      res.status !== 200 ||
-      !/TOKFAI_ALIAS_READY/i.test(text) ||
-      requested !== "gpt-5.4-pro" ||
-      resolved !== "gpt-5-pro"
-    ) {
-      ok =
-        fail(
-          "POST /v1/responses model=gpt-5.4-pro",
-          `HTTP ${res.status} requested=${requested} resolved=${resolved} text=${text.slice(0, 80)}`
-        ) && ok;
+    if (!assertAuthOk(res, "POST /v1/responses auth")) {
+      ok = false;
     } else {
-      ok =
-        pass(
-          "POST /v1/responses model=gpt-5.4-pro → requested=gpt-5.4-pro resolved=gpt-5-pro"
-        ) && ok;
+      const text = String(body?.output_text ?? "");
+      const requested = body?.tokfai?.requested_model;
+      const resolved = body?.tokfai?.resolved_model;
+      if (
+        res.status !== 200 ||
+        !/TOKFAI_ALIAS_READY/i.test(text) ||
+        requested == null ||
+        resolved == null ||
+        requested !== "gpt-5.4-pro" ||
+        resolved !== "gpt-5-pro"
+      ) {
+        ok =
+          fail(
+            "POST /v1/responses model=gpt-5.4-pro",
+            `HTTP ${res.status} requested=${requested} resolved=${resolved} text=${text.slice(0, 80)}`
+          ) && ok;
+      } else {
+        ok =
+          pass(
+            "POST /v1/responses model=gpt-5.4-pro → requested=gpt-5.4-pro resolved=gpt-5-pro"
+          ) && ok;
+      }
     }
   }
 
@@ -139,25 +180,31 @@ async function run() {
       ],
       stream: false,
     });
-    const content = String(body?.choices?.[0]?.message?.content ?? "");
-    const requested = body?.tokfai?.requested_model;
-    const resolved = body?.tokfai?.resolved_model;
-    if (
-      res.status !== 200 ||
-      !/TOKFAI_CHAT_ALIAS_READY/i.test(content) ||
-      requested !== "gpt-5.4-pro" ||
-      resolved !== "gpt-5-pro"
-    ) {
-      ok =
-        fail(
-          "POST /v1/chat/completions model=gpt-5.4-pro",
-          `HTTP ${res.status} requested=${requested} resolved=${resolved} content=${content.slice(0, 80)}`
-        ) && ok;
+    if (!assertAuthOk(res, "POST /v1/chat/completions auth")) {
+      ok = false;
     } else {
-      ok =
-        pass(
-          "POST /v1/chat/completions model=gpt-5.4-pro → requested=gpt-5.4-pro resolved=gpt-5-pro"
-        ) && ok;
+      const content = String(body?.choices?.[0]?.message?.content ?? "");
+      const requested = body?.tokfai?.requested_model;
+      const resolved = body?.tokfai?.resolved_model;
+      if (
+        res.status !== 200 ||
+        !/TOKFAI_CHAT_ALIAS_READY/i.test(content) ||
+        requested == null ||
+        resolved == null ||
+        requested !== "gpt-5.4-pro" ||
+        resolved !== "gpt-5-pro"
+      ) {
+        ok =
+          fail(
+            "POST /v1/chat/completions model=gpt-5.4-pro",
+            `HTTP ${res.status} requested=${requested} resolved=${resolved} content=${content.slice(0, 80)}`
+          ) && ok;
+      } else {
+        ok =
+          pass(
+            "POST /v1/chat/completions model=gpt-5.4-pro → requested=gpt-5.4-pro resolved=gpt-5-pro"
+          ) && ok;
+      }
     }
   }
 
@@ -175,7 +222,9 @@ async function run() {
       }),
       timeoutMs: TIMEOUT_MS,
     });
-    if (res.status !== 200 || !String(text).includes("data:")) {
+    if (!assertAuthOk(res, "POST /v1/chat/completions stream auth")) {
+      ok = false;
+    } else if (res.status !== 200 || !String(text).includes("data:")) {
       ok =
         fail(
           "POST /v1/chat/completions stream model=gpt-5.4-pro",
@@ -199,12 +248,22 @@ async function run() {
       messages: [{ role: "user", content: "Say ok only." }],
       stream: false,
     });
+    if (!assertAuthOk(res, `alias normalize ${JSON.stringify(model)} auth`)) {
+      ok = false;
+      continue;
+    }
     const resolved = body?.tokfai?.resolved_model;
-    if (res.status !== 200 || resolved !== expectResolved) {
+    const requested = body?.tokfai?.requested_model;
+    if (
+      res.status !== 200 ||
+      resolved == null ||
+      requested == null ||
+      resolved !== expectResolved
+    ) {
       ok =
         fail(
           `alias normalize ${JSON.stringify(model)}`,
-          `HTTP ${res.status} resolved=${resolved} expected=${expectResolved}`
+          `HTTP ${res.status} requested=${requested} resolved=${resolved} expected=${expectResolved}`
         ) && ok;
     } else {
       ok =

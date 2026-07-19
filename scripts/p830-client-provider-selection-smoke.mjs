@@ -14,8 +14,8 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  DEFAULT_MOCK_KEY,
   isLiveMode,
+  resolveAcceptanceApiKey,
   resolveApiBaseUrl,
   printOfflineDefaultHint,
 } from "./lib/acceptance-config.mjs";
@@ -97,19 +97,24 @@ async function main() {
     }
   }
 
+  let BASE;
+  let API_KEY;
   if (!LIVE) {
     printOfflineDefaultHint(SCRIPT);
     const mock = await ensureMockGateway();
-    mockChild = mock.child;
+    mockChild = mock.child ?? null;
+    BASE = mock.baseUrl.replace(/\/v1$/, "");
+    API_KEY = resolveAcceptanceApiKey(false, mock.apiKey);
+  } else {
+    BASE = resolveApiBaseUrl(true).replace(/\/v1$/, "");
+    API_KEY = resolveAcceptanceApiKey(true);
   }
 
-  const BASE = resolveApiBaseUrl(LIVE).replace(/\/v1$/, "");
-  const API_KEY = LIVE
-    ? process.env.TOKFAI_API_KEY ?? ""
-    : process.env.TOKFAI_API_KEY ?? process.env.MOCK_API_KEY ?? DEFAULT_MOCK_KEY;
-
   const { res, body } = await acceptanceFetch(`${BASE}/v1/models`, {
-    headers: { Authorization: `Bearer ${API_KEY}` },
+    headers: {
+      Authorization: `Bearer ${API_KEY}`,
+      "Content-Type": "application/json",
+    },
     timeoutMs: 30_000,
   });
 

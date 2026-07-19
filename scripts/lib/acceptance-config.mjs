@@ -24,10 +24,35 @@ export function getMockBaseUrl() {
   return `http://${host}:${port}/v1`;
 }
 
+/**
+ * Resolve API base for acceptance scripts.
+ * Offline mode ALWAYS uses the mock URL (MOCK_HOST/MOCK_PORT) and ignores
+ * TOKFAI_API_BASE so a production server env cannot hijack offline smokes
+ * onto real DMIT (which then 401s on the mock key).
+ */
 export function resolveApiBaseUrl(live) {
-  const explicit = process.env.TOKFAI_API_BASE;
-  if (explicit) return explicit.replace(/\/+$/, "");
-  return live ? PRODUCTION_API_BASE : getMockBaseUrl();
+  if (live) {
+    const explicit = process.env.TOKFAI_API_BASE;
+    if (explicit) return explicit.replace(/\/+$/, "");
+    return PRODUCTION_API_BASE;
+  }
+  return getMockBaseUrl();
+}
+
+/**
+ * Resolve the API key for acceptance scripts.
+ * Offline: prefer the key returned by ensureMockGateway / MOCK_API_KEY /
+ * DEFAULT_MOCK_KEY. Never use TOKFAI_API_KEY offline (production key ≠ mock).
+ */
+export function resolveAcceptanceApiKey(live, mockApiKey) {
+  if (live) {
+    return (process.env.TOKFAI_API_KEY ?? "").trim();
+  }
+  return (
+    mockApiKey ||
+    process.env.MOCK_API_KEY ||
+    DEFAULT_MOCK_KEY
+  ).trim();
 }
 
 export function printOfflineDefaultHint(scriptPath) {

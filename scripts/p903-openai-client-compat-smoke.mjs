@@ -16,8 +16,8 @@
  */
 
 import {
-  DEFAULT_MOCK_KEY,
   isLiveMode,
+  resolveAcceptanceApiKey,
   resolveApiBaseUrl,
   printOfflineDefaultHint,
 } from "./lib/acceptance-config.mjs";
@@ -31,16 +31,18 @@ const SCRIPT = "scripts/p903-openai-client-compat-smoke.mjs";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LIVE = isLiveMode();
 let mockChild = null;
+let BASE;
+let API_KEY;
 
 if (!LIVE) {
   const mock = await ensureMockGateway();
-  mockChild = mock.child;
+  mockChild = mock.child ?? null;
+  BASE = mock.baseUrl.replace(/\/v1$/, "");
+  API_KEY = resolveAcceptanceApiKey(false, mock.apiKey);
+} else {
+  BASE = resolveApiBaseUrl(true).replace(/\/v1$/, "");
+  API_KEY = resolveAcceptanceApiKey(true);
 }
-
-const BASE = resolveApiBaseUrl(LIVE).replace(/\/v1$/, "");
-const API_KEY = LIVE
-  ? process.env.TOKFAI_API_KEY ?? ""
-  : process.env.TOKFAI_API_KEY ?? process.env.MOCK_API_KEY ?? DEFAULT_MOCK_KEY;
 
 const TIMEOUT_MS = Math.max(
   1000,
