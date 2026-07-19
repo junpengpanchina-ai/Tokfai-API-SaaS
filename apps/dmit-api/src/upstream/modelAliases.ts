@@ -55,6 +55,11 @@ export const CLIENT_MODEL_REWRITES: Record<string, string> = {
   "gpt-5.4": "gpt-5",
   "gpt-5-4": "gpt-5",
   "gpt5.4": "gpt-5",
+  // Compact ids (normalizeClientModelId also rewrites gpt5 → gpt-5)
+  gpt5: "gpt-5",
+  "gpt5-pro": "gpt-5-pro",
+  "gpt5.5": "gpt-5.5",
+  "gpt5-5": "gpt-5.5",
   // GPT-5.5 "Pro" display names still mean gpt-5.5
   "gpt-5.5-pro": "gpt-5.5",
   "gpt-5-5-pro": "gpt-5.5",
@@ -67,6 +72,7 @@ export const CLIENT_MODEL_REWRITES: Record<string, string> = {
  * Request still resolves via CLIENT_MODEL_REWRITES → alias_of.
  */
 export const CATALOG_COMPAT_ALIAS_ENTRIES = [
+  { id: "gpt-5.4", alias_of: "gpt-5" },
   { id: "gpt-5.4-pro", alias_of: "gpt-5-pro" },
 ] as const;
 
@@ -249,10 +255,16 @@ export function formatSupportedChatModelsMessage(
   return ids.join(", ");
 }
 
-/** Friendly 400 copy when a model is unknown on Tokfai. */
-export function formatModelNotRegisteredMessage(requestedRaw: string): string {
+/**
+ * Friendly 400 copy when a model is unknown on Tokfai.
+ * Must NOT echo vendor "not registered" wording, upstream hosts, or raw errors.
+ */
+export function formatModelNotRegisteredMessage(_requestedRaw?: string): string {
   return (
-    `model not registered on Tokfai: ${requestedRaw}. ` +
-    "Please choose a Tokfai model such as gpt-5, gpt-5-pro, gpt-5.4-pro, gpt-5.5, gemini-3-pro, or gemini-2.5-flash."
+    "This model is not available on Tokfai. " +
+    "Please refresh model list or choose another Tokfai model."
   );
 }
+
+/** Stable public error code for unknown / unavailable models. */
+export const MODEL_NOT_AVAILABLE_CODE = "model_not_available" as const;

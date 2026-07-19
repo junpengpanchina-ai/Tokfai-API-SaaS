@@ -21,6 +21,9 @@ export const ResponsesRequestSchema = z
     top_p: z.number().optional(),
     max_tokens: z.number().int().positive().optional(),
     max_output_tokens: z.number().int().positive().optional(),
+    max_completion_tokens: z.number().int().positive().optional(),
+    /** Accepted for OpenAI SDK compat; ignored (upstream always non-stream). */
+    stream_options: z.unknown().optional(),
     instructions: z.string().optional(),
   })
   .passthrough();
@@ -123,8 +126,10 @@ export function responsesBodyToChatBody(
     input,
     max_output_tokens,
     max_tokens,
+    max_completion_tokens,
     instructions,
     stream: _stream,
+    stream_options: _streamOptions,
     ...rest
   } = body;
 
@@ -133,7 +138,8 @@ export function responsesBodyToChatBody(
     messages.unshift({ role: "system", content: instructions.trim() });
   }
 
-  const resolvedMaxTokens = max_tokens ?? max_output_tokens;
+  const resolvedMaxTokens =
+    max_tokens ?? max_output_tokens ?? max_completion_tokens;
 
   return {
     ...rest,

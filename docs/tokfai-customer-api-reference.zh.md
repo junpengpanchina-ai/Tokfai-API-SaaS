@@ -382,7 +382,7 @@ Base URL 必须是 `https://api.tokfai.com`；鉴权仍用 Tokfai `sk-tokfai_…
 | `unsupported_n` | `n` 不支持（目前仅 `1`） |
 | `unsupported_response_format` | `response_format` 不支持（目前仅 `url`） |
 | `unauthorized` / `invalid_token` / `missing_token` / `key_revoked` | 鉴权失败 |
-| `model_not_supported` | 模型不可用或不存在 |
+| `model_not_available` | 模型不可用或不存在 |
 | `too_many_requests` / `too_many_concurrent_requests` / `gateway_overloaded` | 限流 / 过载 |
 | `upstream_timeout` | 上游超时 |
 
@@ -441,7 +441,7 @@ Base URL 必须是 `https://api.tokfai.com`；鉴权仍用 Tokfai `sk-tokfai_…
 - 确认 Key 未被撤销（`key_revoked`）
 - 批量接口 `/v1/batches/chat` 不接受控制台 JWT
 
-### model_not_supported / 模型不可用
+### model_not_available / 模型不可用
 
 - 模型 ID 拼写是否正确
 - 是否来自 `GET /v1/models`

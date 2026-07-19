@@ -89,6 +89,27 @@ const Schema = z
   TOKFAI_RATE_LIMIT_RPM: z.coerce.number().int().positive().default(60),
   TOKFAI_RATE_LIMIT_IP_RPM: z.coerce.number().int().positive().default(120),
   TOKFAI_RATE_LIMIT_TENANT_RPM: z.coerce.number().int().positive().default(600),
+  /** Soft TPM (tokens/min) per API key / caller — estimated before upstream. */
+  TOKFAI_RATE_LIMIT_TPM: z.coerce.number().int().positive().default(200_000),
+  /** Per-user daily credit spend cap (charged usage_logs sum). */
+  TOKFAI_DAILY_CREDIT_LIMIT: z.coerce.number().positive().default(10_000),
+  /** Per-user monthly credit spend cap (charged usage_logs sum). */
+  TOKFAI_MONTHLY_CREDIT_LIMIT: z.coerce.number().positive().default(100_000),
+  /** Hard ceiling for max_tokens / max_completion_tokens / max_output_tokens. */
+  TOKFAI_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().default(16_384),
+  /**
+   * Unlimited billing is OFF unless explicitly enabled AND user id is listed.
+   * Ordinary users must never receive unlimited / bypass billing.
+   */
+  TOKFAI_UNLIMITED_BILLING_ENABLED: z
+    .string()
+    .optional()
+    .default("false")
+    .transform((raw) => raw === "true" || raw === "1"),
+  TOKFAI_UNLIMITED_BILLING_USER_IDS: z
+    .string()
+    .default("")
+    .transform(csv),
   TOKFAI_RATE_LIMIT_WINDOW_MS: z.coerce
     .number()
     .int()

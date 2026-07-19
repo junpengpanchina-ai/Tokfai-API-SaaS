@@ -17,6 +17,7 @@ type RedisClient = {
     options?: { NX?: boolean; EX?: number; PX?: number }
   ): Promise<string | null>;
   incr(key: string): Promise<number>;
+  incrBy(key: string, increment: number): Promise<number>;
   decr(key: string): Promise<number>;
   del(key: string | string[]): Promise<number>;
   exists(key: string | string[]): Promise<number>;

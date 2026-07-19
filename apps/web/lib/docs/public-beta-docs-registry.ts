@@ -1118,7 +1118,7 @@ Chatbox / Codex 与其它 OpenAI-compatible 客户端使用相同规则。
 
 - 错误详情请求路径是 \`https://api.tokfai.com\` → 已走 Tokfai；检查模型名（可用 \`gpt-5.4-pro\` 等兼容名）  
 - 错误详情请求路径是 grsaiapi.com / 其它非 Tokfai 主机 → **没有走 Tokfai**，请把供应商改回 \`| tokfai\`  
-- Tokfai 返回 \`model not registered on Tokfai: …\` → 换 \`gpt-5\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\`  
+- Tokfai 返回 \`model_not_available\` / "This model is not available on Tokfai…" → 换 \`gpt-5\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\`  
 - 401 / \`invalid_token\` → 从控制台重新复制 \`sk-tokfai_…\`  
 - 402 / \`insufficient_credits\` → Dashboard → Credits 充值  
 
@@ -1173,7 +1173,7 @@ If the request host is not \`https://api.tokfai.com\`, you selected the wrong pr
 
 - Error path is \`https://api.tokfai.com\` → you hit Tokfai; check the model id (compat names like \`gpt-5.4-pro\` are OK)  
 - Error path is grsaiapi.com / another non-Tokfai host → **not Tokfai**; switch provider to \`| tokfai\`  
-- Tokfai returns \`model not registered on Tokfai: …\` → use \`gpt-5\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\`  
+- Tokfai returns \`model_not_available\` / "This model is not available on Tokfai…" → use \`gpt-5\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\`  
 - 401 / \`invalid_token\` → re-copy \`sk-tokfai_…\` from the console  
 - 402 / \`insufficient_credits\` → top up in Dashboard → Credits  
 

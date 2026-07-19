@@ -67,7 +67,7 @@ batchRoutes.post("/v1/batches/chat", async (c) => {
       {
         error: {
           message: formatModelNotRegisteredMessage(model),
-          code: "model_not_supported",
+          code: "model_not_available",
           type: "invalid_request_error",
         },
         suggestedModels,

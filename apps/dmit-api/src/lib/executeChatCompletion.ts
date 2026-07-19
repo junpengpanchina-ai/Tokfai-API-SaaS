@@ -17,6 +17,7 @@ import { isModelEnabledForTenant } from "../tenants/resolve.js";
 import { providerFetch, isChatFallbackEligible } from "../upstream/grsai.js";
 import {
   formatModelNotRegisteredMessage,
+  MODEL_NOT_AVAILABLE_CODE,
   resolveChatModel,
 } from "../upstream/modelAliases.js";
 import { resolveProviderAttempts } from "../upstream/providers.js";
@@ -30,11 +31,34 @@ import {
   releaseGlobalUpstream,
   tryAcquireGlobalUpstream,
 } from "../gateway/concurrency.js";
+import {
+  assertCreditPeriodLimits,
+  assertTokenBudget,
+  isUnlimitedBillingUser,
+  logUnlimitedBillingGranted,
+  resolveMaxOutputTokens,
+} from "../gateway/keySafetyLimits.js";
 import { logGatewayOverloaded } from "../routes/chatGatewayLogs.js";
 import {
   lookupBillingIdempotency,
   recordSuccessfulUsageAndDebit as persistSuccessfulUsageAndDebit,
 } from "./usageBilling.js";
+
+/**
+ * Client fields that must NEVER influence billing or tenant resolution.
+ * Server derives tenant/user/plan/balance from the verified API key / JWT only.
+ */
+const FORBIDDEN_CLIENT_BILLING_KEYS = [
+  "tenant_id",
+  "price",
+  "credits",
+  "cost",
+  "credits_charged",
+  "resolved_model",
+  "bypass_billing",
+  "unlimited",
+  "free",
+] as const;
 
 export const ChatMessageSchema = z
   .object({
@@ -50,6 +74,9 @@ export const ChatCompletionRequestSchema = z
     temperature: z.number().optional(),
     top_p: z.number().optional(),
     max_tokens: z.number().int().positive().optional(),
+    max_completion_tokens: z.number().int().positive().optional(),
+    /** OpenAI SDK compat — accepted, ignored (upstream always non-stream). */
+    stream_options: z.unknown().optional(),
     stream: z.boolean().optional(),
   })
   .passthrough();
@@ -124,7 +151,10 @@ export async function executeChatCompletion(
   const route = input.route ?? "/v1/chat/completions";
   const limitKey = input.limitKey ?? caller.apiKeyId ?? `user:${caller.userId}`;
 
-  const requestedRaw = (input.body.model || env.BOT_MODEL).trim();
+  // Never trust client billing / tenant overrides — strip before any use.
+  const body = stripClientBillingOverrides(input.body);
+
+  const requestedRaw = (body.model || env.BOT_MODEL).trim();
   const resolvedRequest = resolveChatModel(requestedRaw);
   /** Internal catalog / alias id after consumer compatibility rewrite. */
   const requestedModel = resolvedRequest.canonicalId;
@@ -146,11 +176,11 @@ export async function executeChatCompletion(
 
   if (!(await isModelAllowedForChat(requestedRaw))) {
     const suggestedModels = await listAvailableChatModelIds();
-    const errorCode = "model_not_supported";
+    const errorCode = MODEL_NOT_AVAILABLE_CODE;
     const errorMessage = formatModelNotRegisteredMessage(requestedRaw);
 
-    log.warn("model_not_supported", {
-      code: "model_not_supported",
+    log.warn("model_not_available", {
+      code: MODEL_NOT_AVAILABLE_CODE,
       route,
       requestId,
       requestedModel: requestedRaw,
@@ -273,7 +303,27 @@ export async function executeChatCompletion(
   }
 
   try {
-    await assertHasCredits(caller.userId);
+    const unlimited = isUnlimitedBillingUser(caller.userId);
+    if (unlimited) {
+      logUnlimitedBillingGranted(
+        caller.userId,
+        "TOKFAI_UNLIMITED_BILLING allowlist (admin/internal test only)",
+        requestId
+      );
+    } else {
+      await assertHasCredits(caller.userId);
+      await assertCreditPeriodLimits(caller.userId);
+    }
+
+    const rawMaxOut =
+      body.max_tokens ??
+      (typeof body.max_completion_tokens === "number"
+        ? body.max_completion_tokens
+        : undefined);
+    const maxOut = resolveMaxOutputTokens(rawMaxOut);
+    // Conservative TPM reservation: prompt estimate + capped completion.
+    const estimatedTokens = 1_024 + maxOut;
+    await assertTokenBudget(limitKey, estimatedTokens);
 
     let lastError: ApiError | null = null;
 
@@ -343,7 +393,7 @@ export async function executeChatCompletion(
         }
 
         try {
-          const upstreamBody = buildUpstreamChatBody(input.body, attemptModel);
+          const upstreamBody = buildUpstreamChatBody(body, attemptModel);
 
           const perAttemptTimeoutMs = Math.min(
             env.TOKFAI_UPSTREAM_TIMEOUT_MS,
@@ -371,14 +421,16 @@ export async function executeChatCompletion(
 
           const usage = normalizeUsage(data.usage);
           // Consumer-facing resolved id = Tokfai catalog/alias (e.g. gpt-5-pro).
-          // Bill by the concrete attempt that served the request (existing pricing path).
+          // Bill by the concrete attempt that served the request (never alias floor price).
           const resolvedModel = requestedModel;
           const billableModel = attemptModel;
-          const creditsCharged = await calculateCreditsCharged(
-            billableModel,
-            usage,
-            caller.tenantId
-          );
+          const creditsCharged = unlimited
+            ? 0
+            : await calculateCreditsCharged(
+                billableModel,
+                usage,
+                caller.tenantId
+              );
 
           const response: Record<string, unknown> = {
             ...data,
@@ -815,6 +867,17 @@ function insufficientCreditsError(): ApiError {
     code: "insufficient_credits",
     type: "billing_error",
   });
+}
+
+/** Drop client-supplied billing/tenant fields; never read them for auth or pricing. */
+function stripClientBillingOverrides(
+  body: ChatCompletionRequestBody
+): ChatCompletionRequestBody {
+  const copy = { ...body } as Record<string, unknown>;
+  for (const key of FORBIDDEN_CLIENT_BILLING_KEYS) {
+    delete copy[key];
+  }
+  return copy as ChatCompletionRequestBody;
 }
 
 async function writeUsageLog(

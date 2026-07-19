@@ -38,6 +38,25 @@ function makeRequestId() {
   return `req_mock_${randomBytes(8).toString("hex")}`;
 }
 
+/** Models accepted by the offline mock (catalog + aliases). */
+const MOCK_ALLOWED_MODELS = new Set([
+  "auto-fast",
+  "auto-pro",
+  "auto-cheap",
+  "gpt-5",
+  "gpt-5-chat",
+  "gpt-5-pro",
+  "gpt-5.1",
+  "gpt-5.2",
+  "gpt-5.4",
+  "gpt-5.4-pro",
+  "gpt-5.5",
+  "gemini-2.5-flash",
+  "gemini-2.5-pro",
+  "gemini-3-flash",
+  "gemini-3-pro",
+]);
+
 /** Mirror apps/dmit-api consumer compatibility rewrites (offline mock). */
 function resolveMockCanonicalModel(raw) {
   let value = String(raw ?? "auto-fast").trim().toLowerCase();
@@ -49,15 +68,43 @@ function resolveMockCanonicalModel(raw) {
     "gpt-5-4-pro": "gpt-5-pro",
     "gpt5.4-pro": "gpt-5-pro",
     "gpt-5.4pro": "gpt-5-pro",
+    "gpt5.4pro": "gpt-5-pro",
     "gpt-5.4": "gpt-5",
     "gpt-5-4": "gpt-5",
     "gpt5.4": "gpt-5",
+    gpt5: "gpt-5",
+    "gpt5-pro": "gpt-5-pro",
+    "gpt5.5": "gpt-5.5",
     "gpt-5.5-pro": "gpt-5.5",
     "gpt-5-5-pro": "gpt-5.5",
     "gpt-5.5pro": "gpt-5.5",
     "gpt-5-5": "gpt-5.5",
   };
   return rewrites[value] ?? value;
+}
+
+function isMockModelAllowed(raw) {
+  const canonical = resolveMockCanonicalModel(raw);
+  // Allow after rewrite if either raw normalized id or canonical is listed.
+  let normalized = String(raw ?? "").trim().toLowerCase();
+  normalized = normalized.replace(/^models\//, "").replace(/^openai\//, "");
+  normalized = normalized.replace(/[_\s]+/g, "-").replace(/^gpt(\d)/, "gpt-$1");
+  normalized = normalized.replace(/-+/g, "-").replace(/^-|-$/g, "");
+  return (
+    MOCK_ALLOWED_MODELS.has(canonical) || MOCK_ALLOWED_MODELS.has(normalized)
+  );
+}
+
+function modelNotAvailableBody() {
+  return {
+    error: {
+      message:
+        "This model is not available on Tokfai. Please refresh model list or choose another Tokfai model.",
+      code: "model_not_available",
+      type: "invalid_request_error",
+    },
+    request_id: makeRequestId(),
+  };
 }
 
 function tokfaiMeta(requestedModel = "auto-fast", resolvedModel = "gemini-3-flash") {
@@ -816,6 +863,7 @@ export function startMockGateway(options = {}) {
           "gemini-3-flash": "Tokfai Gemini 3 Flash",
         };
         const aliasOf = {
+          "gpt-5.4": "gpt-5",
           "gpt-5.4-pro": "gpt-5-pro",
         };
         return sendJson(res, 200, {
@@ -843,6 +891,11 @@ export function startMockGateway(options = {}) {
         if (!slot.ok) return sendJson(res, slot.response.status, slot.response.body);
         try {
           const body = await readJsonBody(req);
+          const model =
+            typeof body?.model === "string" ? body.model : "auto-fast";
+          if (!isMockModelAllowed(model)) {
+            return sendJson(res, 400, modelNotAvailableBody());
+          }
           const completion = chatCompletionBody(body);
           if (body?.stream === true) {
             return sendSse(res, chatCompletionToSse(completion));
@@ -860,6 +913,11 @@ export function startMockGateway(options = {}) {
         if (!slot.ok) return sendJson(res, slot.response.status, slot.response.body);
         try {
           const body = await readJsonBody(req);
+          const model =
+            typeof body?.model === "string" ? body.model : "auto-fast";
+          if (!isMockModelAllowed(model)) {
+            return sendJson(res, 400, modelNotAvailableBody());
+          }
           const response = responsesBody(body);
           if (body?.stream === true) {
             return sendSse(res, responsesToSse(response));
