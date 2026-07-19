@@ -190,6 +190,30 @@ console.log("=== P901 billing atomic smoke ===\n");
   }
 }
 
+{
+  const helpers = read("scripts/lib/billing-risk-helpers.mjs");
+  const p900 = read("scripts/p900-billing-risk-audit.mjs");
+  const p905 = read("scripts/p905-billing-risk-drilldown.mjs");
+  if (
+    !helpers.includes("signup_bonus") ||
+    !helpers.includes("classifyPositiveLedgerRow") ||
+    !p900.includes("diagnostics") ||
+    !p905.includes("TOKFAI_RISK_USER_ID") ||
+    !p905.includes("recommended_manual_sql")
+  ) {
+    ok =
+      fail(
+        "p900/p905 diagnostics",
+        "classifier + drilldown + redacted diagnostics required"
+      ) && ok;
+  } else {
+    ok =
+      pass(
+        "p900 classifier recognizes signup_bonus; p905 drilldown is read-only"
+      ) && ok;
+  }
+}
+
 if (!ok) {
   console.error("\nTOKFAI_P901_BILLING_ATOMIC_FAIL");
   process.exit(1);

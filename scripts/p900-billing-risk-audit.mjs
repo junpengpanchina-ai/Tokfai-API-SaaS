@@ -10,11 +10,20 @@
  * Usage:
  *   node scripts/p900-billing-risk-audit.mjs
  *   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/p900-billing-risk-audit.mjs
+ *   TOKFAI_RISK_USER_ID=... node scripts/p905-billing-risk-drilldown.mjs
  */
 
-import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  classifyPositiveLedgerRow,
+  redactEmail,
+  redactId,
+  recommendedActionForLargeBalance,
+  recommendedActionForUnaccountedLedger,
+  toNumber,
+} from "./lib/billing-risk-helpers.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LOOKBACK_HOURS = Math.max(
@@ -26,17 +35,17 @@ const BALANCE_THRESHOLD = Math.max(
   1,
   parseFloat(process.env.BALANCE_ANOMALY_THRESHOLD ?? "1000000") || 1_000_000
 );
+const UNLIMITED_IDS = new Set(
+  (process.env.TOKFAI_UNLIMITED_BILLING_USER_IDS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+);
 
 const findings = [];
 
 function read(rel) {
   return readFileSync(join(ROOT, rel), "utf8");
-}
-
-function redactId(id) {
-  if (!id || typeof id !== "string") return "(null)";
-  if (id.length <= 10) return `${id.slice(0, 2)}…`;
-  return `${id.slice(0, 6)}…${id.slice(-4)}`;
 }
 
 function addFinding({
@@ -45,6 +54,7 @@ function addFinding({
   count,
   samples = [],
   recommended_action,
+  diagnostics = null,
 }) {
   findings.push({
     risk_level,
@@ -52,6 +62,7 @@ function addFinding({
     count,
     sample_redacted_ids: samples.slice(0, 5).map(redactId),
     recommended_action,
+    diagnostics,
   });
 }
 
@@ -93,10 +104,171 @@ function findMigration(substr) {
   return null;
 }
 
+function summarizeUsage(rows) {
+  return (rows ?? []).map((r) => ({
+    id: redactId(r.id),
+    request_id: redactId(r.request_id),
+    model: r.model ?? null,
+    status: r.status ?? null,
+    billing_status: r.billing_status ?? null,
+    credits_charged: toNumber(r.credits_charged),
+    created_at: r.created_at ?? null,
+  }));
+}
+
+function summarizeLedger(rows) {
+  return (rows ?? []).map((r) => ({
+    id: redactId(r.id),
+    type: r.type ?? null,
+    amount: toNumber(r.amount),
+    reason: r.reason ?? null,
+    reference_id: redactId(r.reference_id),
+    created_at: r.created_at ?? null,
+  }));
+}
+
+async function loadAdminUserIds(supabase) {
+  const { data, error } = await supabase
+    .from("admin_users")
+    .select("user_id, status, revoked_at")
+    .eq("status", "active")
+    .is("revoked_at", null)
+    .limit(5000);
+  if (error) {
+    console.log(`INFO  admin_users lookup skipped: ${error.message}`);
+    return new Set();
+  }
+  return new Set((data ?? []).map((r) => r.user_id).filter(Boolean));
+}
+
+async function loadAdminAuditByLedgerIds(supabase, ledgerIds) {
+  const map = new Map();
+  if (!ledgerIds.length) return map;
+  // Batch in chunks of 50
+  for (let i = 0; i < ledgerIds.length; i += 50) {
+    const chunk = ledgerIds.slice(i, i + 50);
+    const { data, error } = await supabase
+      .from("admin_audit_logs")
+      .select(
+        "id, actor_user_id, actor_email, action, credit_ledger_id, request_payload, status, created_at"
+      )
+      .in("credit_ledger_id", chunk)
+      .limit(200);
+    if (error) {
+      console.log(`INFO  admin_audit_logs lookup skipped: ${error.message}`);
+      break;
+    }
+    for (const row of data ?? []) {
+      if (row.credit_ledger_id) map.set(row.credit_ledger_id, row);
+    }
+  }
+  return map;
+}
+
+async function diagnoseLargeBalance(supabase, profile, adminIds) {
+  const userId = profile.id;
+  const [{ count: keyCount }, { data: usage }, { data: ledger }] =
+    await Promise.all([
+      supabase
+        .from("api_keys")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .is("revoked_at", null),
+      supabase
+        .from("usage_logs")
+        .select(
+          "id, request_id, model, status, billing_status, credits_charged, created_at"
+        )
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(5),
+      supabase
+        .from("credit_ledger")
+        .select("id, type, amount, reason, reference_id, tenant_id, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ]);
+
+  const { data: tenantKeys } = await supabase
+    .from("api_keys")
+    .select("tenant_id")
+    .eq("user_id", userId)
+    .not("tenant_id", "is", null)
+    .limit(1);
+
+  const knownPositive = (ledger ?? []).filter((r) => {
+    const cls = classifyPositiveLedgerRow(r, {
+      isAdminUser: adminIds.has(userId),
+      isUnlimitedAllowlisted: UNLIMITED_IDS.has(userId),
+    });
+    return toNumber(r.amount) > 0 && cls.status === "accounted";
+  });
+
+  return {
+    user_id: redactId(userId),
+    tenant_id: redactId(tenantKeys?.[0]?.tenant_id ?? null),
+    email: redactEmail(profile.email),
+    balance: toNumber(profile.credits_balance),
+    created_at: profile.created_at ?? null,
+    updated_at: profile.updated_at ?? null,
+    active_api_key_count: keyCount ?? 0,
+    is_admin_user: adminIds.has(userId),
+    is_unlimited_allowlisted: UNLIMITED_IDS.has(userId),
+    ledger_explained_by_known_sources: knownPositive.length > 0,
+    last_5_usage_logs: summarizeUsage(usage),
+    last_5_credit_ledger: summarizeLedger(ledger),
+    drilldown:
+      `TOKFAI_RISK_USER_ID=${userId} node scripts/p905-billing-risk-drilldown.mjs`,
+  };
+}
+
+async function diagnoseUnaccountedLedger(
+  supabase,
+  row,
+  cls,
+  adminAudit,
+  adminIds
+) {
+  const reasonFromAudit =
+    adminAudit?.request_payload &&
+    typeof adminAudit.request_payload === "object"
+      ? adminAudit.request_payload.reason ?? null
+      : null;
+
+  return {
+    ledger_id: redactId(row.id),
+    user_id: redactId(row.user_id),
+    tenant_id: redactId(row.tenant_id ?? null),
+    amount: toNumber(row.amount),
+    type: row.type ?? null,
+    reason: row.reason ?? null,
+    source: cls.source,
+    classification: cls.classification,
+    status: cls.status,
+    stripe_payment_intent_id_present: Boolean(
+      row.reference_id &&
+        (/^pi_/i.test(row.reference_id) ||
+          /^stripe_checkout:/i.test(row.reference_id))
+    ),
+    payment_reference_present: Boolean(
+      row.reference_id && String(row.reference_id).trim().length > 0
+    ),
+    reference_id_redacted: redactId(row.reference_id),
+    created_at: row.created_at ?? null,
+    created_by_admin_present: Boolean(adminAudit?.actor_user_id),
+    admin_user_id_redacted: redactId(adminAudit?.actor_user_id ?? null),
+    admin_audit_action: adminAudit?.action ?? null,
+    admin_audit_reason: reasonFromAudit,
+    user_is_admin: adminIds.has(row.user_id),
+    drilldown:
+      `TOKFAI_RISK_LEDGER_ID=${row.id} node scripts/p905-billing-risk-drilldown.mjs`,
+  };
+}
+
 function runOfflineStaticChecks() {
   console.log("--- offline static checks ---\n");
 
-  // 1) No ordinary unlimited / bypass in source
   {
     const exec = read("apps/dmit-api/src/lib/executeChatCompletion.ts");
     const limits = read("apps/dmit-api/src/gateway/keySafetyLimits.ts");
@@ -124,7 +296,6 @@ function runOfflineStaticChecks() {
     }
   }
 
-  // 2) Atomic debit + FOR UPDATE
   {
     const mig = findMigration("record_usage_and_debit");
     const debit = findMigration("debit_credits");
@@ -149,7 +320,6 @@ function runOfflineStaticChecks() {
     }
   }
 
-  // 3) Idempotency
   {
     const billing = read("apps/dmit-api/src/lib/usageBilling.ts");
     const mig = findMigration("lookup_usage_idempotency");
@@ -167,7 +337,6 @@ function runOfflineStaticChecks() {
     }
   }
 
-  // 4) No charge on failure / timeout
   {
     const exec = read("apps/dmit-api/src/lib/executeChatCompletion.ts");
     const gateway = read("apps/dmit-api/src/routes/chatGatewayLogs.ts");
@@ -187,7 +356,6 @@ function runOfflineStaticChecks() {
     }
   }
 
-  // 5) Alias bills concrete attempt model
   {
     const exec = read("apps/dmit-api/src/lib/executeChatCompletion.ts");
     if (
@@ -208,7 +376,6 @@ function runOfflineStaticChecks() {
     }
   }
 
-  // 6) Client tenant/price not trusted
   {
     const exec = read("apps/dmit-api/src/lib/executeChatCompletion.ts");
     const auth = read("apps/dmit-api/src/middleware/chatAuth.ts");
@@ -231,7 +398,6 @@ function runOfflineStaticChecks() {
     }
   }
 
-  // 7) Key safety limits present
   {
     const limits = read("apps/dmit-api/src/gateway/keySafetyLimits.ts");
     const env = read("apps/dmit-api/src/env.ts");
@@ -258,13 +424,12 @@ function runOfflineStaticChecks() {
     }
   }
 
-  // 8) Admin routes protected
   {
     const admin = read("apps/dmit-api/src/routes/admin.ts");
     const ok =
       admin.includes("requireAdminV1") &&
       admin.includes('protectedAdminRoutes.post("/credits/adjust"') &&
-      admin.includes("protectedAdminRoutes.use(\"*\", requireAdminV1)");
+      admin.includes('protectedAdminRoutes.use("*", requireAdminV1)');
     if (!ok) {
       addFinding({
         risk_level: "P0",
@@ -279,7 +444,6 @@ function runOfflineStaticChecks() {
     }
   }
 
-  // 9) Revoked key check
   {
     const apiKey = read("apps/dmit-api/src/auth/apiKey.ts");
     if (!apiKey.includes("revoked_at") || !apiKey.includes("key_revoked")) {
@@ -296,7 +460,6 @@ function runOfflineStaticChecks() {
     }
   }
 
-  // 10) Frontend bundle leak (static scan of apps/web sources)
   {
     const leakPatterns = [
       /SUPABASE_SERVICE_ROLE_KEY\s*[:=]/,
@@ -308,7 +471,6 @@ function runOfflineStaticChecks() {
     const hits = [];
     for (const abs of files) {
       const rel = relative(ROOT, abs);
-      // Allow diagnostic mentions in troubleshooting docs only (bare host).
       if (
         rel.includes("troubleshooting") ||
         rel.includes("public-beta-docs-registry") ||
@@ -344,25 +506,73 @@ function runOfflineStaticChecks() {
     }
   }
 
-  // 11) Model error copy
   {
     const aliases = read("apps/dmit-api/src/upstream/modelAliases.ts");
+    const helpers = read("scripts/lib/billing-risk-helpers.mjs");
     const bad =
       /model not register/i.test(aliases) ||
       !aliases.includes("This model is not available on Tokfai") ||
-      !aliases.includes("MODEL_NOT_AVAILABLE_CODE");
+      !aliases.includes("MODEL_NOT_AVAILABLE_CODE") ||
+      !helpers.includes("signup_bonus") ||
+      !helpers.includes("classifyPositiveLedgerRow");
     if (bad) {
       addFinding({
         risk_level: "P1",
-        risk_name: "model_error_exposes_register_copy",
+        risk_name: "model_error_or_ledger_classifier_incomplete",
         count: 1,
-        samples: ["modelAliases.ts"],
+        samples: ["modelAliases.ts", "billing-risk-helpers.mjs"],
         recommended_action:
-          "Return model_not_available with Tokfai-safe message only.",
+          "Keep model_not_available copy + recognize signup_bonus/admin/stripe refs.",
       });
-      console.log("FAIL  model error copy");
+      console.log("FAIL  model error copy / ledger classifier");
     } else {
       console.log("PASS  model_not_available safe error copy");
+      console.log("PASS  ledger classifier recognizes signup_bonus/admin/stripe");
+    }
+
+    // Synthetic classifier self-check (no DB) — signup_bonus must not be P0.
+    const signup = classifyPositiveLedgerRow({
+      type: "grant",
+      amount: 5000,
+      reason: "Signup bonus",
+      reference_id: "signup_bonus:00000000-0000-0000-0000-000000000001",
+    });
+    const adminAdj = classifyPositiveLedgerRow({
+      type: "adjustment",
+      amount: 100,
+      reason: "public_beta_invite",
+      reference_id: "admin_adjustment:00000000-0000-0000-0000-000000000002",
+    });
+    const bare = classifyPositiveLedgerRow({
+      type: "grant",
+      amount: 999999,
+      reason: "",
+      reference_id: null,
+    });
+    if (signup.status !== "accounted" || adminAdj.status !== "accounted") {
+      addFinding({
+        risk_level: "P0",
+        risk_name: "ledger_classifier_false_positive",
+        count: 1,
+        samples: ["classifyPositiveLedgerRow"],
+        recommended_action:
+          "Account signup_bonus / admin_adjustment as legitimate sources.",
+      });
+      console.log("FAIL  classifier false-positive on signup/admin");
+    } else if (bare.status !== "unaccounted") {
+      addFinding({
+        risk_level: "P0",
+        risk_name: "ledger_classifier_false_negative",
+        count: 1,
+        samples: ["classifyPositiveLedgerRow"],
+        recommended_action:
+          "Ordinary unvouchered grants must remain P0 unaccounted.",
+      });
+      console.log("FAIL  classifier must flag bare grants as unaccounted");
+    } else {
+      console.log(
+        "PASS  classifier: signup_bonus/admin_adjustment accounted; bare grant unaccounted"
+      );
     }
   }
 }
@@ -381,6 +591,7 @@ async function runDbChecks() {
   const { createSupabaseAdminClient } = await import("./lib/supabase-admin.mjs");
   const supabase = createSupabaseAdminClient();
   const since = sinceIso();
+  const adminIds = await loadAdminUserIds(supabase);
 
   // Negative balances
   {
@@ -397,7 +608,8 @@ async function runDbChecks() {
         risk_name: "negative_balance_users",
         count: rows.length,
         samples: rows.map((r) => r.id),
-        recommended_action: "Investigate debit race; reconcile via admin adjust.",
+        recommended_action:
+          "Investigate debit race; reconcile via admin adjust (manual). Do not auto-clear.",
       });
       console.log(`FAIL  negative balances: ${rows.length}`);
     } else {
@@ -405,63 +617,135 @@ async function runDbChecks() {
     }
   }
 
-  // Extreme balances
+  // Extreme balances — P1 WARN with rich diagnostics (does not fail suite alone)
   {
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, credits_balance")
+      .select(
+        "id, email, credits_balance, created_at, updated_at, total_credits_purchased, total_credits_used"
+      )
       .gt("credits_balance", BALANCE_THRESHOLD)
       .limit(LIMIT);
     if (error) throw new Error(error.message);
     const rows = data ?? [];
     if (rows.length) {
+      const diagnostics = [];
+      for (const profile of rows.slice(0, 5)) {
+        diagnostics.push(await diagnoseLargeBalance(supabase, profile, adminIds));
+      }
       addFinding({
         risk_level: "P1",
         risk_name: "abnormally_large_balance",
         count: rows.length,
         samples: rows.map((r) => r.id),
-        recommended_action:
-          "Verify Stripe/admin grants; revoke fraudulent top-ups.",
+        recommended_action: recommendedActionForLargeBalance(diagnostics[0]),
+        diagnostics,
       });
       console.log(`WARN  large balances > ${BALANCE_THRESHOLD}: ${rows.length}`);
+      for (const d of diagnostics) {
+        console.log(
+          `      diag user=${d.user_id} balance=${d.balance} keys=${d.active_api_key_count} admin=${d.is_admin_user}`
+        );
+      }
     } else {
       console.log("PASS  no abnormally large balances");
     }
   }
 
-  // Positive ledger without payment/admin reason
+  // Positive ledger — classify; only ordinary unvouchered grants are P0
   {
     const { data, error } = await supabase
       .from("credit_ledger")
-      .select("id, user_id, type, amount, reason, reference_id, created_at")
+      .select(
+        "id, user_id, tenant_id, type, amount, reason, reference_id, created_at"
+      )
       .in("type", ["purchase", "grant", "adjustment", "refund"])
       .gt("amount", 0)
       .gte("created_at", since)
       .order("created_at", { ascending: false })
       .limit(LIMIT);
     if (error) throw new Error(error.message);
-    const suspicious = (data ?? []).filter((row) => {
-      const reason = String(row.reason ?? "").toLowerCase();
-      const ref = String(row.reference_id ?? "").toLowerCase();
-      const hasReason =
-        /admin|stripe|payment|checkout|manual|grant|top.?up|order|webhook|refund/.test(
-          reason
-        ) ||
-        /stripe|pi_|cs_|ch_|order|admin/.test(ref);
-      return !hasReason;
-    });
-    if (suspicious.length) {
+
+    const rows = data ?? [];
+    const auditMap = await loadAdminAuditByLedgerIds(
+      supabase,
+      rows.map((r) => r.id)
+    );
+
+    const unaccounted = [];
+    const internalCandidates = [];
+    let accountedCount = 0;
+
+    for (const row of rows) {
+      const adminAudit = auditMap.get(row.id) ?? null;
+      const cls = classifyPositiveLedgerRow(row, {
+        adminAudit,
+        isAdminUser: adminIds.has(row.user_id),
+        isUnlimitedAllowlisted: UNLIMITED_IDS.has(row.user_id),
+      });
+      if (cls.status === "accounted") {
+        accountedCount += 1;
+        continue;
+      }
+      const diag = await diagnoseUnaccountedLedger(
+        supabase,
+        row,
+        cls,
+        adminAudit,
+        adminIds
+      );
+      if (cls.status === "internal_test_candidate") {
+        internalCandidates.push({ row, cls, diag });
+      } else {
+        unaccounted.push({ row, cls, diag });
+      }
+    }
+
+    console.log(
+      `INFO  positive ledger sample: total=${rows.length} accounted=${accountedCount} internal_review=${internalCandidates.length} unaccounted=${unaccounted.length}`
+    );
+
+    if (internalCandidates.length) {
+      addFinding({
+        risk_level: "P1",
+        risk_name: "positive_ledger_needs_ops_reason",
+        count: internalCandidates.length,
+        samples: internalCandidates.map((x) => x.row.id),
+        recommended_action: recommendedActionForUnaccountedLedger(
+          internalCandidates[0].cls,
+          internalCandidates[0].diag
+        ),
+        diagnostics: internalCandidates.slice(0, 5).map((x) => x.diag),
+      });
+      console.log(
+        `WARN  positive ledger needs ops reason (test/internal): ${internalCandidates.length}`
+      );
+    }
+
+    if (unaccounted.length) {
       addFinding({
         risk_level: "P0",
         risk_name: "credit_grant_without_payment_or_admin_reason",
-        count: suspicious.length,
-        samples: suspicious.map((r) => r.id),
-        recommended_action:
-          "Require admin reason / Stripe id / payment reference on grants.",
+        count: unaccounted.length,
+        samples: unaccounted.map((x) => x.row.id),
+        recommended_action: recommendedActionForUnaccountedLedger(
+          unaccounted[0].cls,
+          unaccounted[0].diag
+        ),
+        diagnostics: unaccounted.slice(0, 5).map((x) => x.diag),
       });
-      console.log(`FAIL  unaccounted positive ledger rows: ${suspicious.length}`);
+      console.log(
+        `FAIL  unaccounted positive ledger rows: ${unaccounted.length}`
+      );
+      for (const x of unaccounted.slice(0, 3)) {
+        console.log(
+          `      diag ledger=${x.diag.ledger_id} user=${x.diag.user_id} amount=${x.diag.amount} source=${x.diag.source} reason=${JSON.stringify(x.diag.reason)}`
+        );
+      }
     } else {
-      console.log("PASS  positive ledger rows have payment/admin reason");
+      console.log(
+        "PASS  positive ledger rows accounted (signup/stripe/admin/audit) or only P1 ops-review"
+      );
     }
   }
 
@@ -495,7 +779,8 @@ async function runDbChecks() {
         risk_name: "succeeded_usage_without_debit",
         count: missing.length,
         samples: missing,
-        recommended_action: "Reconcile; ensure record_usage_and_debit atomic path.",
+        recommended_action:
+          "Reconcile manually; ensure record_usage_and_debit atomic path. Do not auto-delete usage.",
       });
       console.log(`FAIL  charged usage missing debit: ${missing.length}`);
     } else {
@@ -533,7 +818,8 @@ async function runDbChecks() {
         risk_name: "debit_without_usage_request_id",
         count: orphan.length,
         samples: orphan,
-        recommended_action: "Investigate image/legacy debit paths; backfill logs.",
+        recommended_action:
+          "Investigate image/legacy debit paths; backfill logs manually if needed.",
       });
       console.log(`WARN  debit without usage_logs: ${orphan.length}`);
     } else {
@@ -541,7 +827,7 @@ async function runDbChecks() {
     }
   }
 
-  // Duplicate debits per request_id / idempotency
+  // Duplicate idempotency charges
   {
     const { data: logs, error } = await supabase
       .from("usage_logs")
@@ -565,7 +851,8 @@ async function runDbChecks() {
         risk_name: "duplicate_idempotency_charge",
         count: dups.length,
         samples: dups,
-        recommended_action: "Enforce unique (api_key_id, idempotency_key, endpoint).",
+        recommended_action:
+          "Enforce unique (api_key_id, idempotency_key, endpoint). Manual reverse extras.",
       });
       console.log(`FAIL  duplicate idempotency charges: ${dups.length}`);
     } else {
@@ -577,7 +864,9 @@ async function runDbChecks() {
   {
     const { data, error } = await supabase
       .from("usage_logs")
-      .select("id, request_id, status, billing_status, credits_charged, upstream_status")
+      .select(
+        "id, request_id, status, billing_status, credits_charged, upstream_status"
+      )
       .gte("created_at", since)
       .or("status.eq.failed,status.eq.rate_limited")
       .gt("credits_charged", 0)
@@ -590,7 +879,8 @@ async function runDbChecks() {
         risk_name: "failed_request_charged",
         count: rows.length,
         samples: rows.map((r) => r.request_id ?? r.id),
-        recommended_action: "Reverse charges; fix finalize on 4xx/5xx paths.",
+        recommended_action:
+          "Reverse charges via admin adjust; fix finalize on 4xx/5xx paths.",
       });
       console.log(`FAIL  failed requests charged: ${rows.length}`);
     } else {
@@ -613,7 +903,8 @@ async function runDbChecks() {
         risk_name: "api_key_missing_user_binding",
         count: rows.length,
         samples: rows.map((r) => r.id),
-        recommended_action: "Revoke unbound keys; require user_id on create.",
+        recommended_action:
+          "Manually revoke unbound keys; require user_id on create. Do not auto-revoke from audit.",
       });
       console.log(`FAIL  keys missing user_id: ${rows.length}`);
     } else {
@@ -621,7 +912,6 @@ async function runDbChecks() {
     }
   }
 
-  // Active keys missing tenant_id (P2 — host tenancy may be null for main site)
   {
     const { data, error } = await supabase
       .from("api_keys")
@@ -630,10 +920,8 @@ async function runDbChecks() {
       .is("revoked_at", null)
       .limit(LIMIT);
     if (error) throw new Error(error.message);
-    const rows = data ?? [];
-    // Informational — main site keys may legitimately have null tenant_id
     console.log(
-      `INFO  active keys with null tenant_id: ${rows.length} (may be main-site OK)`
+      `INFO  active keys with null tenant_id: ${(data ?? []).length} (may be main-site OK)`
     );
   }
 }
@@ -653,6 +941,7 @@ function printFindings() {
           count: f.count,
           sample_redacted_ids: f.sample_redacted_ids,
           recommended_action: f.recommended_action,
+          diagnostics: f.diagnostics,
         },
         null,
         2

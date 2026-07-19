@@ -44,6 +44,7 @@ const OFFLINE = [
   "scripts/p902-model-alias-compat-smoke.mjs",
   "scripts/p903-openai-client-compat-smoke.mjs",
   "scripts/p904-third-party-client-docs-smoke.mjs",
+  "scripts/p905-billing-risk-drilldown.mjs",
   "scripts/public-model-registry-smoke.mjs",
   "scripts/docs-or-ui-en-no-chinese-smoke.mjs",
   "scripts/responses-nonstream-envelope-smoke.mjs",
