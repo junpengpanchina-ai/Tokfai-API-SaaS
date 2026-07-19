@@ -57,6 +57,23 @@ export async function isMockGatewayReady(baseUrl, apiKey) {
     // Mock responses always include tokfai.resolved_model.
     if (chatBody?.tokfai?.resolved_model !== "gpt-5") return false;
     if (typeof chatBody?.request_id !== "string") return false;
+
+    // Require p914 error-trigger support so stale mocks are not reused.
+    const errRes = await fetch(`${root}/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "__tokfai_mock_insufficient_credits",
+        messages: [{ role: "user", content: "hi" }],
+        stream: false,
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (errRes.status !== 402) return false;
+
     return true;
   } catch {
     return false;

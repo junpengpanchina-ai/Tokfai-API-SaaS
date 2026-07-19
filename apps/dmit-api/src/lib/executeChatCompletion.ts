@@ -864,8 +864,11 @@ function insufficientCreditsError(): ApiError {
   return new ApiError({
     status: 402,
     message: "Insufficient credits.",
+    // Stable API code (dashboard). Client docs also accept alias insufficient_balance.
     code: "insufficient_credits",
     type: "billing_error",
+    publicMessage:
+      "Insufficient balance. Please top up credits in the Tokfai dashboard.",
   });
 }
 

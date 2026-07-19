@@ -1180,9 +1180,168 @@ If the request host is not \`https://api.tokfai.com\`, you selected the wrong pr
 Do not configure third-party upstream hosts as the integration Base URL — only \`https://api.tokfai.com\`.`,
     },
   },
+  {
+    slug: "openai-compatible-clients",
+    title: {
+      zh: "OpenAI Compatible 客户端矩阵",
+      en: "OpenAI-compatible client matrix",
+    },
+    audience: "consumer",
+    category: "quickstart",
+    language: "zh",
+    apiPaths: [
+      "GET /v1/models",
+      "POST /v1/chat/completions",
+      "POST /v1/responses",
+    ],
+    updatedAt: UPDATED_AT,
+    markdown: {
+      zh: `# OpenAI Compatible 客户端矩阵
 
+Tokfai 是 **OpenAI-compatible API 中转聚合网关**，不是只服务某一个客户端。  
+所有客户端统一配置：
 
+| 项 | 值 |
+|---|---|
+| Base URL | \`https://api.tokfai.com\`（或 \`https://api.tokfai.com/v1\`，视客户端是否自动加 \`/v1\`） |
+| API Key | Tokfai 控制台 \`sk-tokfai_…\` |
+| 供应商 / Provider | **Tokfai**（界面常显示 \`| tokfai\`） |
+| 推荐模型 id | \`gpt-5\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\` / \`gemini-3-pro\` / \`gemini-2.5-flash\` |
 
+**禁止**把 OpenAI / Google / 其它上游主机写成 Base URL。
+
+## 1) OpenAI SDK / curl
+
+- \`GET /v1/models\`
+- \`POST /v1/chat/completions\`（\`stream=false|true\`）
+- \`POST /v1/responses\`（\`stream=false|true\`）
+- 常见字段：\`max_tokens\`、\`max_completion_tokens\`、\`stream_options\`、\`temperature\`、\`top_p\`  
+  未支持字段可忽略，不应导致 500。
+
+## 2) 聊天客户端
+
+| 客户端 | 配置要点 | 真机验收 |
+|---|---|---|
+| Cherry Studio | OpenAI Compatible + \`| tokfai\`；见 Cherry 章节 | 建议真机 |
+| Chatbox | 同上 | 建议真机 |
+| NextChat | Custom OpenAI，Base = \`https://api.tokfai.com\` | OpenAI-compatible 理论兼容 |
+| LobeChat | OpenAI 兼容端点 | OpenAI-compatible 理论兼容 |
+| OpenWebUI | OpenAI API 连接 | OpenAI-compatible 理论兼容 |
+| LibreChat | OpenAI endpoint | OpenAI-compatible 理论兼容 |
+
+## 3) 工作流 / 知识库
+
+| 平台 | 配置要点 | 真机验收 |
+|---|---|---|
+| Dify | 模型供应商选 OpenAI-API-compatible；API Base = \`https://api.tokfai.com/v1\` | OpenAI-compatible 理论兼容 |
+| FastGPT | OpenAI 兼容 | OpenAI-compatible 理论兼容 |
+| LangChain | \`ChatOpenAI(base_url=..., api_key=...)\` | OpenAI-compatible 理论兼容 |
+| LlamaIndex | OpenAI-like LLM | OpenAI-compatible 理论兼容 |
+
+## 4) 编程类客户端
+
+| 客户端 | 配置要点 | 真机验收 |
+|---|---|---|
+| Continue | OpenAI-compatible provider | OpenAI-compatible 理论兼容 |
+| Cline | OpenAI Compatible | OpenAI-compatible 理论兼容 |
+| Roo Code | OpenAI Compatible | OpenAI-compatible 理论兼容 |
+| Codex | 优先 \`POST /v1/responses\`（Codex 只是其中一个 case） | 建议真机 |
+
+## 模型 alias（稳定）
+
+- \`GPT 5\` / \`gpt5\` / \`gpt-5\` → \`gpt-5\`
+- \`GPT 5 Pro\` / \`gpt5-pro\` / \`gpt-5-pro\` → \`gpt-5-pro\`
+- \`GPT 5.4 Pro\` / \`gpt-5.4-pro\` / \`gpt-5-4-pro\` → \`gpt-5-pro\`
+- \`GPT 5.5\` / \`gpt5.5\` / \`gpt-5.5\` → \`gpt-5.5\`
+- \`Gemini 3 Pro\` / \`gemini-3-pro\` → \`gemini-3-pro\`
+
+响应 \`tokfai.requested_model\` / \`tokfai.resolved_model\` / \`tokfai.credits_charged\` / \`tokfai.request_id\` 由服务端填写。
+
+## 客户端错误口径（统一）
+
+| 客户端词汇 | API \`error.code\`（兼容） | 含义 |
+|---|---|---|
+| \`model_not_available\` | \`model_not_available\` | 模型不可用 |
+| \`insufficient_balance\` | \`insufficient_credits\` | 余额不足 |
+| \`rate_limited\` | \`too_many_requests\` / \`upstream_rate_limited\` | 限流 |
+| \`upstream_busy\` | \`upstream_model_busy\` | 繁忙 |
+| \`invalid_request\` | \`invalid_request_error\` | 请求不合法 |
+
+错误文案不得出现上游域名、上游原始 \`model not register\` 或内部 stack。`,
+      en: `# OpenAI-compatible client matrix
+
+Tokfai is a **universal OpenAI-compatible API gateway**, not a single-client product.  
+Configure every client the same way:
+
+| Field | Value |
+|---|---|
+| Base URL | \`https://api.tokfai.com\` (or \`https://api.tokfai.com/v1\` if the client does not append \`/v1\`) |
+| API Key | Tokfai console \`sk-tokfai_…\` |
+| Provider | **Tokfai** (often shown as \`| tokfai\`) |
+| Recommended model ids | \`gpt-5\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\` / \`gemini-3-pro\` / \`gemini-2.5-flash\` |
+
+**Never** put OpenAI / Google / other upstream hosts as the Base URL.
+
+## 1) OpenAI SDK / curl
+
+- \`GET /v1/models\`
+- \`POST /v1/chat/completions\` (\`stream=false|true\`)
+- \`POST /v1/responses\` (\`stream=false|true\`)
+- Common fields: \`max_tokens\`, \`max_completion_tokens\`, \`stream_options\`, \`temperature\`, \`top_p\`  
+  Unsupported fields may be ignored — they must not cause HTTP 500.
+
+## 2) Chat clients
+
+| Client | Setup | Device QA |
+|---|---|---|
+| Cherry Studio | OpenAI Compatible + \`| tokfai\` (see Cherry chapter) | Recommended |
+| Chatbox | Same | Recommended |
+| NextChat | Custom OpenAI, Base = \`https://api.tokfai.com\` | Theory-compatible |
+| LobeChat | OpenAI-compatible endpoint | Theory-compatible |
+| OpenWebUI | OpenAI API connection | Theory-compatible |
+| LibreChat | OpenAI endpoint | Theory-compatible |
+
+## 3) Workflow / knowledge
+
+| Platform | Setup | Device QA |
+|---|---|---|
+| Dify | OpenAI-API-compatible; API Base = \`https://api.tokfai.com/v1\` | Theory-compatible |
+| FastGPT | OpenAI-compatible | Theory-compatible |
+| LangChain | \`ChatOpenAI(base_url=..., api_key=...)\` | Theory-compatible |
+| LlamaIndex | OpenAI-like LLM | Theory-compatible |
+
+## 4) Coding clients
+
+| Client | Setup | Device QA |
+|---|---|---|
+| Continue | OpenAI-compatible provider | Theory-compatible |
+| Cline | OpenAI Compatible | Theory-compatible |
+| Roo Code | OpenAI Compatible | Theory-compatible |
+| Codex | Prefer \`POST /v1/responses\` (Codex is one case among many) | Recommended |
+
+## Stable model aliases
+
+- \`GPT 5\` / \`gpt5\` / \`gpt-5\` → \`gpt-5\`
+- \`GPT 5 Pro\` / \`gpt5-pro\` / \`gpt-5-pro\` → \`gpt-5-pro\`
+- \`GPT 5.4 Pro\` / \`gpt-5.4-pro\` / \`gpt-5-4-pro\` → \`gpt-5-pro\`
+- \`GPT 5.5\` / \`gpt5.5\` / \`gpt-5.5\` → \`gpt-5.5\`
+- \`Gemini 3 Pro\` / \`gemini-3-pro\` → \`gemini-3-pro\`
+
+\`tokfai.requested_model\` / \`tokfai.resolved_model\` / \`tokfai.credits_charged\` / \`tokfai.request_id\` are server-authored.
+
+## Unified client error vocabulary
+
+| Client term | API \`error.code\` (compatible) | Meaning |
+|---|---|---|
+| \`model_not_available\` | \`model_not_available\` | Model unavailable |
+| \`insufficient_balance\` | \`insufficient_credits\` | Out of credits |
+| \`rate_limited\` | \`too_many_requests\` / \`upstream_rate_limited\` | Rate limited |
+| \`upstream_busy\` | \`upstream_model_busy\` | Busy |
+| \`invalid_request\` | \`invalid_request_error\` | Bad request |
+
+Error messages must never expose upstream hosts, raw upstream “model not register” text, or internal stacks.`,
+    },
+  },
   {
     slug: "models-and-pricing",
     title: { zh: "模型与价格", en: "Models & pricing" },
@@ -1292,13 +1451,17 @@ Image-only models are not served here — use Tokfai Image Workbench or \`POST /
 
 公开错误只返回友好 \`message\` + 稳定 \`code\` + \`request_id\`。技术细节进内部日志。
 
-| code | 说明 |
-|---|---|
-| \`insufficient_credits\` | 算力积分不足，请充值后再试 |
-| \`reference_image_required\` | 请先上传参考图片，或改用文生图模式 |
-| \`image_generation_timeout\` | 图片生成时间较长，请稍后重试或更换模型 |
-| \`invalid_image_url\` | 图片地址不合法（含 blob / localhost 等） |
-| \`unauthorized\` / \`invalid_token\` | 鉴权失败 |
+| code | 客户端词汇 | 说明 |
+|---|---|---|
+| \`model_not_available\` | \`model_not_available\` | 模型不可用，请刷新模型列表 |
+| \`insufficient_credits\` | \`insufficient_balance\` | 算力积分不足，请充值后再试 |
+| \`too_many_requests\` / \`upstream_rate_limited\` | \`rate_limited\` | 请求过于频繁 |
+| \`upstream_model_busy\` | \`upstream_busy\` | 模型繁忙，请稍后重试 |
+| \`invalid_request_error\` | \`invalid_request\` | 请求参数不合法 |
+| \`reference_image_required\` | — | 请先上传参考图片，或改用文生图模式 |
+| \`image_generation_timeout\` | — | 图片生成时间较长，请稍后重试或更换模型 |
+| \`invalid_image_url\` | — | 图片地址不合法（含 blob / localhost 等） |
+| \`unauthorized\` / \`invalid_token\` | — | 鉴权失败 |
 
 示例：
 
@@ -1316,13 +1479,17 @@ Image-only models are not served here — use Tokfai Image Workbench or \`POST /
 
 Public errors return a friendly \`message\`, stable \`code\`, and \`request_id\`. Technical detail stays in internal logs.
 
-| code | Meaning |
-|---|---|
-| \`insufficient_credits\` | Top up compute credits and retry |
-| \`reference_image_required\` | Upload a reference image, or use text-to-image |
-| \`image_generation_timeout\` | Generation took too long — retry or switch model |
-| \`invalid_image_url\` | Invalid image URL (including blob / localhost) |
-| \`unauthorized\` / \`invalid_token\` | Auth failure |
+| code | Client term | Meaning |
+|---|---|---|
+| \`model_not_available\` | \`model_not_available\` | Model unavailable — refresh model list |
+| \`insufficient_credits\` | \`insufficient_balance\` | Top up compute credits and retry |
+| \`too_many_requests\` / \`upstream_rate_limited\` | \`rate_limited\` | Too many requests |
+| \`upstream_model_busy\` | \`upstream_busy\` | Model busy — retry or switch |
+| \`invalid_request_error\` | \`invalid_request\` | Invalid request |
+| \`reference_image_required\` | — | Upload a reference image, or use text-to-image |
+| \`image_generation_timeout\` | — | Generation took too long — retry or switch model |
+| \`invalid_image_url\` | — | Invalid image URL (including blob / localhost) |
+| \`unauthorized\` / \`invalid_token\` | — | Auth failure |
 
 Example:
 

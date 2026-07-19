@@ -59,8 +59,15 @@ const MOCK_ALLOWED_MODELS = new Set([
 
 /** Mirror apps/dmit-api consumer compatibility rewrites (offline mock). */
 function resolveMockCanonicalModel(raw) {
-  let value = String(raw ?? "auto-fast").trim().toLowerCase();
+  let value = String(raw ?? "auto-fast").trim();
+  try {
+    value = decodeURIComponent(value);
+  } catch {
+    // keep
+  }
+  value = value.toLowerCase();
   value = value.replace(/^models\//, "").replace(/^openai\//, "");
+  value = value.replace(/^google\//, "").replace(/^grsai\//, "");
   value = value.replace(/[_\s]+/g, "-").replace(/^gpt(\d)/, "gpt-$1");
   value = value.replace(/-+/g, "-").replace(/^-|-$/g, "");
   const rewrites = {
@@ -79,6 +86,8 @@ function resolveMockCanonicalModel(raw) {
     "gpt-5-5-pro": "gpt-5.5",
     "gpt-5.5pro": "gpt-5.5",
     "gpt-5-5": "gpt-5.5",
+    "gemini-3-pro-preview": "gemini-3-pro",
+    "gemini-2.5-flash-preview": "gemini-2.5-flash",
   };
   return rewrites[value] ?? value;
 }
@@ -104,6 +113,55 @@ function modelNotAvailableBody() {
       type: "invalid_request_error",
     },
     request_id: makeRequestId(),
+  };
+}
+
+/**
+ * Offline-only error triggers for client error-copy smoke (p914).
+ * Never hit production; model ids are reserved for mock gateways.
+ */
+function mockErrorForModel(rawModel) {
+  const id = String(rawModel ?? "").trim();
+  const table = {
+    "__tokfai_mock_insufficient_credits": {
+      status: 402,
+      code: "insufficient_credits",
+      type: "billing_error",
+      message:
+        "Insufficient balance. Please top up credits in the Tokfai dashboard.",
+    },
+    "__tokfai_mock_rate_limited": {
+      status: 429,
+      code: "too_many_requests",
+      type: "rate_limit_error",
+      message: "Rate limited. Please reduce request rate and retry.",
+    },
+    "__tokfai_mock_upstream_busy": {
+      status: 503,
+      code: "upstream_model_busy",
+      type: "upstream_error",
+      message:
+        "Model is busy on Tokfai. Please retry shortly or choose another Tokfai model.",
+    },
+    "__tokfai_mock_invalid_request": {
+      status: 400,
+      code: "invalid_request_error",
+      type: "invalid_request_error",
+      message: "Invalid request.",
+    },
+  };
+  const hit = table[id];
+  if (!hit) return null;
+  return {
+    status: hit.status,
+    body: {
+      error: {
+        message: hit.message,
+        code: hit.code,
+        type: hit.type,
+      },
+      request_id: makeRequestId(),
+    },
   };
 }
 
@@ -891,8 +949,20 @@ export function startMockGateway(options = {}) {
         if (!slot.ok) return sendJson(res, slot.response.status, slot.response.body);
         try {
           const body = await readJsonBody(req);
+          if (!Array.isArray(body?.messages) || body.messages.length === 0) {
+            return sendJson(res, 400, {
+              error: {
+                message: "Invalid request.",
+                code: "invalid_request_error",
+                type: "invalid_request_error",
+              },
+              request_id: makeRequestId(),
+            });
+          }
           const model =
             typeof body?.model === "string" ? body.model : "auto-fast";
+          const forced = mockErrorForModel(model);
+          if (forced) return sendJson(res, forced.status, forced.body);
           if (!isMockModelAllowed(model)) {
             return sendJson(res, 400, modelNotAvailableBody());
           }
@@ -913,8 +983,20 @@ export function startMockGateway(options = {}) {
         if (!slot.ok) return sendJson(res, slot.response.status, slot.response.body);
         try {
           const body = await readJsonBody(req);
+          if (body?.input === undefined || body?.input === null) {
+            return sendJson(res, 400, {
+              error: {
+                message: "Invalid request.",
+                code: "invalid_request_error",
+                type: "invalid_request_error",
+              },
+              request_id: makeRequestId(),
+            });
+          }
           const model =
             typeof body?.model === "string" ? body.model : "auto-fast";
+          const forced = mockErrorForModel(model);
+          if (forced) return sendJson(res, forced.status, forced.body);
           if (!isMockModelAllowed(model)) {
             return sendJson(res, 400, modelNotAvailableBody());
           }

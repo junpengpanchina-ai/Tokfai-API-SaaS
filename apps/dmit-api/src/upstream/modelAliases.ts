@@ -65,6 +65,9 @@ export const CLIENT_MODEL_REWRITES: Record<string, string> = {
   "gpt-5-5-pro": "gpt-5.5",
   "gpt-5.5pro": "gpt-5.5",
   "gpt-5-5": "gpt-5.5",
+  // Gemini display / vendor-prefix variants (after normalizeClientModelId)
+  "gemini-3-pro-preview": "gemini-3-pro",
+  "gemini-2.5-flash-preview": "gemini-2.5-flash",
 };
 
 /**

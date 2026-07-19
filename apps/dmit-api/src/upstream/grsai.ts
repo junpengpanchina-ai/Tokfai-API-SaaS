@@ -158,7 +158,9 @@ export function mapUpstreamError(
       status: 503,
       code: "upstream_model_busy",
       type: "upstream_error",
-      publicMessage: "当前模型负载较高，请稍后重试或切换推荐模型。",
+      // Client vocabulary alias: upstream_busy (see docs / p914).
+      publicMessage:
+        "Model is busy on Tokfai. Please retry shortly or choose another Tokfai model.",
     };
   }
 
@@ -167,22 +169,13 @@ export function mapUpstreamError(
     combined.includes("model not found") ||
     combined.includes("not registered")
   ) {
-    const modelHint = extractUnregisteredModelHint(combined);
-    if (modelHint?.startsWith("gemini-")) {
-      return {
-        status: 400,
-        code: "model_not_supported",
-        type: "validation_error",
-        publicMessage: `Unsupported model: ${modelHint}. Supported models: gemini-2.5-flash, gemini-2.5-pro, gemini-3-flash, gemini-3-pro`,
-      };
-    }
+    // Never leak upstream vendor "model not register" wording to clients.
     return {
       status: 400,
-      code: "model_not_supported",
+      code: "model_not_available",
       type: "validation_error",
-      publicMessage: modelHint
-        ? `Unsupported model: ${modelHint}. Model is not registered upstream.`
-        : "Unsupported model. Model is not registered upstream.",
+      publicMessage:
+        "This model is not available on Tokfai. Please refresh model list or choose another Tokfai model.",
     };
   }
 
@@ -191,7 +184,8 @@ export function mapUpstreamError(
       status: 429,
       code: "upstream_rate_limited",
       type: "rate_limit_error",
-      publicMessage: "Upstream provider is rate limited.",
+      // Client vocabulary alias: rate_limited (see docs / p914).
+      publicMessage: "Rate limited. Please reduce request rate and retry.",
     };
   }
 
