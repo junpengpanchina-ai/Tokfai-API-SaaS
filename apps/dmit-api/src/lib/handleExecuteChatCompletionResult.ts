@@ -62,6 +62,24 @@ export function respondExecuteChatCompletionFailure(
     });
   }
 
+  // Timeout / upstream errors may include suggestedModels when the provider
+  // circuit is degraded — surface them without changing the error envelope.
+  if (result.suggestedModels?.length) {
+    const body = buildClientErrorBody(
+      new ApiError({
+        status: result.httpStatus,
+        message,
+        publicMessage: message,
+        code,
+      }),
+      requestId
+    );
+    return c.json(
+      { ...body, suggestedModels: result.suggestedModels },
+      result.httpStatus as never
+    );
+  }
+
   throw new ApiError({
     status: result.httpStatus,
     message,

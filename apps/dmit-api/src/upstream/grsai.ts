@@ -19,6 +19,7 @@ export interface UpstreamLogContext {
   route?: string;
   model?: string;
   requestedModel?: string;
+  resolvedModel?: string;
   providerId?: string;
 }
 
@@ -256,6 +257,7 @@ export async function providerFetch<T = unknown>(
         route: logContext.route,
         model: logContext.model,
         requestedModel: logContext.requestedModel,
+        resolvedModel: logContext.resolvedModel ?? logContext.model,
         providerId: provider.id,
         upstreamHost: host,
         upstreamPath,
