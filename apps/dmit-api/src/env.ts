@@ -71,11 +71,39 @@ const Schema = z
     .int()
     .positive()
     .default(90_000),
+  /** Default upstream timeout for /v1/chat/completions (keep short). */
   TOKFAI_UPSTREAM_TIMEOUT_MS: z.coerce
     .number()
     .int()
     .positive()
     .default(90_000),
+  /** Ordinary /v1/responses upstream timeout (not Codex/heavy). */
+  TOKFAI_RESPONSES_UPSTREAM_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(300_000),
+  /** Codex / coding / heavy /v1/responses upstream timeout. */
+  TOKFAI_HEAVY_RESPONSES_UPSTREAM_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(700_000),
+  /**
+   * Idle timeout for stream=true heavy responses — abort only when upstream
+   * sends no data for this long (not a short total wall-clock cut).
+   */
+  TOKFAI_HEAVY_RESPONSES_IDLE_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(700_000),
+  /** Per API key concurrent heavy /v1/responses cap (avoids infinite hang). */
+  TOKFAI_HEAVY_RESPONSES_MAX_CONCURRENCY: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(2),
   TOKFAI_TOTAL_REQUEST_TIMEOUT_MS: z.coerce
     .number()
     .int()

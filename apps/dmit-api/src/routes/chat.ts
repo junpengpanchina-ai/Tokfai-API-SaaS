@@ -94,6 +94,7 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     },
     limitKey,
     idempotencyKey,
+    clientStream: wantsStream,
   });
 
   if (!result.ok) {

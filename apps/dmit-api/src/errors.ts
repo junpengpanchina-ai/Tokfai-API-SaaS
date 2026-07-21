@@ -28,6 +28,7 @@ export interface ApiErrorPayload {
 export const GATEWAY_GUARD_ERROR_CODES = new Set([
   "too_many_requests",
   "too_many_concurrent_requests",
+  "rate_limited",
   "gateway_overloaded",
   "request_body_too_large",
   "upstream_timeout",
@@ -37,6 +38,7 @@ export const GATEWAY_GUARD_ERROR_CODES = new Set([
 export const STATUS_BY_ERROR_CODE: Record<string, number> = {
   too_many_requests: 429,
   too_many_concurrent_requests: 429,
+  rate_limited: 429,
   gateway_overloaded: 503,
   request_body_too_large: 413,
   upstream_timeout: 504,
@@ -260,6 +262,20 @@ export class ApiError extends Error {
       message,
       publicMessage,
       code: "too_many_concurrent_requests",
+      type: "rate_limit_error",
+    });
+  }
+
+  /** Heavy /v1/responses concurrency cap — client vocabulary: rate_limited. */
+  static heavyResponsesRateLimited(
+    message = "Too many concurrent heavy responses.",
+    publicMessage = "当前长任务并发过多，请稍后重试。"
+  ) {
+    return new ApiError({
+      status: 429,
+      message,
+      publicMessage,
+      code: "rate_limited",
       type: "rate_limit_error",
     });
   }

@@ -5,6 +5,9 @@ import { getRedisClient, redisKey } from "../redis/client.js";
 /** Per-key in-flight chat requests (entire handler, including fallback). */
 const keyInflight = new Map<string, number>();
 
+/** Per-key in-flight heavy /v1/responses (Codex / long tasks). */
+const heavyResponsesInflight = new Map<string, number>();
+
 /** Global in-flight upstream chat fetches. */
 let globalUpstreamInflight = 0;
 
@@ -116,6 +119,72 @@ export async function releaseGlobalUpstream(): Promise<void> {
   releaseGlobalUpstreamMemory();
 }
 
+/**
+ * Cap concurrent heavy /v1/responses per API key so 700s timeouts cannot
+ * pile up unbounded. Exceeding the limit → 429 rate_limited (not billable).
+ */
+export async function tryAcquireHeavyResponses(
+  limitKey: string
+): Promise<boolean> {
+  const limit = env.TOKFAI_HEAVY_RESPONSES_MAX_CONCURRENCY;
+  const redis = getRedisClient();
+  if (redis) {
+    try {
+      return await tryIncrementCounter(
+        redis,
+        redisKey("inflight", "heavy_responses", limitKey),
+        limit
+      );
+    } catch (err) {
+      log.warn("redis_heavy_responses_concurrency_fallback", {
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return tryAcquireHeavyResponsesMemory(limitKey, limit);
+}
+
+export async function releaseHeavyResponses(limitKey: string): Promise<void> {
+  const redis = getRedisClient();
+  if (redis) {
+    try {
+      await decrementCounter(
+        redis,
+        redisKey("inflight", "heavy_responses", limitKey)
+      );
+      return;
+    } catch (err) {
+      log.warn("redis_heavy_responses_concurrency_release_fallback", {
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  releaseHeavyResponsesMemory(limitKey);
+}
+
+export async function getHeavyResponsesInflight(
+  limitKey: string
+): Promise<number> {
+  const redis = getRedisClient();
+  if (redis) {
+    try {
+      const raw = await redis.get(
+        redisKey("inflight", "heavy_responses", limitKey)
+      );
+      if (!raw) return heavyResponsesInflight.get(limitKey) ?? 0;
+      const value = Number(raw);
+      return Number.isFinite(value)
+        ? value
+        : (heavyResponsesInflight.get(limitKey) ?? 0);
+    } catch {
+      // fall through
+    }
+  }
+  return heavyResponsesInflight.get(limitKey) ?? 0;
+}
+
 function tryAcquireKeyConcurrencyMemory(limitKey: string): boolean {
   const current = keyInflight.get(limitKey) ?? 0;
   if (current >= env.TOKFAI_MAX_CONCURRENCY_PER_KEY) {
@@ -144,6 +213,25 @@ function tryAcquireGlobalUpstreamMemory(): boolean {
 
 function releaseGlobalUpstreamMemory(): void {
   globalUpstreamInflight = Math.max(0, globalUpstreamInflight - 1);
+}
+
+function tryAcquireHeavyResponsesMemory(
+  limitKey: string,
+  limit: number
+): boolean {
+  const current = heavyResponsesInflight.get(limitKey) ?? 0;
+  if (current >= limit) return false;
+  heavyResponsesInflight.set(limitKey, current + 1);
+  return true;
+}
+
+function releaseHeavyResponsesMemory(limitKey: string): void {
+  const current = heavyResponsesInflight.get(limitKey) ?? 0;
+  if (current <= 1) {
+    heavyResponsesInflight.delete(limitKey);
+    return;
+  }
+  heavyResponsesInflight.set(limitKey, current - 1);
 }
 
 async function tryIncrementCounter(

@@ -137,6 +137,7 @@ responsesRoutes.post("/v1/responses", async (c) => {
     limitKey,
     idempotencyKey,
     route: "/v1/responses",
+    clientStream: wantsStream,
   });
 
   if (!result.ok) {

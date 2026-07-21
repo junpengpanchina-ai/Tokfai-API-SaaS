@@ -50,6 +50,23 @@ See `nginx-api.tokfai.com.conf.example`. After changing upstream port:
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
+### Long Codex / heavy `/v1/responses` timeouts
+
+Tokfai uses **layered** upstream timeouts (chat stays short; Codex/heavy
+responses may wait up to **700s**). If Nginx still has a low
+`proxy_read_timeout` / `proxy_send_timeout` (common defaults: **60s** or
+**300s**, older Tokfai example used **130s**), the edge will return **504**
+before DMIT finishes waiting.
+
+**Recommendation (manual ops — do not auto-edit live nginx):**
+
+```nginx
+proxy_send_timeout 750s;
+proxy_read_timeout 750s;
+```
+
+Apply only after confirming the host config, then `sudo nginx -t && sudo systemctl reload nginx`.
+
 ## Public smoke (after Nginx points at 8788)
 
 ```bash

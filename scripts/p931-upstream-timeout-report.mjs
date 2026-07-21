@@ -3,8 +3,10 @@
  * P931 — Upstream timeout ops report + static contract checks (read-only).
  *
  * Offline (always):
+ *   - layered timeouts (chat short / responses 300s / heavy 700s)
  *   - timeout stays not_billable / no finalize charge
- *   - chat_provider_timeout_stats fields present
+ *   - chat_provider_timeout_stats fields present (incl. timeoutMs)
+ *   - heavy concurrency → 429 rate_limited
  *   - no second provider → fallback_unavailable (not fake fallback_attempt)
  *   - provider+model circuit breaker exists (degraded, suggest switch, no invent)
  *
@@ -82,6 +84,10 @@ console.log("=== P931 Upstream timeout report ===\n");
 let ok = true;
 
 const exec = read("apps/dmit-api/src/lib/executeChatCompletion.ts");
+const policy = read("apps/dmit-api/src/lib/upstreamTimeoutPolicy.ts");
+const envSrc = read("apps/dmit-api/src/env.ts");
+const concurrency = read("apps/dmit-api/src/gateway/concurrency.ts");
+const errors = read("apps/dmit-api/src/errors.ts");
 const breaker = read(
   "apps/dmit-api/src/upstream/providerModelCircuitBreaker.ts"
 );
@@ -89,6 +95,34 @@ const handle = read(
   "apps/dmit-api/src/lib/handleExecuteChatCompletionResult.ts"
 );
 const billing = read("apps/dmit-api/src/lib/usageBilling.ts");
+const grsai = read("apps/dmit-api/src/upstream/grsai.ts");
+
+{
+  const layered =
+    policy.includes("resolveUpstreamTimeoutPolicy") &&
+    policy.includes("UPSTREAM_TIMEOUT_DEFAULTS") &&
+    policy.includes("700_000") &&
+    policy.includes("300_000") &&
+    envSrc.includes("TOKFAI_HEAVY_RESPONSES_UPSTREAM_TIMEOUT_MS") &&
+    envSrc.includes(".default(700_000)") &&
+    envSrc.includes("TOKFAI_RESPONSES_UPSTREAM_TIMEOUT_MS") &&
+    envSrc.includes(".default(300_000)") &&
+    exec.includes("timeoutPolicy") &&
+    policy.includes('tier: "chat"') &&
+    policy.includes("never inherit heavy");
+  if (!layered) {
+    ok =
+      fail(
+        "layered timeouts",
+        "expected chat short / responses 300000 / heavy 700000"
+      ) && ok;
+  } else {
+    ok =
+      pass(
+        "layered timeouts: chat short; responses 300000; heavy 700000 (not global)"
+      ) && ok;
+  }
+}
 
 {
   const notCharged =
@@ -120,17 +154,41 @@ const billing = read("apps/dmit-api/src/lib/usageBilling.ts");
     exec.includes("upstreamStatus") &&
     exec.includes("upstreamErrorCode") &&
     exec.includes("latencyMs") &&
-    exec.includes("fallbackSkippedReason");
+    exec.includes("timeoutMs") &&
+    exec.includes("billing_status") &&
+    exec.includes("fallbackSkippedReason") &&
+    grsai.includes("timeoutMs");
   if (!stats) {
     ok =
       fail(
         "provider timeout stats log",
-        "expected chat_provider_timeout_stats with required fields"
+        "expected chat_provider_timeout_stats with timeoutMs + required fields"
       ) && ok;
   } else {
     ok =
       pass(
-        "provider timeout stats log includes model/provider/status/latency/fallbackSkippedReason"
+        "provider timeout stats log includes model/provider/status/latency/timeoutMs/fallbackSkippedReason"
+      ) && ok;
+  }
+}
+
+{
+  const heavyCap =
+    concurrency.includes("tryAcquireHeavyResponses") &&
+    envSrc.includes("TOKFAI_HEAVY_RESPONSES_MAX_CONCURRENCY") &&
+    errors.includes('code: "rate_limited"') &&
+    errors.includes("当前长任务并发过多，请稍后重试。") &&
+    exec.includes("heavyResponsesRateLimited");
+  if (!heavyCap) {
+    ok =
+      fail(
+        "heavy concurrency limit",
+        "expected max 2 heavy responses → 429 rate_limited"
+      ) && ok;
+  } else {
+    ok =
+      pass(
+        "heavy responses concurrency capped (429 rate_limited, not billable)"
       ) && ok;
   }
 }

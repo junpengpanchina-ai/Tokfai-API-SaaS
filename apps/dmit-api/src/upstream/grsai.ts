@@ -12,6 +12,11 @@ import { getProviderById } from "./providers.js";
 export interface UpstreamFetchOptions extends Omit<RequestInit, "body"> {
   json?: unknown;
   timeoutMs?: number;
+  /**
+   * When set (stream=true path), abort only after this long with no progress.
+   * Non-stream JSON fetch treats this as the attempt timeout.
+   */
+  idleTimeoutMs?: number;
 }
 
 export interface UpstreamLogContext {
@@ -214,6 +219,16 @@ export function mapUpstreamError(
     };
   }
 
+  // Upstream gateway / proxy idle cut — treat as Tokfai upstream_timeout.
+  if (status === 504 || status === 408) {
+    return {
+      status: 504,
+      code: "upstream_timeout",
+      type: "upstream_error",
+      publicMessage: "上游模型响应超时，请稍后重试或切换模型。",
+    };
+  }
+
   return {
     status: 502,
     code: "upstream_error",
@@ -228,12 +243,16 @@ export async function providerFetch<T = unknown>(
   options: UpstreamFetchOptions = {},
   logContext: UpstreamLogContext = {}
 ): Promise<{ data: T; upstreamId: string | null }> {
-  const { json, headers, timeoutMs, ...init } = options;
+  const { json, headers, timeoutMs, idleTimeoutMs, ...init } = options;
   const upstreamUrl = buildProviderUrl(provider, path);
   const { host, path: upstreamPath } = providerUpstreamTarget(provider, path);
   const startedAt = Date.now();
+  // Stream path prefers idle timeout; non-stream uses attempt timeout.
   const effectiveTimeoutMs =
-    timeoutMs ?? provider.timeoutMs ?? env.TOKFAI_UPSTREAM_TIMEOUT_MS;
+    idleTimeoutMs ??
+    timeoutMs ??
+    provider.timeoutMs ??
+    env.TOKFAI_UPSTREAM_TIMEOUT_MS;
 
   const finalHeaders = new Headers(headers);
   finalHeaders.set("Authorization", `Bearer ${provider.apiKey}`);
@@ -247,6 +266,8 @@ export async function providerFetch<T = unknown>(
       ...init,
       headers: finalHeaders,
       body: json !== undefined ? JSON.stringify(json) : undefined,
+      // Idle semantics for today's non-stream upstream: same as attempt timeout.
+      // When true upstream streaming is added, reset this timer on each chunk.
       signal: AbortSignal.timeout(effectiveTimeoutMs),
     });
   } catch (err) {
@@ -264,6 +285,9 @@ export async function providerFetch<T = unknown>(
         upstreamStatus: 504,
         upstreamErrorCode: "upstream_timeout",
         latencyMs,
+        timeoutMs: effectiveTimeoutMs,
+        billing_status: "not_billable",
+        fallbackSkippedReason: null,
       });
       throw new ApiError({
         status: 504,
@@ -294,6 +318,7 @@ export async function providerFetch<T = unknown>(
       route: logContext.route,
       model: logContext.model,
       requestedModel: logContext.requestedModel,
+      resolvedModel: logContext.resolvedModel ?? logContext.model,
       providerId: provider.id,
       upstreamHost: host,
       upstreamPath,
@@ -302,6 +327,8 @@ export async function providerFetch<T = unknown>(
       upstreamErrorCode: mapped.code,
       upstreamErrorMessage,
       latencyMs,
+      timeoutMs: effectiveTimeoutMs,
+      billing_status: "not_billable",
       message: `Upstream ${provider.id} HTTP ${res.status}`,
     });
 
