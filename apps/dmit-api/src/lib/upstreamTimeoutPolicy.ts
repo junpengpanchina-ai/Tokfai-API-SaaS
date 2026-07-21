@@ -3,6 +3,11 @@
  *
  * Chat stays short (env default). Ordinary /v1/responses gets a medium budget.
  * Codex / coding / heavy responses get 700s — never apply that globally.
+ *
+ * Exception: Gemini 3 chat models often exceed the short chat budget on
+ * /v1/chat/completions while finishing within the ordinary responses budget.
+ * Give those models the responses attempt timeout on chat — never the heavy
+ * 700s tier.
  */
 
 import { env } from "../env.js";
@@ -49,6 +54,17 @@ const HEAVY_MODEL_IDS = new Set([
   "gpt5-pro",
 ]);
 
+/**
+ * Gemini 3 chat models that share the same GRSAI path as /v1/responses but
+ * need the longer responses attempt budget on /v1/chat/completions.
+ * Keep this narrow — do not widen the default chat timeout.
+ */
+const SLOW_CHAT_GEMINI3_MODEL_IDS = new Set([
+  "gemini-3-pro",
+  "gemini-3-flash",
+  "gemini-3.1-pro",
+]);
+
 const CODING_ALIAS_RE = /(^|[-_/])(coding|codex|code)([-_/]|$)/i;
 
 const HEAVY_BODY_SIGNAL_RE =
@@ -60,6 +76,11 @@ export function isHeavyResponsesModel(model: string): boolean {
   if (HEAVY_MODEL_IDS.has(trimmed)) return true;
   if (CODING_ALIAS_RE.test(trimmed)) return true;
   return false;
+}
+
+export function isSlowChatGemini3Model(model: string): boolean {
+  const trimmed = model.trim().toLowerCase();
+  return SLOW_CHAT_GEMINI3_MODEL_IDS.has(trimmed);
 }
 
 export function hasHeavyBodySignals(body: unknown): boolean {
@@ -145,6 +166,23 @@ export function resolveUpstreamTimeoutPolicy(args: {
   }
 
   // /v1/chat/completions — keep short; never inherit heavy 700s.
+  // Gemini 3 is the known exception: same upstream as responses, but often
+  // slower than the short chat default (90s) while finishing within 300s.
+  const slowGemini3 =
+    isSlowChatGemini3Model(args.requestedModel) ||
+    isSlowChatGemini3Model(args.resolvedModel ?? "");
+  if (slowGemini3) {
+    const upstreamTimeoutMs = Math.max(chatUpstreamMs, responsesUpstreamMs);
+    return {
+      tier: "chat",
+      isHeavy: false,
+      upstreamTimeoutMs,
+      idleTimeoutMs: upstreamTimeoutMs,
+      totalTimeoutMs: Math.max(chatTotalMs, upstreamTimeoutMs + 10_000),
+      reason: "chat_slow_gemini3",
+    };
+  }
+
   return {
     tier: "chat",
     isHeavy: false,

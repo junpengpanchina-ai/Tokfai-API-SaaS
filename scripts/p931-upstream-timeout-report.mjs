@@ -125,6 +125,29 @@ const grsai = read("apps/dmit-api/src/upstream/grsai.ts");
 }
 
 {
+  const gemini3ChatBudget =
+    policy.includes("SLOW_CHAT_GEMINI3_MODEL_IDS") &&
+    policy.includes("gemini-3-pro") &&
+    policy.includes("gemini-3-flash") &&
+    policy.includes("chat_slow_gemini3") &&
+    policy.includes("isSlowChatGemini3Model") &&
+    /Math\.max\(chatUpstreamMs,\s*responsesUpstreamMs\)/.test(policy) &&
+    policy.includes("never inherit heavy");
+  if (!gemini3ChatBudget) {
+    ok =
+      fail(
+        "gemini-3 chat timeout budget",
+        "expected gemini-3-pro/flash on chat to use responses budget (not heavy 700s)"
+      ) && ok;
+  } else {
+    ok =
+      pass(
+        "gemini-3-pro/flash chat uses responses timeout budget (not heavy 700s)"
+      ) && ok;
+  }
+}
+
+{
   const notCharged =
     exec.includes("failedUsageLog") &&
     /function failedUsageLog[\s\S]*billable:\s*false/.test(exec) &&
