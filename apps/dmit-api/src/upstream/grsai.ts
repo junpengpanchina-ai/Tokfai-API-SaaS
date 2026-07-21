@@ -190,16 +190,9 @@ export function mapUpstreamError(
     };
   }
 
-  // Unsupported sampling / request params (e.g. temperature on some GPT models).
-  // Prefer Tokfai-side filtering; this is a safe fallback that never leaks vendor copy.
-  if (
-    status === 400 &&
-    (combined.includes("unsupported") ||
-      combined.includes("invalid_request") ||
-      combined.includes("unknown parameter") ||
-      combined.includes("does not support") ||
-      combined.includes("not supported"))
-  ) {
+  // Unsupported sampling / empty / unknown upstream 400s → Tokfai envelope.
+  // Prefer Tokfai-side filtering; never leak vendor copy or empty client bodies.
+  if (status === 400) {
     return {
       status: 400,
       code: "invalid_request_error",

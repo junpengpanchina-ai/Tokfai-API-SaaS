@@ -206,5 +206,12 @@ export function sanitizeUpstreamChatBody(
   // stream_options / presence_penalty / frequency_penalty / Cherry extras:
   // intentionally omitted from whitelist — accepted at schema, never forwarded.
 
+  // Final safety: never forward null/undefined keys (Cherry sends many nulls).
+  for (const key of Object.keys(upstream)) {
+    if (upstream[key] === null || upstream[key] === undefined) {
+      delete upstream[key];
+    }
+  }
+
   return { ok: true, upstream };
 }

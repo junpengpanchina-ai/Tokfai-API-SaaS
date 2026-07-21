@@ -7,6 +7,7 @@ import type { ZodError } from "zod";
 
 import { sanitizePublicErrorMessage } from "../errors.js";
 import { log } from "../logger.js";
+import { resolveChatModel } from "../upstream/modelAliases.js";
 
 export type ChatCompletion400Diagnostic = {
   requestId?: string;
@@ -15,6 +16,9 @@ export type ChatCompletion400Diagnostic = {
   rejectedReason: string;
   zodErrors?: string[];
   validationErrors?: string[];
+  /** Optional overrides when caller already resolved the model. */
+  requestedModel?: string;
+  resolvedModel?: string;
 };
 
 /** Top-level body keys only (sorted). */
@@ -93,6 +97,26 @@ export function logChatCompletionInvalidRequest(
           ? "missing"
           : typeof modelRaw;
 
+  let requestedModel =
+    typeof diag.requestedModel === "string" && diag.requestedModel.trim()
+      ? diag.requestedModel.trim()
+      : typeof model === "string" &&
+          model !== "null" &&
+          model !== "missing"
+        ? model
+        : undefined;
+  let resolvedModel =
+    typeof diag.resolvedModel === "string" && diag.resolvedModel.trim()
+      ? diag.resolvedModel.trim()
+      : undefined;
+  if (requestedModel && !resolvedModel) {
+    try {
+      resolvedModel = resolveChatModel(requestedModel).canonicalId;
+    } catch {
+      resolvedModel = requestedModel;
+    }
+  }
+
   const streamRaw = record?.stream;
   const stream =
     streamRaw === true || streamRaw === false
@@ -110,6 +134,8 @@ export function logChatCompletionInvalidRequest(
     requestId: diag.requestId,
     route: diag.route ?? "/v1/chat/completions",
     model,
+    ...(requestedModel ? { requestedModel } : {}),
+    ...(resolvedModel ? { resolvedModel } : {}),
     stream,
     bodyKeys: chatBodyKeys(body).join(","),
     messagesCount,

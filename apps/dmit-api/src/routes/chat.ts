@@ -26,6 +26,7 @@ import {
 import { respondExecuteChatCompletionFailure } from "../lib/handleExecuteChatCompletionResult.js";
 import { parseIdempotencyKey } from "../lib/idempotency.js";
 import { readJsonBodyWithLimit } from "../lib/readJsonBodyWithLimit.js";
+import { resolveChatModel } from "../upstream/modelAliases.js";
 import { logGatewayRejection } from "./chatGatewayLogs.js";
 
 /**
@@ -160,6 +161,13 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
 
   if (!result.ok) {
     if (result.httpStatus === 400) {
+      const requestedRaw =
+        typeof (body as { model?: unknown })?.model === "string"
+          ? String((body as { model: string }).model).trim()
+          : undefined;
+      const resolved = requestedRaw
+        ? resolveChatModel(requestedRaw)
+        : undefined;
       logChatCompletionInvalidRequest({
         requestId: result.requestId || requestId,
         route,
@@ -169,8 +177,11 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
           "Invalid chat completion request."
         ),
         validationErrors: [result.errorCode || "invalid_request_error"],
+        requestedModel: requestedRaw,
+        resolvedModel: resolved?.canonicalId,
       });
     }
+    // Always JSON error body — never SSE — even when client asked stream=true.
     return respondExecuteChatCompletionFailure(c, result);
   }
 

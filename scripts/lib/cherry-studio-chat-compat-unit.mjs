@@ -72,6 +72,7 @@ assert(shouldStripGptSamplingParams("gpt-5.5") === true, "strip gpt-5.5");
 assert(shouldStripGptSamplingParams("gpt-5.4-pro") === true, "strip gpt-5.4-pro");
 assert(shouldStripGptSamplingParams("gpt-5-pro") === true, "strip gpt-5-pro");
 assert(shouldStripGptSamplingParams("gpt-5") === true, "strip gpt-5");
+assert(shouldStripGptSamplingParams("gpt-5.4") === true, "strip gpt-5.4");
 assert(shouldStripGptSamplingParams("gemini-3-pro") === false, "keep gemini sampling");
 assert(shouldStripGptSamplingParams("gemini-2.5-flash") === false, "keep gemini flash sampling");
 
@@ -105,6 +106,42 @@ assert(cherryReal.upstream.response_format === undefined, "null response_format 
 assert(
   cherryReal.upstream.messages[0].content === "Return exactly: TOKFAI_CHERRY_OK",
   "cherry text parts flattened"
+);
+assert(cherryReal.upstream.temperature === undefined, "gpt-5.4 temperature stripped");
+assert(!("tool_choice" in cherryReal.upstream), "tool_choice key absent");
+
+const geminiCherry = sanitizeUpstreamChatBody(
+  {
+    messages: [
+      {
+        role: "user",
+        content: [{ type: "text", text: "Return exactly: TOKFAI_CHERRY_OK" }],
+      },
+    ],
+    temperature: null,
+    top_p: null,
+    presence_penalty: null,
+    frequency_penalty: null,
+    tools: [],
+    tool_choice: null,
+    response_format: null,
+    stream_options: { include_usage: true },
+    max_tokens: 64,
+    max_completion_tokens: 64,
+    enable_thinking: false,
+    provider_options: { cherry: true },
+  },
+  "gemini-3-pro"
+);
+assert(geminiCherry.ok === true, "gemini cherry sanitize ok");
+assert(geminiCherry.upstream.temperature === undefined, "gemini null temperature stripped");
+assert(geminiCherry.upstream.top_p === undefined, "gemini null top_p stripped");
+assert(geminiCherry.upstream.tool_choice === undefined, "gemini null tool_choice stripped");
+assert(geminiCherry.upstream.tools === undefined, "gemini empty tools stripped");
+assert(geminiCherry.upstream.enable_thinking === undefined, "gemini extras dropped");
+assert(
+  !Object.values(geminiCherry.upstream).includes(null),
+  "gemini upstream has no null values"
 );
 
 const gpt = sanitizeUpstreamChatBody(

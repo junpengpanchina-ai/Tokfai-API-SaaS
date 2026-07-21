@@ -88,7 +88,7 @@ let ok = true;
     ok = fail("stack leak", "error handler must not return stack to clients") && ok;
   } else if (
     !errorMw.includes("buildClientErrorBody") ||
-    !errorMw.includes("c.body(")
+    !(errorMw.includes("c.body(") || errorMw.includes("new Response("))
   ) {
     ok = fail("safe error envelope", "expected non-empty JSON error body") && ok;
   } else if (!errorMw.includes("api_error_${err.status}")) {

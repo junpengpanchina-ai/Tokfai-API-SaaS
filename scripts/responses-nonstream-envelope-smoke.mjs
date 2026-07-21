@@ -87,7 +87,8 @@ let ok = true;
       read("apps/dmit-api/src/middleware/error.ts").includes(
         "api_error_${err.status}"
       ) &&
-        read("apps/dmit-api/src/middleware/error.ts").includes("c.body("),
+        (read("apps/dmit-api/src/middleware/error.ts").includes("new Response(") ||
+          read("apps/dmit-api/src/middleware/error.ts").includes("c.body(")),
     ],
     [
       "chat validation 400 returns respondApiError (not throw-only)",

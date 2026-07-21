@@ -185,7 +185,8 @@ const deployReadme = read("deploy/runtime/README.md");
 
 {
   const failureThrows =
-    handle.includes("throw new ApiError") &&
+    (handle.includes("throw new ApiError") ||
+      handle.includes("respondApiError")) &&
     handle.includes("result.httpStatus") &&
     handle.includes("buildClientErrorBody");
   const envelope =

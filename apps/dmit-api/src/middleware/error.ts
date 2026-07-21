@@ -51,6 +51,9 @@ function logApiError(
 /**
  * Send a standard API error envelope without going through onError.
  * Always writes a non-empty JSON body (never Content-Length 0).
+ *
+ * Uses `new Response` (not c.json / c.body) so stream=true / Cherry clients
+ * never observe an empty 400 body from Hono context races.
  */
 export function respondApiError(
   c: Context,
@@ -58,13 +61,23 @@ export function respondApiError(
   requestId?: string
 ) {
   const resolvedId = resolveRequestId(c, requestId);
-  c.header("X-Request-Id", resolvedId);
+  // Best-effort: keep X-Request-Id on the Hono context for downstream middleware.
+  try {
+    c.header("X-Request-Id", resolvedId);
+  } catch {
+    // Context may already be finalized; Response headers below still carry the id.
+  }
 
   const payload = buildClientErrorBody(err, resolvedId);
-  // Explicit serialize — never rely on a path that can yield an empty body.
-  const text = JSON.stringify(payload);
-  if (!text || text === "{}" || !payload?.error?.message) {
-    const fallback = JSON.stringify({
+  let text = JSON.stringify(payload);
+  if (
+    !text ||
+    text === "{}" ||
+    !payload?.error?.message ||
+    !payload?.error?.code ||
+    !payload?.error?.type
+  ) {
+    text = JSON.stringify({
       error: {
         message: "Invalid request.",
         type: "invalid_request_error",
@@ -73,13 +86,15 @@ export function respondApiError(
       },
       request_id: resolvedId,
     });
-    return c.body(fallback, (err.status || 400) as never, {
-      "Content-Type": "application/json; charset=utf-8",
-    });
   }
 
-  return c.body(text, err.status as never, {
-    "Content-Type": "application/json; charset=utf-8",
+  return new Response(text, {
+    status: err.status || 400,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "X-Request-Id": resolvedId,
+      "Cache-Control": "no-store",
+    },
   });
 }
 

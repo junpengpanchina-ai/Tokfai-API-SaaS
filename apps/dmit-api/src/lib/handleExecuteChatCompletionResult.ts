@@ -18,17 +18,29 @@ function respondJsonError(
 ): Response {
   if (extra && Object.keys(extra).length > 0) {
     const resolvedId =
-      (typeof requestId === "string" && requestId.trim()) ||
-      requestIdFromContext(c);
-    if (resolvedId) {
-      c.header("X-Request-Id", resolvedId);
-    }
+      (typeof requestId === "string" && requestId.trim()
+        ? requestId.trim()
+        : undefined) ?? requestIdFromContext(c);
     const body = {
       ...buildClientErrorBody(err, resolvedId),
       ...extra,
     };
-    return c.body(JSON.stringify(body), err.status as never, {
+    const text = JSON.stringify(body);
+    const headers: Record<string, string> = {
       "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+    };
+    if (resolvedId) {
+      headers["X-Request-Id"] = resolvedId;
+      try {
+        c.header("X-Request-Id", resolvedId);
+      } catch {
+        // finalized context — Response headers still set
+      }
+    }
+    return new Response(text, {
+      status: err.status || 400,
+      headers,
     });
   }
   return respondApiError(c, err, requestId);
@@ -37,6 +49,7 @@ function respondJsonError(
 /**
  * Always return the standard Tokfai error envelope — never an empty body
  * and never code/message/request_id null or the literal string "undefined".
+ * stream=true failures must still be application/json (not SSE).
  */
 export function respondExecuteChatCompletionFailure(
   c: Context,
@@ -74,17 +87,25 @@ export function respondExecuteChatCompletionFailure(
   }
 
   if (result.httpStatus === 404) {
-    throw ApiError.notFound(message, code);
+    return respondApiError(
+      c,
+      ApiError.notFound(message, code),
+      requestId
+    );
   }
 
   if (result.httpStatus === 402) {
-    throw new ApiError({
-      status: 402,
-      message,
-      publicMessage: message,
-      code,
-      type: "billing_error",
-    });
+    return respondApiError(
+      c,
+      new ApiError({
+        status: 402,
+        message,
+        publicMessage: message,
+        code,
+        type: "billing_error",
+      }),
+      requestId
+    );
   }
 
   // Timeout / upstream errors may include suggestedModels when the provider
@@ -101,10 +122,14 @@ export function respondExecuteChatCompletionFailure(
     });
   }
 
-  throw new ApiError({
-    status: result.httpStatus,
-    message,
-    publicMessage: message,
-    code,
-  });
+  return respondApiError(
+    c,
+    new ApiError({
+      status: result.httpStatus,
+      message,
+      publicMessage: message,
+      code,
+    }),
+    requestId
+  );
 }

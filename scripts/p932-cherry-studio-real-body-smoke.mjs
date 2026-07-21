@@ -167,6 +167,17 @@ assert(
   "content parts flattened"
 );
 
+const gemSan = sanitizeUpstreamChatBody(parsed.data, "gemini-3-pro");
+assert(gemSan.ok === true, "gemini sanitize ok");
+assert(gemSan.upstream.tool_choice === undefined, "gemini tool_choice stripped");
+assert(gemSan.upstream.temperature === undefined, "gemini null temperature stripped");
+assert(!Object.values(gemSan.upstream).includes(null), "gemini no nulls");
+
+const gpt54San = sanitizeUpstreamChatBody(parsed.data, "gpt-5");
+assert(gpt54San.ok === true, "gpt-5 (alias target) sanitize ok");
+assert(gpt54San.upstream.temperature === undefined, "alias-target temperature stripped");
+assert(gpt54San.upstream.tool_choice === undefined, "alias-target tool_choice stripped");
+
 assert(chatContentShape(body.messages) === "array[text]", "contentShape array[text]");
 assert(chatBodyKeys(body).includes("tool_choice"), "bodyKeys includes tool_choice");
 assert(
@@ -243,11 +254,15 @@ try {
     );
     const staticOk =
       chatRoute.includes("logChatCompletionInvalidRequest") &&
+      chatRoute.includes("respondApiError") &&
       diag.includes("contentShape") &&
       diag.includes("rejectedReason") &&
       diag.includes("bodyKeys") &&
+      diag.includes("requestedModel") &&
+      diag.includes("resolvedModel") &&
       logger.includes("contentShape") &&
       logger.includes("zodErrors") &&
+      logger.includes("requestedModel") &&
       schema.includes("coerceOptionalFiniteNumberInput") &&
       schema.includes("coerceOptionalPositiveIntInput");
     if (!staticOk) {
