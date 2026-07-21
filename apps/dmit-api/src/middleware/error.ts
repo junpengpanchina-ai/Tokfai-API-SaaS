@@ -29,8 +29,10 @@ function logApiError(
     upstreamStatus: err.upstreamStatus,
     upstreamErrorMessage: err.upstreamErrorSnippet,
   };
+  // Use status-specific msg (api_error_504, api_error_500, …) — never
+  // api_error_500 when status is 504 / other non-500 5xx.
   if (err.status >= 500) {
-    log.error("api_error_500", logFields);
+    log.error(`api_error_${err.status}`, logFields);
   } else {
     log.warn("api_error", logFields);
   }

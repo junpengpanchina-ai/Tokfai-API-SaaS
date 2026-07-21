@@ -61,6 +61,7 @@ const OFFLINE = [
   "scripts/p926-continue-client-smoke.mjs",
   "scripts/p927-cline-client-smoke.mjs",
   "scripts/p928-roo-code-client-smoke.mjs",
+  "scripts/p930-codex-responses-timeout-smoke.mjs",
   "scripts/public-model-registry-smoke.mjs",
   "scripts/docs-or-ui-en-no-chinese-smoke.mjs",
   "scripts/responses-nonstream-envelope-smoke.mjs",

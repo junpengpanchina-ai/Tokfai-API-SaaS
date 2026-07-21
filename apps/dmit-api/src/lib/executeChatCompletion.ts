@@ -540,7 +540,38 @@ export async function executeChatCompletion(
 
           lastError = err;
 
-          log.warn("chat_provider_fallback_attempt", {
+          const hasNextProvider =
+            providerIndex < providerAttempts.length - 1 &&
+            isChatFallbackEligible(err);
+
+          if (hasNextProvider) {
+            const nextProvider = providerAttempts[providerIndex + 1]!;
+            log.warn("chat_provider_fallback_attempt", {
+              requestId,
+              route,
+              requestedModel,
+              attemptModel,
+              attemptIndex,
+              providerId: provider.id,
+              providerIndex,
+              nextProviderId: nextProvider.id,
+              status: err.status,
+              code: err.code ?? "failed",
+              upstreamStatus: err.upstreamStatus,
+              upstreamErrorMessage: err.upstreamErrorSnippet,
+              latencyMs: Date.now() - attemptStartedAt,
+            });
+            continue;
+          }
+
+          // No second provider (or error not eligible) — do not pretend fallback ran.
+          const fallbackSkippedReason = !isChatFallbackEligible(err)
+            ? "error_not_fallback_eligible"
+            : providerAttempts.length <= 1
+              ? "no_secondary_provider"
+              : "providers_exhausted";
+
+          log.warn("chat_provider_fallback_unavailable", {
             requestId,
             route,
             requestedModel,
@@ -548,20 +579,14 @@ export async function executeChatCompletion(
             attemptIndex,
             providerId: provider.id,
             providerIndex,
+            providerCount: providerAttempts.length,
+            fallback_skipped_reason: fallbackSkippedReason,
             status: err.status,
             code: err.code ?? "failed",
             upstreamStatus: err.upstreamStatus,
             upstreamErrorMessage: err.upstreamErrorSnippet,
             latencyMs: Date.now() - attemptStartedAt,
           });
-
-          const hasNextProvider =
-            providerIndex < providerAttempts.length - 1 &&
-            isChatFallbackEligible(err);
-
-          if (hasNextProvider) {
-            continue;
-          }
 
           modelAttemptFailed = true;
 
