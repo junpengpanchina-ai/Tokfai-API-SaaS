@@ -68,14 +68,41 @@ const FORBIDDEN_CLIENT_BILLING_KEYS = [
   "free",
 ] as const;
 
-/** Cherry / AI SDK often send null for unset optional numbers. */
+/**
+ * Cherry / AI SDK often send null or stringified numbers for unset optionals.
+ * Coerce when possible; strip unrecognized values instead of 400ing the client.
+ */
+function coerceOptionalFiniteNumberInput(v: unknown): unknown {
+  if (v === null || v === undefined || v === "") return undefined;
+  if (typeof v === "number") return Number.isFinite(v) ? v : undefined;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
+function coerceOptionalPositiveIntInput(v: unknown): unknown {
+  if (v === null || v === undefined || v === "") return undefined;
+  let n: number | undefined;
+  if (typeof v === "number" && Number.isFinite(v)) n = v;
+  else if (typeof v === "string" && v.trim() !== "") {
+    const parsed = Number(v);
+    if (Number.isFinite(parsed)) n = parsed;
+  }
+  if (n === undefined) return undefined;
+  const i = Math.trunc(n);
+  // Non-positive → strip (Cherry may send 0); do not hard-400.
+  return i > 0 ? i : undefined;
+}
+
 const optionalFiniteNumber = z.preprocess(
-  (v) => (v === null || v === "" ? undefined : v),
+  coerceOptionalFiniteNumberInput,
   z.number().finite().optional()
 );
 
 const optionalPositiveInt = z.preprocess(
-  (v) => (v === null || v === "" ? undefined : v),
+  coerceOptionalPositiveIntInput,
   z.number().int().positive().optional()
 );
 
@@ -83,7 +110,9 @@ const optionalBoolean = z.preprocess((v) => {
   if (v === null || v === "") return undefined;
   if (v === "true" || v === 1) return true;
   if (v === "false" || v === 0) return false;
-  return v;
+  if (typeof v === "boolean") return v;
+  // Unrecognized stream values → omit (default non-stream) rather than 400.
+  return undefined;
 }, z.boolean().optional());
 
 export const ChatMessageSchema = z

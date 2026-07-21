@@ -2,6 +2,7 @@ import type { Context } from "hono";
 
 import { ApiError, buildClientErrorBody } from "../errors.js";
 import type { ExecuteChatCompletionResult } from "./executeChatCompletion.js";
+import { safeInvalidRequestMessage } from "./chatCompletionDiagnostics.js";
 
 function requestIdFromContext(c: Context): string | undefined {
   const fromCtx = c.get("requestId" as never);
@@ -10,7 +11,7 @@ function requestIdFromContext(c: Context): string | undefined {
 
 /**
  * Always return the standard Tokfai error envelope — never an empty body
- * and never code/message/request_id null.
+ * and never code/message/request_id null or the literal string "undefined".
  */
 export function respondExecuteChatCompletionFailure(
   c: Context,
@@ -21,9 +22,10 @@ export function respondExecuteChatCompletionFailure(
       ? result.requestId
       : undefined) ?? requestIdFromContext(c);
 
-  const message =
-    (typeof result.errorMessage === "string" && result.errorMessage.trim()) ||
-    "Invalid request.";
+  const message = safeInvalidRequestMessage(
+    result.errorMessage,
+    "Invalid request."
+  );
   const code =
     (typeof result.errorCode === "string" && result.errorCode.trim()) ||
     "invalid_request_error";

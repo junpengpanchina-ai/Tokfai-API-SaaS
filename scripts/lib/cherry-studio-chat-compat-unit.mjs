@@ -58,6 +58,35 @@ assert(shouldStripGptSamplingParams("gemini-2.5-flash") === false, "keep gemini 
 assert(coerceOptionalNumber(null) === undefined, "null number → undefined");
 assert(coerceOptionalNumber(0.7) === 0.7, "finite number kept");
 
+// Real Cherry stream-shaped sanitize (null tool_choice / empty tools)
+const cherryReal = sanitizeUpstreamChatBody(
+  {
+    messages: [
+      {
+        role: "user",
+        content: [{ type: "text", text: "Return exactly: TOKFAI_CHERRY_OK" }],
+      },
+    ],
+    temperature: null,
+    top_p: null,
+    tools: [],
+    tool_choice: null,
+    response_format: null,
+    stream_options: { include_usage: true },
+    max_tokens: 64,
+    max_completion_tokens: 64,
+  },
+  "gpt-5.4"
+);
+assert(cherryReal.ok === true, "cherry real sanitize ok");
+assert(cherryReal.upstream.tool_choice === undefined, "null tool_choice stripped");
+assert(cherryReal.upstream.tools === undefined, "empty tools stripped");
+assert(cherryReal.upstream.response_format === undefined, "null response_format stripped");
+assert(
+  cherryReal.upstream.messages[0].content === "Return exactly: TOKFAI_CHERRY_OK",
+  "cherry text parts flattened"
+);
+
 const gpt = sanitizeUpstreamChatBody(
   {
     messages: [{ role: "user", content: [{ type: "text", text: "hi" }] }],

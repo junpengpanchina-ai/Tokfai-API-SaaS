@@ -57,7 +57,11 @@ export function buildClientErrorBody(
   // Never allow null/empty code or message on error envelopes.
   const rawMessage =
     typeof body.error.message === "string" ? body.error.message.trim() : "";
-  body.error.message = rawMessage || "Invalid request.";
+  // Never leak empty / literal "undefined" / "null" — Cherry Studio shows these.
+  body.error.message =
+    !rawMessage || rawMessage === "undefined" || rawMessage === "null"
+      ? "Invalid request."
+      : rawMessage;
 
   if (!body.error.code || !String(body.error.code).trim()) {
     body.error.code =

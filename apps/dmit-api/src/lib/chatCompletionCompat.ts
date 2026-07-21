@@ -186,6 +186,7 @@ export function sanitizeUpstreamChatBody(
   }
 
   // Non-empty tools only — empty tools:[] from Cherry must not be forwarded.
+  // tool_choice: null / undefined is never forwarded (upstream rejects null).
   if (Array.isArray(body.tools) && body.tools.length > 0) {
     upstream.tools = body.tools;
     if (body.tool_choice !== undefined && body.tool_choice !== null) {
@@ -194,12 +195,16 @@ export function sanitizeUpstreamChatBody(
   }
 
   // response_format: only forward simple json_object / text shapes.
+  // null / undefined / unknown shapes are stripped (never cause client 400).
   if (body.response_format && typeof body.response_format === "object") {
     const rf = body.response_format as Record<string, unknown>;
     if (rf.type === "json_object" || rf.type === "text") {
       upstream.response_format = { type: rf.type };
     }
   }
+
+  // stream_options / presence_penalty / frequency_penalty / Cherry extras:
+  // intentionally omitted from whitelist — accepted at schema, never forwarded.
 
   return { ok: true, upstream };
 }

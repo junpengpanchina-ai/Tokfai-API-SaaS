@@ -14,6 +14,11 @@ import {
 import { chatCompletionToSseBody } from "../lib/chatCompletionSse.js";
 import { normalizeChatMessages } from "../lib/chatCompletionCompat.js";
 import {
+  formatZodIssues,
+  logChatCompletionInvalidRequest,
+  safeInvalidRequestMessage,
+} from "../lib/chatCompletionDiagnostics.js";
+import {
   ChatCompletionRequestSchema,
   executeChatCompletion,
 } from "../lib/executeChatCompletion.js";
@@ -28,6 +33,10 @@ import { logGatewayRejection } from "./chatGatewayLogs.js";
  * Auth is handled by requireApiKeyOrSupabaseJwt (sk-tokfai_ or Supabase JWT).
  * Non-stream requests return JSON; stream=true returns OpenAI-compatible SSE
  * (synthesized from a completed upstream response) ending with data: [DONE].
+ *
+ * Cherry Studio / OpenAI SDK bodies are accepted loosely; unknown harmless
+ * fields are ignored before upstream. Validation 400s always include a concrete
+ * error.message (never undefined) plus redacted shape diagnostics in logs.
  */
 export const chatRoutes = new Hono();
 
@@ -38,6 +47,7 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
   const caller = getChatCaller(c);
   const requestId = c.get("requestId" as never) as string;
   const limitKey = gatewayLimitKey(caller.apiKeyId, caller.userId);
+  const route = "/v1/chat/completions";
 
   let body: unknown;
   try {
@@ -53,33 +63,69 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
         globalInflight: await getGlobalUpstreamInflight(),
       });
     }
+    if (err instanceof ApiError && err.status === 400) {
+      logChatCompletionInvalidRequest({
+        requestId,
+        route,
+        body: null,
+        rejectedReason: safeInvalidRequestMessage(
+          err.publicMessage,
+          "Invalid JSON body."
+        ),
+        validationErrors: [err.code ?? "invalid_request_error"],
+      });
+    }
     throw err;
   }
 
   const parsed = ChatCompletionRequestSchema.safeParse(body);
   if (!parsed.success) {
-    throw ApiError.badRequest(
-      "Invalid chat completion request.",
-      "invalid_request_error"
+    const zodErrors = formatZodIssues(parsed.error);
+    const rejectedReason = safeInvalidRequestMessage(
+      zodErrors[0]
+        ? `Invalid chat completion request: ${zodErrors[0]}`
+        : "Invalid chat completion request."
     );
+    logChatCompletionInvalidRequest({
+      requestId,
+      route,
+      body,
+      rejectedReason,
+      zodErrors,
+      validationErrors: ["schema_validation_failed"],
+    });
+    throw ApiError.badRequest(rejectedReason, "invalid_request_error");
   }
 
   const normalizedMessages = normalizeChatMessages(parsed.data.messages);
   if (!normalizedMessages.ok) {
-    throw ApiError.badRequest(
+    const rejectedReason = safeInvalidRequestMessage(
       normalizedMessages.message,
-      "invalid_request_error"
+      "Invalid chat completion request."
     );
+    logChatCompletionInvalidRequest({
+      requestId,
+      route,
+      body,
+      rejectedReason,
+      validationErrors: ["messages_normalization_failed"],
+    });
+    throw ApiError.badRequest(rejectedReason, "invalid_request_error");
   }
 
   const rawIdempotencyKey =
     c.req.header("idempotency-key") ?? c.req.header("Idempotency-Key");
   const idempotencyKey = parseIdempotencyKey(rawIdempotencyKey);
   if (rawIdempotencyKey && !idempotencyKey) {
-    throw ApiError.badRequest(
-      "Invalid Idempotency-Key header.",
-      "invalid_idempotency_key"
-    );
+    const rejectedReason = "Invalid Idempotency-Key header.";
+    logChatCompletionInvalidRequest({
+      requestId,
+      route,
+      body,
+      rejectedReason,
+      validationErrors: ["invalid_idempotency_key"],
+    });
+    throw ApiError.badRequest(rejectedReason, "invalid_idempotency_key");
   }
 
   const wantsStream = parsed.data.stream === true;
@@ -98,6 +144,18 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
   });
 
   if (!result.ok) {
+    if (result.httpStatus === 400) {
+      logChatCompletionInvalidRequest({
+        requestId: result.requestId || requestId,
+        route,
+        body,
+        rejectedReason: safeInvalidRequestMessage(
+          result.errorMessage,
+          "Invalid chat completion request."
+        ),
+        validationErrors: [result.errorCode || "invalid_request_error"],
+      });
+    }
     return respondExecuteChatCompletionFailure(c, result);
   }
 
