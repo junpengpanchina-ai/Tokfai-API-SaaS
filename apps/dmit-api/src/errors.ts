@@ -49,19 +49,28 @@ export function shouldIncludeRequestIdInError(status: number): boolean {
   return status === 429 || status === 503 || status === 504;
 }
 
+/** Never leak empty / literal "undefined" / "null" to clients (Cherry Studio). */
+export function sanitizePublicErrorMessage(
+  message: unknown,
+  fallback = "Invalid request."
+): string {
+  const trimmed = typeof message === "string" ? message.trim() : "";
+  if (!trimmed || trimmed === "undefined" || trimmed === "null") {
+    return fallback;
+  }
+  return trimmed;
+}
+
 export function buildClientErrorBody(
   err: ApiError,
   requestId?: string
 ): { error: ApiErrorPayload; request_id?: string } {
   const body = err.toJSON();
   // Never allow null/empty code or message on error envelopes.
-  const rawMessage =
-    typeof body.error.message === "string" ? body.error.message.trim() : "";
-  // Never leak empty / literal "undefined" / "null" — Cherry Studio shows these.
-  body.error.message =
-    !rawMessage || rawMessage === "undefined" || rawMessage === "null"
-      ? "Invalid request."
-      : rawMessage;
+  body.error.message = sanitizePublicErrorMessage(
+    body.error.message,
+    err.status >= 500 ? "Internal error." : "Invalid request."
+  );
 
   if (!body.error.code || !String(body.error.code).trim()) {
     body.error.code =
@@ -79,12 +88,16 @@ export function buildClientErrorBody(
           ? "auth_error"
           : "invalid_request_error";
   }
-  if (requestId) {
-    body.error.request_id = requestId;
+  const rid =
+    typeof requestId === "string" && requestId.trim()
+      ? requestId.trim()
+      : undefined;
+  if (rid) {
+    body.error.request_id = rid;
   }
   // Top-level request_id for all 4xx/5xx so clients never see request_id:null.
-  if (requestId && (shouldIncludeRequestIdInError(err.status) || err.status >= 400)) {
-    return { ...body, request_id: requestId };
+  if (rid && (shouldIncludeRequestIdInError(err.status) || err.status >= 400)) {
+    return { ...body, request_id: rid };
   }
   return body;
 }
@@ -215,10 +228,12 @@ export class ApiError extends Error {
   }
 
   static badRequest(message: string, code = "invalid_request_error") {
+    const safe = sanitizePublicErrorMessage(message, "Invalid request.");
     return new ApiError({
       status: 400,
-      message,
-      code,
+      message: safe,
+      publicMessage: safe,
+      code: code?.trim() || "invalid_request_error",
       type: "invalid_request_error",
     });
   }

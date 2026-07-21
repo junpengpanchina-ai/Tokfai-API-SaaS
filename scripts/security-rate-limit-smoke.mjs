@@ -86,8 +86,13 @@ let ok = true;
     /client|public|json[\s\S]{0,80}stack|stack[\s\S]{0,80}json/i.test(errorMw)
   ) {
     ok = fail("stack leak", "error handler must not return stack to clients") && ok;
-  } else if (!errorMw.includes("Internal error") && !errorMw.includes("buildClientErrorBody")) {
-    ok = fail("safe error envelope", "expected client-safe error body") && ok;
+  } else if (
+    !errorMw.includes("buildClientErrorBody") ||
+    !errorMw.includes("c.body(")
+  ) {
+    ok = fail("safe error envelope", "expected non-empty JSON error body") && ok;
+  } else if (!errorMw.includes("api_error_${err.status}")) {
+    ok = fail("api_error_400 log", "expected status-specific api_error_* logs") && ok;
   } else {
     pass("error responses do not expose internal stack");
   }

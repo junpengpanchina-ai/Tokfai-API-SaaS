@@ -6,9 +6,18 @@ import {
   coerceToApiError,
 } from "../errors.js";
 import { log } from "../logger.js";
+import { generateRequestId } from "./requestId.js";
 
 function getRequestId(c: Context): string | undefined {
-  return c.get("requestId" as never);
+  const raw = c.get("requestId" as never);
+  return typeof raw === "string" && raw.trim() ? raw.trim() : undefined;
+}
+
+function resolveRequestId(c: Context, requestId?: string): string {
+  if (typeof requestId === "string" && requestId.trim()) {
+    return requestId.trim();
+  }
+  return getRequestId(c) ?? generateRequestId();
 }
 
 function getRoute(c: Context): string {
@@ -29,22 +38,49 @@ function logApiError(
     upstreamStatus: err.upstreamStatus,
     upstreamErrorMessage: err.upstreamErrorSnippet,
   };
-  // Use status-specific msg (api_error_504, api_error_500, …) — never
-  // api_error_500 when status is 504 / other non-500 5xx.
+  // Always status-specific (api_error_400, api_error_504, …) — never a bare
+  // "api_error" msg, and never api_error_500 when status is 504 / other 5xx.
+  const msg = `api_error_${err.status}`;
   if (err.status >= 500) {
-    log.error(`api_error_${err.status}`, logFields);
+    log.error(msg, logFields);
   } else {
-    log.warn("api_error", logFields);
+    log.warn(msg, logFields);
   }
 }
 
-/** Send a standard API error envelope without going through onError. */
+/**
+ * Send a standard API error envelope without going through onError.
+ * Always writes a non-empty JSON body (never Content-Length 0).
+ */
 export function respondApiError(
   c: Context,
   err: ApiError,
   requestId?: string
 ) {
-  return c.json(buildClientErrorBody(err, requestId), err.status as never);
+  const resolvedId = resolveRequestId(c, requestId);
+  c.header("X-Request-Id", resolvedId);
+
+  const payload = buildClientErrorBody(err, resolvedId);
+  // Explicit serialize — never rely on a path that can yield an empty body.
+  const text = JSON.stringify(payload);
+  if (!text || text === "{}" || !payload?.error?.message) {
+    const fallback = JSON.stringify({
+      error: {
+        message: "Invalid request.",
+        type: "invalid_request_error",
+        code: "invalid_request_error",
+        request_id: resolvedId,
+      },
+      request_id: resolvedId,
+    });
+    return c.body(fallback, (err.status || 400) as never, {
+      "Content-Type": "application/json; charset=utf-8",
+    });
+  }
+
+  return c.body(text, err.status as never, {
+    "Content-Type": "application/json; charset=utf-8",
+  });
 }
 
 /**
@@ -53,7 +89,7 @@ export function respondApiError(
  * Gateway guard codes keep their HTTP status — never remapped to generic 502.
  */
 export const errorHandler: ErrorHandler = (err, c) => {
-  const requestId = getRequestId(c);
+  const requestId = resolveRequestId(c);
   const route = getRoute(c);
   const apiErr = coerceToApiError(err);
 
@@ -70,33 +106,22 @@ export const errorHandler: ErrorHandler = (err, c) => {
     message: "Internal error.",
   });
 
-  return c.json(
-    {
-      error: {
-        message: "Internal error.",
-        code: "server_error",
-        type: "server_error",
-        ...(requestId ? { request_id: requestId } : {}),
-      },
-      ...(requestId ? { request_id: requestId } : {}),
-    },
-    500
+  return respondApiError(
+    c,
+    ApiError.internal("Internal error.", "server_error"),
+    requestId
   );
 };
 
 /** 404 handler when no route matches. */
 export function notFoundHandler(c: Context) {
-  const requestId = getRequestId(c);
-  return c.json(
-    {
-      error: {
-        message: `No route for ${c.req.method} ${c.req.path}.`,
-        code: "route_not_found",
-        type: "not_found",
-        ...(requestId ? { request_id: requestId } : {}),
-      },
-      ...(requestId ? { request_id: requestId } : {}),
-    },
-    404
+  const requestId = resolveRequestId(c);
+  return respondApiError(
+    c,
+    ApiError.notFound(
+      `No route for ${c.req.method} ${c.req.path}.`,
+      "route_not_found"
+    ),
+    requestId
   );
 }

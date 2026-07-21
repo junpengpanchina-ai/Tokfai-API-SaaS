@@ -6,11 +6,17 @@ import {
   requireApiKeyOrSupabaseJwt,
 } from "../middleware/chatAuth.js";
 import { chatGatewayMiddleware } from "../middleware/chatGateway.js";
+import { respondApiError } from "../middleware/error.js";
 import {
   gatewayLimitKey,
   getGlobalUpstreamInflight,
   getKeyInflight,
 } from "../gateway/concurrency.js";
+import {
+  formatZodIssues,
+  logChatCompletionInvalidRequest,
+  safeInvalidRequestMessage,
+} from "../lib/chatCompletionDiagnostics.js";
 import {
   ChatCompletionRequestSchema,
   executeChatCompletion,
@@ -35,6 +41,8 @@ import { logGatewayRejection } from "./chatGatewayLogs.js";
  *
  * stream=false → JSON object=response
  * stream=true  → OpenAI Responses SSE (synthesized from completed response)
+ *
+ * Validation 400s always return a concrete JSON error envelope (never empty body).
  */
 export const responsesRoutes = new Hono();
 
@@ -45,6 +53,7 @@ responsesRoutes.post("/v1/responses", async (c) => {
   const caller = getChatCaller(c);
   const requestId = c.get("requestId" as never) as string;
   const limitKey = gatewayLimitKey(caller.apiKeyId, caller.userId);
+  const route = "/v1/responses";
 
   let body: unknown;
   try {
@@ -60,6 +69,19 @@ responsesRoutes.post("/v1/responses", async (c) => {
         globalInflight: await getGlobalUpstreamInflight(),
       });
     }
+    if (err instanceof ApiError && err.status === 400) {
+      logChatCompletionInvalidRequest({
+        requestId,
+        route,
+        body: null,
+        rejectedReason: safeInvalidRequestMessage(
+          err.publicMessage,
+          "Invalid JSON body."
+        ),
+        validationErrors: [err.code ?? "invalid_request_error"],
+      });
+      return respondApiError(c, err, requestId);
+    }
     throw err;
   }
 
@@ -71,17 +93,42 @@ responsesRoutes.post("/v1/responses", async (c) => {
     !("input" in (body as Record<string, unknown>)) &&
     "messages" in (body as Record<string, unknown>)
   ) {
-    throw ApiError.badRequest(
-      "Invalid responses request: use `input` (string or message array), not `messages`.",
-      "invalid_request_error"
+    const rejectedReason =
+      "Invalid responses request: use `input` (string or message array), not `messages`.";
+    logChatCompletionInvalidRequest({
+      requestId,
+      route,
+      body,
+      rejectedReason,
+      validationErrors: ["messages_instead_of_input"],
+    });
+    return respondApiError(
+      c,
+      ApiError.badRequest(rejectedReason, "invalid_request_error"),
+      requestId
     );
   }
 
   const parsed = ResponsesRequestSchema.safeParse(body);
   if (!parsed.success) {
-    throw ApiError.badRequest(
-      "Invalid responses request.",
-      "invalid_request_error"
+    const zodErrors = formatZodIssues(parsed.error);
+    const rejectedReason = safeInvalidRequestMessage(
+      zodErrors[0]
+        ? `Invalid responses request: ${zodErrors[0]}`
+        : "Invalid responses request."
+    );
+    logChatCompletionInvalidRequest({
+      requestId,
+      route,
+      body,
+      rejectedReason,
+      zodErrors,
+      validationErrors: ["schema_validation_failed"],
+    });
+    return respondApiError(
+      c,
+      ApiError.badRequest(rejectedReason, "invalid_request_error"),
+      requestId
     );
   }
 
@@ -89,9 +136,18 @@ responsesRoutes.post("/v1/responses", async (c) => {
     typeof parsed.data.model !== "string" ||
     !parsed.data.model.trim()
   ) {
-    throw ApiError.badRequest(
-      "Invalid responses request: model is required.",
-      "invalid_request_error"
+    const rejectedReason = "Invalid responses request: model is required.";
+    logChatCompletionInvalidRequest({
+      requestId,
+      route,
+      body,
+      rejectedReason,
+      validationErrors: ["model_required"],
+    });
+    return respondApiError(
+      c,
+      ApiError.badRequest(rejectedReason, "invalid_request_error"),
+      requestId
     );
   }
 
@@ -104,9 +160,19 @@ responsesRoutes.post("/v1/responses", async (c) => {
         typeof message.content !== "string" || message.content.trim() === ""
     )
   ) {
-    throw ApiError.badRequest(
-      "Invalid responses request: input produced empty messages.",
-      "invalid_request_error"
+    const rejectedReason =
+      "Invalid responses request: input produced empty messages.";
+    logChatCompletionInvalidRequest({
+      requestId,
+      route,
+      body,
+      rejectedReason,
+      validationErrors: ["empty_messages_from_input"],
+    });
+    return respondApiError(
+      c,
+      ApiError.badRequest(rejectedReason, "invalid_request_error"),
+      requestId
     );
   }
   const chatParsed = ChatCompletionRequestSchema.safeParse({
@@ -114,9 +180,24 @@ responsesRoutes.post("/v1/responses", async (c) => {
     stream: false,
   });
   if (!chatParsed.success) {
-    throw ApiError.badRequest(
-      "Invalid responses request.",
-      "invalid_request_error"
+    const zodErrors = formatZodIssues(chatParsed.error);
+    const rejectedReason = safeInvalidRequestMessage(
+      zodErrors[0]
+        ? `Invalid responses request: ${zodErrors[0]}`
+        : "Invalid responses request."
+    );
+    logChatCompletionInvalidRequest({
+      requestId,
+      route,
+      body,
+      rejectedReason,
+      zodErrors,
+      validationErrors: ["chat_schema_validation_failed"],
+    });
+    return respondApiError(
+      c,
+      ApiError.badRequest(rejectedReason, "invalid_request_error"),
+      requestId
     );
   }
 
@@ -124,9 +205,18 @@ responsesRoutes.post("/v1/responses", async (c) => {
     c.req.header("idempotency-key") ?? c.req.header("Idempotency-Key");
   const idempotencyKey = parseIdempotencyKey(rawIdempotencyKey);
   if (rawIdempotencyKey && !idempotencyKey) {
-    throw ApiError.badRequest(
-      "Invalid Idempotency-Key header.",
-      "invalid_idempotency_key"
+    const rejectedReason = "Invalid Idempotency-Key header.";
+    logChatCompletionInvalidRequest({
+      requestId,
+      route,
+      body,
+      rejectedReason,
+      validationErrors: ["invalid_idempotency_key"],
+    });
+    return respondApiError(
+      c,
+      ApiError.badRequest(rejectedReason, "invalid_idempotency_key"),
+      requestId
     );
   }
 
@@ -141,6 +231,18 @@ responsesRoutes.post("/v1/responses", async (c) => {
   });
 
   if (!result.ok) {
+    if (result.httpStatus === 400) {
+      logChatCompletionInvalidRequest({
+        requestId: result.requestId || requestId,
+        route,
+        body,
+        rejectedReason: safeInvalidRequestMessage(
+          result.errorMessage,
+          "Invalid responses request."
+        ),
+        validationErrors: [result.errorCode || "invalid_request_error"],
+      });
+    }
     return respondExecuteChatCompletionFailure(c, result);
   }
 
@@ -167,7 +269,6 @@ responsesRoutes.post("/v1/responses", async (c) => {
       headers: {
         "Content-Type": "text/event-stream; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
         "X-Accel-Buffering": "no",
         "X-Request-Id": result.requestId,
       },

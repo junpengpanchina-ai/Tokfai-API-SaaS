@@ -19,6 +19,11 @@ import {
   sanitizeUpstreamChatBody,
   coerceOptionalNumber,
 } from "./src/lib/chatCompletionCompat.ts";
+import {
+  ApiError,
+  buildClientErrorBody,
+  sanitizePublicErrorMessage,
+} from "./src/errors.ts";
 
 function assert(cond, msg) {
   if (!cond) {
@@ -27,6 +32,21 @@ function assert(cond, msg) {
   }
   console.log("PASS  " + msg);
 }
+
+assert(sanitizePublicErrorMessage(undefined) === "Invalid request.", "sanitize undefined");
+assert(sanitizePublicErrorMessage("undefined") === "Invalid request.", "sanitize literal undefined");
+assert(sanitizePublicErrorMessage("  ") === "Invalid request.", "sanitize blank");
+assert(sanitizePublicErrorMessage("bad msgs") === "bad msgs", "sanitize keeps text");
+
+const badReq = ApiError.badRequest("undefined", "invalid_request_error");
+const envelope = buildClientErrorBody(badReq, "req_test_400");
+assert(envelope.error.message === "Invalid request.", "badRequest undefined → safe message");
+assert(envelope.error.code === "invalid_request_error", "badRequest code");
+assert(envelope.error.type === "invalid_request_error", "badRequest type");
+assert(envelope.request_id === "req_test_400", "top-level request_id");
+assert(envelope.error.request_id === "req_test_400", "error.request_id");
+assert(JSON.stringify(envelope).includes('"message"'), "envelope serializes message");
+
 
 assert(normalizeChatMessageContent("hi") === "hi", "content string");
 assert(

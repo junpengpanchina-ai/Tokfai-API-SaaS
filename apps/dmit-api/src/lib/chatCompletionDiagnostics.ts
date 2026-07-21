@@ -5,6 +5,7 @@
 
 import type { ZodError } from "zod";
 
+import { sanitizePublicErrorMessage } from "../errors.js";
 import { log } from "../logger.js";
 
 export type ChatCompletion400Diagnostic = {
@@ -70,12 +71,7 @@ export function safeInvalidRequestMessage(
   reason: string | undefined | null,
   fallback = "Invalid chat completion request."
 ): string {
-  const trimmed =
-    typeof reason === "string" ? reason.trim() : "";
-  if (!trimmed || trimmed === "undefined" || trimmed === "null") {
-    return fallback;
-  }
-  return trimmed;
+  return sanitizePublicErrorMessage(reason, fallback);
 }
 
 export function logChatCompletionInvalidRequest(

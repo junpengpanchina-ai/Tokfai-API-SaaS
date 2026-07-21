@@ -6,6 +6,7 @@ import {
   requireApiKeyOrSupabaseJwt,
 } from "../middleware/chatAuth.js";
 import { chatGatewayMiddleware } from "../middleware/chatGateway.js";
+import { respondApiError } from "../middleware/error.js";
 import {
   gatewayLimitKey,
   getGlobalUpstreamInflight,
@@ -35,8 +36,8 @@ import { logGatewayRejection } from "./chatGatewayLogs.js";
  * (synthesized from a completed upstream response) ending with data: [DONE].
  *
  * Cherry Studio / OpenAI SDK bodies are accepted loosely; unknown harmless
- * fields are ignored before upstream. Validation 400s always include a concrete
- * error.message (never undefined) plus redacted shape diagnostics in logs.
+ * fields are ignored before upstream. Validation 400s always return a concrete
+ * JSON error envelope via respondApiError (never empty body / undefined message).
  */
 export const chatRoutes = new Hono();
 
@@ -74,6 +75,8 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
         ),
         validationErrors: [err.code ?? "invalid_request_error"],
       });
+      // Return directly — do not rely on onError (avoids empty-body races).
+      return respondApiError(c, err, requestId);
     }
     throw err;
   }
@@ -94,7 +97,11 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       zodErrors,
       validationErrors: ["schema_validation_failed"],
     });
-    throw ApiError.badRequest(rejectedReason, "invalid_request_error");
+    return respondApiError(
+      c,
+      ApiError.badRequest(rejectedReason, "invalid_request_error"),
+      requestId
+    );
   }
 
   const normalizedMessages = normalizeChatMessages(parsed.data.messages);
@@ -110,7 +117,11 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       rejectedReason,
       validationErrors: ["messages_normalization_failed"],
     });
-    throw ApiError.badRequest(rejectedReason, "invalid_request_error");
+    return respondApiError(
+      c,
+      ApiError.badRequest(rejectedReason, "invalid_request_error"),
+      requestId
+    );
   }
 
   const rawIdempotencyKey =
@@ -125,7 +136,11 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       rejectedReason,
       validationErrors: ["invalid_idempotency_key"],
     });
-    throw ApiError.badRequest(rejectedReason, "invalid_idempotency_key");
+    return respondApiError(
+      c,
+      ApiError.badRequest(rejectedReason, "invalid_idempotency_key"),
+      requestId
+    );
   }
 
   const wantsStream = parsed.data.stream === true;

@@ -67,8 +67,9 @@ let ok = true;
         transform.includes("resolved_model"),
     ],
     [
-      "failure handler uses buildClientErrorBody",
-      failHandlerTs.includes("buildClientErrorBody"),
+      "failure handler uses buildClientErrorBody / respondApiError",
+      failHandlerTs.includes("buildClientErrorBody") &&
+        failHandlerTs.includes("respondApiError"),
     ],
     [
       "failure handler never omits request_id path",
@@ -78,7 +79,27 @@ let ok = true;
     [
       "ApiError.badRequest defaults invalid_request_error",
       errors.includes('code = "invalid_request_error"') &&
-        errors.includes('"invalid_request_error"'),
+        errors.includes('"invalid_request_error"') &&
+        errors.includes("sanitizePublicErrorMessage"),
+    ],
+    [
+      "error middleware logs api_error_400",
+      read("apps/dmit-api/src/middleware/error.ts").includes(
+        "api_error_${err.status}"
+      ) &&
+        read("apps/dmit-api/src/middleware/error.ts").includes("c.body("),
+    ],
+    [
+      "chat validation 400 returns respondApiError (not throw-only)",
+      read("apps/dmit-api/src/routes/chat.ts").includes("respondApiError") &&
+        read("apps/dmit-api/src/routes/chat.ts").includes(
+          "schema_validation_failed"
+        ),
+    ],
+    [
+      "responses validation 400 returns respondApiError",
+      route.includes("respondApiError") &&
+        route.includes("schema_validation_failed"),
     ],
     [
       "acceptance responses non-stream uses shared runner",
