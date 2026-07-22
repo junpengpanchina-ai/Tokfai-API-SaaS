@@ -15,7 +15,10 @@ import {
 import { chatCompletionToSseBody } from "../lib/chatCompletionSse.js";
 import { normalizeChatMessages } from "../lib/chatCompletionCompat.js";
 import {
+  buildEmptyMessagesNoopChatCompletion,
   formatZodIssues,
+  isEmptyChatMessagesBody,
+  logChatCompletionEmptyMessagesNoop,
   logChatCompletionInvalidRequest,
   safeInvalidRequestMessage,
 } from "../lib/chatCompletionDiagnostics.js";
@@ -80,6 +83,31 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       return respondApiError(c, err, requestId);
     }
     throw err;
+  }
+
+  // Cherry Studio compat: messages missing / non-array / [] → 200 noop
+  // (no upstream, no debit). Must run before schema validation.
+  if (isEmptyChatMessagesBody(body)) {
+    logChatCompletionEmptyMessagesNoop({ requestId, route, body });
+    const noop = buildEmptyMessagesNoopChatCompletion({ requestId, body });
+    const wantsStream =
+      body !== null &&
+      typeof body === "object" &&
+      !Array.isArray(body) &&
+      (body as { stream?: unknown }).stream === true;
+    if (wantsStream) {
+      const sseBody = chatCompletionToSseBody(noop);
+      return c.newResponse(sseBody, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+          "X-Request-Id": requestId,
+        },
+      });
+    }
+    return c.json(noop);
   }
 
   const parsed = ChatCompletionRequestSchema.safeParse(body);

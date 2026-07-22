@@ -1,7 +1,10 @@
 /**
- * Redacted diagnostics for /v1/chat/completions 400s.
+ * Redacted diagnostics for /v1/chat/completions 400s and empty-messages noop.
  * Logs field shapes only — never API keys or full user content.
  */
+
+/** Cherry Studio compat: empty / missing messages → HTTP 200 noop (no upstream). */
+export const EMPTY_MESSAGES_NOOP_CONTENT = "请求内容为空，请重新输入。";
 
 import type { ZodError } from "zod";
 
@@ -148,4 +151,106 @@ export function logChatCompletionInvalidRequest(
       ? { validationErrors: diag.validationErrors.join(" | ") }
       : {}),
   });
+}
+
+/**
+ * Cherry Studio occasionally POSTs messages=[] / missing / non-array.
+ * Treat as empty for a not-billable HTTP 200 noop (never upstream).
+ */
+export function isEmptyChatMessagesBody(body: unknown): boolean {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return false;
+  const messages = (body as Record<string, unknown>).messages;
+  if (messages === undefined || messages === null) return true;
+  if (!Array.isArray(messages)) return true;
+  return messages.length === 0;
+}
+
+export function logChatCompletionEmptyMessagesNoop(args: {
+  requestId: string;
+  route?: string;
+  body: unknown;
+}): void {
+  const body = args.body;
+  const record =
+    body && typeof body === "object" && !Array.isArray(body)
+      ? (body as Record<string, unknown>)
+      : null;
+
+  const modelRaw = record?.model;
+  const model =
+    typeof modelRaw === "string" && modelRaw.trim()
+      ? modelRaw.trim()
+      : modelRaw === null
+        ? "null"
+        : modelRaw === undefined
+          ? "missing"
+          : typeof modelRaw;
+
+  const streamRaw = record?.stream;
+  const stream =
+    streamRaw === true || streamRaw === false
+      ? streamRaw
+      : streamRaw === null
+        ? "null"
+        : streamRaw === undefined
+          ? "missing"
+          : typeof streamRaw;
+
+  log.warn("chat_completion_empty_messages_noop", {
+    requestId: args.requestId,
+    route: args.route ?? "/v1/chat/completions",
+    model,
+    stream,
+    bodyKeys: chatBodyKeys(body).join(","),
+    messagesCount: 0,
+    contentShape: "empty",
+  });
+}
+
+/** OpenAI-compatible chat.completion body for empty-messages noop (not billable). */
+export function buildEmptyMessagesNoopChatCompletion(args: {
+  requestId: string;
+  body: unknown;
+}): Record<string, unknown> {
+  const record =
+    args.body && typeof args.body === "object" && !Array.isArray(args.body)
+      ? (args.body as Record<string, unknown>)
+      : null;
+  const modelRaw = record?.model;
+  const model =
+    typeof modelRaw === "string" && modelRaw.trim()
+      ? modelRaw.trim()
+      : "unknown";
+
+  return {
+    id: `chatcmpl_${args.requestId}`,
+    object: "chat.completion",
+    created: Math.floor(Date.now() / 1000),
+    model,
+    choices: [
+      {
+        index: 0,
+        message: {
+          role: "assistant",
+          content: EMPTY_MESSAGES_NOOP_CONTENT,
+        },
+        finish_reason: "stop",
+      },
+    ],
+    usage: {
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+    },
+    credits_charged: 0,
+    request_id: args.requestId,
+    tokfai: {
+      credits_charged: 0,
+      request_id: args.requestId,
+      requested_model: model,
+      resolved_model: model,
+      billing_status: "not_billable",
+      rejectedReason: "empty_messages",
+    },
+  };
 }

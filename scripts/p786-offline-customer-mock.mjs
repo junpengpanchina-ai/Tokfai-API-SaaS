@@ -949,15 +949,71 @@ export function startMockGateway(options = {}) {
         if (!slot.ok) return sendJson(res, slot.response.status, slot.response.body);
         try {
           const body = await readJsonBody(req);
-          if (!Array.isArray(body?.messages) || body.messages.length === 0) {
-            return sendJson(res, 400, {
-              error: {
-                message: "Invalid request.",
-                code: "invalid_request_error",
-                type: "invalid_request_error",
+          // Cherry Studio compat: empty / missing / non-array messages → 200 noop
+          // (mirror apps/dmit-api chat_completion_empty_messages_noop).
+          if (
+            body?.messages === undefined ||
+            body?.messages === null ||
+            !Array.isArray(body?.messages) ||
+            body.messages.length === 0
+          ) {
+            const requestId = makeRequestId();
+            const model =
+              typeof body?.model === "string" && body.model.trim()
+                ? body.model.trim()
+                : "unknown";
+            console.warn(
+              JSON.stringify({
+                level: "warn",
+                msg: "chat_completion_empty_messages_noop",
+                requestId,
+                route: "/v1/chat/completions",
+                model,
+                stream: body?.stream === true || body?.stream === false
+                  ? body.stream
+                  : body?.stream === undefined
+                    ? "missing"
+                    : typeof body?.stream,
+                bodyKeys: Object.keys(body ?? {}).sort().join(","),
+                messagesCount: 0,
+                contentShape: "empty",
+              })
+            );
+            const noop = {
+              id: `chatcmpl_${requestId}`,
+              object: "chat.completion",
+              created: Math.floor(Date.now() / 1000),
+              model,
+              choices: [
+                {
+                  index: 0,
+                  message: {
+                    role: "assistant",
+                    content: "请求内容为空，请重新输入。",
+                  },
+                  finish_reason: "stop",
+                },
+              ],
+              usage: {
+                prompt_tokens: 0,
+                completion_tokens: 0,
+                total_tokens: 0,
               },
-              request_id: makeRequestId(),
-            });
+              credits_charged: 0,
+              request_id: requestId,
+              tokfai: {
+                credits_charged: 0,
+                request_id: requestId,
+                requested_model: model,
+                resolved_model: model,
+                billing_status: "not_billable",
+                rejectedReason: "empty_messages",
+              },
+            };
+            if (body?.stream === true) {
+              return sendSse(res, chatCompletionToSse(noop));
+            }
+            return sendJson(res, 200, noop);
           }
           const model =
             typeof body?.model === "string" ? body.model : "auto-fast";

@@ -328,19 +328,74 @@ try {
     }
   }
 
-  // Truly invalid request → concrete OpenAI error (never undefined)
+  // Empty / non-array messages → 200 not-billable noop (Cherry Studio compat)
   {
     const { res, body } = await postChat(ctx, {
+      model: "gpt-5.5",
+      stream: false,
+      messages: [],
+      tools: [],
+      tool_choice: null,
+    });
+    if (res.status !== 200) {
+      ok =
+        fail("empty messages noop → 200", `HTTP ${res.status}`) && ok;
+    } else if (
+      body?.choices?.[0]?.message?.content !== "请求内容为空，请重新输入。" ||
+      body?.tokfai?.billing_status !== "not_billable" ||
+      body?.tokfai?.rejectedReason !== "empty_messages"
+    ) {
+      ok =
+        fail(
+          "empty messages noop body",
+          JSON.stringify({
+            content: body?.choices?.[0]?.message?.content,
+            tokfai: body?.tokfai,
+          }).slice(0, 240)
+        ) && ok;
+    } else {
+      ok = pass("empty messages → 200 not_billable noop") && ok;
+    }
+  }
+
+  {
+    const { res, body: _body, text } = await postChat(ctx, {
       model: "gpt-5.5",
       stream: true,
       messages: "not-an-array",
       tools: [],
       tool_choice: null,
     });
+    const raw = typeof text === "string" ? text : "";
+    if (
+      !assertSseOk(res, raw, "non-array messages stream → SSE noop") ||
+      !raw.includes("请求内容为空，请重新输入。")
+    ) {
+      if (!raw.includes("请求内容为空，请重新输入。")) {
+        ok =
+          fail(
+            "non-array messages SSE content",
+            raw.slice(0, 240)
+          ) && ok;
+      } else {
+        ok = false;
+      }
+    } else {
+      ok = pass("non-array messages stream → SSE empty noop") && ok;
+    }
+  }
+
+  // Truly invalid request → concrete OpenAI error (never undefined)
+  {
+    const { res, body } = await postChat(ctx, {
+      model: "__tokfai_mock_invalid_request",
+      stream: false,
+      messages: [{ role: "user", content: "hi" }],
+    });
     if (res.status !== 400) {
       ok =
         fail(
-          "invalid messages → 400",
+          "invalid request → 400",
           `HTTP ${res.status}`
         ) && ok;
     } else {

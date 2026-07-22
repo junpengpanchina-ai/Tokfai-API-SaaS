@@ -122,9 +122,41 @@ try {
   }
 
   {
+    // Empty messages → 200 not-billable noop (Cherry Studio compat).
     const { res, body } = await ctx.postJson("/v1/chat/completions", {
       model: "gpt-5",
       messages: [],
+      stream: false,
+    });
+    if (res.status !== 200) {
+      ok =
+        fail("empty_messages noop HTTP", `expected 200 got ${res.status}`) &&
+        ok;
+    } else if (
+      body?.choices?.[0]?.message?.content !== "请求内容为空，请重新输入。" ||
+      body?.tokfai?.billing_status !== "not_billable" ||
+      body?.tokfai?.rejectedReason !== "empty_messages" ||
+      (typeof body?.credits_charged === "number" && body.credits_charged > 0)
+    ) {
+      ok =
+        fail(
+          "empty_messages noop body",
+          JSON.stringify({
+            content: body?.choices?.[0]?.message?.content,
+            tokfai: body?.tokfai,
+            credits_charged: body?.credits_charged,
+          }).slice(0, 240)
+        ) && ok;
+    } else {
+      ok = pass("empty_messages → 200 not_billable noop") && ok;
+    }
+  }
+
+  {
+    // Still a real 400 invalid_request path (forced mock error).
+    const { res, body } = await ctx.postJson("/v1/chat/completions", {
+      model: "__tokfai_mock_invalid_request",
+      messages: [{ role: "user", content: "hi" }],
       stream: false,
     });
     if (res.status !== 400) {

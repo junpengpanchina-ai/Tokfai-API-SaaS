@@ -617,7 +617,7 @@ async function probeIdempotency(model) {
 }
 
 async function probeFailedNoCharge() {
-  const label = "failed request envelope";
+  const label = "empty messages noop";
   const { res, body, text } = await api("POST", "/v1/chat/completions", {
     model: "gpt-5.5",
     messages: [],
@@ -625,30 +625,34 @@ async function probeFailedNoCharge() {
   });
   const leak = assertNoLeaks(label, text);
   if (!leak.ok) {
-    fail("failed request no leak", leak.detail);
+    fail("empty messages noop no leak", leak.detail);
     return;
   }
-  if (res.ok) {
-    fail("failed request expected error", "empty messages should fail");
+  if (res.status !== 200) {
+    fail("empty messages noop expected 200", `status=${res.status}`);
     return;
   }
-  const envelope = assertStandardErrorEnvelope(body, res, text);
-  if (!envelope.ok) {
+  const content = body?.choices?.[0]?.message?.content;
+  if (content !== "请求内容为空，请重新输入。") {
+    fail("empty messages noop content", String(content ?? ""));
+    return;
+  }
+  if (
+    body?.tokfai?.billing_status !== "not_billable" ||
+    body?.tokfai?.rejectedReason !== "empty_messages"
+  ) {
     fail(
-      "failed request standard envelope",
-      `${envelope.detail} ${JSON.stringify(envelope.summary)}`
+      "empty messages noop metadata",
+      JSON.stringify(body?.tokfai ?? null)
     );
     return;
   }
   const credits = extractCredits(body);
   if (typeof credits === "number" && credits > 0) {
-    fail("failed request no charge", `credits_charged=${credits}`);
+    fail("empty messages noop no charge", `credits_charged=${credits}`);
     return;
   }
-  pass(
-    "failed request no finalized charge",
-    JSON.stringify(envelope.summary)
-  );
+  pass("empty messages noop not billable", `request_id=${extractRequestId(body, res)}`);
 }
 
 async function probeImageOnce() {
