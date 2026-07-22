@@ -22,6 +22,8 @@ export type ChatCompletion400Diagnostic = {
   /** Optional overrides when caller already resolved the model. */
   requestedModel?: string;
   resolvedModel?: string;
+  normalized?: boolean;
+  noop?: boolean;
 };
 
 /** Top-level body keys only (sorted). */
@@ -81,10 +83,17 @@ export function safeInvalidRequestMessage(
   return sanitizePublicErrorMessage(reason, fallback);
 }
 
-export function logChatCompletionInvalidRequest(
-  diag: ChatCompletion400Diagnostic
-): void {
-  const body = diag.body;
+function resolveModelDiagFields(
+  body: unknown,
+  overrides?: { requestedModel?: string; resolvedModel?: string }
+): {
+  model: string;
+  requestedModel?: string;
+  resolvedModel?: string;
+  stream: boolean | string;
+  messages: unknown;
+  messagesCount: number;
+} {
   const record =
     body && typeof body === "object" && !Array.isArray(body)
       ? (body as Record<string, unknown>)
@@ -101,16 +110,16 @@ export function logChatCompletionInvalidRequest(
           : typeof modelRaw;
 
   let requestedModel =
-    typeof diag.requestedModel === "string" && diag.requestedModel.trim()
-      ? diag.requestedModel.trim()
-      : typeof model === "string" &&
-          model !== "null" &&
-          model !== "missing"
+    typeof overrides?.requestedModel === "string" &&
+    overrides.requestedModel.trim()
+      ? overrides.requestedModel.trim()
+      : typeof model === "string" && model !== "null" && model !== "missing"
         ? model
         : undefined;
   let resolvedModel =
-    typeof diag.resolvedModel === "string" && diag.resolvedModel.trim()
-      ? diag.resolvedModel.trim()
+    typeof overrides?.resolvedModel === "string" &&
+    overrides.resolvedModel.trim()
+      ? overrides.resolvedModel.trim()
       : undefined;
   if (requestedModel && !resolvedModel) {
     try {
@@ -133,6 +142,25 @@ export function logChatCompletionInvalidRequest(
   const messages = record?.messages;
   const messagesCount = Array.isArray(messages) ? messages.length : -1;
 
+  return { model, requestedModel, resolvedModel, stream, messages, messagesCount };
+}
+
+export function logChatCompletionInvalidRequest(
+  diag: ChatCompletion400Diagnostic
+): void {
+  const body = diag.body;
+  const {
+    model,
+    requestedModel,
+    resolvedModel,
+    stream,
+    messages,
+    messagesCount,
+  } = resolveModelDiagFields(body, {
+    requestedModel: diag.requestedModel,
+    resolvedModel: diag.resolvedModel,
+  });
+
   log.warn("chat_completion_invalid_request", {
     requestId: diag.requestId,
     route: diag.route ?? "/v1/chat/completions",
@@ -144,6 +172,8 @@ export function logChatCompletionInvalidRequest(
     messagesCount,
     contentShape: chatContentShape(messages),
     rejectedReason: safeInvalidRequestMessage(diag.rejectedReason),
+    normalized: diag.normalized === true,
+    noop: diag.noop === true,
     ...(diag.zodErrors?.length
       ? { zodErrors: diag.zodErrors.join(" | ") }
       : {}),
@@ -154,8 +184,8 @@ export function logChatCompletionInvalidRequest(
 }
 
 /**
- * Cherry Studio occasionally POSTs messages=[] / missing / non-array.
- * Treat as empty for a not-billable HTTP 200 noop (never upstream).
+ * Cherry Studio occasionally POSTs messages=[] / missing / non-array /
+ * all-empty content. Treat as empty for a not-billable HTTP 200 noop.
  */
 export function isEmptyChatMessagesBody(body: unknown): boolean {
   if (!body || typeof body !== "object" || Array.isArray(body)) return false;
@@ -169,41 +199,41 @@ export function logChatCompletionEmptyMessagesNoop(args: {
   requestId: string;
   route?: string;
   body: unknown;
+  /** Original client body (pre-normalize) for contentShape / bodyKeys. */
+  originalBody?: unknown;
+  normalized?: boolean;
+  rejectedReason?: string;
 }): void {
-  const body = args.body;
-  const record =
-    body && typeof body === "object" && !Array.isArray(body)
-      ? (body as Record<string, unknown>)
-      : null;
+  const bodyForShape = args.originalBody ?? args.body;
+  const {
+    model,
+    requestedModel,
+    resolvedModel,
+    stream,
+    messages,
+    messagesCount,
+  } = resolveModelDiagFields(bodyForShape);
 
-  const modelRaw = record?.model;
-  const model =
-    typeof modelRaw === "string" && modelRaw.trim()
-      ? modelRaw.trim()
-      : modelRaw === null
-        ? "null"
-        : modelRaw === undefined
-          ? "missing"
-          : typeof modelRaw;
-
-  const streamRaw = record?.stream;
-  const stream =
-    streamRaw === true || streamRaw === false
-      ? streamRaw
-      : streamRaw === null
-        ? "null"
-        : streamRaw === undefined
-          ? "missing"
-          : typeof streamRaw;
+  const shapeMessages =
+    bodyForShape &&
+    typeof bodyForShape === "object" &&
+    !Array.isArray(bodyForShape)
+      ? (bodyForShape as Record<string, unknown>).messages
+      : messages;
 
   log.warn("chat_completion_empty_messages_noop", {
     requestId: args.requestId,
     route: args.route ?? "/v1/chat/completions",
     model,
+    ...(requestedModel ? { requestedModel } : {}),
+    ...(resolvedModel ? { resolvedModel } : {}),
     stream,
-    bodyKeys: chatBodyKeys(body).join(","),
-    messagesCount: 0,
-    contentShape: "empty",
+    bodyKeys: chatBodyKeys(bodyForShape).join(","),
+    messagesCount: Array.isArray(shapeMessages) ? shapeMessages.length : 0,
+    contentShape: chatContentShape(shapeMessages),
+    rejectedReason: args.rejectedReason ?? "empty_messages",
+    normalized: args.normalized !== false,
+    noop: true,
   });
 }
 
@@ -253,4 +283,38 @@ export function buildEmptyMessagesNoopChatCompletion(args: {
       rejectedReason: "empty_messages",
     },
   };
+}
+
+/**
+ * Redacted log when a client body was sanitized before schema (not a noop).
+ */
+export function logChatCompletionClientNormalized(args: {
+  requestId: string;
+  route?: string;
+  body: unknown;
+  originalBody?: unknown;
+}): void {
+  const bodyForShape = args.originalBody ?? args.body;
+  const {
+    model,
+    requestedModel,
+    resolvedModel,
+    stream,
+    messages,
+    messagesCount,
+  } = resolveModelDiagFields(bodyForShape);
+
+  log.info("chat_completion_client_normalized", {
+    requestId: args.requestId,
+    route: args.route ?? "/v1/chat/completions",
+    model,
+    ...(requestedModel ? { requestedModel } : {}),
+    ...(resolvedModel ? { resolvedModel } : {}),
+    stream,
+    bodyKeys: chatBodyKeys(bodyForShape).join(","),
+    messagesCount,
+    contentShape: chatContentShape(messages),
+    normalized: true,
+    noop: false,
+  });
 }

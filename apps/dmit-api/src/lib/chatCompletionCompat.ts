@@ -4,12 +4,27 @@
  * - Accept common client shapes (null optional numbers, content parts arrays)
  * - Never forward unknown / vendor-incompatible fields upstream
  * - Strip GPT-rejected sampling params so upstream 400s do not leak
+ * - Pre-schema client-body sanitize for Cherry Studio malformed payloads
  */
 
 export type NormalizedChatMessage = {
   role: string;
   content: string;
 };
+
+/** Optional fields Cherry / SDKs often send as explicit null — drop before schema. */
+export const CHAT_NULLABLE_OPTIONAL_KEYS = [
+  "temperature",
+  "top_p",
+  "presence_penalty",
+  "frequency_penalty",
+  "max_tokens",
+  "max_completion_tokens",
+  "tools",
+  "tool_choice",
+  "response_format",
+  "stream_options",
+] as const;
 
 /** Coerce null / empty string → undefined for optional numeric fields. */
 export function coerceOptionalNumber(value: unknown): number | undefined {
@@ -31,8 +46,22 @@ export function coerceOptionalBoolean(value: unknown): boolean | undefined {
 }
 
 /**
+ * Role compat for Cherry / OpenAI SDK variants:
+ * developer → system; assistant|user|system kept; anything else → user.
+ */
+export function normalizeChatMessageRole(role: unknown): string {
+  if (typeof role !== "string" || !role.trim()) return "user";
+  const lower = role.trim().toLowerCase();
+  if (lower === "developer") return "system";
+  if (lower === "assistant" || lower === "user" || lower === "system") {
+    return lower;
+  }
+  return "user";
+}
+
+/**
  * Flatten OpenAI-style content parts to a plain string for upstream chat.
- * Supports string, [{type:"text", text:"..."}], and similar shapes.
+ * Supports string, [{type:"text"|"input_text", text:"..."}], {text:"..."}, etc.
  */
 export function normalizeChatMessageContent(content: unknown): string {
   if (typeof content === "string") return content;
@@ -47,6 +76,7 @@ export function normalizeChatMessageContent(content: unknown): string {
       }
       if (!item || typeof item !== "object") continue;
       const part = item as Record<string, unknown>;
+      // { type: "text" | "input_text", text: "..." } and { text: "..." }
       if (typeof part.text === "string") {
         parts.push(part.text);
         continue;
@@ -55,8 +85,7 @@ export function normalizeChatMessageContent(content: unknown): string {
         parts.push(part.content);
         continue;
       }
-      // Nested parts: { type: "text", text: ... } already handled;
-      // ignore image_url / tool parts for text chat compat.
+      // ignore image_url / tool / illegal object parts for text chat compat
     }
     return parts.join("");
   }
@@ -91,23 +120,133 @@ export function normalizeChatMessages(
       };
     }
     const row = raw as Record<string, unknown>;
-    const role =
-      typeof row.role === "string" && row.role.trim()
-        ? row.role.trim()
-        : "";
-    if (!role) {
-      return {
-        ok: false,
-        message: "Each message must include a non-empty role.",
-      };
-    }
     out.push({
-      role,
+      role: normalizeChatMessageRole(row.role),
       content: normalizeChatMessageContent(row.content),
     });
   }
 
   return { ok: true, messages: out };
+}
+
+export type NormalizeClientChatCompletionBodyResult =
+  | {
+      noop: true;
+      rejectedReason: "empty_messages";
+      normalized: boolean;
+      /** Body retained for model/stream in noop response. */
+      body: Record<string, unknown>;
+    }
+  | {
+      noop: false;
+      normalized: boolean;
+      /** Sanitized object, or original non-object for schema 400. */
+      body: unknown;
+    };
+
+function stripNullOptionalFields(
+  body: Record<string, unknown>
+): { body: Record<string, unknown>; changed: boolean } {
+  let changed = false;
+  const out: Record<string, unknown> = { ...body };
+  for (const key of CHAT_NULLABLE_OPTIONAL_KEYS) {
+    if (out[key] === null) {
+      delete out[key];
+      changed = true;
+    }
+  }
+  return { body: out, changed };
+}
+
+/**
+ * Pre-schema Cherry Studio / OpenAI client body sanitize for /v1/chat/completions.
+ *
+ * - Drop null optional sampling / tools / format fields
+ * - Normalize message roles + flatten content parts to strings
+ * - messages missing / null / [] / non-array / all-empty-content → noop
+ *   (caller returns 200 not_billable; never upstream / never debit)
+ */
+export function normalizeClientChatCompletionBody(
+  rawBody: unknown
+): NormalizeClientChatCompletionBodyResult {
+  if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) {
+    // Non-object bodies fall through to schema → concrete OpenAI 400 envelope.
+    return {
+      noop: false,
+      normalized: false,
+      body: rawBody,
+    };
+  }
+
+  const original = rawBody as Record<string, unknown>;
+  let normalized = false;
+
+  const stripped = stripNullOptionalFields(original);
+  let body = stripped.body;
+  if (stripped.changed) normalized = true;
+
+  const messagesRaw = body.messages;
+
+  // A: missing / null / non-array / [] → empty noop
+  if (
+    messagesRaw === undefined ||
+    messagesRaw === null ||
+    !Array.isArray(messagesRaw) ||
+    messagesRaw.length === 0
+  ) {
+    return {
+      noop: true,
+      rejectedReason: "empty_messages",
+      normalized: true,
+      body,
+    };
+  }
+
+  const normalizedMessages: Record<string, unknown>[] = [];
+  let messagesChanged = false;
+
+  for (const raw of messagesRaw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      // Illegal message entry → skip; may collapse to empty noop below.
+      messagesChanged = true;
+      continue;
+    }
+    const row = raw as Record<string, unknown>;
+    const role = normalizeChatMessageRole(row.role);
+    const content = normalizeChatMessageContent(row.content);
+    if (role !== row.role || content !== row.content) {
+      messagesChanged = true;
+    }
+    // Preserve other passthrough keys on the message object for schema .passthrough().
+    normalizedMessages.push({ ...row, role, content });
+  }
+
+  if (messagesChanged) normalized = true;
+
+  // B: all content empty after extract → same empty noop (no upstream / no debit)
+  const hasText = normalizedMessages.some((m) => {
+    const c = m.content;
+    return typeof c === "string" && c.trim().length > 0;
+  });
+  if (!hasText) {
+    return {
+      noop: true,
+      rejectedReason: "empty_messages",
+      normalized: true,
+      body: { ...body, messages: normalizedMessages },
+    };
+  }
+
+  body = {
+    ...body,
+    messages: normalizedMessages,
+  };
+
+  return {
+    noop: false,
+    normalized,
+    body,
+  };
 }
 
 /** GPT family often rejects custom temperature / top_p / penalties. */

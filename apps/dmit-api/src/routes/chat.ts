@@ -13,11 +13,14 @@ import {
   getKeyInflight,
 } from "../gateway/concurrency.js";
 import { chatCompletionToSseBody } from "../lib/chatCompletionSse.js";
-import { normalizeChatMessages } from "../lib/chatCompletionCompat.js";
+import {
+  normalizeChatMessages,
+  normalizeClientChatCompletionBody,
+} from "../lib/chatCompletionCompat.js";
 import {
   buildEmptyMessagesNoopChatCompletion,
   formatZodIssues,
-  isEmptyChatMessagesBody,
+  logChatCompletionClientNormalized,
   logChatCompletionEmptyMessagesNoop,
   logChatCompletionInvalidRequest,
   safeInvalidRequestMessage,
@@ -39,8 +42,9 @@ import { logGatewayRejection } from "./chatGatewayLogs.js";
  * Non-stream requests return JSON; stream=true returns OpenAI-compatible SSE
  * (synthesized from a completed upstream response) ending with data: [DONE].
  *
- * Cherry Studio / OpenAI SDK bodies are accepted loosely; unknown harmless
- * fields are ignored before upstream. Validation 400s always return a concrete
+ * Cherry Studio / OpenAI SDK bodies are normalized/sanitized BEFORE schema
+ * validation. Empty / all-empty-content messages return a 200 not_billable
+ * noop (never upstream, never debit). Validation 400s always return a concrete
  * JSON error envelope via respondApiError (never empty body / undefined message).
  */
 export const chatRoutes = new Hono();
@@ -54,9 +58,9 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
   const limitKey = gatewayLimitKey(caller.apiKeyId, caller.userId);
   const route = "/v1/chat/completions";
 
-  let body: unknown;
+  let rawBody: unknown;
   try {
-    body = await readJsonBodyWithLimit(c);
+    rawBody = await readJsonBodyWithLimit(c);
   } catch (err) {
     if (err instanceof ApiError && err.code === "request_body_too_large") {
       await logGatewayRejection({
@@ -78,6 +82,8 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
           "Invalid JSON body."
         ),
         validationErrors: [err.code ?? "invalid_request_error"],
+        normalized: false,
+        noop: false,
       });
       // Return directly — do not rely on onError (avoids empty-body races).
       return respondApiError(c, err, requestId);
@@ -85,16 +91,31 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     throw err;
   }
 
-  // Cherry Studio compat: messages missing / non-array / [] → 200 noop
-  // (no upstream, no debit). Must run before schema validation.
-  if (isEmptyChatMessagesBody(body)) {
-    logChatCompletionEmptyMessagesNoop({ requestId, route, body });
-    const noop = buildEmptyMessagesNoopChatCompletion({ requestId, body });
+  // Cherry Studio compat: normalize/sanitize BEFORE schema validation.
+  // messages missing / null / [] / non-array / all-empty-content → 200 noop.
+  const clientNorm = normalizeClientChatCompletionBody(rawBody);
+  if (clientNorm.noop) {
+    logChatCompletionEmptyMessagesNoop({
+      requestId,
+      route,
+      body: clientNorm.body,
+      originalBody: rawBody,
+      normalized: clientNorm.normalized,
+      rejectedReason: clientNorm.rejectedReason,
+    });
+    const noop = buildEmptyMessagesNoopChatCompletion({
+      requestId,
+      body: clientNorm.body,
+    });
     const wantsStream =
-      body !== null &&
-      typeof body === "object" &&
-      !Array.isArray(body) &&
-      (body as { stream?: unknown }).stream === true;
+      (clientNorm.body !== null &&
+        typeof clientNorm.body === "object" &&
+        !Array.isArray(clientNorm.body) &&
+        (clientNorm.body as { stream?: unknown }).stream === true) ||
+      (rawBody !== null &&
+        typeof rawBody === "object" &&
+        !Array.isArray(rawBody) &&
+        (rawBody as { stream?: unknown }).stream === true);
     if (wantsStream) {
       const sseBody = chatCompletionToSseBody(noop);
       return c.newResponse(sseBody, {
@@ -110,6 +131,16 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     return c.json(noop);
   }
 
+  if (clientNorm.normalized) {
+    logChatCompletionClientNormalized({
+      requestId,
+      route,
+      body: clientNorm.body,
+      originalBody: rawBody,
+    });
+  }
+
+  const body = clientNorm.body;
   const parsed = ChatCompletionRequestSchema.safeParse(body);
   if (!parsed.success) {
     const zodErrors = formatZodIssues(parsed.error);
@@ -121,10 +152,12 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     logChatCompletionInvalidRequest({
       requestId,
       route,
-      body,
+      body: rawBody,
       rejectedReason,
       zodErrors,
       validationErrors: ["schema_validation_failed"],
+      normalized: clientNorm.normalized,
+      noop: false,
     });
     return respondApiError(
       c,
@@ -142,9 +175,11 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     logChatCompletionInvalidRequest({
       requestId,
       route,
-      body,
+      body: rawBody,
       rejectedReason,
       validationErrors: ["messages_normalization_failed"],
+      normalized: clientNorm.normalized,
+      noop: false,
     });
     return respondApiError(
       c,
@@ -161,9 +196,11 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     logChatCompletionInvalidRequest({
       requestId,
       route,
-      body,
+      body: rawBody,
       rejectedReason,
       validationErrors: ["invalid_idempotency_key"],
+      normalized: clientNorm.normalized,
+      noop: false,
     });
     return respondApiError(
       c,
@@ -190,8 +227,8 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
   if (!result.ok) {
     if (result.httpStatus === 400) {
       const requestedRaw =
-        typeof (body as { model?: unknown })?.model === "string"
-          ? String((body as { model: string }).model).trim()
+        typeof (rawBody as { model?: unknown })?.model === "string"
+          ? String((rawBody as { model: string }).model).trim()
           : undefined;
       const resolved = requestedRaw
         ? resolveChatModel(requestedRaw)
@@ -199,7 +236,7 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       logChatCompletionInvalidRequest({
         requestId: result.requestId || requestId,
         route,
-        body,
+        body: rawBody,
         rejectedReason: safeInvalidRequestMessage(
           result.errorMessage,
           "Invalid chat completion request."
@@ -207,6 +244,8 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
         validationErrors: [result.errorCode || "invalid_request_error"],
         requestedModel: requestedRaw,
         resolvedModel: resolved?.canonicalId,
+        normalized: clientNorm.normalized,
+        noop: false,
       });
     }
     // Always JSON error body — never SSE — even when client asked stream=true.

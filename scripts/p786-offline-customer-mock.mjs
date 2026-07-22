@@ -360,15 +360,125 @@ function chatCompletionToSse(completion) {
   ].join("");
 }
 
+function mockNormalizeChatContent(content) {
+  if (typeof content === "string") return content;
+  if (content === null || content === undefined) return "";
+  if (Array.isArray(content)) {
+    const parts = [];
+    for (const item of content) {
+      if (typeof item === "string") {
+        parts.push(item);
+        continue;
+      }
+      if (!item || typeof item !== "object") continue;
+      if (typeof item.text === "string") parts.push(item.text);
+      else if (typeof item.content === "string") parts.push(item.content);
+    }
+    return parts.join("");
+  }
+  if (typeof content === "object") {
+    if (typeof content.text === "string") return content.text;
+    if (typeof content.content === "string") return content.content;
+  }
+  return "";
+}
+
+function mockNormalizeChatRole(role) {
+  if (typeof role !== "string" || !role.trim()) return "user";
+  const lower = role.trim().toLowerCase();
+  if (lower === "developer") return "system";
+  if (lower === "assistant" || lower === "user" || lower === "system") return lower;
+  return "user";
+}
+
+function mockChatContentShape(messages) {
+  if (!Array.isArray(messages)) return "not_array";
+  if (messages.length === 0) return "empty";
+  return messages
+    .map((raw) => {
+      if (!raw || typeof raw !== "object") return "invalid_message";
+      const content = raw.content;
+      if (typeof content === "string") return "string";
+      if (content === null) return "null";
+      if (content === undefined) return "missing";
+      if (Array.isArray(content)) {
+        const partTypes = content.map((part) => {
+          if (typeof part === "string") return "string";
+          if (!part || typeof part !== "object") return typeof part;
+          return typeof part.type === "string" && part.type.trim()
+            ? part.type.trim()
+            : typeof part.text === "string"
+              ? "text"
+              : "object";
+        });
+        return `array[${partTypes.join(",")}]`;
+      }
+      return typeof content;
+    })
+    .join("|");
+}
+
+/** Mirror apps/dmit-api normalizeClientChatCompletionBody (offline only). */
+function mockNormalizeClientChatBody(rawBody) {
+  if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) {
+    return { noop: false, body: rawBody };
+  }
+  const NULL_KEYS = [
+    "temperature",
+    "top_p",
+    "presence_penalty",
+    "frequency_penalty",
+    "max_tokens",
+    "max_completion_tokens",
+    "tools",
+    "tool_choice",
+    "response_format",
+    "stream_options",
+  ];
+  const body = { ...rawBody };
+  for (const key of NULL_KEYS) {
+    if (body[key] === null) delete body[key];
+  }
+  const messagesRaw = body.messages;
+  if (
+    messagesRaw === undefined ||
+    messagesRaw === null ||
+    !Array.isArray(messagesRaw) ||
+    messagesRaw.length === 0
+  ) {
+    return { noop: true, body };
+  }
+  const normalizedMessages = [];
+  for (const raw of messagesRaw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+    normalizedMessages.push({
+      ...raw,
+      role: mockNormalizeChatRole(raw.role),
+      content: mockNormalizeChatContent(raw.content),
+    });
+  }
+  const hasText = normalizedMessages.some(
+    (m) => typeof m.content === "string" && m.content.trim().length > 0
+  );
+  if (!hasText) {
+    return { noop: true, body: { ...body, messages: normalizedMessages } };
+  }
+  return { noop: false, body: { ...body, messages: normalizedMessages } };
+}
+
 function chatCompletionBody(body) {
   const requestedModel = typeof body.model === "string" ? body.model : "auto-fast";
   const resolvedModel = resolveMockCanonicalModel(requestedModel);
   const meta = tokfaiMeta(requestedModel, resolvedModel);
+  const firstContent = body.messages?.[0]?.content;
   const content =
-    typeof body.messages?.[0]?.content === "string" &&
-    /TOKFAI_CHAT_ALIAS_READY/i.test(body.messages[0].content)
+    typeof firstContent === "string" &&
+    /TOKFAI_CHAT_ALIAS_READY/i.test(firstContent)
       ? "TOKFAI_CHAT_ALIAS_READY"
-      : "ok";
+      : typeof firstContent === "string" &&
+          /TOKFAI_CHERRY_OK/i.test(firstContent)
+        ? "TOKFAI_CHERRY_OK"
+        : "ok";
   return {
     id: `chatcmpl_${meta.request_id}`,
     object: "chat.completion",
@@ -949,19 +1059,16 @@ export function startMockGateway(options = {}) {
         if (!slot.ok) return sendJson(res, slot.response.status, slot.response.body);
         try {
           const body = await readJsonBody(req);
-          // Cherry Studio compat: empty / missing / non-array messages → 200 noop
-          // (mirror apps/dmit-api chat_completion_empty_messages_noop).
-          if (
-            body?.messages === undefined ||
-            body?.messages === null ||
-            !Array.isArray(body?.messages) ||
-            body.messages.length === 0
-          ) {
+          // Cherry Studio compat: mirror DMIT normalizeClientChatCompletionBody
+          // (empty / missing / non-array / all-empty-content → 200 noop).
+          const clientNorm = mockNormalizeClientChatBody(body);
+          if (clientNorm.noop) {
             const requestId = makeRequestId();
             const model =
               typeof body?.model === "string" && body.model.trim()
                 ? body.model.trim()
                 : "unknown";
+            const messages = body?.messages;
             console.warn(
               JSON.stringify({
                 level: "warn",
@@ -969,14 +1076,19 @@ export function startMockGateway(options = {}) {
                 requestId,
                 route: "/v1/chat/completions",
                 model,
+                requestedModel: model === "unknown" ? undefined : model,
+                resolvedModel: model === "unknown" ? undefined : model,
                 stream: body?.stream === true || body?.stream === false
                   ? body.stream
                   : body?.stream === undefined
                     ? "missing"
                     : typeof body?.stream,
                 bodyKeys: Object.keys(body ?? {}).sort().join(","),
-                messagesCount: 0,
-                contentShape: "empty",
+                messagesCount: Array.isArray(messages) ? messages.length : 0,
+                contentShape: mockChatContentShape(messages),
+                rejectedReason: "empty_messages",
+                normalized: true,
+                noop: true,
               })
             );
             const noop = {
@@ -1015,15 +1127,18 @@ export function startMockGateway(options = {}) {
             }
             return sendJson(res, 200, noop);
           }
+          const normalizedBody = clientNorm.body;
           const model =
-            typeof body?.model === "string" ? body.model : "auto-fast";
+            typeof normalizedBody?.model === "string"
+              ? normalizedBody.model
+              : "auto-fast";
           const forced = mockErrorForModel(model);
           if (forced) return sendJson(res, forced.status, forced.body);
           if (!isMockModelAllowed(model)) {
             return sendJson(res, 400, modelNotAvailableBody());
           }
-          const completion = chatCompletionBody(body);
-          if (body?.stream === true) {
+          const completion = chatCompletionBody(normalizedBody);
+          if (normalizedBody?.stream === true) {
             return sendSse(res, chatCompletionToSse(completion));
           }
           return sendJson(res, 200, completion);

@@ -26,6 +26,8 @@ const ALLOWED_FIELD_KEYS = new Set([
   "messagesCount",
   "contentShape",
   "rejectedReason",
+  "normalized",
+  "noop",
   "zodErrors",
   "validationErrors",
   "upstreamHost",

@@ -15,6 +15,8 @@ const source = `
 import {
   normalizeChatMessageContent,
   normalizeChatMessages,
+  normalizeChatMessageRole,
+  normalizeClientChatCompletionBody,
   shouldStripGptSamplingParams,
   sanitizeUpstreamChatBody,
   coerceOptionalNumber,
@@ -53,8 +55,18 @@ assert(
   normalizeChatMessageContent([{ type: "text", text: "hello" }]) === "hello",
   "content text parts array"
 );
+assert(
+  normalizeChatMessageContent([{ type: "input_text", text: "in" }]) === "in",
+  "content input_text parts"
+);
+assert(normalizeChatMessageContent([{ text: "bare" }]) === "bare", "content bare text");
 assert(normalizeChatMessageContent(null) === "", "content null → empty");
 assert(normalizeChatMessageContent(undefined) === "", "content undefined → empty");
+assert(normalizeChatMessageContent([]) === "", "content [] → empty");
+
+assert(normalizeChatMessageRole("developer") === "system", "developer → system");
+assert(normalizeChatMessageRole("user") === "user", "user kept");
+assert(normalizeChatMessageRole("tool") === "user", "other role → user");
 
 const msgs = normalizeChatMessages([
   { role: "system", content: "You are helpful." },
@@ -67,6 +79,81 @@ assert(msgs.messages[2].content === "", "null content → empty string");
 
 const bad = normalizeChatMessages([]);
 assert(bad.ok === false, "empty messages rejected");
+
+// Pre-schema client normalize matrix (P933)
+const emptyArr = normalizeClientChatCompletionBody({ model: "gpt-5.5", messages: [] });
+assert(emptyArr.noop === true, "messages:[] → noop");
+assert(emptyArr.rejectedReason === "empty_messages", "empty rejectedReason");
+
+const missing = normalizeClientChatCompletionBody({ model: "gpt-5.5" });
+assert(missing.noop === true, "messages missing → noop");
+
+const nullMsgs = normalizeClientChatCompletionBody({ model: "gpt-5.5", messages: null });
+assert(nullMsgs.noop === true, "messages:null → noop");
+
+const strMsgs = normalizeClientChatCompletionBody({ model: "gpt-5.5", messages: "abc" });
+assert(strMsgs.noop === true, "messages:string → noop");
+
+const nullContent = normalizeClientChatCompletionBody({
+  model: "gpt-5.5",
+  messages: [{ role: "user", content: null }],
+});
+assert(nullContent.noop === true, "content:null → noop");
+
+const emptyArrContent = normalizeClientChatCompletionBody({
+  model: "gpt-5.5",
+  messages: [{ role: "user", content: [] }],
+});
+assert(emptyArrContent.noop === true, "content:[] → noop");
+
+const textParts = normalizeClientChatCompletionBody({
+  model: "gpt-5.5",
+  messages: [{ role: "user", content: [{ type: "text", text: "hi" }] }],
+});
+assert(textParts.noop === false, "text parts not noop");
+assert(textParts.normalized === true, "text parts normalized");
+assert(textParts.body.messages[0].content === "hi", "text parts flattened");
+
+const developer = normalizeClientChatCompletionBody({
+  model: "gpt-5.5",
+  messages: [
+    { role: "developer", content: "你是助手" },
+    { role: "user", content: "hi" },
+  ],
+});
+assert(developer.noop === false, "developer role not noop");
+assert(developer.body.messages[0].role === "system", "developer → system");
+assert(developer.body.messages[1].role === "user", "user kept");
+
+const nullOpts = normalizeClientChatCompletionBody({
+  model: "gpt-5.5",
+  messages: [{ role: "user", content: "hi" }],
+  temperature: null,
+  top_p: null,
+  presence_penalty: null,
+  frequency_penalty: null,
+  max_tokens: null,
+  max_completion_tokens: null,
+  tools: null,
+  tool_choice: null,
+  response_format: null,
+  stream_options: null,
+});
+assert(nullOpts.noop === false, "null optionals not noop");
+assert(nullOpts.normalized === true, "null optionals normalized");
+assert(nullOpts.body.temperature === undefined, "temperature null deleted");
+assert(nullOpts.body.tools === undefined, "tools null deleted");
+assert(!("stream_options" in nullOpts.body), "stream_options null deleted");
+
+const normal = normalizeClientChatCompletionBody({
+  model: "gpt-5.5",
+  messages: [{ role: "user", content: "hello world" }],
+  temperature: 0.7,
+});
+assert(normal.noop === false, "normal not noop");
+assert(normal.normalized === false, "normal unchanged");
+assert(normal.body.messages[0].content === "hello world", "normal content intact");
+assert(normal.body.temperature === 0.7, "normal temperature intact");
 
 assert(shouldStripGptSamplingParams("gpt-5.5") === true, "strip gpt-5.5");
 assert(shouldStripGptSamplingParams("gpt-5.4-pro") === true, "strip gpt-5.4-pro");
