@@ -38,6 +38,16 @@ const server = serve(
   }
 );
 
+// Avoid Nginx upstream keepalive reuse of half-closed sockets after SSE
+// (empty HTTP 400 with no content-type/body on the next proxied request).
+const nodeServer = server as { keepAliveTimeout?: number; headersTimeout?: number };
+if (typeof nodeServer.keepAliveTimeout === "number") {
+  nodeServer.keepAliveTimeout = 1;
+}
+if (typeof nodeServer.headersTimeout === "number") {
+  nodeServer.headersTimeout = 5_000;
+}
+
 function shutdown(signal: string) {
   log.info("dmit_shutdown", { signal });
   void closeRedis().finally(() => {

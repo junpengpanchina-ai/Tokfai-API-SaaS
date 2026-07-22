@@ -25,10 +25,24 @@ function respondJsonError(
       ...buildClientErrorBody(err, resolvedId),
       ...extra,
     };
-    const text = JSON.stringify(body);
+    let text = JSON.stringify(body);
+    if (
+      !text ||
+      text === "{}" ||
+      !body?.error ||
+      typeof (body.error as { message?: unknown }).message !== "string" ||
+      !(body.error as { message: string }).message.trim() ||
+      !(body.error as { code?: string }).code ||
+      !(body.error as { type?: string }).type
+    ) {
+      // Never allow empty / undefined envelopes out (Cherry Studio).
+      return respondApiError(c, err, resolvedId);
+    }
     const headers: Record<string, string> = {
       "Content-Type": "application/json; charset=utf-8",
+      "Content-Length": String(Buffer.byteLength(text, "utf8")),
       "Cache-Control": "no-store",
+      Connection: "close",
     };
     if (resolvedId) {
       headers["X-Request-Id"] = resolvedId;

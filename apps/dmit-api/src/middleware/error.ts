@@ -52,8 +52,9 @@ function logApiError(
  * Send a standard API error envelope without going through onError.
  * Always writes a non-empty JSON body (never Content-Length 0).
  *
- * Uses `new Response` (not c.json / c.body) so stream=true / Cherry clients
- * never observe an empty 400 body from Hono context races.
+ * Uses an explicit Content-Length + Connection: close so Nginx upstream
+ * keepalive cannot reuse a half-closed socket after SSE and surface an empty
+ * 400 (no content-type / no body) to Cherry Studio clients.
  */
 export function respondApiError(
   c: Context,
@@ -88,12 +89,15 @@ export function respondApiError(
     });
   }
 
+  const byteLength = Buffer.byteLength(text, "utf8");
   return new Response(text, {
     status: err.status || 400,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
+      "Content-Length": String(byteLength),
       "X-Request-Id": resolvedId,
       "Cache-Control": "no-store",
+      Connection: "close",
     },
   });
 }

@@ -118,12 +118,15 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
         (rawBody as { stream?: unknown }).stream === true);
     if (wantsStream) {
       const sseBody = chatCompletionToSseBody(noop);
+      // Connection: close — avoid Nginx upstream keepalive reuse after SSE,
+      // which otherwise yields empty HTTP 400 bodies on the next request.
       return c.newResponse(sseBody, {
         status: 200,
         headers: {
           "Content-Type": "text/event-stream; charset=utf-8",
+          "Content-Length": String(Buffer.byteLength(sseBody, "utf8")),
           "Cache-Control": "no-cache, no-transform",
-          Connection: "keep-alive",
+          Connection: "close",
           "X-Request-Id": requestId,
         },
       });
@@ -211,6 +214,26 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
 
   const wantsStream = parsed.data.stream === true;
 
+  // Offline/LIVE smoke contract: forced invalid_request envelope (never empty body).
+  // Must not hit upstream / model registry — stays in chat 400 envelope path only.
+  if (parsed.data.model?.trim() === "__tokfai_mock_invalid_request") {
+    logChatCompletionInvalidRequest({
+      requestId,
+      route,
+      body: rawBody,
+      rejectedReason: "Invalid request.",
+      validationErrors: ["invalid_request_error"],
+      requestedModel: "__tokfai_mock_invalid_request",
+      normalized: clientNorm.normalized,
+      noop: false,
+    });
+    return respondApiError(
+      c,
+      ApiError.badRequest("Invalid request.", "invalid_request_error"),
+      requestId
+    );
+  }
+
   const result = await executeChatCompletion({
     caller,
     requestId,
@@ -254,12 +277,14 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
 
   if (wantsStream) {
     const sseBody = chatCompletionToSseBody(result.response);
+    // Connection: close — see empty-messages SSE branch above.
     return c.newResponse(sseBody, {
       status: 200,
       headers: {
         "Content-Type": "text/event-stream; charset=utf-8",
+        "Content-Length": String(Buffer.byteLength(sseBody, "utf8")),
         "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
+        Connection: "close",
         "X-Request-Id": result.requestId,
       },
     });

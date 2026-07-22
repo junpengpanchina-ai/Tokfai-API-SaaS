@@ -127,7 +127,7 @@ export const chatGatewayMiddleware: MiddlewareHandler = async (c, next) => {
   }
 
   try {
-    await next();
+    return await next();
   } finally {
     await releaseKeyConcurrency(limitKey);
   }
