@@ -13,6 +13,9 @@
  *   TOKFAI_PM2_APP=dmit-api   limit pm2 log grep to one process
  *
  * Notes:
+ *   p941 core hard gate must emit TOKFAI_P941_API_ISOLATION_CORE_PASS.
+ *   Soft models (gemini-3-pro / gemini-2.5-pro) may report DEGRADED on
+ *   live upstream timeout without failing the gate; charged timeout still fails.
  *   p942 HTTP probes are mock-gateway contracts (cdn.tokfai.com/demo.png,
  *   example.com/*). LIVE=1 against api.tokfai.com cannot satisfy them.
  *   The gate still sets LIVE=1 for p942, but pins TOKFAI_API_BASE + key to
@@ -32,7 +35,7 @@ const PM2_APP = (process.env.TOKFAI_PM2_APP ?? "").trim();
 const PASS_MARKERS = [
   "TOKFAI_P932_CHERRY_STUDIO_REAL_BODY_PASS",
   "TOKFAI_P933_CHERRY_STUDIO_COMPAT_MATRIX_PASS",
-  "TOKFAI_P941_API_ISOLATION_SMOKE_PASS",
+  "TOKFAI_P941_API_ISOLATION_CORE_PASS",
   "TOKFAI_P942_VISION_ANALYZE_PASS",
   "TOKFAI_PUBLIC_BETA_READY_ALL_PASS",
 ];
@@ -95,11 +98,11 @@ const STEPS = [
   },
   {
     id: "p941",
-    label: "5. LIVE p941 api isolation",
+    label: "5. LIVE p941 api isolation (core hard gate)",
     cwd: ROOT,
     cmd: "node",
     args: ["scripts/p941-api-isolation-smoke.mjs"],
-    marker: "TOKFAI_P941_API_ISOLATION_SMOKE_PASS",
+    marker: "TOKFAI_P941_API_ISOLATION_CORE_PASS",
     live: true,
   },
   {

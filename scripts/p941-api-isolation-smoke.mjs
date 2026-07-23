@@ -6,10 +6,17 @@
  * probing the public OpenAI-compatible surface only. Does not change
  * production code, billing, aliases, or timeouts.
  *
+ * Judgment split (release-gate layer only):
+ *   - Core hard gate (must PASS): gpt-5.5, gpt-5-pro, gpt-5.4-pro,
+ *     gemini-2.5-flash
+ *   - Soft / degraded report (timeout does not block gate): gemini-3-pro,
+ *     gemini-2.5-pro
+ *
  * Hard limits:
  *   - never print full API key
  *   - never expose upstream domains
  *   - no production path edits
+ *   - never raise global server timeout to 700s
  *
  * Coverage:
  *   1. GET  /v1/models
@@ -30,7 +37,8 @@
  *   CHAT_TIMEOUT_MS=120000   (client abort only; does not change server timeout)
  *
  * Acceptance:
- *   TOKFAI_P941_API_ISOLATION_SMOKE_PASS
+ *   TOKFAI_P941_API_ISOLATION_CORE_PASS
+ *   (optional full-green) TOKFAI_P941_API_ISOLATION_SMOKE_PASS
  */
 
 import {
@@ -39,24 +47,37 @@ import {
   fail,
 } from "./lib/client-compat-smoke-bootstrap.mjs";
 import { acceptanceFetch } from "./lib/acceptance-http.mjs";
+import { UPSTREAM_DEGRADED_CODES } from "./lib/public-beta-live-helpers.mjs";
 
 const SCRIPT = "scripts/p941-api-isolation-smoke.mjs";
-const PASS_MARKER = "TOKFAI_P941_API_ISOLATION_SMOKE_PASS";
+const CORE_PASS_MARKER = "TOKFAI_P941_API_ISOLATION_CORE_PASS";
+const CORE_FAIL_MARKER = "TOKFAI_P941_API_ISOLATION_CORE_FAIL";
+const SMOKE_PASS_MARKER = "TOKFAI_P941_API_ISOLATION_SMOKE_PASS";
 const FAIL_MARKER = "TOKFAI_P941_API_ISOLATION_SMOKE_FAIL";
 
-const DEFAULT_MODELS = [
+/** Stable models — hard gate for release. */
+const CORE_MODELS = [
   "gpt-5.5",
   "gpt-5-pro",
   "gpt-5.4-pro",
-  "gemini-3-pro",
-  "gemini-2.5-pro",
   "gemini-2.5-flash",
 ];
+
+/**
+ * Soft models — still probed and reported; live upstream timeout is
+ * DEGRADED (does not fail CORE / release gate). Other hard bugs still fail.
+ */
+const SOFT_MODELS = ["gemini-3-pro", "gemini-2.5-pro"];
+
+const DEFAULT_MODELS = [...CORE_MODELS, ...SOFT_MODELS];
 
 const MODELS = (process.env.MODELS ?? DEFAULT_MODELS.join(","))
   .split(",")
   .map((m) => m.trim())
   .filter(Boolean);
+
+const CORE_SET = new Set(CORE_MODELS);
+const SOFT_SET = new Set(SOFT_MODELS);
 
 const PROMPT = "Say ok only.";
 
@@ -187,6 +208,12 @@ function assertNoUndefinedInRow(row) {
   return null;
 }
 
+function routeStreamFlag(route) {
+  if (/stream\s*=\s*true/i.test(route)) return true;
+  if (/stream\s*=\s*false/i.test(route)) return false;
+  return null;
+}
+
 function buildRow({
   route,
   model,
@@ -198,6 +225,7 @@ function buildRow({
   return {
     route,
     model: model ?? null,
+    stream: routeStreamFlag(route),
     status,
     ok: Boolean(ok),
     latencyMs: Math.round(latencyMs),
@@ -219,6 +247,7 @@ function printRow(row) {
     JSON.stringify({
       route: row.route,
       model: row.model,
+      stream: row.stream,
       status: row.status,
       ok: row.ok,
       latencyMs: row.latencyMs,
@@ -230,6 +259,52 @@ function printRow(row) {
       "error.code": row["error.code"],
       "error.message": row["error.message"],
     })
+  );
+}
+
+function isTimeoutLike(row) {
+  const code = row["error.code"];
+  const message = String(row["error.message"] ?? "");
+  if (typeof code === "string" && UPSTREAM_DEGRADED_CODES.has(code)) {
+    return true;
+  }
+  if (/timeout|timed?\s*out|aborted|AbortError|TimeoutError/i.test(message)) {
+    return true;
+  }
+  if (row.status === 0 && /network/i.test(String(code ?? ""))) {
+    // Client abort often surfaces as network_error + timeout message;
+    // also treat bare client abort with high latency as timeout-ish when
+    // message mentions abort/timeout (already covered). Leave non-timeout
+    // network errors for hard fail.
+    return /timeout|abort/i.test(message);
+  }
+  return false;
+}
+
+function hasChargeOnError(row) {
+  if (typeof row.credits_charged === "number" && row.credits_charged > 0) {
+    return true;
+  }
+  const billing = String(row.billing_status ?? "").toLowerCase();
+  if (billing.includes("charged") && !billing.includes("uncharged")) {
+    return true;
+  }
+  const msg = String(row["error.message"] ?? "").toLowerCase();
+  if (msg.includes("charged timeout")) return true;
+  return false;
+}
+
+/**
+ * Isolation surface OK: HTTP 200 validated body, OR non-200 Tokfai envelope.
+ * (Same as pre-split P941 — rate-limit 429 with envelope is isolation-OK.)
+ */
+function isIsolationOk(row) {
+  if (!row.ok) return false;
+  if (row.status === 200) return true;
+  return (
+    row.status >= 400 &&
+    row["error.code"] != null &&
+    row["error.message"] != null
   );
 }
 
@@ -321,15 +396,49 @@ function validateProbe({
   return { ok: true, detail: null };
 }
 
+function printDegradedReport(degradedRows) {
+  console.log("");
+  console.log("═══ P941 degraded model report ═══");
+  if (!degradedRows.length) {
+    console.log("(none)");
+    return;
+  }
+  for (const row of degradedRows) {
+    console.log(
+      JSON.stringify({
+        kind: "degraded",
+        request_id: row.request_id,
+        model: row.model,
+        route: row.route,
+        stream: row.stream,
+        latencyMs: row.latencyMs,
+        "error.code": row["error.code"],
+        "error.message": row["error.message"],
+        status: row.status,
+        credits_charged: row.credits_charged,
+      })
+    );
+  }
+  console.log(
+    `degraded_count: ${degradedRows.length} (timeout on soft models — does not block CORE)`
+  );
+}
+
 async function main() {
   const ctx = await bootstrapClientCompatSmoke(SCRIPT);
   // Re-mask: bootstrap already prints a prefix; reinforce hard limit.
   console.log(`api_key_masked: ${maskKey(ctx.API_KEY)}`);
   console.log(`models: ${MODELS.join(", ")}`);
+  console.log(`core_models (hard gate): ${CORE_MODELS.join(", ")}`);
+  console.log(
+    `soft_models (timeout → degraded): ${SOFT_MODELS.join(", ")}`
+  );
   console.log("");
 
   const rows = [];
-  let allOk = true;
+  const degradedRows = [];
+  let coreOk = true;
+  let softHardFail = false;
   let lastJsonBody = null;
 
   async function probe({
@@ -375,7 +484,6 @@ async function main() {
       });
       rows.push(row);
       printRow(row);
-      allOk = fail(label, `network: ${message}`) && allOk;
       lastJsonBody = null;
       return row;
     }
@@ -408,11 +516,12 @@ async function main() {
     const undefErr = assertNoUndefinedInRow(row);
     if (undefErr) {
       row.ok = false;
-      allOk = fail(label, undefErr) && allOk;
+      row["error.message"] = row["error.message"] ?? undefErr;
+      row["error.code"] = row["error.code"] ?? "row_integrity";
     } else if (!verdict.ok) {
-      allOk = fail(label, verdict.detail) && allOk;
-    } else {
-      pass(label);
+      row.ok = false;
+      row["error.message"] = row["error.message"] ?? verdict.detail;
+      row["error.code"] = row["error.code"] ?? "probe_validation";
     }
 
     rows.push(row);
@@ -420,13 +529,22 @@ async function main() {
     return row;
   }
 
-  // 1) Catalog
+  // 1) Catalog — always part of the core isolation surface.
   const modelsRow = await probe({
     route: "GET /v1/models",
     model: null,
     method: "GET",
     path: "/v1/models",
   });
+  if (!modelsRow.ok || modelsRow.status !== 200) {
+    coreOk =
+      fail(
+        "GET /v1/models",
+        modelsRow["error.message"] ?? `status=${modelsRow.status}`
+      ) && false;
+  } else {
+    pass("GET /v1/models");
+  }
 
   const catalogIds = new Set(
     modelsRow.ok && modelsRow.status === 200 && Array.isArray(lastJsonBody?.data)
@@ -503,50 +621,117 @@ async function main() {
     });
   }
 
-  // Isolation gate: every available-model probe is 200 or Tokfai envelope.
-  const availableSet = new Set(
-    availableModels.length ? availableModels : MODELS
-  );
+  // ── Judgment: core hard gate vs soft degraded report ────────────────────
   for (const row of rows) {
     if (row.route === "GET /v1/models") continue;
-    if (row.model && !availableSet.has(row.model)) continue;
-    if (!row.ok) {
-      allOk = false;
+
+    const undefErr = assertNoUndefinedInRow(row);
+    if (undefErr) {
+      coreOk = fail("row integrity", undefErr) && false;
+      softHardFail = true;
       continue;
     }
-    const allowed =
-      row.status === 200 ||
-      (row.status >= 400 &&
-        row["error.code"] != null &&
-        row["error.message"] != null);
-    if (!allowed) {
-      allOk =
+
+    const timeout = isTimeoutLike(row);
+    const charged = hasChargeOnError(row);
+    const isCore = row.model && CORE_SET.has(row.model);
+    const isSoft = row.model && SOFT_SET.has(row.model);
+    const label = `${row.route} model=${row.model}`;
+
+    // Timeout must never charge (core or soft).
+    if (timeout && charged) {
+      coreOk =
         fail(
-          `isolation ${row.route} model=${row.model}`,
-          `status=${row.status} not 200 and not Tokfai error`
-        ) && allOk;
+          label,
+          `timeout charged credits_charged=${row.credits_charged} billing_status=${row.billing_status}`
+        ) && false;
+      softHardFail = true;
+      continue;
     }
+
+    // Soft-model live upstream / client timeout → degraded report only.
+    if (isSoft && timeout && !charged) {
+      degradedRows.push(row);
+      console.log(
+        `DEGRADED  ${label} (timeout; does not block CORE) latencyMs=${row.latencyMs} request_id=${row.request_id ?? "null"}`
+      );
+      continue;
+    }
+
+    // Core models: timeout blocks the hard gate (even with a Tokfai envelope).
+    if (isCore && timeout) {
+      coreOk =
+        fail(
+          label,
+          row["error.message"] ??
+            `core timeout status=${row.status} code=${row["error.code"]}`
+        ) && false;
+      continue;
+    }
+
+    // Isolation OK: HTTP 200 or Tokfai error envelope (incl. 429 rate limit).
+    if (isIsolationOk(row)) {
+      pass(label);
+      continue;
+    }
+
+    if (isSoft) {
+      // Soft model non-timeout hard failure (empty body / undefined / bad envelope).
+      softHardFail = true;
+      coreOk =
+        fail(
+          label,
+          row["error.message"] ??
+            `soft probe hard-fail status=${row.status} code=${row["error.code"]}`
+        ) && false;
+      continue;
+    }
+
+    // Core / unknown model from MODELS override — hard fail.
+    coreOk =
+      fail(
+        label,
+        row["error.message"] ??
+          `probe failed status=${row.status} code=${row["error.code"]}`
+      ) && false;
   }
 
-  // Final sweep: every output field must be defined (null allowed).
-  for (const row of rows) {
-    const err = assertNoUndefinedInRow(row);
-    if (err) {
-      allOk = fail("row integrity", err) && allOk;
-    }
-  }
+  printDegradedReport(degradedRows);
+
+  const allGreen =
+    coreOk && !softHardFail && degradedRows.length === 0;
 
   ctx.cleanup();
   console.log("");
   console.log(
-    `summary: ${rows.filter((r) => r.ok).length}/${rows.length} probes ok`
+    `summary: ${rows.filter((r) => r.route === "GET /v1/models" || isIsolationOk(r)).length}/${rows.length} isolation-ok; degraded=${degradedRows.length}`
   );
-  console.log(allOk ? PASS_MARKER : FAIL_MARKER);
-  process.exit(allOk ? 0 : 1);
+  console.log(
+    `core_gate: ${coreOk ? "PASS" : "FAIL"} soft_hard_fail: ${softHardFail}`
+  );
+
+  if (coreOk) {
+    console.log(CORE_PASS_MARKER);
+  } else {
+    console.log(CORE_FAIL_MARKER);
+  }
+
+  if (allGreen) {
+    console.log(SMOKE_PASS_MARKER);
+  } else if (!coreOk || softHardFail) {
+    console.log(FAIL_MARKER);
+  } else {
+    console.log(
+      "TOKFAI_P941_API_ISOLATION_SMOKE_DEGRADED (core PASS; soft timeouts reported)"
+    );
+  }
+
+  process.exit(coreOk && !softHardFail ? 0 : 1);
 }
 
 main().catch((err) => {
   console.error(redactUpstream(err instanceof Error ? err.message : String(err)));
+  console.log(CORE_FAIL_MARKER);
   console.log(FAIL_MARKER);
   process.exit(1);
 });
