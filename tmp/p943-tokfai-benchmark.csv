@@ -1,0 +1,26 @@
+model,route,stream,status,latencyMs,creditsCharged,errorCode,requestId
+,GET /v1/models,,200,1,,,
+gpt-5.5,POST /v1/chat/completions,false,200,1,0.000001,,req_mock_8f5b77128eb1b892
+gpt-5.5,POST /v1/chat/completions,true,200,1,,,
+gpt-5.5,POST /v1/responses,false,200,1,0.000001,,req_mock_43267b2a1bf3b3ad
+gpt-5.5,POST /v1/responses,true,200,1,,,
+gpt-5-pro,POST /v1/chat/completions,false,200,1,0.000001,,req_mock_72f71ceb6293766f
+gpt-5-pro,POST /v1/chat/completions,true,200,1,,,
+gpt-5-pro,POST /v1/responses,false,200,0,0.000001,,req_mock_8f5467bd1dedcb95
+gpt-5-pro,POST /v1/responses,true,200,0,,,
+gpt-5.4-pro,POST /v1/chat/completions,false,200,1,0.000001,,req_mock_477e87396ad5c412
+gpt-5.4-pro,POST /v1/chat/completions,true,200,0,,,
+gpt-5.4-pro,POST /v1/responses,false,200,0,0.000001,,req_mock_9216e5691cd873e4
+gpt-5.4-pro,POST /v1/responses,true,200,0,,,
+gemini-2.5-flash,POST /v1/chat/completions,false,200,0,0.000001,,req_mock_071934b840197701
+gemini-2.5-flash,POST /v1/chat/completions,true,200,0,,,
+gemini-2.5-flash,POST /v1/responses,false,200,0,0.000001,,req_mock_010bd8ee3afc692f
+gemini-2.5-flash,POST /v1/responses,true,200,0,,,
+gemini-3-pro,POST /v1/chat/completions,false,200,0,0.000001,,req_mock_9f500e4cd1e18b54
+gemini-3-pro,POST /v1/chat/completions,true,200,0,,,
+gemini-3-pro,POST /v1/responses,false,200,0,0.000001,,req_mock_fab77eb5c359586d
+gemini-3-pro,POST /v1/responses,true,200,0,,,
+gemini-2.5-pro,POST /v1/chat/completions,false,200,0,0.000001,,req_mock_fd168dc2a09b8610
+gemini-2.5-pro,POST /v1/chat/completions,true,200,1,,,
+gemini-2.5-pro,POST /v1/responses,false,200,0,0.000001,,req_mock_5f6d60f9b6b349a1
+gemini-2.5-pro,POST /v1/responses,true,200,0,,,

@@ -1,0 +1,25 @@
+model,route,stream,status,latencyMs,creditsCharged,errorCode,requestId
+gpt-5.5,POST /v1/chat/completions,false,200,2800,0.01,,syn_comp_gpt-5.5_false
+gpt-5.5,POST /v1/chat/completions,true,200,3100,0.01,,syn_comp_gpt-5.5_true
+gpt-5.5,POST /v1/responses,false,200,3500,0.01,,syn_comp_gpt-5.5_false
+gpt-5.5,POST /v1/responses,true,200,3900,0.01,,syn_comp_gpt-5.5_true
+gpt-5-pro,POST /v1/chat/completions,false,200,2800,0.01,,syn_comp_gpt-5-pro_false
+gpt-5-pro,POST /v1/chat/completions,true,200,3100,0.01,,syn_comp_gpt-5-pro_true
+gpt-5-pro,POST /v1/responses,false,200,3500,0.01,,syn_comp_gpt-5-pro_false
+gpt-5-pro,POST /v1/responses,true,200,3900,0.01,,syn_comp_gpt-5-pro_true
+gpt-5.4-pro,POST /v1/chat/completions,false,200,2800,0.01,,syn_comp_gpt-5.4-pro_false
+gpt-5.4-pro,POST /v1/chat/completions,true,200,3100,0.01,,syn_comp_gpt-5.4-pro_true
+gpt-5.4-pro,POST /v1/responses,false,200,3500,0.01,,syn_comp_gpt-5.4-pro_false
+gpt-5.4-pro,POST /v1/responses,true,200,3900,0.01,,syn_comp_gpt-5.4-pro_true
+gemini-2.5-flash,POST /v1/chat/completions,false,200,2800,0.01,,syn_comp_gemini-2.5-flash_false
+gemini-2.5-flash,POST /v1/chat/completions,true,200,3100,0.01,,syn_comp_gemini-2.5-flash_true
+gemini-2.5-flash,POST /v1/responses,false,200,3500,0.01,,syn_comp_gemini-2.5-flash_false
+gemini-2.5-flash,POST /v1/responses,true,200,3900,0.01,,syn_comp_gemini-2.5-flash_true
+gemini-3-pro,POST /v1/chat/completions,false,200,2800,0.01,,syn_comp_gemini-3-pro_false
+gemini-3-pro,POST /v1/chat/completions,true,504,11100,,upstream_timeout,syn_comp_gemini-3-pro_timeout
+gemini-3-pro,POST /v1/responses,false,200,3500,0.01,,syn_comp_gemini-3-pro_false
+gemini-3-pro,POST /v1/responses,true,504,11900,,upstream_timeout,syn_comp_gemini-3-pro_timeout
+gemini-2.5-pro,POST /v1/chat/completions,false,504,10800,,upstream_timeout,syn_comp_gemini-2.5-pro_timeout
+gemini-2.5-pro,POST /v1/chat/completions,true,504,11100,,upstream_timeout,syn_comp_gemini-2.5-pro_timeout
+gemini-2.5-pro,POST /v1/responses,false,504,11500,,upstream_timeout,syn_comp_gemini-2.5-pro_timeout
+gemini-2.5-pro,POST /v1/responses,true,504,11900,,upstream_timeout,syn_comp_gemini-2.5-pro_timeout

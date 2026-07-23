@@ -1,0 +1,6 @@
+metric,betterWhen,tokfai,competitorBaseline,deltaPct,edgePct,targetBand
+model_coverage,higher,1,0.8333333333333334,20,20,above
+success_rate,higher,1,0.75,33.33,33.33,above
+p95_latency,lower,1,3900,-99.97,99.97,above
+client_compatibility,higher,0.92,0.82,12.2,12.2,meet
+billing_safety_risk,lower,0,0.01,-100,100,above
