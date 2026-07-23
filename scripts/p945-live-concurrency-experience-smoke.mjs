@@ -3,35 +3,35 @@
  * P945 — Live concurrency experience smoke (measurement framework).
  *
  * Verifies client experience under 50 / 100 / 300 / 1000 concurrency.
- * Short generations only (MAX_OUTPUT_TOKENS=16) — real path latency, not long essays.
+ * Short generations only — real path latency, not long essays.
  *
  * Hard limits:
- *   - no production path / billing / alias / Cherry / image edits
+ *   - no production path / billing / alias / Cherry / image edits / Nginx
  *   - does not modify release gate
  *   - never print full API keys
  *   - 429 allowed only with standard envelope + not_billable
- *   - every request builds a fresh payload + fresh fetch init (no Request/body reuse)
- *   - empty-body HTTP 400 is transport_empty_400 and fails the smoke
+ *   - every request: fresh payload + fresh fetch init (no Request/body/Response reuse)
+ *   - stream default = drain full SSE (never return after first frame)
+ *   - transport_empty_400 is not an API-compat failure
  *
  * Env:
  *   CONCURRENCY          default 50 (single wave); or use LEVELS
- *   REQUESTS             default = CONCURRENCY (one request per slot)
+ *   REQUESTS             default = CONCURRENCY
  *   MODEL                default gpt-5.5
  *   ROUTE                chat | responses | /v1/chat/completions | /v1/responses
  *   STREAM               true | false      (default true)
+ *   STREAM_MODE          drain (default) | abort_after_first_sse
+ *   KEEP_ALIVE           1 = allow connection reuse; default close for stream
  *   MAX_OUTPUT_TOKENS    default 16
- *   LEVELS               e.g. 50,100,300,1000 — run multiple waves
+ *   LEVELS               e.g. 50,100,300,1000
  *   CHAT_TIMEOUT_MS      client abort only
  *   CSV_DIR              default tmp
- *   RAW_DIAG             1 = print per-request transport diagnostics
- *   P945_GHOST_RETRY_MAX retry empty-body 400 ghosts (default 4)
- *   P945_SSE_SETTLE_MS   pause after successful stream (default 200)
+ *   RAW_DIAG             1 = per-request transport diagnostics
+ *   P945_GHOST_RETRY_MAX retry transport_empty_400 (default 3)
  *
  * Usage:
  *   SELF_TEST=1 node scripts/p945-live-concurrency-experience-smoke.mjs
  *   LIVE=1 TOKFAI_API_KEY=sk-tokfai_... CONCURRENCY=50 \
- *     node scripts/p945-live-concurrency-experience-smoke.mjs
- *   LIVE=1 TOKFAI_API_KEY=sk-tokfai_... LEVELS=50,100,300,1000 \
  *     node scripts/p945-live-concurrency-experience-smoke.mjs
  *
  * Outputs:
@@ -43,8 +43,6 @@
  */
 
 import { createHash } from "node:crypto";
-import http from "node:http";
-import https from "node:https";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -89,10 +87,19 @@ const RAW_DIAG =
   process.env.RAW_DIAG === "true" ||
   process.env.RAW_DIAG === "TRUE";
 
-/** Retries for empty-body HTTP 400 transport ghosts (SSE/keep-alive leftovers). */
+const KEEP_ALIVE =
+  process.env.KEEP_ALIVE === "1" ||
+  process.env.KEEP_ALIVE === "true" ||
+  process.env.KEEP_ALIVE === "TRUE";
+
+/** drain = normal experience (default). abort_after_first_sse = named early-cancel mode. */
+const STREAM_MODE_RAW = (process.env.STREAM_MODE ?? "drain").trim().toLowerCase();
+const STREAM_MODE =
+  STREAM_MODE_RAW === "abort_after_first_sse" ? "abort_after_first_sse" : "drain";
+
 const GHOST_RETRY_MAX = Math.max(
   1,
-  parseInt(process.env.P945_GHOST_RETRY_MAX ?? "4", 10) || 4
+  parseInt(process.env.P945_GHOST_RETRY_MAX ?? "3", 10) || 3
 );
 
 const MODEL = (process.env.MODEL ?? "gpt-5.5").trim();
@@ -155,70 +162,6 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Fresh TCP connection per request (agent:false).
- * Avoids undici/fetch keep-alive pooling that produces empty-body 400 ghosts
- * after SSE responses on the public edge.
- * @returns {Promise<{ status: number, headers: http.IncomingHttpHeaders, stream: import('node:stream').Readable }>}
- */
-function freshHttpPost({ url, headers, bodyText, signal }) {
-  return new Promise((resolve, reject) => {
-    const u = new URL(url);
-    const lib = u.protocol === "https:" ? https : http;
-    const bodyBuf = Buffer.from(bodyText, "utf8");
-    const reqHeaders = {
-      ...headers,
-      "Content-Length": String(bodyBuf.byteLength),
-      Connection: "close",
-    };
-    const req = lib.request(
-      {
-        protocol: u.protocol,
-        hostname: u.hostname,
-        port: u.port || (u.protocol === "https:" ? 443 : 80),
-        path: `${u.pathname}${u.search}`,
-        method: "POST",
-        headers: reqHeaders,
-        agent: false,
-      },
-      (res) => {
-        resolve({
-          status: res.statusCode ?? 0,
-          headers: res.headers,
-          stream: res,
-        });
-      }
-    );
-
-    const onAbort = () => {
-      req.destroy(new Error("aborted"));
-    };
-    if (signal) {
-      if (signal.aborted) {
-        onAbort();
-        return;
-      }
-      signal.addEventListener("abort", onAbort, { once: true });
-    }
-
-    req.on("error", (err) => {
-      if (signal) signal.removeEventListener("abort", onAbort);
-      reject(err);
-    });
-    req.write(bodyBuf);
-    req.end();
-  });
-}
-
-/** Read an entire Node readable stream to utf8 text. */
-async function readStreamText(stream) {
-  const chunks = [];
-  for await (const chunk of stream) {
-    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
-  }
-  return Buffer.concat(chunks).toString("utf8");
-}
-
 function extractBillingStatus(body, frames = []) {
   const candidates = [
     body?.tokfai?.billing_status,
@@ -261,10 +204,104 @@ function frameHasContent(obj) {
   return false;
 }
 
+function printRawDiag(row, { index, stream }) {
+  if (!RAW_DIAG) return;
+  const preview = String(row.rawText ?? "").slice(0, 300);
+  console.log(
+    [
+      `RAW_DIAG idx=${index}`,
+      `status=${row.status}`,
+      `route=${ROUTE_LABEL}`,
+      `model=${row.model}`,
+      `stream=${stream}`,
+      `requestBodyBytes=${row.requestBodyBytes}`,
+      `requestBodySha256=${row.requestBodySha12}`,
+      `responseBodyBytes=${row.responseBodyBytes}`,
+      `responseBody=${JSON.stringify(preview)}`,
+      `x-request-id=${row.headerRequestId || row.requestId || "(none)"}`,
+      `content-type=${row.contentType || "(none)"}`,
+      `content-length=${row.contentLength || "(none)"}`,
+      `connection=${row.connectionHeader || "(none)"}`,
+      row.streamMode ? `stream_mode=${row.streamMode}` : "",
+      row.transportEmpty400 ? "mark=transport_empty_400" : "",
+      row.attempt != null ? `attempt=${row.attempt}` : "",
+    ]
+      .filter(Boolean)
+      .join(" ")
+  );
+}
+
 /**
- * Fresh payload + fresh HTTP POST (agent:false) every call.
- * Never reuses Request, body streams, Response, or keep-alive sockets.
- * Local exceptions stay status=0 (never masqueraded as HTTP 400).
+ * Drain SSE with ReadableStream reader until done.
+ * Records firstByte / firstSse / firstContent while never returning early
+ * unless streamMode === abort_after_first_sse (explicit cancel).
+ */
+async function readSseResponseBody(res, t0, streamMode) {
+  const scanner = createSseTimingScanner(t0);
+  const reader = res.body?.getReader?.();
+  const decoder = new TextDecoder();
+  let fullText = "";
+  let abortedAfterFirstSse = false;
+
+  if (!reader) {
+    // No streaming body — fall back to full text (still "drained").
+    fullText = await res.text();
+    scanner.onChunk(fullText);
+    scanner.finish();
+    return {
+      fullText,
+      frames: scanner.frames,
+      firstSseMs: scanner.firstSseMs,
+      firstContentMs: scanner.firstContentMs,
+      abortedAfterFirstSse: false,
+    };
+  }
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      fullText += chunk;
+      scanner.onChunk(chunk);
+
+      if (
+        streamMode === "abort_after_first_sse" &&
+        scanner.firstSseMs != null &&
+        !abortedAfterFirstSse
+      ) {
+        abortedAfterFirstSse = true;
+        try {
+          await reader.cancel("abort_after_first_sse");
+        } catch {
+          // ignore cancel errors
+        }
+        break;
+      }
+    }
+    fullText += decoder.decode();
+    if (scanner.bufferText) scanner.onChunk("\n");
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+      // already released after cancel
+    }
+  }
+
+  return {
+    fullText,
+    frames: scanner.frames,
+    firstSseMs: scanner.firstSseMs,
+    firstContentMs: scanner.firstContentMs,
+    abortedAfterFirstSse,
+  };
+}
+
+/**
+ * One probe: fresh payload, fresh fetch init, full SSE drain (default).
+ * Never reuses Request / body / Response across calls.
+ * Local exceptions → status=0 (never disguised as HTTP 400).
  */
 async function runFreshTimedProbe({
   base,
@@ -277,17 +314,16 @@ async function runFreshTimedProbe({
   index,
   attempt = 1,
 }) {
-  // 1) Fresh payload object every request (identical shape for all indexes).
+  // Fresh payload every request — identical shape for all indexes (no odd/even branch).
   const payload = buildRequestBody({
     path,
     model,
     stream,
     maxTokens,
   });
-  // Ensure prompt is explicit and identical — no index branching.
   if (path.includes("/responses")) {
     payload.input = PROMPT;
-  } else if (Array.isArray(payload.messages) && payload.messages[0]) {
+  } else {
     payload.messages = [{ role: "user", content: PROMPT }];
   }
   const bodyText = JSON.stringify(payload);
@@ -295,16 +331,22 @@ async function runFreshTimedProbe({
   const requestBodySha12 = sha256Prefix12(bodyText);
 
   const url = `${base}${path}`;
-  // 2) Fresh headers object every request.
+  const wantClose = stream && !KEEP_ALIVE;
+  const connectionDirective = wantClose ? "close" : KEEP_ALIVE ? "keep-alive" : "";
+
+  /** @type {Record<string, string>} */
   const freshHeaders = {
     ...authHeaders,
     "Content-Type": "application/json",
-    Connection: "close",
   };
+  if (connectionDirective) {
+    freshHeaders.Connection = connectionDirective;
+  }
 
   const t0 = performance.now();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const streamMode = stream ? STREAM_MODE : "n/a";
 
   /** @type {Record<string, unknown>} */
   const row = {
@@ -313,12 +355,14 @@ async function runFreshTimedProbe({
       ? "POST /v1/responses"
       : "POST /v1/chat/completions",
     stream: stream ? "true" : "false",
+    streamMode,
     status: 0,
     firstByteMs: "",
     firstSseMs: "",
     firstContentMs: "",
     totalMs: "",
     requestId: "",
+    headerRequestId: "",
     creditsCharged: "",
     errorCode: "",
     errorMessage: "",
@@ -331,56 +375,54 @@ async function runFreshTimedProbe({
     responseBodyBytes: 0,
     contentType: "",
     contentLength: "",
+    connectionHeader: "",
     url,
     attempt,
   };
 
   try {
-    // 3) Fresh TCP + fresh POST every request — agent:false, no Request reuse.
-    const res = await freshHttpPost({
-      url,
+    // Fresh fetch init every time — never reuse Request / body / Response.
+    const res = await fetch(url, {
+      method: "POST",
       headers: freshHeaders,
-      bodyText,
+      body: bodyText,
       signal: controller.signal,
     });
 
     const firstByteMs = performance.now() - t0;
     row.status = res.status;
     row.firstByteMs = roundMs(firstByteMs);
-    row.contentType = String(res.headers["content-type"] ?? "");
-    row.contentLength = String(res.headers["content-length"] ?? "");
-    const headerRequestId = String(res.headers["x-request-id"] ?? "");
+    row.contentType = res.headers.get("content-type") ?? "";
+    row.contentLength = res.headers.get("content-length") ?? "";
+    row.connectionHeader =
+      res.headers.get("connection") || connectionDirective || "(none)";
+    const headerRequestId = res.headers.get("x-request-id") ?? "";
+    row.headerRequestId = headerRequestId;
 
     let fullText = "";
     /** @type {any[]} */
     let frames = [];
 
     if (stream) {
-      const scanner = createSseTimingScanner(t0);
-      const decoder = new TextDecoder();
-      for await (const chunk of res.stream) {
-        const buf = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
-        const text = decoder.decode(buf, { stream: true });
-        fullText += text;
-        scanner.onChunk(text);
-      }
-      fullText += decoder.decode();
-      if (scanner.bufferText) scanner.onChunk("\n");
-      frames = scanner.frames;
-
-      const totalMs = performance.now() - t0;
+      const sse = await readSseResponseBody(res, t0, streamMode);
+      fullText = sse.fullText;
+      frames = sse.frames;
       row.firstSseMs =
-        scanner.firstSseMs == null ? "" : roundMs(scanner.firstSseMs);
+        sse.firstSseMs == null ? "" : roundMs(sse.firstSseMs);
       row.firstContentMs =
-        scanner.firstContentMs == null ? "" : roundMs(scanner.firstContentMs);
-      row.totalMs = roundMs(totalMs);
+        sse.firstContentMs == null ? "" : roundMs(sse.firstContentMs);
+      if (sse.abortedAfterFirstSse) {
+        row.errorCode = row.errorCode || "abort_after_first_sse";
+      }
+      // Ensure body is fully settled (drain mode already read to done;
+      // abort mode cancelled — do not touch res.body again).
     } else {
-      fullText = await readStreamText(res.stream);
-      const totalMs = performance.now() - t0;
+      fullText = await res.text();
       row.firstSseMs = "";
-      row.totalMs = roundMs(totalMs);
     }
 
+    const totalMs = performance.now() - t0;
+    row.totalMs = roundMs(totalMs);
     row.rawText = fullText;
     row.responseBodyBytes = Buffer.byteLength(fullText, "utf8");
     const emptyBody = !fullText || !String(fullText).trim();
@@ -399,23 +441,11 @@ async function runFreshTimedProbe({
       extractErrorObject(jsonBody, fullText) ??
       extractErrorObject(lastFrame, fullText);
 
-    // Minimal res-like shim for extractExperienceRequestId header lookup.
-    const resShim = {
-      headers: {
-        get(name) {
-          const key = String(name).toLowerCase();
-          const v = res.headers[key];
-          if (Array.isArray(v)) return v[0] ?? null;
-          return v == null ? null : String(v);
-        },
-      },
-    };
-
     const requestId =
       extractExperienceRequestId({
         body: jsonBody,
         frames,
-        res: resShim,
+        res,
         text: fullText,
       }) || headerRequestId;
 
@@ -429,7 +459,7 @@ async function runFreshTimedProbe({
       credits == null || Number.isNaN(credits) ? "" : credits;
     row.errorCode =
       errObj?.code == null && errObj?.type == null
-        ? ""
+        ? String(row.errorCode ?? "")
         : String(errObj.code ?? errObj.type ?? "");
     row.errorMessage =
       errObj?.message == null ? "" : String(errObj.message).slice(0, 240);
@@ -440,22 +470,26 @@ async function runFreshTimedProbe({
       row.firstContentMs = hasContent ? row.totalMs : "";
     }
 
-    // Transport ghost: HTTP 400 with empty body (edge/keep-alive leftover).
-    // Mark explicitly — never treat as a real API validation envelope.
-    if (Number(row.status) === 400 && emptyBody) {
+    // Transport ghost: 400 + empty body + no x-request-id.
+    // Not an API-compat failure — mark explicitly.
+    if (
+      Number(row.status) === 400 &&
+      emptyBody &&
+      !String(headerRequestId ?? "").trim()
+    ) {
       row.transportEmpty400 = true;
       row.errorCode = "transport_empty_400";
       row.errorMessage =
-        "status=400 with empty response body (transport ghost; not an API envelope)";
+        "status=400 empty body without x-request-id (keep-alive/transport ghost; not API compat)";
     }
 
     return row;
   } catch (err) {
-    // Local exceptions must stay status=0 — never masquerade as HTTP 400.
+    // Local exceptions stay status=0 — never masquerade as HTTP 400.
     const totalMs = performance.now() - t0;
     const message = err instanceof Error ? err.message : String(err);
     const isTimeout =
-      /timeout|abort|TimeoutError|AbortError|aborted/i.test(message) ||
+      /timeout|abort|TimeoutError|AbortError/i.test(message) ||
       err?.name === "AbortError" ||
       err?.name === "TimeoutError";
     row.status = 0;
@@ -467,37 +501,13 @@ async function runFreshTimedProbe({
     return row;
   } finally {
     clearTimeout(timer);
-    if (RAW_DIAG) {
-      const preview = String(row.rawText ?? "").slice(0, 300);
-      console.log(
-        [
-          `RAW_DIAG index=${index}`,
-          `attempt=${attempt}`,
-          `status=${row.status}`,
-          `url=${row.url}`,
-          `route=${ROUTE_LABEL}`,
-          `stream=${stream}`,
-          `requestBodyBytes=${row.requestBodyBytes}`,
-          `requestBodySha256=${row.requestBodySha12}`,
-          `responseBodyBytes=${row.responseBodyBytes}`,
-          `responseBody=${JSON.stringify(preview)}`,
-          `x-request-id=${row.requestId || "(none)"}`,
-          `content-type=${row.contentType || "(none)"}`,
-          `content-length=${row.contentLength || "(none)"}`,
-          row.transportEmpty400 ? "mark=transport_empty_400" : "",
-        ]
-          .filter(Boolean)
-          .join(" ")
-      );
-    }
+    printRawDiag(row, { index, stream });
   }
 }
 
 /**
- * Run one logical slot with fresh probes; retry transport_empty_400 ghosts.
- * Final recorded row is the last attempt (success preferred).
- * After a successful stream, briefly settle so the public edge does not
- * return an empty-body 400 on the next fresh TCP connection.
+ * Retry only transport_empty_400 ghosts with a fresh request each attempt.
+ * Final row is the last non-ghost (or last attempt if exhausted).
  */
 async function runSlotWithGhostRetry(ctx, index) {
   let last = null;
@@ -514,21 +524,9 @@ async function runSlotWithGhostRetry(ctx, index) {
       index,
       attempt,
     });
-    if (!last.transportEmpty400) {
-      if (STREAM && isHttpSuccess(Number(last.status))) {
-        const settleMs = Math.max(
-          0,
-          parseInt(process.env.P945_SSE_SETTLE_MS ?? "200", 10) || 200
-        );
-        if (settleMs > 0) await sleep(settleMs);
-      }
-      return last;
-    }
-    if (attempt < GHOST_RETRY_MAX) {
-      await sleep(50 * attempt);
-    }
+    if (!last.transportEmpty400) return last;
+    if (attempt < GHOST_RETRY_MAX) await sleep(40 * attempt);
   }
-  // Exhausted retries — keep transport_empty_400 mark so P945 fails (never pass empty 400).
   return last;
 }
 
@@ -570,46 +568,20 @@ function printJudgmentBanner(judgment) {
   }
 }
 
-function judgeTransportEmpty400(probes) {
-  const hits = probes.filter((p) => p.transportEmpty400);
-  if (!hits.length) {
-    pass("no transport_empty_400");
-    return true;
-  }
-  fail(
-    "transport_empty_400",
-    `count=${hits.length} indexes=${hits.map((p) => p.index).join(",")}`
-  );
-  return false;
-}
-
-function judgeOddEvenEmpty400Pattern(probes) {
-  const empty400 = probes.filter(
-    (p) => Number(p.status) === 400 && p.emptyBody
-  );
-  if (!empty400.length) return true;
-  const odds = empty400.filter((p) => Number(p.index) % 2 === 1);
-  const evens = empty400.filter((p) => Number(p.index) % 2 === 0);
-  // Classic keep-alive ghost: every odd index fails with empty 400.
-  if (
-    odds.length >= 3 &&
-    odds.length === empty400.length &&
-    evens.length === 0 &&
-    odds.length >= Math.floor(probes.length / 2)
-  ) {
-    fail(
-      "fixed odd-index empty body 400 pattern",
-      `odds=${odds.map((p) => p.index).join(",")} — script/transport reuse bug`
-    );
-    return false;
-  }
-  return true;
+/**
+ * API-compat judgment excludes transport_empty_400 rows
+ * (those are keep-alive/transport ghosts, not model/API failures).
+ */
+function judgeApiCompat(probes) {
+  const apiRows = probes.filter((p) => !p.transportEmpty400);
+  return judgeP945Rows(apiRows);
 }
 
 async function runWave(ctx, concurrency) {
   const requests = requestsFor(concurrency);
   console.log(
-    `\n>>> wave concurrency=${concurrency} requests=${requests} model=${MODEL} route=${ROUTE} stream=${STREAM}`
+    `\n>>> wave concurrency=${concurrency} requests=${requests} model=${MODEL} route=${ROUTE} stream=${STREAM}` +
+      ` stream_mode=${STREAM ? STREAM_MODE : "n/a"} keep_alive=${KEEP_ALIVE}`
   );
 
   const probes = await runPool(requests, concurrency, async (index) => {
@@ -644,12 +616,18 @@ async function main() {
   const levels = parseLevels();
   console.log("=== P945 Live concurrency experience smoke ===");
   console.log(
-    "Framework only — no production path / billing / alias / Cherry / image changes."
+    "Framework only — no production path / billing / alias / Cherry / image / Nginx changes."
   );
   console.log(
-    `model=${MODEL} route=${ROUTE} stream=${STREAM} max_output_tokens=${MAX_OUTPUT_TOKENS} raw_diag=${RAW_DIAG}`
+    `model=${MODEL} route=${ROUTE} stream=${STREAM} stream_mode=${STREAM ? STREAM_MODE : "n/a"}` +
+      ` keep_alive=${KEEP_ALIVE} max_output_tokens=${MAX_OUTPUT_TOKENS} raw_diag=${RAW_DIAG}`
   );
   console.log(`levels: ${levels.join(", ")}`);
+  if (STREAM && STREAM_MODE === "abort_after_first_sse") {
+    console.log(
+      "NOTE: STREAM_MODE=abort_after_first_sse — early cancel mode (not normal experience)."
+    );
+  }
   console.log("");
 
   await mkdir(CSV_DIR, { recursive: true });
@@ -666,7 +644,6 @@ async function main() {
     console.log("mode: SELF_TEST (synthetic concurrency rows; no network)");
     for (const concurrency of levels) {
       const requests = requestsFor(concurrency);
-      // Keep self-test bounded even if LEVELS includes 1000
       const n = Math.min(requests, concurrency <= 50 ? 20 : 12);
       const probes = buildSyntheticP945Rows({
         concurrency,
@@ -691,7 +668,7 @@ async function main() {
     }
   }
 
-  const judgment = judgeP945Rows(allProbes);
+  const judgment = judgeApiCompat(allProbes);
   await writeFile(
     resultPath,
     rowsToCsv(P945_RESULT_COLUMNS, allProbes.map(toResultRow)),
@@ -724,23 +701,38 @@ async function main() {
   printJudgmentBanner(judgment);
   allOk = judgment.ok && allOk;
 
+  // Experience acceptance: recorded rows must be clean (retries resolve ghosts).
   if (!SELF_TEST) {
-    allOk = judgeTransportEmpty400(allProbes) && allOk;
-    allOk = judgeOddEvenEmpty400Pattern(allProbes) && allOk;
-  }
+    const summary = summarizeConcurrency(allProbes, allProbes[0]?.concurrency ?? 0);
+    if (summary.successN !== allProbes.length && summary.failN !== 0) {
+      // allow 429 as ok in ok flag, but still require no emptyBody
+    }
+    const leftoverTransport = allProbes.filter((p) => p.transportEmpty400);
+    if (leftoverTransport.length) {
+      // Transport ghosts remaining after retries → experience FAIL (not API-compat label).
+      allOk =
+        fail(
+          "transport_empty_400 remaining after retries",
+          `count=${leftoverTransport.length} indexes=${leftoverTransport.map((p) => p.index).join(",")}`
+        ) && false;
+    } else {
+      pass("no transport_empty_400 in final rows");
+    }
 
-  // Hard rule: empty-body HTTP 400 must never pass P945.
-  const emptyBody400 = allProbes.filter(
-    (p) => Number(p.status) === 400 && p.emptyBody
-  );
-  if (emptyBody400.length) {
-    allOk =
-      fail(
-        "empty body HTTP 400",
-        `count=${emptyBody400.length} indexes=${emptyBody400.map((p) => p.index).join(",")}`
-      ) && false;
-  } else if (!SELF_TEST) {
-    pass("no empty body HTTP 400");
+    if (summary.emptyBodyN > 0) {
+      allOk =
+        fail("emptyBody", `emptyBody=${summary.emptyBodyN} (want 0)`) && false;
+    } else {
+      pass(`emptyBody=0`);
+    }
+
+    if (summary.failN > 0) {
+      allOk =
+        fail("fail count", `fail=${summary.failN} success=${summary.successN}`) &&
+        false;
+    } else {
+      pass(`success=${summary.successN} fail=0`);
+    }
   }
 
   if (ctx) ctx.cleanup();
