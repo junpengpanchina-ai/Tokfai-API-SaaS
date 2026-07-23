@@ -1,0 +1,57 @@
+---
+description: Mandatory Tokfai release gate after dmit-api/scripts changes or deploy
+alwaysApply: true
+---
+
+# Tokfai release gate (mandatory)
+
+After **any** change to `apps/dmit-api/src` or `scripts/`, and before declaring
+a commit or deploy complete:
+
+## Hard limits
+
+1. **Never** declare done after only `typecheck` / `build`.
+2. **Never** declare available from `pm2 online` alone.
+3. Run the full gate:
+
+```bash
+TOKFAI_API_KEY=sk-tokfai_... node scripts/tokfai-release-gate.mjs
+# or: cd apps/dmit-api && TOKFAI_API_KEY=... npm run release-gate
+```
+
+The gate must execute:
+
+- `npm run typecheck` (apps/dmit-api)
+- `npm run build` (apps/dmit-api)
+- `LIVE=1 node scripts/p932-cherry-studio-real-body-smoke.mjs`
+- `LIVE=1 node scripts/p933-cherry-studio-compat-matrix-smoke.mjs`
+- `LIVE=1 node scripts/p941-api-isolation-smoke.mjs`
+- `LIVE=1 node scripts/p942-vision-analyze-smoke.mjs`
+- `node scripts/public-beta-ready-all.mjs`
+
+4. Only these PASS markers count (all required):
+
+- `TOKFAI_P932_CHERRY_STUDIO_REAL_BODY_PASS`
+- `TOKFAI_P933_CHERRY_STUDIO_COMPAT_MATRIX_PASS`
+- `TOKFAI_P941_API_ISOLATION_SMOKE_PASS`
+- `TOKFAI_P942_VISION_ANALYZE_PASS`
+- `TOKFAI_PUBLIC_BETA_READY_ALL_PASS`
+
+5. If **any** marker is missing → **STOP**. Do not extend new features.
+6. If logs show `undefined` / `empty body` / `api_error_500` / `charged timeout`
+   → rollback or fix, then re-run the gate.
+7. New features must not break Cherry Studio, billing, alias, timeout, or
+   image-generation main paths.
+
+## Required completion report
+
+Every finished task that touches the gate surface must print:
+
+- git commit hash
+- changed files
+- the five PASS results above
+- `pm2 status`
+- grep of the last ~800 lines of error logs for the forbidden patterns
+
+Prefer `scripts/tokfai-release-gate.mjs` — it prints this report and exits
+non-zero on failure.

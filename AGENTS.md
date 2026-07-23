@@ -108,3 +108,35 @@ to `apps/web`: **stop**. That logic belongs in `apps/dmit-api`.
 >
 > - **Yes** → `apps/dmit-api`. Frontend calls it via fetch, doesn't implement it.
 > - **No** → `apps/web` can do it (typically Supabase Auth or RLS-scoped reads).
+
+---
+
+## Release gate (mandatory)
+
+After any change to `apps/dmit-api/src` or `scripts/`, and before declaring a
+commit or deploy complete:
+
+```bash
+TOKFAI_API_KEY=sk-tokfai_... node scripts/tokfai-release-gate.mjs
+```
+
+Hard limits:
+
+1. Do **not** declare done after only `typecheck` / `build`.
+2. Do **not** declare available from `pm2 online` alone.
+3. The gate must run typecheck, build, LIVE p932/p933/p941/p942, and
+   `public-beta-ready-all`.
+4. Only these PASS markers count (all required):
+   - `TOKFAI_P932_CHERRY_STUDIO_REAL_BODY_PASS`
+   - `TOKFAI_P933_CHERRY_STUDIO_COMPAT_MATRIX_PASS`
+   - `TOKFAI_P941_API_ISOLATION_SMOKE_PASS`
+   - `TOKFAI_P942_VISION_ANALYZE_PASS`
+   - `TOKFAI_PUBLIC_BETA_READY_ALL_PASS`
+5. Missing any PASS → **STOP** (no new feature work).
+6. Logs with `undefined` / `empty body` / `api_error_500` / `charged timeout`
+   → rollback or fix, then re-run.
+7. New work must not break Cherry Studio, billing, alias, timeout, or image
+   generation main paths.
+
+Completion report must include: git commit hash, changed files, the five PASS
+results, `pm2 status`, and grep of the last ~800 error-log lines.
