@@ -1,6 +1,26 @@
 group,n,successN,failN,p50FirstByteMs,p95FirstByteMs,p99FirstByteMs,p50FirstSseMs,p95FirstSseMs,p99FirstSseMs,p50FirstContentMs,p95FirstContentMs,p99FirstContentMs,p50TotalMs,p95TotalMs,p99TotalMs
-gpt-5.5|POST /v1/chat/completions|stream=true,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1
-gpt-5.5|POST /v1/chat/completions|stream=false,1,1,0,1,1,1,,,,1,1,1,1,1,1
-gpt-5.5|POST /v1/responses|stream=true,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1
-gpt-5.5|POST /v1/responses|stream=false,1,1,0,1,1,1,,,,1,1,1,1,1,1
-ALL,4,4,0,1,1,1,1,1,1,1,1,1,1,1,1
+gpt-5.5|POST /v1/chat/completions|stream=true,1,1,0,719,719,719,722,722,722,5331,5331,5331,5333,5333,5333
+gpt-5.5|POST /v1/chat/completions|stream=false,1,1,0,3320,3320,3320,,,,3321,3321,3321,3321,3321,3321
+gpt-5.5|POST /v1/responses|stream=true,1,1,0,603,603,603,603,603,603,2842,2842,2842,2842,2842,2842
+gpt-5.5|POST /v1/responses|stream=false,1,1,0,3010,3010,3010,,,,3010,3010,3010,3010,3010,3010
+gpt-5-pro|POST /v1/chat/completions|stream=true,1,1,0,635,635,635,636,636,636,3408,3408,3408,3408,3408,3408
+gpt-5-pro|POST /v1/chat/completions|stream=false,1,1,0,3157,3157,3157,,,,3157,3157,3157,3157,3157,3157
+gpt-5-pro|POST /v1/responses|stream=true,1,1,0,604,604,604,604,604,604,2854,2854,2854,2854,2854,2854
+gpt-5-pro|POST /v1/responses|stream=false,1,1,0,5910,5910,5910,,,,5910,5910,5910,5910,5910,5910
+gpt-5.4-pro|POST /v1/chat/completions|stream=true,1,1,0,628,628,628,629,629,629,2963,2963,2963,2964,2964,2964
+gpt-5.4-pro|POST /v1/chat/completions|stream=false,1,1,0,2835,2835,2835,,,,2835,2835,2835,2835,2835,2835
+gpt-5.4-pro|POST /v1/responses|stream=true,1,1,0,624,624,624,624,624,624,3494,3494,3494,3494,3494,3494
+gpt-5.4-pro|POST /v1/responses|stream=false,1,1,0,3102,3102,3102,,,,3102,3102,3102,3102,3102,3102
+gemini-3-pro|POST /v1/chat/completions|stream=true,1,1,0,607,607,607,608,608,608,6688,6688,6688,6688,6688,6688
+gemini-3-pro|POST /v1/chat/completions|stream=false,1,1,0,37394,37394,37394,,,,37394,37394,37394,37394,37394,37394
+gemini-3-pro|POST /v1/responses|stream=true,1,1,0,721,721,721,722,722,722,9523,9523,9523,9523,9523,9523
+gemini-3-pro|POST /v1/responses|stream=false,1,1,0,13067,13067,13067,,,,13067,13067,13067,13067,13067,13067
+gemini-2.5-pro|POST /v1/chat/completions|stream=true,1,1,0,625,625,625,625,625,625,12167,12167,12167,12167,12167,12167
+gemini-2.5-pro|POST /v1/chat/completions|stream=false,1,1,0,11435,11435,11435,,,,11435,11435,11435,11435,11435,11435
+gemini-2.5-pro|POST /v1/responses|stream=true,1,1,0,915,915,915,916,916,916,15106,15106,15106,15106,15106,15106
+gemini-2.5-pro|POST /v1/responses|stream=false,1,1,0,13538,13538,13538,,,,13538,13538,13538,13538,13538,13538
+gemini-2.5-flash|POST /v1/chat/completions|stream=true,1,1,0,653,653,653,653,653,653,8805,8805,8805,8805,8805,8805
+gemini-2.5-flash|POST /v1/chat/completions|stream=false,1,0,1,,,,,,,,,,,,
+gemini-2.5-flash|POST /v1/responses|stream=true,1,1,0,718,718,718,719,719,719,66171,66171,66171,66171,66171,66171
+gemini-2.5-flash|POST /v1/responses|stream=false,1,1,0,5433,5433,5433,,,,5434,5434,5434,5434,5434,5434
+ALL,24,23,1,915,13538,37394,629,916,916,5434,37394,66171,5434,37394,66171

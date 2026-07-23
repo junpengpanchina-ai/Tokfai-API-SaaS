@@ -24,7 +24,7 @@ import {
 import { respondExecuteChatCompletionFailure } from "../lib/handleExecuteChatCompletionResult.js";
 import { parseIdempotencyKey } from "../lib/idempotency.js";
 import { readJsonBodyWithLimit } from "../lib/readJsonBodyWithLimit.js";
-import { responsesToSseBody } from "../lib/responsesSse.js";
+import { respondResponsesEarlySse } from "../lib/respondEarlySse.js";
 import {
   chatCompletionResponseToResponses,
   isResponsesFormatResponse,
@@ -40,7 +40,10 @@ import { logGatewayRejection } from "./chatGatewayLogs.js";
  * for auth, billing, routing, and upstream handling.
  *
  * stream=false → JSON object=response
- * stream=true  → OpenAI Responses SSE (synthesized from completed response)
+ * stream=true  → OpenAI Responses SSE; response.created is flushed immediately
+ *                after prechecks (before upstream). Remaining events are
+ *                synthesized from the completed response. Precheck failures
+ *                still use the JSON error envelope (never empty body).
  *
  * Validation 400s always return a concrete JSON error envelope (never empty body).
  */
@@ -220,6 +223,35 @@ responsesRoutes.post("/v1/responses", async (c) => {
     );
   }
 
+  if (wantsStream) {
+    return respondResponsesEarlySse(c, {
+      caller,
+      requestId,
+      body: chatParsed.data,
+      limitKey,
+      idempotencyKey,
+      toResponsesPayload: (result) => {
+        const response = isResponsesFormatResponse(result.response)
+          ? result.response
+          : chatCompletionResponseToResponses(
+              result.response,
+              result.requestId
+            );
+        if (
+          !response ||
+          typeof response !== "object" ||
+          response.object !== "response"
+        ) {
+          throw ApiError.internal(
+            "Failed to build responses payload.",
+            "server_error"
+          );
+        }
+        return response;
+      },
+    });
+  }
+
   const result = await executeChatCompletion({
     caller,
     requestId,
@@ -227,7 +259,7 @@ responsesRoutes.post("/v1/responses", async (c) => {
     limitKey,
     idempotencyKey,
     route: "/v1/responses",
-    clientStream: wantsStream,
+    clientStream: false,
   });
 
   if (!result.ok) {
@@ -260,19 +292,6 @@ responsesRoutes.post("/v1/responses", async (c) => {
       "Failed to build responses payload.",
       "server_error"
     );
-  }
-
-  if (wantsStream) {
-    const sseBody = responsesToSseBody(response);
-    return c.newResponse(sseBody, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/event-stream; charset=utf-8",
-        "Cache-Control": "no-cache, no-transform",
-        "X-Accel-Buffering": "no",
-        "X-Request-Id": result.requestId,
-      },
-    });
   }
 
   c.header("X-Request-Id", result.requestId);

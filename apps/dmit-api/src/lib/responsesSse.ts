@@ -5,6 +5,10 @@
  * Upstream chat is always non-streaming; we synthesize the Responses event
  * sequence so clients that send stream=true (Cherry Studio OpenAI Provider)
  * receive text/event-stream with non-empty output_text deltas.
+ *
+ * For stream=true main path, response.created is flushed early (before upstream)
+ * via responsesCreatedSseFrame(); remaining events use
+ * responsesSseBodyAfterCreated().
  */
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -37,13 +41,11 @@ function extractOutputText(response: Record<string, unknown>): string {
   return parts.join("");
 }
 
-/**
- * Build the full Responses SSE body from a completed response object.
- * Emits one non-empty output_text.delta (full text in a single chunk).
- */
-export function responsesToSseBody(
-  response: Record<string, unknown>
-): string {
+function responsesSseIds(response: Record<string, unknown>): {
+  responseId: string;
+  model: string;
+  messageId: string;
+} {
   const responseId =
     typeof response.id === "string" && response.id.length > 0
       ? response.id
@@ -53,16 +55,48 @@ export function responsesToSseBody(
       ? response.model
       : "unknown";
   const messageId = `msg_${responseId.replace(/^resp_/, "")}`;
+  return { responseId, model, messageId };
+}
+
+/**
+ * First SSE frame for /v1/responses stream=true — flushed immediately after
+ * prechecks. Minimal legal `response.created` start event.
+ */
+export function responsesCreatedSseFrame(args?: {
+  responseId?: string;
+  model?: string;
+}): string {
+  const responseId =
+    typeof args?.responseId === "string" && args.responseId.length > 0
+      ? args.responseId
+      : `resp_${Date.now()}`;
+  const model =
+    typeof args?.model === "string" && args.model.length > 0
+      ? args.model
+      : "unknown";
+
+  return sseEvent("response.created", {
+    type: "response.created",
+    response: {
+      id: responseId,
+      object: "response",
+      status: "in_progress",
+      model,
+    },
+  });
+}
+
+/**
+ * Remaining Responses SSE events after the early response.created frame.
+ */
+export function responsesSseBodyAfterCreated(
+  response: Record<string, unknown>,
+  opts?: { skipCreated?: boolean }
+): string {
+  const { responseId, model, messageId } = responsesSseIds(response);
   // Cherry requires a non-empty delta; fall back only if upstream text is blank.
   const rawText = extractOutputText(response);
   const outputText = rawText.length > 0 ? rawText : " ";
-
-  const inProgressResponse = {
-    id: responseId,
-    object: "response",
-    status: "in_progress",
-    model,
-  };
 
   const completedItem = {
     id: messageId,
@@ -89,12 +123,11 @@ export function responsesToSseBody(
 
   const chunks: string[] = [];
 
-  chunks.push(
-    sseEvent("response.created", {
-      type: "response.created",
-      response: inProgressResponse,
-    })
-  );
+  if (!opts?.skipCreated) {
+    chunks.push(
+      responsesCreatedSseFrame({ responseId, model })
+    );
+  }
 
   chunks.push(
     sseEvent("response.output_item.added", {
@@ -167,4 +200,14 @@ export function responsesToSseBody(
 
   chunks.push("data: [DONE]\n\n");
   return chunks.join("");
+}
+
+/**
+ * Build the full Responses SSE body from a completed response object.
+ * Emits one non-empty output_text.delta (full text in a single chunk).
+ */
+export function responsesToSseBody(
+  response: Record<string, unknown>
+): string {
+  return responsesSseBodyAfterCreated(response, { skipCreated: false });
 }

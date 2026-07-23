@@ -12,7 +12,6 @@ import {
   getGlobalUpstreamInflight,
   getKeyInflight,
 } from "../gateway/concurrency.js";
-import { chatCompletionToSseBody } from "../lib/chatCompletionSse.js";
 import {
   normalizeChatMessages,
   normalizeClientChatCompletionBody,
@@ -32,6 +31,10 @@ import {
 import { respondExecuteChatCompletionFailure } from "../lib/handleExecuteChatCompletionResult.js";
 import { parseIdempotencyKey } from "../lib/idempotency.js";
 import { readJsonBodyWithLimit } from "../lib/readJsonBodyWithLimit.js";
+import {
+  respondBufferedChatSse,
+  respondChatCompletionEarlySse,
+} from "../lib/respondEarlySse.js";
 import { resolveChatModel } from "../upstream/modelAliases.js";
 import { logGatewayRejection } from "./chatGatewayLogs.js";
 
@@ -40,7 +43,10 @@ import { logGatewayRejection } from "./chatGatewayLogs.js";
  *
  * Auth is handled by requireApiKeyOrSupabaseJwt (sk-tokfai_ or Supabase JWT).
  * Non-stream requests return JSON; stream=true returns OpenAI-compatible SSE
- * (synthesized from a completed upstream response) ending with data: [DONE].
+ * ending with data: [DONE]. After auth / rate-limit / balance precheck /
+ * schema normalize, the first role chunk is flushed immediately — before
+ * upstream returns. Remaining chunks are synthesized from the completed
+ * upstream response. Precheck failures still use the JSON error envelope.
  *
  * Cherry Studio / OpenAI SDK bodies are normalized/sanitized BEFORE schema
  * validation. Empty / all-empty-content messages return a 200 not_billable
@@ -117,19 +123,8 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
         !Array.isArray(rawBody) &&
         (rawBody as { stream?: unknown }).stream === true);
     if (wantsStream) {
-      const sseBody = chatCompletionToSseBody(noop);
-      // Connection: close — avoid Nginx upstream keepalive reuse after SSE,
-      // which otherwise yields empty HTTP 400 bodies on the next request.
-      return c.newResponse(sseBody, {
-        status: 200,
-        headers: {
-          "Content-Type": "text/event-stream; charset=utf-8",
-          "Content-Length": String(Buffer.byteLength(sseBody, "utf8")),
-          "Cache-Control": "no-cache, no-transform",
-          Connection: "close",
-          "X-Request-Id": requestId,
-        },
-      });
+      // Noop is already complete — buffered SSE (no upstream wait).
+      return respondBufferedChatSse(noop, requestId);
     }
     return c.json(noop);
   }
@@ -234,17 +229,29 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     );
   }
 
+  const execBody = {
+    ...parsed.data,
+    messages: normalizedMessages.messages,
+    stream: false as const,
+  };
+
+  if (wantsStream) {
+    return respondChatCompletionEarlySse(c, {
+      caller,
+      requestId,
+      body: execBody,
+      limitKey,
+      idempotencyKey,
+    });
+  }
+
   const result = await executeChatCompletion({
     caller,
     requestId,
-    body: {
-      ...parsed.data,
-      messages: normalizedMessages.messages,
-      stream: false,
-    },
+    body: execBody,
     limitKey,
     idempotencyKey,
-    clientStream: wantsStream,
+    clientStream: false,
   });
 
   if (!result.ok) {
@@ -271,23 +278,7 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
         noop: false,
       });
     }
-    // Always JSON error body — never SSE — even when client asked stream=true.
     return respondExecuteChatCompletionFailure(c, result);
-  }
-
-  if (wantsStream) {
-    const sseBody = chatCompletionToSseBody(result.response);
-    // Connection: close — see empty-messages SSE branch above.
-    return c.newResponse(sseBody, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/event-stream; charset=utf-8",
-        "Content-Length": String(Buffer.byteLength(sseBody, "utf8")),
-        "Cache-Control": "no-cache, no-transform",
-        Connection: "close",
-        "X-Request-Id": result.requestId,
-      },
-    });
   }
 
   return c.json(result.response);

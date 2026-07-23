@@ -195,6 +195,13 @@ export interface ExecuteChatCompletionInput {
   idempotencyKey?: string | null;
   /** Client asked for SSE; upstream remains non-stream, but idle timeout applies. */
   clientStream?: boolean;
+  /**
+   * Called after model/credit/budget prechecks succeed and immediately before
+   * upstream provider attempts. Used by stream=true to flush the first SSE
+   * frame without waiting on the model. Not invoked on precheck failures or
+   * idempotent replay.
+   */
+  onAfterPrecheck?: () => void | Promise<void>;
 }
 
 export type ExecuteChatCompletionResult =
@@ -439,6 +446,9 @@ export async function executeChatCompletion(
     }
 
     try {
+      if (input.onAfterPrecheck) {
+        await input.onAfterPrecheck();
+      }
       return await runProviderAttempts({
         caller,
         requestId,
