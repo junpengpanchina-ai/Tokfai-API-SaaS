@@ -1201,6 +1201,122 @@ export function startMockGateway(options = {}) {
         }
       }
 
+      if (req.method === "POST" && path === "/v1/vision/analyze") {
+        const authErr = checkAuth(req, validKey);
+        if (authErr) return sendJson(res, authErr.status, authErr.body);
+        const body = await readJsonBody(req);
+        const imageUrl =
+          typeof body?.image_url === "string" ? body.image_url.trim() : "";
+        const requestId = makeRequestId();
+        if (!imageUrl) {
+          return sendJson(res, 400, {
+            error: {
+              message: "image_url is required.",
+              code: "invalid_image_url",
+              type: "invalid_request_error",
+            },
+            request_id: requestId,
+          });
+        }
+        if (/^(blob:|file:)/i.test(imageUrl)) {
+          return sendJson(res, 400, {
+            error: {
+              message: "blob: and file: URLs are not supported.",
+              code: "invalid_image_url",
+              type: "validation_error",
+            },
+            request_id: requestId,
+          });
+        }
+        if (/^https?:\/\//i.test(imageUrl)) {
+          try {
+            const host = new URL(imageUrl).hostname.toLowerCase();
+            if (
+              host === "localhost" ||
+              host.endsWith(".localhost") ||
+              host === "127.0.0.1" ||
+              host.startsWith("10.") ||
+              host.startsWith("192.168.") ||
+              /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+            ) {
+              return sendJson(res, 400, {
+                error: {
+                  message: "This image URL is not allowed.",
+                  code: "invalid_image_url",
+                  type: "invalid_request_error",
+                },
+                request_id: requestId,
+              });
+            }
+          } catch {
+            return sendJson(res, 400, {
+              error: {
+                message: "Image URL must be a valid URL.",
+                code: "invalid_image_url",
+                type: "invalid_request_error",
+              },
+              request_id: requestId,
+            });
+          }
+        }
+        if (/^https?:\/\/example\.com\/not-an-image/i.test(imageUrl)) {
+          return sendJson(res, 400, {
+            error: {
+              message:
+                "URL does not point to a supported image (PNG, JPG, or WEBP).",
+              code: "unsupported_image_content_type",
+              type: "validation_error",
+            },
+            request_id: requestId,
+          });
+        }
+        if (/^https?:\/\/example\.com\/huge-image/i.test(imageUrl)) {
+          return sendJson(res, 400, {
+            error: {
+              message: "Image exceeds the 10 MB size limit.",
+              code: "image_too_large",
+              type: "validation_error",
+            },
+            request_id: requestId,
+          });
+        }
+        if (/^https?:\/\/example\.com\/upstream-fail/i.test(imageUrl)) {
+          return sendJson(res, 502, {
+            error: {
+              message: "Vision analyze failed. Please retry.",
+              code: "upstream_error",
+              type: "upstream_error",
+            },
+            request_id: requestId,
+            tokfai: {
+              credits_charged: 0,
+              billing_status: "not_billable",
+              usage_type: "vision_analyze",
+            },
+          });
+        }
+        const requested =
+          typeof body?.model === "string" && body.model.trim()
+            ? body.model.trim()
+            : "vision-auto";
+        const resolved =
+          requested === "vision-auto" ? "gemini-2.5-flash" : requested;
+        return sendJson(res, 200, {
+          id: `vis_${requestId.replace(/^req_/, "")}`,
+          object: "vision.analysis",
+          model: resolved,
+          output_text: "ok",
+          request_id: requestId,
+          tokfai: {
+            credits_charged: 0.000001,
+            billing_status: "charged",
+            resolved_model: resolved,
+            requested_model: requested,
+            usage_type: "vision_analyze",
+          },
+        });
+      }
+
       const imageGetMatch = path.match(/^\/v1\/images\/generations\/([^/]+)$/);
       if (req.method === "GET" && imageGetMatch) {
         const authErr = checkAuth(req, validKey);
@@ -1301,7 +1417,7 @@ if (isMain) {
     console.log("Endpoints: GET /v1/models, POST /v1/chat/completions, POST /v1/responses,");
     console.log("  GET /v1beta/models, POST /v1beta/models/:model:generateContent,");
     console.log("  POST /v1beta/models/:model:streamGenerateContent,");
-    console.log("  POST /v1/images/generations, POST /v1/batches/chat, GET /v1/batches/:id,");
+    console.log("  POST /v1/images/generations, POST /v1/vision/analyze, POST /v1/batches/chat, GET /v1/batches/:id,");
     console.log("  GET /v1/batches/:id/items");
   });
 }

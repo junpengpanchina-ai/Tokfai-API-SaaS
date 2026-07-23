@@ -19,6 +19,7 @@ import { responsesRoutes } from "./routes/responses.js";
 import { geminiRoutes } from "./routes/gemini.js";
 import { batchRoutes } from "./routes/batch.js";
 import { imageRoutes } from "./routes/images.js";
+import { visionRoutes } from "./routes/vision.js";
 import { adminRoutes } from "./routes/admin.js";
 import { announcementRoutes } from "./routes/announcements.js";
 import { meRoutes } from "./routes/me.js";
@@ -47,6 +48,7 @@ export function buildApp() {
   app.route("/", geminiRoutes);
   app.route("/", batchRoutes);
   app.route("/", imageRoutes);
+  app.route("/", visionRoutes);
   app.route("/admin", adminRoutes);
 
   registerDebugRoutes(app);

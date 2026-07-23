@@ -9,6 +9,7 @@ export const PUBLIC_SUPPORTED_ENDPOINTS = [
   "POST /v1/images/generations",
   "GET /v1/images/generations/:id",
   "GET /v1/api/result",
+  "POST /v1/vision/analyze",
   "POST /v1/batches/chat",
 ] as const;
 

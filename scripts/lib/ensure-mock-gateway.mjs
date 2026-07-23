@@ -74,6 +74,24 @@ export async function isMockGatewayReady(baseUrl, apiKey) {
     });
     if (errRes.status !== 402) return false;
 
+    // Require vision analyze route so stale mocks are not reused after P942.
+    const visionRes = await fetch(`${root}/v1/vision/analyze`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "vision-auto",
+        image_url: "https://cdn.tokfai.com/demo.png",
+        prompt: "ok",
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!visionRes.ok) return false;
+    const visionBody = await visionRes.json().catch(() => null);
+    if (visionBody?.object !== "vision.analysis") return false;
+
     return true;
   } catch {
     return false;
