@@ -1,0 +1,2 @@
+concurrency,requests,successN,failN,status429N,status5xxN,emptyBodyN,chargedTimeoutN,p50FirstByteMs,p95FirstByteMs,p99FirstByteMs,p50FirstSseMs,p95FirstSseMs,p99FirstSseMs,p50TotalMs,p95TotalMs,p99TotalMs
+5,5,5,0,0,0,0,0,3,3,3,3,3,3,3,3,3

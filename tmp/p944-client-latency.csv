@@ -1,0 +1,5 @@
+model,route,stream,status,firstByteMs,firstSseMs,firstContentMs,totalMs,requestId,creditsCharged,errorCode,billingStatus
+gpt-5.5,POST /v1/chat/completions,true,200,1,1,1,1,chatcmpl_req_mock_ee3f5f6bd35c3b14,,,
+gpt-5.5,POST /v1/chat/completions,false,200,1,,1,1,req_mock_39db20f13a7142ef,0.000001,,
+gpt-5.5,POST /v1/responses,true,200,1,1,1,1,resp_req_mock_a42f41273b4c5d06,,,
+gpt-5.5,POST /v1/responses,false,200,1,,1,1,req_mock_f393f4660ea80b88,0.000001,,

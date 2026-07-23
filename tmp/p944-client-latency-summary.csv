@@ -1,0 +1,6 @@
+group,n,successN,failN,p50FirstByteMs,p95FirstByteMs,p99FirstByteMs,p50FirstSseMs,p95FirstSseMs,p99FirstSseMs,p50FirstContentMs,p95FirstContentMs,p99FirstContentMs,p50TotalMs,p95TotalMs,p99TotalMs
+gpt-5.5|POST /v1/chat/completions|stream=true,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1
+gpt-5.5|POST /v1/chat/completions|stream=false,1,1,0,1,1,1,,,,1,1,1,1,1,1
+gpt-5.5|POST /v1/responses|stream=true,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1
+gpt-5.5|POST /v1/responses|stream=false,1,1,0,1,1,1,,,,1,1,1,1,1,1
+ALL,4,4,0,1,1,1,1,1,1,1,1,1,1,1,1
