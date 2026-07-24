@@ -124,13 +124,14 @@ Hard limits:
 
 1. Do **not** declare done after only `typecheck` / `build`.
 2. Do **not** declare available from `pm2 online` alone.
-3. The gate must run typecheck, build, LIVE p932/p933/p941/p942, and
+3. The gate must run typecheck, build, LIVE p932/p933/p941/p942/p946, and
    `public-beta-ready-all`.
 4. Only these PASS markers count (all required):
    - `TOKFAI_P932_CHERRY_STUDIO_REAL_BODY_PASS`
    - `TOKFAI_P933_CHERRY_STUDIO_COMPAT_MATRIX_PASS`
    - `TOKFAI_P941_API_ISOLATION_CORE_PASS`
    - `TOKFAI_P942_VISION_ANALYZE_PASS`
+   - `TOKFAI_P946_GEMINI_25_FLASH_NONSTREAM_PASS`
    - `TOKFAI_PUBLIC_BETA_READY_ALL_PASS`
 5. Missing any PASS → **STOP** (no new feature work).
 6. Logs with `undefined` / `empty body` / `api_error_500` / `charged timeout`

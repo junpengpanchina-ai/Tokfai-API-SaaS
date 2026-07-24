@@ -183,6 +183,33 @@ export function resolveUpstreamTimeoutPolicy(args: {
     };
   }
 
+  // gemini-2.5-flash client stream=false may need a short non-stream probe +
+  // internal upstream stream=true drain fallback (same model; not Gemini 3).
+  // Stream fallback must not be capped to the same short chat attempt budget
+  // that just timed out — reserve a longer remaining wall for SSE drain.
+  const gemini25FlashNonStream =
+    args.clientStream !== true &&
+    (args.requestedModel.trim().toLowerCase() === "gemini-2.5-flash" ||
+      (args.resolvedModel ?? "").trim().toLowerCase() === "gemini-2.5-flash");
+  if (gemini25FlashNonStream) {
+    const upstreamTimeoutMs = chatUpstreamMs;
+    const streamFallbackBudgetMs = Math.max(chatUpstreamMs, 120_000);
+    return {
+      tier: "chat",
+      isHeavy: false,
+      upstreamTimeoutMs,
+      idleTimeoutMs: streamFallbackBudgetMs,
+      totalTimeoutMs: Math.max(
+        chatTotalMs,
+        // short non-stream probe + stream drain + one stream retry + buffer
+        Math.min(chatUpstreamMs, 20_000) +
+          streamFallbackBudgetMs * 2 +
+          20_000
+      ),
+      reason: "chat_gemini25_flash_nonstream_stream_fallback",
+    };
+  }
+
   return {
     tier: "chat",
     isHeavy: false,

@@ -31,7 +31,12 @@ import {
   recordProviderModelSuccess,
   recordProviderModelTimeout,
 } from "../upstream/providerModelCircuitBreaker.js";
+import { providerFetchChatStreamAssembled } from "../upstream/providerFetchChatStreamAssembled.js";
 import { buildUpstreamChatBody } from "./upstreamChatBody.js";
+import {
+  isGemini25FlashNonStreamStreamFallbackPath,
+  isGemini25FlashStreamFallbackEligible,
+} from "./gemini25FlashNonStreamStreamFallback.js";
 import {
   releaseGlobalUpstream,
   releaseHeavyResponses,
@@ -576,7 +581,20 @@ async function runProviderAttempts(args: {
 
     // Sole provider already degraded: fail fast with model suggestions —
     // do not wait another ~45s, and do not invent a costlier model switch.
-    if (allDegraded && providerAttempts.length === 1 && !isAlias) {
+    // Exception: gemini-2.5-flash client stream=false may still recover via
+    // upstream stream=true assemble (same model) — do not fail-fast that path.
+    const gemini25FlashStreamFallbackPath =
+      isGemini25FlashNonStreamStreamFallbackPath({
+        clientStream,
+        attemptModel,
+        requestedModel,
+      });
+    if (
+      allDegraded &&
+      providerAttempts.length === 1 &&
+      !isAlias &&
+      !gemini25FlashStreamFallbackPath
+    ) {
       const degradedProvider = providerAttempts[0]!;
       const timeoutErr = ApiError.requestTimeout(
         "Upstream provider degraded after consecutive timeouts.",
@@ -688,24 +706,139 @@ async function runProviderAttempts(args: {
           ? Math.min(timeoutPolicy.idleTimeoutMs, remainingTotalMs)
           : undefined;
 
-        const { data, upstreamId } = await providerFetch<ChatCompletionResponse>(
-          provider,
-          provider.chatPath,
-          {
-            method: "POST",
-            json: upstreamBody,
-            timeoutMs: perAttemptTimeoutMs,
-            ...(idleTimeoutMs != null ? { idleTimeoutMs } : {}),
-          },
-          {
+        const useGemini25FlashStreamFallback =
+          isGemini25FlashNonStreamStreamFallbackPath({
+            clientStream,
+            attemptModel,
+            requestedModel,
+          });
+
+        const logCtx = {
+          requestId,
+          route,
+          model: attemptModel,
+          requestedModel,
+          resolvedModel: requestedModel,
+          providerId: provider.id,
+        };
+
+        let data: ChatCompletionResponse;
+        let upstreamId: string | null;
+        let viaStreamFallback = false;
+
+        const runGemini25FlashStreamAssemble = async (
+          reason: string,
+          priorErr?: ApiError
+        ) => {
+          const remainingMs =
+            timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt);
+          if (remainingMs <= 5_000) {
+            throw (
+              priorErr ??
+              ApiError.requestTimeout(
+                "Upstream provider timed out.",
+                "上游模型响应超时，请稍后重试或切换模型。"
+              )
+            );
+          }
+          // Do NOT cap stream drain to the short chat attempt budget — that is
+          // exactly what just failed for non-stream JSON.
+          const streamWallMs = Math.max(5_000, remainingMs);
+          const streamIdleMs = Math.min(
+            timeoutPolicy.idleTimeoutMs,
+            streamWallMs
+          );
+          log.warn("chat_gemini25_flash_nonstream_stream_fallback", {
             requestId,
             route,
-            model: attemptModel,
             requestedModel,
-            resolvedModel: requestedModel,
+            attemptModel,
             providerId: provider.id,
+            reason,
+            upstreamStatus: priorErr?.upstreamStatus ?? null,
+            billing_status: "not_billable",
+            remainingMs,
+            streamWallMs,
+            streamIdleMs,
+          });
+          return providerFetchChatStreamAssembled(
+            provider,
+            provider.chatPath,
+            {
+              method: "POST",
+              json: upstreamBody,
+              timeoutMs: streamWallMs,
+              idleTimeoutMs: streamIdleMs,
+            },
+            logCtx
+          );
+        };
+
+        // When the non-stream circuit is already open, skip the doomed JSON
+        // attempt and go straight to upstream stream assemble for this model.
+        if (useGemini25FlashStreamFallback && allDegraded) {
+          const assembled = await runGemini25FlashStreamAssemble(
+            "provider_model_degraded"
+          );
+          data = assembled.data;
+          upstreamId = assembled.upstreamId;
+          viaStreamFallback = true;
+        } else {
+          try {
+            // Short non-stream probe for this path — pivot to stream assemble
+            // quickly when GRSAI JSON hangs (prod chat budget can be ~45s).
+            const nonStreamProbeMs = useGemini25FlashStreamFallback
+              ? Math.min(20_000, perAttemptTimeoutMs)
+              : perAttemptTimeoutMs;
+            const fetched = await providerFetch<ChatCompletionResponse>(
+              provider,
+              provider.chatPath,
+              {
+                method: "POST",
+                json: upstreamBody,
+                timeoutMs: nonStreamProbeMs,
+                ...(idleTimeoutMs != null ? { idleTimeoutMs } : {}),
+              },
+              logCtx
+            );
+            data = fetched.data;
+            upstreamId = fetched.upstreamId;
+          } catch (nonStreamErr) {
+            if (
+              !(nonStreamErr instanceof ApiError) ||
+              !useGemini25FlashStreamFallback ||
+              !isGemini25FlashStreamFallbackEligible(nonStreamErr)
+            ) {
+              throw nonStreamErr;
+            }
+
+            try {
+              const assembled = await runGemini25FlashStreamAssemble(
+                nonStreamErr.code ?? "upstream_error",
+                nonStreamErr
+              );
+              data = assembled.data;
+              upstreamId = assembled.upstreamId;
+              viaStreamFallback = true;
+            } catch (streamErr) {
+              // One immediate stream retry when the first drain also times out.
+              if (
+                streamErr instanceof ApiError &&
+                streamErr.code === "upstream_timeout"
+              ) {
+                const assembled = await runGemini25FlashStreamAssemble(
+                  "stream_assemble_retry",
+                  streamErr
+                );
+                data = assembled.data;
+                upstreamId = assembled.upstreamId;
+                viaStreamFallback = true;
+              } else {
+                throw streamErr;
+              }
+            }
           }
-        );
+        }
 
         await recordModelSuccess(attemptModel);
         await recordProviderModelSuccess(provider.id, attemptModel);
@@ -736,6 +869,9 @@ async function runProviderAttempts(args: {
             requested_model: requestedRaw,
             resolved_model: resolvedModel,
             ...(isAlias ? { fallback_attempts: attemptIndex + 1 } : {}),
+            ...(viaStreamFallback
+              ? { upstream_stream_fallback: true }
+              : {}),
           },
         };
 
@@ -782,6 +918,7 @@ async function runProviderAttempts(args: {
           providerIndex,
           latencyMs: Date.now() - startedAt,
           timeoutMs: perAttemptTimeoutMs,
+          viaStreamFallback,
         });
 
         return {

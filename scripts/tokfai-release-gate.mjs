@@ -37,6 +37,7 @@ const PASS_MARKERS = [
   "TOKFAI_P933_CHERRY_STUDIO_COMPAT_MATRIX_PASS",
   "TOKFAI_P941_API_ISOLATION_CORE_PASS",
   "TOKFAI_P942_VISION_ANALYZE_PASS",
+  "TOKFAI_P946_GEMINI_25_FLASH_NONSTREAM_PASS",
   "TOKFAI_PUBLIC_BETA_READY_ALL_PASS",
 ];
 
@@ -117,8 +118,17 @@ const STEPS = [
     liveViaMock: true,
   },
   {
+    id: "p946",
+    label: "7. LIVE p946 gemini-2.5-flash non-stream (30x)",
+    cwd: ROOT,
+    cmd: "node",
+    args: ["scripts/p946-gemini-25-flash-nonstream-smoke.mjs"],
+    marker: "TOKFAI_P946_GEMINI_25_FLASH_NONSTREAM_PASS",
+    live: true,
+  },
+  {
     id: "public-beta-ready-all",
-    label: "7. public-beta-ready-all",
+    label: "8. public-beta-ready-all",
     cwd: ROOT,
     cmd: "node",
     args: ["scripts/public-beta-ready-all.mjs"],
@@ -353,6 +363,10 @@ async function main() {
       env.TOKFAI_API_KEY = API_KEY;
     } else if (step.id === "public-beta-ready-all") {
       env.TOKFAI_API_KEY = API_KEY;
+      // Offline suite scripts honor LIVE=1; prior live steps / parent shell must
+      // not force them onto the real API (rate-limit 429 after P946).
+      // Live probes inside public-beta-ready-all key off TOKFAI_API_KEY only.
+      env.LIVE = "0";
     }
 
     let r;
