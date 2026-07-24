@@ -9,7 +9,11 @@
 export const EARLY_SSE_HEADERS = {
   "Content-Type": "text/event-stream; charset=utf-8",
   "Cache-Control": "no-cache, no-transform",
-  Connection: "keep-alive",
+  // close — not keep-alive. Nginx/edge keep-alive after SSE can yield
+  // empty-body HTTP 400 (no Content-Type / no x-request-id) on the next
+  // request of the same socket; that breaks Cherry Studio sequential chats
+  // and P932/P933. Buffered noop SSE already uses Connection: close.
+  Connection: "close",
   "X-Accel-Buffering": "no",
 } as const;
 

@@ -24,6 +24,8 @@ export const CHAT_NULLABLE_OPTIONAL_KEYS = [
   "tool_choice",
   "response_format",
   "stream_options",
+  "provider_options",
+  "extra_body",
 ] as const;
 
 /** Coerce null / empty string → undefined for optional numeric fields. */

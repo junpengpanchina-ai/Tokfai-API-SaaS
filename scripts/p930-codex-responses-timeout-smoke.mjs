@@ -59,18 +59,22 @@ const nginxExample = read("deploy/runtime/nginx-api.tokfai.com.conf.example");
 const deployReadme = read("deploy/runtime/README.md");
 
 {
+  const respondEarly = read("apps/dmit-api/src/lib/respondEarlySse.ts");
   const shared =
     responses.includes("executeChatCompletion") &&
     responses.includes('route: "/v1/responses"') &&
     responses.includes("respondExecuteChatCompletionFailure") &&
     responses.includes("wantsStream") &&
-    responses.includes("clientStream: wantsStream") &&
-    responses.includes("responsesToSseBody");
+    responses.includes("respondResponsesEarlySse") &&
+    responses.includes("clientStream: false") &&
+    respondEarly.includes("clientStream: true") &&
+    respondEarly.includes("responsesToSseBody") &&
+    respondEarly.includes("respondExecuteChatCompletionFailure");
   if (!shared) {
     ok =
       fail(
         "/v1/responses non-stream + stream share chat execution",
-        "expected executeChatCompletion + failure handler + SSE path + clientStream"
+        "expected executeChatCompletion + failure handler + early SSE path + clientStream"
       ) && ok;
   } else {
     ok =
@@ -375,14 +379,18 @@ const deployReadme = read("deploy/runtime/README.md");
 }
 
 {
-  // Stream path synthesizes SSE only after success; failures throw before SSE.
-  const streamAfterOk =
-    /if \(!result\.ok\)[\s\S]*respondExecuteChatCompletionFailure[\s\S]*if \(wantsStream\)/.test(
+  // Stream path: early SSE after precheck; precheck/timeout failures still use
+  // respondExecuteChatCompletionFailure JSON envelope (never SSE success).
+  const respondEarly = read("apps/dmit-api/src/lib/respondEarlySse.ts");
+  const streamFailuresUseEnvelope =
+    respondEarly.includes("respondExecuteChatCompletionFailure") &&
+    respondEarly.includes("writeFailure") &&
+    /if \(!result\.ok\)[\s\S]*respondExecuteChatCompletionFailure/.test(
       responses
     );
   const sseIsSuccessOnly =
     sse.includes("responsesToSseBody") && !sse.includes("upstream_timeout");
-  if (!streamAfterOk || !sseIsSuccessOnly) {
+  if (!streamFailuresUseEnvelope || !sseIsSuccessOnly) {
     ok =
       fail(
         "stream timeout uses same failure envelope",

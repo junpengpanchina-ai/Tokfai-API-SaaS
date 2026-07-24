@@ -175,6 +175,14 @@ try {
       join(ROOT, "apps/dmit-api/src/routes/chat.ts"),
       "utf8"
     );
+    const earlySse = readFileSync(
+      join(ROOT, "apps/dmit-api/src/lib/earlySseStream.ts"),
+      "utf8"
+    );
+    const respondEarly = readFileSync(
+      join(ROOT, "apps/dmit-api/src/lib/respondEarlySse.ts"),
+      "utf8"
+    );
     const schema = readFileSync(
       join(ROOT, "apps/dmit-api/src/lib/executeChatCompletion.ts"),
       "utf8"
@@ -183,10 +191,15 @@ try {
       compat.includes("normalizeChatMessageContent") &&
       compat.includes("shouldStripGptSamplingParams") &&
       compat.includes("sanitizeUpstreamChatBody") &&
+      compat.includes("normalizeClientChatCompletionBody") &&
       upstream.includes("sanitizeUpstreamChatBody") &&
       upstream.includes("max_completion_tokens") &&
       chatRoute.includes("normalizeChatMessages") &&
-      chatRoute.includes("text/event-stream") &&
+      chatRoute.includes("normalizeClientChatCompletionBody") &&
+      // SSE lives in earlySseStream / respondEarlySse (not inline in chat.ts).
+      earlySse.includes("text/event-stream") &&
+      earlySse.includes('Connection: "close"') &&
+      respondEarly.includes("respondBufferedChatSse") &&
       schema.includes("stream_options") &&
       schema.includes("optionalFiniteNumber");
     if (!staticOk) {

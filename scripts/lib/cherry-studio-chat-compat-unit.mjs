@@ -138,12 +138,16 @@ const nullOpts = normalizeClientChatCompletionBody({
   tool_choice: null,
   response_format: null,
   stream_options: null,
+  provider_options: null,
+  extra_body: null,
 });
 assert(nullOpts.noop === false, "null optionals not noop");
 assert(nullOpts.normalized === true, "null optionals normalized");
 assert(nullOpts.body.temperature === undefined, "temperature null deleted");
 assert(nullOpts.body.tools === undefined, "tools null deleted");
 assert(!("stream_options" in nullOpts.body), "stream_options null deleted");
+assert(!("provider_options" in nullOpts.body), "provider_options null deleted");
+assert(!("extra_body" in nullOpts.body), "extra_body null deleted");
 
 const normal = normalizeClientChatCompletionBody({
   model: "gpt-5.5",
