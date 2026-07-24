@@ -35,12 +35,16 @@ export function buildUpstreamChatBody(
 
   const upstream = sanitized.upstream;
 
+  // Clamp whatever sanitize mapped (max_tokens or promoted max_completion_tokens).
+  // Never re-introduce max_completion_tokens on the upstream payload.
   const rawMax =
+    coerceOptionalNumber(upstream.max_tokens) ??
     coerceOptionalNumber(body.max_tokens) ??
     coerceOptionalNumber(body.max_completion_tokens);
   if (rawMax !== undefined) {
     upstream.max_tokens = resolveMaxOutputTokens(rawMax);
   }
+  delete upstream.max_completion_tokens;
 
   return upstream;
 }

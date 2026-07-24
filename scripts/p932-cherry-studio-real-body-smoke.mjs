@@ -100,6 +100,37 @@ function assertSseOk(res, text, label) {
   return pass(label);
 }
 
+/** SSE success with real assistant content — rejects mid-stream error envelopes. */
+function assertSseContentOk(res, text, label) {
+  const ct = res.headers.get("content-type") ?? "";
+  if (
+    res.status !== 200 ||
+    !ct.includes("text/event-stream") ||
+    !text.includes("chat.completion.chunk") ||
+    !text.includes("data:") ||
+    !/data:\s*\[DONE\]/.test(text)
+  ) {
+    return fail(
+      label,
+      `HTTP ${res.status} ct=${ct} hasChunk=${text.includes("chat.completion.chunk")} done=${/\[DONE\]/.test(text)} body=${text.slice(0, 240)}`
+    );
+  }
+  if (/"error"\s*:\s*\{/.test(text) || /invalid_request_error/.test(text)) {
+    return fail(
+      label,
+      `SSE error envelope after first frame: ${text.slice(0, 280)}`
+    );
+  }
+  // Non-empty delta.content (role frame has content:"").
+  if (!/"delta"\s*:\s*\{[^}]*"content"\s*:\s*"[^"]+/.test(text)) {
+    return fail(
+      label,
+      `missing non-empty assistant content: ${text.slice(0, 280)}`
+    );
+  }
+  return pass(label);
+}
+
 async function postChat(ctx, body) {
   return acceptanceFetch(`${ctx.BASE}/v1/chat/completions`, {
     method: "POST",
@@ -320,7 +351,7 @@ try {
         ) && ok;
     } else {
       ok =
-        assertSseOk(
+        assertSseContentOk(
           res,
           raw,
           "max_completion_tokens-only Cherry stream"

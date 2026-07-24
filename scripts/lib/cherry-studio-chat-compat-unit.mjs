@@ -159,6 +159,32 @@ assert(normal.normalized === false, "normal unchanged");
 assert(normal.body.messages[0].content === "hello world", "normal content intact");
 assert(normal.body.temperature === 0.7, "normal temperature intact");
 
+const maxCompOnly = normalizeClientChatCompletionBody({
+  model: "gpt-5.5",
+  stream: true,
+  messages: [{ role: "user", content: "reply only ok" }],
+  max_completion_tokens: 16,
+});
+assert(maxCompOnly.noop === false, "max_completion_tokens-only not noop");
+assert(maxCompOnly.normalized === true, "max_completion_tokens-only normalized");
+assert(maxCompOnly.body.max_tokens === 16, "max_completion_tokens → max_tokens");
+assert(
+  !("max_completion_tokens" in maxCompOnly.body),
+  "max_completion_tokens deleted after promote"
+);
+
+const maxBoth = normalizeClientChatCompletionBody({
+  model: "gpt-5.5",
+  messages: [{ role: "user", content: "hi" }],
+  max_tokens: 32,
+  max_completion_tokens: 64,
+});
+assert(maxBoth.body.max_tokens === 32, "existing max_tokens kept when both set");
+assert(
+  maxBoth.body.max_completion_tokens === 64,
+  "max_completion_tokens kept when max_tokens present (upstream sanitize drops it)"
+);
+
 assert(shouldStripGptSamplingParams("gpt-5.5") === true, "strip gpt-5.5");
 assert(shouldStripGptSamplingParams("gpt-5.4-pro") === true, "strip gpt-5.4-pro");
 assert(shouldStripGptSamplingParams("gpt-5-pro") === true, "strip gpt-5-pro");
@@ -200,6 +226,25 @@ assert(
 );
 assert(cherryReal.upstream.temperature === undefined, "gpt-5.4 temperature stripped");
 assert(!("tool_choice" in cherryReal.upstream), "tool_choice key absent");
+assert(cherryReal.upstream.max_tokens === 64, "cherry max_tokens forwarded");
+assert(
+  !("max_completion_tokens" in cherryReal.upstream),
+  "cherry max_completion_tokens never forwarded"
+);
+
+const maxCompSanitize = sanitizeUpstreamChatBody(
+  {
+    messages: [{ role: "user", content: "reply only ok" }],
+    max_completion_tokens: 16,
+  },
+  "gpt-5.5"
+);
+assert(maxCompSanitize.ok === true, "max_completion_tokens-only sanitize ok");
+assert(maxCompSanitize.upstream.max_tokens === 16, "sanitize promotes to max_tokens");
+assert(
+  !("max_completion_tokens" in maxCompSanitize.upstream),
+  "sanitize drops max_completion_tokens"
+);
 
 const geminiCherry = sanitizeUpstreamChatBody(
   {

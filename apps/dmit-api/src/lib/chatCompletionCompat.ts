@@ -161,9 +161,29 @@ function stripNullOptionalFields(
 }
 
 /**
+ * OpenAI / Cherry compat: when only max_completion_tokens is set, promote it to
+ * max_tokens and drop max_completion_tokens so upstream never sees the OpenAI-
+ * only field (many providers reject it as invalid_request_error).
+ */
+export function promoteMaxCompletionTokensOnly(
+  body: Record<string, unknown>
+): { body: Record<string, unknown>; changed: boolean } {
+  const maxTokens = coerceOptionalNumber(body.max_tokens);
+  const maxCompletion = coerceOptionalNumber(body.max_completion_tokens);
+  if (maxTokens !== undefined || maxCompletion === undefined) {
+    return { body, changed: false };
+  }
+  const out: Record<string, unknown> = { ...body };
+  out.max_tokens = maxCompletion;
+  delete out.max_completion_tokens;
+  return { body: out, changed: true };
+}
+
+/**
  * Pre-schema Cherry Studio / OpenAI client body sanitize for /v1/chat/completions.
  *
  * - Drop null optional sampling / tools / format fields
+ * - max_completion_tokens-only → max_tokens (delete max_completion_tokens)
  * - Normalize message roles + flatten content parts to strings
  * - messages missing / null / [] / non-array / all-empty-content → noop
  *   (caller returns 200 not_billable; never upstream / never debit)
@@ -186,6 +206,10 @@ export function normalizeClientChatCompletionBody(
   const stripped = stripNullOptionalFields(original);
   let body = stripped.body;
   if (stripped.changed) normalized = true;
+
+  const promoted = promoteMaxCompletionTokensOnly(body);
+  body = promoted.body;
+  if (promoted.changed) normalized = true;
 
   const messagesRaw = body.messages;
 
@@ -311,7 +335,16 @@ export function sanitizeUpstreamChatBody(
     if (topP !== undefined) upstream.top_p = topP;
   }
 
-  // max_tokens / max_completion_tokens are handled by caller (clamping).
+  // max_completion_tokens-only → max_tokens. Never forward max_completion_tokens
+  // (GRSAI / OpenAI-compat proxies often 400 on that field). Clamping is done by
+  // buildUpstreamChatBody via resolveMaxOutputTokens.
+  const rawMax =
+    coerceOptionalNumber(body.max_tokens) ??
+    coerceOptionalNumber(body.max_completion_tokens);
+  if (rawMax !== undefined) {
+    upstream.max_tokens = rawMax;
+  }
+
   // stop / user are generally safe when present and well-typed.
   if (typeof body.user === "string" && body.user.trim()) {
     upstream.user = body.user.trim();
