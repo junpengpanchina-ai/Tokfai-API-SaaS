@@ -671,11 +671,59 @@ function geminiGenerateContentToSse(response) {
   ].join("");
 }
 
+/** Image/media models accepted by offline mock (capability routing). */
+const MOCK_IMAGE_MODELS = new Set([
+  "nano-banana",
+  "nano-banana-fast",
+  "nano-banana-pro",
+  "nano-banana-2",
+  "gpt-image-2",
+]);
+
+function isMockImageModel(model) {
+  const m = String(model ?? "")
+    .trim()
+    .toLowerCase();
+  return MOCK_IMAGE_MODELS.has(m) || m.startsWith("nano-banana");
+}
+
+function isMockTextChatModel(model) {
+  const m = String(model ?? "")
+    .trim()
+    .toLowerCase();
+  if (isMockImageModel(m)) return false;
+  return (
+    m.startsWith("gpt-") ||
+    m.startsWith("gemini-") ||
+    m.startsWith("auto-") ||
+    MOCK_ALLOWED_MODELS.has(m)
+  );
+}
+
 function imageGenerationBody(body) {
   const requestedModel =
-    typeof body.model === "string" ? body.model : "gpt-image-2";
+    typeof body.model === "string" ? body.model : "nano-banana";
   const resolvedModel = requestedModel;
   const meta = tokfaiMeta(requestedModel, resolvedModel);
+
+  // GPT/Gemini text models cannot use /v1/images/generations.
+  if (isMockTextChatModel(resolvedModel) || !isMockImageModel(resolvedModel)) {
+    return {
+      __status: 400,
+      error: {
+        message: "当前图片模型不可用，请切换图片模型",
+        code: "image_model_not_available",
+        type: "invalid_request_error",
+        request_id: meta.request_id,
+      },
+      tokfai: {
+        billing_status: "not_billable",
+        credits_charged: 0,
+      },
+      request_id: meta.request_id,
+      suggestedModels: [...MOCK_IMAGE_MODELS],
+    };
+  }
 
   const images = collectMockImages(body);
   const prompt = typeof body.prompt === "string" ? body.prompt : "";
@@ -690,12 +738,16 @@ function imageGenerationBody(body) {
         message: "需要上传参考图后才能进行保留主体改图。",
         code: "reference_image_missing",
         type: "validation_error",
+        request_id: meta.request_id,
+      },
+      tokfai: {
+        billing_status: "not_billable",
+        credits_charged: 0,
       },
       request_id: meta.request_id,
     };
   }
 
-  const hasDataUrl = images.some((url) => String(url).startsWith("data:image/"));
   const hasBlob = images.some((url) => /^blob:/i.test(String(url)));
   if (hasBlob) {
     return {
@@ -704,14 +756,23 @@ function imageGenerationBody(body) {
         message: "Browser blob URLs cannot be used as reference images.",
         code: "invalid_image_url",
         type: "validation_error",
+        request_id: meta.request_id,
+      },
+      tokfai: {
+        billing_status: "not_billable",
+        credits_charged: 0,
       },
       request_id: meta.request_id,
     };
   }
 
   const mode = images.length > 0 || wantsReference ? "reference_edit" : "text_to_image";
-  // Async accept (matches production POST → 202 + poll).
   const taskId = meta.request_id;
+  const wantFail =
+    /__tokfai_image_fail__|force_upstream_image_error/i.test(prompt);
+  const wantTimeout =
+    /__tokfai_image_timeout__|force_image_task_timeout/i.test(prompt);
+
   imageTasks.set(taskId, {
     id: taskId,
     userKey: "", // filled by route
@@ -723,39 +784,93 @@ function imageGenerationBody(body) {
     usage: { credits_charged: 0 },
     error: null,
     mode,
+    billing_status: "not_billable",
+    credits_charged: 0,
   });
 
-  // Complete shortly after accept so GET poll succeeds in smokes.
   setTimeout(() => {
     const task = imageTasks.get(taskId);
     if (!task) return;
     task.status = "generating";
-    task.progress = 55;
+    task.progress = wantFail ? 96 : 55;
     task.message = { en: "Generating image", zh: "正在生成图片" };
   }, 50);
+
   setTimeout(() => {
     const task = imageTasks.get(taskId);
     if (!task) return;
+    if (wantFail) {
+      task.status = "failed";
+      task.progress = 96;
+      task.message = {
+        en: "Image generation is temporarily unavailable. Please retry shortly.",
+        zh: "图片生成暂时不可用，请稍后重试。",
+      };
+      task.error = {
+        message:
+          "Image generation is temporarily unavailable. Please retry shortly.",
+        code: "upstream_image_error",
+        type: "server_error",
+        request_id: taskId,
+      };
+      task.usage = { credits_charged: 0 };
+      task.billing_status = "not_billable";
+      task.credits_charged = 0;
+      return;
+    }
+    if (wantTimeout) {
+      task.status = "retryable_timeout";
+      task.progress = 90;
+      task.message = {
+        en: "Image generation timed out before completion.",
+        zh: "图片生成超时，请稍后重试。未扣费。",
+      };
+      task.error = {
+        message: "Image generation timed out before completion.",
+        code: "image_task_timeout",
+        type: "upstream_error",
+        request_id: taskId,
+      };
+      task.usage = { credits_charged: 0 };
+      task.billing_status = "not_billable";
+      task.credits_charged = 0;
+      return;
+    }
     task.status = "completed";
     task.progress = 100;
     task.message = { en: "Completed", zh: "已完成" };
-    task.data = [{ url: "https://example.com/mock-image.png" }];
+    task.data = [
+      {
+        url: "https://example.com/mock-image.png",
+        revised_prompt: null,
+      },
+    ];
     task.usage = { credits_charged: meta.credits_charged };
+    task.billing_status = "billable";
+    task.credits_charged = meta.credits_charged;
   }, 200);
 
   return {
     __status: 202,
     id: taskId,
+    task_id: taskId,
     object: "image.generation",
     created: Math.floor(Date.now() / 1000),
     model: resolvedModel,
     status: "queued",
+    processing: true,
     progress: 0,
     message: { en: "Queued", zh: "已排队" },
     data: [],
     usage: { credits_charged: 0 },
-    tokfai: { request_id: taskId, mode },
+    tokfai: {
+      request_id: taskId,
+      billing_status: "not_billable",
+      credits_charged: 0,
+      mode,
+    },
     request_id: taskId,
+    credits_charged: 0,
     mode,
   };
 }
@@ -1334,8 +1449,15 @@ export function startMockGateway(options = {}) {
             request_id: makeRequestId(),
           });
         }
+        const creditsCharged = Number(task.credits_charged ?? 0);
+        const billingStatus =
+          task.billing_status ??
+          (task.status === "completed" && creditsCharged > 0
+            ? "billable"
+            : "not_billable");
         return sendJson(res, 200, {
           id: task.id,
+          task_id: task.id,
           object: "image.generation",
           model: task.model,
           status: task.status,
@@ -1344,8 +1466,14 @@ export function startMockGateway(options = {}) {
           data: task.data,
           usage: task.usage,
           error: task.error,
-          tokfai: { request_id: task.id, mode: task.mode },
+          tokfai: {
+            request_id: task.id,
+            billing_status: billingStatus,
+            credits_charged: creditsCharged,
+            mode: task.mode,
+          },
           request_id: task.id,
+          credits_charged: creditsCharged,
         });
       }
 

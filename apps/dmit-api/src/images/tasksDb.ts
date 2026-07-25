@@ -191,7 +191,7 @@ export async function markImageTaskStarted(requestId: string): Promise<boolean> 
 
 export async function finalizeImageTaskSuccess(args: {
   requestId: string;
-  resultData: Array<{ url: string }>;
+  resultData: Array<{ url: string; revised_prompt?: string | null }>;
   creditsCharged: number;
   usage: Record<string, unknown>;
   upstreamId: string | null;

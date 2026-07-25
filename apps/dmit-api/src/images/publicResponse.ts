@@ -24,6 +24,12 @@ export function buildPublicImageTaskResponse(
     ? Number(task.credits_charged ?? 0)
     : 0;
 
+  const billingStatus = isCompleted
+    ? creditsCharged > 0
+      ? "billable"
+      : "not_billable"
+    : "not_billable";
+
   const usage =
     isCompleted &&
     task.usage &&
@@ -38,29 +44,59 @@ export function buildPublicImageTaskResponse(
   };
 
   const progress = publicProgressForStatus(task.status, task.progress);
+  const isFailed =
+    task.status === "failed" || task.status === "retryable_timeout";
 
-  const error =
-    task.status === "failed" || task.status === "retryable_timeout"
-      ? {
-          code: task.error_code ?? task.status,
-          message: task.error_message ?? message.en,
-          message_en: message.en,
-          message_zh: message.zh,
+  const publicData = isCompleted
+    ? resultData.map((item) => {
+        if (item && typeof item === "object" && !Array.isArray(item)) {
+          const row = item as Record<string, unknown>;
+          return {
+            ...row,
+            revised_prompt:
+              row.revised_prompt === undefined ? null : row.revised_prompt,
+          };
         }
-      : null;
+        return item;
+      })
+    : [];
 
+  const error = isFailed
+    ? {
+        message:
+          task.error_message ||
+          message.en ||
+          "Image generation is temporarily unavailable. Please retry shortly.",
+        code: task.error_code || task.status || "upstream_image_error",
+        type:
+          task.error_code === "image_task_timeout" ||
+          task.error_code === "image_generation_timeout" ||
+          task.error_code === "retryable_timeout"
+            ? "upstream_error"
+            : "server_error",
+        request_id: task.request_id,
+        message_en: message.en,
+        message_zh: message.zh,
+      }
+    : null;
+
+  // Keep granular async status (queued/generating/…) for Workbench.
+  // Tokfai media contract also exposes task_id + tokfai.billing_status.
   const base: Record<string, unknown> = {
     id: task.request_id,
+    task_id: task.request_id,
     object: "image.generation",
     created: Number.isFinite(createdAt) ? createdAt : Math.floor(Date.now() / 1000),
     model: task.model,
     status: task.status,
     progress,
     message,
-    data: isCompleted ? resultData : [],
+    data: publicData,
     usage,
     tokfai: {
       request_id: task.request_id,
+      billing_status: billingStatus,
+      credits_charged: creditsCharged,
       mode: task.mode ?? null,
       prompt_mode: task.prompt_mode ?? null,
       ...(pollRequestId ? { poll_request_id: pollRequestId } : {}),
@@ -68,6 +104,10 @@ export function buildPublicImageTaskResponse(
     request_id: task.request_id,
     credits_charged: creditsCharged,
   };
+
+  if (!isCompleted && !isFailed) {
+    base.processing = true;
+  }
 
   if (error) {
     base.error = error;

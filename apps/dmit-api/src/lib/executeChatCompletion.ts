@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { isImageModel } from "../capabilities/modelCapabilityPolicy.js";
 import { isSlowExperimentalChatModel } from "../catalog/modelRegistry.js";
 
 import { ApiError } from "../errors.js";
@@ -280,6 +281,50 @@ export async function executeChatCompletion(
       isAlias: resolvedRequest.isAlias,
       attempts: resolvedRequest.attempts,
     });
+  }
+
+  // Image/media models must use POST /v1/images/generations — never chat/responses.
+  // Does not alter GPT/Gemini text success paths (image models never reach them).
+  if (isImageModel(requestedRaw) || isImageModel(requestedModel)) {
+    const suggestedModels = await listAvailableChatModelIds();
+    const errorCode = MODEL_NOT_AVAILABLE_CODE;
+    const errorMessage =
+      "Image models are not available on chat completions. Use POST /v1/images/generations.";
+
+    log.warn("model_not_available", {
+      code: MODEL_NOT_AVAILABLE_CODE,
+      route,
+      requestId,
+      requestedModel: requestedRaw,
+      normalizedModel: resolvedRequest.normalized,
+      resolvedModel: requestedModel,
+      reason: "image_capability_isolation",
+      supportedModels: suggestedModels,
+    });
+
+    await writeUsageLog(
+      failedUsageLog({
+        user_id: caller.userId,
+        api_key_id: caller.apiKeyId,
+        tenant_id: caller.tenantId,
+        model: requestedRaw,
+        status: "failed",
+        request_id: requestId,
+        error_code: errorCode,
+        error_message: errorMessage,
+        latency_ms: Date.now() - startedAt,
+      }),
+      route
+    );
+
+    return {
+      ok: false,
+      errorCode,
+      errorMessage,
+      requestId,
+      httpStatus: 400,
+      suggestedModels,
+    };
   }
 
   if (!(await isModelAllowedForChat(requestedRaw))) {

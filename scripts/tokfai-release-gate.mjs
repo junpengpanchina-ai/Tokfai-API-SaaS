@@ -23,6 +23,9 @@
  *   example.com/*). LIVE=1 against api.tokfai.com cannot satisfy them.
  *   The gate still sets LIVE=1 for p942, but pins TOKFAI_API_BASE + key to
  *   the local mock started for that step only.
+ *   p948 Nano Banana capability is mock/static by default (never real
+ *   upstream in the gate). Real Nano Banana:
+ *   LIVE=1 MODEL=nano-banana node scripts/p948-nano-banana-image-smoke.mjs
  */
 
 import { spawnSync } from "node:child_process";
@@ -41,6 +44,7 @@ const PASS_MARKERS = [
   "TOKFAI_P941_API_ISOLATION_CORE_PASS",
   "TOKFAI_P942_VISION_ANALYZE_PASS",
   "TOKFAI_P946_GEMINI_25_FLASH_NONSTREAM_PASS",
+  "TOKFAI_P948_NANO_BANANA_IMAGE_CAPABILITY_PASS",
   "TOKFAI_PUBLIC_BETA_READY_ALL_PASS",
 ];
 
@@ -130,8 +134,19 @@ const STEPS = [
     live: true,
   },
   {
+    id: "p948",
+    label: "8. p948 nano-banana image capability (mock/static — no real Nano Banana)",
+    cwd: ROOT,
+    cmd: "node",
+    args: ["scripts/p948-nano-banana-image-smoke.mjs"],
+    marker: "TOKFAI_P948_NANO_BANANA_IMAGE_CAPABILITY_PASS",
+    live: true,
+    /** Default must not call real Nano Banana; smoke forces mock unless MODEL=nano-banana. */
+    liveViaMock: true,
+  },
+  {
     id: "public-beta-ready-all",
-    label: "8. public-beta-ready-all",
+    label: "9. public-beta-ready-all",
     cwd: ROOT,
     cmd: "node",
     args: ["scripts/public-beta-ready-all.mjs"],
@@ -371,7 +386,7 @@ async function main() {
         env.TOKFAI_API_KEY = mock.apiKey;
         env.TOKFAI_API_BASE = mock.baseUrl;
         console.log(
-          `p942 LIVE via mock: ${mock.baseUrl} (prod cannot satisfy mock URL probes)`
+          `${step.id} LIVE via mock: ${mock.baseUrl} (prod cannot satisfy mock URL probes)`
         );
       } catch (err) {
         results.push({

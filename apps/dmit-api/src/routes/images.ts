@@ -2,6 +2,11 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import {
+  assertCapabilityAllowed,
+  isImageModel,
+  isTextChatModel,
+} from "../capabilities/modelCapabilityPolicy.js";
+import {
   DEFAULT_IMAGE_MODEL_ID,
   isModelAllowedForImage,
   listAvailableImageModelIds,
@@ -169,10 +174,58 @@ imageRoutes.post("/v1/images/generations", async (c) => {
     );
   }
 
-  if (
-    isKnownChatModelKind(resolvedModel) ||
-    !(await isModelAllowedForImage(resolvedModel))
-  ) {
+  const requestedCapability =
+    mode === "reference_edit" ? "image_edit" : "image_generation";
+
+  // Capability routing: GPT/Gemini text models must not use image media surface.
+  if (isTextChatModel(resolvedModel) || isKnownChatModelKind(resolvedModel)) {
+    const suggestedModels = await listAvailableImageModelIds();
+    return c.json(
+      {
+        error: {
+          message: "当前图片模型不可用，请切换图片模型",
+          code: "image_model_not_available",
+          type: "invalid_request_error",
+          request_id: requestId,
+        },
+        tokfai: {
+          billing_status: "not_billable",
+          credits_charged: 0,
+        },
+        suggestedModels,
+      },
+      400
+    );
+  }
+
+  if (isImageModel(resolvedModel)) {
+    try {
+      assertCapabilityAllowed(resolvedModel, requestedCapability);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const suggestedModels = await listAvailableImageModelIds();
+        return c.json(
+          {
+            error: {
+              message: err.publicMessage || err.message,
+              code: err.code ?? "image_model_not_available",
+              type: err.type ?? "invalid_request_error",
+              request_id: requestId,
+            },
+            tokfai: {
+              billing_status: "not_billable",
+              credits_charged: 0,
+            },
+            suggestedModels,
+          },
+          400
+        );
+      }
+      throw err;
+    }
+  }
+
+  if (!(await isModelAllowedForImage(resolvedModel))) {
     const suggestedModels = await listAvailableImageModelIds();
     const errorMessage = "当前图片模型不可用，请切换图片模型";
 
@@ -182,6 +235,11 @@ imageRoutes.post("/v1/images/generations", async (c) => {
           message: errorMessage,
           code: "image_model_not_available",
           type: "invalid_request_error",
+          request_id: requestId,
+        },
+        tokfai: {
+          billing_status: "not_billable",
+          credits_charged: 0,
         },
         suggestedModels,
       },

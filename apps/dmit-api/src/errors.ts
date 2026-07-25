@@ -46,6 +46,8 @@ export const STATUS_BY_ERROR_CODE: Record<string, number> = {
   request_body_too_large: 413,
   upstream_timeout: 504,
   image_generation_timeout: 504,
+  image_task_timeout: 504,
+  upstream_image_error: 502,
 };
 
 /** Stable error.type for known codes — never leave type undefined on envelopes. */
@@ -70,9 +72,13 @@ export function errorTypeForCode(
     code === "upstream_auth_error" ||
     code === "all_upstreams_unavailable" ||
     code === "gateway_overloaded" ||
-    code === "image_generation_timeout"
+    code === "image_generation_timeout" ||
+    code === "image_task_timeout"
   ) {
     return "upstream_error";
+  }
+  if (code === "upstream_image_error") {
+    return "server_error";
   }
   if (code === "model_not_available" || code === "model_not_supported") {
     return "validation_error";

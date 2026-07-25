@@ -9,6 +9,10 @@ import type {
 } from "../types.js";
 import { runImageGenerationWithPolling } from "../upstream/imageAsyncProvider.js";
 import type { ImageUrlResolveSource } from "../upstream/imageUrlResolver.js";
+import {
+  isNanoBananaImageModel,
+  runNanoBananaImageGeneration,
+} from "../upstream/nanoBananaImageProvider.js";
 import { messagesForStatus } from "./progressMessages.js";
 import {
   finalizeImageTaskFailure,
@@ -29,6 +33,8 @@ const UPSTREAM_ERROR_CODES = new Set([
   "upstream_invalid_response",
   "upstream_timeout",
   "image_generation_timeout",
+  "image_task_timeout",
+  "upstream_image_error",
 ]);
 
 export function enqueueImageGeneration(requestId: string): void {
@@ -91,7 +97,7 @@ async function processImageGeneration(requestId: string): Promise<void> {
     let upstreamId: string | null = null;
 
     try {
-      const result = await runImageGenerationWithPolling({
+      const generateParams = {
         requestId,
         resolvedModel: task.model,
         prompt: input.prompt,
@@ -101,7 +107,10 @@ async function processImageGeneration(requestId: string): Promise<void> {
         imageUrlSources: input.imageUrlSources as ImageUrlResolveSource[],
         mode: input.mode,
         promptMode: input.promptMode,
-      });
+      };
+      const result = isNanoBananaImageModel(task.model)
+        ? await runNanoBananaImageGeneration(generateParams)
+        : await runImageGenerationWithPolling(generateParams);
       url = result.url;
       upstreamId = result.upstreamId;
     } catch (err) {
@@ -166,7 +175,7 @@ async function processImageGeneration(requestId: string): Promise<void> {
     const usage = { credits_charged: creditsCharged };
     await finalizeImageTaskSuccess({
       requestId,
-      resultData: [{ url }],
+      resultData: [{ url, revised_prompt: null }],
       creditsCharged,
       usage,
       upstreamId,
@@ -179,9 +188,13 @@ async function processImageGeneration(requestId: string): Promise<void> {
       route: "/v1/images/generations",
       status: 200,
       code: "succeeded",
+      model: task.model,
+      capability:
+        input.mode === "reference_edit" ? "image_edit" : "image_generation",
       mode: input.mode,
       promptMode: input.promptMode,
       imagesCount: input.imagesCount,
+      latencyMs: Date.now() - startedAt,
     });
   } catch (err) {
     log.error("image_generation_worker_failed", {
@@ -205,19 +218,24 @@ async function handleGenerationError(
   if (err instanceof ApiError) {
     const isTimeout =
       err.code === "image_generation_timeout" ||
+      err.code === "image_task_timeout" ||
       err.code === "upstream_timeout";
     if (isTimeout) {
       const msgs = messagesForStatus("retryable_timeout");
       await failTask(
         task,
-        "retryable_timeout",
-        msgs.en,
+        err.code === "image_task_timeout"
+          ? "image_task_timeout"
+          : "retryable_timeout",
+        err.code === "image_task_timeout"
+          ? safePublicMessage(err)
+          : msgs.en,
         startedAt,
         "retryable_timeout"
       );
       return;
     }
-    const code = err.code ?? "upstream_error";
+    const code = err.code ?? "upstream_image_error";
     await failTask(task, code, safePublicMessage(err), startedAt, "failed");
     return;
   }
@@ -275,7 +293,9 @@ function upstreamFailureFields(
   const upstreamStatus =
     code === "upstream_rate_limited"
       ? 429
-      : code === "upstream_timeout" || code === "image_generation_timeout"
+      : code === "upstream_timeout" ||
+          code === "image_generation_timeout" ||
+          code === "image_task_timeout"
         ? 504
         : 502;
 
