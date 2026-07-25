@@ -30,6 +30,72 @@ const FAIL_TOKEN = "TOKFAI_P932_CHERRY_STUDIO_REAL_BODY_FAIL";
 
 const CHERRY_MODELS = ["gpt-5.5", "gpt-5.4", "gpt-5.4-pro", "gemini-3-pro"];
 const PROMPT = "Return exactly: TOKFAI_CHERRY_OK";
+const CHAT_ROUTE = "/v1/chat/completions";
+/** Cherry compatibility required live probes: initial attempt + 1 retry. */
+const CHERRY_PROBE_MAX_ATTEMPTS = 2;
+
+function isTimeoutName(name) {
+  return name === "TimeoutError" || name === "AbortError";
+}
+
+function classifyTimeoutCode(body, timedOut) {
+  const code =
+    typeof body?.error?.code === "string" ? body.error.code.trim() : "";
+  if (code === "upstream_timeout" || code === "upstream_timeout_policy") {
+    return "upstream_timeout_policy";
+  }
+  if (timedOut || code === "network_timeout") return "network_timeout";
+  return null;
+}
+
+function probeErrorFields(result) {
+  const timedOut = result?.timedOut === true;
+  const timeoutCode = classifyTimeoutCode(result?.body, timedOut);
+  if (timeoutCode) {
+    const msg =
+      (typeof result?.errorMessage === "string" && result.errorMessage.trim()) ||
+      (typeof result?.body?.error?.message === "string" &&
+        result.body.error.message.trim()) ||
+      "TimeoutError";
+    return {
+      errorCode: timeoutCode,
+      errorMessage: msg === "undefined" || msg === "null" ? "TimeoutError" : msg,
+    };
+  }
+  const code =
+    (typeof result?.body?.error?.code === "string" &&
+      result.body.error.code.trim()) ||
+    "none";
+  const message =
+    (typeof result?.body?.error?.message === "string" &&
+      result.body.error.message.trim()) ||
+    "none";
+  return {
+    errorCode: code === "undefined" ? "none" : code,
+    errorMessage: message === "undefined" || message === "null" ? "none" : message,
+  };
+}
+
+function logProbe({
+  model,
+  route = CHAT_ROUTE,
+  stream,
+  status,
+  errorCode,
+  errorMessage,
+  attempt,
+}) {
+  const bits = [
+    `model=${model || "(none)"}`,
+    `route=${route}`,
+    `stream=${stream === true ? "true" : "false"}`,
+    `status=${status ?? "none"}`,
+    `errorCode=${errorCode || "none"}`,
+    `errorMessage=${errorMessage || "none"}`,
+  ];
+  if (attempt != null) bits.push(`attempt=${attempt}`);
+  console.log(`PROBE  ${bits.join(" ")}`);
+}
 
 /** Real Cherry Studio / AI SDK-ish chat stream body. */
 function cherryRealBody(model, overrides = {}) {
@@ -132,7 +198,7 @@ function assertSseContentOk(res, text, label) {
 }
 
 async function postChat(ctx, body) {
-  return acceptanceFetch(`${ctx.BASE}/v1/chat/completions`, {
+  return acceptanceFetch(`${ctx.BASE}${CHAT_ROUTE}`, {
     method: "POST",
     headers: ctx.authHeaders({
       "User-Agent": "CherryStudio/1.0 TokfaiP932RealBodySmoke",
@@ -140,6 +206,94 @@ async function postChat(ctx, body) {
     body: JSON.stringify(body),
     timeoutMs: ctx.TIMEOUT_MS,
   });
+}
+
+/**
+ * Run a Cherry live probe with structured logging + 1 timeout retry.
+ * Never throws TimeoutError/AbortError — always returns boolean ok.
+ */
+async function runCherryLiveProbe(ctx, {
+  label,
+  model,
+  body,
+  evaluate,
+}) {
+  const stream = body?.stream === true;
+  let lastDetail = "";
+
+  for (let attempt = 1; attempt <= CHERRY_PROBE_MAX_ATTEMPTS; attempt++) {
+    let result;
+    try {
+      result = await postChat(ctx, body);
+    } catch (err) {
+      const name =
+        err && typeof err === "object" && typeof err.name === "string"
+          ? err.name
+          : "Error";
+      const timedOut = isTimeoutName(name);
+      const errorCode = timedOut ? "network_timeout" : "probe_error";
+      const errorMessage = timedOut
+        ? "TimeoutError"
+        : typeof err?.message === "string" && err.message.trim()
+          ? err.message.trim().slice(0, 180)
+          : name;
+      logProbe({
+        model,
+        stream,
+        status: "throw",
+        errorCode,
+        errorMessage,
+        attempt,
+      });
+      lastDetail = `model=${model} error=${errorMessage} / ${errorCode}`;
+      if (timedOut && attempt < CHERRY_PROBE_MAX_ATTEMPTS) {
+        console.log(
+          `RETRY  ${label} after ${errorCode} (attempt ${attempt}/${CHERRY_PROBE_MAX_ATTEMPTS})`
+        );
+        continue;
+      }
+      return fail(label, lastDetail);
+    }
+
+    const { errorCode, errorMessage } = probeErrorFields(result);
+    logProbe({
+      model,
+      stream,
+      status: result.res?.status ?? "none",
+      errorCode,
+      errorMessage,
+      attempt,
+    });
+
+    const timedOut =
+      result.timedOut === true ||
+      errorCode === "network_timeout" ||
+      errorCode === "upstream_timeout_policy";
+
+    if (timedOut) {
+      lastDetail = `model=${model} error=TimeoutError / ${errorCode}`;
+      if (attempt < CHERRY_PROBE_MAX_ATTEMPTS) {
+        console.log(
+          `RETRY  ${label} after ${errorCode} (attempt ${attempt}/${CHERRY_PROBE_MAX_ATTEMPTS})`
+        );
+        continue;
+      }
+      return fail(label, lastDetail);
+    }
+
+    const verdict = evaluate(result);
+    if (verdict === true) return true;
+    // evaluate already printed FAIL when false; allow retry only for soft transport issues
+    if (typeof verdict === "object" && verdict?.retryable && attempt < CHERRY_PROBE_MAX_ATTEMPTS) {
+      console.log(
+        `RETRY  ${label} after retryable failure (attempt ${attempt}/${CHERRY_PROBE_MAX_ATTEMPTS})`
+      );
+      continue;
+    }
+    return false;
+  }
+
+  return fail(label, lastDetail || `model=${model} error=TimeoutError / network_timeout`);
 }
 
 function runDiagnosticsUnit() {
@@ -308,149 +462,193 @@ try {
   }
 
   for (const model of CHERRY_MODELS) {
-    const { res, body, text } = await postChat(ctx, cherryRealBody(model));
-    const raw = text ?? (typeof body === "string" ? body : "");
-
-    if (res.status === 400) {
-      ok =
-        assertErrorEnvelope(
-          body,
-          `stream ${model} must not 400 (got envelope)`
-        ) && ok;
-      ok =
-        fail(
-          `Cherry real stream body ${model}`,
-          `HTTP 400 code=${body?.error?.code} message=${body?.error?.message}`
-        ) && ok;
-      continue;
-    }
-
-    ok =
-      assertSseOk(res, raw, `Cherry real stream body ${model} → SSE + [DONE]`) &&
-      ok;
+    const reqBody = cherryRealBody(model);
+    const probeOk = await runCherryLiveProbe(ctx, {
+      label: `Cherry real stream body ${model} → SSE + [DONE]`,
+      model,
+      body: reqBody,
+      evaluate: ({ res, body, text }) => {
+        const raw = text ?? (typeof body === "string" ? body : "");
+        if (res.status === 400) {
+          assertErrorEnvelope(
+            body,
+            `stream ${model} must not 400 (got envelope)`
+          );
+          return fail(
+            `Cherry real stream body ${model}`,
+            `HTTP 400 code=${body?.error?.code || "none"} message=${body?.error?.message || "none"}`
+          );
+        }
+        return assertSseOk(
+          res,
+          raw,
+          `Cherry real stream body ${model} → SSE + [DONE]`
+        );
+      },
+    });
+    ok = probeOk && ok;
   }
 
   // max_completion_tokens only (no max_tokens) + null sampling
   {
-    const { res, text, body } = await postChat(
-      ctx,
-      cherryRealBody("gpt-5.5", {
-        max_tokens: undefined,
-        max_completion_tokens: 32,
-        temperature: null,
-        top_p: null,
-      })
-    );
-    // JSON.stringify drops undefined max_tokens
-    const raw = text ?? "";
-    if (res.status !== 200) {
-      ok =
-        fail(
-          "max_completion_tokens-only stream",
-          `HTTP ${res.status} code=${body?.error?.code} message=${body?.error?.message}`
-        ) && ok;
-    } else {
-      ok =
-        assertSseContentOk(
+    const reqBody = cherryRealBody("gpt-5.5", {
+      max_tokens: undefined,
+      max_completion_tokens: 32,
+      temperature: null,
+      top_p: null,
+    });
+    const probeOk = await runCherryLiveProbe(ctx, {
+      label: "max_completion_tokens-only Cherry stream",
+      model: "gpt-5.5",
+      body: reqBody,
+      evaluate: ({ res, body, text }) => {
+        const raw = text ?? "";
+        if (res.status !== 200) {
+          return fail(
+            "max_completion_tokens-only stream",
+            `HTTP ${res.status} code=${body?.error?.code || "none"} message=${body?.error?.message || "none"}`
+          );
+        }
+        return assertSseContentOk(
           res,
           raw,
           "max_completion_tokens-only Cherry stream"
-        ) && ok;
-    }
+        );
+      },
+    });
+    ok = probeOk && ok;
   }
 
   // Empty / non-array messages → 200 not-billable noop (Cherry Studio compat)
   {
-    const { res, body } = await postChat(ctx, {
+    const probeOk = await runCherryLiveProbe(ctx, {
+      label: "empty messages → 200 not_billable noop",
       model: "gpt-5.5",
-      stream: false,
-      messages: [],
-      tools: [],
-      tool_choice: null,
+      body: {
+        model: "gpt-5.5",
+        stream: false,
+        messages: [],
+        tools: [],
+        tool_choice: null,
+      },
+      evaluate: ({ res, body }) => {
+        if (res.status !== 200) {
+          return fail(
+            "empty messages noop → 200",
+            `HTTP ${res.status} code=${body?.error?.code || "none"} message=${body?.error?.message || "none"}`
+          );
+        }
+        if (
+          body?.choices?.[0]?.message?.content !== "请求内容为空，请重新输入。" ||
+          body?.tokfai?.billing_status !== "not_billable" ||
+          body?.tokfai?.rejectedReason !== "empty_messages"
+        ) {
+          return fail(
+            "empty messages noop body",
+            JSON.stringify({
+              content: body?.choices?.[0]?.message?.content,
+              tokfai: body?.tokfai,
+            }).slice(0, 240)
+          );
+        }
+        return pass("empty messages → 200 not_billable noop");
+      },
     });
-    if (res.status !== 200) {
-      ok =
-        fail("empty messages noop → 200", `HTTP ${res.status}`) && ok;
-    } else if (
-      body?.choices?.[0]?.message?.content !== "请求内容为空，请重新输入。" ||
-      body?.tokfai?.billing_status !== "not_billable" ||
-      body?.tokfai?.rejectedReason !== "empty_messages"
-    ) {
-      ok =
-        fail(
-          "empty messages noop body",
-          JSON.stringify({
-            content: body?.choices?.[0]?.message?.content,
-            tokfai: body?.tokfai,
-          }).slice(0, 240)
-        ) && ok;
-    } else {
-      ok = pass("empty messages → 200 not_billable noop") && ok;
-    }
+    ok = probeOk && ok;
   }
 
   {
-    const { res, body: _body, text } = await postChat(ctx, {
+    const probeOk = await runCherryLiveProbe(ctx, {
+      label: "non-array messages stream → SSE empty noop",
       model: "gpt-5.5",
-      stream: true,
-      messages: "not-an-array",
-      tools: [],
-      tool_choice: null,
+      body: {
+        model: "gpt-5.5",
+        stream: true,
+        messages: "not-an-array",
+        tools: [],
+        tool_choice: null,
+      },
+      evaluate: ({ res, text }) => {
+        const raw = typeof text === "string" ? text : "";
+        if (
+          !assertSseOk(res, raw, "non-array messages stream → SSE noop") ||
+          !raw.includes("请求内容为空，请重新输入。")
+        ) {
+          if (!raw.includes("请求内容为空，请重新输入。")) {
+            return fail("non-array messages SSE content", raw.slice(0, 240));
+          }
+          return false;
+        }
+        return pass("non-array messages stream → SSE empty noop");
+      },
     });
-    const raw = typeof text === "string" ? text : "";
-    if (
-      !assertSseOk(res, raw, "non-array messages stream → SSE noop") ||
-      !raw.includes("请求内容为空，请重新输入。")
-    ) {
-      if (!raw.includes("请求内容为空，请重新输入。")) {
-        ok =
-          fail(
-            "non-array messages SSE content",
-            raw.slice(0, 240)
-          ) && ok;
-      } else {
-        ok = false;
-      }
-    } else {
-      ok = pass("non-array messages stream → SSE empty noop") && ok;
-    }
+    ok = probeOk && ok;
   }
 
   // Truly invalid request → concrete OpenAI error (never undefined)
   {
-    const { res, body } = await postChat(ctx, {
+    const probeOk = await runCherryLiveProbe(ctx, {
+      label: "invalid request error envelope (no undefined)",
       model: "__tokfai_mock_invalid_request",
-      stream: false,
-      messages: [{ role: "user", content: "hi" }],
-    });
-    if (res.status !== 400) {
-      ok =
-        fail(
-          "invalid request → 400",
-          `HTTP ${res.status}`
-        ) && ok;
-    } else {
-      ok =
-        assertErrorEnvelope(
+      body: {
+        model: "__tokfai_mock_invalid_request",
+        stream: false,
+        messages: [{ role: "user", content: "hi" }],
+      },
+      evaluate: ({ res, body }) => {
+        if (res.status !== 400) {
+          return fail(
+            "invalid request → 400",
+            `HTTP ${res.status} code=${body?.error?.code || "none"} message=${body?.error?.message || "none"}`
+          );
+        }
+        let localOk = assertErrorEnvelope(
           body,
           "invalid request error envelope (no undefined)"
-        ) && ok;
-      if (body?.error?.code !== "invalid_request_error") {
-        ok =
-          fail(
-            "invalid request code",
-            `code=${body?.error?.code}`
-          ) && ok;
-      } else {
-        ok = pass("invalid request code=invalid_request_error") && ok;
-      }
-      if (!body?.request_id && !body?.error?.request_id) {
-        ok = fail("invalid request has request_id", "missing") && ok;
-      } else {
-        ok = pass("invalid request includes request_id") && ok;
-      }
-    }
+        );
+        if (body?.error?.code !== "invalid_request_error") {
+          localOk =
+            fail(
+              "invalid request code",
+              `code=${body?.error?.code || "none"}`
+            ) && localOk;
+        } else {
+          localOk = pass("invalid request code=invalid_request_error") && localOk;
+        }
+        if (!body?.request_id && !body?.error?.request_id) {
+          localOk = fail("invalid request has request_id", "missing") && localOk;
+        } else {
+          localOk = pass("invalid request includes request_id") && localOk;
+        }
+        return localOk;
+      },
+    });
+    ok = probeOk && ok;
   }
+} catch (err) {
+  const name =
+    err && typeof err === "object" && typeof err.name === "string"
+      ? err.name
+      : "Error";
+  const timedOut = isTimeoutName(name);
+  const errorCode = timedOut ? "network_timeout" : "probe_error";
+  const errorMessage = timedOut
+    ? "TimeoutError"
+    : typeof err?.message === "string" && err.message.trim()
+      ? err.message.trim().slice(0, 240)
+      : name;
+  logProbe({
+    model: "(uncaught)",
+    stream: false,
+    status: "throw",
+    errorCode,
+    errorMessage,
+  });
+  ok =
+    fail(
+      "p932 uncaught probe exception",
+      `model=(uncaught) error=${errorMessage} / ${errorCode}`
+    ) && false;
 } finally {
   ctx.cleanup();
 }

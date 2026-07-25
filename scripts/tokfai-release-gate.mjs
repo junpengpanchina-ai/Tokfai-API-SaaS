@@ -190,6 +190,30 @@ function findForbidden(text, needles) {
   return hits;
 }
 
+/**
+ * Pull model timeout lines from p932/p933 output so gate FAIL names the probe.
+ * Looks for PROBE/FAIL/RETRY lines with TimeoutError / network_timeout /
+ * upstream_timeout_policy — never invents code=undefined.
+ */
+function extractSmokeTimeoutDetail(combined) {
+  const lines = String(combined ?? "").split(/\r?\n/);
+  const hits = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const isTimeoutLine =
+      /TimeoutError|network_timeout|upstream_timeout_policy|upstream_timeout\b/i.test(
+        trimmed
+      );
+    if (!isTimeoutLine) continue;
+    if (!/model=|PROBE\b|FAIL\b|RETRY\b/i.test(trimmed)) continue;
+    hits.push(trimmed.slice(0, 240));
+    if (hits.length >= 6) break;
+  }
+  if (!hits.length) return null;
+  return hits.join(" | ");
+}
+
 function grepLogLines(text, needles) {
   const lines = String(text ?? "").split(/\r?\n/);
   const hits = [];
@@ -392,25 +416,46 @@ async function main() {
     }
 
     if (r.status !== 0) {
+      const timeoutDetail =
+        step.id === "p932" || step.id === "p933"
+          ? extractSmokeTimeoutDetail(r.combined)
+          : null;
+      const detail = timeoutDetail
+        ? `exit=${r.status}; timeout probes: ${timeoutDetail}`
+        : `exit=${r.status}`;
       results.push({
         id: step.id,
         marker: step.marker,
         ok: false,
-        detail: `exit=${r.status}`,
+        detail,
       });
-      failGate(`step "${step.id}" exited ${r.status}`, { meta, results });
+      failGate(
+        timeoutDetail
+          ? `step "${step.id}" exited ${r.status} — ${timeoutDetail}`
+          : `step "${step.id}" exited ${r.status}`,
+        { meta, results }
+      );
     }
 
     if (step.marker) {
       if (!r.combined.includes(step.marker)) {
+        const timeoutDetail =
+          step.id === "p932" || step.id === "p933"
+            ? extractSmokeTimeoutDetail(r.combined)
+            : null;
+        const detail = timeoutDetail
+          ? `MISSING marker ${step.marker}; timeout probes: ${timeoutDetail}`
+          : `MISSING marker ${step.marker}`;
         results.push({
           id: step.id,
           marker: step.marker,
           ok: false,
-          detail: `MISSING marker ${step.marker}`,
+          detail,
         });
         failGate(
-          `step "${step.id}" missing PASS marker: ${step.marker}`,
+          timeoutDetail
+            ? `step "${step.id}" missing PASS marker: ${step.marker} — ${timeoutDetail}`
+            : `step "${step.id}" missing PASS marker: ${step.marker}`,
           { meta, results }
         );
       }
