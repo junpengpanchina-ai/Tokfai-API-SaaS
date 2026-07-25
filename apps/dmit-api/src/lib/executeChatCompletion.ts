@@ -183,6 +183,7 @@ const UPSTREAM_ERROR_CODES = new Set([
   "upstream_auth_error",
   "upstream_rate_limited",
   "upstream_model_busy",
+  "upstream_model_unavailable",
   "model_not_available",
   "model_not_supported",
   "upstream_timeout",
@@ -581,13 +582,14 @@ async function runProviderAttempts(args: {
 
     // Sole provider already degraded: fail fast with model suggestions —
     // do not wait another ~45s, and do not invent a costlier model switch.
-    // Exception: gemini-2.5-flash client stream=false may still recover via
+    // Exception: gemini-2.5-flash /v1/chat/completions may still recover via
     // upstream stream=true assemble (same model) — do not fail-fast that path.
     const gemini25FlashStreamFallbackPath =
       isGemini25FlashNonStreamStreamFallbackPath({
         clientStream,
         attemptModel,
         requestedModel,
+        route,
       });
     if (
       allDegraded &&
@@ -702,16 +704,22 @@ async function runProviderAttempts(args: {
           timeoutPolicy.upstreamTimeoutMs,
           remainingTotalMs
         );
-        const idleTimeoutMs = clientStream
-          ? Math.min(timeoutPolicy.idleTimeoutMs, remainingTotalMs)
-          : undefined;
 
         const useGemini25FlashStreamFallback =
           isGemini25FlashNonStreamStreamFallbackPath({
             clientStream,
             attemptModel,
             requestedModel,
+            route,
           });
+
+        // Non-stream JSON must use absolute timeoutMs (incl. 20s probe).
+        // Passing idleTimeoutMs would override the probe via ?? in providerFetch.
+        // Idle timeout applies only to real upstream SSE drain below.
+        const idleTimeoutMs =
+          clientStream && !useGemini25FlashStreamFallback
+            ? Math.min(timeoutPolicy.idleTimeoutMs, remainingTotalMs)
+            : undefined;
 
         const logCtx = {
           requestId,
@@ -755,6 +763,7 @@ async function runProviderAttempts(args: {
             attemptModel,
             providerId: provider.id,
             reason,
+            clientStream,
             upstreamStatus: priorErr?.upstreamStatus ?? null,
             billing_status: "not_billable",
             remainingMs,
@@ -787,6 +796,7 @@ async function runProviderAttempts(args: {
           try {
             // Short non-stream probe for this path — pivot to stream assemble
             // quickly when GRSAI JSON hangs (prod chat budget can be ~45s).
+            // Client stream=true still synthesizes OpenAI SSE from the JSON.
             const nonStreamProbeMs = useGemini25FlashStreamFallback
               ? Math.min(20_000, perAttemptTimeoutMs)
               : perAttemptTimeoutMs;
@@ -1304,7 +1314,9 @@ function upstreamFailureFields(
     err.upstreamStatus ??
     (code === "upstream_rate_limited"
       ? 429
-      : code === "upstream_model_busy" || code === "all_upstreams_unavailable"
+      : code === "upstream_model_busy" ||
+          code === "upstream_model_unavailable" ||
+          code === "all_upstreams_unavailable"
         ? 503
         : code === "upstream_auth_error"
           ? 403
@@ -1382,6 +1394,7 @@ async function logChatFailure(args: {
   const usageStatus =
     err.code === "upstream_rate_limited" ||
     err.code === "upstream_model_busy" ||
+    err.code === "upstream_model_unavailable" ||
     err.code === "all_upstreams_unavailable" ||
     err.code === "rate_limited" ||
     err.code === "too_many_requests" ||

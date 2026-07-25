@@ -253,6 +253,8 @@ function isUpstreamDegradedCode(code) {
   return (
     code === "upstream_timeout" ||
     code === "upstream_model_busy" ||
+    code === "upstream_model_unavailable" ||
+    code === "all_upstreams_unavailable" ||
     code === "image_generation_timeout" ||
     code === "retryable_timeout"
   );

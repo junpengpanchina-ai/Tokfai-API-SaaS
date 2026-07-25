@@ -12,6 +12,8 @@ export const FULL_KEY_RE = /sk-tokfai_[a-f0-9]{48}/i;
 export const UPSTREAM_DEGRADED_CODES = new Set([
   "upstream_timeout",
   "upstream_model_busy",
+  "upstream_model_unavailable",
+  "all_upstreams_unavailable",
   "image_generation_timeout",
   "retryable_timeout",
 ]);

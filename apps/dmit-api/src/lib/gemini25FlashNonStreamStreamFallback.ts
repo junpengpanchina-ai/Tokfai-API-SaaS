@@ -1,7 +1,11 @@
 /**
- * Narrow gate for gemini-2.5-flash /v1/chat/completions stream=false only:
+ * Narrow gate for gemini-2.5-flash /v1/chat/completions:
  * when upstream non-stream times out or is unavailable, drain upstream
- * stream=true and assemble chat.completion JSON.
+ * stream=true and assemble chat.completion JSON (then synthesize client SSE
+ * when the client asked for stream=true).
+ *
+ * Client stream=true is enabled only for /v1/chat/completions so /v1/responses
+ * and gemini-3-pro stream paths stay untouched.
  *
  * Does not touch aliases, Cherry compat, or image paths.
  */
@@ -15,12 +19,20 @@ export function isGemini25FlashNonStreamStreamFallbackPath(args: {
   clientStream: boolean;
   attemptModel: string;
   requestedModel: string;
+  route?: string;
 }): boolean {
-  return (
-    args.clientStream !== true &&
-    args.attemptModel === GEMINI_25_FLASH_NONSTREAM_STREAM_FALLBACK_MODEL &&
-    args.requestedModel === GEMINI_25_FLASH_NONSTREAM_STREAM_FALLBACK_MODEL
-  );
+  if (
+    args.attemptModel !== GEMINI_25_FLASH_NONSTREAM_STREAM_FALLBACK_MODEL ||
+    args.requestedModel !== GEMINI_25_FLASH_NONSTREAM_STREAM_FALLBACK_MODEL
+  ) {
+    return false;
+  }
+  const route = args.route ?? "/v1/chat/completions";
+  if (route !== "/v1/chat/completions") {
+    return false;
+  }
+  // clientStream true|false — both use non-stream-first + optional stream assemble.
+  return true;
 }
 
 /** Errors that may retry via upstream stream assemble (same model). */
@@ -30,6 +42,7 @@ export function isGemini25FlashStreamFallbackEligible(err: ApiError): boolean {
   if (
     code === "upstream_timeout" ||
     code === "upstream_model_busy" ||
+    code === "upstream_model_unavailable" ||
     code === "model_not_available" ||
     code === "all_upstreams_unavailable"
   ) {

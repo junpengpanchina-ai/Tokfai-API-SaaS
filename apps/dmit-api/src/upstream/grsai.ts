@@ -100,6 +100,7 @@ export function isChatFallbackEligible(err: ApiError): boolean {
   }
   return [
     "upstream_model_busy",
+    "upstream_model_unavailable",
     "model_not_available",
     "model_not_supported",
     "upstream_timeout",
@@ -163,7 +164,10 @@ export function mapUpstreamError(
   if (
     combined.includes("负载较高") ||
     combined.includes("load is too high") ||
-    combined.includes("model load")
+    combined.includes("model load") ||
+    combined.includes("model busy") ||
+    combined.includes("model is busy") ||
+    combined.includes("upstream busy")
   ) {
     return {
       status: 503,
@@ -187,6 +191,26 @@ export function mapUpstreamError(
       type: "validation_error",
       publicMessage:
         "This model is not available on Tokfai. Please refresh model list or choose another Tokfai model.",
+    };
+  }
+
+  // Capacity / routing outages often arrive as HTTP 400 with vendor copy like
+  // "No available channel". Never mislabel those as client invalid_request_error.
+  if (
+    combined.includes("no available channel") ||
+    combined.includes("channel unavailable") ||
+    combined.includes("no channel") ||
+    combined.includes("provider unavailable") ||
+    combined.includes("distributor") ||
+    combined.includes("model unavailable") ||
+    /\bunavailable\b/.test(combined)
+  ) {
+    return {
+      status: 503,
+      code: "upstream_model_unavailable",
+      type: "upstream_error",
+      publicMessage:
+        "This model is temporarily unavailable on Tokfai. Please retry shortly or choose another Tokfai model.",
     };
   }
 

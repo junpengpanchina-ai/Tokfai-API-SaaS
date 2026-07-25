@@ -16,6 +16,9 @@
  *   p941 core hard gate must emit TOKFAI_P941_API_ISOLATION_CORE_PASS.
  *   Soft models (gemini-3-pro / gemini-2.5-pro) may report DEGRADED on
  *   live upstream timeout without failing the gate; charged timeout still fails.
+ *   p932/p933 GPT channel unavailable (upstream_model_unavailable / busy)
+ *   soft-passes as DEGRADED — not Cherry schema FAIL. gemini-2.5-flash stream
+ *   must emit assistant content + [DONE] (not ping-only hang).
  *   p942 HTTP probes are mock-gateway contracts (cdn.tokfai.com/demo.png,
  *   example.com/*). LIVE=1 against api.tokfai.com cannot satisfy them.
  *   The gate still sets LIVE=1 for p942, but pins TOKFAI_API_BASE + key to

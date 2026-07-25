@@ -22,6 +22,7 @@ import {
   fail,
 } from "./lib/client-compat-smoke-bootstrap.mjs";
 import { acceptanceFetch } from "./lib/acceptance-http.mjs";
+import { UPSTREAM_DEGRADED_CODES } from "./lib/public-beta-live-helpers.mjs";
 
 const SCRIPT = "scripts/p932-cherry-studio-real-body-smoke.mjs";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -29,10 +30,46 @@ const PASS_TOKEN = "TOKFAI_P932_CHERRY_STUDIO_REAL_BODY_PASS";
 const FAIL_TOKEN = "TOKFAI_P932_CHERRY_STUDIO_REAL_BODY_FAIL";
 
 const CHERRY_MODELS = ["gpt-5.5", "gpt-5.4", "gpt-5.4-pro", "gemini-3-pro"];
+/** Must return assistant content + [DONE] — never 30s ping-only hang. */
+const GEMINI_25_FLASH_STREAM_MODEL = "gemini-2.5-flash";
 const PROMPT = "Return exactly: TOKFAI_CHERRY_OK";
 const CHAT_ROUTE = "/v1/chat/completions";
 /** Cherry compatibility required live probes: initial attempt + 1 retry. */
 const CHERRY_PROBE_MAX_ATTEMPTS = 2;
+
+function isUpstreamChannelDegraded(code) {
+  return typeof code === "string" && UPSTREAM_DEGRADED_CODES.has(code);
+}
+
+/** Recover error object from JSON body or mid-stream SSE error frame. */
+function extractProbeError(body, text) {
+  if (body?.error && typeof body.error === "object" && !Array.isArray(body.error)) {
+    return body.error;
+  }
+  const raw = typeof text === "string" ? text : "";
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) continue;
+    const payload = trimmed.slice(5).trim();
+    if (!payload || payload === "[DONE]") continue;
+    try {
+      const parsed = JSON.parse(payload);
+      if (parsed?.error && typeof parsed.error === "object") {
+        return parsed.error;
+      }
+    } catch {
+      // continue
+    }
+  }
+  return null;
+}
+
+function softPassUpstreamDegraded(label, code, message, requestId) {
+  console.warn(
+    `DEGRADED  ${label} — upstream channel unavailable (not Cherry schema failure) code=${code} message=${message || "none"} request_id=${requestId || "none"}`
+  );
+  return pass(`${label} (upstream degraded soft-ok)`);
+}
 
 function isTimeoutName(name) {
   return name === "TimeoutError" || name === "AbortError";
@@ -469,20 +506,94 @@ try {
       body: reqBody,
       evaluate: ({ res, body, text }) => {
         const raw = text ?? (typeof body === "string" ? body : "");
-        if (res.status === 400) {
+        const errObj = extractProbeError(body, raw);
+        const code =
+          (typeof errObj?.code === "string" && errObj.code.trim()) ||
+          (typeof body?.error?.code === "string" && body.error.code.trim()) ||
+          "";
+        const message =
+          (typeof errObj?.message === "string" && errObj.message.trim()) ||
+          (typeof body?.error?.message === "string" &&
+            body.error.message.trim()) ||
+          "";
+        const requestId =
+          body?.request_id ||
+          errObj?.request_id ||
+          body?.error?.request_id ||
+          res.headers?.get?.("x-request-id") ||
+          null;
+
+        // GPT channel / capacity outages must not be treated as Cherry schema FAIL.
+        if (isUpstreamChannelDegraded(code)) {
+          if (
+            !code.trim() ||
+            !message.trim() ||
+            message === "undefined" ||
+            code === "invalid_request_error"
+          ) {
+            return fail(
+              `Cherry real stream body ${model}`,
+              `degraded envelope invalid code=${code || "none"} message=${message || "none"}`
+            );
+          }
+          return softPassUpstreamDegraded(
+            `Cherry real stream body ${model}`,
+            code,
+            message,
+            requestId
+          );
+        }
+
+        if (res.status === 400 || code === "invalid_request_error") {
           assertErrorEnvelope(
-            body,
+            body?.error ? body : { error: errObj || body?.error },
             `stream ${model} must not 400 (got envelope)`
           );
           return fail(
             `Cherry real stream body ${model}`,
-            `HTTP 400 code=${body?.error?.code || "none"} message=${body?.error?.message || "none"}`
+            `HTTP ${res.status} code=${code || body?.error?.code || "none"} message=${message || body?.error?.message || "none"}`
           );
         }
         return assertSseOk(
           res,
           raw,
           `Cherry real stream body ${model} → SSE + [DONE]`
+        );
+      },
+    });
+    ok = probeOk && ok;
+  }
+
+  // gemini-2.5-flash stream must synthesize content + [DONE] (not ping-only hang).
+  {
+    const model = GEMINI_25_FLASH_STREAM_MODEL;
+    const probeOk = await runCherryLiveProbe(ctx, {
+      label: `gemini-2.5-flash stream → content + [DONE]`,
+      model,
+      body: cherryRealBody(model, { max_tokens: 32, max_completion_tokens: 32 }),
+      evaluate: ({ res, body, text }) => {
+        const raw = text ?? "";
+        const errObj = extractProbeError(body, raw);
+        const code =
+          (typeof errObj?.code === "string" && errObj.code.trim()) || "";
+        if (isUpstreamChannelDegraded(code)) {
+          return softPassUpstreamDegraded(
+            "gemini-2.5-flash stream",
+            code,
+            errObj?.message,
+            body?.request_id || errObj?.request_id
+          );
+        }
+        if (/^: ping/m.test(raw) && !/"delta"\s*:\s*\{[^}]*"content"\s*:\s*"[^"]+/.test(raw)) {
+          return fail(
+            "gemini-2.5-flash stream",
+            `ping-only / missing content: ${raw.slice(0, 280)}`
+          );
+        }
+        return assertSseContentOk(
+          res,
+          raw,
+          "gemini-2.5-flash stream → content + [DONE]"
         );
       },
     });
@@ -503,10 +614,23 @@ try {
       body: reqBody,
       evaluate: ({ res, body, text }) => {
         const raw = text ?? "";
+        const errObj = extractProbeError(body, raw);
+        const code =
+          (typeof errObj?.code === "string" && errObj.code.trim()) ||
+          (typeof body?.error?.code === "string" && body.error.code.trim()) ||
+          "";
+        if (isUpstreamChannelDegraded(code)) {
+          return softPassUpstreamDegraded(
+            "max_completion_tokens-only stream",
+            code,
+            errObj?.message || body?.error?.message,
+            body?.request_id || errObj?.request_id
+          );
+        }
         if (res.status !== 200) {
           return fail(
             "max_completion_tokens-only stream",
-            `HTTP ${res.status} code=${body?.error?.code || "none"} message=${body?.error?.message || "none"}`
+            `HTTP ${res.status} code=${code || "none"} message=${errObj?.message || body?.error?.message || "none"}`
           );
         }
         return assertSseContentOk(

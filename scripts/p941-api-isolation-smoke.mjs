@@ -262,9 +262,23 @@ function printRow(row) {
   );
 }
 
+/** Channel / capacity outages — not Cherry schema bugs; soft for CORE too. */
+function isCapacityDegraded(row) {
+  const code = row["error.code"];
+  return (
+    code === "upstream_model_unavailable" ||
+    code === "upstream_model_busy" ||
+    code === "all_upstreams_unavailable"
+  );
+}
+
 function isTimeoutLike(row) {
   const code = row["error.code"];
   const message = String(row["error.message"] ?? "");
+  // Capacity codes are handled separately — do not treat as core-hard timeout.
+  if (isCapacityDegraded(row)) {
+    return false;
+  }
   if (typeof code === "string" && UPSTREAM_DEGRADED_CODES.has(code)) {
     return true;
   }
@@ -638,14 +652,24 @@ async function main() {
     const isSoft = row.model && SOFT_SET.has(row.model);
     const label = `${row.route} model=${row.model}`;
 
-    // Timeout must never charge (core or soft).
-    if (timeout && charged) {
+    // Timeout / capacity must never charge (core or soft).
+    if ((timeout || isCapacityDegraded(row)) && charged) {
       coreOk =
         fail(
           label,
           `timeout charged credits_charged=${row.credits_charged} billing_status=${row.billing_status}`
         ) && false;
       softHardFail = true;
+      continue;
+    }
+
+    // GPT/channel capacity outages with Tokfai envelope → DEGRADED, not schema FAIL.
+    // Applies to CORE and soft models (p932/p933/release-gate alignment).
+    if (isCapacityDegraded(row) && !charged && isIsolationOk(row)) {
+      degradedRows.push(row);
+      console.log(
+        `DEGRADED  ${label} (upstream channel unavailable; does not block CORE) latencyMs=${row.latencyMs} request_id=${row.request_id ?? "null"} code=${row["error.code"]}`
+      );
       continue;
     }
 

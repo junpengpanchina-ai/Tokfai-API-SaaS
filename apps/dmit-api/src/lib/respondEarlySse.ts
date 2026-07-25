@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 
-import { ApiError, buildClientErrorBody } from "../errors.js";
+import { ApiError, buildClientErrorBody, errorTypeForCode } from "../errors.js";
 import {
   chatCompletionRoleSseFrame,
   chatCompletionSseBodyAfterRole,
@@ -28,14 +28,16 @@ function failureToSseEnvelope(
     result.errorMessage,
     "Invalid request."
   );
+  const status = result.httpStatus || 500;
   const code =
     (typeof result.errorCode === "string" && result.errorCode.trim()) ||
     "invalid_request_error";
   const err = new ApiError({
-    status: result.httpStatus || 500,
+    status,
     message,
     publicMessage: message,
     code,
+    type: errorTypeForCode(code, status),
   });
   const body = buildClientErrorBody(err, result.requestId);
   // Mid-stream failure: preserve standard envelope shape; never charge.

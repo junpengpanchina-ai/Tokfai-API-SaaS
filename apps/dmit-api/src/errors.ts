@@ -40,10 +40,49 @@ export const STATUS_BY_ERROR_CODE: Record<string, number> = {
   too_many_concurrent_requests: 429,
   rate_limited: 429,
   gateway_overloaded: 503,
+  upstream_model_busy: 503,
+  upstream_model_unavailable: 503,
+  all_upstreams_unavailable: 503,
   request_body_too_large: 413,
   upstream_timeout: 504,
   image_generation_timeout: 504,
 };
+
+/** Stable error.type for known codes — never leave type undefined on envelopes. */
+export function errorTypeForCode(
+  code: string | undefined,
+  status: number
+): ErrorType {
+  if (code === "invalid_request_error") return "invalid_request_error";
+  if (
+    code === "upstream_rate_limited" ||
+    code === "rate_limited" ||
+    code === "too_many_requests" ||
+    code === "too_many_concurrent_requests"
+  ) {
+    return "rate_limit_error";
+  }
+  if (
+    code === "upstream_model_busy" ||
+    code === "upstream_model_unavailable" ||
+    code === "upstream_timeout" ||
+    code === "upstream_error" ||
+    code === "upstream_auth_error" ||
+    code === "all_upstreams_unavailable" ||
+    code === "gateway_overloaded" ||
+    code === "image_generation_timeout"
+  ) {
+    return "upstream_error";
+  }
+  if (code === "model_not_available" || code === "model_not_supported") {
+    return "validation_error";
+  }
+  if (status === 401 || status === 403) return "auth_error";
+  if (status === 404) return "not_found";
+  if (status === 402) return "billing_error";
+  if (status >= 500) return "server_error";
+  return "invalid_request_error";
+}
 
 export function shouldIncludeRequestIdInError(status: number): boolean {
   return status === 429 || status === 503 || status === 504;

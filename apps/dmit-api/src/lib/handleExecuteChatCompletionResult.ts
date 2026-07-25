@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 
-import { ApiError, buildClientErrorBody } from "../errors.js";
+import { ApiError, buildClientErrorBody, errorTypeForCode } from "../errors.js";
 import { respondApiError } from "../middleware/error.js";
 import type { ExecuteChatCompletionResult } from "./executeChatCompletion.js";
 import { safeInvalidRequestMessage } from "./chatCompletionDiagnostics.js";
@@ -130,6 +130,7 @@ export function respondExecuteChatCompletionFailure(
       message,
       publicMessage: message,
       code,
+      type: errorTypeForCode(code, result.httpStatus),
     });
     return respondJsonError(c, err, requestId, {
       suggestedModels: result.suggestedModels,
@@ -143,6 +144,7 @@ export function respondExecuteChatCompletionFailure(
       message,
       publicMessage: message,
       code,
+      type: errorTypeForCode(code, result.httpStatus),
     }),
     requestId
   );

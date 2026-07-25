@@ -15,6 +15,7 @@ const states = new Map<string, BreakerState>();
 
 const CIRCUIT_FAILURE_CODES = new Set([
   "upstream_model_busy",
+  "upstream_model_unavailable",
   "model_not_available",
   "upstream_timeout",
   "upstream_error",

@@ -183,15 +183,16 @@ export function resolveUpstreamTimeoutPolicy(args: {
     };
   }
 
-  // gemini-2.5-flash client stream=false may need a short non-stream probe +
-  // internal upstream stream=true drain fallback (same model; not Gemini 3).
+  // gemini-2.5-flash /v1/chat/completions (stream true|false) may need a short
+  // non-stream probe + internal upstream stream=true drain, then synthesize
+  // client SSE when stream=true. Never apply this budget to /v1/responses.
   // Stream fallback must not be capped to the same short chat attempt budget
   // that just timed out — reserve a longer remaining wall for SSE drain.
-  const gemini25FlashNonStream =
-    args.clientStream !== true &&
+  const gemini25FlashChat =
+    route === "/v1/chat/completions" &&
     (args.requestedModel.trim().toLowerCase() === "gemini-2.5-flash" ||
       (args.resolvedModel ?? "").trim().toLowerCase() === "gemini-2.5-flash");
-  if (gemini25FlashNonStream) {
+  if (gemini25FlashChat) {
     const upstreamTimeoutMs = chatUpstreamMs;
     const streamFallbackBudgetMs = Math.max(chatUpstreamMs, 120_000);
     return {
