@@ -1,6 +1,7 @@
 import { env } from "../env.js";
 import { ApiError } from "../errors.js";
 import { log } from "../logger.js";
+import { resolveImageUpstreamModel } from "./imageModelAliases.js";
 import {
   fetchImageAsDataUrl,
   sanitizeImageUrlForLog,
@@ -249,7 +250,7 @@ export async function generateImage(
 
   const { payload, adapterMode, upstreamPayloadKeys, inputImagesForLog } =
     await buildGrsaiImagePayload({
-      model: request.model,
+      model: resolveImageUpstreamModel(request.model),
       prompt: upstreamPrompt,
       aspectRatio: request.aspectRatio,
       imageSize: request.imageSize,

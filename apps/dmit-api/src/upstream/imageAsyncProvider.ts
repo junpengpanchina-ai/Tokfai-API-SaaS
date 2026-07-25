@@ -11,6 +11,7 @@ import {
   type ImageGenerateDebugInfo,
   type ImageGenerateResult,
 } from "./imageAdapter.js";
+import { resolveImageUpstreamModel } from "./imageModelAliases.js";
 import { sanitizeImageUrlForLog, type ImageUrlResolveSource } from "./imageUrlResolver.js";
 
 const PROVIDER_ID = "primary_image";
@@ -248,10 +249,13 @@ export async function createImageGenerationTask(
     params.prompt,
     params.imageUrls.length
   );
+  // Public Tokfai model stays on params.resolvedModel; only the upstream body
+  // uses the mapped provider id (e.g. nano-banana → nano-banana-fast).
+  const upstreamModel = resolveImageUpstreamModel(params.resolvedModel);
 
   const { payload, adapterMode, upstreamPayloadKeys } =
     await buildGrsaiImagePayload({
-      model: params.resolvedModel,
+      model: upstreamModel,
       prompt: upstreamPrompt,
       aspectRatio: params.aspectRatio,
       imageSize: params.imageSize,

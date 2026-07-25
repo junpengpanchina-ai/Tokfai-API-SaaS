@@ -5,6 +5,7 @@ import {
   listAliasModelsForCatalog,
   resolveChatModel,
 } from "../upstream/modelAliases.js";
+import { isUnavailableImageModel } from "../upstream/imageModelAliases.js";
 import { priceFor } from "../upstream/pricing.js";
 import { tokfaiClientDisplayName } from "./clientModelDisplayName.js";
 import {
@@ -51,7 +52,6 @@ type ModelPricingRow = {
 const DEFAULT_IMAGE_MODEL_CREDITS: Record<string, number> = {
   "nano-banana": 1,
   "nano-banana-fast": 1,
-  "nano-banana-pro": 5,
   "nano-banana-2": 3,
   "gpt-image-2": 2,
 };
@@ -351,6 +351,8 @@ export async function isModelAllowedForChat(model: string): Promise<boolean> {
 export async function isModelAllowedForImage(model: string): Promise<boolean> {
   if (isHiddenInternalModel(model)) return false;
   if (isKnownChatModelKind(model)) return false;
+  // Hard deny — overrides DB enabled rows for temporarily unavailable SKUs.
+  if (isUnavailableImageModel(model)) return false;
 
   const fromDb = await isModelAllowedFromDb(model, "image");
   if (fromDb !== null) return fromDb;
@@ -378,9 +380,13 @@ export async function listAvailableChatModelIds(): Promise<string[]> {
 export async function listAvailableImageModelIds(): Promise<string[]> {
   const fromDb = await listAvailableModelIdsFromDb("image");
   if (fromDb !== null) {
-    return fromDb.filter((id) => !isHiddenInternalModel(id));
+    return fromDb.filter(
+      (id) => !isHiddenInternalModel(id) && !isUnavailableImageModel(id)
+    );
   }
-  return listStaticSuggestedImageModelIds();
+  return listStaticSuggestedImageModelIds().filter(
+    (id) => !isUnavailableImageModel(id)
+  );
 }
 
 async function listAvailableModelIdsFromDb(

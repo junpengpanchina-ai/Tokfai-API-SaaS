@@ -92,6 +92,28 @@ export async function isMockGatewayReady(baseUrl, apiKey) {
     const visionBody = await visionRes.json().catch(() => null);
     if (visionBody?.object !== "vision.analysis") return false;
 
+    // Require P948 unavailable Nano Banana rejection so stale mocks are not reused.
+    const unavailableRes = await fetch(`${root}/v1/images/generations`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "nano-banana-pro",
+        prompt: "stale-mock-probe",
+        size: "1024x1024",
+        n: 1,
+        response_format: "url",
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (unavailableRes.status !== 400) return false;
+    const unavailableBody = await unavailableRes.json().catch(() => null);
+    if (unavailableBody?.error?.code !== "image_model_not_available") {
+      return false;
+    }
+
     return true;
   } catch {
     return false;

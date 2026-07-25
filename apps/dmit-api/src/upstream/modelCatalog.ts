@@ -149,12 +149,12 @@ export const MODEL_CATALOG: Record<string, TokfaiModelCatalogItem> = {
     object: "model",
     owned_by: "tokfai",
     provider: "grsai",
-    upstream_model: "nano-banana",
+    upstream_model: "nano-banana-fast",
     enabled: true,
     kind: "image",
     input_per_1k: 0.0001,
     output_per_1k: 0.0002,
-    note: "Image model placeholder pricing."
+    note: "Public nano-banana maps upstream to nano-banana-fast."
   },
 
   "nano-banana-fast": {
@@ -176,11 +176,11 @@ export const MODEL_CATALOG: Record<string, TokfaiModelCatalogItem> = {
     owned_by: "tokfai",
     provider: "grsai",
     upstream_model: "nano-banana-pro",
-    enabled: true,
+    enabled: false,
     kind: "image",
     input_per_1k: 0.0001,
     output_per_1k: 0.0002,
-    note: "Pro image model placeholder pricing."
+    note: "Temporarily unavailable (upstream timeout)."
   },
 
   "nano-banana-2": {

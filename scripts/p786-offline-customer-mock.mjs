@@ -675,15 +675,39 @@ function geminiGenerateContentToSse(response) {
 const MOCK_IMAGE_MODELS = new Set([
   "nano-banana",
   "nano-banana-fast",
-  "nano-banana-pro",
   "nano-banana-2",
   "gpt-image-2",
 ]);
+
+/** Temporarily unavailable — mirror dmit-api imageModelAliases UNAVAILABLE set. */
+const MOCK_UNAVAILABLE_IMAGE_MODELS = new Set([
+  "nano-banana-2-lite",
+  "nano-banana-pro",
+  "nano-banana-pro-vip",
+  "nano-banana-pro-cl",
+  "nano-banana-2-cl",
+  "nano-banana-2-2k-cl",
+  "nano-banana-2-4k-cl",
+  "nano-banana-pro-4k-vip",
+]);
+
+/**
+ * Tokfai public → upstream mapping (mock mirror of resolveImageUpstreamModel).
+ * Public response still shows the requested model.
+ */
+function resolveMockImageUpstreamModel(model) {
+  const m = String(model ?? "")
+    .trim()
+    .toLowerCase();
+  if (m === "nano-banana") return "nano-banana-fast";
+  return m;
+}
 
 function isMockImageModel(model) {
   const m = String(model ?? "")
     .trim()
     .toLowerCase();
+  if (MOCK_UNAVAILABLE_IMAGE_MODELS.has(m)) return false;
   return MOCK_IMAGE_MODELS.has(m) || m.startsWith("nano-banana");
 }
 
@@ -704,7 +728,27 @@ function imageGenerationBody(body) {
   const requestedModel =
     typeof body.model === "string" ? body.model : "nano-banana";
   const resolvedModel = requestedModel;
+  const upstreamModel = resolveMockImageUpstreamModel(resolvedModel);
   const meta = tokfaiMeta(requestedModel, resolvedModel);
+
+  // Temporarily unavailable Nano Banana SKUs.
+  if (MOCK_UNAVAILABLE_IMAGE_MODELS.has(String(resolvedModel).toLowerCase())) {
+    return {
+      __status: 400,
+      error: {
+        message: "当前图片模型不可用，请切换图片模型",
+        code: "image_model_not_available",
+        type: "invalid_request_error",
+        request_id: meta.request_id,
+      },
+      tokfai: {
+        billing_status: "not_billable",
+        credits_charged: 0,
+      },
+      request_id: meta.request_id,
+      suggestedModels: [...MOCK_IMAGE_MODELS],
+    };
+  }
 
   // GPT/Gemini text models cannot use /v1/images/generations.
   if (isMockTextChatModel(resolvedModel) || !isMockImageModel(resolvedModel)) {
@@ -780,6 +824,8 @@ function imageGenerationBody(body) {
     progress: 0,
     message: { en: "Queued", zh: "已排队" },
     model: resolvedModel,
+    // Internal only — never copied into public poll response.
+    _upstream_model: upstreamModel,
     data: [],
     usage: { credits_charged: 0 },
     error: null,

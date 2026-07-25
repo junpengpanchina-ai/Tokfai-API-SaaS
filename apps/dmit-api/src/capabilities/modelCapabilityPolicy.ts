@@ -1,4 +1,5 @@
 import { ApiError } from "../errors.js";
+import { isUnavailableImageModel } from "../upstream/imageModelAliases.js";
 
 /**
  * Runtime capability routing policy (image/media foundation).
@@ -25,8 +26,16 @@ const TEXT_CHAT_MODELS = [
   "gemini-2.5-flash",
 ] as const;
 
-const IMAGE_GENERATION_MODELS = ["nano-banana"] as const;
-const IMAGE_EDIT_MODELS = ["nano-banana"] as const;
+const IMAGE_GENERATION_MODELS = [
+  "nano-banana",
+  "nano-banana-fast",
+  "nano-banana-2",
+] as const;
+const IMAGE_EDIT_MODELS = [
+  "nano-banana",
+  "nano-banana-fast",
+  "nano-banana-2",
+] as const;
 
 /** Primary capability table (explicit product policy). */
 const MODEL_CAPABILITIES: Record<string, ModelCapability[]> = {
@@ -36,6 +45,8 @@ const MODEL_CAPABILITIES: Record<string, ModelCapability[]> = {
   "gemini-3-pro": ["text_chat"],
   "gemini-2.5-flash": ["text_chat"],
   "nano-banana": ["image_generation", "image_edit"],
+  "nano-banana-fast": ["image_generation", "image_edit"],
+  "nano-banana-2": ["image_generation", "image_edit"],
 };
 
 const CAPABILITY_AVAILABILITY: Record<ModelCapability, CapabilityAvailability> =
@@ -129,11 +140,22 @@ export function assertCapabilityAllowed(
     });
   }
 
+  const isImageCap =
+    requestedCapability === "image_generation" ||
+    requestedCapability === "image_edit";
+
+  if (isImageCap && isUnavailableImageModel(model)) {
+    throw new ApiError({
+      status: 400,
+      message: "当前图片模型不可用，请切换图片模型",
+      code: "image_model_not_available",
+      type: "invalid_request_error",
+      publicMessage: "当前图片模型不可用，请切换图片模型",
+    });
+  }
+
   const caps = getModelCapability(model);
   if (!caps.includes(requestedCapability)) {
-    const isImageCap =
-      requestedCapability === "image_generation" ||
-      requestedCapability === "image_edit";
     throw new ApiError({
       status: 400,
       message: isImageCap

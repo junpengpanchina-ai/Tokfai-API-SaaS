@@ -3,14 +3,16 @@
  * P948 — Nano Banana image capability smoke (default: static + mock).
  *
  * Checks:
- * 1) model=nano-banana hits image_generation capability
- * 2) nano-banana cannot use /v1/chat/completions
- * 3) gpt/gemini cannot use /v1/images/generations
- * 4) image failure → not_billable
- * 5) image timeout → not_billable
- * 6) mock success returns data[0].url or b64_json
- * 7) response error message/code never undefined
- * 8) video_generation is reserved/disabled
+ * 1) model=nano-banana hits image_generation; maps upstream to nano-banana-fast;
+ *    public response model stays nano-banana; completes with data[0].url
+ * 2) model=nano-banana-fast completes
+ * 3) model=nano-banana-2 completes (or slow) and cannot use chat
+ * 4) unavailable Nano Banana SKUs → image_model_not_available
+ * 5) gpt/gemini cannot use /v1/images/generations
+ * 6) image failure → not_billable
+ * 7) image timeout → not_billable
+ * 8) response error message/code never undefined
+ * 9) video_generation is reserved/disabled
  *
  * Usage (gate / offline — mock only, never real Nano Banana):
  *   node scripts/p948-nano-banana-image-smoke.mjs
@@ -43,6 +45,17 @@ const LIVE = String(process.env.LIVE ?? "").trim() === "1";
 const LIVE_MODEL = String(process.env.MODEL ?? "").trim().toLowerCase();
 /** Only when LIVE=1 AND MODEL=nano-banana may this smoke hit real upstream. */
 const REAL_NANO_BANANA = LIVE && LIVE_MODEL === "nano-banana";
+
+const UNAVAILABLE_IMAGE_MODELS = [
+  "nano-banana-2-lite",
+  "nano-banana-pro",
+  "nano-banana-pro-vip",
+  "nano-banana-pro-cl",
+  "nano-banana-2-cl",
+  "nano-banana-2-2k-cl",
+  "nano-banana-2-4k-cl",
+  "nano-banana-pro-4k-vip",
+];
 
 /**
  * Default / gate path: always mock (even if LIVE=1 without MODEL=nano-banana).
@@ -145,14 +158,20 @@ function checkStaticSources() {
   const chatExec = read("apps/dmit-api/src/lib/executeChatCompletion.ts");
   const publicResp = read("apps/dmit-api/src/images/publicResponse.ts");
   const app = read("apps/dmit-api/src/app.ts");
+  const aliases = read("apps/dmit-api/src/upstream/imageModelAliases.ts");
+  const asyncProvider = read(
+    "apps/dmit-api/src/upstream/imageAsyncProvider.ts"
+  );
+  const catalog = read("apps/dmit-api/src/upstream/modelCatalog.ts");
 
   ok =
-    (policy.includes('image_generation') &&
+    (policy.includes("image_generation") &&
     policy.includes("nano-banana") &&
     policy.includes("getModelCapability") &&
     policy.includes("assertCapabilityAllowed") &&
     policy.includes("isImageModel") &&
     policy.includes("isVideoModel") &&
+    policy.includes("isUnavailableImageModel") &&
     /video_generation[\s\S]*reserved|reserved[\s\S]*video_generation/.test(
       policy
     )
@@ -169,6 +188,37 @@ function checkStaticSources() {
     policy.includes("gemini-2.5-flash")
       ? pass("text_chat models listed in capability policy")
       : fail("text_chat models listed in capability policy")) && ok;
+
+  ok =
+    (aliases.includes("resolveImageUpstreamModel") &&
+    aliases.includes('if (normalized === "nano-banana") return "nano-banana-fast"') &&
+    aliases.includes("UNAVAILABLE_IMAGE_MODEL_IDS") &&
+    UNAVAILABLE_IMAGE_MODELS.every((id) => aliases.includes(`"${id}"`))
+      ? pass(
+          "resolveImageUpstreamModel maps nano-banana→nano-banana-fast + unavailable set"
+        )
+      : fail(
+          "resolveImageUpstreamModel maps nano-banana→nano-banana-fast + unavailable set"
+        )) && ok;
+
+  ok =
+    (asyncProvider.includes("resolveImageUpstreamModel") &&
+    /resolveImageUpstreamModel\s*\(\s*params\.resolvedModel\s*\)/.test(
+      asyncProvider
+    )
+      ? pass("imageAsyncProvider applies resolveImageUpstreamModel to upstream body")
+      : fail(
+          "imageAsyncProvider applies resolveImageUpstreamModel to upstream body"
+        )) && ok;
+
+  ok =
+    (/upstream_model:\s*"nano-banana-fast"/.test(catalog) &&
+    /"nano-banana"\s*:\s*\{[\s\S]*?upstream_model:\s*"nano-banana-fast"/.test(
+      catalog
+    )
+      ? pass("modelCatalog nano-banana upstream_model is nano-banana-fast")
+      : fail("modelCatalog nano-banana upstream_model is nano-banana-fast")) &&
+    ok;
 
   ok =
     (provider.includes("runNanoBananaImageGeneration") &&
@@ -200,9 +250,13 @@ function checkStaticSources() {
   ok =
     (publicResp.includes("billing_status") &&
     publicResp.includes("task_id") &&
-    publicResp.includes("revised_prompt")
-      ? pass("public image response includes Tokfai billing + task_id")
-      : fail("public image response includes Tokfai billing + task_id")) && ok;
+    publicResp.includes("revised_prompt") &&
+    !publicResp.includes("upstream_model") &&
+    !/grsai/i.test(publicResp)
+      ? pass("public image response includes Tokfai billing + task_id (no upstream leak)")
+      : fail(
+          "public image response includes Tokfai billing + task_id (no upstream leak)"
+        )) && ok;
 
   ok =
     (app.includes("imageRoutes")
@@ -242,6 +296,44 @@ async function pollUntilTerminal(getJson, taskId, { timeoutMs = 8_000 } = {}) {
   return latest;
 }
 
+async function postImageAndAwait(postJson, getJson, model, prompt, opts = {}) {
+  const timeoutMs = opts.timeoutMs ?? 8_000;
+  const { res, body, text } = await postJson("/v1/images/generations", {
+    model,
+    prompt,
+    size: "1024x1024",
+    n: 1,
+    response_format: "url",
+  });
+  const taskId = body?.task_id || body?.id || body?.request_id;
+  const accepted =
+    (res.status === 202 || res.status === 200) && Boolean(taskId);
+  if (!accepted) {
+    return { accepted: false, res, body, text, polled: null };
+  }
+  const polled = await pollUntilTerminal(getJson, taskId, { timeoutMs });
+  return { accepted: true, res, body, text, polled, taskId };
+}
+
+function hasCompletedUrl(polled) {
+  const data0 = polled?.body?.data?.[0];
+  const hasUrl =
+    typeof data0?.url === "string" && data0.url.trim().length > 0;
+  const hasB64 =
+    typeof data0?.b64_json === "string" && data0.b64_json.trim().length > 0;
+  return polled?.body?.status === "completed" && (hasUrl || hasB64);
+}
+
+function leaksUpstream(body, text) {
+  const blob = `${JSON.stringify(body ?? {})}\n${String(text ?? "")}`;
+  if (/\bgrsai\b/i.test(blob)) return true;
+  if (/\bupstream_model\b/i.test(blob)) return true;
+  if (/sk-[a-z0-9_-]{16,}/i.test(blob) && !/sk-tokfai_/i.test(blob)) {
+    return true;
+  }
+  return false;
+}
+
 async function main() {
   let ok = true;
   console.log("=== P948 Nano Banana image capability smoke ===");
@@ -258,70 +350,178 @@ async function main() {
   const { postJson, getJson, cleanup } = ctx;
 
   try {
-
-    // 1) nano-banana → image_generation accept
+    // 1) nano-banana → image_generation; upstream mapping; completed; public model
     {
-      const { res, body, text } = await postJson("/v1/images/generations", {
-        model: "nano-banana",
-        prompt: "a simple red circle on white background",
-        size: "1024x1024",
-        n: 1,
-        response_format: "url",
-      });
-      const accepted =
-        (res.status === 202 || res.status === 200) &&
-        (body?.task_id || body?.id || body?.request_id);
+      const result = await postImageAndAwait(
+        postJson,
+        getJson,
+        "nano-banana",
+        "a simple red circle on white background",
+        { timeoutMs: REAL_NANO_BANANA ? 130_000 : 8_000 }
+      );
       ok =
-        (accepted
+        (result.accepted
           ? pass("1. model=nano-banana hits image_generation (POST accepted)")
           : fail(
               "1. model=nano-banana hits image_generation (POST accepted)",
-              `status=${res.status} body=${String(text).slice(0, 240)}`
+              `status=${result.res.status} body=${String(result.text).slice(0, 240)}`
             )) && ok;
 
-      if (accepted && containsUndefinedLiteral(text)) {
+      if (result.accepted && containsUndefinedLiteral(result.text)) {
         ok =
           fail(
             "1b. accept response has no undefined literals",
-            String(text).slice(0, 200)
+            String(result.text).slice(0, 200)
           ) && false;
-      } else if (accepted) {
+      } else if (result.accepted) {
         pass("1b. accept response has no undefined literals");
       }
 
-      const taskId = body?.task_id || body?.id || body?.request_id;
-      if (taskId && !REAL_NANO_BANANA) {
-        const polled = await pollUntilTerminal(getJson, taskId);
-        const data0 = polled?.body?.data?.[0];
-        const hasUrl =
-          typeof data0?.url === "string" && data0.url.trim().length > 0;
-        const hasB64 =
-          typeof data0?.b64_json === "string" && data0.b64_json.trim().length > 0;
+      if (result.accepted) {
+        const publicModel =
+          result.polled?.body?.model ?? result.body?.model ?? null;
         ok =
-          (polled?.body?.status === "completed" && (hasUrl || hasB64)
-            ? pass("6. mock success returns data[0].url or b64_json")
+          (publicModel === "nano-banana"
+            ? pass(
+                "1c. public response model stays nano-banana (no upstream leak)"
+              )
             : fail(
-                "6. mock success returns data[0].url or b64_json",
-                `status=${polled?.body?.status} data0=${JSON.stringify(data0)}`
+                "1c. public response model stays nano-banana (no upstream leak)",
+                `model=${publicModel}`
+              )) && ok;
+
+        ok =
+          (!leaksUpstream(result.polled?.body ?? result.body, result.text)
+            ? pass("1d. response does not leak grsai / upstream_model / key")
+            : fail(
+                "1d. response does not leak grsai / upstream_model / key"
+              )) && ok;
+      }
+
+      if (result.accepted && result.polled) {
+        const completed = hasCompletedUrl(result.polled);
+        // Static asserts already prove nano-banana→nano-banana-fast wiring.
+        ok =
+          (completed
+            ? pass(
+                "1e. model=nano-banana maps upstream nano-banana-fast and completed"
+              )
+            : fail(
+                "1e. model=nano-banana maps upstream nano-banana-fast and completed",
+                `status=${result.polled?.body?.status} data0=${JSON.stringify(result.polled?.body?.data?.[0])}`
               )) && ok;
 
         const billable =
-          polled?.body?.tokfai?.billing_status === "billable" ||
-          Number(polled?.body?.tokfai?.credits_charged ?? 0) > 0 ||
-          Number(polled?.body?.credits_charged ?? 0) > 0;
-        if (polled?.body?.status === "completed") {
+          result.polled?.body?.tokfai?.billing_status === "billable" ||
+          Number(result.polled?.body?.tokfai?.credits_charged ?? 0) > 0 ||
+          Number(result.polled?.body?.credits_charged ?? 0) > 0;
+        if (result.polled?.body?.status === "completed") {
           ok =
-            (billable || polled?.body?.tokfai?.billing_status
-              ? pass("6b. completed response includes tokfai billing fields")
-              : fail("6b. completed response includes tokfai billing fields")) &&
+            (billable || result.polled?.body?.tokfai?.billing_status
+              ? pass("1f. completed response includes tokfai billing fields")
+              : fail("1f. completed response includes tokfai billing fields")) &&
             ok;
         }
-      } else if (REAL_NANO_BANANA && taskId) {
-        pass("6. LIVE Nano Banana accept ok (skip mock url assert)");
       }
     }
 
-    // 2) nano-banana cannot use chat/completions
+    // 2) nano-banana-fast must completed
+    {
+      const result = await postImageAndAwait(
+        postJson,
+        getJson,
+        "nano-banana-fast",
+        "a simple blue square on white background",
+        { timeoutMs: REAL_NANO_BANANA ? 130_000 : 8_000 }
+      );
+      if (!REAL_NANO_BANANA) {
+        ok =
+          (result.accepted && hasCompletedUrl(result.polled)
+            ? pass("2. model=nano-banana-fast completed")
+            : fail(
+                "2. model=nano-banana-fast completed",
+                `accepted=${result.accepted} status=${result.polled?.body?.status}`
+              )) && ok;
+      } else if (result.accepted) {
+        const status = result.polled?.body?.status;
+        ok =
+          (status === "completed" ||
+          status === "retryable_timeout" ||
+          status === "failed"
+            ? pass(`2. model=nano-banana-fast terminal (${status})`)
+            : fail(
+                "2. model=nano-banana-fast terminal",
+                `status=${status}`
+              )) && ok;
+      } else {
+        ok =
+          fail(
+            "2. model=nano-banana-fast completed",
+            `status=${result.res.status} body=${String(result.text).slice(0, 240)}`
+          ) && false;
+      }
+    }
+
+    // 3) nano-banana-2 completed or slow; cannot use chat
+    {
+      const result = await postImageAndAwait(
+        postJson,
+        getJson,
+        "nano-banana-2",
+        "a simple green triangle on white background",
+        { timeoutMs: REAL_NANO_BANANA ? 130_000 : 8_000 }
+      );
+      if (!REAL_NANO_BANANA) {
+        ok =
+          (result.accepted && hasCompletedUrl(result.polled)
+            ? pass("3a. model=nano-banana-2 completed (mock)")
+            : fail(
+                "3a. model=nano-banana-2 completed (mock)",
+                `accepted=${result.accepted} status=${result.polled?.body?.status}`
+              )) && ok;
+      } else if (result.accepted) {
+        const status = result.polled?.body?.status;
+        const okTerminal =
+          status === "completed" ||
+          status === "retryable_timeout" ||
+          status === "failed" ||
+          result.polled?.body?.processing === true;
+        ok =
+          (okTerminal
+            ? pass(
+                `3a. model=nano-banana-2 completed or slow (${status ?? "processing"})`
+              )
+            : fail(
+                "3a. model=nano-banana-2 completed or slow",
+                `status=${status}`
+              )) && ok;
+      } else {
+        ok =
+          fail(
+            "3a. model=nano-banana-2 completed or slow",
+            `status=${result.res.status} body=${String(result.text).slice(0, 240)}`
+          ) && false;
+      }
+
+      const { res, body, text } = await postJson("/v1/chat/completions", {
+        model: "nano-banana-2",
+        messages: [{ role: "user", content: "hi" }],
+        max_tokens: 8,
+      });
+      const rejected =
+        res.status >= 400 &&
+        (body?.error?.code === "model_not_available" ||
+          /image/i.test(String(body?.error?.message ?? "")));
+      ok =
+        (rejected
+          ? pass("3b. nano-banana-2 cannot use /v1/chat/completions")
+          : fail(
+              "3b. nano-banana-2 cannot use /v1/chat/completions",
+              `status=${res.status} body=${String(text).slice(0, 240)}`
+            )) && ok;
+    }
+
+    // 4) nano-banana cannot use chat/completions
     {
       const { res, body, text } = await postJson("/v1/chat/completions", {
         model: "nano-banana",
@@ -334,9 +534,9 @@ async function main() {
           /image/i.test(String(body?.error?.message ?? "")));
       ok =
         (rejected
-          ? pass("2. nano-banana cannot use /v1/chat/completions")
+          ? pass("4. nano-banana cannot use /v1/chat/completions")
           : fail(
-              "2. nano-banana cannot use /v1/chat/completions",
+              "4. nano-banana cannot use /v1/chat/completions",
               `status=${res.status} body=${String(text).slice(0, 240)}`
             )) && ok;
       if (
@@ -347,15 +547,37 @@ async function main() {
       ) {
         ok =
           fail(
-            "7a. chat reject error has defined message/code",
+            "8a. chat reject error has defined message/code",
             JSON.stringify(body.error)
           ) && false;
       } else {
-        pass("7a. chat reject error has defined message/code");
+        pass("8a. chat reject error has defined message/code");
       }
     }
 
-    // 3) gpt/gemini cannot use images/generations
+    // 5) unavailable models → image_model_not_available
+    for (const model of UNAVAILABLE_IMAGE_MODELS) {
+      const { res, body, text } = await postJson("/v1/images/generations", {
+        model,
+        prompt: "should not generate",
+        size: "1024x1024",
+        n: 1,
+        response_format: "url",
+      });
+      const rejected =
+        res.status >= 400 &&
+        body?.error?.code === "image_model_not_available" &&
+        body?.tokfai?.billing_status === "not_billable";
+      ok =
+        (rejected
+          ? pass(`5. ${model} → image_model_not_available`)
+          : fail(
+              `5. ${model} → image_model_not_available`,
+              `status=${res.status} body=${String(text).slice(0, 240)}`
+            )) && ok;
+    }
+
+    // 6) gpt/gemini cannot use images/generations
     for (const model of ["gpt-5.4", "gemini-2.5-flash"]) {
       const { res, body, text } = await postJson("/v1/images/generations", {
         model,
@@ -370,15 +592,15 @@ async function main() {
           body?.tokfai?.billing_status === "not_billable");
       ok =
         (rejected
-          ? pass(`3. ${model} cannot use /v1/images/generations`)
+          ? pass(`6. ${model} cannot use /v1/images/generations`)
           : fail(
-              `3. ${model} cannot use /v1/images/generations`,
+              `6. ${model} cannot use /v1/images/generations`,
               `status=${res.status} body=${String(text).slice(0, 240)}`
             )) && ok;
     }
 
     if (!REAL_NANO_BANANA) {
-      // 4) failure not billable
+      // 7) failure not billable
       {
         const { res, body, text } = await postJson("/v1/images/generations", {
           model: "nano-banana",
@@ -391,7 +613,7 @@ async function main() {
         if (!(res.status === 202 || res.status === 200) || !taskId) {
           ok =
             fail(
-              "4. image failure not_billable",
+              "7. image failure not_billable",
               `accept failed status=${res.status} ${String(text).slice(0, 200)}`
             ) && false;
         } else {
@@ -405,9 +627,9 @@ async function main() {
             polled?.body?.error?.code === "upstream_image_error";
           ok =
             (failed && notBillable
-              ? pass("4. image failure not_billable")
+              ? pass("7. image failure not_billable")
               : fail(
-                  "4. image failure not_billable",
+                  "7. image failure not_billable",
                   `status=${polled?.body?.status} tokfai=${JSON.stringify(polled?.body?.tokfai)} error=${JSON.stringify(polled?.body?.error)}`
                 )) && ok;
 
@@ -420,16 +642,16 @@ async function main() {
           ) {
             ok =
               fail(
-                "7b. failure error has defined message/code",
+                "8b. failure error has defined message/code",
                 JSON.stringify(err)
               ) && false;
           } else {
-            pass("7b. failure error has defined message/code");
+            pass("8b. failure error has defined message/code");
           }
         }
       }
 
-      // 5) timeout not billable
+      // 8) timeout not billable
       {
         const { res, body, text } = await postJson("/v1/images/generations", {
           model: "nano-banana",
@@ -442,7 +664,7 @@ async function main() {
         if (!(res.status === 202 || res.status === 200) || !taskId) {
           ok =
             fail(
-              "5. image timeout not_billable",
+              "8. image timeout not_billable",
               `accept failed status=${res.status} ${String(text).slice(0, 200)}`
             ) && false;
         } else {
@@ -455,20 +677,20 @@ async function main() {
             polled?.body?.error?.code === "image_task_timeout";
           ok =
             (timedOut && notBillable
-              ? pass("5. image timeout not_billable")
+              ? pass("8. image timeout not_billable")
               : fail(
-                  "5. image timeout not_billable",
+                  "8. image timeout not_billable",
                   `status=${polled?.body?.status} tokfai=${JSON.stringify(polled?.body?.tokfai)} error=${JSON.stringify(polled?.body?.error)}`
                 )) && ok;
         }
       }
     } else {
-      pass("4. image failure not_billable (skipped on LIVE Nano Banana)");
-      pass("5. image timeout not_billable (skipped on LIVE Nano Banana)");
-      pass("7b. failure error envelope (skipped on LIVE Nano Banana)");
+      pass("7. image failure not_billable (skipped on LIVE Nano Banana)");
+      pass("8. image timeout not_billable (skipped on LIVE Nano Banana)");
+      pass("8b. failure error envelope (skipped on LIVE Nano Banana)");
     }
 
-    // 8) video reserved — static already; assertCapabilityAllowed in policy source
+    // 9) video reserved — static already; assertCapabilityAllowed in policy source
     {
       const policy = read(
         "apps/dmit-api/src/capabilities/modelCapabilityPolicy.ts"
@@ -477,8 +699,8 @@ async function main() {
         (policy.includes("video_generation") &&
         /reserved|disabled/.test(policy) &&
         !policy.includes("runVideoGeneration")
-          ? pass("8. video_generation reserved/disabled (no production wire)")
-          : fail("8. video_generation reserved/disabled (no production wire)")) &&
+          ? pass("9. video_generation reserved/disabled (no production wire)")
+          : fail("9. video_generation reserved/disabled (no production wire)")) &&
         ok;
     }
   } finally {

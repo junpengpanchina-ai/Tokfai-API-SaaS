@@ -28,7 +28,6 @@ export const STATIC_CHAT_MODEL_IDS = [
 export const STATIC_IMAGE_MODEL_IDS = [
   "nano-banana-fast",
   "nano-banana",
-  "nano-banana-pro",
   "nano-banana-2",
   "gpt-image-2",
 ] as const;
