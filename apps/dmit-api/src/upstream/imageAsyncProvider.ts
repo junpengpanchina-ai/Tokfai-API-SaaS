@@ -251,7 +251,8 @@ export async function createImageGenerationTask(
   );
   // Public Tokfai model stays on params.resolvedModel; only the upstream body
   // uses the mapped provider id (e.g. nano-banana → nano-banana-fast).
-  const upstreamModel = resolveImageUpstreamModel(params.resolvedModel);
+  const requestedModel = params.resolvedModel;
+  const upstreamModel = resolveImageUpstreamModel(requestedModel);
 
   const { payload, adapterMode, upstreamPayloadKeys } =
     await buildGrsaiImagePayload({
@@ -262,6 +263,9 @@ export async function createImageGenerationTask(
       resolvedImageUrls: params.imageUrls,
     });
 
+  // Hard-pin: never let adapter/defaults send the public id upstream.
+  payload.model = upstreamModel;
+
   const upstreamImages = Array.isArray(payload.images)
     ? (payload.images as unknown[]).filter((item) => typeof item === "string")
     : [];
@@ -269,7 +273,10 @@ export async function createImageGenerationTask(
   log.info("image_generation_upstream_request", {
     requestId: params.requestId,
     providerId: PROVIDER_ID,
-    model: params.resolvedModel,
+    requestedModel,
+    upstreamModel,
+    // `model` mirrors the provider body field (not the public catalog id).
+    model: upstreamModel,
     mode: params.mode,
     promptMode: params.promptMode,
     imagesCount: params.imageUrls.length,

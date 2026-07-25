@@ -42,6 +42,7 @@ const ALLOWED_FIELD_KEYS = new Set([
   "grsaiApiKeyMask",
   "requestedModel",
   "resolvedModel",
+  "upstreamModel",
   "attemptModel",
   "attemptIndex",
   "apiKeyId",

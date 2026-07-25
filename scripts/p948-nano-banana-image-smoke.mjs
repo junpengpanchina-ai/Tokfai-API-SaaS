@@ -5,14 +5,15 @@
  * Checks:
  * 1) model=nano-banana hits image_generation; maps upstream to nano-banana-fast;
  *    public response model stays nano-banana; completes with data[0].url
- * 2) model=nano-banana-fast completes
- * 3) model=nano-banana-2 completes (or slow) and cannot use chat
+ * 2) model=nano-banana-fast success path billable
+ * 3) model=nano-banana-2 success path billable (or slow) and cannot use chat
  * 4) unavailable Nano Banana SKUs → image_model_not_available
  * 5) gpt/gemini cannot use /v1/images/generations
  * 6) image failure → not_billable
  * 7) image timeout → not_billable
  * 8) response error message/code never undefined
  * 9) video_generation is reserved/disabled
+ * 10) logs emit requestedModel + upstreamModel + providerId (static)
  *
  * Usage (gate / offline — mock only, never real Nano Banana):
  *   node scripts/p948-nano-banana-image-smoke.mjs
@@ -162,7 +163,9 @@ function checkStaticSources() {
   const asyncProvider = read(
     "apps/dmit-api/src/upstream/imageAsyncProvider.ts"
   );
+  const imageAdapter = read("apps/dmit-api/src/upstream/imageAdapter.ts");
   const catalog = read("apps/dmit-api/src/upstream/modelCatalog.ts");
+  const loggerSrc = read("apps/dmit-api/src/logger.ts");
 
   ok =
     (policy.includes("image_generation") &&
@@ -203,12 +206,33 @@ function checkStaticSources() {
 
   ok =
     (asyncProvider.includes("resolveImageUpstreamModel") &&
-    /resolveImageUpstreamModel\s*\(\s*params\.resolvedModel\s*\)/.test(
+    /resolveImageUpstreamModel\s*\(\s*(?:params\.resolvedModel|requestedModel)\s*\)/.test(
       asyncProvider
-    )
-      ? pass("imageAsyncProvider applies resolveImageUpstreamModel to upstream body")
+    ) &&
+    /payload\.model\s*=\s*upstreamModel/.test(asyncProvider)
+      ? pass(
+          "imageAsyncProvider applies resolveImageUpstreamModel + hard-pins payload.model"
+        )
       : fail(
-          "imageAsyncProvider applies resolveImageUpstreamModel to upstream body"
+          "imageAsyncProvider applies resolveImageUpstreamModel + hard-pins payload.model"
+        )) && ok;
+
+  ok =
+    (asyncProvider.includes("requestedModel") &&
+    asyncProvider.includes("upstreamModel") &&
+    /providerId:\s*PROVIDER_ID/.test(asyncProvider) &&
+    /image_generation_upstream_request[\s\S]*?requestedModel[\s\S]*?upstreamModel/.test(
+      asyncProvider
+    ) &&
+    loggerSrc.includes('"upstreamModel"') &&
+    imageAdapter.includes("requestedModel") &&
+    imageAdapter.includes("upstreamModel") &&
+    /payload\.model\s*=\s*upstreamModel/.test(imageAdapter)
+      ? pass(
+          "nano-banana default upstreamModel must be nano-banana-fast (logs + allowlist + pin)"
+        )
+      : fail(
+          "nano-banana default upstreamModel must be nano-banana-fast (logs + allowlist + pin)"
         )) && ok;
 
   ok =
@@ -324,6 +348,37 @@ function hasCompletedUrl(polled) {
   return polled?.body?.status === "completed" && (hasUrl || hasB64);
 }
 
+function isBillableSuccess(polled) {
+  if (!hasCompletedUrl(polled)) return false;
+  const billing =
+    polled?.body?.tokfai?.billing_status ?? polled?.body?.billing_status;
+  const credits = Number(
+    polled?.body?.tokfai?.credits_charged ??
+      polled?.body?.credits_charged ??
+      polled?.body?.usage?.credits_charged ??
+      0
+  );
+  return billing === "billable" && credits > 0;
+}
+
+function isNotBillableFailureOrTimeout(polled) {
+  const billing =
+    polled?.body?.tokfai?.billing_status ?? polled?.body?.billing_status;
+  const credits = Number(
+    polled?.body?.tokfai?.credits_charged ??
+      polled?.body?.credits_charged ??
+      0
+  );
+  const status = polled?.body?.status;
+  const code = polled?.body?.error?.code;
+  const terminalFail =
+    status === "failed" ||
+    status === "retryable_timeout" ||
+    code === "upstream_image_error" ||
+    code === "image_task_timeout";
+  return terminalFail && billing === "not_billable" && credits === 0;
+}
+
 function leaksUpstream(body, text) {
   const blob = `${JSON.stringify(body ?? {})}\n${String(text ?? "")}`;
   if (/\bgrsai\b/i.test(blob)) return true;
@@ -425,7 +480,7 @@ async function main() {
       }
     }
 
-    // 2) nano-banana-fast must completed
+    // 2) nano-banana-fast success path billable
     {
       const result = await postImageAndAwait(
         postJson,
@@ -436,33 +491,41 @@ async function main() {
       );
       if (!REAL_NANO_BANANA) {
         ok =
-          (result.accepted && hasCompletedUrl(result.polled)
-            ? pass("2. model=nano-banana-fast completed")
+          (result.accepted && isBillableSuccess(result.polled)
+            ? pass("2. nano-banana-fast success path billable")
             : fail(
-                "2. model=nano-banana-fast completed",
-                `accepted=${result.accepted} status=${result.polled?.body?.status}`
+                "2. nano-banana-fast success path billable",
+                `accepted=${result.accepted} status=${result.polled?.body?.status} tokfai=${JSON.stringify(result.polled?.body?.tokfai)}`
               )) && ok;
       } else if (result.accepted) {
         const status = result.polled?.body?.status;
-        ok =
-          (status === "completed" ||
-          status === "retryable_timeout" ||
-          status === "failed"
-            ? pass(`2. model=nano-banana-fast terminal (${status})`)
-            : fail(
-                "2. model=nano-banana-fast terminal",
-                `status=${status}`
-              )) && ok;
+        if (status === "completed") {
+          ok =
+            (isBillableSuccess(result.polled)
+              ? pass("2. nano-banana-fast success path billable")
+              : fail(
+                  "2. nano-banana-fast success path billable",
+                  `tokfai=${JSON.stringify(result.polled?.body?.tokfai)}`
+                )) && ok;
+        } else {
+          ok =
+            (status === "retryable_timeout" || status === "failed"
+              ? pass(`2. model=nano-banana-fast terminal (${status})`)
+              : fail(
+                  "2. model=nano-banana-fast terminal",
+                  `status=${status}`
+                )) && ok;
+        }
       } else {
         ok =
           fail(
-            "2. model=nano-banana-fast completed",
+            "2. nano-banana-fast success path billable",
             `status=${result.res.status} body=${String(result.text).slice(0, 240)}`
           ) && false;
       }
     }
 
-    // 3) nano-banana-2 completed or slow; cannot use chat
+    // 3) nano-banana-2 success path billable (or slow); cannot use chat
     {
       const result = await postImageAndAwait(
         postJson,
@@ -473,32 +536,41 @@ async function main() {
       );
       if (!REAL_NANO_BANANA) {
         ok =
-          (result.accepted && hasCompletedUrl(result.polled)
-            ? pass("3a. model=nano-banana-2 completed (mock)")
+          (result.accepted && isBillableSuccess(result.polled)
+            ? pass("3a. nano-banana-2 success path billable")
             : fail(
-                "3a. model=nano-banana-2 completed (mock)",
-                `accepted=${result.accepted} status=${result.polled?.body?.status}`
+                "3a. nano-banana-2 success path billable",
+                `accepted=${result.accepted} status=${result.polled?.body?.status} tokfai=${JSON.stringify(result.polled?.body?.tokfai)}`
               )) && ok;
       } else if (result.accepted) {
         const status = result.polled?.body?.status;
-        const okTerminal =
-          status === "completed" ||
-          status === "retryable_timeout" ||
-          status === "failed" ||
-          result.polled?.body?.processing === true;
-        ok =
-          (okTerminal
-            ? pass(
-                `3a. model=nano-banana-2 completed or slow (${status ?? "processing"})`
-              )
-            : fail(
-                "3a. model=nano-banana-2 completed or slow",
-                `status=${status}`
-              )) && ok;
+        if (status === "completed") {
+          ok =
+            (isBillableSuccess(result.polled)
+              ? pass("3a. nano-banana-2 success path billable")
+              : fail(
+                  "3a. nano-banana-2 success path billable",
+                  `tokfai=${JSON.stringify(result.polled?.body?.tokfai)}`
+                )) && ok;
+        } else {
+          const okTerminal =
+            status === "retryable_timeout" ||
+            status === "failed" ||
+            result.polled?.body?.processing === true;
+          ok =
+            (okTerminal
+              ? pass(
+                  `3a. model=nano-banana-2 completed or slow (${status ?? "processing"})`
+                )
+              : fail(
+                  "3a. model=nano-banana-2 completed or slow",
+                  `status=${status}`
+                )) && ok;
+        }
       } else {
         ok =
           fail(
-            "3a. model=nano-banana-2 completed or slow",
+            "3a. nano-banana-2 success path billable",
             `status=${result.res.status} body=${String(result.text).slice(0, 240)}`
           ) && false;
       }
@@ -618,18 +690,11 @@ async function main() {
             ) && false;
         } else {
           const polled = await pollUntilTerminal(getJson, taskId);
-          const notBillable =
-            polled?.body?.tokfai?.billing_status === "not_billable" &&
-            Number(polled?.body?.tokfai?.credits_charged ?? 0) === 0 &&
-            Number(polled?.body?.credits_charged ?? 0) === 0;
-          const failed =
-            polled?.body?.status === "failed" ||
-            polled?.body?.error?.code === "upstream_image_error";
           ok =
-            (failed && notBillable
-              ? pass("7. image failure not_billable")
+            (isNotBillableFailureOrTimeout(polled)
+              ? pass("7. failed/timeout path not_billable (failure)")
               : fail(
-                  "7. image failure not_billable",
+                  "7. failed/timeout path not_billable (failure)",
                   `status=${polled?.body?.status} tokfai=${JSON.stringify(polled?.body?.tokfai)} error=${JSON.stringify(polled?.body?.error)}`
                 )) && ok;
 
@@ -669,24 +734,18 @@ async function main() {
             ) && false;
         } else {
           const polled = await pollUntilTerminal(getJson, taskId);
-          const notBillable =
-            polled?.body?.tokfai?.billing_status === "not_billable" &&
-            Number(polled?.body?.tokfai?.credits_charged ?? 0) === 0;
-          const timedOut =
-            polled?.body?.status === "retryable_timeout" ||
-            polled?.body?.error?.code === "image_task_timeout";
           ok =
-            (timedOut && notBillable
-              ? pass("8. image timeout not_billable")
+            (isNotBillableFailureOrTimeout(polled)
+              ? pass("8. failed/timeout path not_billable (timeout)")
               : fail(
-                  "8. image timeout not_billable",
+                  "8. failed/timeout path not_billable (timeout)",
                   `status=${polled?.body?.status} tokfai=${JSON.stringify(polled?.body?.tokfai)} error=${JSON.stringify(polled?.body?.error)}`
                 )) && ok;
         }
       }
     } else {
-      pass("7. image failure not_billable (skipped on LIVE Nano Banana)");
-      pass("8. image timeout not_billable (skipped on LIVE Nano Banana)");
+      pass("7. failed/timeout path not_billable (failure skipped on LIVE)");
+      pass("8. failed/timeout path not_billable (timeout skipped on LIVE)");
       pass("8b. failure error envelope (skipped on LIVE Nano Banana)");
     }
 

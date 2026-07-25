@@ -248,20 +248,30 @@ export async function generateImage(
     imageUrls.length
   );
 
+  const requestedModel = request.model;
+  const upstreamModel = resolveImageUpstreamModel(requestedModel);
+
   const { payload, adapterMode, upstreamPayloadKeys, inputImagesForLog } =
     await buildGrsaiImagePayload({
-      model: resolveImageUpstreamModel(request.model),
+      model: upstreamModel,
       prompt: upstreamPrompt,
       aspectRatio: request.aspectRatio,
       imageSize: request.imageSize,
       resolvedImageUrls: imageUrls,
     });
 
+  // Hard-pin: never let adapter/defaults send the public id upstream.
+  payload.model = upstreamModel;
+
   const firstImage = inputImagesForLog[0];
   const firstImageMeta = describeFirstImageForLog(firstImage);
 
   log.info("image_generation_upstream_request", {
-    model: request.model,
+    providerId: "primary_image",
+    requestedModel,
+    upstreamModel,
+    // `model` mirrors the provider body field (not the public catalog id).
+    model: upstreamModel,
     has_input_images: imageUrls.length > 0,
     input_images_count: imageUrls.length,
     image_url_sources: imageUrlSources,
