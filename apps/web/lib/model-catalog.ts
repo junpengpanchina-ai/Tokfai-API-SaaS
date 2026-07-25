@@ -292,7 +292,8 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     type: "image",
     status: "available",
     billingUnit: IMAGE_BILLING_UNIT,
-    description: "Fast image generation with lower latency.",
+    description:
+      "Lightweight fast images / lower cost. Async Image API only (task_id poll; bill on success).",
     pricing: imagePricing(440),
     traits: { speed: "high", quality: "medium", cost: "low" },
     tags: ["Fast"],
@@ -307,7 +308,8 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     type: "image",
     status: "available",
     billingUnit: IMAGE_BILLING_UNIT,
-    description: "Image generation model.",
+    description:
+      "Recommended image model. Async Image API only (task_id poll; bill on success).",
     pricing: imagePricing(1400),
     traits: { speed: "medium", quality: "medium", cost: "medium" },
     categories: ["recommended", "low_cost"],
@@ -336,7 +338,8 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     type: "image",
     status: "available",
     billingUnit: IMAGE_BILLING_UNIT,
-    description: "Next-generation Nano Banana image model.",
+    description:
+      "Higher quality / more stable images. Async Image API only (task_id poll; bill on success).",
     pricing: imagePricing(1200),
     traits: { speed: "medium", quality: "high", cost: "medium" },
     categories: ["high_quality"],
@@ -649,7 +652,7 @@ export const DASHBOARD_USE_CASES: DashboardUseCaseEntry[] = [
   },
   {
     id: "text_to_image",
-    recommendedModelIds: ["nano-banana-fast", "gpt-image-2"],
+    recommendedModelIds: ["nano-banana", "nano-banana-fast"],
     playground: "image",
     defaultModelId: "nano-banana-fast",
   },

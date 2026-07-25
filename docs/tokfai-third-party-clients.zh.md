@@ -1,6 +1,6 @@
 # Tokfai 第三方客户端真实接入指南
 
-Tokfai 是 **OpenAI-compatible API 中转聚合网关**。所有客户端只连 Tokfai，不连任何上游主机。
+Tokfai 是 **KA 大客户 AI 聚合平台**（OpenAI-compatible API）。所有客户端只连 Tokfai；不要在文档或客户端配置中暴露上游主机、供应商或 upstreamModel。
 
 | 项 | 值 |
 |---|---|

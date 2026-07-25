@@ -103,16 +103,61 @@ request = matlab.net.http.RequestMessage( ...
 response = request.send(url);
 disp(response.Body.Data)`;
 
+const IMAGE_DOC_MODEL = "nano-banana";
+
 const IMAGE_REF_CURL = `curl https://api.tokfai.com/v1/images/generations \\
   -H "Authorization: Bearer ${TOKFAI_API_KEY_PLACEHOLDER}" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "gpt-image-2",
+    "model": "${IMAGE_DOC_MODEL}",
     "prompt": "保留主体，换成直播间带货主图风格",
-    "image": ["https://example.com/your-reference-image.jpg"],
+    "images": ["https://example.com/your-reference-image.jpg"],
     "size": "1024x1024",
+    "n": 1,
     "response_format": "url"
   }'`;
+
+const IMAGE_SUBMIT_RESPONSE_EXAMPLE = `{
+  "id": "img_xxx",
+  "task_id": "img_xxx",
+  "object": "image.generation",
+  "created": 1777689832,
+  "model": "nano-banana",
+  "status": "queued",
+  "progress": 5,
+  "data": [],
+  "usage": {
+    "credits_charged": 0
+  },
+  "tokfai": {
+    "request_id": "img_xxx",
+    "billing_status": "not_billable",
+    "credits_charged": 0
+  }
+}`;
+
+const IMAGE_COMPLETED_RESPONSE_EXAMPLE = `{
+  "id": "img_xxx",
+  "task_id": "img_xxx",
+  "object": "image.generation",
+  "created": 1777689832,
+  "model": "nano-banana",
+  "status": "completed",
+  "progress": 100,
+  "data": [
+    {
+      "url": "https://example-cdn.tokfai.com/file/xxx.png"
+    }
+  ],
+  "usage": {
+    "credits_charged": 1400
+  },
+  "tokfai": {
+    "request_id": "img_xxx",
+    "billing_status": "billable",
+    "credits_charged": 1400
+  }
+}`;
 
 export const PUBLIC_BETA_DOCS: PublicBetaDoc[] = [
   {
@@ -134,7 +179,7 @@ export const PUBLIC_BETA_DOCS: PublicBetaDoc[] = [
 官网：https://www.tokfai.com  
 API Base URL：\`${TOKFAI_API_ORIGIN}\`（完整路径前缀 \`${TOKFAI_API_BASE_URL}\`）
 
-注册并充值算力积分后，按下面三步接入 Tokfai API。
+Tokfai 是 **KA 大客户 AI 聚合平台**：文本与代码（GPT / Gemini）、图片生成（Nano Banana 异步 task_id）、视频预留 / coming soon。注册并充值算力积分后，按下面三步接入。
 
 ## 三步接入
 
@@ -146,9 +191,9 @@ API Base URL：\`${TOKFAI_API_ORIGIN}\`（完整路径前缀 \`${TOKFAI_API_BASE
 
 | 场景 | 接口 |
 |---|---|
-| 普通聊天 | \`POST https://api.tokfai.com/v1/chat/completions\` |
-| GPT-5.5 / 工具调用 / Codex 类场景 | \`POST https://api.tokfai.com/v1/responses\` |
-| 图片生成 | \`POST https://api.tokfai.com/v1/images/generations\`（或 Dashboard 图片工作台） |
+| 文本与代码 | \`POST https://api.tokfai.com/v1/chat/completions\` 或 \`POST /v1/responses\` |
+| 图片生成 | \`POST /v1/images/generations\` → 轮询 \`GET /v1/images/generations/:task_id\` |
+| 视频 | 预留 / coming soon（未开放） |
 
 ### 步骤 3：在请求中选择模型
 
@@ -182,7 +227,7 @@ MATLAB 可通过 HTTP JSON 接入 Tokfai。GPT-5.5 等复杂推理、工具调�
 Website: https://www.tokfai.com  
 API Base URL: \`${TOKFAI_API_ORIGIN}\` (paths under \`${TOKFAI_API_BASE_URL}\`)
 
-After sign-up and topping up compute credits, integrate in three steps.
+Tokfai is a **KA enterprise AI aggregation platform**: text & code (GPT / Gemini), image generation (Nano Banana async task_id), video reserved / coming soon. After sign-up and topping up compute credits, integrate in three steps.
 
 ## Three-step integration
 
@@ -194,9 +239,9 @@ Create an \`sk-tokfai_xxx\` API key in the dashboard. **The API key is not bound
 
 | Use case | Endpoint |
 |---|---|
-| Chat | \`POST https://api.tokfai.com/v1/chat/completions\` |
-| GPT-5.5 / tools / Codex-like agents | \`POST https://api.tokfai.com/v1/responses\` |
-| Image generation | \`POST https://api.tokfai.com/v1/images/generations\` (or Dashboard Image Workbench) |
+| Text & code | \`POST /v1/chat/completions\` or \`POST /v1/responses\` |
+| Image generation | \`POST /v1/images/generations\` → poll \`GET /v1/images/generations/:task_id\` |
+| Video | reserved / coming soon (not available) |
 
 ### Step 3: Select the model in the request
 
@@ -702,296 +747,192 @@ For multi-turn chat, use \`POST /v1/chat/completions\` with a \`messages\` array
     markdown: {
       zh: `# 图片生成 API
 
-路径：\`POST https://api.tokfai.com/v1/images/generations\`
+Tokfai 是 **KA 大客户 AI 聚合平台**。图片能力与文本能力分离：
 
-该接口兼容 OpenAI Images Generations 形态，用于文生图、参考图改图、电商主图生成等场景。
+| 能力 | 模型 | 接口 |
+|---|---|---|
+| 文本与代码 | GPT / Gemini | \`POST /v1/chat/completions\` 或 \`POST /v1/responses\` |
+| 图片生成 | Nano Banana 系列 | \`POST /v1/images/generations\` + 轮询 |
+| 视频生成 | — | **预留 / coming soon / reserved**（未开放） |
 
-> 图片专用模型**不会**出现在普通聊天客户端的 \`GET /v1/models\` 列表中。请使用 **Tokfai 图片工作台**（Dashboard）或本文档的 OpenAI-compatible 图片接口；不要在 Cherry Studio / Chatbox 里把图片模型当对话模型使用。
+> Nano Banana **不能**走 chat。GPT / Gemini **不能**走 image generation。  
+> 图片模型**不会**出现在普通聊天客户端的 \`GET /v1/models\` 列表中。请用 **图片工作台** 或本接口。
+
+## 推荐图片模型
+
+| model | 说明 |
+|---|---|
+| \`nano-banana\` | **推荐图片模型** |
+| \`nano-banana-fast\` | 轻量快图 / 成本低 |
+| \`nano-banana-2\` | 更高质量 / 更稳定 |
+
+## 异步任务流程
+
+1. \`POST /v1/images/generations\` 提交任务 → 返回 \`id\` / \`task_id\`
+2. \`GET /v1/images/generations/:task_id\` 轮询进度与结果
+3. **成功才扣费**；**失败 / 超时不扣费**（见 \`usage.credits_charged\` 与 \`tokfai.billing_status\`）
 
 ## 请求字段
 
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---:|---|
-| \`model\` | string | 否 | 图片模型 ID。未传时使用默认图片模型 |
+| \`model\` | string | 否 | 图片模型 ID（推荐 \`nano-banana\`；默认多为 \`nano-banana-fast\`） |
 | \`prompt\` | string | 是 | 图片生成提示词 |
-| \`image\` | array[string] | 否 | 参考图 URL 或 base64 data URL。与下列别名字段等价 |
-| \`images\` | array[string] | 否 | \`image\` 的兼容别名 |
-| \`image_urls\` | array[string] | 否 | \`image\` 的兼容别名 |
-| \`reference_images\` | array[string] | 否 | \`image\` 的兼容别名 |
-| \`input_images\` | array[string] | 否 | \`image\` 的兼容别名 |
 | \`size\` | string | 否 | 如 \`1024x1024\` |
-| \`aspect_ratio\` / \`aspectRatio\` | string | 否 | 如 \`1:1\`、\`16:9\`、\`9:16\` |
-| \`response_format\` | string | 否 | 当前支持 \`url\` |
 | \`n\` | number | 否 | 当前仅支持 \`1\` |
+| \`response_format\` | string | 否 | 当前仅支持 \`url\` |
+| \`images\` / \`image_urls\` 等 | array[string] | 否 | 参考图（文生图可省略） |
 
-\`image\`、\`images\`、\`image_urls\`、\`reference_images\`、\`input_images\` 都会归一化为参考图列表。
-
-## 文生图示例
+## 提交示例（POST）
 
 \`\`\`bash
 curl https://api.tokfai.com/v1/images/generations \\
   -H "Authorization: Bearer sk-tokfai_xxx" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "gpt-image-2",
+    "model": "nano-banana",
     "prompt": "生成一张边牧与古牧正在直播间带货的电商主图",
-    "image": [],
     "size": "1024x1024",
+    "n": 1,
     "response_format": "url"
   }'
 \`\`\`
 
-## 参考图改图示例
-
-\`\`\`bash
-curl https://api.tokfai.com/v1/images/generations \\
-  -H "Authorization: Bearer sk-tokfai_xxx" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "gpt-image-2",
-    "prompt": "保留主体，把背景换成科技感直播间带货主图",
-    "image": [
-      "https://example.com/reference.jpg"
-    ],
-    "size": "1024x1024",
-    "response_format": "url"
-  }'
-\`\`\`
-
-## Python 示例
-
-\`\`\`python
-import requests
-
-res = requests.post(
-    "https://api.tokfai.com/v1/images/generations",
-    headers={
-        "Authorization": "Bearer sk-tokfai_xxx",
-        "Content-Type": "application/json"
-    },
-    json={
-        "model": "gpt-image-2",
-        "prompt": "生成一张边牧与古牧正在直播间带货的电商主图",
-        "image": [],
-        "size": "1024x1024",
-        "response_format": "url"
-    }
-)
-
-print(res.json())
-\`\`\`
-
-## 成功响应示例
+提交后典型响应（\`202\`，含 \`task_id\`）：
 
 \`\`\`json
-{
-  "created": 1777689832,
-  "data": [
-    {
-      "url": "https://example-cdn.tokfai.com/file/xxx.png"
-    }
-  ],
-  "usage": {
-    "total_tokens": 6267,
-    "input_tokens": 17,
-    "output_tokens": 6250,
-    "input_tokens_details": {}
-  }
-}
+${IMAGE_SUBMIT_RESPONSE_EXAMPLE}
 \`\`\`
 
-实际响应还可能包含：
-
-\`\`\`json
-{
-  "id": "img_xxx",
-  "object": "image.generation",
-  "model": "gpt-image-2",
-  "status": "succeeded",
-  "tokfai": {
-    "request_id": "xxx",
-    "credits_charged": 123.45
-  }
-}
-\`\`\`
-
-## 异步结果查询
-
-如果接口返回 \`id\` 或 \`request_id\`，可查询任务状态：
+## 轮询示例（GET）
 
 \`\`\`bash
-curl "https://api.tokfai.com/v1/api/result?id=REQUEST_ID" \\
+curl https://api.tokfai.com/v1/images/generations/img_xxx \\
   -H "Authorization: Bearer sk-tokfai_xxx"
 \`\`\`
 
-兼容返回：
+完成后典型响应：
 
 \`\`\`json
-{
-  "id": "REQUEST_ID",
-  "status": "succeeded",
-  "results": [
-    {
-      "url": "https://example-cdn.tokfai.com/file/xxx.png"
-    }
-  ]
-}
+${IMAGE_COMPLETED_RESPONSE_EXAMPLE}
 \`\`\`
+
+必看字段：\`id\`、\`task_id\`、\`status\`、\`progress\`、\`data[].url\`、\`usage.credits_charged\`、\`tokfai.billing_status\`。
+
+## 参考图改图
+
+\`\`\`bash
+${IMAGE_REF_CURL}
+\`\`\`
+
+## 常见图片错误
+
+| code | 说明 |
+|---|---|
+| \`image_model_not_available\` | 当前图片模型不可用，请切换图片模型 |
+| \`upstream_image_error\` | 图片生成暂时不可用，请稍后重试 |
+| \`image_task_timeout\` | 图片生成时间较长，未扣费，可稍后重试或切换更快图片模型 |
 
 说明：
 
-- 文生图：\`image\` 传空数组或不传
-- 参考图改图：\`image\` / \`images\` / \`image_urls\` / \`reference_images\` / \`input_images\` 任一字段非空
-- 当前 \`response_format\` 仅支持 \`url\`
-- 当前 \`n\` 仅支持 \`1\`
+- 文生图：不传参考图或传空数组
+- 当前 \`response_format\` 仅 \`url\`，\`n\` 仅 \`1\`
 - 不支持 \`blob:\`、\`file:\`、\`localhost\`、内网地址
-- 成功才扣算力积分；失败通常不扣费，以 Usage / Credits 为准`,
-      en: `# Image Generation
+- 对外只使用 Tokfai 模型 id 与 api.tokfai.com；不要填写其它厂商主机`,
+      en: `# Image Generation API
 
-Path: \`POST https://api.tokfai.com/v1/images/generations\`
+Tokfai is a **KA enterprise AI aggregation platform**. Image and text capabilities are separated:
 
-OpenAI Images Generations compatible — text-to-image, reference edit, ecommerce creatives.
+| Capability | Models | Endpoint |
+|---|---|---|
+| Text & code | GPT / Gemini | \`POST /v1/chat/completions\` or \`POST /v1/responses\` |
+| Image generation | Nano Banana series | \`POST /v1/images/generations\` + poll |
+| Video generation | — | **reserved / coming soon** (not available) |
 
-> Image-only models are **not** listed on \`GET /v1/models\` for ordinary chat clients. Use **Tokfai Image Workbench** (Dashboard) or this OpenAI-compatible Image API — do not treat image models as chat models in Cherry Studio / Chatbox.
+> Nano Banana **cannot** use chat. GPT / Gemini **cannot** use image generation.  
+> Image models are **not** listed on \`GET /v1/models\` for ordinary chat clients. Use **Image Workbench** or this API.
+
+## Recommended image models
+
+| model | Notes |
+|---|---|
+| \`nano-banana\` | **Recommended image model** |
+| \`nano-banana-fast\` | Lightweight / fast / lower cost |
+| \`nano-banana-2\` | Higher quality / more stable |
+
+## Async task flow
+
+1. \`POST /v1/images/generations\` submit → returns \`id\` / \`task_id\`
+2. \`GET /v1/images/generations/:task_id\` poll for progress + result
+3. **Billed on success only**; **failure / timeout not charged** (\`usage.credits_charged\`, \`tokfai.billing_status\`)
 
 ## Request fields
 
 | Field | Type | Required | Notes |
 |---|---|---:|---|
-| \`model\` | string | no | Image model id; default applies if omitted |
+| \`model\` | string | no | Image model id (recommend \`nano-banana\`; default often \`nano-banana-fast\`) |
 | \`prompt\` | string | yes | Generation prompt |
-| \`image\` | array[string] | no | Reference URL or base64 data URL |
-| \`images\` | array[string] | no | Alias of \`image\` |
-| \`image_urls\` | array[string] | no | Alias of \`image\` |
-| \`reference_images\` | array[string] | no | Alias of \`image\` |
-| \`input_images\` | array[string] | no | Alias of \`image\` |
 | \`size\` | string | no | e.g. \`1024x1024\` |
-| \`aspect_ratio\` / \`aspectRatio\` | string | no | e.g. \`1:1\`, \`16:9\`, \`9:16\` |
-| \`response_format\` | string | no | \`url\` supported today |
 | \`n\` | number | no | \`1\` only today |
+| \`response_format\` | string | no | \`url\` only today |
+| \`images\` / \`image_urls\` etc. | array[string] | no | Reference images (omit for text-to-image) |
 
-\`image\`, \`images\`, \`image_urls\`, \`reference_images\`, and \`input_images\` merge into one reference list.
-
-## Text-to-image
+## Submit (POST)
 
 \`\`\`bash
 curl https://api.tokfai.com/v1/images/generations \\
   -H "Authorization: Bearer sk-tokfai_xxx" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "gpt-image-2",
+    "model": "nano-banana",
     "prompt": "生成一张边牧与古牧正在直播间带货的电商主图",
-    "image": [],
     "size": "1024x1024",
+    "n": 1,
     "response_format": "url"
   }'
 \`\`\`
+
+Typical accept response (\`202\` with \`task_id\`):
+
+\`\`\`json
+${IMAGE_SUBMIT_RESPONSE_EXAMPLE}
+\`\`\`
+
+## Poll (GET)
+
+\`\`\`bash
+curl https://api.tokfai.com/v1/images/generations/img_xxx \\
+  -H "Authorization: Bearer sk-tokfai_xxx"
+\`\`\`
+
+Typical completed response:
+
+\`\`\`json
+${IMAGE_COMPLETED_RESPONSE_EXAMPLE}
+\`\`\`
+
+Required fields: \`id\`, \`task_id\`, \`status\`, \`progress\`, \`data[].url\`, \`usage.credits_charged\`, \`tokfai.billing_status\`.
 
 ## Reference edit
 
 \`\`\`bash
-curl https://api.tokfai.com/v1/images/generations \\
-  -H "Authorization: Bearer sk-tokfai_xxx" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "gpt-image-2",
-    "prompt": "保留主体，把背景换成科技感直播间带货主图",
-    "image": [
-      "https://example.com/reference.jpg"
-    ],
-    "size": "1024x1024",
-    "response_format": "url"
-  }'
+${IMAGE_REF_CURL}
 \`\`\`
 
-## Python
+## Common image errors
 
-\`\`\`python
-import requests
-
-res = requests.post(
-    "https://api.tokfai.com/v1/images/generations",
-    headers={
-        "Authorization": "Bearer sk-tokfai_xxx",
-        "Content-Type": "application/json"
-    },
-    json={
-        "model": "gpt-image-2",
-        "prompt": "生成一张边牧与古牧正在直播间带货的电商主图",
-        "image": [],
-        "size": "1024x1024",
-        "response_format": "url"
-    }
-)
-
-print(res.json())
-\`\`\`
-
-## Success response
-
-\`\`\`json
-{
-  "created": 1777689832,
-  "data": [
-    {
-      "url": "https://example-cdn.tokfai.com/file/xxx.png"
-    }
-  ],
-  "usage": {
-    "total_tokens": 6267,
-    "input_tokens": 17,
-    "output_tokens": 6250,
-    "input_tokens_details": {}
-  }
-}
-\`\`\`
-
-May also include:
-
-\`\`\`json
-{
-  "id": "img_xxx",
-  "object": "image.generation",
-  "model": "gpt-image-2",
-  "status": "succeeded",
-  "tokfai": {
-    "request_id": "xxx",
-    "credits_charged": 123.45
-  }
-}
-\`\`\`
-
-## Async result lookup
-
-If the response includes \`id\` or \`request_id\`:
-
-\`\`\`bash
-curl "https://api.tokfai.com/v1/api/result?id=REQUEST_ID" \\
-  -H "Authorization: Bearer sk-tokfai_xxx"
-\`\`\`
-
-Compatible shape:
-
-\`\`\`json
-{
-  "id": "REQUEST_ID",
-  "status": "succeeded",
-  "results": [
-    {
-      "url": "https://example-cdn.tokfai.com/file/xxx.png"
-    }
-  ]
-}
-\`\`\`
+| code | Meaning |
+|---|---|
+| \`image_model_not_available\` | Current image model unavailable — switch image models |
+| \`upstream_image_error\` | Image generation temporarily unavailable — retry shortly |
+| \`image_task_timeout\` | Generation took too long; **not charged** — retry or switch to a faster image model |
 
 Notes:
 
-- Text-to-image: omit \`image\` or pass \`[]\`
-- Reference edit: any of \`image\` / \`images\` / \`image_urls\` / \`reference_images\` / \`input_images\` non-empty
-- \`response_format\` supports \`url\` only today
-- \`n\` supports \`1\` only today
-- \`blob:\`, \`file:\`, \`localhost\`, private networks are not supported
-- Credits charged on success; failures usually are not billed — Usage / Credits are authoritative`,
+- Text-to-image: omit references or pass \`[]\`
+- \`response_format\` is \`url\` only; \`n\` is \`1\` only
+- \`blob:\`, \`file:\`, \`localhost\`, private networks unsupported
+- Use Tokfai model ids and api.tokfai.com only — do not point clients at other vendor hosts`,
     },
   },
   {
@@ -1491,12 +1432,14 @@ Image-only models are not served here — use Tokfai Image Workbench or \`POST /
 | code | 客户端词汇 | 说明 |
 |---|---|---|
 | \`model_not_available\` | \`model_not_available\` | 模型不可用，请刷新模型列表 |
+| \`image_model_not_available\` | — | 当前图片模型不可用，请切换图片模型 |
+| \`upstream_image_error\` | — | 图片生成暂时不可用，请稍后重试 |
+| \`image_task_timeout\` | — | 图片生成时间较长，未扣费，可稍后重试或切换更快图片模型 |
 | \`insufficient_credits\` | \`insufficient_balance\` | 算力积分不足，请充值后再试 |
 | \`too_many_requests\` / \`upstream_rate_limited\` | \`rate_limited\` | 请求过于频繁 |
 | \`upstream_model_busy\` | \`upstream_busy\` | 模型繁忙，请稍后重试 |
 | \`invalid_request_error\` | \`invalid_request\` | 请求参数不合法 |
 | \`reference_image_required\` | — | 请先上传参考图片，或改用文生图模式 |
-| \`image_generation_timeout\` | — | 图片生成时间较长，请稍后重试或更换模型 |
 | \`invalid_image_url\` | — | 图片地址不合法（含 blob / localhost 等） |
 | \`unauthorized\` / \`invalid_token\` | — | 鉴权失败 |
 
@@ -1519,12 +1462,14 @@ Public errors return a friendly \`message\`, stable \`code\`, and \`request_id\`
 | code | Client term | Meaning |
 |---|---|---|
 | \`model_not_available\` | \`model_not_available\` | Model unavailable — refresh model list |
+| \`image_model_not_available\` | — | Current image model unavailable — switch image models |
+| \`upstream_image_error\` | — | Image generation temporarily unavailable — retry shortly |
+| \`image_task_timeout\` | — | Generation took too long; not charged — retry or switch to a faster image model |
 | \`insufficient_credits\` | \`insufficient_balance\` | Top up compute credits and retry |
 | \`too_many_requests\` / \`upstream_rate_limited\` | \`rate_limited\` | Too many requests |
 | \`upstream_model_busy\` | \`upstream_busy\` | Model busy — retry or switch |
 | \`invalid_request_error\` | \`invalid_request\` | Invalid request |
 | \`reference_image_required\` | — | Upload a reference image, or use text-to-image |
-| \`image_generation_timeout\` | — | Generation took too long — retry or switch model |
 | \`invalid_image_url\` | — | Invalid image URL (including blob / localhost) |
 | \`unauthorized\` / \`invalid_token\` | — | Auth failure |
 

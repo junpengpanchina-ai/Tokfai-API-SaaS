@@ -36,35 +36,35 @@ export const messages = {
       language: "Language",
     },
     home: {
-      headline: "Tokfai API Gateway",
+      headline: "Tokfai — KA AI aggregation platform",
       tagline:
-        "One API key for GPT, Gemini, and image models — OpenAI-compatible, Gemini-compatible, and Tokfai Image API.",
+        "Not a single chat tool. One API key for text & code (GPT / Gemini), image generation (Nano Banana), and reserved video capacity.",
       description:
-        "Top up compute credits, then call. Text models bill by usage; image models bill per generation. Failed requests are not charged.",
+        "Built for enterprise workloads: ecommerce batch product shots, training remixes, GEO outbound content, and drone flight analytics. Text bills by usage; images bill only on success after async task completion.",
       compatLabel: "Works with",
       compatCursor: "Cursor",
       compatCherryStudio: "Cherry Studio",
       compatOpenAiSdk: "OpenAI SDK",
       compatCustomApp: "Custom App",
-      scenariosTitle: "Core use cases",
+      scenariosTitle: "Core capabilities",
       scenariosDesc:
-        "Three API surfaces — chat, image, and desktop client integration — all on the same OpenAI-compatible base URL.",
-      scenarioChatTitle: "Chat API",
+        "Text/code, image generation (async task_id), and client integration — same Tokfai base URL. Video is reserved / coming soon.",
+      scenarioChatTitle: "Text & code",
       scenarioChatBody:
-        "Send messages via POST /chat/completions. Stream or batch responses with models like gpt-5.4.",
+        "GPT / Gemini via POST /v1/chat/completions or /v1/responses — assistants, agents, code, GEO copy.",
       scenarioChatCta: "Chat API docs",
-      scenarioImageTitle: "Image API",
+      scenarioImageTitle: "Image generation",
       scenarioImageBody:
-        "Generate images with text-to-image or image-to-image via POST /v1/images/generations.",
+        "Nano Banana via POST /v1/images/generations — submit returns task_id; poll for results. Success billed; failure/timeout not charged.",
       scenarioImageCta: "Image API docs",
       scenarioDevToolsTitle: "Developer tools integration",
       scenarioDevToolsBody:
-        "Point Cursor or Cherry Studio at api.tokfai.com/v1 with your sk-tokfai_… key — no code changes required.",
+        "Point Cursor or Cherry Studio at api.tokfai.com/v1 with your sk-tokfai_… key — use Tokfai text models only in chat clients.",
       scenarioDevToolsCta: "Integration guide",
       scenarioEndpointLabel: "Endpoint",
       scenarioModelLabel: "Recommended model",
       startWithCredits: "Top up now",
-      tryImagePlayground: "Try Image Playground",
+      tryImagePlayground: "Try Image Workbench",
       viewPricing: "View pricing",
       readDocs: "View integration docs",
       howItWorksTitle: "How it works",
@@ -80,7 +80,7 @@ export const messages = {
         "Issue a sk-tokfai_… key from the dashboard and store it securely.",
       step4Title: "Call the API",
       step4Body:
-        "Point OpenAI SDK, Cursor, Cherry Studio, or your app at api.tokfai.com/v1. Test chat in Chat Playground and images in Image Playground.",
+        "Point OpenAI SDK, Cursor, Cherry Studio, or your app at api.tokfai.com/v1. Use Chat for text models; Image Workbench for Nano Banana async image tasks.",
       step5Title: "Monitor usage",
       step5Body:
         "Watch requests, credits charged, and ledger entries update in real time.",
@@ -335,7 +335,7 @@ export const messages = {
         subtitle:
           "Browse available Tokfai models, capabilities, recommended use cases, and billing notes.",
         capabilitiesSubtitle:
-          "Capabilities and use cases only. Rates live on Pricing; integration lives on Docs.",
+          "Text & code models vs image generation (Nano Banana async). Rates on Pricing; integration on Docs. Video is reserved / coming soon.",
         apiKeyNotBoundHint:
           "API keys are not bound to a model. Set the model ID in the request body's model field.",
         viewPricing: "View pricing",
@@ -445,7 +445,7 @@ export const messages = {
         buildTemplateAutoFast: "Build template — auto-fast chat",
         buildTemplateAutoPro: "Build template — auto-pro quality",
         buildTemplateAutoCheap: "Build template — auto-cheap batch",
-        buildTemplateImage: "Build template — gpt-image-2 image",
+        buildTemplateImage: "Build template — nano-banana image",
         buildPayloadWithModel: "Build payload with this model",
         buildPayloadAutoFast: "Build payload — general/support chat",
         buildPayloadAutoPro: "Build payload — hospital/auto quality",
@@ -453,7 +453,7 @@ export const messages = {
         buildPayloadImage: "Build payload — image",
         starterTemplateAutoPro: "auto-pro → Quality Chat starter",
         starterTemplateAutoCheap: "auto-cheap → Ecommerce batch starter",
-        starterTemplateImage: "gpt-image-2 → Image starter template",
+        starterTemplateImage: "nano-banana → Image starter template",
         startFromModelAutoPro: "auto-pro — quality workloads",
         startFromModelAutoCheap: "auto-cheap — high-volume ecommerce copy",
         openIntegrationWorkbench: "Open Integration Workbench",
@@ -558,16 +558,16 @@ export const messages = {
         chatSectionTitle: "Chat Models",
         chatSectionDesc:
           "OpenAI-compatible chat models billed by input/output tokens. Use for assistants, agents, and text generation via POST /v1/chat/completions.",
-        imageSectionTitle: "Image Models",
+        imageSectionTitle: "Image generation",
         imageSectionDesc:
-          "Text-to-image and image-to-image models billed per successful generation via POST /v1/images/generations.",
+          "Nano Banana series via POST /v1/images/generations — async task_id + poll. Billed only on success; failure/timeout not charged. Not for chat.",
         recommendedUseCase: "Best for",
         availability: "Availability",
         imageComingSoonTitle: "Image Models (coming soon)",
         imageComingSoonDesc: "Additional image models planned for future release.",
-        videoSectionTitle: "Video Models",
+        videoSectionTitle: "Video Models (reserved)",
         videoSectionDesc:
-          "Coming soon — video generation models planned for a dedicated Video Playground.",
+          "Reserved / coming soon — video capacity is not publicly available yet.",
         comingSoon: "Coming soon",
         available: "Available",
         price: "Price",
@@ -1516,24 +1516,24 @@ export const messages = {
           "May be unavailable during high load. For stable routing, use auto-fast or auto-pro.",
       },
       imageUseCase: {
-        "gpt-image-2": "Text-to-image, image-to-image, high-quality images",
-        "gpt-image-2-vip": "Text-to-image, image-to-image, high-quality images",
-        "nano-banana-fast": "Text-to-image, image-to-image, batch low-cost",
-        "nano-banana": "Text-to-image, image-to-image, batch low-cost",
-        "nano-banana-pro": "Text-to-image, image-to-image, high-quality images",
-        "nano-banana-2": "Text-to-image, image-to-image, high-quality images",
-        "nano-banana-pro-vt": "Text-to-image, image-to-image, high-quality images",
-        "nano-banana-2-cl": "Text-to-image, image-to-image, high-quality images",
-        "nano-banana-2-4k-cl": "Text-to-image, image-to-image, high-quality images",
-        "nano-banana-pro-cl": "Text-to-image, image-to-image, high-quality Pro / VIP",
-        "nano-banana-pro-vip": "Text-to-image, image-to-image, high-quality Pro / VIP",
-        "nano-banana-pro-4k-vip": "Text-to-image, image-to-image, high-quality Pro / VIP",
+        "gpt-image-2": "Compatible-style image model (async Image API only)",
+        "gpt-image-2-vip": "Compatible-style image model (coming soon / reserved)",
+        "nano-banana-fast": "Lightweight fast images / lower cost (async task_id)",
+        "nano-banana": "Recommended image model (async task_id; bill on success)",
+        "nano-banana-pro": "Higher-quality images (availability may vary)",
+        "nano-banana-2": "Higher quality / more stable (async task_id)",
+        "nano-banana-pro-vt": "Higher-quality images (availability may vary)",
+        "nano-banana-2-cl": "Higher-quality images (availability may vary)",
+        "nano-banana-2-4k-cl": "Higher-quality images (availability may vary)",
+        "nano-banana-pro-cl": "Higher-quality images (availability may vary)",
+        "nano-banana-pro-vip": "Higher-quality images (availability may vary)",
+        "nano-banana-pro-4k-vip": "Higher-quality images (availability may vary)",
       },
     },
     docs: {
       pageTitle: "API Documentation",
       pageSubtitle:
-        "Point your client at https://api.tokfai.com/v1, send a sk-tokfai_… API key, and use the same request shape as OpenAI.",
+        "Tokfai KA AI aggregation platform — text/code, image generation, reserved video. Point clients at https://api.tokfai.com/v1 with sk-tokfai_….",
       createApiKey: "Create API key",
       copy: "Copy",
       copied: "Copied",
@@ -2855,7 +2855,7 @@ export const messages = {
         warning: {
           browserSensitive: "Avoid real patient data, secrets, or full PII in browser — generate on your backend.",
           fieldMissing: "Some required fields are empty — output may be incomplete.",
-          imageModel: "Image API requires gpt-image-2.",
+          imageModel: "Image API requires an image model such as nano-banana.",
         },
         docs: {
           what: "Payload Builder maps your business fields into Tokfai API request bodies.",
@@ -3469,11 +3469,11 @@ export const messages = {
         "HTTP 200 with content, request_id, credits_charged, usage; match request_id in Usage / Credits.",
       chatApiChapterFailure:
         "See common errors below — missing_token, invalid_token, insufficient_credits, or upstream busy/timeout.",
-      imageApiTitle: "Image API",
+      imageApiTitle: "Image generation API",
       imageApiDesc:
-        "Text-to-image via POST https://api.tokfai.com/v1/images/generations — billed per successful generation.",
+        "Nano Banana async image generation via POST /v1/images/generations — submit returns task_id; poll GET /v1/images/generations/:task_id. Billed on success only.",
       imageApiEndpoint:
-        "Endpoint: POST https://api.tokfai.com/v1/images/generations — OpenAI-compatible image generation.",
+        "Endpoints: POST /v1/images/generations (submit) and GET /v1/images/generations/:task_id (poll). GPT/Gemini text models cannot use this path.",
       imageApiSameKeyNote:
         "Use the same Tokfai API Key as Chat: Authorization: Bearer sk-tokfai_xxx (create or copy in API Keys).",
       imageApiTerminalNote:
@@ -3488,26 +3488,32 @@ export const messages = {
       imageApiReferenceCopyLabel: "One-line curl with image_urls",
       imageApiBillingTitle: "Billing:",
       imageApiBillingSuccessOnly:
-        "Credits are charged only after a successful generation (HTTP 200 with image URL).",
+        "Credits are charged only after a successful generation (status completed with data[].url).",
       imageApiBillingFailures:
-        "Failed requests are usually not charged — check Usage for the official record.",
+        "Failures and timeouts are not charged — check Usage / tokfai.billing_status for the official record.",
       imageApiBillingInsufficient:
         "insufficient_credits when balance is too low — top up in Credits before generating.",
       imageApiBillingMoreExpensive:
         "Image models cost more per request than Chat — confirm your balance on Models and Credits before bulk runs.",
-      imageApiResponseTitle: "On HTTP 200, check these response fields:",
+      imageApiResponseTitle: "Check these response fields (submit + poll):",
       imageApiFieldImageUrl:
-        "data[0].url — generated image URL (response_format must be url).",
+        "data[].url — generated image URL when status is completed (response_format must be url).",
+      imageApiFieldTaskId:
+        "id / task_id — async task id; poll GET /v1/images/generations/:task_id.",
+      imageApiFieldStatus: "status — queued / generating / completed / failed (etc.).",
+      imageApiFieldProgress: "progress — 0–100 task progress while polling.",
       imageApiFieldRequestId:
         "request_id — copy this to search in Usage and Credits.",
       imageApiFieldCreditsCharged:
-        "credits_charged — credits debited for this generation.",
+        "usage.credits_charged — credits debited for this generation (0 until success).",
+      imageApiFieldBillingStatus:
+        "tokfai.billing_status — billable only after success; otherwise not_billable.",
       imageApiFieldModel:
-        "model — the image model id that served the request (e.g. gpt-image-2).",
+        "model — image model id (e.g. nano-banana, nano-banana-fast, nano-banana-2).",
       imageApiFieldInputImages:
         "input_images_count — how many image_urls you sent (when present).",
       imageApiReconcileTitle: "Reconcile with Usage / Credits:",
-      imageApiReconcileStep1: "Copy request_id from the JSON response.",
+      imageApiReconcileStep1: "Copy task_id / request_id from the JSON response.",
       imageApiReconcileStep2:
         "Open Usage and search the request_id — confirm model and credits_charged.",
       imageApiReconcileStep3:
@@ -3522,26 +3528,26 @@ export const messages = {
       imageApiErrorInvalidPrompt:
         "invalid_prompt — prompt is required and cannot be empty.",
       imageApiErrorModelNotFound:
-        "model_not_found — image model id unavailable or misspelled. Try gpt-image-2 or browse Models.",
+        "image_model_not_available — current image model unavailable; switch to another image model (e.g. nano-banana / nano-banana-fast).",
       imageApiErrorInvalidImageUrl:
         "invalid_image_url — image_urls entry is missing, blocked, or not a valid http/https URL.",
       imageApiErrorUpstreamTimeout:
-        "upstream_timeout — image service timed out. Retry later or switch models.",
+        "image_task_timeout — generation took too long; not charged. Retry later or switch to a faster image model.",
       imageApiErrorRequestTooLarge:
         "request_body_too_large — JSON body exceeds the gateway limit. Reduce payload size.",
       imageApiErrorUpstreamError:
-        "upstream_error / upstream_rate_limited — service unavailable or rate-limited. Retry with backoff.",
+        "upstream_image_error — image generation temporarily unavailable; retry shortly.",
       imageApiBody:
-        "Send prompt, model, and size from your backend. Successful generations debit credits; failed calls are usually not charged.",
+        "Send model, prompt, size, n, response_format. Poll task_id for data[].url. Success bills; failure/timeout does not.",
       imageApiChapterPurpose:
         "Generate images from your product workflow — not via Tokfai-operated design services.",
       imageApiChapterCopy:
-        "One-line image curl below (gpt-image-2, 1024x1024, response_format url) and Authorization header.",
+        "One-line image curl below (nano-banana, size, n, response_format url) and Authorization header.",
       imageApiChapterVerify:
-        "HTTP 200 with data[0].url, request_id, credits_charged; match request_id in Usage / Credits.",
+        "Submit returns task_id; poll until completed with data[].url, usage.credits_charged, tokfai.billing_status.",
       imageApiChapterFailure:
-        "See common errors below — missing_token, invalid_token, insufficient_credits, or upstream timeout.",
-      imagePlaygroundLink: "Open Image Playground",
+        "See common errors — image_model_not_available, upstream_image_error, image_task_timeout (not charged).",
+      imagePlaygroundLink: "Open Image Workbench",
       batchChapterPurpose:
         "Submit many chat prompts in one job from your own backend — not a managed operations service.",
       batchChapterCopy:
@@ -4071,7 +4077,7 @@ export const messages = {
           scenario: "SKU copy at scale",
           system: "E-commerce PIM / listing tool",
           api: "Batch API / Image API",
-          model: "auto-cheap / gpt-image-2",
+          model: "auto-cheap / nano-banana",
           fields: "request_id, credits_charged, data[0].url (image)",
           reconcile: "Usage → Credits",
         },
@@ -4136,7 +4142,7 @@ export const messages = {
           scenario4: "Image generation prompts for product visuals.",
           scenario5: "Batch SKU copy for hundreds of listings via Batch API.",
           apis: "Chat API — single product copy. Image API — product and poster images. Batch API — bulk SKU titles, bullets, and short descriptions.",
-          models: "auto-fast for daily copy; auto-cheap for bulk SKU jobs; auto-pro for premium brand copy; gpt-image-2 for product images.",
+          models: "auto-fast for daily copy; auto-cheap for bulk SKU jobs; auto-pro for premium brand copy; nano-banana for product images (async Image API).",
           typicalInput: "SKU attributes, product name, or buyer question.",
           typicalOutput: "Title, bullets, short description text, or image URL in data[0].url.",
           reconcile: "Each batch item request_id → Usage → Credits; image calls use request_id and credits_charged.",
@@ -5149,10 +5155,10 @@ export const messages = {
         summaryComingSoon: "Coming soon models",
         chatSectionTitle: "Chat Models",
         chatSectionDesc: "Token-based chat models from the catalog.",
-        imageSectionTitle: "Image Models",
-        imageSectionDesc: "Per-generation image models from the catalog.",
-        videoSectionTitle: "Video Models",
-        videoSectionDesc: "Video models reserved for future Playground support.",
+        imageSectionTitle: "Image generation",
+        imageSectionDesc: "Nano Banana async image models (task_id poll; bill on success).",
+        videoSectionTitle: "Video Models (reserved)",
+        videoSectionDesc: "Reserved / coming soon — not publicly available.",
         modelsSectionTitle: "Models",
         emptyFilters: "No models match the current filters.",
         tableModelName: "Model name",
@@ -5467,35 +5473,35 @@ export const messages = {
       language: "语言",
     },
     home: {
-      headline: "Tokfai API 网关",
+      headline: "Tokfai — KA 大客户 AI 聚合平台",
       tagline:
-        "一个 API Key 接入 GPT、Gemini 与图片生成模型，支持 OpenAI-compatible、Gemini-compatible 与 Tokfai Image API。",
+        "不是单一聊天工具。一个 API Key 覆盖文本与代码（GPT / Gemini）、图片生成（Nano Banana），视频能力预留 / coming soon。",
       description:
-        "充值算力积分后即可调用。文本模型按用量扣费，图片模型按次扣费。失败请求不扣费。",
+        "面向行业场景：电商批量实拍图/换图、培训二创、GEO 出海内容、无人机仿飞精控与批量飞行数据分析。文本按用量扣费；图片异步任务成功才扣费，失败/超时不扣费。",
       compatLabel: "兼容",
       compatCursor: "Cursor",
       compatCherryStudio: "Cherry Studio",
       compatOpenAiSdk: "OpenAI SDK",
       compatCustomApp: "自研 App",
-      scenariosTitle: "核心场景",
+      scenariosTitle: "核心能力",
       scenariosDesc:
-        "对话、图像与桌面客户端接入 — 共用同一 OpenAI 兼容 Base URL。",
-      scenarioChatTitle: "Chat API",
+        "文本与代码、图片生成（异步 task_id）、桌面客户端接入 — 共用 Tokfai Base URL。视频能力预留 / reserved。",
+      scenarioChatTitle: "文本与代码",
       scenarioChatBody:
-        "通过 POST /chat/completions 发送消息，使用 gpt-5.4 等模型流式或批量获取回复。",
+        "GPT / Gemini 走 POST /v1/chat/completions 或 /v1/responses — 对话、Agent、代码、GEO 文案。",
       scenarioChatCta: "Chat API 文档",
-      scenarioImageTitle: "Image API",
+      scenarioImageTitle: "图片生成",
       scenarioImageBody:
-        "通过 POST /v1/images/generations 进行文生图或图生图。",
+        "Nano Banana 走 POST /v1/images/generations — 提交返回 task_id，轮询取结果。成功才扣费；失败/超时不扣费。",
       scenarioImageCta: "Image API 文档",
       scenarioDevToolsTitle: "桌面客户端接入",
       scenarioDevToolsBody:
-        "将 Cursor 或 Cherry Studio 指向 api.tokfai.com/v1，填入 sk-tokfai_… 密钥，无需改代码。",
+        "将 Cursor 或 Cherry Studio 指向 api.tokfai.com/v1，填入 sk-tokfai_… 密钥；聊天客户端只选 Tokfai 文本模型。",
       scenarioDevToolsCta: "接入指南",
       scenarioEndpointLabel: "接口",
       scenarioModelLabel: "推荐 model",
       startWithCredits: "立即充值",
-      tryImagePlayground: "体验 Image Playground",
+      tryImagePlayground: "体验图片工作台",
       viewPricing: "查看定价",
       readDocs: "查看接入文档",
       howItWorksTitle: "如何开始",
@@ -5508,7 +5514,7 @@ export const messages = {
       step3Body: "在控制台签发 sk-tokfai_… 密钥并妥善保存。",
       step4Title: "调用 API",
       step4Body:
-        "将 OpenAI SDK、Cursor、Cherry Studio 或自研应用指向 api.tokfai.com/v1。可在 Chat Playground 与 Image Playground 测试。",
+        "将 OpenAI SDK、Cursor、Cherry Studio 或自研应用指向 api.tokfai.com/v1。文本用 Chat；Nano Banana 图片走图片工作台异步任务。",
       step5Title: "查看用量",
       step5Body: "实时查看请求、扣费算力积分与账本流水。",
       devQuickRefTitle: "开发者速查",
@@ -5749,7 +5755,7 @@ export const messages = {
         subtitle:
           "查看 Tokfai 当前可用模型、能力、推荐场景和计费说明。",
         capabilitiesSubtitle:
-          "只讲模型能力与适合场景。价格请看定价页，接入方式请看文档页。",
+          "文本与代码 vs 图片生成（Nano Banana 异步）。价格看定价页，接入看文档。视频能力预留 / coming soon。",
         apiKeyNotBoundHint:
           "API Key 不绑定模型。请在请求体的 model 字段中填写模型 ID。",
         viewPricing: "查看定价",
@@ -5858,7 +5864,7 @@ export const messages = {
         buildTemplateAutoFast: "生成模板 — auto-fast Chat",
         buildTemplateAutoPro: "生成模板 — auto-pro 质量",
         buildTemplateAutoCheap: "生成模板 — auto-cheap Batch",
-        buildTemplateImage: "生成模板 — gpt-image-2 图像",
+        buildTemplateImage: "生成模板 — nano-banana 图像",
         buildPayloadWithModel: "用此 model 生成 payload",
         buildPayloadAutoFast: "生成 payload — 通用/客服 Chat",
         buildPayloadAutoPro: "生成 payload — 医院/车企质量",
@@ -5866,7 +5872,7 @@ export const messages = {
         buildPayloadImage: "生成 payload — 图像",
         starterTemplateAutoPro: "auto-pro → 高质量 Chat 模板",
         starterTemplateAutoCheap: "auto-cheap → 电商 Batch 模板",
-        starterTemplateImage: "gpt-image-2 → Image 起步模板",
+        starterTemplateImage: "nano-banana → Image 起步模板",
         startFromModelAutoPro: "auto-pro — 高质量任务",
         startFromModelAutoCheap: "auto-cheap — 电商大批量文案",
         openIntegrationWorkbench: "打开接入工作台",
@@ -5963,15 +5969,15 @@ export const messages = {
         chatSectionTitle: "对话模型",
         chatSectionDesc:
           "OpenAI 兼容对话模型，按 input/output tokens 计费。适用于助手、Agent 与文本生成，通过 POST /v1/chat/completions 调用。",
-        imageSectionTitle: "图像模型",
+        imageSectionTitle: "图片生成",
         imageSectionDesc:
-          "文生图与图生图模型，按每次成功生成计费，通过 POST /v1/images/generations 调用。",
+          "Nano Banana 系列走 POST /v1/images/generations — 异步 task_id 轮询。成功才扣费；失败/超时不扣费。不可当 chat 模型。",
         recommendedUseCase: "适合场景",
         availability: "可用状态",
         imageComingSoonTitle: "图像模型（即将上线）",
         imageComingSoonDesc: "更多图像模型计划在未来发布。",
-        videoSectionTitle: "视频模型",
-        videoSectionDesc: "即将上线——视频生成模型将使用独立 Video Playground。",
+        videoSectionTitle: "视频模型（预留）",
+        videoSectionDesc: "预留 / coming soon — 视频能力尚未对外开放。",
         comingSoon: "即将上线",
         available: "可用",
         price: "价格",
@@ -6865,24 +6871,24 @@ export const messages = {
           "高负载时可能暂时不可用。稳定路由请使用 auto-fast 或 auto-pro。",
       },
       imageUseCase: {
-        "gpt-image-2": "适合文生图 / 图生图 / 高质量图片",
-        "gpt-image-2-vip": "适合文生图 / 图生图 / 高质量图片",
-        "nano-banana-fast": "适合文生图 / 图生图 / 批量低成本",
-        "nano-banana": "适合文生图 / 图生图 / 批量低成本",
-        "nano-banana-pro": "适合文生图 / 图生图 / 高质量图片",
-        "nano-banana-2": "适合文生图 / 图生图 / 高质量图片",
-        "nano-banana-pro-vt": "适合文生图 / 图生图 / 高质量图片",
-        "nano-banana-2-cl": "适合文生图 / 图生图 / 高质量图片",
-        "nano-banana-2-4k-cl": "适合文生图 / 图生图 / 高质量图片",
-        "nano-banana-pro-cl": "适合文生图 / 图生图 / 高质量图片 / Pro 或 VIP",
-        "nano-banana-pro-vip": "适合文生图 / 图生图 / 高质量图片 / Pro 或 VIP",
-        "nano-banana-pro-4k-vip": "适合文生图 / 图生图 / 高质量图片 / Pro 或 VIP",
+        "gpt-image-2": "兼容风格图片模型（仅异步 Image API）",
+        "gpt-image-2-vip": "兼容风格图片模型（预留 / coming soon）",
+        "nano-banana-fast": "轻量快图 / 成本低（异步 task_id）",
+        "nano-banana": "推荐图片模型（异步 task_id；成功才扣费）",
+        "nano-banana-pro": "更高质量图片（可用性可能受限）",
+        "nano-banana-2": "更高质量 / 更稳定（异步 task_id）",
+        "nano-banana-pro-vt": "更高质量图片（可用性可能受限）",
+        "nano-banana-2-cl": "更高质量图片（可用性可能受限）",
+        "nano-banana-2-4k-cl": "更高质量图片（可用性可能受限）",
+        "nano-banana-pro-cl": "更高质量图片（可用性可能受限）",
+        "nano-banana-pro-vip": "更高质量图片（可用性可能受限）",
+        "nano-banana-pro-4k-vip": "更高质量图片（可用性可能受限）",
       },
     },
     docs: {
       pageTitle: "API 文档",
       pageSubtitle:
-        "将客户端指向 https://api.tokfai.com/v1，使用 sk-tokfai_… API Key，请求格式与 OpenAI 兼容。",
+        "Tokfai KA 大客户 AI 聚合平台 — 文本与代码、图片生成、视频预留。客户端指向 https://api.tokfai.com/v1，使用 sk-tokfai_…。",
       createApiKey: "创建 API Key",
       copy: "复制",
       copied: "已复制",
@@ -8167,7 +8173,7 @@ export const messages = {
         warning: {
           browserSensitive: "避免在浏览器输入真实患者数据、密钥或完整隐私信息 — 在后端生成。",
           fieldMissing: "部分必填字段为空 — 输出可能不完整。",
-          imageModel: "Image API 需使用 gpt-image-2。",
+          imageModel: "Image API 需使用图片模型（如 nano-banana）。",
         },
         docs: {
           what: "业务字段生成器将字段映射为 Tokfai API 请求体。",
@@ -8750,11 +8756,11 @@ export const messages = {
         "HTTP 200 含 content、request_id、credits_charged、usage；在 Usage / Credits 按 request_id 核对。",
       chatApiChapterFailure:
         "见下方常见错误 — missing_token、invalid_token、insufficient_credits 或上游繁忙/超时。",
-      imageApiTitle: "Image API",
+      imageApiTitle: "图片生成 API",
       imageApiDesc:
-        "文生图 — POST https://api.tokfai.com/v1/images/generations，按成功生成扣费。",
+        "Nano Banana 异步图片生成：POST /v1/images/generations 提交返回 task_id；GET /v1/images/generations/:task_id 轮询结果。成功才扣费。",
       imageApiEndpoint:
-        "接口：POST https://api.tokfai.com/v1/images/generations — OpenAI 兼容图像生成。",
+        "接口：POST /v1/images/generations（提交）与 GET /v1/images/generations/:task_id（轮询）。GPT/Gemini 文本模型不能走此路径。",
       imageApiSameKeyNote:
         "与 Chat 使用同一 Tokfai API Key：Authorization: Bearer sk-tokfai_xxx（在 API Keys 创建或复制）。",
       imageApiTerminalNote:
@@ -8768,25 +8774,32 @@ export const messages = {
       imageApiReferenceCopyLabel: "带 image_urls 的单行 curl",
       imageApiBillingTitle: "计费说明：",
       imageApiBillingSuccessOnly:
-        "仅在成功生成后扣算力积分（HTTP 200 且返回图片 URL）。",
+        "仅在成功生成后扣算力积分（status=completed 且返回 data[].url）。",
       imageApiBillingFailures:
-        "失败请求通常不扣费 — 以 Usage 中的官方记录为准。",
+        "失败与超时不扣费 — 以 Usage / tokfai.billing_status 为准。",
       imageApiBillingInsufficient:
         "余额不足时返回 insufficient_credits — 生成前请在 Credits 充值。",
       imageApiBillingMoreExpensive:
         "图像模型单次费用通常高于 Chat — 批量生成前请在 Models 与 Credits 确认余额。",
-      imageApiResponseTitle: "HTTP 200 时查看这些响应字段：",
+      imageApiResponseTitle: "提交与轮询时查看这些响应字段：",
       imageApiFieldImageUrl:
-        "data[0].url — 生成图片 URL（response_format 须为 url）。",
+        "data[].url — 任务完成后的图片 URL（response_format 须为 url）。",
+      imageApiFieldTaskId:
+        "id / task_id — 异步任务 id；用 GET /v1/images/generations/:task_id 轮询。",
+      imageApiFieldStatus: "status — queued / generating / completed / failed 等。",
+      imageApiFieldProgress: "progress — 轮询时的 0–100 进度。",
       imageApiFieldRequestId:
         "request_id — 复制后在 Usage 与 Credits 中搜索。",
-      imageApiFieldCreditsCharged: "credits_charged — 本次生成扣减的算力积分。",
+      imageApiFieldCreditsCharged:
+        "usage.credits_charged — 本次生成扣减的算力积分（成功前为 0）。",
+      imageApiFieldBillingStatus:
+        "tokfai.billing_status — 仅成功后为 billable；否则 not_billable。",
       imageApiFieldModel:
-        "model — 实际服务的图像模型 id（如 gpt-image-2）。",
+        "model — 图片模型 id（如 nano-banana、nano-banana-fast、nano-banana-2）。",
       imageApiFieldInputImages:
         "input_images_count — 你发送的 image_urls 数量（若返回）。",
       imageApiReconcileTitle: "在 Usage / Credits 对账：",
-      imageApiReconcileStep1: "从 JSON 响应复制 request_id。",
+      imageApiReconcileStep1: "从 JSON 响应复制 task_id / request_id。",
       imageApiReconcileStep2:
         "打开 Usage 搜索 request_id — 核对 model 与 credits_charged。",
       imageApiReconcileStep3:
@@ -8801,26 +8814,26 @@ export const messages = {
       imageApiErrorInvalidPrompt:
         "invalid_prompt — prompt 必填且不能为空。",
       imageApiErrorModelNotFound:
-        "model_not_found — 图像模型不可用或 id 错误。可试 gpt-image-2 或浏览 Models。",
+        "image_model_not_available — 当前图片模型不可用，请切换图片模型（如 nano-banana / nano-banana-fast）。",
       imageApiErrorInvalidImageUrl:
         "invalid_image_url — image_urls 条目缺失、被拦截或不是有效的 http/https URL。",
       imageApiErrorUpstreamTimeout:
-        "upstream_timeout — 图像服务超时。请稍后重试或换模型。",
+        "image_task_timeout — 图片生成时间较长，未扣费，可稍后重试或切换更快图片模型。",
       imageApiErrorRequestTooLarge:
         "request_body_too_large — JSON 请求体超过网关限制。请减小 payload。",
       imageApiErrorUpstreamError:
-        "upstream_error / upstream_rate_limited — 服务暂不可用或限流。请退避重试。",
+        "upstream_image_error — 图片生成暂时不可用，请稍后重试。",
       imageApiBody:
-        "从你的后端提交 prompt、model、size。成功生成扣算力积分；失败通常不扣费。",
+        "从后端提交 model、prompt、size、n、response_format；用 task_id 轮询 data[].url。成功才扣费；失败/超时不扣费。",
       imageApiChapterPurpose:
         "在你的产品流程里生成图像——不是 Tokfai 代做设计服务。",
       imageApiChapterCopy:
-        "下方单行 image curl（gpt-image-2、1024x1024、response_format url）与 Authorization 头。",
+        "下方单行 image curl（nano-banana、size、n、response_format url）与 Authorization 头。",
       imageApiChapterVerify:
-        "HTTP 200 含 data[0].url、request_id、credits_charged；在 Usage / Credits 按 request_id 核对。",
+        "提交返回 task_id；轮询至 completed，含 data[].url、usage.credits_charged、tokfai.billing_status。",
       imageApiChapterFailure:
-        "见下方常见错误 — missing_token、invalid_token、insufficient_credits 或上游超时。",
-      imagePlaygroundLink: "打开 Image Playground",
+        "见常见错误 — image_model_not_available、upstream_image_error、image_task_timeout（未扣费）。",
+      imagePlaygroundLink: "打开图片工作台",
       batchChapterPurpose:
         "在你的后端一次提交多条对话任务——不是代运营服务。",
       batchChapterCopy:
@@ -9302,7 +9315,7 @@ export const messages = {
           scenario: "SKU 批量文案",
           system: "电商 PIM / 上架工具",
           api: "Batch API / Image API",
-          model: "auto-cheap / gpt-image-2",
+          model: "auto-cheap / nano-banana",
           fields: "request_id, credits_charged, data[0].url（图像）",
           reconcile: "Usage → Credits",
         },
@@ -9362,7 +9375,7 @@ export const messages = {
           scenario4: "商品图生成 prompt。",
           scenario5: "Batch API 批量 SKU 标题 / 卖点 / 短详情。",
           apis: "Chat API：单条商品文案。Image API：商品图与海报。Batch API：批量 SKU 文案。",
-          models: "auto-fast：日常文案；auto-cheap：批量 SKU；auto-pro：高质量品牌文案；gpt-image-2：商品图。",
+          models: "auto-fast：日常文案；auto-cheap：批量 SKU；auto-pro：高质量品牌文案；nano-banana：商品图（异步 Image API）。",
           typicalInput: "SKU 属性、商品名或买家问题。",
           typicalOutput: "标题、卖点、短详情文本，或图像 URL（data[0].url）。",
           reconcile: "每个 batch item 的 request_id → Usage → Credits；图像调用看 request_id 与 credits_charged。",
@@ -10338,10 +10351,10 @@ export const messages = {
         summaryComingSoon: "即将上线模型",
         chatSectionTitle: "对话模型",
         chatSectionDesc: "目录中的 token 计费对话模型。",
-        imageSectionTitle: "图像模型",
-        imageSectionDesc: "目录中的按次计费图像模型。",
-        videoSectionTitle: "视频模型",
-        videoSectionDesc: "预留给未来 Playground 的视频模型。",
+        imageSectionTitle: "图片生成",
+        imageSectionDesc: "Nano Banana 异步图片模型（task_id 轮询；成功才扣费）。",
+        videoSectionTitle: "视频模型（预留）",
+        videoSectionDesc: "预留 / coming soon — 尚未对外开放。",
         modelsSectionTitle: "模型",
         emptyFilters: "没有符合当前筛选条件的模型。",
         tableModelName: "模型名称",

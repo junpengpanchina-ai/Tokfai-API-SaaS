@@ -42,7 +42,7 @@ export function modelsCurlOneLineSafe(apiKey = TOKFAI_API_KEY_PLACEHOLDER): stri
 
 export function imageCurlOneLineSafe(apiKey = TOKFAI_API_KEY_PLACEHOLDER): string {
   const body = shellSingleQuotedJson({
-    model: "gpt-image-2",
+    model: "nano-banana",
     prompt: "Create a clean product-style image of a futuristic API dashboard.",
     size: "1024x1024",
     n: 1,

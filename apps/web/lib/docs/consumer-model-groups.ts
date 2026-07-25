@@ -44,24 +44,24 @@ const GROUP_META: Record<
   { title: { zh: string; en: string }; description: { zh: string; en: string } }
 > = {
   recommended: {
-    title: { zh: "正式模型", en: "Public models" },
+    title: { zh: "文本与代码模型", en: "Text & code models" },
     description: {
-      zh: "已上架、可稳定调用的正式模型。",
-      en: "Listed models ready for production use.",
+      zh: "GPT / Gemini 等文本能力，走 /v1/chat/completions 或 /v1/responses。图片模型不在此列表。",
+      en: "GPT / Gemini text capabilities via /v1/chat/completions or /v1/responses. Image models are listed separately.",
     },
   },
   high_quality: {
-    title: { zh: "高质量模型", en: "High-quality models" },
+    title: { zh: "高质量文本模型", en: "High-quality text models" },
     description: {
-      zh: "追求更好效果时使用。",
-      en: "Use when you need stronger quality.",
+      zh: "追求更好文本效果时使用。不可用于图片生成。",
+      en: "Use when you need stronger text quality. Not for image generation.",
     },
   },
   image: {
-    title: { zh: "图片模型", en: "Image models" },
+    title: { zh: "图片生成", en: "Image generation" },
     description: {
-      zh: "文生图与参考图改图。按次扣算力积分。",
-      en: "Text-to-image and reference edits. Charged per generation.",
+      zh: "Nano Banana 系列走 POST /v1/images/generations：提交返回 task_id，轮询 GET /v1/images/generations/:task_id 取结果。成功才扣费；失败/超时不扣费。不可当 chat 模型使用。",
+      en: "Nano Banana via POST /v1/images/generations: submit returns task_id; poll GET /v1/images/generations/:task_id. Billed on success only. Not usable as chat models.",
     },
   },
 };

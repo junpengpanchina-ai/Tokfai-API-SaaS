@@ -69,7 +69,8 @@ export type PublicModel = {
 export const PUBLIC_DOC_EXAMPLE_MODELS = {
   chatCompletions: "auto-fast",
   responses: "gpt-5.5",
-  image: "gpt-image-2",
+  /** Recommended image model for docs — never a chat model. */
+  image: "nano-banana",
   quickstart: "auto-fast",
 } as const;
 
@@ -221,7 +222,29 @@ export const PUBLIC_MODEL_REGISTRY: PublicModel[] = [
     bestForEn: "Long text and multimodal input",
   },
 
-  // —— Public image ——
+  // —— Public image (Image API only — never listed as chat models) ——
+  {
+    id: "nano-banana",
+    displayName: { zh: "nano-banana", en: "nano-banana" },
+    family: "image",
+    status: "public",
+    visible: true,
+    group: "image",
+    recommendedEndpoint: "/v1/images/generations",
+    supportsChatCompletions: false,
+    supportsResponses: false,
+    supportsStreaming: false,
+    supportsImageInput: true,
+    supportsImageGeneration: true,
+    beginnerFriendly: true,
+    tags: ["image", "recommended"],
+    descriptionZh:
+      "推荐图片模型。提交后返回 task_id，轮询任务查询获取结果；成功才扣费，失败/超时不扣费。",
+    descriptionEn:
+      "Recommended image model. Submit returns task_id; poll for results. Billed on success only — failures/timeouts are not charged.",
+    bestForZh: "电商主图、批量实拍图/换图、培训二创",
+    bestForEn: "Ecommerce creatives, batch product shots, training remixes",
+  },
   {
     id: "nano-banana-fast",
     displayName: { zh: "nano-banana-fast", en: "nano-banana-fast" },
@@ -236,31 +259,13 @@ export const PUBLIC_MODEL_REGISTRY: PublicModel[] = [
     supportsImageInput: true,
     supportsImageGeneration: true,
     beginnerFriendly: true,
-    tags: ["image", "fast", "recommended"],
-    descriptionZh: "更快的图片生成，适合试跑与批量。",
-    descriptionEn: "Faster image generation for trials and volume.",
-    bestForZh: "文生图、参考图改图",
-    bestForEn: "Text-to-image and reference edits",
-  },
-  {
-    id: "nano-banana",
-    displayName: { zh: "nano-banana", en: "nano-banana" },
-    family: "image",
-    status: "public",
-    visible: true,
-    group: "image",
-    recommendedEndpoint: "/v1/images/generations",
-    supportsChatCompletions: false,
-    supportsResponses: false,
-    supportsStreaming: false,
-    supportsImageInput: true,
-    supportsImageGeneration: true,
-    beginnerFriendly: false,
-    tags: ["image", "best_quality"],
-    descriptionZh: "更高质量的图片生成。",
-    descriptionEn: "Higher-quality image generation.",
-    bestForZh: "文生图、参考图改图",
-    bestForEn: "Text-to-image and reference edits",
+    tags: ["image", "fast", "low_cost"],
+    descriptionZh:
+      "轻量快图，成本更低。异步提交 → task_id → 轮询结果；成功才扣费。",
+    descriptionEn:
+      "Lightweight fast images at lower cost. Async submit → task_id → poll. Billed on success only.",
+    bestForZh: "试跑、大批量低成本出图",
+    bestForEn: "Trials and high-volume low-cost generation",
   },
   {
     id: "nano-banana-2",
@@ -277,10 +282,12 @@ export const PUBLIC_MODEL_REGISTRY: PublicModel[] = [
     supportsImageGeneration: true,
     beginnerFriendly: false,
     tags: ["image", "best_quality"],
-    descriptionZh: "下一代 Nano Banana 图片模型。",
-    descriptionEn: "Next-generation Nano Banana image model.",
-    bestForZh: "文生图、参考图改图",
-    bestForEn: "Text-to-image and reference edits",
+    descriptionZh:
+      "更高质量、更稳定的图片模型。异步任务面：task_id 轮询；成功才扣费。",
+    descriptionEn:
+      "Higher quality and more stable images. Async task surface with task_id polling; billed on success only.",
+    bestForZh: "高质量主图、品牌视觉、稳定批量出图",
+    bestForEn: "Premium creatives and stable batch image jobs",
   },
   {
     id: "gpt-image-2",
@@ -297,8 +304,10 @@ export const PUBLIC_MODEL_REGISTRY: PublicModel[] = [
     supportsImageGeneration: true,
     beginnerFriendly: false,
     tags: ["image"],
-    descriptionZh: "OpenAI 风格图片生成模型。",
-    descriptionEn: "OpenAI-compatible image generation model.",
+    descriptionZh:
+      "兼容风格图片模型。走 /v1/images/generations 异步任务；不可用于 chat。",
+    descriptionEn:
+      "Compatible-style image model via async /v1/images/generations — not for chat.",
     bestForZh: "文生图、参考图改图",
     bestForEn: "Text-to-image and reference edits",
   },

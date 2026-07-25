@@ -48,13 +48,13 @@ export function resolveTokfaiApiBaseUrl(
 }
 
 export const TOKFAI_PRODUCT_TAGLINE =
-  "Tokfai API gateway — one API key for GPT, Gemini, and image models.";
+  "Tokfai — KA enterprise AI aggregation platform. One API key for text/code (GPT / Gemini) and image generation (Nano Banana).";
 export const TOKFAI_BILLING_POLICY =
-  "Successful calls debit compute credits. Failed calls are not charged.";
+  "Successful calls debit compute credits. Failed calls and image timeouts are not charged.";
 export const TOKFAI_PRICING_DISCLAIMER =
   "Reference prices help planning. Actual charges follow Usage and the compute-credits ledger.";
 export const TOKFAI_PLAYGROUND_POLICY =
-  "Chat Playground supports chat models. Image Playground supports image models.";
+  "Chat Playground is for text models only. Image Workbench is for Nano Banana image models via async tasks.";
 export const TOKFAI_STARTER_PLAN = "¥10 = 100,000 compute credits (¥1 = 10,000)";
 export const TOKFAI_PAYMENT_METHODS =
   "WeChat Pay, Visa / international cards";

@@ -1,13 +1,13 @@
 # Tokfai 用户接入 API 参考
 
 > 独立客户文档（对齐 `api.tokfai.com` 实际行为）  
-> 更新：2026-07-14  
+> 更新：2026-07-25  
 > 官网：https://www.tokfai.com  
 > Base URL：`https://api.tokfai.com`  
 > 路径前缀：`https://api.tokfai.com/v1`  
 > 计费单位：算力积分（compute credits）
 
-模型能力见控制台「模型」页；单价与套餐见「定价」页。本文只讲怎么调用。
+Tokfai 是 **KA 大客户 AI 聚合平台**，不是单一聊天工具。能力分为：文本与代码（GPT / Gemini）、图片生成（Nano Banana 异步任务）、视频（预留 / coming soon）。模型能力见控制台「模型」页；单价与套餐见「定价」页。本文只讲怎么调用。
 
 ---
 
@@ -180,22 +180,35 @@ disp(response);
 ## 6. 图片生成 API
 
 Base URL：`https://api.tokfai.com`  
-Endpoint：`POST /v1/images/generations`  
 Auth：`Authorization: Bearer sk-tokfai_xxx`
 
-### 三种用法（同一公开接口）
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `POST` | `/v1/images/generations` | 提交图片任务，返回 `task_id` |
+| `GET` | `/v1/images/generations/:task_id` | 轮询进度与结果 |
 
-| 场景 | 怎么区分 |
+> Nano Banana **不能**走 `/v1/chat/completions`。GPT / Gemini **不能**走图片生成接口。
+
+### 推荐图片模型
+
+| model | 说明 |
 |---|---|
-| 文生图 | 不传参考图字段，或传空数组 |
-| 参考图改图 | `images` / `image_urls` / `reference_images` / `input_images` 非空；或 `mode: "reference_edit"` |
-| 电商图 | 文生图或带商品参考图 + 电商场景 prompt |
+| `nano-banana` | **推荐图片模型** |
+| `nano-banana-fast` | 轻量快图 / 成本低（未指定 model 时的常见默认） |
+| `nano-banana-2` | 更高质量 / 更稳定 |
 
-### 兼容字段
+### 异步流程与计费
 
-`model`、`prompt`、`images`、`image_urls`、`reference_images`、`input_images`、`size`、`aspect_ratio` / `aspectRatio`、`response_format`、`mode`、`n`
+1. `POST` 提交 → 返回 `id` / `task_id`  
+2. `GET /v1/images/generations/:task_id` 轮询  
+3. **成功才扣费**；**失败 / 超时不扣费**（看 `usage.credits_charged` 与 `tokfai.billing_status`）
 
-### 约束（与实现一致）
+### 请求字段（示例必含）
+
+`model`、`prompt`、`size`、`n`、`response_format`  
+兼容参考图：`images` / `image_urls` / `reference_images` / `input_images` 等
+
+### 约束
 
 | 项 | 规则 |
 |---|---|
@@ -203,24 +216,67 @@ Auth：`Authorization: Bearer sk-tokfai_xxx`
 | `n` | 目前仅支持 `1` |
 | `response_format` | 目前仅支持 `"url"` |
 | 参考图数量 | 最多 4 张 |
-| 参考图 URL | `http://` / `https://`；也支持 `data:image/…;base64,…` |
-| 不支持 | `blob:`、`file:`、内网 / 私有地址（含 localhost） |
-| 未指定 `model` 时 | 默认图片模型为 `nano-banana-fast`（示例常用 `gpt-image-2`） |
+| 不支持 | `blob:`、`file:`、内网 / localhost |
 
-### Shell（文生图）
+### Shell（提交）
 
 ```bash
 curl https://api.tokfai.com/v1/images/generations \
   -H "Authorization: Bearer sk-tokfai_xxx" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-image-2",
+    "model": "nano-banana",
     "prompt": "生成一张边牧与古牧正在直播间带货的电商主图",
     "size": "1024x1024",
     "n": 1,
     "response_format": "url"
   }'
 ```
+
+### 提交响应示例
+
+```json
+{
+  "id": "img_xxx",
+  "task_id": "img_xxx",
+  "status": "queued",
+  "progress": 5,
+  "data": [],
+  "usage": { "credits_charged": 0 },
+  "tokfai": {
+    "request_id": "img_xxx",
+    "billing_status": "not_billable",
+    "credits_charged": 0
+  }
+}
+```
+
+### Shell（轮询）
+
+```bash
+curl https://api.tokfai.com/v1/images/generations/img_xxx \
+  -H "Authorization: Bearer sk-tokfai_xxx"
+```
+
+### 完成响应示例
+
+```json
+{
+  "id": "img_xxx",
+  "task_id": "img_xxx",
+  "status": "completed",
+  "progress": 100,
+  "data": [{ "url": "https://example-cdn.tokfai.com/file/xxx.png" }],
+  "usage": { "credits_charged": 1400 },
+  "tokfai": {
+    "request_id": "img_xxx",
+    "billing_status": "billable",
+    "credits_charged": 1400
+  }
+}
+```
+
+必看字段：`id`、`task_id`、`status`、`progress`、`data[].url`、`usage.credits_charged`、`tokfai.billing_status`。
 
 ### 参考图改图
 
@@ -229,36 +285,14 @@ curl https://api.tokfai.com/v1/images/generations \
   -H "Authorization: Bearer sk-tokfai_xxx" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-image-2",
+    "model": "nano-banana",
     "prompt": "保留主体，换成直播间带货主图风格",
     "images": ["https://example.com/your-reference-image.jpg"],
     "size": "1024x1024",
+    "n": 1,
     "response_format": "url"
   }'
 ```
-
-若改图意图明确但未上传参考图，可能返回：
-
-```json
-{
-  "error": {
-    "message": "请先上传参考图片，或改用文生图模式。",
-    "code": "reference_image_required",
-    "type": "validation_error",
-    "request_id": "…"
-  }
-}
-```
-
-### 成功响应字段
-
-`id`、`object`、`created`、`model`、`status`、`data`、`usage`、`tokfai`  
-成功才扣费；失败通常不扣费（以 Usage / Credits 为准）。
-
-### 异步查询（beta）
-
-`GET /v1/images/generations/{id}` 可按 `request_id` 查状态。  
-公测阶段：图片 URL 以 POST 成功响应为准；GET 主要返回状态与计费字段。
 
 ### JavaScript
 
@@ -270,9 +304,10 @@ fetch("https://api.tokfai.com/v1/images/generations", {
     "Content-Type": "application/json"
   },
   body: JSON.stringify({
-    model: "gpt-image-2",
+    model: "nano-banana",
     prompt: "生成一张边牧与古牧正在直播间带货的电商主图",
     size: "1024x1024",
+    n: 1,
     response_format: "url"
   })
 })
@@ -290,9 +325,10 @@ res = requests.post(
         "Content-Type": "application/json"
     },
     json={
-        "model": "gpt-image-2",
+        "model": "nano-banana",
         "prompt": "生成一张边牧与古牧正在直播间带货的电商主图",
         "size": "1024x1024",
+        "n": 1,
         "response_format": "url"
     }
 )
@@ -376,7 +412,9 @@ Base URL 必须是 `https://api.tokfai.com`；鉴权仍用 Tokfai `sk-tokfai_…
 |---|---|
 | `insufficient_credits` | 算力积分不足，请充值后再试 |
 | `reference_image_required` | 请先上传参考图片，或改用文生图模式 |
-| `image_generation_timeout` | 图片生成超时，请稍后重试或更换模型 |
+| `image_model_not_available` | 当前图片模型不可用，请切换图片模型 |
+| `upstream_image_error` | 图片生成暂时不可用，请稍后重试 |
+| `image_task_timeout` | 图片生成时间较长，未扣费，可稍后重试或切换更快图片模型 |
 | `invalid_image_url` | 图片地址不合法（含 blob / localhost / 私有网段等） |
 | `invalid_prompt` | prompt 缺失或不合法 |
 | `unsupported_n` | `n` 不支持（目前仅 `1`） |
@@ -384,7 +422,6 @@ Base URL 必须是 `https://api.tokfai.com`；鉴权仍用 Tokfai `sk-tokfai_…
 | `unauthorized` / `invalid_token` / `missing_token` / `key_revoked` | 鉴权失败 |
 | `model_not_available` | 模型不可用或不存在 |
 | `too_many_requests` / `too_many_concurrent_requests` / `gateway_overloaded` | 限流 / 过载 |
-| `upstream_timeout` | 上游超时 |
 
 示例：
 
@@ -421,11 +458,13 @@ Base URL 必须是 `https://api.tokfai.com`；鉴权仍用 Tokfai `sk-tokfai_…
 
 ### 图片接口路径？
 
-`POST /v1/images/generations`（文生图与改图同一路径）
+- 提交：`POST /v1/images/generations`（返回 `task_id`）
+- 轮询：`GET /v1/images/generations/:task_id`
+- Nano Banana 不能走 chat；GPT / Gemini 不能走 image generation
 
 ### 失败会扣费吗？
 
-通常不扣；以 Usage / Credits 为准。用 `request_id` 对账。
+图片失败 / 超时不扣费；成功才扣费。以 Usage / Credits 与 `tokfai.billing_status` 为准。用 `task_id` / `request_id` 对账。
 
 ### 健康检查
 

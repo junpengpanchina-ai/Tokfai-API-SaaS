@@ -1199,9 +1199,13 @@ export const CUSTOMER_DOC_SECTIONS: CustomerDocSection[] = [
       {
         type: "bullets",
         items: [
+          "integration.imageApiFieldTaskId",
+          "integration.imageApiFieldStatus",
+          "integration.imageApiFieldProgress",
           "integration.imageApiFieldImageUrl",
-          "integration.imageApiFieldRequestId",
           "integration.imageApiFieldCreditsCharged",
+          "integration.imageApiFieldBillingStatus",
+          "integration.imageApiFieldRequestId",
           "integration.imageApiFieldModel",
           "integration.imageApiFieldInputImages",
         ],

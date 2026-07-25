@@ -32,7 +32,7 @@ const SCENARIOS = [
     icon: ImageIcon,
     endpoint: TOKFAI_IMAGES_GENERATIONS_FULL_PATH,
     model: "nano-banana",
-    docsHref: "/docs#image-generations",
+    docsHref: "/docs#image-api",
   },
   {
     key: "devtools" as const,

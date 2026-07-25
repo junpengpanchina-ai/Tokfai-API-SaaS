@@ -322,34 +322,42 @@ disp(response.Body.Data)
 # 图片生成 API
 
 Base URL：`https://api.tokfai.com`  
-Endpoint：`POST /v1/images/generations`  
 Auth：`Authorization: Bearer sk-tokfai_xxx`
 
-> 图片专用模型**不会**出现在普通聊天客户端的 `GET /v1/models` 列表中。请使用 **Tokfai 图片工作台** 或本文档的 OpenAI-compatible 图片接口。
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `POST` | `/v1/images/generations` | 提交任务，返回 `task_id` |
+| `GET` | `/v1/images/generations/:task_id` | 轮询进度与结果 |
 
-## 三种用法（同一公开接口）
+> 图片专用模型**不会**出现在普通聊天客户端的 `GET /v1/models` 列表中。Nano Banana **不能**走 chat；GPT / Gemini **不能**走 image generation。  
+> 推荐模型：`nano-banana`（推荐）、`nano-banana-fast`（轻量快图）、`nano-banana-2`（更高质量 / 更稳定）。
 
-| 场景 | 怎么区分 |
-|---|---|
-| 文生图 | `images` 为空或不传 |
-| 参考图改图 | `images` / `image_urls` 非空 |
-| 电商图生成 | 文生图或带商品参考图；用电商场景 prompt（控制台 Image Playground 也有电商模板） |
+## 异步流程与计费
 
-兼容字段：`model`、`prompt`、`images`、`size`、`aspect_ratio`、`aspectRatio`、`response_format`
+提交 → 返回 `task_id` → 轮询 GET → **成功才扣费**；**失败 / 超时不扣费**。
 
-## Shell
+必看响应字段：`id`、`task_id`、`status`、`progress`、`data[].url`、`usage.credits_charged`、`tokfai.billing_status`。
+
+## Shell（提交）
 
 ```bash
 curl https://api.tokfai.com/v1/images/generations \
   -H "Authorization: Bearer sk-tokfai_xxx" \
   -H "Content-Type: application/json" \
   -d '{
-  "model": "gpt-image-2",
+  "model": "nano-banana",
   "prompt": "生成一张边牧与古牧正在直播间带货的电商主图",
   "size": "1024x1024",
   "n": 1,
   "response_format": "url"
 }'
+```
+
+## Shell（轮询）
+
+```bash
+curl https://api.tokfai.com/v1/images/generations/img_xxx \
+  -H "Authorization: Bearer sk-tokfai_xxx"
 ```
 
 ## JavaScript
@@ -362,9 +370,10 @@ fetch("https://api.tokfai.com/v1/images/generations", {
     "Content-Type": "application/json"
   },
   body: JSON.stringify({
-    model: "gpt-image-2",
+    model: "nano-banana",
     prompt: "生成一张边牧与古牧正在直播间带货的电商主图",
     size: "1024x1024",
+    n: 1,
     response_format: "url"
   })
 })
@@ -382,23 +391,23 @@ res = requests.post(
         "Content-Type": "application/json"
     },
     json={
-        "model": "gpt-image-2",
+        "model": "nano-banana",
         "prompt": "生成一张边牧与古牧正在直播间带货的电商主图",
         "size": "1024x1024",
+        "n": 1,
         "response_format": "url"
     }
 )
 print(res.json())
 ```
 
-## 成功响应（Tokfai 格式）
+## 常见图片错误
 
-返回字段包括：`id`、`object`、`created`、`model`、`status`、`data`、`usage`、`tokfai`。  
-成功才扣费；失败通常不扣费（以 Usage / Credits 为准）。
-
-## 异步查询（beta）
-
-`GET /v1/images/generations/{id}` 可按 `request_id` 查询状态。公测阶段为 beta：图片 URL 以 POST 成功响应为准，查询接口主要返回状态与计费字段。
+| code | 说明 |
+|---|---|
+| `image_model_not_available` | 当前图片模型不可用，请切换图片模型 |
+| `upstream_image_error` | 图片生成暂时不可用，请稍后重试 |
+| `image_task_timeout` | 图片生成时间较长，未扣费，可稍后重试或切换更快图片模型 |
 
 ---
 
@@ -423,10 +432,11 @@ curl https://api.tokfai.com/v1/images/generations \
   -H "Authorization: Bearer sk-tokfai_xxx" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-image-2",
+    "model": "nano-banana",
     "prompt": "保留主体，换成直播间带货主图风格",
     "images": ["https://example.com/your-reference-image.jpg"],
     "size": "1024x1024",
+    "n": 1,
     "response_format": "url"
   }'
 ```
@@ -578,7 +588,9 @@ Base URL 必须是 `https://api.tokfai.com`，API Key 仍是 Tokfai `sk-tokfai_�
 |---|---|
 | `insufficient_credits` | 算力积分不足，请充值后再试 |
 | `reference_image_required` | 请先上传参考图片，或改用文生图模式 |
-| `image_generation_timeout` | 图片生成时间较长，请稍后重试或更换模型 |
+| `image_model_not_available` | 当前图片模型不可用，请切换图片模型 |
+| `upstream_image_error` | 图片生成暂时不可用，请稍后重试 |
+| `image_task_timeout` | 图片生成时间较长，未扣费，可稍后重试或切换更快图片模型 |
 | `invalid_image_url` | 图片地址不合法（含 blob / localhost 等） |
 | `unauthorized` / `invalid_token` | 鉴权失败 |
 
