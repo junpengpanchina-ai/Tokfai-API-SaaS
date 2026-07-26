@@ -9,6 +9,7 @@ import {
   releaseKeyConcurrency,
   tryAcquireKeyConcurrency,
 } from "../gateway/concurrency.js";
+import { getKaLoadTestLimits } from "../gateway/kaLoadTest.js";
 import {
   checkApiKeyRateLimit,
   checkIpRateLimit,
@@ -57,10 +58,20 @@ async function rejectGatewayGuard(
     reason?: string;
     limit?: number;
     current?: number;
+    rateLimitPolicy?: "normal" | "ka_load_test";
   }
 ) {
-  const { caller, requestId, err, limitKey, route, reason, limit, current } =
-    args;
+  const {
+    caller,
+    requestId,
+    err,
+    limitKey,
+    route,
+    reason,
+    limit,
+    current,
+    rateLimitPolicy,
+  } = args;
 
   await logGatewayRejection({
     caller,
@@ -73,6 +84,7 @@ async function rejectGatewayGuard(
     reason,
     limit,
     current,
+    rateLimitPolicy,
   });
 
   return respondApiError(c, err, requestId);
@@ -82,23 +94,39 @@ async function rejectGatewayGuard(
  * Per-key RPM, per-IP RPM, per-tenant RPM, per-key concurrency, body size guard.
  * Runs after auth on chat / responses / gemini gateways.
  * 429 rejections are logged as non-billable (no charge).
+ *
+ * P953: KA_LOAD_TEST_KEYS / KA_LOAD_TEST_TENANTS may elevate quotas for
+ * allowlisted callers only — auth + billing debit stay mandatory.
  */
 export const chatGatewayMiddleware: MiddlewareHandler = async (c, next) => {
   const caller = getChatCaller(c);
   const requestId = c.get("requestId" as never) as string;
   const limitKey = gatewayLimitKey(caller.apiKeyId, caller.userId);
   const route = requestRoute(c);
+  const ka = getKaLoadTestLimits({
+    apiKeyId: caller.apiKeyId,
+    keyId: caller.keyId,
+    tenantId: caller.tenantId,
+  });
+  c.set("rateLimitPolicy" as never, ka.policy);
 
   try {
     assertBodySizeWithinLimit(c.req.header("content-length"));
   } catch (err) {
     if (err instanceof ApiError && err.code === "request_body_too_large") {
-      return rejectGatewayGuard(c, { caller, requestId, err, limitKey, route });
+      return rejectGatewayGuard(c, {
+        caller,
+        requestId,
+        err,
+        limitKey,
+        route,
+        rateLimitPolicy: ka.policy,
+      });
     }
     throw err;
   }
 
-  const ipRate = await checkIpRateLimit(clientIp(c));
+  const ipRate = await checkIpRateLimit(clientIp(c), ka.ipRpm);
   if (!ipRate.allowed) {
     return rejectGatewayGuard(c, {
       caller,
@@ -109,10 +137,11 @@ export const chatGatewayMiddleware: MiddlewareHandler = async (c, next) => {
       reason: "ip_rpm",
       limit: ipRate.limit,
       current: ipRate.current,
+      rateLimitPolicy: ka.policy,
     });
   }
 
-  const tenantRate = await checkTenantRateLimit(caller.tenantId);
+  const tenantRate = await checkTenantRateLimit(caller.tenantId, ka.tenantRpm);
   if (!tenantRate.allowed) {
     return rejectGatewayGuard(c, {
       caller,
@@ -123,10 +152,11 @@ export const chatGatewayMiddleware: MiddlewareHandler = async (c, next) => {
       reason: "tenant_rpm",
       limit: tenantRate.limit,
       current: tenantRate.current,
+      rateLimitPolicy: ka.policy,
     });
   }
 
-  const rate = await checkApiKeyRateLimit(limitKey);
+  const rate = await checkApiKeyRateLimit(limitKey, ka.keyRpm);
   c.header("X-RateLimit-Limit", String(rate.limit));
   c.header("X-RateLimit-Remaining", String(rate.remaining));
   c.header("X-RateLimit-Reset", String(Math.ceil(rate.resetAt / 1000)));
@@ -141,10 +171,11 @@ export const chatGatewayMiddleware: MiddlewareHandler = async (c, next) => {
       reason: "key_rpm",
       limit: rate.limit,
       current: rate.current,
+      rateLimitPolicy: ka.policy,
     });
   }
 
-  if (!(await tryAcquireKeyConcurrency(limitKey))) {
+  if (!(await tryAcquireKeyConcurrency(limitKey, ka.keyConcurrency))) {
     const keyInflight = await getKeyInflight(limitKey);
     return rejectGatewayGuard(c, {
       caller,
@@ -153,8 +184,9 @@ export const chatGatewayMiddleware: MiddlewareHandler = async (c, next) => {
       limitKey,
       route,
       reason: "key_concurrency",
-      limit: env.TOKFAI_MAX_CONCURRENCY_PER_KEY,
+      limit: ka.keyConcurrency,
       current: keyInflight,
+      rateLimitPolicy: ka.policy,
     });
   }
 

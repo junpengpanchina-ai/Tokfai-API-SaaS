@@ -39,30 +39,38 @@ export async function checkRateLimit(
 }
 
 /** Per API key / caller identity RPM. */
-export function checkApiKeyRateLimit(limitKey: string): Promise<RateLimitResult> {
-  return checkRateLimit(limitKey, env.TOKFAI_RATE_LIMIT_RPM);
+export function checkApiKeyRateLimit(
+  limitKey: string,
+  limitOverride?: number
+): Promise<RateLimitResult> {
+  return checkRateLimit(limitKey, limitOverride ?? env.TOKFAI_RATE_LIMIT_RPM);
 }
 
 /** Per client IP RPM (short-window abuse guard). */
-export function checkIpRateLimit(ip: string): Promise<RateLimitResult> {
+export function checkIpRateLimit(
+  ip: string,
+  limitOverride?: number
+): Promise<RateLimitResult> {
   const key = `ip:${ip.trim() || "unknown"}`;
-  return checkRateLimit(key, env.TOKFAI_RATE_LIMIT_IP_RPM);
+  return checkRateLimit(key, limitOverride ?? env.TOKFAI_RATE_LIMIT_IP_RPM);
 }
 
 /** Per tenant RPM (shared quota across keys on a subsite). */
 export function checkTenantRateLimit(
-  tenantId: string | null | undefined
+  tenantId: string | null | undefined,
+  limitOverride?: number
 ): Promise<RateLimitResult> {
+  const limit = limitOverride ?? env.TOKFAI_RATE_LIMIT_TENANT_RPM;
   if (!tenantId) {
     return Promise.resolve({
       allowed: true,
-      limit: env.TOKFAI_RATE_LIMIT_TENANT_RPM,
-      remaining: env.TOKFAI_RATE_LIMIT_TENANT_RPM,
+      limit,
+      remaining: limit,
       resetAt: Date.now() + env.TOKFAI_RATE_LIMIT_WINDOW_MS,
       current: 0,
     });
   }
-  return checkRateLimit(`tenant:${tenantId}`, env.TOKFAI_RATE_LIMIT_TENANT_RPM);
+  return checkRateLimit(`tenant:${tenantId}`, limit);
 }
 
 function checkRateLimitMemory(

@@ -465,7 +465,11 @@ export async function executeChatCompletion(
       );
     } else {
       await assertHasCredits(caller.userId);
-      await assertCreditPeriodLimits(caller.userId);
+      await assertCreditPeriodLimits(caller.userId, {
+        apiKeyId: caller.apiKeyId,
+        keyId: caller.keyId,
+        tenantId: caller.tenantId,
+      });
     }
 
     const rawMaxOut =

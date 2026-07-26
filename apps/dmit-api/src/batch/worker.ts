@@ -115,6 +115,7 @@ async function processBatch(batchId: string): Promise<void> {
   }
 
   const caller: ChatCaller = {
+    keyId: null,
     userId: batch.user_id,
     apiKeyId: batch.api_key_id,
     tenantId,

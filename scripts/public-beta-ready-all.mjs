@@ -66,6 +66,7 @@ const OFFLINE = [
   "scripts/p932-cherry-studio-real-body-smoke.mjs",
   "scripts/p933-cherry-studio-compat-matrix-smoke.mjs",
   "scripts/p946-gemini-25-flash-nonstream-smoke.mjs",
+  "scripts/p953-ka-loadtest-whitelist-smoke.mjs",
   "scripts/public-model-registry-smoke.mjs",
   "scripts/docs-or-ui-en-no-chinese-smoke.mjs",
   "scripts/responses-nonstream-envelope-smoke.mjs",

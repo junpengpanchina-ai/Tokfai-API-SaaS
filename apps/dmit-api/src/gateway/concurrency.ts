@@ -47,14 +47,18 @@ export async function getGlobalUpstreamInflight(): Promise<number> {
   return globalUpstreamInflight;
 }
 
-export async function tryAcquireKeyConcurrency(limitKey: string): Promise<boolean> {
+export async function tryAcquireKeyConcurrency(
+  limitKey: string,
+  limitOverride?: number
+): Promise<boolean> {
+  const limit = limitOverride ?? env.TOKFAI_MAX_CONCURRENCY_PER_KEY;
   const redis = getRedisClient();
   if (redis) {
     try {
       const acquired = await tryIncrementCounter(
         redis,
         redisKey("inflight", "key", limitKey),
-        env.TOKFAI_MAX_CONCURRENCY_PER_KEY
+        limit
       );
       if (acquired) return true;
       return false;
@@ -65,7 +69,7 @@ export async function tryAcquireKeyConcurrency(limitKey: string): Promise<boolea
     }
   }
 
-  return tryAcquireKeyConcurrencyMemory(limitKey);
+  return tryAcquireKeyConcurrencyMemory(limitKey, limit);
 }
 
 export async function releaseKeyConcurrency(limitKey: string): Promise<void> {
@@ -185,9 +189,12 @@ export async function getHeavyResponsesInflight(
   return heavyResponsesInflight.get(limitKey) ?? 0;
 }
 
-function tryAcquireKeyConcurrencyMemory(limitKey: string): boolean {
+function tryAcquireKeyConcurrencyMemory(
+  limitKey: string,
+  limit: number
+): boolean {
   const current = keyInflight.get(limitKey) ?? 0;
-  if (current >= env.TOKFAI_MAX_CONCURRENCY_PER_KEY) {
+  if (current >= limit) {
     return false;
   }
   keyInflight.set(limitKey, current + 1);

@@ -47,6 +47,8 @@ export const requireApiKeyOrSupabaseJwt: MiddlewareHandler = async (c, next) => 
 export interface ChatCaller {
   userId: string;
   apiKeyId: string | null;
+  /** Internal api_keys.key_id (12-hex); null for JWT playground callers. */
+  keyId: string | null;
   tenantId: string | null;
 }
 
@@ -61,13 +63,14 @@ export function getChatCaller(c: {
     return {
       userId: apiKey.userId,
       apiKeyId: apiKey.apiKeyId,
+      keyId: apiKey.keyId,
       tenantId: apiKey.tenantId ?? tenantId,
     };
   }
 
   const user = c.get("user" as never) as AuthedUser | undefined;
   if (user?.id) {
-    return { userId: user.id, apiKeyId: null, tenantId };
+    return { userId: user.id, apiKeyId: null, keyId: null, tenantId };
   }
 
   throw ApiError.unauthorized("Missing Bearer token.", "missing_token");

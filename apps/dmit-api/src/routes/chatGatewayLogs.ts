@@ -32,6 +32,8 @@ export async function logGatewayRejection(args: {
   reason?: string;
   limit?: number;
   current?: number;
+  /** P953: normal | ka_load_test — never log raw API key secrets. */
+  rateLimitPolicy?: "normal" | "ka_load_test";
 }): Promise<void> {
   const {
     caller,
@@ -45,6 +47,7 @@ export async function logGatewayRejection(args: {
     reason,
     limit,
     current,
+    rateLimitPolicy,
   } = args;
 
   const resolvedRoute = route ?? "/v1/chat/completions";
@@ -106,6 +109,7 @@ export async function logGatewayRejection(args: {
       current: current ?? keyInflight,
       key_hash: safeRateLimitKeyHash(limitKey),
       request_id: requestId,
+      rate_limit_policy: rateLimitPolicy ?? "normal",
     });
   }
 }

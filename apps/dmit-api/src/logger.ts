@@ -54,6 +54,7 @@ const ALLOWED_FIELD_KEYS = new Set([
   "current",
   "key_hash",
   "request_id",
+  "rate_limit_policy",
   "dbErrorMessage",
   "tokenPrefix",
   "keyId",

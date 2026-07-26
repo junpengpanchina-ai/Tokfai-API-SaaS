@@ -138,6 +138,29 @@ const Schema = z
     .string()
     .default("")
     .transform(csv),
+  /**
+   * P953 — production KA load-test allowlist (api_keys.id UUID and/or key_id).
+   * Empty = no elevation; ordinary defaults unchanged.
+   * Never put raw sk-tokfai_ secrets here.
+   */
+  KA_LOAD_TEST_KEYS: z.string().default("").transform(csv),
+  /** P953 — production KA load-test tenant ids (tenants.id UUID). */
+  KA_LOAD_TEST_TENANTS: z.string().default("").transform(csv),
+  /** Elevated per-key RPM for KA load-test allowlist only. */
+  KA_LOAD_TEST_KEY_RPM: z.coerce.number().int().positive().default(1200),
+  /** Elevated per-key concurrency for KA load-test allowlist only. */
+  KA_LOAD_TEST_KEY_CONCURRENCY: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(600),
+  /** Elevated per-tenant RPM for KA load-test allowlist only. */
+  KA_LOAD_TEST_TENANT_RPM: z.coerce.number().int().positive().default(3000),
+  /**
+   * Elevated per-IP RPM when the request is on the KA load-test allowlist
+   * (same-host press tools would otherwise die at the normal IP gate first).
+   */
+  KA_LOAD_TEST_IP_RPM: z.coerce.number().int().positive().default(6000),
   TOKFAI_RATE_LIMIT_WINDOW_MS: z.coerce
     .number()
     .int()

@@ -3,6 +3,7 @@ import { env } from "../env.js";
 import { log } from "../logger.js";
 import { getRedisClient, redisKey } from "../redis/client.js";
 import { supabase } from "../supabase.js";
+import { getKaLoadTestLimits } from "./kaLoadTest.js";
 
 /**
  * Per-key / per-user safety limits for public beta (1000-user relay protection).
@@ -190,8 +191,24 @@ async function sumChargedCreditsSince(
   return sum;
 }
 
-export async function assertCreditPeriodLimits(userId: string): Promise<void> {
+export async function assertCreditPeriodLimits(
+  userId: string,
+  opts?: {
+    apiKeyId?: string | null;
+    keyId?: string | null;
+    tenantId?: string | null;
+  }
+): Promise<void> {
   if (isUnlimitedBillingUser(userId)) return;
+
+  // P953: KA load-test allowlist skips daily/monthly period caps only.
+  // Balance precheck + success debit (billing) still apply.
+  const ka = getKaLoadTestLimits({
+    apiKeyId: opts?.apiKeyId,
+    keyId: opts?.keyId,
+    tenantId: opts?.tenantId,
+  });
+  if (ka.skipCreditPeriodLimits) return;
 
   const [daily, monthly] = await Promise.all([
     sumChargedCreditsSince(userId, startOfUtcDayIso()),
