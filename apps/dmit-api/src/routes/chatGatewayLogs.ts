@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { ApiError } from "../errors.js";
 import { log } from "../logger.js";
 import type { ChatCaller } from "../middleware/chatAuth.js";
@@ -9,6 +11,14 @@ const GATEWAY_RATE_LIMIT_CODES = new Set([
   "too_many_concurrent_requests",
 ]);
 
+/** Non-reversible short fingerprint of the gateway limit key (never the raw secret). */
+export function safeRateLimitKeyHash(limitKey: string): string {
+  return createHash("sha256")
+    .update(`tokfai:rl:${limitKey}`)
+    .digest("hex")
+    .slice(0, 16);
+}
+
 export async function logGatewayRejection(args: {
   caller: ChatCaller;
   requestId: string;
@@ -17,14 +27,33 @@ export async function logGatewayRejection(args: {
   keyInflight: number;
   globalInflight: number;
   model?: string;
+  route?: string;
+  /** Machine reason: ip_rpm | tenant_rpm | key_rpm | key_concurrency */
+  reason?: string;
+  limit?: number;
+  current?: number;
 }): Promise<void> {
-  const { caller, requestId, err, limitKey, keyInflight, globalInflight, model } =
-    args;
+  const {
+    caller,
+    requestId,
+    err,
+    limitKey,
+    keyInflight,
+    globalInflight,
+    model,
+    route,
+    reason,
+    limit,
+    current,
+  } = args;
+
+  const resolvedRoute = route ?? "/v1/chat/completions";
+  const resolvedModel = model ?? "unknown";
 
   const entry: UsageLogInsert = {
     user_id: caller.userId,
     api_key_id: caller.apiKeyId,
-    model: model ?? "unknown",
+    model: resolvedModel,
     status: GATEWAY_RATE_LIMIT_CODES.has(err.code ?? "")
       ? "rate_limited"
       : "failed",
@@ -48,7 +77,7 @@ export async function logGatewayRejection(args: {
   if (error) {
     log.warn("usage_log_insert_failed", {
       requestId,
-      route: "/v1/chat/completions",
+      route: resolvedRoute,
       status: 500,
       code: "usage_log_insert_failed",
       message: "Failed to write gateway usage log.",
@@ -57,7 +86,7 @@ export async function logGatewayRejection(args: {
 
   log.warn("chat_gateway_rejected", {
     requestId,
-    route: "/v1/chat/completions",
+    route: resolvedRoute,
     status: err.status,
     code: err.code ?? "gateway_rejected",
     message: err.publicMessage,
@@ -67,6 +96,18 @@ export async function logGatewayRejection(args: {
     keyInflight,
     globalInflight,
   });
+
+  if (GATEWAY_RATE_LIMIT_CODES.has(err.code ?? "")) {
+    log.warn("rate_limit_rejected", {
+      route: resolvedRoute,
+      model: resolvedModel,
+      reason: reason ?? err.code ?? "rate_limited",
+      limit: limit ?? null,
+      current: current ?? keyInflight,
+      key_hash: safeRateLimitKeyHash(limitKey),
+      request_id: requestId,
+    });
+  }
 }
 
 export async function logGatewayOverloaded(args: {

@@ -41,6 +41,11 @@ function clientIp(c: Parameters<MiddlewareHandler>[0]): string {
   return "unknown";
 }
 
+function requestRoute(c: Parameters<MiddlewareHandler>[0]): string {
+  const path = c.req.path?.trim();
+  return path && path.length > 0 ? path : "/v1/chat/completions";
+}
+
 async function rejectGatewayGuard(
   c: Parameters<MiddlewareHandler>[0],
   args: {
@@ -48,9 +53,14 @@ async function rejectGatewayGuard(
     requestId: string;
     err: ApiError;
     limitKey: string;
+    route: string;
+    reason?: string;
+    limit?: number;
+    current?: number;
   }
 ) {
-  const { caller, requestId, err, limitKey } = args;
+  const { caller, requestId, err, limitKey, route, reason, limit, current } =
+    args;
 
   await logGatewayRejection({
     caller,
@@ -59,6 +69,10 @@ async function rejectGatewayGuard(
     limitKey,
     keyInflight: await getKeyInflight(limitKey),
     globalInflight: await getGlobalUpstreamInflight(),
+    route,
+    reason,
+    limit,
+    current,
   });
 
   return respondApiError(c, err, requestId);
@@ -73,12 +87,13 @@ export const chatGatewayMiddleware: MiddlewareHandler = async (c, next) => {
   const caller = getChatCaller(c);
   const requestId = c.get("requestId" as never) as string;
   const limitKey = gatewayLimitKey(caller.apiKeyId, caller.userId);
+  const route = requestRoute(c);
 
   try {
     assertBodySizeWithinLimit(c.req.header("content-length"));
   } catch (err) {
     if (err instanceof ApiError && err.code === "request_body_too_large") {
-      return rejectGatewayGuard(c, { caller, requestId, err, limitKey });
+      return rejectGatewayGuard(c, { caller, requestId, err, limitKey, route });
     }
     throw err;
   }
@@ -90,6 +105,10 @@ export const chatGatewayMiddleware: MiddlewareHandler = async (c, next) => {
       requestId,
       err: ApiError.tooManyRequests(),
       limitKey,
+      route,
+      reason: "ip_rpm",
+      limit: ipRate.limit,
+      current: ipRate.current,
     });
   }
 
@@ -100,6 +119,10 @@ export const chatGatewayMiddleware: MiddlewareHandler = async (c, next) => {
       requestId,
       err: ApiError.tooManyRequests(),
       limitKey,
+      route,
+      reason: "tenant_rpm",
+      limit: tenantRate.limit,
+      current: tenantRate.current,
     });
   }
 
@@ -114,15 +137,24 @@ export const chatGatewayMiddleware: MiddlewareHandler = async (c, next) => {
       requestId,
       err: ApiError.tooManyRequests(),
       limitKey,
+      route,
+      reason: "key_rpm",
+      limit: rate.limit,
+      current: rate.current,
     });
   }
 
   if (!(await tryAcquireKeyConcurrency(limitKey))) {
+    const keyInflight = await getKeyInflight(limitKey);
     return rejectGatewayGuard(c, {
       caller,
       requestId,
       err: ApiError.tooManyConcurrentRequests(),
       limitKey,
+      route,
+      reason: "key_concurrency",
+      limit: env.TOKFAI_MAX_CONCURRENCY_PER_KEY,
+      current: keyInflight,
     });
   }
 

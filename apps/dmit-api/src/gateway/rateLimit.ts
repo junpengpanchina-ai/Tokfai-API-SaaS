@@ -7,6 +7,8 @@ export interface RateLimitResult {
   limit: number;
   remaining: number;
   resetAt: number;
+  /** Observed count in the current window (at decision time). */
+  current: number;
 }
 
 interface WindowState {
@@ -57,6 +59,7 @@ export function checkTenantRateLimit(
       limit: env.TOKFAI_RATE_LIMIT_TENANT_RPM,
       remaining: env.TOKFAI_RATE_LIMIT_TENANT_RPM,
       resetAt: Date.now() + env.TOKFAI_RATE_LIMIT_WINDOW_MS,
+      current: 0,
     });
   }
   return checkRateLimit(`tenant:${tenantId}`, env.TOKFAI_RATE_LIMIT_TENANT_RPM);
@@ -78,7 +81,7 @@ function checkRateLimitMemory(
   const resetAt = state.windowStart + windowMs;
 
   if (state.count >= limit) {
-    return { allowed: false, limit, remaining: 0, resetAt };
+    return { allowed: false, limit, remaining: 0, resetAt, current: state.count };
   }
 
   state.count += 1;
@@ -87,6 +90,7 @@ function checkRateLimitMemory(
     limit,
     remaining: Math.max(0, limit - state.count),
     resetAt,
+    current: state.count,
   };
 }
 
@@ -107,7 +111,7 @@ async function checkRateLimitRedis(
   }
 
   if (count > limit) {
-    return { allowed: false, limit, remaining: 0, resetAt };
+    return { allowed: false, limit, remaining: 0, resetAt, current: count };
   }
 
   return {
@@ -115,6 +119,7 @@ async function checkRateLimitRedis(
     limit,
     remaining: Math.max(0, limit - count),
     resetAt,
+    current: count,
   };
 }
 
