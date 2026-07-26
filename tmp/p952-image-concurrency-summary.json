@@ -1,0 +1,20 @@
+{
+  "total_done": 7,
+  "completed": 3,
+  "failed": 3,
+  "timeout": 1,
+  "billable_success": 2,
+  "bad_billing_failures": 1,
+  "missing_url_success": 1,
+  "error_codes": {
+    "upstream_image_error": 3,
+    "image_task_timeout": 1
+  },
+  "latency": {
+    "min": 7000,
+    "p50": 12000,
+    "p90": 120000,
+    "p95": 120000,
+    "max": 120000
+  }
+}

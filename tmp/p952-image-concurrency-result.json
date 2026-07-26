@@ -1,0 +1,58 @@
+[
+  {
+    "status": "completed",
+    "credits": 1400,
+    "billingStatus": "billable",
+    "url": "https://cdn.example.com/a.png",
+    "errorCode": null,
+    "latencyMs": 8000
+  },
+  {
+    "status": "completed",
+    "credits": 1400,
+    "billingStatus": "billable",
+    "url": "https://cdn.example.com/b.png",
+    "errorCode": null,
+    "latencyMs": 12000
+  },
+  {
+    "status": "failed",
+    "credits": 0,
+    "billingStatus": "not_billable",
+    "url": null,
+    "errorCode": "upstream_image_error",
+    "latencyMs": 15000
+  },
+  {
+    "status": "failed",
+    "credits": 0,
+    "billingStatus": "not_billable",
+    "url": null,
+    "errorCode": "upstream_image_error",
+    "latencyMs": 18000
+  },
+  {
+    "status": "retryable_timeout",
+    "credits": 0,
+    "billingStatus": "not_billable",
+    "url": null,
+    "errorCode": "image_task_timeout",
+    "latencyMs": 120000
+  },
+  {
+    "status": "failed",
+    "credits": 100,
+    "billingStatus": "billable",
+    "url": null,
+    "errorCode": "upstream_image_error",
+    "latencyMs": 9000
+  },
+  {
+    "status": "completed",
+    "credits": 0,
+    "billingStatus": "not_billable",
+    "url": null,
+    "errorCode": null,
+    "latencyMs": 7000
+  }
+]
