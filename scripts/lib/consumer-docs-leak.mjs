@@ -1,47 +1,31 @@
 /**
- * Shared consumer-docs leak helpers.
+ * Shared consumer-docs leak helpers (P950).
  *
- * Bare `grsaiapi.com` is allowed only inside known wrong-provider diagnostic
- * phrases. `https://grsaiapi.com` must never appear as an integration host.
+ * Customer-visible surfaces must not expose:
+ * - GRSAI / grsai / garsai brand tokens
+ * - grsaiapi.com (any form — not even as a wrong-provider diagnostic)
+ * - 上游供应商 / upstream provider
+ * - upstreamModel (camelCase field / key leak)
+ * - /v1/api/generate upstream path
  */
 
-/** Phrases that may mention grsaiapi.com as a wrong-provider signal. */
-export const ALLOWED_WRONG_PROVIDER_DIAGNOSTICS = [
-  "如果出现 grsaiapi.com，说明没有走 Tokfai",
-  "如果错误详情里出现 grsaiapi.com，说明没有走 Tokfai",
-  "并且请求路径是 grsaiapi.com",
-  "请求路径是 grsaiapi.com",
-  "请求路径出现 grsaiapi.com",
-  "错误详情请求路径是 grsaiapi.com",
-  "如果请求路径不是 api.tokfai.com（例如 grsaiapi.com、openai.com、googleapis.com）",
-  "如果请求路径不是 api.tokfai.com（grsaiapi.com / openai.com / googleapis.com / generativelanguage.googleapis.com）",
-  "如果请求路径不是 api.tokfai.com（例如 grsaiapi.com / openai.com / googleapis.com）",
-  "请求路径是 grsaiapi.com / openai.com / googleapis.com / generativelanguage.googleapis.com",
-  "If error details show grsaiapi.com, the request did not go through Tokfai",
-  "and the request path is grsaiapi.com",
-  "request path shows grsaiapi.com",
-  "Request path is grsaiapi.com",
-  "Error path is grsaiapi.com",
-  "If the request path is not api.tokfai.com (e.g. grsaiapi.com, openai.com, googleapis.com)",
-  "If the request path is not api.tokfai.com (grsaiapi.com / openai.com / googleapis.com / generativelanguage.googleapis.com)",
-  "If the request path is not api.tokfai.com (e.g. grsaiapi.com / openai.com / googleapis.com)",
-  "Request path is grsaiapi.com / openai.com / googleapis.com / generativelanguage.googleapis.com",
-];
+/** @deprecated P950 — bare grsaiapi.com is no longer allowed in consumer docs. */
+export const ALLOWED_WRONG_PROVIDER_DIAGNOSTICS = [];
 
 /**
- * Brand / path leak after stripping allowed diagnostics.
- * - forbids https://grsaiapi.com (integration URL form)
- * - forbids grsai / garsai brand tokens (not inside grsaiapi.com)
+ * Brand / path / field leaks in customer-visible copy.
+ * - forbids grsaiapi.com in any form
+ * - forbids grsai / garsai brand tokens
+ * - forbids upstreamModel camelCase
+ * - forbids 上游供应商 / upstream provider
  */
 export const CONSUMER_LEAK_RE =
-  /https?:\/\/grsaiapi\.com|(?<![\w.])grsai(?!api\.com)|(?<![\w.])garsai|https?:\/\/v1\/api\/generate|["'`]\/v1\/api\/generate["'`]|上游供应商|upstream\s+provider|provider\s+name/i;
+  /grsaiapi\.com|(?<![\w.])grsai(?!api\.com)|(?<![\w.])garsai|https?:\/\/v1\/api\/generate|["'`]\/v1\/api\/generate["'`]|上游供应商|upstream\s+provider|upstreamModel/i;
 
 export function stripAllowedWrongProviderDiagnostics(src) {
-  let out = String(src);
-  for (const phrase of ALLOWED_WRONG_PROVIDER_DIAGNOSTICS) {
-    out = out.split(phrase).join("");
-  }
-  return out;
+  // P950: no allowlist — return as-is for findConsumerLeak.
+  void ALLOWED_WRONG_PROVIDER_DIAGNOSTICS;
+  return String(src);
 }
 
 export function findConsumerLeak(src) {

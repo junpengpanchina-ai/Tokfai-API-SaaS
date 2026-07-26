@@ -130,7 +130,7 @@ const EN: Record<string, string> = {
     "The selected model is temporarily unavailable or under high load.",
   "dashboard.playground.errors.upstreamTimeout":
     "The selected model is temporarily unavailable or under high load.",
-  "dashboard.playground.errors.upstreamModelBusy":
+  "dashboard.playground.errors.modelBusy":
     "This model is under high load. Retry shortly or switch to auto-fast.",
   "dashboard.playground.errors.modelNotAvailable":
     "This model is not available for API calls. Switch to a recommended model.",
@@ -264,7 +264,7 @@ const ZH: Record<string, string> = {
   "dashboard.playground.errors.modelNotFound": "模型不存在或不可用。请换用其他模型。",
   "dashboard.playground.errors.upstreamError": "所选模型暂时不可用或负载较高。",
   "dashboard.playground.errors.upstreamTimeout": "所选模型暂时不可用或负载较高。",
-  "dashboard.playground.errors.upstreamModelBusy":
+  "dashboard.playground.errors.modelBusy":
     "该模型负载较高。请稍后重试或改用 auto-fast。",
   "dashboard.playground.errors.modelNotAvailable":
     "该模型不可用于 API 调用。请改用推荐模型。",

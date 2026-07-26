@@ -113,7 +113,7 @@ export function resolvePlaygroundRiskMessage(
     }
 
     if (normalized === "upstream_model_busy") {
-      return t(`${prefix}.upstreamModelBusy`);
+      return t(`${prefix}.modelBusy`);
     }
 
     if (normalized === "upstream_timeout" || status === 504) {

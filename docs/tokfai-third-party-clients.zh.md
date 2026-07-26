@@ -1,6 +1,6 @@
 # Tokfai 第三方客户端真实接入指南
 
-Tokfai 是 **KA 大客户 AI 聚合平台**（OpenAI-compatible API）。所有客户端只连 Tokfai；不要在文档或客户端配置中暴露上游主机、供应商或 upstreamModel。
+Tokfai 是 **KA 大客户 AI 聚合平台**（OpenAI-compatible API）。所有客户端只连 Tokfai（Base URL：`https://api.tokfai.com/v1`）；不要把其它厂商主机或内置 OpenAI / Gemini 供应商当成接入入口。
 
 | 项 | 值 |
 |---|---|
@@ -31,7 +31,7 @@ Tokfai 是 **KA 大客户 AI 聚合平台**（OpenAI-compatible API）。所有�
 
 ## 客户端错误口径（仅 Tokfai）
 
-客户端 / 文档只使用以下口径，不得出现上游域名或上游原始错误：
+客户端 / 文档只使用以下口径，不得出现其它厂商主机或原始内部错误：
 
 | 提示 | 含义 | 建议动作 |
 |---|---|---|

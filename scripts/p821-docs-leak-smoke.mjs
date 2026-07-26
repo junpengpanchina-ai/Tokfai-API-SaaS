@@ -7,7 +7,7 @@
  * - https://grsaiapi.com as an integration Base URL
  * - https://v1/api/generate / /v1/api/generate as consumer endpoints
  *
- * Bare `grsaiapi.com` is allowed only inside known wrong-provider diagnostics.
+ * P950: bare `grsaiapi.com` is forbidden on consumer surfaces (no diagnostic allowlist).
  *
  * Usage: node scripts/p821-docs-leak-smoke.mjs
  */
@@ -95,7 +95,7 @@ function main() {
     "POST /v1/images/generations",
     "Authorization: Bearer",
     "| tokfai",
-    "如果出现 grsaiapi.com，说明没有走 Tokfai",
+    "如果请求路径不是 api.tokfai.com，说明没有走 Tokfai",
   ];
   const missing = required.filter((s) => !registry.includes(s));
 

@@ -983,9 +983,9 @@ export function ImagePlaygroundResultArea({
                         {result?.image_source_type ?? "unknown"}
                       </p>
                       <p>
-                        upstream_images_count:{" "}
-                        {result?.upstream_images_count ??
-                          result?.resolved_images_count ??
+                        resolved_images_count:{" "}
+                        {result?.resolved_images_count ??
+                          result?.upstream_images_count ??
                           0}
                       </p>
                       <p>

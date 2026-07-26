@@ -58,10 +58,10 @@ const GROUP_META: Record<
     },
   },
   image: {
-    title: { zh: "图片生成", en: "Image generation" },
+    title: { zh: "Image API / 图片工作台", en: "Image API / Image Workbench" },
     description: {
-      zh: "Nano Banana 系列走 POST /v1/images/generations：提交返回 task_id，轮询 GET /v1/images/generations/:task_id 取结果。成功才扣费；失败/超时不扣费。不可当 chat 模型使用。",
-      en: "Nano Banana via POST /v1/images/generations: submit returns task_id; poll GET /v1/images/generations/:task_id. Billed on success only. Not usable as chat models.",
+      zh: "Nano Banana 系列仅走 POST /v1/images/generations（图片工作台同路径）：submit 返回 task_id，轮询 GET /v1/images/generations/:task_id。成功 → billable；失败/超时 → not_billable。不可用于 /v1/chat/completions；GPT/Gemini 不可用于 images/generations。",
+      en: "Nano Banana via Image API POST /v1/images/generations only: submit returns task_id; poll GET /v1/images/generations/:task_id. Success → billable; failed/timeout → not_billable. Not for chat; GPT/Gemini cannot use images/generations.",
     },
   },
 };

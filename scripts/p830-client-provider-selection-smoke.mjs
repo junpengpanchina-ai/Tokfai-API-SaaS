@@ -2,8 +2,8 @@
 /**
  * P830 — Third-party client provider-selection smoke (offline).
  *
- * 1) Consumer docs require "| tokfai" and wrong-provider diagnostic for grsaiapi.com
- * 2) Docs must not use https://grsaiapi.com as an integration Base URL
+ * 1) Consumer docs require "| tokfai" and wrong-provider path diagnostic
+ * 2) Docs must not mention grsaiapi.com (P950 — no real upstream domains)
  * 3) Offline /v1/models exposes Tokfai-prefixed display names; ids unchanged
  * 4) /v1/models includes at least one gpt* and one gemini* chat model
  *
@@ -33,7 +33,7 @@ let mockChild = null;
 
 const REQUIRED_DOC_PHRASES = [
   "| tokfai",
-  "如果出现 grsaiapi.com，说明没有走 Tokfai",
+  "如果请求路径不是 api.tokfai.com，说明没有走 Tokfai",
   "TOKFAI_READY",
 ];
 
@@ -79,10 +79,14 @@ async function main() {
   }
 
   const asHost = findGrsaiapiAsIntegrationHost(corpus);
-  if (asHost) {
-    ok = fail("docs do not use grsaiapi.com as integration host", asHost) && ok;
+  if (asHost || /grsaiapi\.com/i.test(corpus)) {
+    ok =
+      fail(
+        "docs do not mention grsaiapi.com",
+        asHost || "bare grsaiapi.com found"
+      ) && ok;
   } else {
-    ok = pass("docs do not use grsaiapi.com as integration host") && ok;
+    ok = pass("docs do not mention grsaiapi.com") && ok;
   }
 
   for (const rel of [

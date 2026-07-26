@@ -473,7 +473,7 @@ export const messages = {
           "Start with a small package to complete integration testing. Confirm model, quality, and consumption before scaling volume.",
         smartRoutingTitle: "Alias / Smart routing",
         smartRoutingDesc:
-          "Use auto-* aliases for a stable entry point. Tokfai tries upstream models in order and returns the model that actually succeeded.",
+          "Use auto-* aliases for a stable entry point. Tokfai tries models in order and returns the model that actually succeeded.",
         smartRoutingAlias: {
           "auto-fast":
             "Recommended default — fast, stable chat. Fallback: gemini-3-flash → gemini-2.5-flash → gemini-3-pro.",
@@ -1026,7 +1026,7 @@ export const messages = {
             "The selected model is temporarily unavailable or under high load.",
           upstreamTimeout:
             "The selected model is temporarily unavailable or under high load.",
-          upstreamModelBusy:
+          modelBusy:
             "This model is under high load. Retry shortly or switch to auto-fast.",
           modelNotAvailable:
             "This model is not available for API calls. Switch to a recommended model.",
@@ -1598,7 +1598,7 @@ export const messages = {
         "Start with auto-fast for integration and Playground tests — Tokfai routes to the first available fast model. Use auto-pro for quality, auto-cheap for batch. gpt-5.4 / gpt-5.5 remain explicit high-quality IDs that may be busy under load.",
       smartRoutingTitle: "Smart routing aliases",
       smartRoutingDesc:
-        "Pass auto-fast, auto-pro, or auto-cheap as the model field. The response model field shows which upstream model succeeded. Explicit model IDs do not auto-fallback.",
+        "Pass auto-fast, auto-pro, or auto-cheap as the model field. The response model field shows which model id succeeded. Explicit model IDs do not auto-fallback.",
       smartRoutingAutoFast:
         "auto-fast — default fast & stable: gemini-3-flash → gemini-2.5-flash → gemini-3-pro",
       smartRoutingAutoPro:
@@ -1662,7 +1662,7 @@ export const messages = {
       externalVerifyModelsTitle: "2. List models",
       externalVerifyChatTitle: "3. Chat completion (model auto-fast)",
       externalVerificationModelNote:
-        "Start with auto-fast for integration smoke tests — Tokfai auto-routes when upstream models are busy. Use auto-pro for quality workloads. Explicit gpt-5.4 / gpt-5.5 may return upstream_model_busy (HTTP 503). Do not use gpt-4o-mini; it is not registered upstream.",
+        "Start with auto-fast for integration smoke tests — Tokfai auto-routes when models are busy. Use auto-pro for quality workloads. Explicit gpt-5.4 / gpt-5.5 may return upstream_model_busy (HTTP 503). Do not use gpt-4o-mini; it is not a registered Tokfai model.",
       cherryStudioLabel: "Cherry Studio",
       cherryStudioSteps:
         "Settings → Provider → OpenAI Compatible (custom). Name Tokfai, Base URL https://api.tokfai.com/v1, API Key sk-tokfai_…, pick models under Tokfai only. Do not use built-in OpenAI / Gemini providers. Correct: Tokfai GPT-5.4 Pro | Tokfai. Wrong: GPT 5.4 Pro | OpenAI or Gemini 3.1 Pro Preview | Gemini.",
@@ -1673,7 +1673,7 @@ export const messages = {
       cherryStudioError404:
         "Pick a Tokfai model ID such as auto-fast under the | tokfai provider. Image-only models are not for chat clients.",
       cherryStudioErrorWrongProvider:
-        "If the request path is not api.tokfai.com (e.g. grsaiapi.com, openai.com, googleapis.com), the request did not go through Tokfai — wrong Cherry Studio provider, not a Tokfai API error. Switch to custom OpenAI Compatible named Tokfai. Correct: Tokfai GPT-5.4 Pro | Tokfai. Wrong: GPT 5.4 Pro | OpenAI.",
+        "If the request path is not api.tokfai.com (e.g. openai.com, googleapis.com), the request did not go through Tokfai — wrong Cherry Studio provider, not a Tokfai API error. Switch to custom OpenAI Compatible named Tokfai. Correct: Tokfai GPT-5.4 Pro | Tokfai. Wrong: GPT 5.4 Pro | OpenAI.",
       cherryStudioError500:
         "The model service is temporarily unavailable — retry in a few minutes or switch models.",
       cursorLabel: "Cursor",
@@ -1712,7 +1712,7 @@ export const messages = {
       error404Route: "HTTP path not found on api.tokfai.com",
       errorWrongProvider:
         "Request did not go through Tokfai — wrong client provider selected",
-      error429: "Upstream model rate limit — retry with exponential backoff",
+      error429: "Model rate limit — retry with exponential backoff",
       error500: "Model or upstream service temporarily unavailable — retry later",
       errorInvalidPrompt: "Missing or empty prompt for image generation",
       errorInvalidImageUrl: "The image URL is malformed or not allowed",
@@ -1780,7 +1780,7 @@ export const messages = {
       errorInvalidToken: "API key is wrong, revoked, or malformed.",
       errorInsufficientCredits: "Account balance is too low.",
       errorModelNotFound: "Model does not exist or is not available yet.",
-      errorUpstreamError: "Upstream model service error.",
+      errorUpstreamError: "Model service temporarily unavailable.",
       errorRateLimited: "Requests are being sent too quickly.",
       createApiKey: "Create API Key",
       openPlayground: "Open Playground",
@@ -2874,7 +2874,7 @@ export const messages = {
       customerPathTitle: "Customer integration path",
       customerPathDesc: "Six steps from API Key to Usage / Credits reconciliation.",
       customerPathIntro:
-        "Tokfai is an OpenAI-compatible API gateway. Your backend holds the API Key; Tokfai routes Chat, Image, and Batch to upstream models.",
+        "Tokfai is an OpenAI-compatible API gateway. Your backend holds the API Key; Tokfai routes Chat, Image, and Batch requests.",
       customerPathStep1: "Create API Key in Dashboard.",
       customerPathStep2: "Copy one-line Chat curl (includes your key).",
       customerPathStep3: "Paste in any terminal — expect HTTP 200.",
@@ -3423,7 +3423,7 @@ export const messages = {
       chatApiOpenAiFormat:
         "OpenAI-compatible JSON body. Core fields: model (string), messages (array of role + content), stream (boolean).",
       chatApiAutoFastNote:
-        "Default production model: auto-fast — Tokfai routes to the first available fast upstream model.",
+        "Default production model: auto-fast — Tokfai routes to the first available fast model.",
       chatApiTerminalNote:
         "Copy the one-line curl below and paste into any terminal (Mac, Windows PowerShell, or Linux). No project folder or cd required.",
       chatApiCopyNowTitle: "You can copy now",
@@ -3442,7 +3442,7 @@ export const messages = {
       chatApiFieldRequestedModel:
         "tokfai.requested_model — the model id you sent (e.g. auto-fast).",
       chatApiFieldResolvedModel:
-        "tokfai.resolved_model — the upstream model Tokfai actually used.",
+        "tokfai.resolved_model — the model id Tokfai actually served.",
       chatApiReconcileTitle: "Reconcile with Usage / Credits:",
       chatApiReconcileStep1: "Copy request_id from the JSON response.",
       chatApiReconcileStep2: "Open Usage and search the request_id — confirm model, tokens, and credits_charged.",
@@ -3458,9 +3458,9 @@ export const messages = {
       chatApiErrorModelNotAvailable:
         "model_not_available / model_not_found — model id unavailable or misspelled. Try auto-fast or browse Models.",
       chatApiErrorUpstreamBusy:
-        "upstream_model_busy / upstream_timeout — upstream busy or slow. Retry or use auto-fast / auto-pro.",
+        "upstream_model_busy / upstream_timeout — model busy or slow. Retry or use auto-fast / auto-pro.",
       chatApiBody:
-        "Use auto-fast for production chat. The response model field shows which upstream model served the request.",
+        "Use auto-fast for production chat. The response model field shows which model id Tokfai served.",
       chatApiChapterPurpose:
         "Send OpenAI-compatible chat requests from your app, script, or IDE.",
       chatApiChapterCopy:
@@ -3488,9 +3488,9 @@ export const messages = {
       imageApiReferenceCopyLabel: "One-line curl with image_urls",
       imageApiBillingTitle: "Billing:",
       imageApiBillingSuccessOnly:
-        "Credits are charged only after a successful generation (status completed with data[].url).",
+        "Success (status completed with data[].url) → billable. Credits are charged only then.",
       imageApiBillingFailures:
-        "Failures and timeouts are not charged — check Usage / tokfai.billing_status for the official record.",
+        "Failed / timeout → not_billable (not charged). Success → billable. Check Usage / tokfai.billing_status for the official record.",
       imageApiBillingInsufficient:
         "insufficient_credits when balance is too low — top up in Credits before generating.",
       imageApiBillingMoreExpensive:
@@ -3664,7 +3664,7 @@ export const messages = {
       sdkReconcileCredits:
         "credits_charged — credits debited for this call when present.",
       sdkReconcileResolvedModel:
-        "tokfai.resolved_model — upstream model Tokfai routed to (may differ from the model you sent).",
+        "tokfai.resolved_model — the model id Tokfai routed to (may differ from the model you sent).",
       sdkBillingTitle: "Credits and billing",
       sdkBillingSuccess:
         "HTTP 200 / 202 with a successful result usually debits credits.",
@@ -3736,14 +3736,14 @@ export const messages = {
       cursorVerifyResponseCredits:
         "credits_charged — credits debited when present.",
       cursorVerifyResponseResolvedModel:
-        "tokfai.resolved_model — upstream model Tokfai routed to.",
+        "tokfai.resolved_model — the model id Tokfai routed to.",
       cursorReconcileTitle: "Reconcile with Usage / Credits",
       cursorReconcileRequestId:
         "Copy request_id from the response or Cursor logs → search in Usage.",
       cursorReconcileCredits:
         "Match credits_charged on the Usage row with Credits ledger amount.",
       cursorReconcileResolvedModel:
-        "tokfai.resolved_model shows which upstream model served the request.",
+        "tokfai.resolved_model shows which model id Tokfai served for the request.",
       cursorBillingTitle: "Credits and billing",
       cursorBillingSuccess: "Successful requests debit credits.",
       cursorBillingFailed:
@@ -3759,7 +3759,7 @@ export const messages = {
       cursorErrorModel:
         "model_not_available / model_not_found — model name wrong. Start with auto-fast.",
       cursorErrorUpstreamBusy:
-        "upstream_model_busy — upstream busy. Retry or use auto-fast.",
+        "upstream_model_busy — model busy. Retry or use auto-fast.",
       cursorErrorTimeout: "upstream_timeout — upstream slow. Retry after a short wait.",
       cursorErrorRateLimit:
         "too_many_requests / too_many_concurrent_requests — reduce rate or concurrency.",
@@ -3822,7 +3822,7 @@ export const messages = {
       cherryVerifyResponseRequestedModel:
         "tokfai.requested_model — the model id you sent (e.g. auto-fast).",
       cherryVerifyResponseResolvedModel:
-        "tokfai.resolved_model — upstream model Tokfai routed to.",
+        "tokfai.resolved_model — the model id Tokfai routed to.",
       cherryReconcileTitle: "Reconcile with Usage / Credits",
       cherryReconcileUiNote:
         "Cherry Studio may not show the full API response — that is normal.",
@@ -3844,7 +3844,7 @@ export const messages = {
       cherryTroubleshootModel:
         "model_not_available — switch to auto-fast under | tokfai, or browse Models.",
       cherryTroubleshootWrongProvider:
-        "If the request path is not api.tokfai.com (grsaiapi.com / openai.com / googleapis.com / generativelanguage.googleapis.com), the request did not go through Tokfai — wrong Cherry Studio provider, not a Tokfai API error. Switch to OpenAI Compatible named Tokfai. Correct: Tokfai GPT-5.4 Pro | Tokfai. Wrong: GPT 5.4 Pro | OpenAI or Gemini 3.1 Pro Preview | Gemini.",
+        "If the request path is not api.tokfai.com (e.g. openai.com / googleapis.com / generativelanguage.googleapis.com), the request did not go through Tokfai — wrong Cherry Studio provider, not a Tokfai API error. Switch to OpenAI Compatible named Tokfai. Correct: Tokfai GPT-5.4 Pro | Tokfai. Wrong: GPT 5.4 Pro | OpenAI or Gemini 3.1 Pro Preview | Gemini.",
       cherryTroubleshootTimeout:
         "upstream_timeout — retry after a short wait or switch to auto-fast.",
       cherryTroubleshootCredits:
@@ -3858,7 +3858,7 @@ export const messages = {
       cherryErrorModel:
         "model_not_available / model_not_found — model name wrong. Start with auto-fast under | tokfai.",
       cherryErrorUpstreamBusy:
-        "upstream_model_busy — upstream busy. Retry or switch to auto-fast.",
+        "upstream_model_busy — model busy. Retry or switch to auto-fast.",
       cherryErrorTimeout: "upstream_timeout — upstream slow. Retry after a short wait.",
       cherryErrorRateLimit:
         "too_many_requests / too_many_concurrent_requests — reduce rate or concurrency.",
@@ -5891,7 +5891,7 @@ export const messages = {
           "建议先用小套餐完成接入测试，确认模型、质量和消耗后再放量。",
         smartRoutingTitle: "别名 / 智能路由",
         smartRoutingDesc:
-          "使用 auto-* 别名作为稳定入口。Tokfai 按顺序尝试上游模型，并在响应中返回实际成功的 model。",
+          "使用 auto-* 别名作为稳定入口。Tokfai 按顺序尝试可用模型，并在响应中返回实际成功的 model。",
         smartRoutingAlias: {
           "auto-fast":
             "推荐默认 — 快速稳定对话。回退顺序：gemini-3-flash → gemini-2.5-flash → gemini-3-pro。",
@@ -6410,7 +6410,7 @@ export const messages = {
           modelNotFound: "模型不存在或暂未开放，请换一个模型。",
           upstreamError: "当前模型暂时不可用或负载较高。",
           upstreamTimeout: "当前模型暂时不可用或负载较高。",
-          upstreamModelBusy:
+          modelBusy:
             "当前模型负载较高，请稍后重试或切换 auto-fast。",
           modelNotAvailable:
             "当前模型暂不可用，请切换推荐模型。",
@@ -6860,9 +6860,9 @@ export const messages = {
         "auto-pro": "高质量别名 — 优先 gpt-5.5，再回退到其他 Pro 模型。",
         "auto-cheap": "低成本别名 — 优先 gemini-2.5-flash，再 gemini-3-flash。",
         "gemini-3-flash": "稳定真实模型 — 也是 auto-fast 的第一跳。",
-        "gpt-5.4": "高质量模型，上游高负载时可能暂时不可用。",
-        "gpt-5.5": "高质量模型，上游高负载时可能暂时不可用。",
-        "gpt-4o-mini": "可能不可用，视上游注册状态，请勿作为接入示例。",
+        "gpt-5.4": "高质量模型，高负载时可能暂时不可用。",
+        "gpt-5.5": "高质量模型，高负载时可能暂时不可用。",
+        "gpt-4o-mini": "可能不可用，请勿作为接入示例。",
         "gemini-3.1-pro":
           "高负载时可能暂时不可用。稳定路由请使用 auto-fast 或 auto-pro。",
         "gemini-3-pro":
@@ -6953,7 +6953,7 @@ export const messages = {
         "首次接入建议从 auto-fast 开始 Playground 与 API 测试 — Tokfai 会在上游繁忙时自动切换。高质量场景用 auto-pro，批量低成本用 auto-cheap。gpt-5.4 / gpt-5.5 为明确指定的高质量 ID，高负载时可能暂时不可用。",
       smartRoutingTitle: "智能路由别名",
       smartRoutingDesc:
-        "在 model 字段传入 auto-fast、auto-pro 或 auto-cheap。响应中的 model 字段为实际成功的上游模型。明确指定 model ID 时不会自动 fallback。",
+        "在 model 字段传入 auto-fast、auto-pro 或 auto-cheap。响应中的 model 字段为实际成功的模型 id。明确指定 model ID 时不会自动 fallback。",
       smartRoutingAutoFast:
         "auto-fast — 默认快速稳定：gemini-3-flash → gemini-2.5-flash → gemini-3-pro",
       smartRoutingAutoPro:
@@ -7015,7 +7015,7 @@ export const messages = {
       externalVerifyModelsTitle: "2. 列出 models",
       externalVerifyChatTitle: "3. Chat completion（model auto-fast）",
       externalVerificationModelNote:
-        "首次接入建议用 auto-fast 做 smoke test — 上游繁忙时 Tokfai 会自动切换。高质量场景用 auto-pro。明确指定 gpt-5.4 / gpt-5.5 可能返回 upstream_model_busy（HTTP 503）。请勿使用 gpt-4o-mini，上游未注册。",
+        "首次接入建议用 auto-fast 做 smoke test — 模型繁忙时 Tokfai 会自动切换。高质量场景用 auto-pro。明确指定 gpt-5.4 / gpt-5.5 可能返回 upstream_model_busy（HTTP 503）。请勿使用 gpt-4o-mini，该模型未在 Tokfai 注册。",
       cherryStudioLabel: "Cherry Studio",
       cherryStudioSteps:
         "设置 → 服务商 → OpenAI Compatible（自定义）。名称 Tokfai，API 地址 https://api.tokfai.com/v1，API Key sk-tokfai_…，模型必须从 Tokfai 下选择。不要选择 OpenAI / Gemini 内置供应商。正确：Tokfai GPT-5.4 Pro | Tokfai。错误：GPT 5.4 Pro | OpenAI 或 Gemini 3.1 Pro Preview | Gemini。",
@@ -7026,7 +7026,7 @@ export const messages = {
       cherryStudioError404:
         "在 | tokfai 供应商下选择 Tokfai model ID（如 auto-fast）。图片专用模型不要用于聊天客户端。",
       cherryStudioErrorWrongProvider:
-        "如果请求路径不是 api.tokfai.com（例如 grsaiapi.com、openai.com、googleapis.com），说明没有走 Tokfai——这是 Cherry Studio 供应商选错，不是 Tokfai API 错误。请改回自定义 OpenAI Compatible，名称 Tokfai。正确：Tokfai GPT-5.4 Pro | Tokfai。错误：GPT 5.4 Pro | OpenAI。",
+        "如果请求路径不是 api.tokfai.com（例如 openai.com、googleapis.com），说明没有走 Tokfai——这是 Cherry Studio 供应商选错，不是 Tokfai API 错误。请改回自定义 OpenAI Compatible，名称 Tokfai。正确：Tokfai GPT-5.4 Pro | Tokfai。错误：GPT 5.4 Pro | OpenAI。",
       cherryStudioError500:
         "模型服务暂时不可用 — 稍后重试或切换 model。",
       cursorLabel: "Cursor",
@@ -7039,7 +7039,7 @@ export const messages = {
       cursorError404:
         "在 model 选择器中选择 Tokfai model ID（如 auto-fast）。完整列表见 Models。",
       cursorError500:
-        "重试请求或切换 model — 上游服务可能短暂不可用。",
+        "重试请求或切换 model — 模型服务可能短暂不可用。",
       openAiSdkLabel: "OpenAI SDK",
       openAiSdkSteps:
         "将 baseURL 设为 https://api.tokfai.com/v1，apiKey 设为 sk-tokfai_… 密钥。首次接入默认对话 model 建议使用 auto-fast。",
@@ -7064,8 +7064,8 @@ export const messages = {
       error404Route: "api.tokfai.com 上不存在该 HTTP 路径",
       errorWrongProvider:
         "请求未经过 Tokfai — 客户端选错了供应商",
-      error429: "上游模型限流 — 请指数退避后重试",
-      error500: "模型或上游服务暂时不可用 — 请稍后重试",
+      error429: "模型限流 — 请指数退避后重试",
+      error500: "模型服务暂时不可用 — 请稍后重试",
       errorInvalidPrompt: "图像生成缺少或为空 prompt",
       errorInvalidImageUrl: "图片 URL 格式无效或不被允许",
       errorImageUrlUnreachable: "Tokfai 无法从提供的 URL 拉取图片",
@@ -7130,7 +7130,7 @@ export const messages = {
       errorInvalidToken: "API Key 错误、已吊销或格式不对。",
       errorInsufficientCredits: "余额不足。",
       errorModelNotFound: "模型不存在或暂未开放。",
-      errorUpstreamError: "上游模型服务异常。",
+      errorUpstreamError: "模型服务暂时不可用。",
       errorRateLimited: "请求过快。",
       createApiKey: "创建 API Key",
       openPlayground: "打开 Playground",
@@ -8192,7 +8192,7 @@ export const messages = {
       customerPathTitle: "客户接入路径",
       customerPathDesc: "从 API Key 到 Usage / Credits 对账的六步路径。",
       customerPathIntro:
-        "Tokfai 是 OpenAI 兼容 API 网关。API Key 保存在您的后端；Tokfai 路由 Chat、Image 与 Batch 到上游模型。",
+        "Tokfai 是 OpenAI 兼容 API 网关。API Key 保存在您的后端；Tokfai 路由 Chat、Image 与 Batch 请求。",
       customerPathStep1: "在 Dashboard 创建 API Key。",
       customerPathStep2: "复制单行 Chat curl（含您的密钥）。",
       customerPathStep3: "粘贴到任意终端 — 预期 HTTP 200。",
@@ -8728,7 +8728,7 @@ export const messages = {
       chatApiFieldRequestedModel:
         "tokfai.requested_model — 你请求的 model id（如 auto-fast）。",
       chatApiFieldResolvedModel:
-        "tokfai.resolved_model — Tokfai 实际上游使用的模型。",
+        "tokfai.resolved_model — Tokfai 实际服务的模型 id。",
       chatApiReconcileTitle: "在 Usage / Credits 对账：",
       chatApiReconcileStep1: "从 JSON 响应复制 request_id。",
       chatApiReconcileStep2:
@@ -8774,9 +8774,9 @@ export const messages = {
       imageApiReferenceCopyLabel: "带 image_urls 的单行 curl",
       imageApiBillingTitle: "计费说明：",
       imageApiBillingSuccessOnly:
-        "仅在成功生成后扣算力积分（status=completed 且返回 data[].url）。",
+        "成功（status=completed 且返回 data[].url）→ billable，此时才扣算力积分。",
       imageApiBillingFailures:
-        "失败与超时不扣费 — 以 Usage / tokfai.billing_status 为准。",
+        "失败 / 超时 → not_billable（不扣费）。成功 → billable。以 Usage / tokfai.billing_status 为准。",
       imageApiBillingInsufficient:
         "余额不足时返回 insufficient_credits — 生成前请在 Credits 充值。",
       imageApiBillingMoreExpensive:
@@ -8947,7 +8947,7 @@ export const messages = {
         "request_id — 从 SDK 响应复制（顶层或 tokfai.request_id），在 Usage 中搜索。",
       sdkReconcileCredits: "credits_charged — 本次调用扣减的 credits（如有）。",
       sdkReconcileResolvedModel:
-        "tokfai.resolved_model — Tokfai 实际路由的上游模型（可能与发送的 model 不同）。",
+        "tokfai.resolved_model — Tokfai 实际路由的模型 id（可能与发送的 model 不同）。",
       sdkBillingTitle: "扣费说明",
       sdkBillingSuccess: "HTTP 200 / 202 且成功结果通常扣 credits。",
       sdkBillingFailed: "失败、鉴权错误、取消通常不扣费。",
@@ -9010,11 +9010,11 @@ export const messages = {
       cursorVerifyResponseRequestedModel:
         "tokfai.requested_model — 你发送的 model id（如 auto-fast）。",
       cursorVerifyResponseCredits: "credits_charged — 如有则表示本次扣减 credits。",
-      cursorVerifyResponseResolvedModel: "tokfai.resolved_model — Tokfai 实际路由的上游模型。",
+      cursorVerifyResponseResolvedModel: "tokfai.resolved_model — Tokfai 实际路由的模型 id。",
       cursorReconcileTitle: "与 Usage / Credits 对账",
       cursorReconcileRequestId: "从响应或 Cursor 日志复制 request_id → 在 Usage 搜索。",
       cursorReconcileCredits: "核对 Usage 行 credits_charged 与 Credits 账本金额。",
-      cursorReconcileResolvedModel: "tokfai.resolved_model 显示实际上游模型。",
+      cursorReconcileResolvedModel: "tokfai.resolved_model 显示 Tokfai 实际服务的模型 id。",
       cursorBillingTitle: "扣费说明",
       cursorBillingSuccess: "成功请求会扣 credits。",
       cursorBillingFailed: "失败、鉴权错误、服务失败通常不扣费。",
@@ -9083,7 +9083,7 @@ export const messages = {
         "usage.prompt_tokens / completion_tokens / total_tokens — token 计数。",
       cherryVerifyResponseRequestedModel:
         "tokfai.requested_model — 你发送的 model id（如 auto-fast）。",
-      cherryVerifyResponseResolvedModel: "tokfai.resolved_model — Tokfai 路由的上游模型。",
+      cherryVerifyResponseResolvedModel: "tokfai.resolved_model — Tokfai 路由的模型 id。",
       cherryReconcileTitle: "与 Usage / Credits 对账",
       cherryReconcileUiNote: "Cherry Studio 界面可能不展示完整 API 响应 — 属正常情况。",
       cherryReconcileRequestId: "若日志或响应中有 request_id，复制后在 Usage 搜索。",
@@ -9102,7 +9102,7 @@ export const messages = {
       cherryTroubleshootModel:
         "model_not_available — 在 | tokfai 下换 auto-fast，或浏览 Models。",
       cherryTroubleshootWrongProvider:
-        "如果请求路径不是 api.tokfai.com（grsaiapi.com / openai.com / googleapis.com / generativelanguage.googleapis.com），说明没有走 Tokfai——这是 Cherry Studio 供应商选错，不是 Tokfai API 错误。请改回 OpenAI Compatible，名称 Tokfai。正确：Tokfai GPT-5.4 Pro | Tokfai。错误：GPT 5.4 Pro | OpenAI 或 Gemini 3.1 Pro Preview | Gemini。",
+        "如果请求路径不是 api.tokfai.com（例如 openai.com / googleapis.com / generativelanguage.googleapis.com），说明没有走 Tokfai——这是 Cherry Studio 供应商选错，不是 Tokfai API 错误。请改回 OpenAI Compatible，名称 Tokfai。正确：Tokfai GPT-5.4 Pro | Tokfai。错误：GPT 5.4 Pro | OpenAI 或 Gemini 3.1 Pro Preview | Gemini。",
       cherryTroubleshootTimeout:
         "upstream_timeout — 稍后重试或换 auto-fast。",
       cherryTroubleshootCredits:

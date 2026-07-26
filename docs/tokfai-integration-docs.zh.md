@@ -334,7 +334,7 @@ Auth：`Authorization: Bearer sk-tokfai_xxx`
 
 ## 异步流程与计费
 
-提交 → 返回 `task_id` → 轮询 GET → **成功才扣费**；**失败 / 超时不扣费**。
+提交 → 返回 `task_id` → 轮询 GET → **成功 → `billable`（扣费）**；**失败 / 超时 → `not_billable`（不扣费）**。
 
 必看响应字段：`id`、`task_id`、`status`、`progress`、`data[].url`、`usage.credits_charged`、`tokfai.billing_status`。
 
@@ -513,8 +513,7 @@ Chatbox / NextChat / OpenWebUI / Dify / FastGPT / Continue / Cline / Roo Code �
 
 - 错误详情请求路径是 `https://api.tokfai.com/v1` → 已走 Tokfai；检查模型名  
 - **如果请求路径不是 api.tokfai.com，说明没有走 Tokfai**——这不是 Tokfai API 错误，而是 Cherry Studio 供应商选错  
-- 若错误详情出现 `grsaiapi.com`、`openai.com`、`googleapis.com`、`generativelanguage.googleapis.com` 等主机 → 选错了内置供应商，请求未经过 Tokfai  
-- 如果出现 grsaiapi.com，说明没有走 Tokfai — 请切回 `| Tokfai` / `| tokfai`  
+- 若错误详情出现 `openai.com`、`googleapis.com`、`generativelanguage.googleapis.com` 等非 Tokfai 主机 → 选错了内置供应商，请求未经过 Tokfai — 请切回 `| Tokfai` / `| tokfai`，Base URL 填 `https://api.tokfai.com/v1`  
 - `model_not_available` → 换上表模型 id（仍须在 Tokfai 供应商下）  
 - `insufficient_credits` → Dashboard → Credits 充值  
 - `rate_limited` → 降低并发后重试  
@@ -664,7 +663,7 @@ Base URL 必须是 `https://api.tokfai.com`，API Key 仍是 Tokfai `sk-tokfai_�
 - Cherry 是否选中了 **Tokfai / `| tokfai`**（正确示例：`Tokfai GPT-5.4 Pro | Tokfai`；错误示例：`GPT 5.4 Pro | OpenAI`、`Gemini 3.1 Pro Preview | Gemini`）  
 - Base URL 是否为 `https://api.tokfai.com/v1`  
 - **如果请求路径不是 api.tokfai.com，说明没有走 Tokfai**  
-- 如果出现 grsaiapi.com，说明没有走 Tokfai（或错误详情出现 openai.com / googleapis.com / generativelanguage.googleapis.com）→ 供应商选错，不是 Tokfai API 故障  
+- 若错误详情出现 openai.com / googleapis.com / generativelanguage.googleapis.com 等非 Tokfai 主机 → 供应商选错，不是 Tokfai API 故障  
 
 ## 有调用但 Usage 无条目
 - 可能请求打到了错误的 Base URL 或选错了内置供应商  

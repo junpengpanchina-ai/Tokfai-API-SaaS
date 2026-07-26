@@ -4,9 +4,9 @@ Next.js frontend for the Tokfai dashboard and marketing site. Deployed on **Verc
 
 Tokfai is a **KA enterprise AI aggregation platform** (not a single chat tool):
 
-- Text & code: GPT / Gemini → `/v1/chat/completions` or `/v1/responses`
-- Image generation: Nano Banana → `/v1/images/generations` (async `task_id` poll; bill on success)
-- Video: reserved / coming soon
+- Text & code: GPT / Gemini → `/v1/chat/completions` or `/v1/responses` (Base URL `https://api.tokfai.com/v1`)
+- Image API / 图片工作台: Nano Banana → `POST /v1/images/generations` (submit → `task_id` → poll; success `billable`, failed/timeout `not_billable`)
+- Video: reserved / coming soon (not a production path)
 
 This repo is a monorepo:
 

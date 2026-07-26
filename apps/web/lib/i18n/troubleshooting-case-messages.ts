@@ -102,7 +102,7 @@ export const troubleshootingCaseMessagesEn: Record<string, string> = {
 
   "integration.troubleshooting.case.upstream_model_busy.title": "upstream_model_busy — model congested",
   "integration.troubleshooting.case.upstream_model_busy.likelyCause":
-    "Upstream capacity is busy — common on premium models at peak.",
+    "Model capacity is busy — common on premium models at peak.",
   "integration.troubleshooting.case.upstream_model_busy.action1":
     "Retry with backoff — or route via auto-fast / auto-cheap aliases.",
   "integration.troubleshooting.case.upstream_model_busy.action2":
@@ -112,7 +112,7 @@ export const troubleshootingCaseMessagesEn: Record<string, string> = {
 
   "integration.troubleshooting.case.upstream_timeout.title": "upstream_timeout — request timed out",
   "integration.troubleshooting.case.upstream_timeout.likelyCause":
-    "Upstream did not finish within the gateway timeout — slow model or large prompt.",
+    "The model did not finish within the gateway timeout — slow model or large prompt.",
   "integration.troubleshooting.case.upstream_timeout.action1":
     "Search Usage by request_id — if no debit, safe to retry with backoff.",
   "integration.troubleshooting.case.upstream_timeout.action2":
@@ -130,9 +130,9 @@ export const troubleshootingCaseMessagesEn: Record<string, string> = {
   "integration.troubleshooting.case.gateway_overloaded.action3":
     "Usually not charged.",
 
-  "integration.troubleshooting.case.upstream_rate_limited.title": "upstream_rate_limited — upstream throttled",
+  "integration.troubleshooting.case.upstream_rate_limited.title": "upstream_rate_limited — rate limited",
   "integration.troubleshooting.case.upstream_rate_limited.likelyCause":
-    "Tokfai or upstream rate limits were hit — too many requests in a short window.",
+    "Rate limits were hit — too many requests in a short window.",
   "integration.troubleshooting.case.upstream_rate_limited.action1":
     "Backoff retry — max 3 attempts with increasing delay.",
   "integration.troubleshooting.case.upstream_rate_limited.action2":
@@ -140,9 +140,9 @@ export const troubleshootingCaseMessagesEn: Record<string, string> = {
   "integration.troubleshooting.case.upstream_rate_limited.action3":
     "Usually not charged.",
 
-  "integration.troubleshooting.case.upstream_error.title": "upstream_error — upstream failure",
+  "integration.troubleshooting.case.upstream_error.title": "upstream_error — service error",
   "integration.troubleshooting.case.upstream_error.likelyCause":
-    "Upstream returned an error Tokfai could not map to a finer code.",
+    "The model service returned an error Tokfai could not map to a finer code.",
   "integration.troubleshooting.case.upstream_error.action1":
     "Copy request_id and search Usage — confirm whether credits were debited.",
   "integration.troubleshooting.case.upstream_error.action2":
@@ -184,7 +184,7 @@ export const troubleshootingCaseMessagesEn: Record<string, string> = {
   "integration.troubleshooting.case.image_generation_failed.title":
     "image_generation_failed — image job failed",
   "integration.troubleshooting.case.image_generation_failed.likelyCause":
-    "Image upstream failed after accepting the request.",
+    "Image generation failed after the request was accepted.",
   "integration.troubleshooting.case.image_generation_failed.action1":
     "Search Usage by request_id — confirm credits_charged.",
   "integration.troubleshooting.case.image_generation_failed.action2":
@@ -262,7 +262,7 @@ export const troubleshootingCaseMessagesEn: Record<string, string> = {
   "integration.troubleshooting.case.cherry_connection_failed.action1":
     "Use custom OpenAI Compatible named Tokfai only — Base URL https://api.tokfai.com/v1 and an sk-tokfai_… key. Correct: Tokfai GPT-5.4 Pro | Tokfai. Wrong: GPT 5.4 Pro | OpenAI.",
   "integration.troubleshooting.case.cherry_connection_failed.action2":
-    "If the request path is not api.tokfai.com (e.g. grsaiapi.com / openai.com / googleapis.com), the request did not go through Tokfai — wrong provider, not a Tokfai API error.",
+    "If the request path is not api.tokfai.com (e.g. openai.com / googleapis.com), the request did not go through Tokfai — wrong provider, not a Tokfai API error.",
   "integration.troubleshooting.case.cherry_connection_failed.action3":
     "Copy Cherry Studio config from Docs → Cherry Studio.",
 
@@ -376,9 +376,9 @@ export const troubleshootingCaseMessagesZh: Record<string, string> = {
     "5–30 秒后退避重试（最多 3 次）。",
   "integration.troubleshooting.case.model_not_available.action3": "通常不扣费。",
 
-  "integration.troubleshooting.case.upstream_model_busy.title": "upstream_model_busy — 上游繁忙",
+  "integration.troubleshooting.case.upstream_model_busy.title": "upstream_model_busy — 模型繁忙",
   "integration.troubleshooting.case.upstream_model_busy.likelyCause":
-    "上游容量繁忙 — 高峰时 premium 模型常见。",
+    "模型容量繁忙 — 高峰时 premium 模型常见。",
   "integration.troubleshooting.case.upstream_model_busy.action1":
     "退避重试 — 或通过 auto-fast / auto-cheap 别名路由。",
   "integration.troubleshooting.case.upstream_model_busy.action2":
@@ -386,9 +386,9 @@ export const troubleshootingCaseMessagesZh: Record<string, string> = {
   "integration.troubleshooting.case.upstream_model_busy.action3":
     "通常不扣费 — 有 request_id 时在 Usage 核对。",
 
-  "integration.troubleshooting.case.upstream_timeout.title": "upstream_timeout — 上游超时",
+  "integration.troubleshooting.case.upstream_timeout.title": "upstream_timeout — 请求超时",
   "integration.troubleshooting.case.upstream_timeout.likelyCause":
-    "网关在超时前未收到上游完成 — 慢模型或大提示词。",
+    "网关在超时前未收到完成结果 — 慢模型或大提示词。",
   "integration.troubleshooting.case.upstream_timeout.action1":
     "在 Usage 搜 request_id — 无扣费可安全退避重试。",
   "integration.troubleshooting.case.upstream_timeout.action2":
@@ -405,18 +405,18 @@ export const troubleshootingCaseMessagesZh: Record<string, string> = {
     "按容量规划器设置客户端并发上限。",
   "integration.troubleshooting.case.gateway_overloaded.action3": "通常不扣费。",
 
-  "integration.troubleshooting.case.upstream_rate_limited.title": "upstream_rate_limited — 上游限流",
+  "integration.troubleshooting.case.upstream_rate_limited.title": "upstream_rate_limited — 限流",
   "integration.troubleshooting.case.upstream_rate_limited.likelyCause":
-    "短时间内请求过多触发 Tokfai 或上游限流。",
+    "短时间内请求过多触发限流。",
   "integration.troubleshooting.case.upstream_rate_limited.action1":
     "退避重试 — 最多 3 次递增延迟。",
   "integration.troubleshooting.case.upstream_rate_limited.action2":
     "大批量文案走 Batch — 不要同步 Chat 洪峰。",
   "integration.troubleshooting.case.upstream_rate_limited.action3": "通常不扣费。",
 
-  "integration.troubleshooting.case.upstream_error.title": "upstream_error — 上游错误",
+  "integration.troubleshooting.case.upstream_error.title": "upstream_error — 服务错误",
   "integration.troubleshooting.case.upstream_error.likelyCause":
-    "上游返回错误，Tokfai 无法映射为更细的错误码。",
+    "模型服务返回错误，Tokfai 无法映射为更细的错误码。",
   "integration.troubleshooting.case.upstream_error.action1":
     "复制 request_id 在 Usage 搜索 — 确认是否扣费。",
   "integration.troubleshooting.case.upstream_error.action2":
@@ -452,7 +452,7 @@ export const troubleshootingCaseMessagesZh: Record<string, string> = {
   "integration.troubleshooting.case.image_generation_failed.title":
     "image_generation_failed — 图像生成失败",
   "integration.troubleshooting.case.image_generation_failed.likelyCause":
-    "请求已接受但图像上游最终失败。",
+    "请求已接受但图像生成最终失败。",
   "integration.troubleshooting.case.image_generation_failed.action1":
     "在 Usage 搜 request_id 确认 credits_charged。",
   "integration.troubleshooting.case.image_generation_failed.action2":
@@ -528,7 +528,7 @@ export const troubleshootingCaseMessagesZh: Record<string, string> = {
   "integration.troubleshooting.case.cherry_connection_failed.action1":
     "只使用自定义 OpenAI Compatible，名称 Tokfai — API 地址 https://api.tokfai.com/v1，API Key 以 sk-tokfai_ 开头。正确：Tokfai GPT-5.4 Pro | Tokfai。错误：GPT 5.4 Pro | OpenAI。",
   "integration.troubleshooting.case.cherry_connection_failed.action2":
-    "如果请求路径不是 api.tokfai.com（例如 grsaiapi.com / openai.com / googleapis.com），说明没有走 Tokfai——这是供应商选错，不是 Tokfai API 错误。",
+    "如果请求路径不是 api.tokfai.com（例如 openai.com / googleapis.com），说明没有走 Tokfai——这是供应商选错，不是 Tokfai API 错误。",
   "integration.troubleshooting.case.cherry_connection_failed.action3":
     "从文档 → Cherry Studio 复制正确配置。",
 

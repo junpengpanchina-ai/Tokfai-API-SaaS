@@ -770,7 +770,7 @@ Tokfai 是 **KA 大客户 AI 聚合平台**。图片能力与文本能力分离�
 
 1. \`POST /v1/images/generations\` 提交任务 → 返回 \`id\` / \`task_id\`
 2. \`GET /v1/images/generations/:task_id\` 轮询进度与结果
-3. **成功才扣费**；**失败 / 超时不扣费**（见 \`usage.credits_charged\` 与 \`tokfai.billing_status\`）
+3. **成功 → \`tokfai.billing_status: billable\`（扣费）**；**失败 / 超时 → \`not_billable\`（不扣费）**（见 \`usage.credits_charged\` 与 \`tokfai.billing_status\`）
 
 ## 请求字段
 
@@ -864,7 +864,7 @@ Tokfai is a **KA enterprise AI aggregation platform**. Image and text capabiliti
 
 1. \`POST /v1/images/generations\` submit → returns \`id\` / \`task_id\`
 2. \`GET /v1/images/generations/:task_id\` poll for progress + result
-3. **Billed on success only**; **failure / timeout not charged** (\`usage.credits_charged\`, \`tokfai.billing_status\`)
+3. **Success → \`tokfai.billing_status: billable\` (charged)**; **failed / timeout → \`not_billable\` (not charged)** (\`usage.credits_charged\`, \`tokfai.billing_status\`)
 
 ## Request fields
 
@@ -1062,8 +1062,7 @@ Chatbox 与其它 OpenAI-compatible 客户端使用相同规则。完整矩阵�
 
 - 错误详情请求路径是 \`https://api.tokfai.com/v1\` → 已走 Tokfai；检查模型名  
 - **如果请求路径不是 api.tokfai.com，说明没有走 Tokfai**——这不是 Tokfai API 错误，而是 Cherry Studio 供应商选错  
-- 若错误详情出现 \`grsaiapi.com\`、\`openai.com\`、\`googleapis.com\`、\`generativelanguage.googleapis.com\` 等主机 → 选错了内置供应商，请求未经过 Tokfai  
-- 如果出现 grsaiapi.com，说明没有走 Tokfai — 请切回 \`| Tokfai\` / \`| tokfai\`，Base URL 填 \`https://api.tokfai.com/v1\`  
+- 若错误详情出现 \`openai.com\`、\`googleapis.com\`、\`generativelanguage.googleapis.com\` 等非 Tokfai 主机 → 选错了内置供应商，请求未经过 Tokfai — 请切回 \`| Tokfai\` / \`| tokfai\`，Base URL 填 \`https://api.tokfai.com/v1\`  
 - \`model_not_available\` → 换 \`gpt-5\` / \`gpt-5.4\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\` / \`gemini-3-pro\` / \`gemini-2.5-flash\`（仍须在 Tokfai 供应商下）  
 - \`insufficient_credits\` → Dashboard → Credits 充值  
 - \`rate_limited\` → 降低并发后重试  
@@ -1124,8 +1123,7 @@ Note: \`gpt-5.4\` maps to \`gpt-5\`; \`gpt-5.4-pro\` / \`GPT 5.4 Pro\` map to \`
 
 - Error path is \`https://api.tokfai.com/v1\` → you hit Tokfai; check the model id  
 - **If the request path is not api.tokfai.com, the request did not go through Tokfai** — this is a wrong Cherry Studio provider selection, not a Tokfai API failure  
-- If error details show \`grsaiapi.com\`, \`openai.com\`, \`googleapis.com\`, or \`generativelanguage.googleapis.com\` → built-in provider selected; traffic never hit Tokfai  
-- If error details show grsaiapi.com, the request did not go through Tokfai — switch back to \`| Tokfai\` / \`| tokfai\` and set Base URL to \`https://api.tokfai.com/v1\`  
+- If error details show \`openai.com\`, \`googleapis.com\`, or \`generativelanguage.googleapis.com\` (not api.tokfai.com) → built-in provider selected; traffic never hit Tokfai — switch back to \`| Tokfai\` / \`| tokfai\` and set Base URL to \`https://api.tokfai.com/v1\`  
 - \`model_not_available\` → use \`gpt-5\` / \`gpt-5.4\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\` / \`gemini-3-pro\` / \`gemini-2.5-flash\` (still under Tokfai)  
 - \`insufficient_credits\` → top up in Dashboard → Credits  
 - \`rate_limited\` → reduce concurrency and retry  
@@ -1586,8 +1584,7 @@ Usually not — Usage / Credits are authoritative. Reconcile with \`request_id\`
 - **不要选择 OpenAI / Gemini 内置供应商**  
 - Base URL 是否为 \`https://api.tokfai.com/v1\`  
 - **如果请求路径不是 api.tokfai.com，说明没有走 Tokfai**（这不是 Tokfai API 错误，而是客户端供应商选错）  
-- 如果出现 grsaiapi.com，说明没有走 Tokfai  
-- 请求路径是 grsaiapi.com / openai.com / googleapis.com / generativelanguage.googleapis.com → 选错供应商（不是 Tokfai 能拦截的问题）  
+- 若错误详情出现 openai.com / googleapis.com / generativelanguage.googleapis.com 等非 Tokfai 主机 → 选错供应商（不是 Tokfai 能拦截的问题）  
 - 请求路径是 \`api.tokfai.com\` → 已走 Tokfai；换 \`gpt-5\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\`  
 
 ## 图片模型在聊天客户端报错
@@ -1611,8 +1608,7 @@ Usually not — Usage / Credits are authoritative. Reconcile with \`request_id\`
 - Do not use built-in OpenAI / Gemini providers  
 - Confirm Base URL is \`https://api.tokfai.com/v1\`  
 - **If the request path is not api.tokfai.com, the request did not go through Tokfai** (wrong client provider, not a Tokfai API failure)  
-- If error details show grsaiapi.com, the request did not go through Tokfai  
-- Request path is grsaiapi.com / openai.com / googleapis.com / generativelanguage.googleapis.com → wrong provider (Tokfai cannot intercept that traffic)  
+- If error details show openai.com / googleapis.com / generativelanguage.googleapis.com (not api.tokfai.com) → wrong provider (Tokfai cannot intercept that traffic)  
 - Request path is \`api.tokfai.com\` → you hit Tokfai; try \`gpt-5\` / \`gpt-5-pro\` / \`gpt-5.4-pro\` / \`gpt-5.5\`  
 
 ## Image model errors in chat clients

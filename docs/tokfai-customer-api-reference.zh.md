@@ -177,10 +177,11 @@ disp(response);
 
 ---
 
-## 6. 图片生成 API
+## 6. Image API / 图片工作台
 
-Base URL：`https://api.tokfai.com`  
-Auth：`Authorization: Bearer sk-tokfai_xxx`
+Base URL：`https://api.tokfai.com/v1`  
+Auth：`Authorization: Bearer sk-tokfai_xxx`  
+接口：`POST /v1/images/generations`（图片工作台同路径）
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -201,7 +202,7 @@ Auth：`Authorization: Bearer sk-tokfai_xxx`
 
 1. `POST` 提交 → 返回 `id` / `task_id`  
 2. `GET /v1/images/generations/:task_id` 轮询  
-3. **成功才扣费**；**失败 / 超时不扣费**（看 `usage.credits_charged` 与 `tokfai.billing_status`）
+3. **成功 → `tokfai.billing_status: billable`（扣费）**；**失败 / 超时 → `not_billable`（不扣费）**（看 `usage.credits_charged` 与 `tokfai.billing_status`）
 
 ### 请求字段（示例必含）
 
@@ -356,29 +357,31 @@ Base URL 必须是 `https://api.tokfai.com`；鉴权仍用 Tokfai `sk-tokfai_…
 
 ## 8. Cherry Studio 接入
 
-对外只配置：API 地址 `https://api.tokfai.com`、Tokfai 控制台 API Key、带 `| tokfai` 后缀的模型（展示名如 `Tokfai GPT-5` / `Tokfai GPT-5.4 Pro`）。Chatbox / Codex 等同理。
+**只配置 Tokfai OpenAI Compatible（自定义），不要选 Cherry Studio 内置 OpenAI / Gemini / Google。**
 
-**不是选择 GPT-5 就代表正在使用 Tokfai。必须确认服务商是 Tokfai，或请求路径是 `https://api.tokfai.com`。**
+对外只配置：Base URL `https://api.tokfai.com/v1`、Tokfai 控制台 API Key、带 `| tokfai` 后缀的模型（展示名如 `Tokfai GPT-5` / `Tokfai GPT-5.4 Pro`）。Chatbox / Codex 等同理。
+
+**不是选择 GPT-5 就代表正在使用 Tokfai。必须确认服务商是 Tokfai，且请求路径是 `https://api.tokfai.com/v1`。**
 
 | 项 | 值 |
 |---|---|
 | 服务名称 | Tokfai |
 | 类型 | OpenAI Compatible / Custom OpenAI |
-| Base URL | `https://api.tokfai.com` |
+| Base URL | `https://api.tokfai.com/v1` |
 | API Key | Tokfai 控制台生成 |
 | 模型 id | `gpt-5` / `gpt-5-pro` / `gpt-5.4-pro` / `gpt-5.5` / `gemini-3-pro` |
 | 展示名 | `Tokfai GPT-5`、`Tokfai GPT-5 Pro`、`Tokfai GPT-5.4 Pro`、`Tokfai Gemini 3 Pro` |
 | 顶部必须显示 | `| tokfai` |
 
 正确：`Tokfai GPT-5 | tokfai`、`Tokfai GPT-5.4 Pro | tokfai`。  
-错误：`GPT 5 | OpenAI`、`GPT 5.4 Pro | OpenAI`、`Gemini | Google`、请求路径出现 grsaiapi.com。
+错误：`GPT 5 | OpenAI`、`GPT 5.4 Pro | OpenAI`、`Gemini | Google`，或请求路径不是 `api.tokfai.com`。
 
-如果出现 grsaiapi.com，说明没有走 Tokfai。  
+**如果请求路径不是 api.tokfai.com，说明没有走 Tokfai。**  
 `gpt-5.4-pro` / `GPT 5.4 Pro` 在 Tokfai 内兼容映射到 `gpt-5-pro`。
 
 强制隔离测试：只启用 Tokfai → 关闭其它服务商 → 获取模型列表 → 新建话题 → 顶部必须 `| tokfai` → Prompt：`只回答 TOKFAI_READY，不要解释。`
 
-排查：路径是 `api.tokfai.com` → 已走 Tokfai（检查模型名）；路径是 grsaiapi.com → 选错供应商。
+排查：路径是 `api.tokfai.com` → 已走 Tokfai（检查模型名）；路径不是 `api.tokfai.com`（例如 openai.com / googleapis.com）→ 选错了内置供应商。
 
 图片功能请使用 Tokfai 图片工作台或 `POST /v1/images/generations`。
 

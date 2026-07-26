@@ -220,7 +220,7 @@ function checkStaticSecurity() {
     fail("admin reason", "credits-adjust requires reason");
   } else pass("Admin write requires reason");
 
-  // Frontend leak scan — allow wrong-provider diagnostics (bare grsaiapi.com)
+  // Frontend leak scan — P950 forbids grsaiapi.com / GRSAI / upstreamModel on consumer surfaces
   const webFiles = [
     "apps/web/lib/docs/public-beta-docs-registry.ts",
     "apps/web/components/consumer-docs-guide.tsx",
