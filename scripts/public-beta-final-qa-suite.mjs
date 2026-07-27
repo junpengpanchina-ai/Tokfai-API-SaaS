@@ -393,7 +393,7 @@ async function checkChatResponses(base, apiKey) {
 async function checkImageAsync(base, apiKey) {
   console.log("\n── Image async ──");
   const { res, body } = await apiPost(base, "/v1/images/generations", apiKey, {
-    model: "gpt-image-2",
+    model: "nano-banana",
     prompt: "a red apple",
     n: 1,
     response_format: "url",

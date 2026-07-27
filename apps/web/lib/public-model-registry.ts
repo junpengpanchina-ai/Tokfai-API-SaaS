@@ -21,8 +21,8 @@ export type PublicModelStatus =
 export type PublicModelFamily = "gpt" | "gemini" | "image" | "auto";
 
 export type PublicModelGroupId =
-  | "recommended"
-  | "high_quality"
+  | "chat"
+  | "vision"
   | "image"
   | "aliases";
 
@@ -33,7 +33,8 @@ export type PublicModelTag =
   | "low_cost"
   | "image"
   | "vision"
-  | "alias";
+  | "alias"
+  | "coming_soon";
 
 export type RecommendedEndpoint =
   | "/v1/chat/completions"
@@ -57,6 +58,8 @@ export type PublicModel = {
   supportsStreaming: boolean;
   supportsImageInput: boolean;
   supportsImageGeneration: boolean;
+  /** Shown but not callable (e.g. GPT Image coming soon). */
+  comingSoon?: boolean;
   beginnerFriendly?: boolean;
   tags: PublicModelTag[];
   descriptionZh: string;
@@ -100,14 +103,14 @@ export const PUBLIC_MODELS_API_ALLOWLIST = [
 ] as const;
 
 export const PUBLIC_MODEL_REGISTRY: PublicModel[] = [
-  // —— Public chat ——
+  // —— Chat Models ——
   {
     id: "gpt-5.4",
     displayName: { zh: "GPT 5.4", en: "GPT 5.4" },
     family: "gpt",
     status: "public",
     visible: true,
-    group: "recommended",
+    group: "chat",
     recommendedEndpoint: "/v1/chat/completions or /v1/responses",
     supportsChatCompletions: true,
     supportsResponses: true,
@@ -127,7 +130,7 @@ export const PUBLIC_MODEL_REGISTRY: PublicModel[] = [
     family: "gpt",
     status: "public",
     visible: true,
-    group: "recommended",
+    group: "chat",
     recommendedEndpoint: "/v1/responses",
     supportsChatCompletions: true,
     supportsResponses: true,
@@ -141,13 +144,15 @@ export const PUBLIC_MODEL_REGISTRY: PublicModel[] = [
     bestForZh: "复杂推理、代码、工具调用、Agent / Codex",
     bestForEn: "Complex reasoning, coding, tool calling, Agent / Codex",
   },
+
+  // —— Vision Models (chat + image input; not image generation) ——
   {
     id: "gemini-3-flash",
     displayName: { zh: "Gemini 3 Flash", en: "Gemini 3 Flash" },
     family: "gemini",
     status: "public",
     visible: true,
-    group: "recommended",
+    group: "vision",
     recommendedEndpoint: "/v1/chat/completions or /v1beta",
     supportsChatCompletions: true,
     supportsResponses: true,
@@ -155,9 +160,9 @@ export const PUBLIC_MODEL_REGISTRY: PublicModel[] = [
     supportsImageInput: true,
     supportsImageGeneration: false,
     beginnerFriendly: true,
-    tags: ["recommended", "fast"],
-    descriptionZh: "更快的 Gemini 对话体验。",
-    descriptionEn: "Faster Gemini chat experience.",
+    tags: ["recommended", "fast", "vision"],
+    descriptionZh: "更快的 Gemini 对话体验，支持图片输入理解。",
+    descriptionEn: "Faster Gemini chat with image-input understanding.",
     bestForZh: "长文本、多模态输入",
     bestForEn: "Long text and multimodal input",
   },
@@ -167,7 +172,7 @@ export const PUBLIC_MODEL_REGISTRY: PublicModel[] = [
     family: "gemini",
     status: "public",
     visible: true,
-    group: "recommended",
+    group: "vision",
     recommendedEndpoint: "/v1/chat/completions or /v1beta",
     supportsChatCompletions: true,
     supportsResponses: true,
@@ -175,9 +180,9 @@ export const PUBLIC_MODEL_REGISTRY: PublicModel[] = [
     supportsImageInput: true,
     supportsImageGeneration: false,
     beginnerFriendly: false,
-    tags: ["recommended", "best_quality"],
-    descriptionZh: "更高质量的 Gemini 推理与长文。",
-    descriptionEn: "Higher-quality Gemini reasoning and long-form work.",
+    tags: ["recommended", "best_quality", "vision"],
+    descriptionZh: "更高质量的 Gemini 推理与长文，支持图片输入。",
+    descriptionEn: "Higher-quality Gemini reasoning and long-form work with vision.",
     bestForZh: "长文本、多模态输入",
     bestForEn: "Long text and multimodal input",
   },
@@ -187,7 +192,7 @@ export const PUBLIC_MODEL_REGISTRY: PublicModel[] = [
     family: "gemini",
     status: "public",
     visible: true,
-    group: "recommended",
+    group: "vision",
     recommendedEndpoint: "/v1/chat/completions or /v1beta",
     supportsChatCompletions: true,
     supportsResponses: true,
@@ -195,9 +200,9 @@ export const PUBLIC_MODEL_REGISTRY: PublicModel[] = [
     supportsImageInput: true,
     supportsImageGeneration: false,
     beginnerFriendly: true,
-    tags: ["fast", "low_cost"],
-    descriptionZh: "稳定、成本友好的 Gemini Flash。",
-    descriptionEn: "Stable, cost-friendly Gemini Flash.",
+    tags: ["fast", "low_cost", "vision"],
+    descriptionZh: "稳定、成本友好的 Gemini Flash，支持图片输入。",
+    descriptionEn: "Stable, cost-friendly Gemini Flash with vision input.",
     bestForZh: "长文本、多模态输入",
     bestForEn: "Long text and multimodal input",
   },
@@ -207,7 +212,7 @@ export const PUBLIC_MODEL_REGISTRY: PublicModel[] = [
     family: "gemini",
     status: "public",
     visible: true,
-    group: "high_quality",
+    group: "vision",
     recommendedEndpoint: "/v1/chat/completions or /v1beta",
     supportsChatCompletions: true,
     supportsResponses: true,
@@ -215,14 +220,14 @@ export const PUBLIC_MODEL_REGISTRY: PublicModel[] = [
     supportsImageInput: true,
     supportsImageGeneration: false,
     beginnerFriendly: false,
-    tags: ["best_quality"],
-    descriptionZh: "稳定的高质量 Gemini 文本模型。",
-    descriptionEn: "Stable high-quality Gemini text model.",
+    tags: ["best_quality", "vision"],
+    descriptionZh: "稳定的高质量 Gemini 文本与视觉理解模型。",
+    descriptionEn: "Stable high-quality Gemini text and vision model.",
     bestForZh: "长文本、多模态输入",
     bestForEn: "Long text and multimodal input",
   },
 
-  // —— Public image (Image API only — never listed as chat models) ——
+  // —— Image Generation Models (Image API only — never listed as chat models) ——
   {
     id: "nano-banana",
     displayName: { zh: "nano-banana", en: "nano-banana" },
@@ -300,16 +305,17 @@ export const PUBLIC_MODEL_REGISTRY: PublicModel[] = [
     supportsChatCompletions: false,
     supportsResponses: false,
     supportsStreaming: false,
-    supportsImageInput: true,
-    supportsImageGeneration: true,
+    supportsImageInput: false,
+    supportsImageGeneration: false,
+    comingSoon: true,
     beginnerFriendly: false,
-    tags: ["image"],
+    tags: ["image", "coming_soon"],
     descriptionZh:
-      "兼容风格图片模型。走 /v1/images/generations 异步任务；不可用于 chat。",
+      "Coming soon / 暂不可用。勿当作已开放的图片生成模型接入。",
     descriptionEn:
-      "Compatible-style image model via async /v1/images/generations — not for chat.",
-    bestForZh: "文生图、参考图改图",
-    bestForEn: "Text-to-image and reference edits",
+      "Coming soon / unavailable. Do not treat as a live image generation model.",
+    bestForZh: "预留兼容位（尚未开放）",
+    bestForEn: "Reserved compatibility slot (not available yet)",
   },
 
   // —— Compatibility aliases (GET /v1/models catalog aliases only) ——
@@ -504,8 +510,12 @@ export function summarizePublicRegistryStats(): {
 } {
   const models = listPublicConsumerModels();
   return {
-    totalAvailable: models.length,
-    chatCount: models.filter((m) => m.family !== "image").length,
-    imageCount: models.filter((m) => m.family === "image").length,
+    totalAvailable: models.filter((m) => !m.comingSoon).length,
+    chatCount: models.filter(
+      (m) => m.family !== "image" && !m.comingSoon
+    ).length,
+    imageCount: models.filter(
+      (m) => m.family === "image" && !m.comingSoon && m.supportsImageGeneration
+    ).length,
   };
 }

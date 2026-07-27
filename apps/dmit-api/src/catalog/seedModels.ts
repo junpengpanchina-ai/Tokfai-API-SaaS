@@ -115,7 +115,7 @@ export const CATALOG_SEED_ENTRIES: CatalogSeedEntry[] = [
     id: "gpt-image-2",
     display_name: "GPT Image 2",
     model_type: "image",
-    status: "available",
+    status: "coming_soon",
     sort_order: 200,
     billing_type: "image",
     input_credits_per_million_tokens: 0,

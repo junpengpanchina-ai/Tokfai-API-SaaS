@@ -261,12 +261,12 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     id: "gpt-image-2",
     displayName: "GPT Image 2",
     type: "image",
-    status: "available",
+    status: "coming_soon",
     billingUnit: IMAGE_BILLING_UNIT,
-    description: "OpenAI-compatible image generation model.",
+    description: "Coming soon / unavailable — not a live image generation path.",
     pricing: imagePricing(600),
     traits: { speed: "medium", quality: "high", cost: "low" },
-    categories: ["recommended"],
+    categories: ["coming_soon"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
@@ -442,8 +442,9 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
 /** Curated Image Playground model order (display-only). */
 export const IMAGE_PLAYGROUND_PRIMARY_MODEL_IDS = [
   "nano-banana-fast",
-  "gpt-image-2",
   "nano-banana",
+  "nano-banana-2",
+  "gpt-image-2",
 ] as const;
 
 export const IMAGE_PLAYGROUND_DEFAULT_MODEL = "nano-banana-fast";

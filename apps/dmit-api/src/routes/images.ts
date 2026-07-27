@@ -4,8 +4,11 @@ import { z } from "zod";
 import {
   assertCapabilityAllowed,
   isImageModel,
-  isTextChatModel,
 } from "../capabilities/modelCapabilityPolicy.js";
+import {
+  isNonImageTextModel,
+  MODEL_NOT_IMAGE_CAPABLE_CODE,
+} from "../lib/imageProviderIsolation.js";
 import {
   DEFAULT_IMAGE_MODEL_ID,
   isModelAllowedForImage,
@@ -177,14 +180,29 @@ imageRoutes.post("/v1/images/generations", async (c) => {
   const requestedCapability =
     mode === "reference_edit" ? "image_edit" : "image_generation";
 
-  // Capability routing: GPT/Gemini text models must not use image media surface.
-  if (isTextChatModel(resolvedModel) || isKnownChatModelKind(resolvedModel)) {
+  // Capability routing: GPT/Gemini/Claude text models must not use image surface.
+  // Stable code model_not_image_capable — never 500.
+  if (
+    isNonImageTextModel(resolvedModel) ||
+    isNonImageTextModel(requestedModel) ||
+    isKnownChatModelKind(resolvedModel)
+  ) {
     const suggestedModels = await listAvailableImageModelIds();
+    log.warn("model_not_image_capable", {
+      code: MODEL_NOT_IMAGE_CAPABLE_CODE,
+      route: "/v1/images/generations",
+      requestId,
+      requestedModel,
+      resolvedModel,
+      billing_status: "not_billable",
+      suggestedModels,
+    });
     return c.json(
       {
         error: {
-          message: "当前图片模型不可用，请切换图片模型",
-          code: "image_model_not_available",
+          message:
+            "This model is not image-capable. Use an image model on POST /v1/images/generations (e.g. nano-banana).",
+          code: MODEL_NOT_IMAGE_CAPABLE_CODE,
           type: "invalid_request_error",
           request_id: requestId,
         },

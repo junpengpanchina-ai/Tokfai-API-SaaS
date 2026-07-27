@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { isImageModel } from "../capabilities/modelCapabilityPolicy.js";
+import { IMAGE_MODEL_NOT_FOR_CHAT_CODE } from "./imageProviderIsolation.js";
 import { isSlowExperimentalChatModel } from "../catalog/modelRegistry.js";
 
 import { ApiError } from "../errors.js";
@@ -284,21 +285,22 @@ export async function executeChatCompletion(
   }
 
   // Image/media models must use POST /v1/images/generations — never chat/responses.
-  // Does not alter GPT/Gemini text success paths (image models never reach them).
+  // No fallback into text providers; not_billable (failed usage log only, no debit).
   if (isImageModel(requestedRaw) || isImageModel(requestedModel)) {
     const suggestedModels = await listAvailableChatModelIds();
-    const errorCode = MODEL_NOT_AVAILABLE_CODE;
+    const errorCode = IMAGE_MODEL_NOT_FOR_CHAT_CODE;
     const errorMessage =
-      "Image models are not available on chat completions. Use POST /v1/images/generations.";
+      "Image models cannot be used on /v1/chat/completions. Use POST /v1/images/generations.";
 
-    log.warn("model_not_available", {
-      code: MODEL_NOT_AVAILABLE_CODE,
+    log.warn("image_model_not_for_chat", {
+      code: IMAGE_MODEL_NOT_FOR_CHAT_CODE,
       route,
       requestId,
       requestedModel: requestedRaw,
       normalizedModel: resolvedRequest.normalized,
       resolvedModel: requestedModel,
       reason: "image_capability_isolation",
+      billing_status: "not_billable",
       supportedModels: suggestedModels,
     });
 
@@ -313,6 +315,9 @@ export async function executeChatCompletion(
         error_code: errorCode,
         error_message: errorMessage,
         latency_ms: Date.now() - startedAt,
+        billing_status: "not_billable",
+        billable: false,
+        credits_charged: 0,
       }),
       route
     );
@@ -1331,7 +1336,12 @@ type FailedUsageLogFields = Pick<
   Partial<
     Pick<
       UsageLogInsert,
-      "upstream_status" | "upstream_error_code" | "safety_reason"
+      | "upstream_status"
+      | "upstream_error_code"
+      | "safety_reason"
+      | "billing_status"
+      | "billable"
+      | "credits_charged"
     >
   >;
 

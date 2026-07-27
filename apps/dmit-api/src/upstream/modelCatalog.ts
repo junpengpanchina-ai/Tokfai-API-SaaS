@@ -202,11 +202,11 @@ export const MODEL_CATALOG: Record<string, TokfaiModelCatalogItem> = {
     owned_by: "tokfai",
     provider: "grsai",
     upstream_model: "gpt-image-2",
-    enabled: true,
+    enabled: false,
     kind: "image",
     input_per_1k: 0.0001,
     output_per_1k: 0.0002,
-    note: "Image generation model placeholder pricing."
+    note: "Coming soon / unavailable — not a public image generation path (P954)."
   }
 };
 

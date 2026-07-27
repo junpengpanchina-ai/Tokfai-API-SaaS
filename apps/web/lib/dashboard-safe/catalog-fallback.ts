@@ -15,7 +15,6 @@ export const FALLBACK_IMAGE_MODEL_IDS = [
   "nano-banana-fast",
   "nano-banana",
   "nano-banana-2",
-  "gpt-image-2",
 ] as const;
 
 export const FALLBACK_DEFAULT_CHAT_MODEL = "auto-fast";

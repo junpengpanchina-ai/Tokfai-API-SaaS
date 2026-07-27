@@ -1,4 +1,9 @@
 import { ApiError } from "../errors.js";
+import {
+  IMAGE_MODEL_NOT_FOR_CHAT_CODE,
+  MODEL_NOT_IMAGE_CAPABLE_CODE,
+  isNonImageTextModel,
+} from "../lib/imageProviderIsolation.js";
 import { isUnavailableImageModel } from "../upstream/imageModelAliases.js";
 
 /**
@@ -17,6 +22,13 @@ export type ModelCapability =
   | "video_generation";
 
 export type CapabilityAvailability = "enabled" | "reserved" | "disabled";
+
+/** Re-export stable isolation codes (P954). */
+export {
+  IMAGE_MODEL_NOT_FOR_CHAT_CODE,
+  MODEL_NOT_IMAGE_CAPABLE_CODE,
+  isNonImageTextModel,
+};
 
 const TEXT_CHAT_MODELS = [
   "gpt-5.5",
@@ -67,11 +79,11 @@ function normalizeModelId(model: string): string {
     .replace(/^google\//, "");
 }
 
-/** Nano Banana family (+ legacy gpt-image-2) share image capabilities. */
+/** Nano Banana family (+ legacy gpt-image-*) share image capabilities. */
 function isImageFamilyModel(model: string): boolean {
   const m = normalizeModelId(model);
   if (m === "nano-banana" || m.startsWith("nano-banana-")) return true;
-  if (m === "gpt-image-2") return true;
+  if (m === "gpt-image" || m.startsWith("gpt-image-")) return true;
   return false;
 }
 

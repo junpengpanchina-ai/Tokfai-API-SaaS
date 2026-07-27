@@ -116,6 +116,23 @@ function modelNotAvailableBody() {
   };
 }
 
+function imageModelNotForChatBody(requestId = makeRequestId()) {
+  return {
+    error: {
+      message:
+        "Image models cannot be used on /v1/chat/completions. Use POST /v1/images/generations.",
+      code: "image_model_not_for_chat",
+      type: "invalid_request_error",
+      request_id: requestId,
+    },
+    tokfai: {
+      billing_status: "not_billable",
+      credits_charged: 0,
+    },
+    request_id: requestId,
+  };
+}
+
 /**
  * Offline-only error triggers for client error-copy smoke (p914).
  * Never hit production; model ids are reserved for mock gateways.
@@ -676,11 +693,12 @@ const MOCK_IMAGE_MODELS = new Set([
   "nano-banana",
   "nano-banana-fast",
   "nano-banana-2",
-  "gpt-image-2",
 ]);
 
-/** Temporarily unavailable — mirror dmit-api imageModelAliases UNAVAILABLE set. */
+/** Temporarily unavailable / coming soon — mirror dmit-api UNAVAILABLE set. */
 const MOCK_UNAVAILABLE_IMAGE_MODELS = new Set([
+  "gpt-image-2",
+  "gpt-image-2-vip",
   "nano-banana-2-lite",
   "nano-banana-pro",
   "nano-banana-pro-vip",
@@ -750,13 +768,14 @@ function imageGenerationBody(body) {
     };
   }
 
-  // GPT/Gemini text models cannot use /v1/images/generations.
+  // GPT/Gemini/Claude text models cannot use /v1/images/generations.
   if (isMockTextChatModel(resolvedModel) || !isMockImageModel(resolvedModel)) {
     return {
       __status: 400,
       error: {
-        message: "当前图片模型不可用，请切换图片模型",
-        code: "image_model_not_available",
+        message:
+          "This model is not image-capable. Use an image model on POST /v1/images/generations (e.g. nano-banana).",
+        code: "model_not_image_capable",
         type: "invalid_request_error",
         request_id: meta.request_id,
       },
@@ -1295,6 +1314,10 @@ export function startMockGateway(options = {}) {
               : "auto-fast";
           const forced = mockErrorForModel(model);
           if (forced) return sendJson(res, forced.status, forced.body);
+          // Image models are isolated — never chat fallback / billing.
+          if (isMockImageModel(model) || MOCK_UNAVAILABLE_IMAGE_MODELS.has(String(model).toLowerCase()) || String(model).toLowerCase().startsWith("nano-banana") || String(model).toLowerCase().startsWith("gpt-image")) {
+            return sendJson(res, 400, imageModelNotForChatBody());
+          }
           if (!isMockModelAllowed(model)) {
             return sendJson(res, 400, modelNotAvailableBody());
           }
@@ -1329,6 +1352,9 @@ export function startMockGateway(options = {}) {
             typeof body?.model === "string" ? body.model : "auto-fast";
           const forced = mockErrorForModel(model);
           if (forced) return sendJson(res, forced.status, forced.body);
+          if (isMockImageModel(model) || MOCK_UNAVAILABLE_IMAGE_MODELS.has(String(model).toLowerCase()) || String(model).toLowerCase().startsWith("nano-banana") || String(model).toLowerCase().startsWith("gpt-image")) {
+            return sendJson(res, 400, imageModelNotForChatBody());
+          }
           if (!isMockModelAllowed(model)) {
             return sendJson(res, 400, modelNotAvailableBody());
           }

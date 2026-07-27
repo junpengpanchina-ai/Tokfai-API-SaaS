@@ -83,6 +83,13 @@ export function errorTypeForCode(
   if (code === "model_not_available" || code === "model_not_supported") {
     return "validation_error";
   }
+  if (
+    code === "image_model_not_for_chat" ||
+    code === "model_not_image_capable" ||
+    code === "image_model_not_available"
+  ) {
+    return "invalid_request_error";
+  }
   if (status === 401 || status === 403) return "auth_error";
   if (status === 404) return "not_found";
   if (status === 402) return "billing_error";

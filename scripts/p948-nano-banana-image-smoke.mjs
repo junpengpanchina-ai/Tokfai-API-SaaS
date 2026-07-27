@@ -48,6 +48,8 @@ const LIVE_MODEL = String(process.env.MODEL ?? "").trim().toLowerCase();
 const REAL_NANO_BANANA = LIVE && LIVE_MODEL === "nano-banana";
 
 const UNAVAILABLE_IMAGE_MODELS = [
+  "gpt-image-2",
+  "gpt-image-2-vip",
   "nano-banana-2-lite",
   "nano-banana-pro",
   "nano-banana-pro-vip",
@@ -260,13 +262,15 @@ function checkStaticSources() {
   ok =
     (images.includes('"/v1/images/generations"') &&
     images.includes("assertCapabilityAllowed") &&
-    images.includes("isTextChatModel")
+    images.includes("isNonImageTextModel") &&
+    images.includes("model_not_image_capable")
       ? pass("images route uses capability routing")
       : fail("images route uses capability routing")) && ok;
 
   ok =
     (chatExec.includes("isImageModel") &&
     chatExec.includes("image_capability_isolation") &&
+    chatExec.includes("image_model_not_for_chat") &&
     chatExec.includes("/v1/images/generations")
       ? pass("chat completions isolates image models")
       : fail("chat completions isolates image models")) && ok;
@@ -582,7 +586,8 @@ async function main() {
       });
       const rejected =
         res.status >= 400 &&
-        (body?.error?.code === "model_not_available" ||
+        (body?.error?.code === "image_model_not_for_chat" ||
+          body?.error?.code === "model_not_available" ||
           /image/i.test(String(body?.error?.message ?? "")));
       ok =
         (rejected
@@ -602,7 +607,8 @@ async function main() {
       });
       const rejected =
         res.status >= 400 &&
-        (body?.error?.code === "model_not_available" ||
+        (body?.error?.code === "image_model_not_for_chat" ||
+          body?.error?.code === "model_not_available" ||
           /image/i.test(String(body?.error?.message ?? "")));
       ok =
         (rejected
@@ -660,7 +666,8 @@ async function main() {
       });
       const rejected =
         res.status >= 400 &&
-        (body?.error?.code === "image_model_not_available" ||
+        (body?.error?.code === "model_not_image_capable" ||
+          body?.error?.code === "image_model_not_available" ||
           body?.tokfai?.billing_status === "not_billable");
       ok =
         (rejected

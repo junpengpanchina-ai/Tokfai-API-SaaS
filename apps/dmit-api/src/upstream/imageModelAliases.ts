@@ -10,10 +10,13 @@ export const IMAGE_MODEL_ALIASES: Record<string, string> = {
 };
 
 /**
- * Temporarily unavailable image models (upstream timeout / not provisioned).
+ * Temporarily unavailable / not-yet-public image models.
  * Hard-deny overrides DB enabled rows — returns image_model_not_available.
+ * gpt-image-2 is coming soon — do not pretend it is available (P954).
  */
 export const UNAVAILABLE_IMAGE_MODEL_IDS = new Set([
+  "gpt-image-2",
+  "gpt-image-2-vip",
   "nano-banana-2-lite",
   "nano-banana-pro",
   "nano-banana-pro-vip",

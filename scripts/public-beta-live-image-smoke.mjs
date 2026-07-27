@@ -10,7 +10,7 @@
  *   TOKFAI_API_KEY=... TOKFAI_IMAGE_MODEL=nano-banana-fast node scripts/public-beta-live-image-smoke.mjs
  *
  * Env:
- *   TOKFAI_IMAGE_MODEL   default gpt-image-2 (try nano-banana-fast for faster runs)
+ *   TOKFAI_IMAGE_MODEL   default nano-banana-fast (gpt-image-2 is coming soon / unavailable)
  *   TOKFAI_IMAGE_PROMPT  default clean dashboard illustration
  *   TOKFAI_IMAGE_SIZE    default 1024x1024
  *   TOKFAI_IMAGE_POLL_MS default 180000
@@ -29,7 +29,7 @@ import {
 const API_KEY = (process.env.TOKFAI_API_KEY ?? "").trim();
 const OTHER_KEY = (process.env.TOKFAI_OTHER_API_KEY ?? "").trim();
 const BASE = normalizeApiBase(process.env.TOKFAI_API_BASE);
-const MODEL = (process.env.TOKFAI_IMAGE_MODEL ?? "gpt-image-2").trim();
+const MODEL = (process.env.TOKFAI_IMAGE_MODEL ?? "nano-banana-fast").trim();
 const PROMPT =
   process.env.TOKFAI_IMAGE_PROMPT ??
   "A clean minimal API dashboard illustration, white background";

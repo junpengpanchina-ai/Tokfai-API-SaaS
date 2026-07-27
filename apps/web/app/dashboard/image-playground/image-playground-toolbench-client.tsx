@@ -43,7 +43,7 @@ import {
 import {
   formatImageCreditsAmount,
   formatImageModelSelectLabel,
-  IMAGE_PLAYGROUND_MODEL_IDS,
+  IMAGE_PLAYGROUND_SELECT_MODEL_IDS,
   IMAGE_PLAYGROUND_SIZES,
   type ImagePlaygroundModelId,
   type ImagePlaygroundSize,
@@ -461,7 +461,7 @@ export function ImagePlaygroundRunSettingsPanel({
               disabled={loading}
               className={IMAGE_PLAYGROUND_TOOLBENCH.select}
             >
-              {IMAGE_PLAYGROUND_MODEL_IDS.map((m) => (
+              {IMAGE_PLAYGROUND_SELECT_MODEL_IDS.map((m) => (
                 <option key={m} value={m}>
                   {formatImageModelSelectLabel(m, locale)}
                 </option>

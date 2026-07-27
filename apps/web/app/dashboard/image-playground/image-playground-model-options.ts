@@ -37,21 +37,27 @@ const IMAGE_MODELS: ImagePlaygroundModelOption[] = [
     id: "nano-banana-pro",
     displayName: "Nano Banana Pro",
     creditsPerRequest: 1800,
-    status: "available",
+    status: "coming_soon",
   },
   {
     id: "gpt-image-2",
     displayName: "GPT Image 2",
     creditsPerRequest: 600,
-    status: "available",
+    status: "coming_soon",
   },
 ];
 
 export const IMAGE_PLAYGROUND_DEFAULT_MODEL = "nano-banana-fast";
 
+/** Selectable / callable models only. */
 export const IMAGE_PLAYGROUND_MODEL_IDS = IMAGE_MODELS
   .filter((model) => model.status === "available")
   .map((model) => model.id);
+
+/** Includes coming_soon entries for honest UI labeling. */
+export const IMAGE_PLAYGROUND_SELECT_MODEL_IDS = IMAGE_MODELS.map(
+  (model) => model.id
+);
 
 export const IMAGE_PLAYGROUND_SIZES: ImagePlaygroundSize[] = [
   "1024x1024",
@@ -88,6 +94,11 @@ export function formatImageModelSelectLabel(
 ): string {
   const entry = getImageModelOptionById(modelId);
   if (!entry) return modelId;
+  if (entry.status === "coming_soon") {
+    return locale === "zh"
+      ? `${entry.displayName} (${modelId}) · 即将上线`
+      : `${entry.displayName} (${modelId}) · coming soon`;
+  }
   const price = formatImageCreditsAmount(entry.creditsPerRequest, locale);
   if (locale === "zh") {
     return `${entry.displayName} (${modelId}) · ${price} 算力积分 / 次`;

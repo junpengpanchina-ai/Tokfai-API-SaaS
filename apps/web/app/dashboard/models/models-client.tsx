@@ -32,6 +32,7 @@ const TAG_LABEL_KEYS: Record<ConsumerModelCapabilityTag, string> = {
   image: "dashboard.models.tagImage",
   vision: "dashboard.models.tagVision",
   alias: "dashboard.models.tagAlias",
+  coming_soon: "dashboard.models.tagComingSoon",
 };
 
 function docAnchorForModel(model: ConsumerModelCard): string {
@@ -173,6 +174,11 @@ function ModelCapabilityCard({
             </div>
           </div>
           <Badge variant="outline">{model.kind}</Badge>
+          {model.comingSoon ? (
+            <Badge variant="secondary">
+              {t("dashboard.models.tagComingSoon")}
+            </Badge>
+          ) : null}
         </div>
         <CardDescription>
           {zh ? model.oneLiner.zh : model.oneLiner.en}

@@ -24,6 +24,7 @@ export type ConsumerModelCard = {
   supportsStream: boolean;
   supportsImageInput: boolean;
   beginnerFriendly: boolean;
+  comingSoon: boolean;
   recommendedEndpoint: string;
   bestFor: { zh: string; en: string };
   /** Alias / routing target note for consumers. */
@@ -43,25 +44,25 @@ const GROUP_META: Record<
   Exclude<PublicModelGroupId, "aliases">,
   { title: { zh: string; en: string }; description: { zh: string; en: string } }
 > = {
-  recommended: {
-    title: { zh: "文本与代码模型", en: "Text & code models" },
+  chat: {
+    title: { zh: "对话模型", en: "Chat Models" },
     description: {
-      zh: "GPT / Gemini 等文本能力，走 /v1/chat/completions 或 /v1/responses。图片模型不在此列表。",
-      en: "GPT / Gemini text capabilities via /v1/chat/completions or /v1/responses. Image models are listed separately.",
+      zh: "GPT 等文本对话模型，走 /v1/chat/completions 或 /v1/responses。不可用于图片生成。",
+      en: "GPT and other text chat models via /v1/chat/completions or /v1/responses. Not for image generation.",
     },
   },
-  high_quality: {
-    title: { zh: "高质量文本模型", en: "High-quality text models" },
+  vision: {
+    title: { zh: "视觉模型", en: "Vision Models" },
     description: {
-      zh: "追求更好文本效果时使用。不可用于图片生成。",
-      en: "Use when you need stronger text quality. Not for image generation.",
+      zh: "支持图片输入理解的对话模型（如 Gemini）。用于 chat/responses，不是文生图。",
+      en: "Chat models with image-input understanding (e.g. Gemini). For chat/responses — not text-to-image.",
     },
   },
   image: {
-    title: { zh: "Image API / 图片工作台", en: "Image API / Image Workbench" },
+    title: { zh: "图片生成模型", en: "Image Generation Models" },
     description: {
-      zh: "Nano Banana 系列仅走 POST /v1/images/generations（图片工作台同路径）：submit 返回 task_id，轮询 GET /v1/images/generations/:task_id。成功 → billable；失败/超时 → not_billable。不可用于 /v1/chat/completions；GPT/Gemini 不可用于 images/generations。",
-      en: "Nano Banana via Image API POST /v1/images/generations only: submit returns task_id; poll GET /v1/images/generations/:task_id. Success → billable; failed/timeout → not_billable. Not for chat; GPT/Gemini cannot use images/generations.",
+      zh: "Nano Banana 仅走 POST /v1/images/generations：submit 返回 task_id，轮询 GET。成功才扣费。不可用于 /v1/chat/completions；GPT/Gemini 文本模型不可用于 images/generations。",
+      en: "Nano Banana via POST /v1/images/generations only: submit returns task_id; poll GET. Billed on success. Not for chat; GPT/Gemini text models cannot use images/generations.",
     },
   },
 };
@@ -77,10 +78,10 @@ const ALIASES_META = {
 function kindForModel(model: PublicModel): ConsumerModelCard["kind"] {
   if (model.status === "alias") return "alias";
   if (model.family === "image") return "image";
+  if (model.group === "vision" || model.supportsImageInput) return "vision";
   if (model.tags.includes("best_quality") && model.family === "gemini") {
     return "reasoning";
   }
-  if (model.supportsImageInput) return "vision";
   return "chat";
 }
 
@@ -96,6 +97,7 @@ function toCard(model: PublicModel): ConsumerModelCard {
     supportsStream: model.supportsStreaming,
     supportsImageInput: model.supportsImageInput,
     beginnerFriendly: Boolean(model.beginnerFriendly),
+    comingSoon: Boolean(model.comingSoon),
     recommendedEndpoint: model.recommendedEndpoint,
     bestFor: { zh: model.bestForZh, en: model.bestForEn },
     routesTo: model.routesTo,
@@ -105,8 +107,8 @@ function toCard(model: PublicModel): ConsumerModelCard {
 function buildPublicGroups(): ConsumerModelGroup[] {
   const publics = listPublicConsumerModels();
   const order: Array<Exclude<PublicModelGroupId, "aliases">> = [
-    "recommended",
-    "high_quality",
+    "chat",
+    "vision",
     "image",
   ];
   const groups: ConsumerModelGroup[] = [];
@@ -143,5 +145,10 @@ export const CONSUMER_MODEL_GROUPS: ConsumerModelGroup[] = (() => {
 })();
 
 export const CONSUMER_VISIBLE_IMAGE_MODEL_IDS = listPublicConsumerModels()
-  .filter((m) => m.family === "image")
+  .filter(
+    (m) =>
+      m.family === "image" &&
+      !m.comingSoon &&
+      m.supportsImageGeneration
+  )
   .map((m) => m.id);
