@@ -48,8 +48,6 @@ const LIVE_MODEL = String(process.env.MODEL ?? "").trim().toLowerCase();
 const REAL_NANO_BANANA = LIVE && LIVE_MODEL === "nano-banana";
 
 const UNAVAILABLE_IMAGE_MODELS = [
-  "gpt-image-2",
-  "gpt-image-2-vip",
   "nano-banana-2-lite",
   "nano-banana-pro",
   "nano-banana-pro-vip",
@@ -198,12 +196,15 @@ function checkStaticSources() {
     (aliases.includes("resolveImageUpstreamModel") &&
     aliases.includes('if (normalized === "nano-banana") return "nano-banana-fast"') &&
     aliases.includes("UNAVAILABLE_IMAGE_MODEL_IDS") &&
-    UNAVAILABLE_IMAGE_MODELS.every((id) => aliases.includes(`"${id}"`))
+    UNAVAILABLE_IMAGE_MODELS.every((id) => aliases.includes(`"${id}"`)) &&
+    !/"gpt-image-2"\s*,/.test(
+      aliases.match(/UNAVAILABLE_IMAGE_MODEL_IDS[\s\S]*?\];/)?.[0] ?? ""
+    )
       ? pass(
-          "resolveImageUpstreamModel maps nano-banana→nano-banana-fast + unavailable set"
+          "resolveImageUpstreamModel maps nano-banana→nano-banana-fast + unavailable set (no gpt-image-2)"
         )
       : fail(
-          "resolveImageUpstreamModel maps nano-banana→nano-banana-fast + unavailable set"
+          "resolveImageUpstreamModel maps nano-banana→nano-banana-fast + unavailable set (no gpt-image-2)"
         )) && ok;
 
   ok =

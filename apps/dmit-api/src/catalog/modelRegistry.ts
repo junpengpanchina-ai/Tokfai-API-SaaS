@@ -29,6 +29,8 @@ export const STATIC_IMAGE_MODEL_IDS = [
   "nano-banana-fast",
   "nano-banana",
   "nano-banana-2",
+  "gpt-image-2",
+  "gpt-image-2-vip",
 ] as const;
 
 export function isHiddenInternalModel(modelId: string): boolean {

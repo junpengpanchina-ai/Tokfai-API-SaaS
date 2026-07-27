@@ -43,7 +43,13 @@ const IMAGE_MODELS: ImagePlaygroundModelOption[] = [
     id: "gpt-image-2",
     displayName: "GPT Image 2",
     creditsPerRequest: 600,
-    status: "coming_soon",
+    status: "available",
+  },
+  {
+    id: "gpt-image-2-vip",
+    displayName: "GPT Image 2 VIP",
+    creditsPerRequest: 1300,
+    status: "available",
   },
 ];
 

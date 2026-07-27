@@ -1518,7 +1518,7 @@ export const messages = {
       },
       imageUseCase: {
         "gpt-image-2": "Compatible-style image model (async Image API only)",
-        "gpt-image-2-vip": "Compatible-style image model (coming soon / reserved)",
+        "gpt-image-2-vip": "VIP compatible-style image model (async Image API only)",
         "nano-banana-fast": "Lightweight fast images / lower cost (async task_id)",
         "nano-banana": "Recommended image model (async task_id; bill on success)",
         "nano-banana-pro": "Higher-quality images (availability may vary)",
@@ -6874,7 +6874,7 @@ export const messages = {
       },
       imageUseCase: {
         "gpt-image-2": "兼容风格图片模型（仅异步 Image API）",
-        "gpt-image-2-vip": "兼容风格图片模型（预留 / coming soon）",
+        "gpt-image-2-vip": "VIP 兼容风格图片模型（仅异步 Image API）",
         "nano-banana-fast": "轻量快图 / 成本低（异步 task_id）",
         "nano-banana": "推荐图片模型（异步 task_id；成功才扣费）",
         "nano-banana-pro": "更高质量图片（可用性可能受限）",

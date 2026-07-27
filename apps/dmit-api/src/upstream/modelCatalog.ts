@@ -202,11 +202,24 @@ export const MODEL_CATALOG: Record<string, TokfaiModelCatalogItem> = {
     owned_by: "tokfai",
     provider: "grsai",
     upstream_model: "gpt-image-2",
-    enabled: false,
+    enabled: true,
     kind: "image",
     input_per_1k: 0.0001,
     output_per_1k: 0.0002,
-    note: "Coming soon / unavailable — not a public image generation path (P954)."
+    note: "P956 — Image Generation only (/v1/images/generations); not for chat."
+  },
+
+  "gpt-image-2-vip": {
+    id: "gpt-image-2-vip",
+    object: "model",
+    owned_by: "tokfai",
+    provider: "grsai",
+    upstream_model: "gpt-image-2-vip",
+    enabled: true,
+    kind: "image",
+    input_per_1k: 0.0001,
+    output_per_1k: 0.0002,
+    note: "P956 — VIP Image Generation only (/v1/images/generations); not for chat."
   }
 };
 

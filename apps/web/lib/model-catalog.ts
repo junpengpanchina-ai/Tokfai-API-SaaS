@@ -261,12 +261,13 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     id: "gpt-image-2",
     displayName: "GPT Image 2",
     type: "image",
-    status: "coming_soon",
+    status: "available",
     billingUnit: IMAGE_BILLING_UNIT,
-    description: "Coming soon / unavailable — not a live image generation path.",
+    description:
+      "Compatible-style image model. Async Image API only (task_id poll; bill on success). Not for Chat.",
     pricing: imagePricing(600),
     traits: { speed: "medium", quality: "high", cost: "low" },
-    categories: ["coming_soon"],
+    categories: ["image"],
     supports: [...IMAGE_MODEL_SUPPORTS],
     playground: IMAGE_MODEL_PLAYGROUND,
     catalogMeta: catalogMeta(),
@@ -275,9 +276,10 @@ export const IMAGE_MODELS: ModelCatalogEntry[] = [
     id: "gpt-image-2-vip",
     displayName: "GPT Image 2 VIP",
     type: "image",
-    status: "coming_soon",
+    status: "available",
     billingUnit: IMAGE_BILLING_UNIT,
-    description: "Premium tier of GPT Image 2.",
+    description:
+      "VIP compatible-style image model. Async Image API only; billed on success. Not for Chat.",
     pricing: imagePricing(1300),
     traits: { speed: "medium", quality: "high", cost: "medium" },
     tags: ["VIP"],
@@ -445,6 +447,7 @@ export const IMAGE_PLAYGROUND_PRIMARY_MODEL_IDS = [
   "nano-banana",
   "nano-banana-2",
   "gpt-image-2",
+  "gpt-image-2-vip",
 ] as const;
 
 export const IMAGE_PLAYGROUND_DEFAULT_MODEL = "nano-banana-fast";
@@ -527,6 +530,7 @@ export const CONSUMER_CHAT_MODEL_IDS = [
 /** Consumer-facing image models — verified + priced only. */
 export const CONSUMER_IMAGE_MODEL_IDS = [
   "gpt-image-2",
+  "gpt-image-2-vip",
   "nano-banana-fast",
   "nano-banana",
   "nano-banana-2",

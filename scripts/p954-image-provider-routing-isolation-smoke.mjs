@@ -42,6 +42,7 @@ function assertStatic() {
   const chatExec = readSrc("apps/dmit-api/src/lib/executeChatCompletion.ts");
   const images = readSrc("apps/dmit-api/src/routes/images.ts");
   const aliases = readSrc("apps/dmit-api/src/upstream/imageModelAliases.ts");
+  const catalog = readSrc("apps/dmit-api/src/upstream/modelCatalog.ts");
   const groups = readSrc("apps/web/lib/docs/consumer-model-groups.ts");
   const registry = readSrc("apps/web/lib/public-model-registry.ts");
 
@@ -72,10 +73,15 @@ function assertStatic() {
     ok;
 
   ok =
-    (aliases.includes('"gpt-image-2"') &&
-    aliases.includes("UNAVAILABLE_IMAGE_MODEL_IDS")
-      ? pass("gpt-image-2 listed unavailable / coming soon")
-      : fail("gpt-image-2 listed unavailable / coming soon")) && ok;
+    (aliases.includes("UNAVAILABLE_IMAGE_MODEL_IDS") &&
+    !/"gpt-image-2"\s*,/.test(
+      aliases.match(/UNAVAILABLE_IMAGE_MODEL_IDS[\s\S]*?\];/)?.[0] ?? "gpt-image-2"
+    ) &&
+    catalog.includes('"gpt-image-2"') &&
+    /"gpt-image-2"\s*:\s*\{[\s\S]*?enabled:\s*true/.test(catalog)
+      ? pass("gpt-image-2 enabled for Image Generation (P956; not in UNAVAILABLE)")
+      : fail("gpt-image-2 enabled for Image Generation (P956; not in UNAVAILABLE)")) &&
+    ok;
 
   ok =
     (groups.includes("Chat Models") &&
@@ -87,10 +93,14 @@ function assertStatic() {
   ok =
     (registry.includes('group: "chat"') &&
     registry.includes('group: "vision"') &&
-    registry.includes("comingSoon: true") &&
-    /id:\s*"gpt-image-2"[\s\S]*?comingSoon:\s*true/.test(registry)
-      ? pass("registry: chat/vision groups + gpt-image-2 comingSoon")
-      : fail("registry: chat/vision groups + gpt-image-2 comingSoon")) && ok;
+    registry.includes('group: "image"') &&
+    /id:\s*"gpt-image-2"[\s\S]*?supportsImageGeneration:\s*true/.test(registry) &&
+    !/id:\s*"gpt-image-2"[\s\S]*?comingSoon:\s*true/.test(
+      registry.match(/id:\s*"gpt-image-2"[\s\S]*?bestForEn:[\s\S]*?},/)?.[0] ??
+        "comingSoon: true"
+    )
+      ? pass("registry: gpt-image-2 in Image Generation (not comingSoon)")
+      : fail("registry: gpt-image-2 in Image Generation (not comingSoon)")) && ok;
 
   return ok;
 }

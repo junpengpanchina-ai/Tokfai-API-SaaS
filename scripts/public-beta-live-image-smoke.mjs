@@ -10,7 +10,7 @@
  *   TOKFAI_API_KEY=... TOKFAI_IMAGE_MODEL=nano-banana-fast node scripts/public-beta-live-image-smoke.mjs
  *
  * Env:
- *   TOKFAI_IMAGE_MODEL   default nano-banana-fast (gpt-image-2 is coming soon / unavailable)
+ *   TOKFAI_IMAGE_MODEL   default nano-banana-fast (gpt-image-2 also available via Image API)
  *   TOKFAI_IMAGE_PROMPT  default clean dashboard illustration
  *   TOKFAI_IMAGE_SIZE    default 1024x1024
  *   TOKFAI_IMAGE_POLL_MS default 180000

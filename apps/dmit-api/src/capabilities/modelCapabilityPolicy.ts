@@ -42,11 +42,15 @@ const IMAGE_GENERATION_MODELS = [
   "nano-banana",
   "nano-banana-fast",
   "nano-banana-2",
+  "gpt-image-2",
+  "gpt-image-2-vip",
 ] as const;
 const IMAGE_EDIT_MODELS = [
   "nano-banana",
   "nano-banana-fast",
   "nano-banana-2",
+  "gpt-image-2",
+  "gpt-image-2-vip",
 ] as const;
 
 /** Primary capability table (explicit product policy). */
@@ -59,6 +63,8 @@ const MODEL_CAPABILITIES: Record<string, ModelCapability[]> = {
   "nano-banana": ["image_generation", "image_edit"],
   "nano-banana-fast": ["image_generation", "image_edit"],
   "nano-banana-2": ["image_generation", "image_edit"],
+  "gpt-image-2": ["image_generation", "image_edit"],
+  "gpt-image-2-vip": ["image_generation", "image_edit"],
 };
 
 const CAPABILITY_AVAILABILITY: Record<ModelCapability, CapabilityAvailability> =

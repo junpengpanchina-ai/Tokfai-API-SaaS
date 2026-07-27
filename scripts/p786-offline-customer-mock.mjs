@@ -693,12 +693,12 @@ const MOCK_IMAGE_MODELS = new Set([
   "nano-banana",
   "nano-banana-fast",
   "nano-banana-2",
+  "gpt-image-2",
+  "gpt-image-2-vip",
 ]);
 
 /** Temporarily unavailable / coming soon — mirror dmit-api UNAVAILABLE set. */
 const MOCK_UNAVAILABLE_IMAGE_MODELS = new Set([
-  "gpt-image-2",
-  "gpt-image-2-vip",
   "nano-banana-2-lite",
   "nano-banana-pro",
   "nano-banana-pro-vip",
@@ -726,7 +726,12 @@ function isMockImageModel(model) {
     .trim()
     .toLowerCase();
   if (MOCK_UNAVAILABLE_IMAGE_MODELS.has(m)) return false;
-  return MOCK_IMAGE_MODELS.has(m) || m.startsWith("nano-banana");
+  return (
+    MOCK_IMAGE_MODELS.has(m) ||
+    m.startsWith("nano-banana") ||
+    m === "gpt-image" ||
+    m.startsWith("gpt-image-")
+  );
 }
 
 function isMockTextChatModel(model) {

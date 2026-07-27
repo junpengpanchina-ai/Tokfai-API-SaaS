@@ -53,6 +53,8 @@ const DEFAULT_IMAGE_MODEL_CREDITS: Record<string, number> = {
   "nano-banana": 1,
   "nano-banana-fast": 1,
   "nano-banana-2": 3,
+  "gpt-image-2": 600,
+  "gpt-image-2-vip": 1300,
 };
 
 export const DEFAULT_IMAGE_MODEL_ALLOWLIST = new Set([
