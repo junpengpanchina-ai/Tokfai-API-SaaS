@@ -61,6 +61,20 @@ function maxPollMs(): number {
   return Math.max(requestTimeoutMs(), 180_000);
 }
 
+/** Soft wait (expose task_timeout) before continuing to hard max. */
+function softWaitMs(): number {
+  const fromEnv = Number(process.env.IMAGE_SOFT_WAIT_MS);
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv;
+  return Math.min(maxPollMs(), 120_000);
+}
+
+/** Absolute hard stop — terminal image_generation_timeout. */
+function hardWaitMs(): number {
+  const fromEnv = Number(process.env.IMAGE_HARD_WAIT_MS);
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv;
+  return Math.max(maxPollMs() * 2, 600_000);
+}
+
 function retryDelayMs(): number {
   return 1_500 + Math.floor(Math.random() * 1_501);
 }
@@ -201,6 +215,11 @@ export type CreateImageTaskParams = {
   imageUrlSources: ImageUrlResolveSource[];
   mode: "reference_edit" | "text_to_image";
   promptMode: "subject_preserve" | "normal";
+  /** P957 — soft wait window exceeded while upstream may still be pending. */
+  onSoftWaitExceeded?: (info: {
+    latencyMs: number;
+    lastStatus: string | null;
+  }) => void | Promise<void>;
 };
 
 export type CreateImageTaskResult = {
@@ -508,10 +527,13 @@ async function runImageGenerationAttempt(
     throw friendlyUpstreamFailed("missing_task_id");
   }
 
-  const deadline = Date.now() + maxPollMs();
+  const startedAt = Date.now();
+  const softDeadline = startedAt + softWaitMs();
+  const hardDeadline = startedAt + hardWaitMs();
   const interval = pollIntervalMs();
+  let softNotified = false;
 
-  while (Date.now() < deadline) {
+  while (Date.now() < hardDeadline) {
     await sleep(interval);
     const polled = await pollImageGenerationTask({
       requestId: params.requestId,
@@ -528,6 +550,23 @@ async function runImageGenerationAttempt(
 
     if (isSucceededStatus(polled.status) && !polled.url) {
       throw friendlyUpstreamFailed("succeeded_without_url");
+    }
+
+    if (isFailedStatus(polled.status)) {
+      throw friendlyUpstreamFailed(polled.status ?? "failed");
+    }
+
+    // Soft wait window: notify once, keep polling so clients can continue.
+    if (!softNotified && Date.now() >= softDeadline) {
+      softNotified = true;
+      try {
+        await params.onSoftWaitExceeded?.({
+          latencyMs: Date.now() - startedAt,
+          lastStatus: polled.status,
+        });
+      } catch {
+        // ignore soft-notify errors
+      }
     }
   }
 

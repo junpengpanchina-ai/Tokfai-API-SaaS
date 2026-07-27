@@ -19,6 +19,7 @@ import {
   finalizeImageTaskSuccess,
   loadImageTaskByRequestId,
   markImageTaskStarted,
+  markImageTaskWaitWindowExceeded,
   parseInputSnapshot,
   updateImageTaskProgress,
 } from "./tasksDb.js";
@@ -107,6 +108,10 @@ async function processImageGeneration(requestId: string): Promise<void> {
         imageUrlSources: input.imageUrlSources as ImageUrlResolveSource[],
         mode: input.mode,
         promptMode: input.promptMode,
+        onSoftWaitExceeded: async () => {
+          // P957: keep task in-flight; poll can continue; not billed.
+          await markImageTaskWaitWindowExceeded(requestId);
+        },
       };
       const result = isNanoBananaImageModel(task.model)
         ? await runNanoBananaImageGeneration(generateParams)

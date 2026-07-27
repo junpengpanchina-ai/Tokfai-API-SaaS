@@ -4,6 +4,12 @@ import {
   STATUS_PROGRESS,
   type ImageTaskStatus,
 } from "./progressMessages.js";
+import {
+  IMAGE_SOFT_WAIT_MS,
+  isPastImageSoftWait,
+  isSoftTimeoutCode,
+  SOFT_TIMEOUT_MESSAGES,
+} from "./imageTimeoutPolicy.js";
 
 /**
  * Public poll / POST-accepted response. Never includes upstream provider,
@@ -24,6 +30,7 @@ export function buildPublicImageTaskResponse(
     ? Number(task.credits_charged ?? 0)
     : 0;
 
+  // Billable only when completed AND charged (url success path).
   const billingStatus = isCompleted
     ? creditsCharged > 0
       ? "billable"
@@ -47,6 +54,17 @@ export function buildPublicImageTaskResponse(
   const isFailed =
     task.status === "failed" || task.status === "retryable_timeout";
 
+  const softTimedOut =
+    !isCompleted &&
+    !isFailed &&
+    (isSoftTimeoutCode(task.error_code) ||
+      isPastImageSoftWait(task.created_at, Date.now(), IMAGE_SOFT_WAIT_MS));
+
+  if (softTimedOut) {
+    if (!message.en) message.en = SOFT_TIMEOUT_MESSAGES.en;
+    if (!message.zh) message.zh = SOFT_TIMEOUT_MESSAGES.zh;
+  }
+
   const publicData = isCompleted
     ? resultData.map((item) => {
         if (item && typeof item === "object" && !Array.isArray(item)) {
@@ -61,6 +79,7 @@ export function buildPublicImageTaskResponse(
       })
     : [];
 
+  // Hard terminal failures only — soft wait-window does not set error.
   const error = isFailed
     ? {
         message:
@@ -71,7 +90,8 @@ export function buildPublicImageTaskResponse(
         type:
           task.error_code === "image_task_timeout" ||
           task.error_code === "image_generation_timeout" ||
-          task.error_code === "retryable_timeout"
+          task.error_code === "retryable_timeout" ||
+          task.error_code === "processing_timeout"
             ? "upstream_error"
             : "server_error",
         request_id: task.request_id,
@@ -100,6 +120,7 @@ export function buildPublicImageTaskResponse(
       mode: task.mode ?? null,
       prompt_mode: task.prompt_mode ?? null,
       ...(pollRequestId ? { poll_request_id: pollRequestId } : {}),
+      ...(softTimedOut ? { task_timeout: true } : {}),
     },
     request_id: task.request_id,
     credits_charged: creditsCharged,
@@ -107,6 +128,11 @@ export function buildPublicImageTaskResponse(
 
   if (!isCompleted && !isFailed) {
     base.processing = true;
+  }
+
+  // P957: past wait window while still in-flight — soft signal, poll continues.
+  if (softTimedOut) {
+    base.task_timeout = true;
   }
 
   if (error) {
@@ -143,6 +169,7 @@ export function buildPublicImageApiResultResponse(
   const full = buildPublicImageTaskResponse(task, pollRequestId);
   return {
     id: full.id,
+    task_id: full.task_id,
     status: full.status,
     progress: full.progress,
     message: full.message,
@@ -151,6 +178,8 @@ export function buildPublicImageApiResultResponse(
     results: full.data,
     usage: full.usage,
     error: full.error ?? null,
+    processing: full.processing,
+    task_timeout: full.task_timeout,
     tokfai: full.tokfai,
     request_id: task.request_id,
   };

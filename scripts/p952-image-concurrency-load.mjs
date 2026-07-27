@@ -206,12 +206,29 @@ async function runOneImageJob(base, key, index) {
     }
 
     if (!isTerminal(latest?.status)) {
-      row.status = "timeout";
-      row.clientTimeout = true;
-      row.errorCode = "client_poll_timeout";
+      const stillProcessing =
+        latest?.processing === true ||
+        latest?.task_timeout === true ||
+        ["queued", "validating", "billing_check", "requesting_model", "generating", "saving_result"].includes(
+          String(latest?.status ?? "").toLowerCase()
+        );
+      if (stillProcessing) {
+        // P957: client wait window exceeded while upstream still in-flight
+        row.status = "processing_timeout";
+        row.processingTimeout = true;
+        row.errorCode =
+          latest?.task_timeout || latest?.tokfai?.task_timeout
+            ? "image_task_timeout"
+            : "processing_timeout";
+      } else {
+        row.status = "timeout";
+        row.clientTimeout = true;
+        row.errorCode = "client_poll_timeout";
+      }
       row.credits = extractCredits(latest) ?? 0;
       row.billingStatus = extractBillingStatus(latest);
       row.latencyMs = Date.now() - started;
+      row.requestId = taskId;
       return row;
     }
 

@@ -2,7 +2,8 @@
  * Nano Banana image/media adapter (independent of grsai text chat provider).
  *
  * - Long-running generate + poll
- * - Hard client-facing timeout at 120s → image_task_timeout (not_billable)
+ * - Soft wait (NANO_BANANA_MAX_WAIT_MS) → processing/task_timeout, keep polling
+ * - Hard wait (NANO_BANANA_HARD_WAIT_MS) → image_task_timeout (not_billable)
  * - Upstream failure after high progress (≥95%) → upstream_image_error (never fake success)
  * - All failure paths leave billing to the worker as not_billable
  *
@@ -11,6 +12,10 @@
 
 import { ApiError } from "../errors.js";
 import { log } from "../logger.js";
+import {
+  IMAGE_HARD_WAIT_MS,
+  IMAGE_SOFT_WAIT_MS,
+} from "../images/imageTimeoutPolicy.js";
 import {
   createImageGenerationTask,
   pollImageGenerationTask,
@@ -21,8 +26,11 @@ import type { ImageGenerateResult } from "./imageAdapter.js";
 const CAPABILITY = "image_generation" as const;
 const PROVIDER_ID = "nano_banana_image";
 
-/** Upstream unfinished past this → image_task_timeout (or processing at route layer). */
-export const NANO_BANANA_MAX_WAIT_MS = 120_000;
+/** Soft wait window — expose task_timeout + processing; poll continues (P957). */
+export const NANO_BANANA_MAX_WAIT_MS = IMAGE_SOFT_WAIT_MS;
+
+/** Absolute hard stop — terminal image_task_timeout (P957). */
+export const NANO_BANANA_HARD_WAIT_MS = IMAGE_HARD_WAIT_MS;
 
 const POLL_INTERVAL_MS = 2_000;
 const HIGH_PROGRESS_THRESHOLD = 95;
@@ -110,10 +118,11 @@ export async function runNanoBananaImageGeneration(
     providerId: PROVIDER_ID,
   };
 
-  log.info("nano_banana_image_start", {
+    log.info("nano_banana_image_start", {
     ...logBase,
     mode: params.mode,
     maxWaitMs: NANO_BANANA_MAX_WAIT_MS,
+    hardWaitMs: NANO_BANANA_HARD_WAIT_MS,
   });
 
   try {
@@ -139,9 +148,12 @@ export async function runNanoBananaImageGeneration(
       throw upstreamImageError("missing_task_id", 502);
     }
 
-    const deadline = startedAt + NANO_BANANA_MAX_WAIT_MS;
+    const softDeadline = startedAt + NANO_BANANA_MAX_WAIT_MS;
+    const hardDeadline = startedAt + NANO_BANANA_HARD_WAIT_MS;
+    let softNotified = false;
+    let lastStatus: string | null = null;
 
-    while (Date.now() < deadline) {
+    while (Date.now() < hardDeadline) {
       await sleep(POLL_INTERVAL_MS);
 
       let polled: {
@@ -198,6 +210,8 @@ export async function runNanoBananaImageGeneration(
         );
       }
 
+      lastStatus = polled.status;
+
       if (polled.url && polled.url.trim()) {
         const latencyMs = Date.now() - startedAt;
         log.info("nano_banana_image_succeeded", {
@@ -226,11 +240,38 @@ export async function runNanoBananaImageGeneration(
         throw upstreamImageError(status, 502);
       }
 
+      // Soft wait window: keep polling; announce once so poll responses show task_timeout.
+      if (!softNotified && Date.now() >= softDeadline) {
+        softNotified = true;
+        const latencyMs = Date.now() - startedAt;
+        log.info("nano_banana_image_soft_timeout", {
+          ...logBase,
+          upstream_status: lastUpstreamStatus,
+          latencyMs,
+          progress: lastProgress,
+          lastStatus,
+          code: "processing_timeout",
+        });
+        try {
+          await params.onSoftWaitExceeded?.({
+            latencyMs,
+            lastStatus,
+          });
+        } catch {
+          // ignore
+        }
+      }
+
       // Advance synthetic progress while pending so ≥95% failure path is testable.
       if (lastProgress == null) lastProgress = 0;
       lastProgress = Math.min(
         99,
-        Math.max(lastProgress, Math.floor(((Date.now() - startedAt) / NANO_BANANA_MAX_WAIT_MS) * 100))
+        Math.max(
+          lastProgress,
+          Math.floor(
+            ((Date.now() - startedAt) / NANO_BANANA_HARD_WAIT_MS) * 100
+          )
+        )
       );
     }
 
@@ -240,6 +281,7 @@ export async function runNanoBananaImageGeneration(
       upstream_status: lastUpstreamStatus,
       latencyMs,
       progress: lastProgress,
+      lastStatus,
       code: "image_task_timeout",
     });
     throw imageTaskTimeoutError(latencyMs);

@@ -14,6 +14,7 @@ export const P952_SUMMARY_KEYS = [
   "completed",
   "failed",
   "timeout",
+  "processing_timeout",
   "billable_success",
   "bad_billing_failures",
   "missing_url_success",
@@ -25,13 +26,14 @@ export const P952_LATENCY_KEYS = ["min", "p50", "p90", "p95", "max"];
 
 /**
  * @typedef {object} ImageLoadRow
- * @property {string} [status] completed|failed|timeout|retryable_timeout|…
+ * @property {string} [status] completed|failed|timeout|retryable_timeout|processing_timeout|…
  * @property {number|null} [credits]
  * @property {string} [billingStatus] billable|not_billable|charged|…
  * @property {string|null} [url]
  * @property {string|null} [errorCode]
  * @property {number|null} [latencyMs]
  * @property {boolean} [clientTimeout]
+ * @property {boolean} [processingTimeout]
  */
 
 function num(value) {
@@ -41,6 +43,9 @@ function num(value) {
 
 function normalizeStatus(row) {
   const raw = String(row?.status ?? "").toLowerCase();
+  if (row?.processingTimeout || raw === "processing_timeout") {
+    return "processing_timeout";
+  }
   if (row?.clientTimeout) return "timeout";
   if (raw === "succeeded") return "completed";
   if (
@@ -87,6 +92,7 @@ export function summarizeImageConcurrencyLoad(rows) {
   let completed = 0;
   let failed = 0;
   let timeout = 0;
+  let processing_timeout = 0;
   let billable_success = 0;
   let bad_billing_failures = 0;
   let missing_url_success = 0;
@@ -112,6 +118,11 @@ export function summarizeImageConcurrencyLoad(rows) {
       if (credits > 0 || billable) bad_billing_failures += 1;
     } else if (status === "timeout") {
       timeout += 1;
+      // image_task_timeout / hard timeout: not bad billing unless charged
+      if (credits > 0 || billable) bad_billing_failures += 1;
+    } else if (status === "processing_timeout") {
+      // P957 soft wait — still in-flight / pollable; never billable success
+      processing_timeout += 1;
       if (credits > 0 || billable) bad_billing_failures += 1;
     } else {
       // unknown terminal — count toward failed bucket for ops visibility
@@ -147,6 +158,7 @@ export function summarizeImageConcurrencyLoad(rows) {
     completed,
     failed,
     timeout,
+    processing_timeout,
     billable_success,
     bad_billing_failures,
     missing_url_success,
@@ -173,6 +185,7 @@ export function formatImageConcurrencySummary(summary) {
     `completed=${summary.completed}`,
     `failed=${summary.failed}`,
     `timeout=${summary.timeout}`,
+    `processing_timeout=${summary.processing_timeout ?? 0}`,
     `billable_success=${summary.billable_success}`,
     `bad_billing_failures=${summary.bad_billing_failures}`,
     `missing_url_success=${summary.missing_url_success}`,

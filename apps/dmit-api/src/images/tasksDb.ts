@@ -10,6 +10,10 @@ import {
   STATUS_PROGRESS,
   type ImageTaskStatus,
 } from "./progressMessages.js";
+import {
+  IMAGE_SOFT_TIMEOUT_CODE,
+  SOFT_TIMEOUT_MESSAGES,
+} from "./imageTimeoutPolicy.js";
 
 const IMAGE_ENDPOINT = "/v1/images/generations";
 
@@ -265,6 +269,39 @@ export async function finalizeImageTaskFailure(args: {
 
   if (error) {
     // Best-effort; avoid throwing over double-finalize races.
+  }
+}
+
+/**
+ * P957 — Soft wait window exceeded while upstream may still be running.
+ * Keeps task in-flight so poll can continue; not billable; not terminal.
+ */
+export async function markImageTaskWaitWindowExceeded(
+  requestId: string
+): Promise<void> {
+  const now = new Date().toISOString();
+  const { error } = await supabase()
+    .from("image_generation_tasks")
+    .update({
+      error_code: IMAGE_SOFT_TIMEOUT_CODE,
+      error_message:
+        "Image generation is still in progress past the wait window. Poll again with task_id. Not billed yet.",
+      message_en: SOFT_TIMEOUT_MESSAGES.en,
+      message_zh: SOFT_TIMEOUT_MESSAGES.zh,
+      updated_at: now,
+    })
+    .eq("request_id", requestId)
+    .in("status", [
+      "queued",
+      "validating",
+      "billing_check",
+      "requesting_model",
+      "generating",
+      "saving_result",
+    ]);
+
+  if (error) {
+    // Non-fatal — publicResponse also derives soft timeout from created_at age.
   }
 }
 

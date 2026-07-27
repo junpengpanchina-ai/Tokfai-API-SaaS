@@ -840,6 +840,10 @@ function imageGenerationBody(body) {
     /__tokfai_image_fail__|force_upstream_image_error/i.test(prompt);
   const wantTimeout =
     /__tokfai_image_timeout__|force_image_task_timeout/i.test(prompt);
+  /** P957 soft wait: stay in-flight with task_timeout, then complete (poll continues). */
+  const wantSoftTimeout =
+    /__tokfai_image_soft_timeout__|force_image_soft_timeout/i.test(prompt);
+  const completeDelayMs = wantSoftTimeout ? 2_500 : 200;
 
   imageTasks.set(taskId, {
     id: taskId,
@@ -856,6 +860,8 @@ function imageGenerationBody(body) {
     mode,
     billing_status: "not_billable",
     credits_charged: 0,
+    task_timeout: false,
+    created_at_ms: Date.now(),
   });
 
   setTimeout(() => {
@@ -864,6 +870,13 @@ function imageGenerationBody(body) {
     task.status = "generating";
     task.progress = wantFail ? 96 : 55;
     task.message = { en: "Generating image", zh: "正在生成图片" };
+    if (wantSoftTimeout) {
+      task.task_timeout = true;
+      task.message = {
+        en: "Still generating (wait window exceeded). Keep polling with task_id — not billed yet.",
+        zh: "仍在生成中（已超过等待窗口）。请继续用 task_id 轮询，尚未扣费。",
+      };
+    }
   }, 50);
 
   setTimeout(() => {
@@ -872,6 +885,7 @@ function imageGenerationBody(body) {
     if (wantFail) {
       task.status = "failed";
       task.progress = 96;
+      task.task_timeout = false;
       task.message = {
         en: "Image generation is temporarily unavailable. Please retry shortly.",
         zh: "图片生成暂时不可用，请稍后重试。",
@@ -891,6 +905,7 @@ function imageGenerationBody(body) {
     if (wantTimeout) {
       task.status = "retryable_timeout";
       task.progress = 90;
+      task.task_timeout = false;
       task.message = {
         en: "Image generation timed out before completion.",
         zh: "图片生成超时，请稍后重试。未扣费。",
@@ -908,6 +923,7 @@ function imageGenerationBody(body) {
     }
     task.status = "completed";
     task.progress = 100;
+    task.task_timeout = false;
     task.message = { en: "Completed", zh: "已完成" };
     task.data = [
       {
@@ -918,7 +934,7 @@ function imageGenerationBody(body) {
     task.usage = { credits_charged: meta.credits_charged };
     task.billing_status = "billable";
     task.credits_charged = meta.credits_charged;
-  }, 200);
+  }, completeDelayMs);
 
   return {
     __status: 202,
@@ -1532,7 +1548,13 @@ export function startMockGateway(options = {}) {
           (task.status === "completed" && creditsCharged > 0
             ? "billable"
             : "not_billable");
-        return sendJson(res, 200, {
+        const isTerminal =
+          task.status === "completed" ||
+          task.status === "failed" ||
+          task.status === "retryable_timeout";
+        const softTimedOut =
+          !isTerminal && Boolean(task.task_timeout);
+        const body = {
           id: task.id,
           task_id: task.id,
           object: "image.generation",
@@ -1542,16 +1564,22 @@ export function startMockGateway(options = {}) {
           message: task.message,
           data: task.data,
           usage: task.usage,
-          error: task.error,
+          error: isTerminal ? task.error : null,
           tokfai: {
             request_id: task.id,
             billing_status: billingStatus,
-            credits_charged: creditsCharged,
+            credits_charged:
+              task.status === "completed" ? creditsCharged : 0,
             mode: task.mode,
+            ...(softTimedOut ? { task_timeout: true } : {}),
           },
           request_id: task.id,
-          credits_charged: creditsCharged,
-        });
+          credits_charged:
+            task.status === "completed" ? creditsCharged : 0,
+        };
+        if (!isTerminal) body.processing = true;
+        if (softTimedOut) body.task_timeout = true;
+        return sendJson(res, 200, body);
       }
 
       if (req.method === "POST" && path === "/v1/batches/chat") {
