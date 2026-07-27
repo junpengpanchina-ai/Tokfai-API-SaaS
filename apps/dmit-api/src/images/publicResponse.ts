@@ -5,6 +5,7 @@ import {
   type ImageTaskStatus,
 } from "./progressMessages.js";
 import {
+  IMAGE_SOFT_TIMEOUT_CODE,
   IMAGE_SOFT_WAIT_MS,
   isPastImageSoftWait,
   isSoftTimeoutCode,
@@ -30,12 +31,16 @@ export function buildPublicImageTaskResponse(
     ? Number(task.credits_charged ?? 0)
     : 0;
 
-  // Billable only when completed AND charged (url success path).
-  const billingStatus = isCompleted
-    ? creditsCharged > 0
-      ? "billable"
-      : "not_billable"
-    : "not_billable";
+  // Billable only when completed AND charged (url success path requires url).
+  const hasUrl =
+    isCompleted &&
+    resultData.some((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return false;
+      const url = (item as Record<string, unknown>).url;
+      return typeof url === "string" && url.trim().length > 0;
+    });
+  const billingStatus =
+    isCompleted && hasUrl && creditsCharged > 0 ? "billable" : "not_billable";
 
   const usage =
     isCompleted &&
@@ -43,7 +48,7 @@ export function buildPublicImageTaskResponse(
     typeof task.usage === "object" &&
     !Array.isArray(task.usage)
       ? (task.usage as Record<string, unknown>)
-      : { credits_charged: creditsCharged };
+      : { credits_charged: isCompleted && hasUrl ? creditsCharged : 0 };
 
   const message = {
     en: task.message_en ?? "",
@@ -61,8 +66,9 @@ export function buildPublicImageTaskResponse(
       isPastImageSoftWait(task.created_at, Date.now(), IMAGE_SOFT_WAIT_MS));
 
   if (softTimedOut) {
-    if (!message.en) message.en = SOFT_TIMEOUT_MESSAGES.en;
-    if (!message.zh) message.zh = SOFT_TIMEOUT_MESSAGES.zh;
+    // Always prefer pending copy — never look like a hard failure.
+    message.en = SOFT_TIMEOUT_MESSAGES.en;
+    message.zh = SOFT_TIMEOUT_MESSAGES.zh;
   }
 
   const publicData = isCompleted
@@ -91,7 +97,8 @@ export function buildPublicImageTaskResponse(
           task.error_code === "image_task_timeout" ||
           task.error_code === "image_generation_timeout" ||
           task.error_code === "retryable_timeout" ||
-          task.error_code === "processing_timeout"
+          task.error_code === "processing_timeout" ||
+          task.error_code === "image_task_timeout_pending"
             ? "upstream_error"
             : "server_error",
         request_id: task.request_id,
@@ -116,14 +123,20 @@ export function buildPublicImageTaskResponse(
     tokfai: {
       request_id: task.request_id,
       billing_status: billingStatus,
-      credits_charged: creditsCharged,
+      credits_charged: isCompleted && hasUrl ? creditsCharged : 0,
       mode: task.mode ?? null,
       prompt_mode: task.prompt_mode ?? null,
       ...(pollRequestId ? { poll_request_id: pollRequestId } : {}),
-      ...(softTimedOut ? { task_timeout: true } : {}),
+      ...(softTimedOut
+        ? {
+            timeout_pending: true,
+            task_timeout: true,
+            timeout_code: IMAGE_SOFT_TIMEOUT_CODE,
+          }
+        : {}),
     },
     request_id: task.request_id,
-    credits_charged: creditsCharged,
+    credits_charged: isCompleted && hasUrl ? creditsCharged : 0,
   };
 
   if (!isCompleted && !isFailed) {
@@ -132,7 +145,9 @@ export function buildPublicImageTaskResponse(
 
   // P957: past wait window while still in-flight — soft signal, poll continues.
   if (softTimedOut) {
+    base.timeout_pending = true;
     base.task_timeout = true;
+    base.timeout_code = IMAGE_SOFT_TIMEOUT_CODE;
   }
 
   if (error) {
@@ -180,6 +195,8 @@ export function buildPublicImageApiResultResponse(
     error: full.error ?? null,
     processing: full.processing,
     task_timeout: full.task_timeout,
+    timeout_pending: full.timeout_pending,
+    timeout_code: full.timeout_code,
     tokfai: full.tokfai,
     request_id: task.request_id,
   };

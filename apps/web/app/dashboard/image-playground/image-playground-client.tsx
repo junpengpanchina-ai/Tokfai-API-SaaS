@@ -853,7 +853,16 @@ export function ImageGeneratePanel({
       setLastRequestMode(requestMode);
       const res = await consumerImageGenerationsWithProgress(payload, {
         onProgress: (state) => {
-          if (state.status) setProgressStatus(state.status);
+          if (
+            state.timeout_pending ||
+            state.task_timeout ||
+            state.tokfai?.timeout_pending ||
+            state.tokfai?.task_timeout
+          ) {
+            setProgressStatus("timeout_pending");
+          } else if (state.status) {
+            setProgressStatus(state.status);
+          }
           if (typeof state.progress === "number") {
             const capped =
               state.status === "completed" || state.status === "succeeded"
@@ -914,12 +923,23 @@ export function ImageGeneratePanel({
     } catch (err) {
       setCompletedAt(new Date().toISOString());
       const base = toPlaygroundError(err, t);
+      const isTimeoutPending =
+        base.code === "image_task_timeout_pending" ||
+        base.code === "timeout_pending" ||
+        base.code === "processing_timeout";
       const isTimeout =
-        base.code === "retryable_timeout" ||
-        base.code === "image_generation_timeout" ||
-        base.code === "upstream_timeout";
-      // Never show 100% / success chrome on timeout or failure.
-      if (isTimeout) {
+        !isTimeoutPending &&
+        (base.code === "retryable_timeout" ||
+          base.code === "image_generation_timeout" ||
+          base.code === "upstream_timeout" ||
+          base.code === "image_task_timeout");
+      // Soft pending: keep generating UX, not failure chrome.
+      if (isTimeoutPending) {
+        setProgressStatus("timeout_pending");
+        setProgressPercent((prev) =>
+          typeof prev === "number" ? Math.min(prev, 95) : 95
+        );
+      } else if (isTimeout) {
         setProgressStatus("retryable_timeout");
         setProgressPercent((prev) =>
           typeof prev === "number" ? Math.min(prev, 95) : 95
@@ -928,11 +948,20 @@ export function ImageGeneratePanel({
       setResult(null);
       setError({
         ...base,
+        code: isTimeoutPending
+          ? "image_task_timeout_pending"
+          : isTimeout
+            ? "retryable_timeout"
+            : base.code,
         model,
         elapsedMs: Date.now() - generateStartedAt,
         // Gateway may retry timeout/busy once server-side; client cannot observe count.
         retryCount:
-          isTimeout || base.code === "upstream_model_busy" ? 1 : 0,
+          isTimeout ||
+          isTimeoutPending ||
+          base.code === "upstream_model_busy"
+            ? 1
+            : 0,
       });
     } finally {
       setLoading(false);

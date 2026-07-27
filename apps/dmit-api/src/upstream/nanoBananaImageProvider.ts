@@ -250,7 +250,7 @@ export async function runNanoBananaImageGeneration(
           latencyMs,
           progress: lastProgress,
           lastStatus,
-          code: "processing_timeout",
+          code: "image_task_timeout_pending",
         });
         try {
           await params.onSoftWaitExceeded?.({

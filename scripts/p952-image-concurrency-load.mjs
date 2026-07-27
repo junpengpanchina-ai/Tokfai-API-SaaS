@@ -208,18 +208,26 @@ async function runOneImageJob(base, key, index) {
     if (!isTerminal(latest?.status)) {
       const stillProcessing =
         latest?.processing === true ||
+        latest?.timeout_pending === true ||
         latest?.task_timeout === true ||
+        latest?.tokfai?.timeout_pending === true ||
         ["queued", "validating", "billing_check", "requesting_model", "generating", "saving_result"].includes(
           String(latest?.status ?? "").toLowerCase()
         );
       if (stillProcessing) {
         // P957: client wait window exceeded while upstream still in-flight
-        row.status = "processing_timeout";
+        row.status = "timeout_pending";
+        row.timeoutPending = true;
         row.processingTimeout = true;
         row.errorCode =
-          latest?.task_timeout || latest?.tokfai?.task_timeout
-            ? "image_task_timeout"
-            : "processing_timeout";
+          latest?.timeout_code ||
+          latest?.tokfai?.timeout_code ||
+          (latest?.timeout_pending ||
+          latest?.task_timeout ||
+          latest?.tokfai?.timeout_pending ||
+          latest?.tokfai?.task_timeout
+            ? "image_task_timeout_pending"
+            : "timeout_pending");
       } else {
         row.status = "timeout";
         row.clientTimeout = true;

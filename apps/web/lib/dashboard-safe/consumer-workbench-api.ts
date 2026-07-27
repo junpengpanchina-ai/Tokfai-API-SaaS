@@ -98,6 +98,29 @@ export async function consumerImageGenerationsWithProgress(
 
   while (!isImageGenerationTerminal(latest.status)) {
     if (options?.signal?.aborted) {
+      const stillPending =
+        latest.processing === true ||
+        latest.timeout_pending === true ||
+        latest.task_timeout === true ||
+        latest.tokfai?.timeout_pending === true ||
+        !isImageGenerationTerminal(latest.status);
+      if (stillPending) {
+        throw new DashboardDmitApiError({
+          status: 202,
+          message:
+            typeof latest.message === "object"
+              ? latest.message.en ||
+                "Still generating — check again later with task_id. Not billed yet."
+              : "Still generating — check again later with task_id. Not billed yet.",
+          code: "image_task_timeout_pending",
+          body: {
+            ...latest,
+            timeout_pending: true,
+            task_id: taskId,
+            request_id: latest.request_id ?? taskId,
+          },
+        });
+      }
       throw new DashboardDmitApiError({
         status: 499,
         message: "Aborted.",

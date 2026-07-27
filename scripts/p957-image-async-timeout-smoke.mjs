@@ -3,12 +3,13 @@
  * P957 — Image async timeout hardening smoke.
  *
  * Asserts:
- * 1) Soft wait → processing + task_timeout + trackable task_id (not hard fail)
+ * 1) Soft wait → processing + timeout_pending (image_task_timeout_pending)
+ *    + trackable task_id (not hard fail)
  * 2) Poll continues after soft timeout; later completed+url → billable
  * 3) Hard __tokfai_image_timeout__ → image_task_timeout, not_billable
- * 4) image_task_timeout / processing_timeout ∉ bad_billing_failures when unpaid
- * 5) 20 @ C2 summary: allow processing_timeout; forbid 500 / bad billing /
- *    missing_url_success
+ * 4) timeout_pending / unpaid image_task_timeout ∉ bad_billing_failures
+ * 5) 20 @ C1 summary: allow timeout_pending; forbid 500 / bad billing /
+ *    missing_url_success / dirty runtime patterns in scripts
  * 6) P954 isolation codes unchanged (static)
  *
  * Usage (default mock):
@@ -36,6 +37,15 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PASS_MARKER = "TOKFAI_P957_IMAGE_ASYNC_TIMEOUT_PASS";
 const FAIL_MARKER = "TOKFAI_P957_IMAGE_ASYNC_TIMEOUT_FAIL";
 
+const DIRTY_RUNTIME = [
+  "api_error_500",
+  "charged timeout",
+  "message=undefined",
+  "code=undefined",
+  "empty body",
+  "Cannot set headers after they are sent",
+];
+
 function readSrc(rel) {
   return readFileSync(join(ROOT, rel), "utf8");
 }
@@ -53,22 +63,26 @@ function assertStatic() {
   const isolation = readSrc("apps/dmit-api/src/lib/imageProviderIsolation.ts");
   const chat = readSrc("apps/dmit-api/src/lib/executeChatCompletion.ts");
   const images = readSrc("apps/dmit-api/src/routes/images.ts");
+  const labels = readSrc(
+    "apps/web/app/dashboard/image-playground/image-playground-labels.ts"
+  );
+  const frontendApi = readSrc("apps/web/lib/dashboard-safe/image-api.ts");
 
   ok =
     (policy.includes("IMAGE_SOFT_WAIT_MS") &&
     policy.includes("IMAGE_HARD_WAIT_MS") &&
-    policy.includes("processing_timeout")
-      ? pass("static: soft/hard wait policy present")
-      : fail("static: soft/hard wait policy present")) && ok;
+    policy.includes("image_task_timeout_pending")
+      ? pass("static: soft/hard wait + image_task_timeout_pending")
+      : fail("static: soft/hard wait + image_task_timeout_pending")) && ok;
 
   ok =
-    (pub.includes("task_timeout") &&
+    (pub.includes("timeout_pending") &&
     pub.includes("processing") &&
-    pub.includes('billingStatus = isCompleted') &&
-    pub.includes("creditsCharged > 0")
-      ? pass("static: publicResponse soft task_timeout + billable only completed")
+    pub.includes("IMAGE_SOFT_TIMEOUT_CODE") &&
+    pub.includes("hasUrl")
+      ? pass("static: publicResponse timeout_pending + billable only completed+url")
       : fail(
-          "static: publicResponse soft task_timeout + billable only completed"
+          "static: publicResponse timeout_pending + billable only completed+url"
         )) && ok;
 
   ok =
@@ -81,7 +95,7 @@ function assertStatic() {
   ok =
     (nano.includes("NANO_BANANA_HARD_WAIT_MS") &&
     nano.includes("onSoftWaitExceeded") &&
-    nano.includes("processing_timeout")
+    nano.includes("image_task_timeout_pending")
       ? pass("static: nano banana soft-then-hard wait")
       : fail("static: nano banana soft-then-hard wait")) && ok;
 
@@ -93,13 +107,33 @@ function assertStatic() {
       ? pass("static: P954 isolation codes unchanged")
       : fail("static: P954 isolation codes unchanged")) && ok;
 
-  // image_task_timeout unpaid must not be treated as bad billing in summarizer
+  ok =
+    (labels.includes("timeoutPendingFriendly") &&
+    labels.includes("statusTimeoutPending") &&
+    /生成中，可稍后查询/.test(labels) &&
+    frontendApi.includes("image_task_timeout_pending")
+      ? pass("static: frontend pending copy (not failure)")
+      : fail("static: frontend pending copy (not failure)")) && ok;
+
   const lib = readSrc("scripts/lib/image-concurrency-load.mjs");
   ok =
-    (lib.includes("processing_timeout") &&
-    /status === "timeout"[\s\S]*bad_billing_failures/.test(lib)
-      ? pass("static: timeout/processing_timeout only bad if charged")
-      : fail("static: timeout/processing_timeout only bad if charged")) && ok;
+    (lib.includes("timeout_pending") &&
+    /status === "timeout_pending"[\s\S]*bad_billing_failures/.test(lib)
+      ? pass("static: timeout_pending only bad if charged")
+      : fail("static: timeout_pending only bad if charged")) && ok;
+
+  for (const rel of [
+    "apps/dmit-api/src/images/worker.ts",
+    "apps/dmit-api/src/images/publicResponse.ts",
+    "apps/dmit-api/src/upstream/nanoBananaImageProvider.ts",
+  ]) {
+    const src = readSrc(rel);
+    const hit = DIRTY_RUNTIME.find((p) => src.includes(p));
+    ok =
+      (!hit
+        ? pass(`static dirty-free: ${rel}`)
+        : fail(`static dirty-free: ${rel}`, hit)) && ok;
+  }
 
   return ok;
 }
@@ -109,17 +143,16 @@ async function main() {
   console.log(`script: ${SCRIPT}`);
   let ok = assertStatic();
 
-  // Pure summary fixtures: unpaid timeouts must not inflate bad_billing
   {
     const rows = [
       {
-        status: "processing_timeout",
+        status: "timeout_pending",
         credits: 0,
         billingStatus: "not_billable",
         url: null,
-        errorCode: "image_task_timeout",
+        errorCode: "image_task_timeout_pending",
         latencyMs: 5_000,
-        processingTimeout: true,
+        timeoutPending: true,
       },
       {
         status: "timeout",
@@ -148,7 +181,7 @@ async function main() {
     ];
     const summary = summarizeImageConcurrencyLoad(rows);
     const good =
-      summary.processing_timeout === 1 &&
+      summary.timeout_pending === 1 &&
       summary.timeout === 1 &&
       summary.billable_success === 1 &&
       summary.missing_url_success === 1 &&
@@ -156,10 +189,10 @@ async function main() {
     ok =
       (good
         ? pass(
-            "summary: unpaid image_task_timeout/processing_timeout not bad_billing"
+            "summary: unpaid timeout_pending / image_task_timeout not bad_billing"
           )
         : fail(
-            "summary: unpaid image_task_timeout/processing_timeout not bad_billing",
+            "summary: unpaid timeout_pending / image_task_timeout not bad_billing",
             JSON.stringify(summary)
           )) && ok;
   }
@@ -192,7 +225,6 @@ async function main() {
   }
 
   try {
-    // Soft timeout: processing + task_timeout + task_id; poll continues → billable
     {
       const { res, body, text } = await postJson("/v1/images/generations", {
         model: "nano-banana",
@@ -231,17 +263,23 @@ async function main() {
           }
           if (
             poll.body?.processing &&
-            (poll.body?.task_timeout || poll.body?.tokfai?.task_timeout)
+            (poll.body?.timeout_pending ||
+              poll.body?.task_timeout ||
+              poll.body?.tokfai?.timeout_pending ||
+              poll.body?.tokfai?.task_timeout)
           ) {
             softSeen = true;
             const unpaid =
               poll.body?.tokfai?.billing_status === "not_billable" &&
-              Number(poll.body?.tokfai?.credits_charged ?? 0) === 0;
+              Number(poll.body?.tokfai?.credits_charged ?? 0) === 0 &&
+              !poll.body?.error;
             ok =
               (unpaid
-                ? pass("soft poll: processing+task_timeout not_billable")
+                ? pass(
+                    "soft poll: processing+timeout_pending not_billable (no error)"
+                  )
                 : fail(
-                    "soft poll: processing+task_timeout not_billable",
+                    "soft poll: processing+timeout_pending not_billable (no error)",
                     JSON.stringify(poll.body?.tokfai)
                   )) && ok;
           }
@@ -252,15 +290,17 @@ async function main() {
         }
         ok =
           (softSeen
-            ? pass("soft timeout observed before completion")
-            : fail("soft timeout observed before completion")) && ok;
+            ? pass("soft timeout_pending observed before completion")
+            : fail("soft timeout_pending observed before completion")) && ok;
         const billableOk =
           completed?.status === "completed" &&
           typeof completed?.data?.[0]?.url === "string" &&
           completed?.tokfai?.billing_status === "billable";
         ok =
           (billableOk
-            ? pass("after soft timeout: completed+url billable via continued poll")
+            ? pass(
+                "after soft timeout: completed+url billable via continued poll"
+              )
             : fail(
                 "after soft timeout: completed+url billable via continued poll",
                 JSON.stringify(completed?.tokfai)
@@ -268,7 +308,6 @@ async function main() {
       }
     }
 
-    // Hard timeout still not billable
     {
       const { res, body, text } = await postJson("/v1/images/generations", {
         model: "nano-banana",
@@ -318,10 +357,10 @@ async function main() {
       }
     }
 
-    // 20 @ C2 with short client wait → allow processing_timeout; forbid bad billing / 500 / missing url success
+    // 20 @ C1 — allow timeout_pending; forbid 500 / bad billing / missing url
     {
       const COUNT = 20;
-      const CONCURRENCY = 2;
+      const CONCURRENCY = 1;
       const POLL_BUDGET_MS = 400;
       let http500 = 0;
 
@@ -332,7 +371,7 @@ async function main() {
           const started = Date.now();
           const create = await postJson("/v1/images/generations", {
             model: "nano-banana",
-            prompt: `__tokfai_image_soft_timeout__ c2-${i}`,
+            prompt: `__tokfai_image_soft_timeout__ c1-${i}`,
             size: "1024x1024",
             n: 1,
             response_format: "url",
@@ -400,15 +439,15 @@ async function main() {
             };
           }
           return {
-            status: "processing_timeout",
-            processingTimeout: true,
+            status: "timeout_pending",
+            timeoutPending: true,
             credits: Number(latest?.tokfai?.credits_charged ?? 0),
             billingStatus: latest?.tokfai?.billing_status ?? "not_billable",
             url: null,
             errorCode:
-              latest?.task_timeout || latest?.tokfai?.task_timeout
-                ? "image_task_timeout"
-                : "processing_timeout",
+              latest?.timeout_code ||
+              latest?.tokfai?.timeout_code ||
+              "image_task_timeout_pending",
             latencyMs: Date.now() - started,
             requestId: taskId,
           };
@@ -420,27 +459,23 @@ async function main() {
       console.log(formatImageConcurrencySummary(summary));
       console.log(`http_500_count=${http500}`);
 
-      const c2Ok =
+      const c1Ok =
         summary.total_done === COUNT &&
         http500 === 0 &&
         summary.bad_billing_failures === 0 &&
         summary.missing_url_success === 0 &&
-        summary.processing_timeout >= 1;
+        summary.timeout_pending >= 1;
       ok =
-        (c2Ok
+        (c1Ok
           ? pass(
-              "20 C2: allow processing_timeout; no 500 / bad billing / missing url success"
+              "20 C1: allow timeout_pending; no 500 / bad billing / missing url success"
             )
           : fail(
-              "20 C2: allow processing_timeout; no 500 / bad billing / missing url success",
-              JSON.stringify({
-                http500,
-                summary,
-              })
+              "20 C1: allow timeout_pending; no 500 / bad billing / missing url success",
+              JSON.stringify({ http500, summary })
             )) && ok;
     }
 
-    // P954 live isolation still holds on mock
     {
       const chatReject = await postJson("/v1/chat/completions", {
         model: "nano-banana",

@@ -28,6 +28,9 @@ const STATUS_LABEL_KEYS: Record<string, string> = {
   completed: "dashboard.imageWorkbench.statusCompleted",
   failed: "dashboard.imageWorkbench.statusFailed",
   retryable_timeout: "dashboard.imageWorkbench.statusRetryableTimeout",
+  timeout_pending: "dashboard.imageWorkbench.statusTimeoutPending",
+  image_task_timeout_pending: "dashboard.imageWorkbench.statusTimeoutPending",
+  processing_timeout: "dashboard.imageWorkbench.statusTimeoutPending",
   succeeded: "dashboard.imageWorkbench.statusCompleted",
   running: "dashboard.imageWorkbench.statusGenerating",
 };

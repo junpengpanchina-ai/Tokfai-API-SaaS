@@ -108,6 +108,8 @@ const EN: Record<string, string> = {
   "dashboard.imageWorkbench.imageProgressTitle": "Creating your image",
   "dashboard.imageWorkbench.imageTimeoutFriendly":
     "Image generation took longer than expected. No credits were charged. Please retry later or use a faster image model.",
+  "dashboard.imageWorkbench.timeoutPendingFriendly":
+    "Still generating. Keep this task_id / request_id and check again later. Not billed yet.",
   "dashboard.imageWorkbench.imageFailFriendly":
     "This attempt did not complete. Failed calls are usually not charged. Try simplifying the request and retry.",
   "dashboard.imageWorkbench.noChargeHint":
@@ -143,6 +145,8 @@ const EN: Record<string, string> = {
   "dashboard.imageWorkbench.statusFailed": "Failed",
   "dashboard.imageWorkbench.statusRetryableTimeout":
     "Image generation took longer than expected",
+  "dashboard.imageWorkbench.statusTimeoutPending":
+    "Still generating — you can check again later",
   "dashboard.imageWorkbench.progressPercent": "{percent}%",
   "dashboard.imageWorkbench.visionStage1": "Reading your image...",
   "dashboard.imageWorkbench.visionStage2": "Understanding your request...",
@@ -412,6 +416,8 @@ const ZH: Record<string, string> = {
   "dashboard.imageWorkbench.imageProgressTitle": "正在生成图片",
   "dashboard.imageWorkbench.imageTimeoutFriendly":
     "图片生成时间较长，未扣费。你可以稍后重试，或切换更快的图片模型。",
+  "dashboard.imageWorkbench.timeoutPendingFriendly":
+    "生成中，可稍后查询。请保留 task_id / request_id，尚未扣费。",
   "dashboard.imageWorkbench.imageFailFriendly":
     "这次没有成功，通常不会扣费。你可以简化需求后重试。",
   "dashboard.imageWorkbench.noChargeHint": "未扣费",
@@ -445,6 +451,7 @@ const ZH: Record<string, string> = {
   "dashboard.imageWorkbench.statusCompleted": "已完成",
   "dashboard.imageWorkbench.statusFailed": "失败",
   "dashboard.imageWorkbench.statusRetryableTimeout": "图片生成时间较长",
+  "dashboard.imageWorkbench.statusTimeoutPending": "生成中，可稍后查询",
   "dashboard.imageWorkbench.progressPercent": "{percent}%",
   "dashboard.imageWorkbench.visionStage1": "正在读取图片...",
   "dashboard.imageWorkbench.visionStage2": "正在理解你的需求...",

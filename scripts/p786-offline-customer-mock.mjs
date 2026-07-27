@@ -861,6 +861,8 @@ function imageGenerationBody(body) {
     billing_status: "not_billable",
     credits_charged: 0,
     task_timeout: false,
+    timeout_pending: false,
+    timeout_code: null,
     created_at_ms: Date.now(),
   });
 
@@ -872,9 +874,11 @@ function imageGenerationBody(body) {
     task.message = { en: "Generating image", zh: "正在生成图片" };
     if (wantSoftTimeout) {
       task.task_timeout = true;
+      task.timeout_pending = true;
+      task.timeout_code = "image_task_timeout_pending";
       task.message = {
-        en: "Still generating (wait window exceeded). Keep polling with task_id — not billed yet.",
-        zh: "仍在生成中（已超过等待窗口）。请继续用 task_id 轮询，尚未扣费。",
+        en: "Still generating — you can check again later with task_id. Not billed yet.",
+        zh: "生成中，可稍后查询（保留 task_id）。尚未扣费。",
       };
     }
   }, 50);
@@ -1553,7 +1557,8 @@ export function startMockGateway(options = {}) {
           task.status === "failed" ||
           task.status === "retryable_timeout";
         const softTimedOut =
-          !isTerminal && Boolean(task.task_timeout);
+          !isTerminal &&
+          (Boolean(task.task_timeout) || Boolean(task.timeout_pending));
         const body = {
           id: task.id,
           task_id: task.id,
@@ -1571,14 +1576,26 @@ export function startMockGateway(options = {}) {
             credits_charged:
               task.status === "completed" ? creditsCharged : 0,
             mode: task.mode,
-            ...(softTimedOut ? { task_timeout: true } : {}),
+            ...(softTimedOut
+              ? {
+                  timeout_pending: true,
+                  task_timeout: true,
+                  timeout_code:
+                    task.timeout_code || "image_task_timeout_pending",
+                }
+              : {}),
           },
           request_id: task.id,
           credits_charged:
             task.status === "completed" ? creditsCharged : 0,
         };
         if (!isTerminal) body.processing = true;
-        if (softTimedOut) body.task_timeout = true;
+        if (softTimedOut) {
+          body.task_timeout = true;
+          body.timeout_pending = true;
+          body.timeout_code =
+            task.timeout_code || "image_task_timeout_pending";
+        }
         return sendJson(res, 200, body);
       }
 

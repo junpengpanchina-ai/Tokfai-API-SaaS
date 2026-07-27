@@ -664,6 +664,42 @@ export function ImagePlaygroundResultArea({
   const isReferenceEdit =
     requestMode === "reference_edit" || referenceImageIncluded;
 
+  // Client-side validation (status 0) already has localized friendly copy —
+  // show that as the primary message. Upstream/API failures stay generic;
+  // raw upstream text only appears inside collapsed Details.
+  const isClientValidation = error?.status === 0;
+  const isTimeoutPending =
+    error?.code === "image_task_timeout_pending" ||
+    error?.code === "timeout_pending" ||
+    error?.code === "processing_timeout";
+  const isRetryableTimeout =
+    !isTimeoutPending &&
+    (error?.code === "retryable_timeout" ||
+      error?.code === "image_generation_timeout" ||
+      error?.code === "upstream_timeout" ||
+      error?.code === "image_task_timeout" ||
+      Boolean(error?.code?.toLowerCase().includes("timeout")) ||
+      Boolean(error?.message?.toLowerCase().includes("timeout")) ||
+      Boolean(error?.message?.includes("超时")) ||
+      Boolean(error?.message?.includes("未扣费")));
+
+  const friendlyError = isClientValidation && error?.message
+    ? error.message
+    : isTimeoutPending
+      ? t("dashboard.imageWorkbench.timeoutPendingFriendly")
+      : isRetryableTimeout
+        ? t("dashboard.imageWorkbench.imageTimeoutFriendly")
+        : t("dashboard.imageWorkbench.imageFailFriendly");
+
+  const billingHint = isClientValidation
+    ? null
+    : isTimeoutPending ||
+        isRetryableTimeout ||
+        error?.code === "no_charge" ||
+        error?.code === "not_charged"
+      ? t("dashboard.imageWorkbench.noChargeHint")
+      : t("dashboard.imageWorkbench.billingUnknownHint");
+
   const title =
     state === "loading"
       ? t("dashboard.imageWorkbench.imageProgressTitle")
@@ -671,43 +707,22 @@ export function ImagePlaygroundResultArea({
         ? isReferenceEdit
           ? t("dashboard.imagePlayground.referenceEditResultTitle")
           : t("dashboard.imagePlayground.successComplete")
-        : t("dashboard.imagePlayground.toolbenchResultPanelTitle");
+        : isTimeoutPending
+          ? t("dashboard.imageWorkbench.statusTimeoutPending")
+          : t("dashboard.imagePlayground.toolbenchResultPanelTitle");
 
   const cardClass = cn(
     IMAGE_PLAYGROUND_TOOLBENCH.card,
     IMAGE_PLAYGROUND_TOOLBENCH.resultCard,
     attention && "ring-2 ring-emerald-200/90 border-emerald-300/70",
     state === "success" && "border-emerald-500/35",
-    state === "error" && attention && "ring-destructive/15 border-destructive/40",
+    state === "error" &&
+      attention &&
+      !isTimeoutPending &&
+      "ring-destructive/15 border-destructive/40",
+    state === "error" && isTimeoutPending && "border-primary/25",
     state === "loading" && !attention && "border-primary/25"
   );
-
-  // Client-side validation (status 0) already has localized friendly copy —
-  // show that as the primary message. Upstream/API failures stay generic;
-  // raw upstream text only appears inside collapsed Details.
-  const isClientValidation = error?.status === 0;
-  const isRetryableTimeout =
-    error?.code === "retryable_timeout" ||
-    error?.code === "image_generation_timeout" ||
-    error?.code === "upstream_timeout" ||
-    Boolean(error?.code?.toLowerCase().includes("timeout")) ||
-    Boolean(error?.message?.toLowerCase().includes("timeout")) ||
-    Boolean(error?.message?.includes("超时")) ||
-    Boolean(error?.message?.includes("未扣费"));
-
-  const friendlyError = isClientValidation && error?.message
-    ? error.message
-    : isRetryableTimeout
-      ? t("dashboard.imageWorkbench.imageTimeoutFriendly")
-      : t("dashboard.imageWorkbench.imageFailFriendly");
-
-  const billingHint = isClientValidation
-    ? null
-    : isRetryableTimeout ||
-        error?.code === "no_charge" ||
-        error?.code === "not_charged"
-      ? t("dashboard.imageWorkbench.noChargeHint")
-      : t("dashboard.imageWorkbench.billingUnknownHint");
 
   const focusModelSelect = () => {
     const el = document.getElementById("toolbench-model");

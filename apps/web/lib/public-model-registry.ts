@@ -330,7 +330,7 @@ export const PUBLIC_MODEL_REGISTRY: PublicModel[] = [
     supportsImageInput: false,
     supportsImageGeneration: true,
     beginnerFriendly: false,
-    tags: ["image", "vip"],
+    tags: ["image", "best_quality"],
     descriptionZh:
       "VIP 兼容风格图片模型。仅 /v1/images/generations；成功才扣费。不可用于 Chat。",
     descriptionEn:

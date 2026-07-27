@@ -42,7 +42,9 @@ export type ImageGenerationTaskStatus =
   | "failed"
   | "retryable_timeout"
   | "succeeded"
-  | "running";
+  | "running"
+  | "timeout_pending"
+  | "image_task_timeout_pending";
 
 export interface ImageProgressMessage {
   en?: string;
@@ -76,10 +78,20 @@ export interface ImageGenerationResponse {
     message_en?: string;
     message_zh?: string;
   } | null;
+  processing?: boolean;
+  /** P957 soft wait — still in-flight; poll again; not a failure. */
+  timeout_pending?: boolean;
+  task_timeout?: boolean;
+  timeout_code?: string;
   tokfai?: {
     request_id?: string;
     mode?: string | null;
     prompt_mode?: string | null;
+    billing_status?: string;
+    credits_charged?: number;
+    timeout_pending?: boolean;
+    task_timeout?: boolean;
+    timeout_code?: string;
   };
 }
 
@@ -195,6 +207,30 @@ export async function imageGenerationsWithProgress(
 
   while (!isImageGenerationTerminal(latest.status)) {
     if (options?.signal?.aborted) {
+      const stillPending =
+        latest.processing === true ||
+        latest.timeout_pending === true ||
+        latest.task_timeout === true ||
+        latest.tokfai?.timeout_pending === true ||
+        !isImageGenerationTerminal(latest.status);
+      if (stillPending) {
+        // P957: client wait ended while upstream may still run — not a failure.
+        throw new DashboardDmitApiError({
+          status: 202,
+          message:
+            typeof latest.message === "object"
+              ? latest.message.en ||
+                "Still generating — check again later with task_id. Not billed yet."
+              : "Still generating — check again later with task_id. Not billed yet.",
+          code: "image_task_timeout_pending",
+          body: {
+            ...latest,
+            timeout_pending: true,
+            task_id: taskId,
+            request_id: latest.request_id ?? taskId,
+          },
+        });
+      }
       throw new DashboardDmitApiError({
         status: 499,
         message: "Aborted.",
