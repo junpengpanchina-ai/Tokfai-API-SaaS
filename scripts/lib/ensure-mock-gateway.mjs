@@ -58,7 +58,7 @@ export async function isMockGatewayReady(baseUrl, apiKey) {
     if (chatBody?.tokfai?.resolved_model !== "gpt-5") return false;
     if (typeof chatBody?.request_id !== "string") return false;
 
-    // Require p914 error-trigger support so stale mocks are not reused.
+    // Require p914 / p969 error-trigger support so stale mocks are not reused.
     const errRes = await fetch(`${root}/v1/chat/completions`, {
       method: "POST",
       headers: {
@@ -73,6 +73,24 @@ export async function isMockGatewayReady(baseUrl, apiKey) {
       signal: AbortSignal.timeout(8000),
     });
     if (errRes.status !== 402) return false;
+
+    const timeoutRes = await fetch(`${root}/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "__tokfai_mock_upstream_timeout",
+        messages: [{ role: "user", content: "hi" }],
+        stream: false,
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (timeoutRes.status !== 504) return false;
+    const timeoutBody = await timeoutRes.json().catch(() => null);
+    if (timeoutBody?.error?.code !== "upstream_timeout") return false;
+    if (timeoutBody?.tokfai?.billing_status !== "not_billable") return false;
 
     // Require vision analyze route so stale mocks are not reused after P942.
     const visionRes = await fetch(`${root}/v1/vision/analyze`, {

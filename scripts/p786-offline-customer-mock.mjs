@@ -34,8 +34,23 @@ const batches = new Map();
  * }>} */
 const imageTasks = new Map();
 
+/** P969: Idempotency-Key → successful chat completion snapshot (offline only). */
+/** @type {Map<string, { requestId: string, creditsCharged: number, body: Record<string, unknown> }>} */
+const chatIdempotency = new Map();
+
 function makeRequestId() {
   return `req_mock_${randomBytes(8).toString("hex")}`;
+}
+
+function parseIdempotencyHeader(req) {
+  const raw =
+    req.headers["idempotency-key"] ?? req.headers["Idempotency-Key"] ?? "";
+  const key = Array.isArray(raw) ? String(raw[0] ?? "") : String(raw ?? "");
+  const trimmed = key.trim();
+  if (!trimmed) return null;
+  if (trimmed.length < 8 || trimmed.length > 128) return null;
+  if (!/^[A-Za-z0-9._:-]+$/.test(trimmed)) return null;
+  return trimmed;
 }
 
 /** Models accepted by the offline mock (catalog + aliases). */
@@ -105,14 +120,16 @@ function isMockModelAllowed(raw) {
 }
 
 function modelNotAvailableBody() {
+  const requestId = makeRequestId();
   return {
     error: {
       message:
         "This model is not available on Tokfai. Please refresh model list or choose another Tokfai model.",
       code: "model_not_available",
       type: "invalid_request_error",
+      request_id: requestId,
     },
-    request_id: makeRequestId(),
+    ...notBillableExtras(requestId),
   };
 }
 
@@ -125,11 +142,7 @@ function imageModelNotForChatBody(requestId = makeRequestId()) {
       type: "invalid_request_error",
       request_id: requestId,
     },
-    tokfai: {
-      billing_status: "not_billable",
-      credits_charged: 0,
-    },
-    request_id: requestId,
+    ...notBillableExtras(requestId),
   };
 }
 
@@ -137,6 +150,18 @@ function imageModelNotForChatBody(requestId = makeRequestId()) {
  * Offline-only error triggers for client error-copy smoke (p914).
  * Never hit production; model ids are reserved for mock gateways.
  */
+function notBillableExtras(requestId) {
+  return {
+    request_id: requestId,
+    credits_charged: 0,
+    tokfai: {
+      request_id: requestId,
+      credits_charged: 0,
+      billing_status: "not_billable",
+    },
+  };
+}
+
 function mockErrorForModel(rawModel) {
   const id = String(rawModel ?? "").trim();
   const table = {
@@ -160,6 +185,18 @@ function mockErrorForModel(rawModel) {
       message:
         "Model is busy on Tokfai. Please retry shortly or choose another Tokfai model.",
     },
+    "__tokfai_mock_upstream_timeout": {
+      status: 504,
+      code: "upstream_timeout",
+      type: "upstream_error",
+      message: "Upstream timed out. Please retry after a short wait.",
+    },
+    "__tokfai_mock_upstream_error": {
+      status: 502,
+      code: "upstream_error",
+      type: "upstream_error",
+      message: "Upstream error on Tokfai. Please retry shortly.",
+    },
     "__tokfai_mock_invalid_request": {
       status: 400,
       code: "invalid_request_error",
@@ -169,6 +206,7 @@ function mockErrorForModel(rawModel) {
   };
   const hit = table[id];
   if (!hit) return null;
+  const requestId = makeRequestId();
   return {
     status: hit.status,
     body: {
@@ -176,8 +214,9 @@ function mockErrorForModel(rawModel) {
         message: hit.message,
         code: hit.code,
         type: hit.type,
+        request_id: requestId,
       },
-      request_id: makeRequestId(),
+      ...notBillableExtras(requestId),
     },
   };
 }
@@ -193,6 +232,7 @@ function tokfaiMeta(requestedModel = "auto-fast", resolvedModel = "gemini-3-flas
       credits_charged: creditsCharged,
       requested_model: requestedModel,
       resolved_model: resolvedModel,
+      billing_status: "charged",
     },
   };
 }
@@ -1264,6 +1304,13 @@ export function startMockGateway(options = {}) {
         if (!slot.ok) return sendJson(res, slot.response.status, slot.response.body);
         try {
           const body = await readJsonBody(req);
+          const idemKey = parseIdempotencyHeader(req);
+          if (idemKey && chatIdempotency.has(idemKey)) {
+            const hit = chatIdempotency.get(idemKey);
+            const replay = structuredClone(hit.body);
+            // Keep original request_id / credits — no double charge.
+            return sendJson(res, 200, replay);
+          }
           // Cherry Studio compat: mirror DMIT normalizeClientChatCompletionBody
           // (empty / missing / non-array / all-empty-content → 200 noop).
           const clientNorm = mockNormalizeClientChatBody(body);
@@ -1347,6 +1394,13 @@ export function startMockGateway(options = {}) {
             return sendJson(res, 400, modelNotAvailableBody());
           }
           const completion = chatCompletionBody(normalizedBody);
+          if (idemKey && normalizedBody?.stream !== true) {
+            chatIdempotency.set(idemKey, {
+              requestId: completion.request_id,
+              creditsCharged: Number(completion.credits_charged ?? 0),
+              body: completion,
+            });
+          }
           if (normalizedBody?.stream === true) {
             return sendSse(res, chatCompletionToSse(completion));
           }
