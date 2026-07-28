@@ -1,0 +1,173 @@
+{
+  "suite": "p958-adversarial-load",
+  "started_at": "2026-07-27T16:35:11.303Z",
+  "base": "https://api.tokfai.com",
+  "api_key_masked": "sk-tokfai_0d…c63a (len=58)",
+  "chat_model": "gemini-2.5-flash",
+  "image_model": "nano-banana",
+  "steps": {
+    "baseline_health": {
+      "health_http": 200,
+      "models_http": 200,
+      "chat": {
+        "ok": true,
+        "http": 200,
+        "code": null,
+        "latencyMs": 24710,
+        "requestId": "3-dab8aedf-db46-4021-b0e2-41580fc063b5",
+        "sample": null
+      }
+    },
+    "chat_stress": {
+      "total": 50,
+      "concurrency": 10,
+      "ok": 6,
+      "ok_rate": 0.12,
+      "http": {
+        "200": 6,
+        "429": 44
+      },
+      "n429": 44,
+      "n500": 0,
+      "latency": {
+        "n": 50,
+        "min": 404,
+        "p50": 524,
+        "p95": 17269,
+        "max": 86593
+      },
+      "sample_errors": [
+        {
+          "http": 429,
+          "code": "too_many_concurrent_requests",
+          "sample": "{\"error\":{\"message\":\"当前并发请求过多，请降低并发。\",\"code\":\"too_many_concurrent_requests\",\"type\":\"rate_limit_error\",\"request_id\":\"2aedca778f62d6a7fb8e298aa361c837\"},\"request_id\":\"2aedca778f62d6a"
+        },
+        {
+          "http": 429,
+          "code": "too_many_concurrent_requests",
+          "sample": "{\"error\":{\"message\":\"当前并发请求过多，请降低并发。\",\"code\":\"too_many_concurrent_requests\",\"type\":\"rate_limit_error\",\"request_id\":\"65a6b8ce6546529fab8108af75f7f832\"},\"request_id\":\"65a6b8ce6546529"
+        },
+        {
+          "http": 429,
+          "code": "too_many_concurrent_requests",
+          "sample": "{\"error\":{\"message\":\"当前并发请求过多，请降低并发。\",\"code\":\"too_many_concurrent_requests\",\"type\":\"rate_limit_error\",\"request_id\":\"fcedc29ca3eb2e85683c166898253fe7\"},\"request_id\":\"fcedc29ca3eb2e8"
+        },
+        {
+          "http": 429,
+          "code": "too_many_concurrent_requests",
+          "sample": "{\"error\":{\"message\":\"当前并发请求过多，请降低并发。\",\"code\":\"too_many_concurrent_requests\",\"type\":\"rate_limit_error\",\"request_id\":\"27b3e52c28161b45f3d1cfe0f6239f07\"},\"request_id\":\"27b3e52c28161b4"
+        },
+        {
+          "http": 429,
+          "code": "too_many_concurrent_requests",
+          "sample": "{\"error\":{\"message\":\"当前并发请求过多，请降低并发。\",\"code\":\"too_many_concurrent_requests\",\"type\":\"rate_limit_error\",\"request_id\":\"aafd1ab8e5f834ac4450aa8683e4feef\"},\"request_id\":\"aafd1ab8e5f834a"
+        }
+      ]
+    },
+    "image_async_stress": {
+      "total": 12,
+      "concurrency": 2,
+      "summary": {
+        "total_done": 12,
+        "completed": 12,
+        "failed": 0,
+        "timeout": 0,
+        "timeout_pending": 0,
+        "billable_success": 12,
+        "bad_billing_failures": 0,
+        "missing_url_success": 0,
+        "error_codes": {},
+        "latency": {
+          "min": 9720,
+          "p50": 18638,
+          "p90": 71724,
+          "p95": 80333,
+          "max": 80333
+        }
+      },
+      "http": {
+        "202": 12
+      },
+      "judged": {
+        "ok": true,
+        "failures": []
+      }
+    },
+    "mixed_stress": {
+      "duration_ms": 142205,
+      "chat": {
+        "total": 20,
+        "ok": 0,
+        "http": {
+          "429": 20
+        }
+      },
+      "image": {
+        "total": 6,
+        "summary": {
+          "total_done": 6,
+          "completed": 6,
+          "failed": 0,
+          "timeout": 0,
+          "timeout_pending": 0,
+          "billable_success": 6,
+          "bad_billing_failures": 0,
+          "missing_url_success": 0,
+          "error_codes": {},
+          "latency": {
+            "min": 9851,
+            "p50": 12524,
+            "p90": 107476,
+            "p95": 107476,
+            "max": 107476
+          }
+        },
+        "http": {
+          "202": 6
+        }
+      }
+    },
+    "negative_route_isolation": {
+      "image_on_chat": {
+        "http": 400,
+        "code": "image_model_not_for_chat",
+        "billing": null
+      },
+      "text_on_image": {
+        "http": 400,
+        "code": "model_not_image_capable",
+        "billing": "not_billable"
+      }
+    },
+    "spike_test": {
+      "concurrency": 20,
+      "duration_sec": 15,
+      "total": 674,
+      "ok": 0,
+      "n429": 674,
+      "n500": 0,
+      "http": {
+        "429": 674
+      }
+    },
+    "recovery_test": {
+      "health_http": 200,
+      "chat": {
+        "ok": false,
+        "http": 429,
+        "code": "too_many_requests",
+        "latencyMs": 421,
+        "requestId": null,
+        "sample": "{\"error\":{\"message\":\"请求过于频繁，请降低并发或稍后重试。\",\"code\":\"too_many_requests\",\"type\":\"rate_limit_error\",\"request_id\":\"7d7dac88ef3474ed813c047703d81fb6\"},\"request_id\":\"7d7dac88ef3474ed813c047"
+      },
+      "image": {
+        "http": 202,
+        "task_id": "15a9d4e1ebf271779a36c6bf86baf1dc",
+        "code": null
+      }
+    }
+  },
+  "pass": true,
+  "failures": [],
+  "finished_at": "2026-07-27T16:43:21.697Z"
+}
