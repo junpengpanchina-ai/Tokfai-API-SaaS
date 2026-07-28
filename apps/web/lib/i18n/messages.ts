@@ -169,13 +169,14 @@ export const messages = {
       overview: {
         title: "Welcome back",
         subtitle:
-          "Try Tokfai Chat API, analyze product images, or connect Cherry Studio / the OpenAI SDK.",
+          "Get an API key, try Chat or Image generation, then check balance and usage — or connect Cherry Studio / the OpenAI SDK.",
         subtitleReturning:
-          "Try Tokfai Chat API, analyze product images, or connect Cherry Studio / the OpenAI SDK.",
+          "Get an API key, try Chat or Image generation, then check balance and usage — or connect Cherry Studio / the OpenAI SDK.",
         continueTitle: "Get started",
-        continueDesc: "Try chat, analyze product images, or connect Cherry Studio.",
+        continueDesc:
+          "Try chat completions, generate images, or connect Cherry Studio.",
         startChat: "Try chat models",
-        startImage: "Recognize ecommerce images",
+        startImage: "Generate images",
         startCherry: "Connect Cherry Studio",
         goTopUp: "Top up",
         goUsage: "View usage",
@@ -1038,6 +1039,14 @@ export const messages = {
           switchModelHint:
             "Try auto-fast for stable routing. gpt-5.4 / gpt-5.5 are high-quality models that may be busy under load.",
           rateLimited: "Too many requests. Please try again later.",
+          imageModelNotForChat:
+            "This is an image model — it cannot use Chat Completions. Open Image Playground instead.",
+          modelNotImageCapable:
+            "This text model cannot generate images. Use Chat Playground or a chat endpoint.",
+          imageTaskTimeout:
+            "Image generation timed out and was not charged. Retry or switch to a faster image model.",
+          useImagePlaygroundHint:
+            "Switch to Image Playground for nano-banana / gpt-image models.",
           unknown: "Request failed. Please try again later.",
           missingPrompt: "Please enter a prompt.",
           keyNotRetrievable:
@@ -1194,6 +1203,15 @@ export const messages = {
             "The image model is temporarily unavailable or slow. Try again later or switch models.",
           billingNotChargedHint:
             "Failed requests are usually not charged. See Usage / Credits for the official record.",
+          rateLimited: "Too many requests. Please try again later.",
+          imageModelNotForChat:
+            "This is an image model — it cannot use Chat Completions. Stay in Image Playground.",
+          modelNotImageCapable:
+            "This text model cannot generate images. Pick an image model (nano-banana / gpt-image-*).",
+          imageTaskTimeout:
+            "Image generation timed out and was not charged. Retry or switch to a faster image model.",
+          useChatPlaygroundHint:
+            "For text/chat models, use Chat Playground instead.",
           missingPrompt: "Please enter a prompt.",
           keyNotRetrievable:
             "For security, full keys aren't stored long-term. Paste your key or create a new test key.",
@@ -4924,6 +4942,18 @@ export const messages = {
         last7dCredits: "Credits consumed (7d)",
         paidOrders: "Paid orders",
         totalRecharge: "Total recharge",
+        totalBalance: "Total balance (credits)",
+        totalBalanceHint: "Sum of all user credits_balance — open liability.",
+        chatCredits: "Chat credits consumed",
+        imageCredits: "Image credits consumed",
+        moneyBagTitle: "Money-bag risks",
+        moneyBagDesc:
+          "Billing integrity alarms from image tasks. Non-zero counts need ops review before more traffic.",
+        riskBadBilling: "bad_billing_failures",
+        riskProviderUnpaid: "provider_success_unpaid",
+        riskChargedMissingUrl: "charged_missing_url",
+        riskMissingUrlSuccess: "missing_url_success",
+        riskStaleTimeout: "stale_timeout_pending",
         requestSparklineTitle: "Request trend (7d)",
         requestSparklineDesc: "Daily request count from usage logs.",
         sparklineEmpty: "No request data for the last 7 days.",
@@ -5600,13 +5630,13 @@ export const messages = {
       overview: {
         title: "欢迎回来",
         subtitle:
-          "使用 Tokfai 体验 Chat API、分析商品图，或接入 Cherry Studio / OpenAI SDK。",
+          "先拿 API Key，试 Chat / 图片生成，再在余额与用量里对账——也可接入 Cherry Studio / OpenAI SDK。",
         subtitleReturning:
-          "使用 Tokfai 体验 Chat API、分析商品图，或接入 Cherry Studio / OpenAI SDK。",
+          "先拿 API Key，试 Chat / 图片生成，再在余额与用量里对账——也可接入 Cherry Studio / OpenAI SDK。",
         continueTitle: "立即开始",
-        continueDesc: "体验对话、分析商品图，或接入 Cherry Studio。",
+        continueDesc: "体验对话补全、生成图片，或接入 Cherry Studio。",
         startChat: "体验对话模型",
-        startImage: "识别电商图",
+        startImage: "生成图片",
         startCherry: "接入 Cherry Studio",
         goTopUp: "去充值",
         goUsage: "查看用量",
@@ -6423,6 +6453,14 @@ export const messages = {
           allUpstreamsHint:
             "可尝试 auto-fast、降低并发，或稍后再试。",
           rateLimited: "请求过快，请稍后再试。",
+          imageModelNotForChat:
+            "这是图片模型，不能走 Chat Completions。请打开图片工作台。",
+          modelNotImageCapable:
+            "该文本模型不能生成图片。请使用对话体验或 Chat 接口。",
+          imageTaskTimeout:
+            "图片生成超时，未扣费。可重试或切换更快的图片模型。",
+          useImagePlaygroundHint:
+            "nano-banana / gpt-image 模型请改用图片工作台。",
           unknown: "请求失败，请稍后重试。",
           missingPrompt: "请输入测试内容。",
           keyNotRetrievable:
@@ -6565,6 +6603,14 @@ export const messages = {
             "图片模型暂时不可用或生成较慢，请稍后重试或切换模型。",
           billingNotChargedHint:
             "失败请求通常不会扣费，以 Usage / Credits 记录为准。",
+          rateLimited: "请求过于频繁，请稍后再试。",
+          imageModelNotForChat:
+            "这是图片模型，不能走 Chat Completions。请留在图片工作台。",
+          modelNotImageCapable:
+            "该文本模型不能生成图片。请选择图片模型（nano-banana / gpt-image-*）。",
+          imageTaskTimeout:
+            "图片生成超时，未扣费。可重试或切换更快的图片模型。",
+          useChatPlaygroundHint: "文本/对话模型请改用对话体验。",
           missingPrompt: "请输入 prompt。",
           keyNotRetrievable:
             "出于安全考虑，完整 key 不会长期保存。请粘贴 key，或重新创建一个测试 Key。",
@@ -10123,6 +10169,18 @@ export const messages = {
         last7dCredits: "近 7 天消耗算力积分",
         paidOrders: "已支付订单",
         totalRecharge: "累计充值",
+        totalBalance: "平台总余额（算力积分）",
+        totalBalanceHint: "所有用户 credits_balance 合计——未兑现负债。",
+        chatCredits: "Chat 累计消耗",
+        imageCredits: "Image 累计消耗",
+        moneyBagTitle: "钱袋子风险",
+        moneyBagDesc:
+          "图片任务计费完整性告警。非零即需运维排查，勿在未处理前加大流量。",
+        riskBadBilling: "bad_billing_failures",
+        riskProviderUnpaid: "provider_success_unpaid",
+        riskChargedMissingUrl: "charged_missing_url",
+        riskMissingUrlSuccess: "missing_url_success",
+        riskStaleTimeout: "stale_timeout_pending",
         requestSparklineTitle: "请求趋势（7 天）",
         requestSparklineDesc: "来自 usage_logs 的每日请求数。",
         sparklineEmpty: "近 7 天暂无请求数据。",

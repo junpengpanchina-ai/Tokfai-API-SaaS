@@ -197,6 +197,8 @@ const EN: Record<string, string> = {
     "Not enough credits — add credits before generating.",
   "dashboard.imagePlayground.topUp": "Add credits",
   "dashboard.imagePlayground.toolbenchModelLabel": "Model",
+  "dashboard.imagePlayground.imageModelsOnlyHint":
+    "Image models only — text/chat models (gpt-*, gemini-*) cannot generate images here.",
   "dashboard.imagePlayground.size": "Size",
   "dashboard.imagePlayground.toolbenchBillingNoteShort":
     "Successful generations use credits. Failed calls are usually not charged.",
@@ -315,6 +317,16 @@ const EN: Record<string, string> = {
   "dashboard.imagePlayground.errors.modelNotFound": "Model not found.",
   "dashboard.imagePlayground.errors.modelNotAvailable":
     "This model is not available here yet.",
+  "dashboard.imagePlayground.errors.rateLimited":
+    "Too many requests. Please wait a moment and try again.",
+  "dashboard.imagePlayground.errors.imageModelNotForChat":
+    "This is an image model — it cannot use Chat Completions. Stay in Image Playground.",
+  "dashboard.imagePlayground.errors.modelNotImageCapable":
+    "This text model cannot generate images. Pick an image model (nano-banana / gpt-image-*).",
+  "dashboard.imagePlayground.errors.imageTaskTimeout":
+    "Image generation timed out and was not charged. Retry or switch to a faster image model.",
+  "dashboard.imagePlayground.errors.useChatPlaygroundHint":
+    "For text/chat models, use Chat Playground instead.",
 };
 
 const ZH: Record<string, string> = {
@@ -501,6 +513,8 @@ const ZH: Record<string, string> = {
     "余额不足——请先充值再生成。",
   "dashboard.imagePlayground.topUp": "去充值",
   "dashboard.imagePlayground.toolbenchModelLabel": "模型",
+  "dashboard.imagePlayground.imageModelsOnlyHint":
+    "仅图片模型——文本/对话模型（gpt-*、gemini-*）不能在此生成图片。",
   "dashboard.imagePlayground.size": "尺寸",
   "dashboard.imagePlayground.toolbenchBillingNoteShort":
     "成功生成会扣费，失败通常不扣费。",
@@ -611,6 +625,15 @@ const ZH: Record<string, string> = {
   "dashboard.imagePlayground.errors.invalidDrop": "请拖入 PNG、JPG 或 WEBP 图片文件。",
   "dashboard.imagePlayground.errors.modelNotFound": "未找到该模型。",
   "dashboard.imagePlayground.errors.modelNotAvailable": "该模型暂不可用。",
+  "dashboard.imagePlayground.errors.rateLimited": "请求过于频繁，请稍后再试。",
+  "dashboard.imagePlayground.errors.imageModelNotForChat":
+    "这是图片模型，不能走 Chat Completions。请留在图片工作台。",
+  "dashboard.imagePlayground.errors.modelNotImageCapable":
+    "该文本模型不能生成图片。请选择图片模型（nano-banana / gpt-image-*）。",
+  "dashboard.imagePlayground.errors.imageTaskTimeout":
+    "图片生成超时，未扣费。可重试或切换更快的图片模型。",
+  "dashboard.imagePlayground.errors.useChatPlaygroundHint":
+    "文本/对话模型请改用对话体验。",
 };
 
 /** Exported for parity / UX smoke scripts. */

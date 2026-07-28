@@ -24,6 +24,8 @@ const EN: Record<string, string> = {
   "dashboard.playground.estimatedCostLabel": "Estimated charge",
   "dashboard.playground.estimatedCostHint": "Charged by token usage after success",
   "dashboard.playground.model": "Model",
+  "dashboard.playground.chatModelsOnlyHint":
+    "Chat models only — image models (nano-banana, gpt-image-*) belong in Image Playground.",
   "dashboard.playground.prompt": "Prompt",
   "dashboard.playground.promptPlaceholder":
     "Enter test content, e.g. introduce Tokfai API in one sentence.",
@@ -141,6 +143,14 @@ const EN: Record<string, string> = {
   "dashboard.playground.errors.switchModelHint":
     "Try auto-fast for stable routing. gpt-5.4 / gpt-5.5 are high-quality models that may be busy under load.",
   "dashboard.playground.errors.rateLimited": "Too many requests. Please try again later.",
+  "dashboard.playground.errors.imageModelNotForChat":
+    "This is an image model — it cannot use Chat Completions. Open Image Playground instead.",
+  "dashboard.playground.errors.modelNotImageCapable":
+    "This text model cannot generate images. Use Chat Playground or a chat endpoint.",
+  "dashboard.playground.errors.imageTaskTimeout":
+    "Image generation timed out and was not charged. Retry or switch to a faster image model.",
+  "dashboard.playground.errors.useImagePlaygroundHint":
+    "Switch to Image Playground for nano-banana / gpt-image models.",
   "dashboard.playground.errors.unknown": "Request failed. Please try again later.",
   "dashboard.playground.errors.missingPrompt": "Please enter a prompt.",
   "dashboard.playground.errors.keyNotRetrievable":
@@ -167,6 +177,8 @@ const ZH: Record<string, string> = {
   "dashboard.playground.estimatedCostLabel": "预计扣费",
   "dashboard.playground.estimatedCostHint": "成功后按 token 用量扣费",
   "dashboard.playground.model": "模型",
+  "dashboard.playground.chatModelsOnlyHint":
+    "仅对话模型——图片模型（nano-banana、gpt-image-*）请到图片工作台。",
   "dashboard.playground.prompt": "Prompt",
   "dashboard.playground.promptPlaceholder":
     "请输入测试内容，例如：用一句话介绍 Tokfai API。",
@@ -275,6 +287,14 @@ const ZH: Record<string, string> = {
   "dashboard.playground.errors.switchModelHint":
     "建议使用 auto-fast 获得稳定路由。gpt-5.4 / gpt-5.5 高质量模型在高峰可能繁忙。",
   "dashboard.playground.errors.rateLimited": "请求过于频繁，请稍后再试。",
+  "dashboard.playground.errors.imageModelNotForChat":
+    "这是图片模型，不能走 Chat Completions。请打开图片工作台。",
+  "dashboard.playground.errors.modelNotImageCapable":
+    "该文本模型不能生成图片。请使用对话体验或 Chat 接口。",
+  "dashboard.playground.errors.imageTaskTimeout":
+    "图片生成超时，未扣费。可重试或切换更快的图片模型。",
+  "dashboard.playground.errors.useImagePlaygroundHint":
+    "nano-banana / gpt-image 模型请改用图片工作台。",
   "dashboard.playground.errors.unknown": "请求失败，请稍后重试。",
   "dashboard.playground.errors.missingPrompt": "请输入 prompt。",
   "dashboard.playground.errors.keyNotRetrievable":

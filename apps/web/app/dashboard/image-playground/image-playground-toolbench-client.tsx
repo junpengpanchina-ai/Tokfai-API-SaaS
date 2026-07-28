@@ -467,6 +467,9 @@ export function ImagePlaygroundRunSettingsPanel({
                 </option>
               ))}
             </select>
+            <p className="text-[11px] text-muted-foreground">
+              {t("dashboard.imagePlayground.imageModelsOnlyHint")}
+            </p>
             {isModelComingSoon ? (
               <p className="text-[11px] font-medium text-destructive">
                 {t("dashboard.imagePlayground.modelComingSoon")}

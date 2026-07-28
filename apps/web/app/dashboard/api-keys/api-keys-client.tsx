@@ -224,7 +224,7 @@ export function ApiKeysClient({
             </Link>
           </Button>
           <Button type="button" size="sm" variant="outline" asChild>
-            <Link href="/dashboard/docs#quick-start">
+            <Link href="/dashboard/docs#quickstart">
               {t("dashboard.apiKeys.quickStartDocs")}
             </Link>
           </Button>
@@ -495,7 +495,7 @@ function OneTimeSecretCard({
               </Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/dashboard/docs#quick-start">
+              <Link href="/dashboard/docs#quickstart">
                 {t("dashboard.apiKeys.quickStartDocs")}
               </Link>
             </Button>

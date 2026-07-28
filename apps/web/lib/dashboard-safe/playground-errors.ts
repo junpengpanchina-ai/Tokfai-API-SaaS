@@ -6,6 +6,7 @@ export type PlaygroundErrorKind =
   | "upstream"
   | "rate_limit"
   | "validation"
+  | "timeout"
   | "unknown";
 
 const AUTH_TOKEN_CODES = new Set([
@@ -27,6 +28,18 @@ const UPSTREAM_CODES = new Set([
   "network_error",
 ]);
 
+const ISOLATION_CODES = new Set([
+  "image_model_not_for_chat",
+  "model_not_image_capable",
+]);
+
+const TIMEOUT_CODES = new Set([
+  "image_task_timeout",
+  "image_task_timeout_pending",
+  "timeout_pending",
+  "retryable_timeout",
+]);
+
 export function classifyPlaygroundError(
   status: number,
   code?: string | null
@@ -45,7 +58,14 @@ export function classifyPlaygroundError(
     return "auth";
   }
 
-  if (normalized === "model_not_available") {
+  if (TIMEOUT_CODES.has(normalized)) {
+    return "timeout";
+  }
+
+  if (
+    ISOLATION_CODES.has(normalized) ||
+    normalized === "model_not_available"
+  ) {
     return "validation";
   }
 
@@ -59,7 +79,11 @@ export function classifyPlaygroundError(
     return "upstream";
   }
 
-  if (normalized === "rate_limited" || status === 429) {
+  if (
+    normalized === "rate_limited" ||
+    normalized === "too_many_requests" ||
+    status === 429
+  ) {
     return "rate_limit";
   }
 
@@ -97,6 +121,13 @@ export function resolvePlaygroundRiskMessage(
     return t(`${prefix}.invalidOrMissingToken`);
   }
 
+  if (kind === "timeout") {
+    if (scope === "imagePlayground") {
+      return t(`${prefix}.imageTaskTimeout`);
+    }
+    return t(`${prefix}.upstreamTimeout`);
+  }
+
   if (kind === "upstream") {
     if (scope === "imagePlayground") {
       if (normalized === "upstream_timeout") {
@@ -128,6 +159,14 @@ export function resolvePlaygroundRiskMessage(
   }
 
   if (kind === "validation") {
+    if (normalized === "image_model_not_for_chat") {
+      return t(`${prefix}.imageModelNotForChat`);
+    }
+
+    if (normalized === "model_not_image_capable") {
+      return t(`${prefix}.modelNotImageCapable`);
+    }
+
     if (normalized === "model_not_available") {
       return t(`${prefix}.modelNotAvailable`);
     }
@@ -162,6 +201,10 @@ export function playgroundRiskHintKey(
 ): string | null {
   const normalized = (code ?? "").toLowerCase();
 
+  if (kind === "timeout" && scope === "imagePlayground") {
+    return "dashboard.imagePlayground.errors.billingNotChargedHint";
+  }
+
   if (kind === "upstream") {
     if (normalized === "all_upstreams_unavailable") {
       return "dashboard.playground.errors.allUpstreamsHint";
@@ -171,12 +214,16 @@ export function playgroundRiskHintKey(
       : "dashboard.playground.errors.switchModelHint";
   }
 
-  if (
-    kind === "validation" &&
-    scope === "playground" &&
-    normalized === "model_not_available"
-  ) {
-    return "dashboard.playground.errors.switchModelHint";
+  if (kind === "validation") {
+    if (normalized === "image_model_not_for_chat") {
+      return "dashboard.playground.errors.useImagePlaygroundHint";
+    }
+    if (normalized === "model_not_image_capable") {
+      return "dashboard.imagePlayground.errors.useChatPlaygroundHint";
+    }
+    if (scope === "playground" && normalized === "model_not_available") {
+      return "dashboard.playground.errors.switchModelHint";
+    }
   }
 
   return null;

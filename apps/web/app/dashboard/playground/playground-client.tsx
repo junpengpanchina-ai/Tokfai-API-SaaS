@@ -406,6 +406,9 @@ export function PlaygroundClient({
                 );
               })}
             </select>
+            <p className="text-xs text-muted-foreground">
+              {t("dashboard.playground.chatModelsOnlyHint")}
+            </p>
             {selectedModelEntry?.description && !isSmartModelAlias(model) ? (
               <p className="text-xs text-muted-foreground">
                 {selectedModelEntry.description}

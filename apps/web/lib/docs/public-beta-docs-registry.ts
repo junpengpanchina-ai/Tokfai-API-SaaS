@@ -45,7 +45,7 @@ export type PublicBetaDoc = {
   markdown: { zh: string; en: string };
 };
 
-const UPDATED_AT = "2026-07-16";
+const UPDATED_AT = "2026-07-28";
 
 const QUICKSTART_CURL = modelsCurlMultiline();
 const RESPONSES_CURL = `curl -sS ${TOKFAI_API_BASE_URL}/responses \\
@@ -752,10 +752,11 @@ Tokfai 是 **KA 大客户 AI 聚合平台**。图片能力与文本能力分离�
 | 能力 | 模型 | 接口 |
 |---|---|---|
 | 文本与代码 | GPT / Gemini | \`POST /v1/chat/completions\` 或 \`POST /v1/responses\` |
-| 图片生成 | Nano Banana 系列 | \`POST /v1/images/generations\` + 轮询 |
+| 图片生成 | Nano Banana / gpt-image 系列 | \`POST /v1/images/generations\` + 轮询 |
 | 视频生成 | — | **预留 / coming soon / reserved**（未开放） |
 
-> Nano Banana **不能**走 chat。GPT / Gemini **不能**走 image generation。  
+> **能力隔离（强制）**：图片模型 **不能** 走 Chat；文本模型 **不能** 走 Images。  
+> 错路由会返回稳定错误码（\`image_model_not_for_chat\` / \`model_not_image_capable\`），且 \`billing_status: not_billable\`（不扣费）。  
 > 图片模型**不会**出现在普通聊天客户端的 \`GET /v1/models\` 列表中。请用 **图片工作台** 或本接口。
 
 ## 推荐图片模型
@@ -765,12 +766,28 @@ Tokfai 是 **KA 大客户 AI 聚合平台**。图片能力与文本能力分离�
 | \`nano-banana\` | **推荐图片模型** |
 | \`nano-banana-fast\` | 轻量快图 / 成本低 |
 | \`nano-banana-2\` | 更高质量 / 更稳定 |
+| \`gpt-image-2\` | OpenAI 兼容图片模型 |
+| \`gpt-image-2-vip\` | 更高优先级 / 更稳定图片通道 |
+
+## 异步任务状态
+
+| status | 含义 | 计费 |
+|---|---|---|
+| \`queued\` | 已受理，排队中 | 不扣费 |
+| \`generating\` | 上游生成中 | 不扣费 |
+| \`saving_result\` | 正在落盘 / 写回结果 | 不扣费 |
+| \`completed\` | 任务完成 | **仅当 \`data[].url\` 存在时 billable** |
+| \`failed\` | 失败终态 | \`not_billable\` |
+| \`timeout_pending\` | 软超时，任务仍可轮询 / 后台对账 | \`not_billable\`（未出 URL 不扣费） |
+
+> **计费硬规则**：\`status=completed\` **且** 响应含可用 \`data[].url\` → \`tokfai.billing_status: billable\`。  
+> 仅 completed 但缺少 URL、失败、超时、错路由 → **不扣费**（\`not_billable\`）。
 
 ## 异步任务流程
 
 1. \`POST /v1/images/generations\` 提交任务 → 返回 \`id\` / \`task_id\`
-2. \`GET /v1/images/generations/:task_id\` 轮询进度与结果
-3. **成功 → \`tokfai.billing_status: billable\`（扣费）**；**失败 / 超时 → \`not_billable\`（不扣费）**（见 \`usage.credits_charged\` 与 \`tokfai.billing_status\`）
+2. \`GET /v1/images/generations/:task_id\` 轮询进度与结果（兼容 alias：\`GET /v1/api/result?id=\`）
+3. **\`completed\` + \`data[].url\` → billable（扣费）**；**失败 / 超时 / 缺 URL → not_billable（不扣费）**（见 \`usage.credits_charged\` 与 \`tokfai.billing_status\`）
 
 ## 请求字段
 
@@ -829,9 +846,12 @@ ${IMAGE_REF_CURL}
 
 | code | 说明 |
 |---|---|
+| \`image_model_not_for_chat\` | 图片模型不能走 Chat；\`not_billable\` |
+| \`model_not_image_capable\` | 文本模型不能走 Images；\`not_billable\` |
 | \`image_model_not_available\` | 当前图片模型不可用，请切换图片模型 |
 | \`upstream_image_error\` | 图片生成暂时不可用，请稍后重试 |
 | \`image_task_timeout\` | 图片生成时间较长，未扣费，可稍后重试或切换更快图片模型 |
+| \`image_task_timeout_pending\` / \`timeout_pending\` | 软超时，任务仍可轮询；未出 URL 不扣费 |
 
 说明：
 
@@ -846,10 +866,11 @@ Tokfai is a **KA enterprise AI aggregation platform**. Image and text capabiliti
 | Capability | Models | Endpoint |
 |---|---|---|
 | Text & code | GPT / Gemini | \`POST /v1/chat/completions\` or \`POST /v1/responses\` |
-| Image generation | Nano Banana series | \`POST /v1/images/generations\` + poll |
+| Image generation | Nano Banana / gpt-image series | \`POST /v1/images/generations\` + poll |
 | Video generation | — | **reserved / coming soon** (not available) |
 
-> Nano Banana **cannot** use chat. GPT / Gemini **cannot** use image generation.  
+> **Capability isolation (enforced)**: Image models **cannot** use Chat; text models **cannot** use Images.  
+> Wrong-route calls return stable codes (\`image_model_not_for_chat\` / \`model_not_image_capable\`) with \`billing_status: not_billable\`.  
 > Image models are **not** listed on \`GET /v1/models\` for ordinary chat clients. Use **Image Workbench** or this API.
 
 ## Recommended image models
@@ -859,12 +880,28 @@ Tokfai is a **KA enterprise AI aggregation platform**. Image and text capabiliti
 | \`nano-banana\` | **Recommended image model** |
 | \`nano-banana-fast\` | Lightweight / fast / lower cost |
 | \`nano-banana-2\` | Higher quality / more stable |
+| \`gpt-image-2\` | OpenAI-compatible image model |
+| \`gpt-image-2-vip\` | Higher-priority / more stable image lane |
+
+## Async task statuses
+
+| status | Meaning | Billing |
+|---|---|---|
+| \`queued\` | Accepted, waiting | not charged |
+| \`generating\` | Upstream generating | not charged |
+| \`saving_result\` | Persisting result | not charged |
+| \`completed\` | Finished | **billable only when \`data[].url\` is present** |
+| \`failed\` | Terminal failure | \`not_billable\` |
+| \`timeout_pending\` | Soft timeout; still pollable / reconciling | \`not_billable\` (no URL → no charge) |
+
+> **Billing hard rule**: \`status=completed\` **and** a usable \`data[].url\` → \`tokfai.billing_status: billable\`.  
+> Completed without URL, failed, timeout, or wrong-route → **not charged** (\`not_billable\`).
 
 ## Async task flow
 
 1. \`POST /v1/images/generations\` submit → returns \`id\` / \`task_id\`
-2. \`GET /v1/images/generations/:task_id\` poll for progress + result
-3. **Success → \`tokfai.billing_status: billable\` (charged)**; **failed / timeout → \`not_billable\` (not charged)** (\`usage.credits_charged\`, \`tokfai.billing_status\`)
+2. \`GET /v1/images/generations/:task_id\` poll for progress + result (alias: \`GET /v1/api/result?id=\`)
+3. **\`completed\` + \`data[].url\` → billable (charged)**; **failed / timeout / missing URL → not_billable** (\`usage.credits_charged\`, \`tokfai.billing_status\`)
 
 ## Request fields
 
@@ -923,9 +960,12 @@ ${IMAGE_REF_CURL}
 
 | code | Meaning |
 |---|---|
+| \`image_model_not_for_chat\` | Image model cannot use Chat; \`not_billable\` |
+| \`model_not_image_capable\` | Text model cannot use Images; \`not_billable\` |
 | \`image_model_not_available\` | Current image model unavailable — switch image models |
 | \`upstream_image_error\` | Image generation temporarily unavailable — retry shortly |
 | \`image_task_timeout\` | Generation took too long; **not charged** — retry or switch to a faster image model |
+| \`image_task_timeout_pending\` / \`timeout_pending\` | Soft timeout; still pollable; no URL → not charged |
 
 Notes:
 
@@ -1402,7 +1442,9 @@ Image-only models are not served here — use Tokfai Image Workbench or \`POST /
 - 充值套餐以人民币标价，到账为算力积分（可能含赠送）  
 - Chat / Responses：按用量扣算力积分  
 - Image：按次扣算力积分  
-- 失败请求通常不扣费，以 Usage 与 Credits 账本为准  
+- **错路由 / 参数错误请求为 \`not_billable\`（不扣费）**，例如 \`image_model_not_for_chat\`、\`model_not_image_capable\`  
+- **图片任务仅在 \`completed\` 且 \`data[].url\` 可用时 billable**；失败、超时、缺 URL 不扣费  
+- 以 Usage 与 Credits 账本为准；用 \`request_id\` 对账  
 - 详细套餐与单价请看定价页；模型能力请看模型页`,
       en: `# Billing
 
@@ -1410,7 +1452,9 @@ Image-only models are not served here — use Tokfai Image Workbench or \`POST /
 - Recharge packs are priced in CNY and credit compute credits (bonus may apply)  
 - Chat / Responses: charged by usage in compute credits  
 - Image: charged per generation in compute credits  
-- Failed requests are usually not charged — Usage and Credits are authoritative  
+- **Wrong-route / invalid requests are \`not_billable\`** (e.g. \`image_model_not_for_chat\`, \`model_not_image_capable\`)  
+- **Image tasks are billable only when \`completed\` and \`data[].url\` is present**; failed / timeout / missing URL are not charged  
+- Usage and Credits are authoritative — reconcile with \`request_id\`  
 - See Pricing for packs and rates; see Models for capabilities`,
     },
   },
@@ -1429,10 +1473,13 @@ Image-only models are not served here — use Tokfai Image Workbench or \`POST /
 
 | code | 客户端词汇 | 说明 |
 |---|---|---|
+| \`image_model_not_for_chat\` | — | 图片模型不能走 Chat；\`not_billable\` |
+| \`model_not_image_capable\` | — | 文本模型不能走 Images；\`not_billable\` |
 | \`model_not_available\` | \`model_not_available\` | 模型不可用，请刷新模型列表 |
 | \`image_model_not_available\` | — | 当前图片模型不可用，请切换图片模型 |
 | \`upstream_image_error\` | — | 图片生成暂时不可用，请稍后重试 |
 | \`image_task_timeout\` | — | 图片生成时间较长，未扣费，可稍后重试或切换更快图片模型 |
+| \`image_task_timeout_pending\` / \`timeout_pending\` | — | 软超时，仍可轮询；未出 URL 不扣费 |
 | \`insufficient_credits\` | \`insufficient_balance\` | 算力积分不足，请充值后再试 |
 | \`too_many_requests\` / \`upstream_rate_limited\` | \`rate_limited\` | 请求过于频繁 |
 | \`upstream_model_busy\` | \`upstream_busy\` | 模型繁忙，请稍后重试 |
@@ -1459,10 +1506,13 @@ Public errors return a friendly \`message\`, stable \`code\`, and \`request_id\`
 
 | code | Client term | Meaning |
 |---|---|---|
+| \`image_model_not_for_chat\` | — | Image model cannot use Chat; \`not_billable\` |
+| \`model_not_image_capable\` | — | Text model cannot use Images; \`not_billable\` |
 | \`model_not_available\` | \`model_not_available\` | Model unavailable — refresh model list |
 | \`image_model_not_available\` | — | Current image model unavailable — switch image models |
 | \`upstream_image_error\` | — | Image generation temporarily unavailable — retry shortly |
 | \`image_task_timeout\` | — | Generation took too long; not charged — retry or switch to a faster image model |
+| \`image_task_timeout_pending\` / \`timeout_pending\` | — | Soft timeout; still pollable; no URL → not charged |
 | \`insufficient_credits\` | \`insufficient_balance\` | Top up compute credits and retry |
 | \`too_many_requests\` / \`upstream_rate_limited\` | \`rate_limited\` | Too many requests |
 | \`upstream_model_busy\` | \`upstream_busy\` | Model busy — retry or switch |

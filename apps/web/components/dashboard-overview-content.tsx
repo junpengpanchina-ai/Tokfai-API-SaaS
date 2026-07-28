@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { DashboardAnnouncementsOverview } from "@/components/dashboard-announcements-overview";
+import { DashboardFirstRunOnboardingCard } from "@/components/dashboard-first-run-onboarding";
 import type { PublicAnnouncement } from "@/lib/dashboard-safe/dtos/announcements";
 import type { DashboardOverviewData } from "@/lib/dashboard-safe/dtos/overview";
 import {
@@ -86,6 +87,13 @@ export function DashboardOverviewContent({
           {t("dashboard.overview.subtitle")}
         </p>
       </div>
+
+      <DashboardFirstRunOnboardingCard
+        hasActiveApiKey={safeOverview.hasActiveApiKey}
+        hasChatSuccess={safeOverview.hasChatPlaygroundSuccess}
+        hasRecentUsage={safeOverview.requestsLast7Days > 0}
+        variant="dashboard"
+      />
 
       {/* 2. Account status */}
       <Card>

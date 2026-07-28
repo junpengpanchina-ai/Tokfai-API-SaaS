@@ -201,7 +201,7 @@ export function CustomerIntegrationGuide({
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
-              <GuideHashLink href={`${docsBase}#quick-start`}>
+              <GuideHashLink href={`${docsBase}#quickstart`}>
                 {t("integration.ctaQuickStart")}
               </GuideHashLink>
             </Button>

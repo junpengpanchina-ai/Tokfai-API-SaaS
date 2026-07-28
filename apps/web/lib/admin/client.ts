@@ -237,6 +237,17 @@ export type AdminDashboardSummary = {
   model_top_10: AdminDashboardModelTopRow[];
   recent_errors: AdminDashboardRecentError[];
 
+  total_balance_credits?: number | null;
+  chat_credits_consumed?: number | null;
+  image_credits_consumed?: number | null;
+  money_bag_risks?: {
+    bad_billing_failures: number | null;
+    provider_success_unpaid: number | null;
+    charged_missing_url: number | null;
+    missing_url_success: number | null;
+    stale_timeout_pending: number | null;
+  };
+
   updated_at: string;
 };
 

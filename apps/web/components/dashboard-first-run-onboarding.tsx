@@ -171,7 +171,7 @@ export function DashboardFirstRunOnboardingCard({
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
-            <Link href="/dashboard/docs#quick-start" prefetch={false}>
+            <Link href="/dashboard/docs#quickstart" prefetch={false}>
               <Terminal className="h-4 w-4" />
               {t("dashboard.firstRun.quickStart")}
             </Link>

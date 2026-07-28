@@ -240,6 +240,76 @@ export function AdminOverviewPanel({
 
       {summary ? (
         <>
+          <Card className="border-destructive/30">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">
+                {t("admin.overview.moneyBagTitle")}
+              </CardTitle>
+              <CardDescription>
+                {t("admin.overview.moneyBagDesc")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <AdminStatCard
+                  label={t("admin.overview.riskBadBilling")}
+                  value={formatCount(
+                    summary.money_bag_risks?.bad_billing_failures
+                  )}
+                  tone={
+                    (summary.money_bag_risks?.bad_billing_failures ?? 0) > 0
+                      ? "danger"
+                      : "default"
+                  }
+                />
+                <AdminStatCard
+                  label={t("admin.overview.riskProviderUnpaid")}
+                  value={formatCount(
+                    summary.money_bag_risks?.provider_success_unpaid
+                  )}
+                  tone={
+                    (summary.money_bag_risks?.provider_success_unpaid ?? 0) > 0
+                      ? "danger"
+                      : "default"
+                  }
+                />
+                <AdminStatCard
+                  label={t("admin.overview.riskChargedMissingUrl")}
+                  value={formatCount(
+                    summary.money_bag_risks?.charged_missing_url
+                  )}
+                  tone={
+                    (summary.money_bag_risks?.charged_missing_url ?? 0) > 0
+                      ? "danger"
+                      : "default"
+                  }
+                />
+                <AdminStatCard
+                  label={t("admin.overview.riskMissingUrlSuccess")}
+                  value={formatCount(
+                    summary.money_bag_risks?.missing_url_success
+                  )}
+                  tone={
+                    (summary.money_bag_risks?.missing_url_success ?? 0) > 0
+                      ? "warning"
+                      : "default"
+                  }
+                />
+                <AdminStatCard
+                  label={t("admin.overview.riskStaleTimeout")}
+                  value={formatCount(
+                    summary.money_bag_risks?.stale_timeout_pending
+                  )}
+                  tone={
+                    (summary.money_bag_risks?.stale_timeout_pending ?? 0) > 0
+                      ? "warning"
+                      : "default"
+                  }
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <AdminStatCard
               label={t("admin.overview.todayRequests")}
@@ -272,6 +342,35 @@ export function AdminOverviewPanel({
             <AdminStatCard
               label={t("admin.overview.activeUsers7d")}
               value={formatCount(summary.active_users_7d)}
+            />
+            <AdminStatCard
+              label={t("admin.overview.totalBalance")}
+              value={
+                summary.total_balance_credits != null
+                  ? formatCreditsPrecise(summary.total_balance_credits)
+                  : "—"
+              }
+              hint={t("admin.overview.totalBalanceHint")}
+            />
+            <AdminStatCard
+              label={t("admin.overview.totalRecharge")}
+              value={formatCny(summary.total_recharge_amount_cents)}
+            />
+            <AdminStatCard
+              label={t("admin.overview.chatCredits")}
+              value={
+                summary.chat_credits_consumed != null
+                  ? formatCreditsPrecise(summary.chat_credits_consumed)
+                  : "—"
+              }
+            />
+            <AdminStatCard
+              label={t("admin.overview.imageCredits")}
+              value={
+                summary.image_credits_consumed != null
+                  ? formatCreditsPrecise(summary.image_credits_consumed)
+                  : "—"
+              }
             />
           </div>
 

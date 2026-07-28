@@ -86,6 +86,25 @@ export type AdminDashboardSummary = {
   model_top_10: AdminDashboardModelTopRow[];
   recent_errors: AdminDashboardRecentError[];
 
+  /** Platform sum of profiles.credits_balance (open liability). */
+  total_balance_credits: number | null;
+  /** Lifetime credits charged on chat-like usage_logs rows. */
+  chat_credits_consumed: number | null;
+  /** Lifetime credits charged on image usage_logs / image tasks. */
+  image_credits_consumed: number | null;
+
+  /**
+   * Money-bag risk counters (P961 orphan flags + lightweight task aggregates).
+   * Prefer these over generic error_rate when triage is about money integrity.
+   */
+  money_bag_risks: {
+    bad_billing_failures: number | null;
+    provider_success_unpaid: number | null;
+    charged_missing_url: number | null;
+    missing_url_success: number | null;
+    stale_timeout_pending: number | null;
+  };
+
   updated_at: string;
 };
 
@@ -733,6 +752,263 @@ function computeErrorRatePercent(
   return Math.round((failed / total) * 1000) / 10;
 }
 
+async function sumProfilesBalanceCredits(): Promise<SafeSumResult> {
+  try {
+    let total = 0;
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const to = from + PAGE_SIZE - 1;
+      const { data, error } = await supabase()
+        .from("profiles")
+        .select("credits_balance")
+        .range(from, to);
+
+      if (error) {
+        return {
+          value: null,
+          warning: `profiles balance sum: ${error.message}`,
+        };
+      }
+
+      const page = (data ?? []) as Array<{
+        credits_balance: number | string | null;
+      }>;
+      total += page.reduce(
+        (sum, row) => sum + toNumber(row.credits_balance),
+        0
+      );
+      if (page.length < PAGE_SIZE) break;
+    }
+    return { value: total };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { value: null, warning: `profiles balance sum: ${message}` };
+  }
+}
+
+function isImageUsageModel(model: string | null | undefined): boolean {
+  if (!model) return false;
+  const id = model.toLowerCase();
+  return (
+    id.startsWith("nano-banana") ||
+    id.startsWith("gpt-image") ||
+    id.includes("image")
+  );
+}
+
+function isImageUsageEndpoint(endpoint: string | null | undefined): boolean {
+  if (!endpoint) return false;
+  const ep = endpoint.toLowerCase();
+  return ep.includes("/images/") || ep.includes("image");
+}
+
+async function sumChatAndImageCredits(): Promise<{
+  chat: number | null;
+  image: number | null;
+  warning?: string;
+}> {
+  try {
+    let chat = 0;
+    let image = 0;
+
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const to = from + PAGE_SIZE - 1;
+      const { data, error } = await supabase()
+        .from("usage_logs")
+        .select("credits_charged, endpoint, model")
+        .range(from, to);
+
+      if (error) {
+        if (isMissingColumnError(error.message)) {
+          // Fallback without endpoint column.
+          return sumChatAndImageCreditsByModelOnly();
+        }
+        return {
+          chat: null,
+          image: null,
+          warning: `usage_logs chat/image credits: ${error.message}`,
+        };
+      }
+
+      const page = (data ?? []) as Array<{
+        credits_charged: number | string | null;
+        endpoint: string | null;
+        model: string | null;
+      }>;
+
+      for (const row of page) {
+        const credits = toNumber(row.credits_charged);
+        if (
+          isImageUsageEndpoint(row.endpoint) ||
+          isImageUsageModel(row.model)
+        ) {
+          image += credits;
+        } else {
+          chat += credits;
+        }
+      }
+
+      if (page.length < PAGE_SIZE) break;
+    }
+
+    return { chat, image };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      chat: null,
+      image: null,
+      warning: `usage_logs chat/image credits: ${message}`,
+    };
+  }
+}
+
+async function sumChatAndImageCreditsByModelOnly(): Promise<{
+  chat: number | null;
+  image: number | null;
+  warning?: string;
+}> {
+  try {
+    let chat = 0;
+    let image = 0;
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const to = from + PAGE_SIZE - 1;
+      const { data, error } = await supabase()
+        .from("usage_logs")
+        .select("credits_charged, model")
+        .range(from, to);
+
+      if (error) {
+        return {
+          chat: null,
+          image: null,
+          warning: `usage_logs chat/image credits (model): ${error.message}`,
+        };
+      }
+
+      const page = (data ?? []) as Array<{
+        credits_charged: number | string | null;
+        model: string | null;
+      }>;
+
+      for (const row of page) {
+        const credits = toNumber(row.credits_charged);
+        if (isImageUsageModel(row.model)) image += credits;
+        else chat += credits;
+      }
+
+      if (page.length < PAGE_SIZE) break;
+    }
+    return { chat, image };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      chat: null,
+      image: null,
+      warning: `usage_logs chat/image credits (model): ${message}`,
+    };
+  }
+}
+
+async function countOrphanCostFlag(flag: string): Promise<SafeCountResult> {
+  try {
+    const { count, error } = await supabase()
+      .from("image_generation_tasks")
+      .select("id", { count: "exact", head: true })
+      .filter(`orphan_cost_flags->>${flag}`, "eq", "true");
+
+    if (error) {
+      if (isMissingTableError(error.message) || isMissingColumnError(error.message)) {
+        return { value: 0 };
+      }
+      return {
+        value: null,
+        warning: `image_generation_tasks ${flag}: ${error.message}`,
+      };
+    }
+
+    return { value: count ?? 0 };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      value: null,
+      warning: `image_generation_tasks ${flag}: ${message}`,
+    };
+  }
+}
+
+/**
+ * Money-bag risk aggregates from existing image_generation_tasks rows.
+ * Does not change billing / reconcile logic — display only.
+ */
+async function buildMoneyBagRisks(): Promise<{
+  risks: AdminDashboardSummary["money_bag_risks"];
+  warning?: string;
+}> {
+  const empty = {
+    bad_billing_failures: null as number | null,
+    provider_success_unpaid: null as number | null,
+    charged_missing_url: null as number | null,
+    missing_url_success: null as number | null,
+    stale_timeout_pending: null as number | null,
+  };
+
+  try {
+    const [
+      providerSuccessUnpaid,
+      chargedMissingUrl,
+      staleTimeoutPending,
+      chargedFailed,
+      missingUrlSuccess,
+    ] = await Promise.all([
+      countOrphanCostFlag("provider_success_unpaid"),
+      countOrphanCostFlag("charged_missing_url"),
+      countOrphanCostFlag("stale_timeout_pending"),
+      safeCount("image_generation_tasks", (q) =>
+        q.eq("billing_status", "charged").in("status", [
+          "failed",
+          "retryable_timeout",
+        ])
+      ),
+      // completed + no usable URL: reconcile_result='missing_url' when set;
+      // also count completed rows with credits_charged=0 and empty result_data via orphan flag path.
+      safeCount("image_generation_tasks", (q) =>
+        q.eq("status", "completed").eq("reconcile_result", "missing_url")
+      ),
+    ]);
+
+    const warnings = [
+      providerSuccessUnpaid.warning,
+      chargedMissingUrl.warning,
+      staleTimeoutPending.warning,
+      chargedFailed.warning,
+      missingUrlSuccess.warning,
+    ].filter(Boolean) as string[];
+
+    const chargedMissing = chargedMissingUrl.value ?? 0;
+    const chargedFail = chargedFailed.value ?? 0;
+    const badBilling =
+      chargedMissingUrl.value == null && chargedFailed.value == null
+        ? null
+        : chargedMissing + chargedFail;
+
+    return {
+      risks: {
+        bad_billing_failures: badBilling,
+        provider_success_unpaid: providerSuccessUnpaid.value,
+        charged_missing_url: chargedMissingUrl.value,
+        missing_url_success: missingUrlSuccess.value,
+        stale_timeout_pending: staleTimeoutPending.value,
+      },
+      warning: warnings.length ? warnings.join("; ") : undefined,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      risks: empty,
+      warning: `money_bag_risks: ${message}`,
+    };
+  }
+}
+
 export async function buildAdminDashboardSummary(): Promise<{
   summary: AdminDashboardSummary;
   warnings: string[];
@@ -767,6 +1043,9 @@ export async function buildAdminDashboardSummary(): Promise<{
     sparklineResult,
     modelTopResult,
     recentErrorsResult,
+    totalBalanceCredits,
+    chatImageCredits,
+    moneyBagRisks,
   ] = await Promise.all([
     safeCount("profiles"),
     safeCount("admin_users"),
@@ -792,6 +1071,9 @@ export async function buildAdminDashboardSummary(): Promise<{
     buildRequestSparkline7d(),
     buildModelTop10(),
     fetchRecentErrors(),
+    sumProfilesBalanceCredits(),
+    sumChatAndImageCredits(),
+    buildMoneyBagRisks(),
   ]);
 
   const failedRequests: SafeCountResult = {
@@ -825,6 +1107,9 @@ export async function buildAdminDashboardSummary(): Promise<{
   collectWarning(warnings, sparklineResult);
   collectWarning(warnings, modelTopResult);
   collectWarning(warnings, recentErrorsResult);
+  collectWarning(warnings, totalBalanceCredits);
+  collectWarning(warnings, chatImageCredits);
+  collectWarning(warnings, moneyBagRisks);
 
   return {
     summary: {
@@ -866,6 +1151,11 @@ export async function buildAdminDashboardSummary(): Promise<{
       request_sparkline_7d: sparklineResult.points,
       model_top_10: modelTopResult.rows,
       recent_errors: recentErrorsResult.errors,
+
+      total_balance_credits: totalBalanceCredits.value,
+      chat_credits_consumed: chatImageCredits.chat,
+      image_credits_consumed: chatImageCredits.image,
+      money_bag_risks: moneyBagRisks.risks,
 
       updated_at: new Date().toISOString(),
     },

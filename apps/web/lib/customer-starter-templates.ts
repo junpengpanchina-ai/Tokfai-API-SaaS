@@ -671,7 +671,8 @@ export function sortStarterTemplatesFeatured(templates: StarterTemplate[]): Star
 export function starterTemplateDocHref(hash: string): string {
   if (hash === "starter-templates") return STARTER_TEMPLATES_DASHBOARD_PATH;
   if (hash === "usage-credits") return "/dashboard/docs#usage-credits";
-  if (hash === "quick-start") return "/dashboard/docs#quick-start";
+  if (hash === "quick-start" || hash === "quickstart")
+    return "/dashboard/docs#quickstart";
   if (hash === "industry-examples") return "/dashboard/docs#industry-examples";
   return `/dashboard/docs#${hash}`;
 }

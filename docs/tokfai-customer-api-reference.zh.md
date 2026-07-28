@@ -1,7 +1,7 @@
 # Tokfai 用户接入 API 参考
 
 > 独立客户文档（对齐 `api.tokfai.com` 实际行为）  
-> 更新：2026-07-25  
+> 更新：2026-07-28  
 > 官网：https://www.tokfai.com  
 > Base URL：`https://api.tokfai.com`  
 > 路径前缀：`https://api.tokfai.com/v1`  
@@ -197,12 +197,29 @@ Auth：`Authorization: Bearer sk-tokfai_xxx`
 | `nano-banana` | **推荐图片模型** |
 | `nano-banana-fast` | 轻量快图 / 成本低（未指定 model 时的常见默认） |
 | `nano-banana-2` | 更高质量 / 更稳定 |
+| `gpt-image-2` | OpenAI 兼容图片模型 |
+| `gpt-image-2-vip` | 更高优先级 / 更稳定图片通道 |
+
+### 异步任务状态
+
+| status | 含义 | 计费 |
+|---|---|---|
+| `queued` | 已受理，排队中 | 不扣费 |
+| `generating` | 上游生成中 | 不扣费 |
+| `saving_result` | 正在落盘 / 写回结果 | 不扣费 |
+| `completed` | 任务完成 | **仅当 `data[].url` 存在时 billable** |
+| `failed` | 失败终态 | `not_billable` |
+| `timeout_pending` | 软超时，任务仍可轮询 / 后台对账 | `not_billable`（未出 URL 不扣费） |
+
+> **能力隔离**：图片模型不能走 `/v1/chat/completions`；文本模型不能走图片接口。  
+> 错路由返回 `image_model_not_for_chat` / `model_not_image_capable`，且 `not_billable`。  
+> **计费硬规则**：`completed` + 可用 `data[].url` 才 billable。
 
 ### 异步流程与计费
 
 1. `POST` 提交 → 返回 `id` / `task_id`  
-2. `GET /v1/images/generations/:task_id` 轮询  
-3. **成功 → `tokfai.billing_status: billable`（扣费）**；**失败 / 超时 → `not_billable`（不扣费）**（看 `usage.credits_charged` 与 `tokfai.billing_status`）
+2. `GET /v1/images/generations/:task_id` 轮询（兼容 alias：`GET /v1/api/result?id=`）  
+3. **`completed` + `data[].url` → `tokfai.billing_status: billable`（扣费）**；**失败 / 超时 / 缺 URL → `not_billable`（不扣费）**（看 `usage.credits_charged` 与 `tokfai.billing_status`）
 
 ### 请求字段（示例必含）
 
@@ -400,7 +417,9 @@ Base URL 必须是 `https://api.tokfai.com`；鉴权仍用 Tokfai `sk-tokfai_…
 - 充值套餐以人民币标价，到账为算力积分（可能含赠送）
 - Chat / Responses：按用量扣算力积分
 - Image：按次扣算力积分
-- 失败请求通常不扣费，以 Usage 与 Credits 账本为准
+- **错路由 / 参数错误请求为 `not_billable`（不扣费）**，例如 `image_model_not_for_chat`、`model_not_image_capable`
+- **图片任务仅在 `completed` 且 `data[].url` 可用时 billable**；失败、超时、缺 URL 不扣费
+- 以 Usage / Credits 账本为准；用 `request_id` 对账
 - 详细套餐与单价看定价页；模型能力看模型页
 
 ---
@@ -413,11 +432,14 @@ Base URL 必须是 `https://api.tokfai.com`；鉴权仍用 Tokfai `sk-tokfai_…
 
 | code | 说明 |
 |---|---|
+| `image_model_not_for_chat` | 图片模型不能走 Chat；`not_billable` |
+| `model_not_image_capable` | 文本模型不能走 Images；`not_billable` |
 | `insufficient_credits` | 算力积分不足，请充值后再试 |
 | `reference_image_required` | 请先上传参考图片，或改用文生图模式 |
 | `image_model_not_available` | 当前图片模型不可用，请切换图片模型 |
 | `upstream_image_error` | 图片生成暂时不可用，请稍后重试 |
 | `image_task_timeout` | 图片生成时间较长，未扣费，可稍后重试或切换更快图片模型 |
+| `image_task_timeout_pending` / `timeout_pending` | 软超时，仍可轮询；未出 URL 不扣费 |
 | `invalid_image_url` | 图片地址不合法（含 blob / localhost / 私有网段等） |
 | `invalid_prompt` | prompt 缺失或不合法 |
 | `unsupported_n` | `n` 不支持（目前仅 `1`） |
