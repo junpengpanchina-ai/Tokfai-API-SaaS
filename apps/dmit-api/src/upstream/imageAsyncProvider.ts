@@ -220,6 +220,15 @@ export type CreateImageTaskParams = {
     latencyMs: number;
     lastStatus: string | null;
   }) => void | Promise<void>;
+  /**
+   * P961 — upstream accepted the job; persist provider_task_id /
+   * upstream_request_id / tokfai_request_id immediately.
+   */
+  onUpstreamSubmitted?: (info: {
+    providerTaskId: string;
+    upstreamRequestId: string;
+    providerStatus: string | null;
+  }) => void | Promise<void>;
 };
 
 export type CreateImageTaskResult = {
@@ -515,6 +524,19 @@ async function runImageGenerationAttempt(
   params: CreateImageTaskParams
 ): Promise<ImageGenerateResult> {
   const created = await createImageGenerationTask(params);
+
+  if (created.taskId) {
+    try {
+      await params.onUpstreamSubmitted?.({
+        providerTaskId: created.taskId,
+        upstreamRequestId: created.taskId,
+        providerStatus: created.status,
+      });
+    } catch {
+      // persist is best-effort; continue generation
+    }
+  }
+
   if (created.url) {
     return {
       url: created.url,

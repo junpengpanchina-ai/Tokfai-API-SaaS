@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 
 import { buildApp } from "./app.js";
 import { env, grsaiUpstreamTarget, maskSecret } from "./env.js";
+import { startImageCostReconcileLoop } from "./images/costReconcile.js";
 import { log } from "./logger.js";
 import { closeRedis, initRedis } from "./redis/client.js";
 import { warnSupabaseAdminConfig } from "./supabase.js";
@@ -11,6 +12,9 @@ warnSupabaseAdminConfig();
 await initRedis();
 
 const app = buildApp();
+
+// P961 — background reconcile for timeout_pending / hard-timeout image jobs.
+startImageCostReconcileLoop();
 
 const port = env.PORT;
 const hostname = process.env.HOST?.trim() || "127.0.0.1";

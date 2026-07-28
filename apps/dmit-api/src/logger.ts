@@ -75,6 +75,17 @@ const ALLOWED_FIELD_KEYS = new Set([
   "stripeErrorType",
   "stripeErrorParam",
   "recreatedCustomer",
+  // P961 image cost reconciliation / orphan cost guard
+  "tokfai_request_id",
+  "provider_task_id",
+  "upstream_request_id",
+  "provider_status",
+  "customer_billing_status",
+  "credits_charged",
+  "reconcile_result",
+  "reconcile_status",
+  "orphan_cost_audit",
+  "orphan_alarms",
 ]);
 
 /**

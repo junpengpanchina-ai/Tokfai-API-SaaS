@@ -129,6 +129,18 @@ export async function runNanoBananaImageGeneration(
     const created = await createImageGenerationTask(params);
     lastUpstreamStatus = 200;
 
+    if (created.taskId) {
+      try {
+        await params.onUpstreamSubmitted?.({
+          providerTaskId: created.taskId,
+          upstreamRequestId: created.taskId,
+          providerStatus: created.status,
+        });
+      } catch {
+        // persist is best-effort
+      }
+    }
+
     if (created.url && created.url.trim()) {
       const latencyMs = Date.now() - startedAt;
       log.info("nano_banana_image_succeeded", {

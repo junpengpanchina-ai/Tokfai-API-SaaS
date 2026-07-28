@@ -227,6 +227,16 @@ export interface ImageGenerationTaskRow {
   endpoint: string;
   input_snapshot: unknown;
   upstream_id: string | null;
+  /** P961 — provider async task id (mirrors upstream_id; persist on submit). */
+  provider_task_id?: string | null;
+  /** P961 — upstream request correlation id. */
+  upstream_request_id?: string | null;
+  upstream_submitted_at?: string | null;
+  provider_status?: string | null;
+  reconcile_status?: string | null;
+  reconcile_result?: string | null;
+  reconciled_at?: string | null;
+  orphan_cost_flags?: unknown | null;
   mode: string | null;
   prompt_mode: string | null;
   created_at: string;

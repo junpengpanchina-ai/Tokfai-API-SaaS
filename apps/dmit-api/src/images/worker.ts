@@ -13,19 +13,23 @@ import {
   isNanoBananaImageModel,
   runNanoBananaImageGeneration,
 } from "../upstream/nanoBananaImageProvider.js";
+import {
+  clearImageGenerationActive,
+  markImageGenerationActive,
+} from "./activeImageTasks.js";
 import { messagesForStatus } from "./progressMessages.js";
 import {
   finalizeImageTaskFailure,
   finalizeImageTaskSuccess,
   loadImageTaskByRequestId,
   markImageTaskStarted,
+  markImageTaskUpstreamSubmitted,
   markImageTaskWaitWindowExceeded,
   parseInputSnapshot,
   updateImageTaskProgress,
 } from "./tasksDb.js";
 
 const IMAGE_LEDGER_REASON = "Image generation usage";
-const activeTasks = new Set<string>();
 
 const UPSTREAM_ERROR_CODES = new Set([
   "upstream_auth_error",
@@ -43,10 +47,10 @@ export function enqueueImageGeneration(requestId: string): void {
 }
 
 async function processImageGeneration(requestId: string): Promise<void> {
-  if (activeTasks.has(requestId)) return;
-  activeTasks.add(requestId);
+  if (!markImageGenerationActive(requestId)) return;
 
   const startedAt = Date.now();
+  let submittedProviderTaskId: string | null = null;
 
   try {
     const claimed = await markImageTaskStarted(requestId);
@@ -108,18 +112,55 @@ async function processImageGeneration(requestId: string): Promise<void> {
         imageUrlSources: input.imageUrlSources as ImageUrlResolveSource[],
         mode: input.mode,
         promptMode: input.promptMode,
+        onUpstreamSubmitted: async (info: {
+          providerTaskId: string;
+          upstreamRequestId: string;
+          providerStatus: string | null;
+        }) => {
+          // P961: persist provider_task_id / upstream_request_id / tokfai_request_id
+          // as soon as upstream accepts — before soft/hard timeout.
+          submittedProviderTaskId = info.providerTaskId;
+          await markImageTaskUpstreamSubmitted({
+            requestId,
+            providerTaskId: info.providerTaskId,
+            upstreamRequestId: info.upstreamRequestId,
+            providerStatus: info.providerStatus,
+          });
+          log.info("image_upstream_submitted", {
+            tokfai_request_id: requestId,
+            requestId,
+            provider_task_id: info.providerTaskId,
+            upstream_request_id: info.upstreamRequestId,
+            provider_status: info.providerStatus ?? "pending",
+            customer_billing_status: "pending",
+            credits_charged: 0,
+            reconcile_result: "pending",
+            code: "image_upstream_submitted",
+          });
+        },
         onSoftWaitExceeded: async () => {
-          // P957: keep task in-flight; poll can continue; not billed.
+          // P957/P961: keep task in-flight (timeout_pending); not billed;
+          // enter background reconcile via reconcile_status=pending.
           await markImageTaskWaitWindowExceeded(requestId);
+          log.info("image_timeout_pending", {
+            tokfai_request_id: requestId,
+            requestId,
+            provider_task_id: submittedProviderTaskId ?? undefined,
+            provider_status: "processing",
+            customer_billing_status: "pending",
+            credits_charged: 0,
+            reconcile_result: "timeout_pending",
+            code: "image_task_timeout_pending",
+          });
         },
       };
       const result = isNanoBananaImageModel(task.model)
         ? await runNanoBananaImageGeneration(generateParams)
         : await runImageGenerationWithPolling(generateParams);
       url = result.url;
-      upstreamId = result.upstreamId;
+      upstreamId = result.upstreamId ?? submittedProviderTaskId;
     } catch (err) {
-      await handleGenerationError(task, err, startedAt);
+      await handleGenerationError(task, err, startedAt, submittedProviderTaskId);
       return;
     }
 
@@ -186,24 +227,27 @@ async function processImageGeneration(requestId: string): Promise<void> {
       upstreamId,
       mode: input.mode,
       promptMode: input.promptMode,
+      reconcileResult: "success",
     });
 
     log.info("image_generation_succeeded", {
       requestId,
+      tokfai_request_id: requestId,
       route: "/v1/images/generations",
       status: 200,
       code: "succeeded",
       model: task.model,
-      capability:
-        input.mode === "reference_edit" ? "image_edit" : "image_generation",
-      mode: input.mode,
-      promptMode: input.promptMode,
-      imagesCount: input.imagesCount,
+      provider_task_id: upstreamId ?? undefined,
+      provider_status: "completed",
+      customer_billing_status: creditsCharged > 0 ? "charged" : "not_billable",
+      credits_charged: creditsCharged,
+      reconcile_result: "success",
       latencyMs: Date.now() - startedAt,
     });
   } catch (err) {
     log.error("image_generation_worker_failed", {
       requestId,
+      tokfai_request_id: requestId,
       message: err instanceof Error ? err.message : String(err),
     });
     const task = await loadImageTaskByRequestId(requestId);
@@ -211,14 +255,15 @@ async function processImageGeneration(requestId: string): Promise<void> {
       await failTask(task, "server_error", "Internal error.", startedAt);
     }
   } finally {
-    activeTasks.delete(requestId);
+    clearImageGenerationActive(requestId);
   }
 }
 
 async function handleGenerationError(
   task: ImageGenerationTaskRow,
   err: unknown,
-  startedAt: number
+  startedAt: number,
+  providerTaskId: string | null
 ): Promise<void> {
   if (err instanceof ApiError) {
     const isTimeout =
@@ -227,6 +272,8 @@ async function handleGenerationError(
       err.code === "upstream_timeout";
     if (isTimeout) {
       const msgs = messagesForStatus("retryable_timeout");
+      // P961: hard timeout is retryable_timeout / not_billable, but keep
+      // reconcile pending when a provider task was already submitted.
       await failTask(
         task,
         err.code === "image_task_timeout"
@@ -236,12 +283,20 @@ async function handleGenerationError(
           ? safePublicMessage(err)
           : msgs.en,
         startedAt,
-        "retryable_timeout"
+        "retryable_timeout",
+        {
+          keepReconcilePending: Boolean(
+            providerTaskId || task.upstream_id || task.provider_task_id
+          ),
+        }
       );
       return;
     }
     const code = err.code ?? "upstream_image_error";
-    await failTask(task, code, safePublicMessage(err), startedAt, "failed");
+    await failTask(task, code, safePublicMessage(err), startedAt, "failed", {
+      keepReconcilePending: false,
+      reconcileResult: "provider_failed",
+    });
     return;
   }
 
@@ -253,14 +308,22 @@ async function failTask(
   errorCode: string,
   errorMessage: string,
   startedAt: number,
-  status: "failed" | "retryable_timeout" = "failed"
+  status: "failed" | "retryable_timeout" = "failed",
+  opts?: { keepReconcilePending?: boolean; reconcileResult?: string | null }
 ): Promise<void> {
+  const keepReconcilePending = Boolean(opts?.keepReconcilePending);
   await finalizeImageTaskFailure({
     requestId: task.request_id,
     status,
     errorCode,
     errorMessage,
+    keepReconcilePending,
+    reconcileResult:
+      opts?.reconcileResult ??
+      (status === "retryable_timeout" ? "hard_timeout" : "provider_failed"),
   });
+
+  const providerTaskId = task.provider_task_id || task.upstream_id || null;
 
   await writeFailedUsageLog({
     user_id: task.user_id,
@@ -273,14 +336,23 @@ async function failTask(
     error_code: errorCode,
     error_message: errorMessage,
     latency_ms: Date.now() - startedAt,
+    upstream_id: providerTaskId,
     ...upstreamFailureFields(errorCode),
   });
 
   log.warn("image_generation_failed", {
     requestId: task.request_id,
+    tokfai_request_id: task.request_id,
     route: "/v1/images/generations",
     code: errorCode,
     message: errorMessage,
+    provider_task_id: providerTaskId ?? undefined,
+    provider_status: status === "retryable_timeout" ? "timeout" : "failed",
+    customer_billing_status: "not_billable",
+    credits_charged: 0,
+    reconcile_result:
+      opts?.reconcileResult ??
+      (status === "retryable_timeout" ? "hard_timeout" : "provider_failed"),
   });
 }
 
@@ -395,24 +467,28 @@ async function writeFailedUsageLog(
     | "completion_tokens"
     | "total_tokens"
     | "credits_charged"
-    | "upstream_id"
     | "billable"
     | "finish_reason"
     | "safety_reason"
   > &
-    Partial<Pick<UsageLogInsert, "upstream_status" | "upstream_error_code">>
+    Partial<
+      Pick<
+        UsageLogInsert,
+        "upstream_status" | "upstream_error_code" | "upstream_id"
+      >
+    >
 ): Promise<void> {
   const { error } = await supabase().from("usage_logs").insert({
     prompt_tokens: null,
     completion_tokens: null,
     total_tokens: null,
     credits_charged: null,
-    upstream_id: null,
     billable: false,
     finish_reason: null,
     safety_reason: null,
     billing_status: "not_billable",
     ...entry,
+    upstream_id: entry.upstream_id ?? null,
   });
 
   if (error) {

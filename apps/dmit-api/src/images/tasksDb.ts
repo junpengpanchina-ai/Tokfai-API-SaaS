@@ -201,6 +201,7 @@ export async function finalizeImageTaskSuccess(args: {
   upstreamId: string | null;
   mode: string;
   promptMode: string;
+  reconcileResult?: string | null;
 }): Promise<void> {
   const now = new Date().toISOString();
   const msgs = messagesForStatus("completed");
@@ -216,10 +217,16 @@ export async function finalizeImageTaskSuccess(args: {
       credits_charged: args.creditsCharged,
       billing_status: args.creditsCharged > 0 ? "charged" : "not_billable",
       upstream_id: args.upstreamId,
-      mode: args.mode,
-      prompt_mode: args.promptMode,
+      provider_task_id: args.upstreamId,
+      provider_status: "completed",
       error_code: null,
       error_message: null,
+      reconcile_status: "reconciled",
+      reconcile_result: args.reconcileResult ?? "success",
+      reconciled_at: now,
+      orphan_cost_flags: {},
+      mode: args.mode,
+      prompt_mode: args.promptMode,
       completed_at: now,
       updated_at: now,
     })
@@ -238,10 +245,13 @@ export async function finalizeImageTaskFailure(args: {
   status: "failed" | "retryable_timeout";
   errorCode: string;
   errorMessage: string;
+  reconcileResult?: string | null;
+  keepReconcilePending?: boolean;
 }): Promise<void> {
   const now = new Date().toISOString();
   const msgs = messagesForStatus(args.status);
   const progress = STATUS_PROGRESS[args.status];
+  const keepPending = Boolean(args.keepReconcilePending);
   const { error } = await supabase()
     .from("image_generation_tasks")
     .update({
@@ -254,6 +264,11 @@ export async function finalizeImageTaskFailure(args: {
       credits_charged: 0,
       usage: { credits_charged: 0 },
       billing_status: "not_billable",
+      reconcile_status: keepPending ? "pending" : "reconciled",
+      reconcile_result:
+        args.reconcileResult ??
+        (args.status === "retryable_timeout" ? "hard_timeout" : "provider_failed"),
+      reconciled_at: keepPending ? null : now,
       completed_at: now,
       updated_at: now,
     })
@@ -265,6 +280,8 @@ export async function finalizeImageTaskFailure(args: {
       "requesting_model",
       "generating",
       "saving_result",
+      // P961: allow reconcile to re-terminalize from soft-timeout-era hard stop
+      "retryable_timeout",
     ]);
 
   if (error) {
@@ -275,6 +292,7 @@ export async function finalizeImageTaskFailure(args: {
 /**
  * P957 — Soft wait window exceeded while upstream may still be running.
  * Keeps task in-flight so poll can continue; not billable; not terminal.
+ * P961 — Also marks reconcile_status=pending for background orphan-cost guard.
  */
 export async function markImageTaskWaitWindowExceeded(
   requestId: string
@@ -288,6 +306,7 @@ export async function markImageTaskWaitWindowExceeded(
         "Image generation is still in progress past the wait window. Poll again with task_id. Not billed yet.",
       message_en: SOFT_TIMEOUT_MESSAGES.en,
       message_zh: SOFT_TIMEOUT_MESSAGES.zh,
+      reconcile_status: "pending",
       updated_at: now,
     })
     .eq("request_id", requestId)
@@ -303,6 +322,122 @@ export async function markImageTaskWaitWindowExceeded(
   if (error) {
     // Non-fatal — publicResponse also derives soft timeout from created_at age.
   }
+}
+
+/**
+ * P961 — Persist provider task ids as soon as upstream accepts the job.
+ * Never expose these ids on the public poll response.
+ */
+export async function markImageTaskUpstreamSubmitted(args: {
+  requestId: string;
+  providerTaskId: string;
+  upstreamRequestId?: string | null;
+  providerStatus?: string | null;
+}): Promise<void> {
+  const now = new Date().toISOString();
+  const providerTaskId = args.providerTaskId.trim();
+  if (!providerTaskId) return;
+
+  const upstreamRequestId =
+    typeof args.upstreamRequestId === "string" && args.upstreamRequestId.trim()
+      ? args.upstreamRequestId.trim()
+      : providerTaskId;
+
+  const { error } = await supabase()
+    .from("image_generation_tasks")
+    .update({
+      upstream_id: providerTaskId,
+      provider_task_id: providerTaskId,
+      upstream_request_id: upstreamRequestId,
+      upstream_submitted_at: now,
+      provider_status: args.providerStatus ?? "pending",
+      reconcile_status: "pending",
+      updated_at: now,
+    })
+    .eq("request_id", args.requestId)
+    .in("status", [
+      "queued",
+      "validating",
+      "billing_check",
+      "requesting_model",
+      "generating",
+      "saving_result",
+    ]);
+
+  if (error) {
+    // Best-effort — worker still holds ids in memory for success finalize.
+  }
+}
+
+/** P961 — Mark task eligible for background reconcile (soft/hard timeout paths). */
+export async function markImageTaskReconcilePending(
+  requestId: string
+): Promise<void> {
+  const now = new Date().toISOString();
+  const { error } = await supabase()
+    .from("image_generation_tasks")
+    .update({
+      reconcile_status: "pending",
+      updated_at: now,
+    })
+    .eq("request_id", requestId)
+    .neq("reconcile_status", "reconciled");
+
+  if (error) {
+    // Non-fatal
+  }
+}
+
+export async function updateImageTaskReconcileMeta(args: {
+  requestId: string;
+  reconcileStatus: string;
+  reconcileResult?: string | null;
+  providerStatus?: string | null;
+  orphanCostFlags?: Record<string, unknown> | null;
+  markReconciledAt?: boolean;
+}): Promise<void> {
+  const now = new Date().toISOString();
+  const patch: Record<string, unknown> = {
+    reconcile_status: args.reconcileStatus,
+    updated_at: now,
+  };
+  if (args.reconcileResult !== undefined) {
+    patch.reconcile_result = args.reconcileResult;
+  }
+  if (args.providerStatus !== undefined) {
+    patch.provider_status = args.providerStatus;
+  }
+  if (args.orphanCostFlags !== undefined) {
+    patch.orphan_cost_flags = args.orphanCostFlags ?? {};
+  }
+  if (args.markReconciledAt) {
+    patch.reconciled_at = now;
+  }
+
+  const { error } = await supabase()
+    .from("image_generation_tasks")
+    .update(patch)
+    .eq("request_id", args.requestId);
+
+  if (error) {
+    // Best-effort
+  }
+}
+
+/** Tasks needing P961 background reconcile (has provider id + pending). */
+export async function listImageTasksNeedingReconcile(limit = 25): Promise<
+  ImageGenerationTaskRow[]
+> {
+  const { data, error } = await supabase()
+    .from("image_generation_tasks")
+    .select("*")
+    .eq("reconcile_status", "pending")
+    .or("provider_task_id.not.is.null,upstream_id.not.is.null")
+    .order("updated_at", { ascending: true })
+    .limit(Math.max(1, Math.min(limit, 100)));
+
+  if (error || !data) return [];
+  return data as ImageGenerationTaskRow[];
 }
 
 export function parseInputSnapshot(

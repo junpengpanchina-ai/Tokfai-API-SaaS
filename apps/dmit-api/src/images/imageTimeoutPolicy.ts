@@ -1,10 +1,13 @@
 /**
  * P957 — Image async wait-window / timeout policy.
+ * P961 — Soft timeout_pending must enter background reconcile (orphan cost guard);
+ *         hard wait → retryable_timeout + image_task_timeout, not_billable, still
+ *         reconcilable when provider_task_id was persisted on upstream submit.
  *
  * Soft wait: past client/API wait window while still in-flight →
  *   processing + timeout_pending (image_task_timeout_pending), keep task_id,
  *   not billed, poll continues. Frontend shows “still generating, check later”
- *   — never a hard failure.
+ *   — never a hard failure. Not counted in bad_billing_failures.
  * Hard wait: absolute stop → retryable_timeout + image_task_timeout, not_billable.
  *
  * Does not touch Chat / chatGateway / P954 isolation.
