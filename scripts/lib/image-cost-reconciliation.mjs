@@ -142,6 +142,16 @@ export function decideReconcileAction(input) {
   };
 }
 
+/** Mirror of apps/dmit-api/src/images/orphanCostAudit.ts#hasImageResultUrl */
+export function hasImageResultUrl(resultData) {
+  if (!Array.isArray(resultData)) return false;
+  return resultData.some((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return false;
+    const url = item.url;
+    return typeof url === "string" && url.trim().length > 0;
+  });
+}
+
 /**
  * Scenario fixtures for P961 smoke (success / timeout_pending /
  * later_completed / provider_failed / missing_url).

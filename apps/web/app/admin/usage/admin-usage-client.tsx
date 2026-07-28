@@ -25,7 +25,7 @@ import {
   AdminApiError,
   fetchAdminApi,
 } from "@/lib/admin/client";
-import { formatInt } from "@/lib/format";
+import { formatCredits, formatInt } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 import { formatMessage } from "@/lib/i18n/messages";
 
@@ -33,6 +33,17 @@ export type AdminUsageLog = AdminUsageLogRow;
 
 type UsageResponse = {
   data?: AdminUsageLog[];
+  site_summary?: AdminUsageSiteSummary | null;
+};
+
+type AdminUsageSiteSummary = {
+  total_requests: number | null;
+  succeeded: number | null;
+  failed: number | null;
+  image_requests: number | null;
+  chat_requests: number | null;
+  total_credits_charged: number | null;
+  warning?: string;
 };
 
 type StatusFilter = "all" | "succeeded" | "failed";
@@ -42,13 +53,18 @@ export function AdminUsageClient({
   initialLogs,
   initialError,
   initialEmailFilter = "",
+  initialSiteSummary = null,
 }: {
   initialLogs: AdminUsageLog[];
   initialError: string | null;
   initialEmailFilter?: string;
+  initialSiteSummary?: AdminUsageSiteSummary | null;
 }) {
   const { t } = useI18n();
   const [logs, setLogs] = useState(initialLogs);
+  const [siteSummary, setSiteSummary] = useState<AdminUsageSiteSummary | null>(
+    initialSiteSummary
+  );
   const [error, setError] = useState<string | null>(initialError);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -61,6 +77,7 @@ export function AdminUsageClient({
     try {
       const body = await fetchAdminApi<UsageResponse>("/admin/usage");
       setLogs(Array.isArray(body.data) ? body.data : []);
+      setSiteSummary(body.site_summary ?? null);
     } catch (err) {
       setError(
         err instanceof AdminApiError && err.isSessionExpired
@@ -78,7 +95,8 @@ export function AdminUsageClient({
     setLogs(initialLogs);
     setError(initialError);
     setEmailFilter(initialEmailFilter);
-  }, [initialLogs, initialError, initialEmailFilter]);
+    setSiteSummary(initialSiteSummary);
+  }, [initialLogs, initialError, initialEmailFilter, initialSiteSummary]);
 
   const stats = useMemo(() => computeUsageLogStats(logs), [logs]);
 
@@ -166,21 +184,60 @@ export function AdminUsageClient({
         </Card>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <AdminStatCard
-          label={t("admin.usage.totalRequests")}
-          value={formatInt(stats.totalRequests)}
-        />
-        <AdminStatCard label={t("admin.usage.succeeded")} value={formatInt(stats.succeeded)} />
-        <AdminStatCard label={t("admin.usage.failed")} value={formatInt(stats.failed)} />
-        <AdminStatCard
-          label={t("admin.usage.imageRequests")}
-          value={formatInt(stats.imageRequests)}
-        />
-        <AdminStatCard
-          label={t("admin.usage.chatRequests")}
-          value={formatInt(stats.chatRequests)}
-        />
+      {siteSummary ? (
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            {t("admin.usage.siteSectionTitle")}
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+            <AdminStatCard
+              label={t("admin.usage.siteTotalRequests")}
+              value={formatInt(siteSummary.total_requests)}
+            />
+            <AdminStatCard
+              label={t("admin.usage.siteSucceeded")}
+              value={formatInt(siteSummary.succeeded)}
+            />
+            <AdminStatCard
+              label={t("admin.usage.siteFailed")}
+              value={formatInt(siteSummary.failed)}
+            />
+            <AdminStatCard
+              label={t("admin.usage.siteImageRequests")}
+              value={formatInt(siteSummary.image_requests)}
+            />
+            <AdminStatCard
+              label={t("admin.usage.siteChatRequests")}
+              value={formatInt(siteSummary.chat_requests)}
+            />
+            <AdminStatCard
+              label={t("admin.usage.siteCreditsCharged")}
+              value={formatCredits(siteSummary.total_credits_charged)}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          {t("admin.usage.loadedSectionTitle")}
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <AdminStatCard
+            label={t("admin.usage.totalRequests")}
+            value={formatInt(stats.totalRequests)}
+          />
+          <AdminStatCard label={t("admin.usage.succeeded")} value={formatInt(stats.succeeded)} />
+          <AdminStatCard label={t("admin.usage.failed")} value={formatInt(stats.failed)} />
+          <AdminStatCard
+            label={t("admin.usage.imageRequests")}
+            value={formatInt(stats.imageRequests)}
+          />
+          <AdminStatCard
+            label={t("admin.usage.chatRequests")}
+            value={formatInt(stats.chatRequests)}
+          />
+        </div>
       </div>
 
       <Card>

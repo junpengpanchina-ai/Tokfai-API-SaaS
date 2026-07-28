@@ -357,6 +357,118 @@ async function listRecentUsageLogs() {
   }));
 }
 
+const USAGE_SUCCESS_STATUSES = ["succeeded", "success", "ok"];
+const IMAGE_MODEL_HINTS = [
+  "nano-banana",
+  "gpt-image",
+  "dall-e",
+  "flux",
+  "stable-diffusion",
+];
+
+function isLikelyImageModel(model: string | null | undefined): boolean {
+  const m = String(model ?? "").toLowerCase();
+  return IMAGE_MODEL_HINTS.some((hint) => m.includes(hint));
+}
+
+/**
+ * P968 — site-wide usage aggregates for admin display (read-only).
+ * Complements the loaded 100-row batch so cards are not mislabeled as full-site.
+ */
+async function buildAdminUsageSiteSummary(): Promise<{
+  total_requests: number | null;
+  succeeded: number | null;
+  failed: number | null;
+  image_requests: number | null;
+  chat_requests: number | null;
+  total_credits_charged: number | null;
+  warning?: string;
+}> {
+  try {
+    const [totalRes, successRes] = await Promise.all([
+      supabase()
+        .from("usage_logs")
+        .select("id", { count: "exact", head: true }),
+      supabase()
+        .from("usage_logs")
+        .select("id", { count: "exact", head: true })
+        .in("status", USAGE_SUCCESS_STATUSES),
+    ]);
+
+    if (totalRes.error) {
+      return {
+        total_requests: null,
+        succeeded: null,
+        failed: null,
+        image_requests: null,
+        chat_requests: null,
+        total_credits_charged: null,
+        warning: totalRes.error.message,
+      };
+    }
+
+    const total = totalRes.count ?? 0;
+    const succeeded = successRes.error ? null : (successRes.count ?? 0);
+    const failed =
+      succeeded == null ? null : Math.max(total - succeeded, 0);
+
+    // Scan credits + chat/image split in pages (display only; no billing writes).
+    let imageRequests = 0;
+    let chatRequests = 0;
+    let totalCredits = 0;
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const to = from + PAGE - 1;
+      const { data, error } = await supabase()
+        .from("usage_logs")
+        .select("model, credits_charged, endpoint")
+        .range(from, to);
+      if (error) {
+        return {
+          total_requests: total,
+          succeeded,
+          failed,
+          image_requests: null,
+          chat_requests: null,
+          total_credits_charged: null,
+          warning: error.message,
+        };
+      }
+      const page = data ?? [];
+      for (const row of page) {
+        totalCredits += toNumber(row.credits_charged);
+        const ep = String(row.endpoint ?? "").toLowerCase();
+        if (ep.includes("/images") || isLikelyImageModel(row.model)) {
+          imageRequests += 1;
+        } else {
+          chatRequests += 1;
+        }
+      }
+      if (page.length < PAGE) break;
+    }
+
+    return {
+      total_requests: total,
+      succeeded,
+      failed,
+      image_requests: imageRequests,
+      chat_requests: chatRequests,
+      total_credits_charged: Math.round(totalCredits * 1_000_000) / 1_000_000,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      total_requests: null,
+      succeeded: null,
+      failed: null,
+      image_requests: null,
+      chat_requests: null,
+      total_credits_charged: null,
+      warning: message,
+    };
+  }
+}
+
 async function listAdminUsageLogs() {
   const { data, error } = await supabase()
     .from("usage_logs")
@@ -1143,8 +1255,11 @@ protectedAdminRoutes.post("/models/:id/restore", async (c) => {
 });
 
 protectedAdminRoutes.get("/usage", async (c) => {
-  const usageLogs = await listAdminUsageLogs();
-  return c.json({ data: usageLogs });
+  const [usageLogs, siteSummary] = await Promise.all([
+    listAdminUsageLogs(),
+    buildAdminUsageSiteSummary(),
+  ]);
+  return c.json({ data: usageLogs, site_summary: siteSummary });
 });
 
 protectedAdminRoutes.get("/tenants", async (c) => {

@@ -1,7 +1,7 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { fetchDmitAdmin, toAdminDebug } from "@/lib/admin/server";
+import { fetchDmitAdmin } from "@/lib/admin/server";
 import { DmitServerError, getDmitBaseUrl } from "@/lib/dmit/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -18,6 +18,15 @@ export const dynamic = "force-dynamic";
 
 type UsageResponse = {
   data?: AdminUsageLog[];
+  site_summary?: {
+    total_requests: number | null;
+    succeeded: number | null;
+    failed: number | null;
+    image_requests: number | null;
+    chat_requests: number | null;
+    total_credits_charged: number | null;
+    warning?: string;
+  } | null;
 };
 
 export default async function AdminUsagePage({
@@ -51,6 +60,7 @@ export default async function AdminUsagePage({
   }
 
   let initialLogs: AdminUsageLog[] = [];
+  let initialSiteSummary: UsageResponse["site_summary"] = null;
   let initialError: string | null = null;
 
   try {
@@ -59,6 +69,7 @@ export default async function AdminUsagePage({
       accessToken
     );
     initialLogs = Array.isArray(body.data) ? body.data : [];
+    initialSiteSummary = body.site_summary ?? null;
   } catch (error) {
     if (error instanceof DmitServerError) {
       initialError =
@@ -79,6 +90,7 @@ export default async function AdminUsagePage({
       initialLogs={initialLogs}
       initialError={initialError}
       initialEmailFilter={initialEmailFilter}
+      initialSiteSummary={initialSiteSummary}
     />
   );
 }
