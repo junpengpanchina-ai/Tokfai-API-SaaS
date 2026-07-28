@@ -103,9 +103,27 @@ export type AdminDashboardSummary = {
     charged_missing_url: number | null;
     missing_url_success: number | null;
     stale_timeout_pending: number | null;
+    /** Soft/hard image timeouts (error_code / status). */
+    image_task_timeout: number | null;
+    /** usage_logs rate-limit rows (too_many_requests / 429-class codes). */
+    too_many_requests: number | null;
   };
 
+  /** Recent image generation tasks for ops glance (no secrets). */
+  recent_image_tasks: AdminDashboardRecentImageTask[];
+
   updated_at: string;
+};
+
+export type AdminDashboardRecentImageTask = {
+  id: string;
+  request_id: string | null;
+  model: string | null;
+  status: string | null;
+  billing_status: string | null;
+  credits_charged: number | null;
+  error_code: string | null;
+  created_at: string;
 };
 
 type SafeCountResult = {
@@ -949,6 +967,8 @@ async function buildMoneyBagRisks(): Promise<{
     charged_missing_url: null as number | null,
     missing_url_success: null as number | null,
     stale_timeout_pending: null as number | null,
+    image_task_timeout: null as number | null,
+    too_many_requests: null as number | null,
   };
 
   try {
@@ -958,6 +978,9 @@ async function buildMoneyBagRisks(): Promise<{
       staleTimeoutPending,
       chargedFailed,
       missingUrlSuccess,
+      imageTaskTimeoutByCode,
+      imageTaskTimeoutByStatus,
+      tooManyRequests,
     ] = await Promise.all([
       countOrphanCostFlag("provider_success_unpaid"),
       countOrphanCostFlag("charged_missing_url"),
@@ -968,10 +991,28 @@ async function buildMoneyBagRisks(): Promise<{
           "retryable_timeout",
         ])
       ),
-      // completed + no usable URL: reconcile_result='missing_url' when set;
-      // also count completed rows with credits_charged=0 and empty result_data via orphan flag path.
       safeCount("image_generation_tasks", (q) =>
         q.eq("status", "completed").eq("reconcile_result", "missing_url")
+      ),
+      safeCount("image_generation_tasks", (q) =>
+        q.in("error_code", [
+          "image_task_timeout",
+          "image_task_timeout_pending",
+          "timeout_pending",
+          "retryable_timeout",
+        ])
+      ),
+      safeCount("image_generation_tasks", (q) =>
+        q.eq("status", "retryable_timeout")
+      ),
+      safeCount("usage_logs", (q) =>
+        q.in("error_code", [
+          "too_many_requests",
+          "too_many_concurrent_requests",
+          "rate_limited",
+          "upstream_rate_limited",
+          "gateway_overloaded",
+        ])
       ),
     ]);
 
@@ -981,6 +1022,9 @@ async function buildMoneyBagRisks(): Promise<{
       staleTimeoutPending.warning,
       chargedFailed.warning,
       missingUrlSuccess.warning,
+      imageTaskTimeoutByCode.warning,
+      imageTaskTimeoutByStatus.warning,
+      tooManyRequests.warning,
     ].filter(Boolean) as string[];
 
     const chargedMissing = chargedMissingUrl.value ?? 0;
@@ -990,6 +1034,14 @@ async function buildMoneyBagRisks(): Promise<{
         ? null
         : chargedMissing + chargedFail;
 
+    const timeoutByCode = imageTaskTimeoutByCode.value ?? 0;
+    const timeoutByStatus = imageTaskTimeoutByStatus.value ?? 0;
+    const imageTaskTimeout =
+      imageTaskTimeoutByCode.value == null &&
+      imageTaskTimeoutByStatus.value == null
+        ? null
+        : Math.max(timeoutByCode, timeoutByStatus);
+
     return {
       risks: {
         bad_billing_failures: badBilling,
@@ -997,6 +1049,8 @@ async function buildMoneyBagRisks(): Promise<{
         charged_missing_url: chargedMissingUrl.value,
         missing_url_success: missingUrlSuccess.value,
         stale_timeout_pending: staleTimeoutPending.value,
+        image_task_timeout: imageTaskTimeout,
+        too_many_requests: tooManyRequests.value,
       },
       warning: warnings.length ? warnings.join("; ") : undefined,
     };
@@ -1006,6 +1060,48 @@ async function buildMoneyBagRisks(): Promise<{
       risks: empty,
       warning: `money_bag_risks: ${message}`,
     };
+  }
+}
+
+async function fetchRecentImageTasks(): Promise<{
+  tasks: AdminDashboardRecentImageTask[];
+  warning?: string;
+}> {
+  try {
+    const { data, error } = await supabase()
+      .from("image_generation_tasks")
+      .select(
+        "id, request_id, model, status, billing_status, credits_charged, error_code, created_at"
+      )
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    if (error) {
+      if (isMissingTableError(error.message)) {
+        return { tasks: [] };
+      }
+      return {
+        tasks: [],
+        warning: `recent image tasks: ${error.message}`,
+      };
+    }
+
+    return {
+      tasks: ((data ?? []) as AdminDashboardRecentImageTask[]).map((row) => ({
+        id: row.id,
+        request_id: row.request_id,
+        model: row.model,
+        status: row.status,
+        billing_status: row.billing_status,
+        credits_charged:
+          row.credits_charged == null ? null : toNumber(row.credits_charged),
+        error_code: row.error_code,
+        created_at: row.created_at,
+      })),
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { tasks: [], warning: `recent image tasks: ${message}` };
   }
 }
 
@@ -1046,6 +1142,7 @@ export async function buildAdminDashboardSummary(): Promise<{
     totalBalanceCredits,
     chatImageCredits,
     moneyBagRisks,
+    recentImageTasks,
   ] = await Promise.all([
     safeCount("profiles"),
     safeCount("admin_users"),
@@ -1074,6 +1171,7 @@ export async function buildAdminDashboardSummary(): Promise<{
     sumProfilesBalanceCredits(),
     sumChatAndImageCredits(),
     buildMoneyBagRisks(),
+    fetchRecentImageTasks(),
   ]);
 
   const failedRequests: SafeCountResult = {
@@ -1110,6 +1208,7 @@ export async function buildAdminDashboardSummary(): Promise<{
   collectWarning(warnings, totalBalanceCredits);
   collectWarning(warnings, chatImageCredits);
   collectWarning(warnings, moneyBagRisks);
+  collectWarning(warnings, recentImageTasks);
 
   return {
     summary: {
@@ -1156,6 +1255,7 @@ export async function buildAdminDashboardSummary(): Promise<{
       chat_credits_consumed: chatImageCredits.chat,
       image_credits_consumed: chatImageCredits.image,
       money_bag_risks: moneyBagRisks.risks,
+      recent_image_tasks: recentImageTasks.tasks,
 
       updated_at: new Date().toISOString(),
     },

@@ -250,7 +250,7 @@ export function AdminOverviewPanel({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <AdminStatCard
                   label={t("admin.overview.riskBadBilling")}
                   value={formatCount(
@@ -302,6 +302,28 @@ export function AdminOverviewPanel({
                   )}
                   tone={
                     (summary.money_bag_risks?.stale_timeout_pending ?? 0) > 0
+                      ? "warning"
+                      : "default"
+                  }
+                />
+                <AdminStatCard
+                  label={t("admin.overview.riskImageTimeout")}
+                  value={formatCount(
+                    summary.money_bag_risks?.image_task_timeout
+                  )}
+                  tone={
+                    (summary.money_bag_risks?.image_task_timeout ?? 0) > 0
+                      ? "warning"
+                      : "default"
+                  }
+                />
+                <AdminStatCard
+                  label={t("admin.overview.riskTooManyRequests")}
+                  value={formatCount(
+                    summary.money_bag_risks?.too_many_requests
+                  )}
+                  tone={
+                    (summary.money_bag_risks?.too_many_requests ?? 0) > 0
                       ? "warning"
                       : "default"
                   }
@@ -505,6 +527,74 @@ export function AdminOverviewPanel({
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">
+                {t("admin.overview.recentImageTasksTitle")}
+              </CardTitle>
+              <CardDescription>
+                {t("admin.overview.recentImageTasksDesc")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(summary.recent_image_tasks ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {t("admin.overview.recentImageTasksEmpty")}
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="pb-2 pr-3 font-medium">
+                          {t("admin.overview.colCreated")}
+                        </th>
+                        <th className="pb-2 pr-3 font-medium">
+                          {t("admin.overview.colModel")}
+                        </th>
+                        <th className="pb-2 pr-3 font-medium">
+                          {t("admin.overview.colStatus")}
+                        </th>
+                        <th className="pb-2 pr-3 font-medium">
+                          {t("admin.overview.colBilling")}
+                        </th>
+                        <th className="pb-2 pr-3 font-medium">
+                          {t("admin.overview.colCode")}
+                        </th>
+                        <th className="pb-2 font-medium">
+                          {t("admin.overview.colRequestId")}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(summary.recent_image_tasks ?? []).map((row) => (
+                        <tr key={row.id} className="border-b last:border-0">
+                          <td className="py-2 pr-3">
+                            {formatDateTime(row.created_at)}
+                          </td>
+                          <td className="py-2 pr-3 font-mono text-xs">
+                            {row.model ?? "—"}
+                          </td>
+                          <td className="py-2 pr-3">{row.status ?? "—"}</td>
+                          <td className="py-2 pr-3">
+                            {row.billing_status ?? "—"}
+                            {row.credits_charged != null
+                              ? ` · ${formatCreditsPrecise(row.credits_charged)}`
+                              : ""}
+                          </td>
+                          <td className="py-2 pr-3">{row.error_code ?? "—"}</td>
+                          <td className="py-2 font-mono text-xs">
+                            {row.request_id ?? "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader className="pb-3">

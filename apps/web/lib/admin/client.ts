@@ -246,7 +246,19 @@ export type AdminDashboardSummary = {
     charged_missing_url: number | null;
     missing_url_success: number | null;
     stale_timeout_pending: number | null;
+    image_task_timeout?: number | null;
+    too_many_requests?: number | null;
   };
+  recent_image_tasks?: Array<{
+    id: string;
+    request_id: string | null;
+    model: string | null;
+    status: string | null;
+    billing_status: string | null;
+    credits_charged: number | null;
+    error_code: string | null;
+    created_at: string;
+  }>;
 
   updated_at: string;
 };
