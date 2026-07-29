@@ -3,7 +3,10 @@
  * SSE chunks ending with `data: [DONE]`.
  *
  * Upstream is called with stream:false; we synthesize SSE so clients that
- * default to stream=true (Cherry Studio, etc.) still connect successfully.
+ * default to stream=true (Cherry Studio, Cursor, etc.) still connect successfully.
+ *
+ * P970: when the completion includes message.tool_calls, emit OpenAI-compatible
+ * delta.tool_calls chunks and finish_reason=tool_calls.
  *
  * For stream=true main path, the role chunk is flushed early (before upstream)
  * via chatCompletionRoleSseFrame(); remaining events use
@@ -24,6 +27,7 @@ function extractAssistantContent(response: Record<string, unknown>): string {
   if (!message) return "";
   const content = message.content;
   if (typeof content === "string") return content;
+  if (content === null || content === undefined) return "";
   if (Array.isArray(content)) {
     return content
       .map((part) => {
@@ -38,11 +42,24 @@ function extractAssistantContent(response: Record<string, unknown>): string {
   return "";
 }
 
+function extractToolCalls(response: Record<string, unknown>): unknown[] | null {
+  const choices = Array.isArray(response.choices) ? response.choices : [];
+  const first = asRecord(choices[0]);
+  if (!first) return null;
+  const message = asRecord(first.message);
+  if (!message) return null;
+  const toolCalls = message.tool_calls;
+  if (!Array.isArray(toolCalls) || toolCalls.length === 0) return null;
+  return toolCalls;
+}
+
 function extractFinishReason(response: Record<string, unknown>): string {
   const choices = Array.isArray(response.choices) ? response.choices : [];
   const first = asRecord(choices[0]);
   const reason = first?.finish_reason;
-  return typeof reason === "string" && reason.length > 0 ? reason : "stop";
+  if (typeof reason === "string" && reason.length > 0) return reason;
+  if (extractToolCalls(response)) return "tool_calls";
+  return "stop";
 }
 
 function sseLine(payload: unknown): string {
@@ -87,13 +104,15 @@ function chatCompletionSseMeta(response: Record<string, unknown>): {
 }
 
 /**
- * Remaining SSE events after the early role frame (content + finish + DONE).
+ * Remaining SSE events after the early role frame
+ * (content and/or tool_calls + finish + DONE).
  */
 export function chatCompletionSseBodyAfterRole(
   response: Record<string, unknown>
 ): string {
   const { id, created, model } = chatCompletionSseMeta(response);
   const content = extractAssistantContent(response);
+  const toolCalls = extractToolCalls(response);
   const finishReason = extractFinishReason(response);
 
   const base = {
@@ -120,6 +139,36 @@ export function chatCompletionSseBodyAfterRole(
     );
   }
 
+  // OpenAI-compatible streaming tool_calls: one delta with the full array
+  // (assembled from non-stream upstream). Clients that merge by index still work.
+  if (toolCalls) {
+    const deltaToolCalls = toolCalls.map((tc, index) => {
+      const row = asRecord(tc) ?? {};
+      const fn = asRecord(row.function);
+      return {
+        index: typeof row.index === "number" ? row.index : index,
+        id: typeof row.id === "string" ? row.id : `call_${index}`,
+        type: typeof row.type === "string" ? row.type : "function",
+        function: {
+          name: typeof fn?.name === "string" ? fn.name : "",
+          arguments: typeof fn?.arguments === "string" ? fn.arguments : "",
+        },
+      };
+    });
+    chunks.push(
+      sseLine({
+        ...base,
+        choices: [
+          {
+            index: 0,
+            delta: { tool_calls: deltaToolCalls },
+            finish_reason: null,
+          },
+        ],
+      })
+    );
+  }
+
   chunks.push(
     sseLine({
       ...base,
@@ -137,7 +186,7 @@ export function chatCompletionSseBodyAfterRole(
   return chunks.join("");
 }
 
-/** Build the full SSE body (role + content + finish + [DONE]). */
+/** Build the full SSE body (role + content/tool_calls + finish + [DONE]). */
 export function chatCompletionToSseBody(
   response: Record<string, unknown>
 ): string {

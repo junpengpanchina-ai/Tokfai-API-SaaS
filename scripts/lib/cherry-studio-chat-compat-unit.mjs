@@ -66,7 +66,9 @@ assert(normalizeChatMessageContent([]) === "", "content [] → empty");
 
 assert(normalizeChatMessageRole("developer") === "system", "developer → system");
 assert(normalizeChatMessageRole("user") === "user", "user kept");
-assert(normalizeChatMessageRole("tool") === "user", "other role → user");
+assert(normalizeChatMessageRole("tool") === "tool", "tool role kept (P970)");
+assert(normalizeChatMessageRole("function") === "function", "function role kept (P970)");
+assert(normalizeChatMessageRole("foobar") === "user", "other role → user");
 
 const msgs = normalizeChatMessages([
   { role: "system", content: "You are helpful." },

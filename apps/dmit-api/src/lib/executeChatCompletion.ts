@@ -3,6 +3,25 @@ import { z } from "zod";
 import { isImageModel } from "../capabilities/modelCapabilityPolicy.js";
 import { IMAGE_MODEL_NOT_FOR_CHAT_CODE } from "./imageProviderIsolation.js";
 import { isSlowExperimentalChatModel } from "../catalog/modelRegistry.js";
+import {
+  ALL_TOOL_UPSTREAMS_UNAVAILABLE_CODE,
+  MODEL_NOT_TOOL_CAPABLE_CODE,
+  TOOLS_CAPABLE_FALLBACK_MODELS,
+  modelSupportsTools,
+  normalizeToolCallsOnChatCompletion,
+  requestHasTools,
+  resolveToolsCapableAttempts,
+  toolChoiceSummary,
+} from "./toolCallCapability.js";
+import { chatBodyKeys } from "./chatCompletionDiagnostics.js";
+
+function toolsCapableSuggestions(): string[] {
+  return [
+    "auto-pro",
+    "gpt-5-pro",
+    ...TOOLS_CAPABLE_FALLBACK_MODELS,
+  ];
+}
 
 import { ApiError } from "../errors.js";
 import { env } from "../env.js";
@@ -427,6 +446,89 @@ export async function executeChatCompletion(
       route,
     });
     return failureResult(err, requestId, requestedModel);
+  }
+
+  // P970 — tools / tool_choice: prefer tools-capable attempts; never swallow tools.
+  const hasTools = requestHasTools(body);
+  const supportsToolsRequested = modelSupportsTools(requestedRaw);
+  let toolsFallbackApplied = false;
+  if (hasTools) {
+    const toolsResolved = resolveToolsCapableAttempts({
+      requestedModel: requestedRaw,
+      attempts: attempts.length > 0 ? attempts : [requestedModel],
+    });
+    if (!toolsResolved) {
+      const errorCode = MODEL_NOT_TOOL_CAPABLE_CODE;
+      const errorMessage =
+        "This model does not support OpenAI-compatible tool calling. Use a tools-capable model (e.g. auto-pro, gpt-5.5).";
+      const suggestedModels = toolsCapableSuggestions();
+      log.warn("model_not_tool_capable", {
+        code: errorCode,
+        route,
+        requestId,
+        requestedModel: requestedRaw,
+        resolvedModel: requestedModel,
+        attemptedModel: attempts[0] ?? requestedModel,
+        supportsTools: false,
+        hasTools: true,
+        toolChoice: toolChoiceSummary(body),
+        bodyKeys: chatBodyKeys(body).join(","),
+        billing_status: "not_billable",
+        credits_charged: 0,
+      });
+      await writeUsageLog(
+        failedUsageLog({
+          user_id: caller.userId,
+          api_key_id: caller.apiKeyId,
+          tenant_id: caller.tenantId,
+          model: requestedRaw,
+          status: "failed",
+          request_id: requestId,
+          error_code: errorCode,
+          error_message: errorMessage,
+          latency_ms: Date.now() - startedAt,
+          billing_status: "not_billable",
+          billable: false,
+          credits_charged: 0,
+        }),
+        route
+      );
+      return {
+        ok: false,
+        errorCode,
+        errorMessage,
+        requestId,
+        httpStatus: 400,
+        suggestedModels,
+      };
+    }
+    toolsFallbackApplied = toolsResolved.fallbackApplied;
+    attempts = toolsResolved.attempts;
+    log.info("chat_tools_capability", {
+      requestId,
+      route,
+      requestedModel: requestedRaw,
+      resolvedModel: requestedModel,
+      attemptedModel: attempts[0] ?? null,
+      supportsTools: toolsResolved.supportsTools,
+      supportsToolsRequested,
+      hasTools: true,
+      toolChoice: toolChoiceSummary(body),
+      bodyKeys: chatBodyKeys(body).join(","),
+      toolsFallbackApplied,
+      attempts,
+    });
+  } else {
+    log.info("chat_request_capability", {
+      requestId,
+      route,
+      requestedModel: requestedRaw,
+      resolvedModel: requestedModel,
+      supportsTools: supportsToolsRequested,
+      hasTools: false,
+      toolChoice: toolChoiceSummary(body),
+      bodyKeys: chatBodyKeys(body).join(","),
+    });
   }
 
   if (input.idempotencyKey && caller.apiKeyId) {
@@ -920,8 +1022,12 @@ async function runProviderAttempts(args: {
               caller.tenantId
             );
 
+        const normalizedData = normalizeToolCallsOnChatCompletion(
+          data as unknown as Record<string, unknown>
+        );
+
         const response: Record<string, unknown> = {
-          ...data,
+          ...normalizedData,
           // Upstream may omit or send empty object; OpenAI clients require this.
           object: "chat.completion",
           model: resolvedModel,
@@ -956,7 +1062,9 @@ async function runProviderAttempts(args: {
             error_message: null,
             latency_ms: Date.now() - startedAt,
             billable: true,
-            finish_reason: extractFinishReason(data),
+            finish_reason: extractFinishReason(
+              normalizedData as unknown as ChatCompletionResponse
+            ),
             upstream_status: null,
             upstream_error_code: null,
             safety_reason: isAlias ? requestedModel : null,
@@ -968,18 +1076,31 @@ async function runProviderAttempts(args: {
           }
         );
 
+        const finishReason = extractFinishReason(
+          normalizedData as unknown as ChatCompletionResponse
+        );
         log.info("chat_completion_succeeded", {
           requestId,
           route,
           status: 200,
           code: "succeeded",
           message: "Chat completion succeeded.",
-          requestedModel,
+          requestedModel: requestedRaw,
           resolvedModel,
+          attemptedModel: attemptModel,
           attemptModel,
           attemptIndex,
           providerId: provider.id,
           providerIndex,
+          supportsTools: modelSupportsTools(attemptModel),
+          hasTools: requestHasTools(body),
+          toolChoice: toolChoiceSummary(body),
+          bodyKeys: chatBodyKeys(body).join(","),
+          finish_reason: finishReason,
+          upstreamStatus: 200,
+          upstreamErrorCode: null,
+          billing_status: "charged",
+          credits_charged: creditsCharged,
           latencyMs: Date.now() - startedAt,
           timeoutMs: perAttemptTimeoutMs,
           viaStreamFallback,
@@ -1156,7 +1277,9 @@ async function runProviderAttempts(args: {
     }
   }
 
-  const fallbackErr = lastError ?? allUpstreamsUnavailableError();
+  const fallbackErr = requestHasTools(body)
+    ? allToolUpstreamsUnavailableError(lastError)
+    : (lastError ?? allUpstreamsUnavailableError());
   await logChatFailure({
     caller,
     requestId,
@@ -1166,7 +1289,9 @@ async function runProviderAttempts(args: {
     route,
     timeoutMs: timeoutPolicy.upstreamTimeoutMs,
   });
-  return failureResult(fallbackErr, requestId, requestedModel);
+  return failureResultWithSuggestions(fallbackErr, requestId, requestedModel, {
+    suggestSwitchModel: true,
+  });
 }
 
 function failureResult(
@@ -1427,6 +1552,35 @@ function allUpstreamsUnavailableError(): ApiError {
   });
 }
 
+function allToolUpstreamsUnavailableError(lastError: ApiError | null): ApiError {
+  if (
+    lastError &&
+    (lastError.code === "upstream_timeout" ||
+      lastError.code === "all_upstreams_unavailable" ||
+      lastError.code === ALL_TOOL_UPSTREAMS_UNAVAILABLE_CODE)
+  ) {
+    return new ApiError({
+      status: 503,
+      message: "All tools-capable upstream models unavailable.",
+      code: ALL_TOOL_UPSTREAMS_UNAVAILABLE_CODE,
+      type: "upstream_error",
+      publicMessage:
+        "当前支持 tool calling 的模型暂时不可用，请稍后重试或切换 auto-pro / gpt-5.5。",
+      upstreamStatus: lastError.upstreamStatus,
+      upstreamErrorSnippet: lastError.upstreamErrorSnippet,
+    });
+  }
+  if (lastError) return lastError;
+  return new ApiError({
+    status: 503,
+    message: "All tools-capable upstream models unavailable.",
+    code: ALL_TOOL_UPSTREAMS_UNAVAILABLE_CODE,
+    type: "upstream_error",
+    publicMessage:
+      "当前支持 tool calling 的模型暂时不可用，请稍后重试或切换 auto-pro / gpt-5.5。",
+  });
+}
+
 async function logChatFailure(args: {
   caller: ChatCaller;
   requestId: string;
@@ -1455,6 +1609,7 @@ async function logChatFailure(args: {
     err.code === "upstream_model_busy" ||
     err.code === "upstream_model_unavailable" ||
     err.code === "all_upstreams_unavailable" ||
+    err.code === ALL_TOOL_UPSTREAMS_UNAVAILABLE_CODE ||
     err.code === "rate_limited" ||
     err.code === "too_many_requests" ||
     err.code === "too_many_concurrent_requests"
@@ -1472,6 +1627,9 @@ async function logChatFailure(args: {
       error_code: err.code ?? null,
       error_message: err.publicMessage,
       latency_ms: Date.now() - startedAt,
+      billing_status: "not_billable",
+      billable: false,
+      credits_charged: 0,
       // Ops-only breadcrumb for timeout reports (not billing). Format: provider=<id>
       safety_reason: providerId ? `provider=${providerId}` : null,
       ...upstreamFailureFields(lastAttempt ?? err),
@@ -1484,7 +1642,9 @@ async function logChatFailure(args: {
     route,
     requestedModel,
     resolvedModel: requestedModel,
+    attemptedModel: requestedModel,
     providerId: providerId ?? null,
+    supportsTools: modelSupportsTools(requestedModel),
     status: err.status,
     code: err.code ?? "failed",
     message: err.publicMessage,
@@ -1494,6 +1654,7 @@ async function logChatFailure(args: {
     latencyMs: Date.now() - startedAt,
     ...(typeof timeoutMs === "number" ? { timeoutMs } : {}),
     billing_status: "not_billable",
+    credits_charged: 0,
     fallbackSkippedReason:
       err.code === "upstream_timeout" ? "request_failed" : null,
   });

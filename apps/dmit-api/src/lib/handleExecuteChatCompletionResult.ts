@@ -88,16 +88,18 @@ export function respondExecuteChatCompletionFailure(
       message,
       publicMessage: message,
       code,
-      type: "invalid_request_error",
+      type: errorTypeForCode(code, 400),
     });
-    return respondJsonError(
-      c,
-      err,
-      requestId,
-      result.suggestedModels?.length
-        ? { suggestedModels: result.suggestedModels }
-        : undefined
-    );
+    const extra: Record<string, unknown> = {
+      tokfai: {
+        billing_status: "not_billable",
+        credits_charged: 0,
+      },
+    };
+    if (result.suggestedModels?.length) {
+      extra.suggestedModels = result.suggestedModels;
+    }
+    return respondJsonError(c, err, requestId, extra);
   }
 
   if (result.httpStatus === 404) {

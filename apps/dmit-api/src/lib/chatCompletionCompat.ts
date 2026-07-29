@@ -9,7 +9,11 @@
 
 export type NormalizedChatMessage = {
   role: string;
-  content: string;
+  content: string | null;
+  /** OpenAI tool/function message fields — preserved for Cursor / tool loops. */
+  name?: string;
+  tool_call_id?: string;
+  tool_calls?: unknown;
 };
 
 /** Optional fields Cherry / SDKs often send as explicit null — drop before schema. */
@@ -48,14 +52,21 @@ export function coerceOptionalBoolean(value: unknown): boolean | undefined {
 }
 
 /**
- * Role compat for Cherry / OpenAI SDK variants:
- * developer → system; assistant|user|system kept; anything else → user.
+ * Role compat for Cherry / OpenAI / Cursor SDK variants:
+ * developer → system; assistant|user|system|tool|function kept; else → user.
+ * P970: never rewrite tool/function → user (breaks tool call loops).
  */
 export function normalizeChatMessageRole(role: unknown): string {
   if (typeof role !== "string" || !role.trim()) return "user";
   const lower = role.trim().toLowerCase();
   if (lower === "developer") return "system";
-  if (lower === "assistant" || lower === "user" || lower === "system") {
+  if (
+    lower === "assistant" ||
+    lower === "user" ||
+    lower === "system" ||
+    lower === "tool" ||
+    lower === "function"
+  ) {
     return lower;
   }
   return "user";
@@ -122,10 +133,27 @@ export function normalizeChatMessages(
       };
     }
     const row = raw as Record<string, unknown>;
-    out.push({
-      role: normalizeChatMessageRole(row.role),
-      content: normalizeChatMessageContent(row.content),
-    });
+    const role = normalizeChatMessageRole(row.role);
+    const contentRaw = normalizeChatMessageContent(row.content);
+    // OpenAI tool/function messages often use empty content + tool_call_id.
+    const content =
+      role === "tool" || role === "function"
+        ? contentRaw.length > 0
+          ? contentRaw
+          : null
+        : contentRaw;
+
+    const msg: NormalizedChatMessage = { role, content };
+    if (typeof row.name === "string" && row.name.trim()) {
+      msg.name = row.name.trim();
+    }
+    if (typeof row.tool_call_id === "string" && row.tool_call_id.trim()) {
+      msg.tool_call_id = row.tool_call_id.trim();
+    }
+    if (Array.isArray(row.tool_calls) && row.tool_calls.length > 0) {
+      msg.tool_calls = row.tool_calls;
+    }
+    out.push(msg);
   }
 
   return { ok: true, messages: out };
@@ -239,22 +267,50 @@ export function normalizeClientChatCompletionBody(
     }
     const row = raw as Record<string, unknown>;
     const role = normalizeChatMessageRole(row.role);
-    const content = normalizeChatMessageContent(row.content);
+    const contentFlat = normalizeChatMessageContent(row.content);
+    const content =
+      role === "tool" || role === "function"
+        ? contentFlat.length > 0
+          ? contentFlat
+          : null
+        : contentFlat;
     if (role !== row.role || content !== row.content) {
       messagesChanged = true;
     }
-    // Preserve other passthrough keys on the message object for schema .passthrough().
-    normalizedMessages.push({ ...row, role, content });
+    // Preserve tool_calls / tool_call_id / name for Cursor tool loops.
+    const next: Record<string, unknown> = { ...row, role, content };
+    if (Array.isArray(row.tool_calls) && row.tool_calls.length > 0) {
+      next.tool_calls = row.tool_calls;
+    } else {
+      delete next.tool_calls;
+    }
+    if (typeof row.tool_call_id === "string" && row.tool_call_id.trim()) {
+      next.tool_call_id = row.tool_call_id.trim();
+    }
+    if (typeof row.name === "string" && row.name.trim()) {
+      next.name = row.name.trim();
+    }
+    normalizedMessages.push(next);
   }
 
   if (messagesChanged) normalized = true;
 
-  // B: all content empty after extract → same empty noop (no upstream / no debit)
+  // B: all content empty after extract → empty noop (no upstream / no debit).
+  // Tool-role messages / assistant tool_calls count as non-empty payload.
   const hasText = normalizedMessages.some((m) => {
     const c = m.content;
     return typeof c === "string" && c.trim().length > 0;
   });
-  if (!hasText) {
+  const hasToolPayload = normalizedMessages.some((m) => {
+    const role = String(m.role ?? "");
+    if (role === "tool" || role === "function") return true;
+    if (Array.isArray(m.tool_calls) && m.tool_calls.length > 0) return true;
+    if (typeof m.tool_call_id === "string" && m.tool_call_id.trim()) return true;
+    return false;
+  });
+  const hasToolsArg =
+    Array.isArray(body.tools) && (body.tools as unknown[]).length > 0;
+  if (!hasText && !hasToolPayload && !hasToolsArg) {
     return {
       noop: true,
       rejectedReason: "empty_messages",

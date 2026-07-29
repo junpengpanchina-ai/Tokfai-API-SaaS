@@ -104,11 +104,37 @@ const Schema = z
     .int()
     .positive()
     .default(2),
+  /** Overall request wall clock (non-tool chat); keep moderate. */
   TOKFAI_TOTAL_REQUEST_TIMEOUT_MS: z.coerce
     .number()
     .int()
     .positive()
-    .default(120_000),
+    .default(180_000),
+  /**
+   * P970 — Non-stream chat wall / idle budget (not heavy 700s).
+   * Alias of total chat budget when tools are absent.
+   */
+  TOKFAI_CHAT_TIMEOUT_MS: z.coerce.number().int().positive().default(180_000),
+  /** P970 — Client stream=true chat idle/wall budget. */
+  TOKFAI_STREAM_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
+  /**
+   * P970 — Only when request includes tools / tool_choice.
+   * Never apply global 700s; tool path uses this dedicated budget.
+   */
+  TOKFAI_TOOL_CALL_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(420_000),
+  /**
+   * P970 — Per-upstream-attempt budget (alias of TOKFAI_UPSTREAM_TIMEOUT_MS).
+   * Kept as a named knob for ops; defaults match UPSTREAM_ATTEMPT_TIMEOUT_MS=90s.
+   */
+  TOKFAI_UPSTREAM_ATTEMPT_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional(),
   TOKFAI_CHAT_BODY_MAX_BYTES: z.coerce
     .number()
     .int()
@@ -262,6 +288,10 @@ const Schema = z
       GRSAI_BASE_URL: normalizeGrsaiBaseUrl(rawBase),
       GRSAI_CHAT_COMPLETIONS_PATH: chatPath,
       GRSAI_IMAGE_GENERATE_PATH: imagePath,
+      // P970: named attempt timeout aliases TOKFAI_UPSTREAM_TIMEOUT_MS when set.
+      TOKFAI_UPSTREAM_TIMEOUT_MS:
+        data.TOKFAI_UPSTREAM_ATTEMPT_TIMEOUT_MS ??
+        data.TOKFAI_UPSTREAM_TIMEOUT_MS,
     };
   });
 

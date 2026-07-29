@@ -387,14 +387,15 @@ function chatCompletionToSse(completion) {
   const id = completion.id ?? `chatcmpl_mock`;
   const created = completion.created ?? Math.floor(Date.now() / 1000);
   const model = completion.model ?? "gemini-3-flash";
+  const message = completion.choices?.[0]?.message ?? {};
   const content =
-    completion.choices?.[0]?.message?.content ??
-    (typeof completion.choices?.[0]?.message?.content === "string"
-      ? completion.choices[0].message.content
-      : "ok");
-  const finishReason = completion.choices?.[0]?.finish_reason ?? "stop";
+    typeof message.content === "string" ? message.content : "";
+  const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls : null;
+  const finishReason =
+    completion.choices?.[0]?.finish_reason ??
+    (toolCalls ? "tool_calls" : "stop");
   const base = { id, object: "chat.completion.chunk", created, model };
-  return [
+  const chunks = [
     `data: ${JSON.stringify({
       ...base,
       choices: [
@@ -405,16 +406,46 @@ function chatCompletionToSse(completion) {
         },
       ],
     })}\n\n`,
-    `data: ${JSON.stringify({
-      ...base,
-      choices: [{ index: 0, delta: { content }, finish_reason: null }],
-    })}\n\n`,
+  ];
+  if (content.length > 0) {
+    chunks.push(
+      `data: ${JSON.stringify({
+        ...base,
+        choices: [{ index: 0, delta: { content }, finish_reason: null }],
+      })}\n\n`
+    );
+  }
+  if (toolCalls) {
+    const deltaToolCalls = toolCalls.map((tc, index) => ({
+      index,
+      id: tc?.id ?? `call_${index}`,
+      type: tc?.type ?? "function",
+      function: {
+        name: tc?.function?.name ?? "",
+        arguments: tc?.function?.arguments ?? "",
+      },
+    }));
+    chunks.push(
+      `data: ${JSON.stringify({
+        ...base,
+        choices: [
+          {
+            index: 0,
+            delta: { tool_calls: deltaToolCalls },
+            finish_reason: null,
+          },
+        ],
+      })}\n\n`
+    );
+  }
+  chunks.push(
     `data: ${JSON.stringify({
       ...base,
       choices: [{ index: 0, delta: {}, finish_reason: finishReason }],
-    })}\n\n`,
-    "data: [DONE]\n\n",
-  ].join("");
+    })}\n\n`
+  );
+  chunks.push("data: [DONE]\n\n");
+  return chunks.join("");
 }
 
 function mockNormalizeChatContent(content) {
@@ -444,7 +475,15 @@ function mockNormalizeChatRole(role) {
   if (typeof role !== "string" || !role.trim()) return "user";
   const lower = role.trim().toLowerCase();
   if (lower === "developer") return "system";
-  if (lower === "assistant" || lower === "user" || lower === "system") return lower;
+  if (
+    lower === "assistant" ||
+    lower === "user" ||
+    lower === "system" ||
+    lower === "tool" ||
+    lower === "function"
+  ) {
+    return lower;
+  }
   return "user";
 }
 
@@ -517,7 +556,15 @@ function mockNormalizeClientChatBody(rawBody) {
   const hasText = normalizedMessages.some(
     (m) => typeof m.content === "string" && m.content.trim().length > 0
   );
-  if (!hasText) {
+  const hasToolPayload = normalizedMessages.some((m) => {
+    const role = String(m.role ?? "");
+    if (role === "tool" || role === "function") return true;
+    if (Array.isArray(m.tool_calls) && m.tool_calls.length > 0) return true;
+    if (typeof m.tool_call_id === "string" && m.tool_call_id.trim()) return true;
+    return false;
+  });
+  const hasToolsArg = Array.isArray(body.tools) && body.tools.length > 0;
+  if (!hasText && !hasToolPayload && !hasToolsArg) {
     return { noop: true, body: { ...body, messages: normalizedMessages } };
   }
   return { noop: false, body: { ...body, messages: normalizedMessages } };
@@ -528,6 +575,9 @@ function chatCompletionBody(body) {
   const resolvedModel = resolveMockCanonicalModel(requestedModel);
   const meta = tokfaiMeta(requestedModel, resolvedModel);
   const firstContent = body.messages?.[0]?.content;
+  const hasTools =
+    (Array.isArray(body.tools) && body.tools.length > 0) ||
+    (body.tool_choice != null && body.tool_choice !== "none");
   const content =
     typeof firstContent === "string" &&
     /TOKFAI_CHAT_ALIAS_READY/i.test(firstContent)
@@ -535,7 +585,46 @@ function chatCompletionBody(body) {
       : typeof firstContent === "string" &&
           /TOKFAI_CHERRY_OK/i.test(firstContent)
         ? "TOKFAI_CHERRY_OK"
-        : "ok";
+        : hasTools
+          ? null
+          : "ok";
+
+  if (hasTools) {
+    const toolName =
+      body.tools?.[0]?.function?.name &&
+      typeof body.tools[0].function.name === "string"
+        ? body.tools[0].function.name
+        : "get_weather";
+    return {
+      id: `chatcmpl_${meta.request_id}`,
+      object: "chat.completion",
+      created: Math.floor(Date.now() / 1000),
+      model: resolvedModel,
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: "assistant",
+            content: null,
+            tool_calls: [
+              {
+                id: "call_mock_p970",
+                type: "function",
+                function: {
+                  name: toolName,
+                  arguments: JSON.stringify({ location: "Shanghai" }),
+                },
+              },
+            ],
+          },
+          finish_reason: "tool_calls",
+        },
+      ],
+      usage: { prompt_tokens: 12, completion_tokens: 8, total_tokens: 20 },
+      ...meta,
+    };
+  }
+
   return {
     id: `chatcmpl_${meta.request_id}`,
     object: "chat.completion",
@@ -1283,6 +1372,10 @@ export function startMockGateway(options = {}) {
           object: "list",
           data: ids.map((id) => {
             const label = labels[id] ?? `Tokfai ${id}`;
+            const coding =
+              /(^|[-_/])(coding|codex|code)([-_/]|$)/i.test(id) ||
+              id.startsWith("gpt-5") ||
+              id.startsWith("auto-pro");
             return {
               id,
               object: "model",
@@ -1292,6 +1385,13 @@ export function startMockGateway(options = {}) {
               display_name: label,
               title: label,
               ...(aliasOf[id] ? { alias_of: aliasOf[id] } : {}),
+              capabilities: {
+                chat: true,
+                stream: true,
+                tools: true,
+                image: false,
+                coding,
+              },
             };
           }),
         });

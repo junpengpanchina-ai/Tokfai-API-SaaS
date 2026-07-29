@@ -43,11 +43,14 @@ export const STATUS_BY_ERROR_CODE: Record<string, number> = {
   upstream_model_busy: 503,
   upstream_model_unavailable: 503,
   all_upstreams_unavailable: 503,
+  all_tool_upstreams_unavailable: 503,
   request_body_too_large: 413,
   upstream_timeout: 504,
   image_generation_timeout: 504,
   image_task_timeout: 504,
   upstream_image_error: 502,
+  model_not_tool_capable: 400,
+  tool_call_not_supported: 400,
 };
 
 /** Stable error.type for known codes — never leave type undefined on envelopes. */
@@ -71,6 +74,7 @@ export function errorTypeForCode(
     code === "upstream_error" ||
     code === "upstream_auth_error" ||
     code === "all_upstreams_unavailable" ||
+    code === "all_tool_upstreams_unavailable" ||
     code === "gateway_overloaded" ||
     code === "image_generation_timeout" ||
     code === "image_task_timeout"
@@ -86,7 +90,9 @@ export function errorTypeForCode(
   if (
     code === "image_model_not_for_chat" ||
     code === "model_not_image_capable" ||
-    code === "image_model_not_available"
+    code === "image_model_not_available" ||
+    code === "model_not_tool_capable" ||
+    code === "tool_call_not_supported"
   ) {
     return "invalid_request_error";
   }

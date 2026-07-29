@@ -1,8 +1,11 @@
 /**
  * Layered upstream timeout policy.
  *
- * Chat stays short (env default). Ordinary /v1/responses gets a medium budget.
+ * Chat stays moderate (env default). Ordinary /v1/responses gets a medium budget.
  * Codex / coding / heavy responses get 700s — never apply that globally.
+ *
+ * P970: tools / tool_choice on /v1/chat/completions use TOOL_CALL_TIMEOUT_MS
+ * (default 420s) — not the heavy 700s responses tier.
  *
  * Exception: Gemini 3 chat models often exceed the short chat budget on
  * /v1/chat/completions while finishing within the ordinary responses budget.
@@ -11,12 +14,22 @@
  */
 
 import { env } from "../env.js";
+import { requestHasTools } from "./toolCallCapability.js";
 
-export type UpstreamTimeoutTier = "chat" | "responses" | "heavy";
+export type UpstreamTimeoutTier =
+  | "chat"
+  | "responses"
+  | "heavy"
+  | "tool_call"
+  | "stream";
 
 /** Documented defaults (env may override). */
 export const UPSTREAM_TIMEOUT_DEFAULTS = {
-  chatMs: 90_000,
+  /** Per-attempt upstream fetch budget. */
+  attemptMs: 90_000,
+  chatMs: 180_000,
+  streamMs: 300_000,
+  toolCallMs: 420_000,
   responsesMs: 300_000,
   heavyMs: 700_000,
   heavyIdleMs: 700_000,
@@ -130,7 +143,10 @@ export function resolveUpstreamTimeoutPolicy(args: {
   const bodyHeavy = hasHeavyBodySignals(args.body);
   const isHeavy = isResponses && (modelHeavy || bodyHeavy);
 
-  const chatUpstreamMs = env.TOKFAI_UPSTREAM_TIMEOUT_MS;
+  const attemptMs = env.TOKFAI_UPSTREAM_TIMEOUT_MS;
+  const chatMs = env.TOKFAI_CHAT_TIMEOUT_MS;
+  const streamMs = env.TOKFAI_STREAM_TIMEOUT_MS;
+  const toolCallMs = env.TOKFAI_TOOL_CALL_TIMEOUT_MS;
   const responsesUpstreamMs = env.TOKFAI_RESPONSES_UPSTREAM_TIMEOUT_MS;
   const heavyUpstreamMs = env.TOKFAI_HEAVY_RESPONSES_UPSTREAM_TIMEOUT_MS;
   const heavyIdleMs = env.TOKFAI_HEAVY_RESPONSES_IDLE_TIMEOUT_MS;
@@ -165,14 +181,40 @@ export function resolveUpstreamTimeoutPolicy(args: {
     };
   }
 
-  // /v1/chat/completions — keep short; never inherit heavy 700s.
+  // /v1/chat/completions — P970 tool_call tier (not heavy 700s).
+  const hasTools = requestHasTools(args.body);
+  if (hasTools) {
+    const upstreamTimeoutMs = Math.max(attemptMs, toolCallMs);
+    return {
+      tier: "tool_call",
+      isHeavy: false,
+      upstreamTimeoutMs,
+      idleTimeoutMs: upstreamTimeoutMs,
+      totalTimeoutMs: Math.max(chatTotalMs, upstreamTimeoutMs + 10_000),
+      reason: "chat_tool_call",
+    };
+  }
+
+  // Client stream=true without tools — STREAM_TIMEOUT_MS.
+  if (args.clientStream) {
+    const upstreamTimeoutMs = Math.max(attemptMs, streamMs);
+    return {
+      tier: "stream",
+      isHeavy: false,
+      upstreamTimeoutMs,
+      idleTimeoutMs: upstreamTimeoutMs,
+      totalTimeoutMs: Math.max(chatTotalMs, upstreamTimeoutMs + 10_000),
+      reason: "chat_stream",
+    };
+  }
+
   // Gemini 3 is the known exception: same upstream as responses, but often
-  // slower than the short chat default (90s) while finishing within 300s.
+  // slower than the short chat default while finishing within 300s.
   const slowGemini3 =
     isSlowChatGemini3Model(args.requestedModel) ||
     isSlowChatGemini3Model(args.resolvedModel ?? "");
   if (slowGemini3) {
-    const upstreamTimeoutMs = Math.max(chatUpstreamMs, responsesUpstreamMs);
+    const upstreamTimeoutMs = Math.max(attemptMs, chatMs, responsesUpstreamMs);
     return {
       tier: "chat",
       isHeavy: false,
@@ -186,15 +228,13 @@ export function resolveUpstreamTimeoutPolicy(args: {
   // gemini-2.5-flash /v1/chat/completions (stream true|false) may need a short
   // non-stream probe + internal upstream stream=true drain, then synthesize
   // client SSE when stream=true. Never apply this budget to /v1/responses.
-  // Stream fallback must not be capped to the same short chat attempt budget
-  // that just timed out — reserve a longer remaining wall for SSE drain.
   const gemini25FlashChat =
     route === "/v1/chat/completions" &&
     (args.requestedModel.trim().toLowerCase() === "gemini-2.5-flash" ||
       (args.resolvedModel ?? "").trim().toLowerCase() === "gemini-2.5-flash");
   if (gemini25FlashChat) {
-    const upstreamTimeoutMs = chatUpstreamMs;
-    const streamFallbackBudgetMs = Math.max(chatUpstreamMs, 120_000);
+    const upstreamTimeoutMs = Math.max(attemptMs, chatMs);
+    const streamFallbackBudgetMs = Math.max(upstreamTimeoutMs, streamMs);
     return {
       tier: "chat",
       isHeavy: false,
@@ -202,21 +242,20 @@ export function resolveUpstreamTimeoutPolicy(args: {
       idleTimeoutMs: streamFallbackBudgetMs,
       totalTimeoutMs: Math.max(
         chatTotalMs,
-        // short non-stream probe + stream drain + one stream retry + buffer
-        Math.min(chatUpstreamMs, 20_000) +
-          streamFallbackBudgetMs * 2 +
-          20_000
+        Math.min(upstreamTimeoutMs, 20_000) + streamFallbackBudgetMs * 2 + 20_000
       ),
       reason: "chat_gemini25_flash_nonstream_stream_fallback",
     };
   }
 
+  // Default non-stream chat: CHAT_TIMEOUT_MS wall, attempt capped by UPSTREAM_ATTEMPT.
+  const chatWallMs = Math.max(attemptMs, chatMs);
   return {
     tier: "chat",
     isHeavy: false,
-    upstreamTimeoutMs: chatUpstreamMs,
-    idleTimeoutMs: chatUpstreamMs,
-    totalTimeoutMs: Math.max(chatTotalMs, chatUpstreamMs + 10_000),
+    upstreamTimeoutMs: chatWallMs,
+    idleTimeoutMs: chatWallMs,
+    totalTimeoutMs: Math.max(chatTotalMs, chatWallMs + 10_000),
     reason: "chat_default",
   };
 }

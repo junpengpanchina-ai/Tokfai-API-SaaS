@@ -8,6 +8,7 @@ import {
 import { isUnavailableImageModel } from "../upstream/imageModelAliases.js";
 import { priceFor } from "../upstream/pricing.js";
 import { tokfaiClientDisplayName } from "./clientModelDisplayName.js";
+import { resolveModelCapabilityFlags } from "../lib/toolCallCapability.js";
 import {
   DEFAULT_IMAGE_MODEL_ID,
   isHiddenInternalModel,
@@ -544,6 +545,14 @@ export type OpenAiModelListItem = {
   title: string;
   /** Present when id is a consumer compatibility alias. */
   alias_of?: string;
+  /** P970 — OpenAI-compatible capability markers for Cursor / clients. */
+  capabilities?: {
+    chat: boolean;
+    stream: boolean;
+    tools: boolean;
+    image: boolean;
+    coding: boolean;
+  };
 };
 
 type ModelRow = {
@@ -557,8 +566,9 @@ type ModelRow = {
 const DEFAULT_OWNED_BY = "tokfai";
 
 function withClientDisplayFields(
-  item: Omit<OpenAiModelListItem, "name" | "display_name" | "title"> & {
+  item: Omit<OpenAiModelListItem, "name" | "display_name" | "title" | "capabilities"> & {
     display_name?: string | null;
+    capabilities?: OpenAiModelListItem["capabilities"];
   }
 ): OpenAiModelListItem {
   const label = tokfaiClientDisplayName(item.id, item.display_name);
@@ -570,6 +580,8 @@ function withClientDisplayFields(
     name: label,
     display_name: label,
     title: label,
+    ...(item.alias_of ? { alias_of: item.alias_of } : {}),
+    capabilities: item.capabilities ?? resolveModelCapabilityFlags(item.id),
   };
 }
 
@@ -630,7 +642,19 @@ export async function listCatalogModels(): Promise<OpenAiModelListItem[]> {
     });
   }
 
-  return [...aliases, ...concrete];
+  return [
+    ...aliases.map((row) =>
+      withClientDisplayFields({
+        id: row.id,
+        object: "model",
+        created: row.created,
+        owned_by: row.owned_by,
+        display_name: row.display_name,
+        ...(row.alias_of ? { alias_of: row.alias_of } : {}),
+      })
+    ),
+    ...concrete,
+  ];
 }
 
 async function listCatalogModelsFromDb(): Promise<OpenAiModelListItem[] | null> {

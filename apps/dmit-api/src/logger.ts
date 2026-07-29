@@ -86,6 +86,24 @@ const ALLOWED_FIELD_KEYS = new Set([
   "reconcile_status",
   "orphan_cost_audit",
   "orphan_alarms",
+  // P970 Cursor / OpenAI tool call compatibility
+  "attemptedModel",
+  "supportsTools",
+  "supportsToolsRequested",
+  "hasTools",
+  "toolChoice",
+  "toolsFallbackApplied",
+  "attempts",
+  "billing_status",
+  "finish_reason",
+  "timeoutMs",
+  "idleTimeoutMs",
+  "totalTimeoutMs",
+  "tier",
+  "isHeavy",
+  "clientStream",
+  "viaStreamFallback",
+  "fallbackSkippedReason",
 ]);
 
 /**
