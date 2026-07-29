@@ -1,15 +1,19 @@
 /**
- * P972 — OpenAI-compatible graceful error envelope for forced tool failures.
+ * P972/P974 — OpenAI-compatible graceful error envelope for tool failures /
+ * routing guard (model_not_tool_capable, fake tool_call, etc.).
  *
  * Does not change P971 billing rules (still not_billable / credits=0).
- * Ensures clients never see 504 HTML, empty bodies, or mid-stream header races
- * when strict tools requests fail without tool_calls.
+ * Ensures clients never see 504 HTML, empty bodies, or mid-stream header races.
  */
 
 import { ApiError, buildClientErrorBody, errorTypeForCode } from "../errors.js";
 import {
+  ALL_TOOL_UPSTREAMS_UNAVAILABLE_CODE,
+  MODEL_NOT_TOOL_CAPABLE_CODE,
+  MODEL_NOT_TOOL_CAPABLE_MESSAGE,
   PROVIDER_TOOL_CALL_NOT_SUPPORTED_CODE,
   TOOL_CALL_NOT_GENERATED_CODE,
+  TOOL_CALL_NOT_SUPPORTED_CODE,
 } from "./toolCallCapability.js";
 import { safeInvalidRequestMessage } from "./chatCompletionDiagnostics.js";
 
@@ -18,11 +22,21 @@ const FORCED_TOOL_FAILURE_CODES = new Set<string>([
   PROVIDER_TOOL_CALL_NOT_SUPPORTED_CODE,
 ]);
 
-/** HTTP statuses allowed for non-stream forced-tool failure JSON. */
+const TOOL_ROUTING_GUARD_CODES = new Set<string>([
+  MODEL_NOT_TOOL_CAPABLE_CODE,
+  TOOL_CALL_NOT_SUPPORTED_CODE,
+  ALL_TOOL_UPSTREAMS_UNAVAILABLE_CODE,
+]);
+
+/** HTTP statuses allowed for non-stream tool-guard failure JSON. */
 const ALLOWED_HTTP = new Set([400, 422, 502, 503]);
 
 export function isForcedToolFailureCode(code: unknown): boolean {
   return typeof code === "string" && FORCED_TOOL_FAILURE_CODES.has(code);
+}
+
+export function isToolRoutingGuardErrorCode(code: unknown): boolean {
+  return typeof code === "string" && TOOL_ROUTING_GUARD_CODES.has(code);
 }
 
 /**
@@ -34,22 +48,31 @@ export function clampForcedToolFailureHttpStatus(status: number): number {
   return 502;
 }
 
-export function buildForcedToolFailurePayload(args: {
+export function buildNotBillableToolErrorPayload(args: {
   code?: string | null;
   message?: string | null;
   requestId?: string | null;
   httpStatus?: number;
+  defaultCode?: string;
+  defaultMessage?: string;
 }): {
   status: number;
   payload: Record<string, unknown>;
 } {
-  const code = isForcedToolFailureCode(args.code)
-    ? String(args.code)
-    : TOOL_CALL_NOT_GENERATED_CODE;
-  const status = clampForcedToolFailureHttpStatus(args.httpStatus ?? 502);
+  const defaultCode = args.defaultCode ?? TOOL_CALL_NOT_GENERATED_CODE;
+  const code =
+    isForcedToolFailureCode(args.code) || isToolRoutingGuardErrorCode(args.code)
+      ? String(args.code)
+      : defaultCode;
+  const status = clampForcedToolFailureHttpStatus(
+    args.httpStatus ?? (code === MODEL_NOT_TOOL_CAPABLE_CODE ? 400 : 502)
+  );
   const message = safeInvalidRequestMessage(
     args.message,
-    "Upstream did not return tool_calls for a strict tools request."
+    args.defaultMessage ??
+      (code === MODEL_NOT_TOOL_CAPABLE_CODE
+        ? MODEL_NOT_TOOL_CAPABLE_MESSAGE
+        : "Upstream did not return tool_calls for a strict tools request.")
   );
   const requestId =
     typeof args.requestId === "string" && args.requestId.trim()
@@ -78,6 +101,18 @@ export function buildForcedToolFailurePayload(args: {
   return { status, payload };
 }
 
+export function buildForcedToolFailurePayload(args: {
+  code?: string | null;
+  message?: string | null;
+  requestId?: string | null;
+  httpStatus?: number;
+}): {
+  status: number;
+  payload: Record<string, unknown>;
+} {
+  return buildNotBillableToolErrorPayload(args);
+}
+
 /** Non-stream: application/json body (never empty / HTML). */
 export function forcedToolFailureJsonResponse(args: {
   code?: string | null;
@@ -101,6 +136,16 @@ export function forcedToolFailureJsonResponse(args: {
   return new Response(text, { status, headers });
 }
 
+export function notBillableErrorToSseBody(args: {
+  code?: string | null;
+  message?: string | null;
+  requestId?: string | null;
+  httpStatus?: number;
+}): string {
+  const { payload } = buildNotBillableToolErrorPayload(args);
+  return `data: ${JSON.stringify(payload)}\n\ndata: [DONE]\n\n`;
+}
+
 /**
  * Stream: SSE error chunk + data: [DONE].
  * HTTP 200 (headers already committed on early-flush path; buffered path matches).
@@ -111,8 +156,7 @@ export function forcedToolFailureToSseBody(args: {
   requestId?: string | null;
   httpStatus?: number;
 }): string {
-  const { payload } = buildForcedToolFailurePayload(args);
-  return `data: ${JSON.stringify(payload)}\n\ndata: [DONE]\n\n`;
+  return notBillableErrorToSseBody(args);
 }
 
 export function forcedToolFailureSseResponse(args: {
@@ -121,7 +165,7 @@ export function forcedToolFailureSseResponse(args: {
   requestId?: string | null;
   httpStatus?: number;
 }): Response {
-  const body = forcedToolFailureToSseBody(args);
+  const body = notBillableErrorToSseBody(args);
   const rid =
     typeof args.requestId === "string" && args.requestId.trim()
       ? args.requestId.trim()

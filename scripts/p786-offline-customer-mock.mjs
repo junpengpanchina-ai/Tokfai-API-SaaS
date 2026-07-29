@@ -597,22 +597,47 @@ function mockIsStrictToolCall(body) {
   return false;
 }
 
-function mockToolsCapabilityMark(id) {
-  const m = String(id ?? "").toLowerCase();
-  if (m === "auto-fast" || m === "auto-cheap") return false;
-  if (
-    m === "auto-pro" ||
-    m.startsWith("gpt-5") ||
-    m.startsWith("gpt-4") ||
-    m === "gemini-2.5-flash" ||
-    m === "gemini-2.5-pro" ||
-    m === "gemini-3-pro"
-  ) {
-    // Offline mock always returns real tool_calls — advertise experimental
-    // until LIVE verifies tools:true in production catalog.
-    return "experimental";
+function mockParseVerifiedToolsIds() {
+  const raw = process.env.VERIFIED_TOOLS_CAPABLE_MODEL_IDS ?? "";
+  const out = new Set();
+  for (const part of String(raw).split(/[,;\s]+/)) {
+    const id = part.trim().toLowerCase();
+    if (id) out.add(id);
   }
-  return false;
+  return out;
+}
+
+function mockIsVerifiedToolCapable(modelId) {
+  const m = String(modelId ?? "")
+    .trim()
+    .toLowerCase();
+  if (!m) return false;
+  return mockParseVerifiedToolsIds().has(m);
+}
+
+function mockToolsCapabilityMark(id) {
+  // P974 — tools=true only when explicitly whitelisted.
+  return mockIsVerifiedToolCapable(id);
+}
+
+function mockModelNotToolCapableError(requestId, requestedModel) {
+  return {
+    error: {
+      message:
+        "This model is not verified for tool calling on Tokfai. Choose a verified tool-capable model or remove tool_choice.",
+      code: "model_not_tool_capable",
+      type: "invalid_request_error",
+      request_id: requestId,
+    },
+    request_id: requestId,
+    tokfai: {
+      billing_status: "not_billable",
+      credits_charged: 0,
+      request_id: requestId,
+      requested_model: requestedModel,
+    },
+    credits_charged: 0,
+  };
 }
 
 function mockFakeToolCallGuardError(requestId, requestedModel) {
@@ -679,6 +704,39 @@ function chatCompletionBody(body) {
       tokfai: { ...meta.tokfai },
       __p971_fake_content: true,
       __p971_strict: strictToolCall,
+    };
+  }
+
+  // P974 — unverified + tool_choice:auto → ordinary chat (no forged tool_calls).
+  if (hasTools && !strictToolCall && !mockIsVerifiedToolCapable(requestedModel)) {
+    return {
+      id: `chatcmpl_${meta.request_id}`,
+      object: "chat.completion",
+      created: Math.floor(Date.now() / 1000),
+      model: resolvedModel,
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: "assistant",
+            content:
+              typeof firstContent === "string" && firstContent.trim()
+                ? "ok"
+                : "ok",
+          },
+          finish_reason: "stop",
+        },
+      ],
+      usage: { prompt_tokens: 8, completion_tokens: 2, total_tokens: 10 },
+      ...meta,
+      tokfai: {
+        ...meta.tokfai,
+        auto_no_tool_call: true,
+        has_tools: true,
+        strict_tool_call: false,
+        tools_degraded_to_chat: true,
+        upstream_returned_tool_calls: false,
+      },
     };
   }
 
@@ -1624,6 +1682,26 @@ export function startMockGateway(options = {}) {
           }
           if (!isMockModelAllowed(model)) {
             return sendJson(res, 400, modelNotAvailableBody());
+          }
+          // P974 — forced tools on non-whitelist → model_not_tool_capable.
+          const hasToolsReq =
+            (Array.isArray(normalizedBody?.tools) &&
+              normalizedBody.tools.length > 0) ||
+            (normalizedBody?.tool_choice != null &&
+              normalizedBody.tool_choice !== "none");
+          if (
+            hasToolsReq &&
+            mockIsStrictToolCall(normalizedBody) &&
+            !mockIsVerifiedToolCapable(model)
+          ) {
+            const rid = makeRequestId();
+            const errBody = mockModelNotToolCapableError(rid, model);
+            if (normalizedBody?.stream === true) {
+              const sse =
+                `data: ${JSON.stringify(errBody)}\n\n` + "data: [DONE]\n\n";
+              return sendSse(res, sse);
+            }
+            return sendJson(res, 400, errBody);
           }
           const completion = chatCompletionBody(normalizedBody);
           // P971 — strict tools + fake content → not_billable (mirror DMIT guard).

@@ -1,10 +1,12 @@
 /**
- * P970/P971 — OpenAI-compatible tools / tool_choice capability + fake tool-call guard.
+ * P970/P971/P974 — OpenAI-compatible tools / tool_choice capability +
+ * verified tool-capable registry / routing guard.
  *
  * Kept in lib/ (not capabilities/) so hot-deploys stay writable on prod.
  * Does not touch image billing / P961 reconcile.
  */
 
+import { env } from "../env.js";
 import { normalizeClientModelId } from "../upstream/modelAliases.js";
 import { isImageModel } from "../capabilities/modelCapabilityPolicy.js";
 
@@ -17,7 +19,10 @@ export const TOOL_CALL_NOT_GENERATED_CODE = "tool_call_not_generated" as const;
 export const PROVIDER_TOOL_CALL_NOT_SUPPORTED_CODE =
   "provider_tool_call_not_supported" as const;
 
-/** Preferred concrete models when falling back for a tools request. */
+export const MODEL_NOT_TOOL_CAPABLE_MESSAGE =
+  "This model is not verified for tool calling on Tokfai. Choose a verified tool-capable model or remove tool_choice.";
+
+/** Preferred concrete models when falling back among *verified* tools models. */
 export const TOOLS_CAPABLE_FALLBACK_MODELS = [
   "gpt-5.5",
   "gpt-5.4",
@@ -26,34 +31,8 @@ export const TOOLS_CAPABLE_FALLBACK_MODELS = [
   "gemini-3-pro",
 ] as const;
 
-/**
- * P971 — models that have returned real `message.tool_calls` in LIVE smoke.
- * Until LIVE confirms, keep this narrow so /v1/models does not advertise fake tools.
- */
-export const VERIFIED_TOOLS_CAPABLE_MODEL_IDS = new Set<string>([
-  // Live-verified only. Offline mock may still exercise the contract.
-]);
-
-/**
- * Models that may accept tools params but are not yet LIVE-verified for
- * stable tool_calls. Advertised as tools: "experimental".
- * auto-fast intentionally excluded — production returned fake stop/content.
- */
-export const EXPERIMENTAL_TOOLS_MODEL_IDS = new Set<string>([
-  "gpt-5.5",
-  "gpt-5.4",
-  "gpt-5-pro",
-  "gpt-5",
-  "gpt-5-chat",
-  "gpt-5.1",
-  "gpt-5.2",
-  "auto-pro",
-  "gemini-2.5-flash",
-  "gemini-2.5-pro",
-  "gemini-3-pro",
-]);
-
-export type ToolsCapabilityMark = boolean | "experimental";
+/** P974 — catalog tools is boolean only (true iff LIVE-verified whitelist). */
+export type ToolsCapabilityMark = boolean;
 
 export type ModelCapabilityFlags = {
   chat: boolean;
@@ -62,6 +41,32 @@ export type ModelCapabilityFlags = {
   image: boolean;
   coding: boolean;
 };
+
+/** Parse VERIFIED_TOOLS_CAPABLE_MODEL_IDS (comma / semicolon / whitespace). */
+export function parseVerifiedToolsCapableModelIds(
+  raw: string | undefined | null = env.VERIFIED_TOOLS_CAPABLE_MODEL_IDS
+): Set<string> {
+  const out = new Set<string>();
+  if (typeof raw !== "string" || !raw.trim()) return out;
+  for (const part of raw.split(/[,;\s]+/)) {
+    const id = normalizeClientModelId(part.trim());
+    if (id) out.add(id);
+  }
+  return out;
+}
+
+/**
+ * P974 — true only when modelId is in VERIFIED_TOOLS_CAPABLE_MODEL_IDS.
+ * auto-fast / auto-pro are false unless explicitly listed.
+ */
+export function isVerifiedToolCapableModel(modelId: string): boolean {
+  const m = normalizeClientModelId(modelId);
+  if (!m) return false;
+  if (isImageModel(m) || m.startsWith("gpt-image") || m.includes("nano-banana")) {
+    return false;
+  }
+  return parseVerifiedToolsCapableModelIds().has(m);
+}
 
 export function requestHasTools(body: unknown): boolean {
   if (!body || typeof body !== "object" || Array.isArray(body)) return false;
@@ -95,7 +100,6 @@ export function clientRequiresToolCall(body: unknown): boolean {
     const flag = (tokfai as Record<string, unknown>).require_tool_call;
     if (flag === true || flag === "true" || flag === 1) return true;
   }
-  // Also accept top-level for convenience (never forwarded upstream).
   const top = record.require_tool_call;
   return top === true || top === "true" || top === 1;
 }
@@ -114,7 +118,6 @@ export function isStrictToolCallRequest(body: unknown): boolean {
   if (choice === "required") return true;
   if (choice && typeof choice === "object" && !Array.isArray(choice)) {
     const row = choice as Record<string, unknown>;
-    // OpenAI: { type: "function", function: { name } } or { function: { name } }
     if (row.type === "function") return true;
     if (row.function && typeof row.function === "object") return true;
     if (typeof row.name === "string" && row.name.trim()) return true;
@@ -147,44 +150,15 @@ export function extractResponseFinishReason(data: unknown): string | null {
 }
 
 /**
- * Whether Tokfai may *attempt* tools against this model (routing).
- * Catalog advertising is separate — see resolveToolsCapabilityMark().
+ * Whether Tokfai may forward tools upstream for this model (P974 = verified only).
  */
 export function modelSupportsTools(model: string): boolean {
-  const m = normalizeClientModelId(model);
-  if (!m) return false;
-  if (isImageModel(m) || m.startsWith("gpt-image") || m.includes("nano-banana")) {
-    return false;
-  }
-  if (VERIFIED_TOOLS_CAPABLE_MODEL_IDS.has(m)) return true;
-  if (EXPERIMENTAL_TOOLS_MODEL_IDS.has(m)) return true;
-  // auto-pro is experimental; auto-fast / auto-cheap do not claim tools.
-  if (m === "auto-pro") return true;
-  if (m.startsWith("auto-")) return false;
-  if (m.startsWith("gpt-5") || m.startsWith("gpt-4") || m.startsWith("o1") || m.startsWith("o3")) {
-    return true;
-  }
-  if (m.startsWith("gemini-2.5") || m === "gemini-3-pro") return true;
-  // gemini-3-flash / others: allow attempt but do not advertise (catalog false)
-  if (m.startsWith("gemini-")) return true;
-  if (m.startsWith("claude-")) return true;
-  return false;
+  return isVerifiedToolCapableModel(model);
 }
 
-/** Catalog advertising for tools — conservative (P971). */
+/** Catalog advertising for tools — true only if verified whitelist (P974). */
 export function resolveToolsCapabilityMark(model: string): ToolsCapabilityMark {
-  const m = normalizeClientModelId(model);
-  if (!m) return false;
-  if (isImageModel(m) || m.startsWith("gpt-image") || m.includes("nano-banana")) {
-    return false;
-  }
-  if (VERIFIED_TOOLS_CAPABLE_MODEL_IDS.has(m)) return true;
-  if (m === "auto-fast" || m === "auto-cheap") return false;
-  if (EXPERIMENTAL_TOOLS_MODEL_IDS.has(m) || m === "auto-pro") {
-    return "experimental";
-  }
-  if (m.startsWith("gpt-5") || m.startsWith("gpt-4")) return "experimental";
-  return false;
+  return isVerifiedToolCapableModel(model);
 }
 
 export function isCodingModel(model: string): boolean {
@@ -214,16 +188,28 @@ export function resolveModelCapabilityFlags(model: string): ModelCapabilityFlags
 }
 
 /**
- * Reorder / extend attempt chain so tools requests hit tools-capable models first.
- * Returns null when no tools-capable attempt remains.
+ * Strip tools / tool_choice so an auto tools request can run as ordinary chat.
+ */
+export function stripToolsFromChatBody<T extends Record<string, unknown>>(
+  body: T
+): T {
+  const next = { ...body } as Record<string, unknown>;
+  delete next.tools;
+  delete next.tool_choice;
+  return next as T;
+}
+
+/**
+ * Reorder attempt chain among verified tools-capable models only.
+ * Returns null when no verified attempt remains (caller rejects or degrades).
  */
 export function resolveToolsCapableAttempts(args: {
   requestedModel: string;
   attempts: string[];
 }): { attempts: string[]; supportsTools: boolean; fallbackApplied: boolean } | null {
-  const filtered = args.attempts.filter((id) => modelSupportsTools(id));
+  const filtered = args.attempts.filter((id) => isVerifiedToolCapableModel(id));
   if (filtered.length > 0) {
-    const supportsRequested = modelSupportsTools(args.requestedModel);
+    const supportsRequested = isVerifiedToolCapableModel(args.requestedModel);
     return {
       attempts: filtered,
       supportsTools: true,
@@ -231,9 +217,13 @@ export function resolveToolsCapableAttempts(args: {
     };
   }
 
-  if (!modelSupportsTools(args.requestedModel)) {
+  // Do not invent unverified fallbacks — P974 whitelist only.
+  const verifiedFallbacks = TOOLS_CAPABLE_FALLBACK_MODELS.filter((id) =>
+    isVerifiedToolCapableModel(id)
+  );
+  if (verifiedFallbacks.length > 0) {
     return {
-      attempts: [...TOOLS_CAPABLE_FALLBACK_MODELS],
+      attempts: [...verifiedFallbacks],
       supportsTools: true,
       fallbackApplied: true,
     };

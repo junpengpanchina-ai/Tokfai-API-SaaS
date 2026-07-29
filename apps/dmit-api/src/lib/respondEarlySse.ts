@@ -22,16 +22,19 @@ import {
 import { safeInvalidRequestMessage } from "./chatCompletionDiagnostics.js";
 import {
   forcedToolFailureSseResponse,
-  forcedToolFailureToSseBody,
   isForcedToolFailureCode,
+  notBillableErrorToSseBody,
+  isToolRoutingGuardErrorCode,
 } from "./toolCallFailureEnvelope.js";
 
 function failureToSseEnvelope(
   result: ExecuteChatCompletionResult & { ok: false }
 ): string {
-  // P972 — forced tool failures share the graceful SSE contract.
-  if (isForcedToolFailureCode(result.errorCode)) {
-    return forcedToolFailureToSseBody({
+  if (
+    isForcedToolFailureCode(result.errorCode) ||
+    isToolRoutingGuardErrorCode(result.errorCode)
+  ) {
+    return notBillableErrorToSseBody({
       code: result.errorCode,
       message: result.errorMessage,
       requestId: result.requestId,
@@ -115,8 +118,11 @@ export async function respondChatCompletionEarlySse(
 
   const result = gated.earlyDone;
   if (!result.ok) {
-    // P972 — stream forced-tool failure before/without early flush still SSE.
-    if (isForcedToolFailureCode(result.errorCode)) {
+    // P972/P974 — stream tool guard failures: SSE error + [DONE] (not JSON).
+    if (
+      isForcedToolFailureCode(result.errorCode) ||
+      isToolRoutingGuardErrorCode(result.errorCode)
+    ) {
       return forcedToolFailureSseResponse({
         code: result.errorCode,
         message: result.errorMessage,
@@ -184,7 +190,10 @@ export async function respondResponsesEarlySse(
 
   const result = gated.earlyDone;
   if (!result.ok) {
-    if (isForcedToolFailureCode(result.errorCode)) {
+    if (
+      isForcedToolFailureCode(result.errorCode) ||
+      isToolRoutingGuardErrorCode(result.errorCode)
+    ) {
       return forcedToolFailureSseResponse({
         code: result.errorCode,
         message: result.errorMessage,

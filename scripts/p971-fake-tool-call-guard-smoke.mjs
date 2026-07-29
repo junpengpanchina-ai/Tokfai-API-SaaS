@@ -134,8 +134,8 @@ function staticChecks() {
       tools.includes("responseHasToolCalls") &&
       tools.includes("TOOL_CALL_NOT_GENERATED_CODE") &&
       tools.includes("resolveToolsCapabilityMark") &&
-      tools.includes('return "experimental"') &&
-      tools.includes('m === "auto-fast"'),
+      tools.includes("isVerifiedToolCapableModel") &&
+      tools.includes("isVerifiedToolCapableModel"),
     "strict + capability mark helpers"
   );
 
@@ -169,10 +169,10 @@ function staticChecks() {
 
   record(
     "static_capabilities_conservative",
-    tools.includes("VERIFIED_TOOLS_CAPABLE_MODEL_IDS") &&
-      pricing.includes("resolveModelCapabilityFlags") &&
-      pricing.includes('"experimental"'),
-    "catalog tools true|experimental|false"
+    tools.includes("isVerifiedToolCapableModel") &&
+      tools.includes("parseVerifiedToolsCapableModelIds") &&
+      pricing.includes("resolveModelCapabilityFlags"),
+    "catalog tools whitelist-only (P974)"
   );
 
   record(
@@ -205,19 +205,19 @@ async function runRuntime(ctx) {
     const autoFast = data.find((m) => m?.id === "auto-fast");
     const toolsMark = autoFast?.capabilities?.tools;
     const anyExperimental = data.some(
-      (m) => m?.capabilities?.tools === "experimental"
+      (m) => m?.capabilities?.tools === true
     );
     const verifiedTrue = data.filter((m) => m?.capabilities?.tools === true);
     const ok =
       res.status === 200 &&
       autoFast &&
       toolsMark !== true &&
-      (toolsMark === false || toolsMark === "experimental" || toolsMark == null);
+      (toolsMark === false || toolsMark == null);
     record(
       "models_auto_fast_tools_not_true",
       ok || (LIVE && UPSTREAM_DEGRADED_CODES.has(body?.error?.code)),
       ok
-        ? `auto-fast.tools=${JSON.stringify(toolsMark)} experimental=${anyExperimental} true=${verifiedTrue.length}`
+        ? `auto-fast.tools=${JSON.stringify(toolsMark)} toolsTrue=${anyExperimental} true=${verifiedTrue.length}`
         : `status=${res.status} tools=${JSON.stringify(toolsMark)}`,
       LIVE && !ok && res.status >= 500
     );
@@ -244,6 +244,7 @@ async function runRuntime(ctx) {
     } else if (
       (code === "tool_call_not_generated" ||
         code === "provider_tool_call_not_supported" ||
+        code === "model_not_tool_capable" ||
         code === "all_tool_upstreams_unavailable" ||
         code === "upstream_timeout") &&
       notBillable(body)
@@ -251,7 +252,7 @@ async function runRuntime(ctx) {
       record(
         "forced_tool_choice_billable_tool_calls",
         true,
-        `upstream could not tool_call code=${code} (not_billable)`,
+        `guard/not_billable code=${code}`,
         true
       );
     } else if (LIVE && UPSTREAM_DEGRADED_CODES.has(code)) {
@@ -284,7 +285,8 @@ async function runRuntime(ctx) {
     const ok =
       res.status >= 400 &&
       (code === "tool_call_not_generated" ||
-        code === "provider_tool_call_not_supported") &&
+        code === "provider_tool_call_not_supported" ||
+        code === "model_not_tool_capable") &&
       notBillable(body) &&
       (body?.request_id || body?.error?.request_id || body?.tokfai?.request_id);
     if (ok) {
@@ -347,7 +349,8 @@ async function runRuntime(ctx) {
     const ok =
       res.status >= 400 &&
       (code === "tool_call_not_generated" ||
-        code === "provider_tool_call_not_supported") &&
+        code === "provider_tool_call_not_supported" ||
+        code === "model_not_tool_capable") &&
       notBillable(body);
     if (ok) {
       record(

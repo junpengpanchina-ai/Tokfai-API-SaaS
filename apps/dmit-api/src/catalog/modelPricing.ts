@@ -549,8 +549,8 @@ export type OpenAiModelListItem = {
   capabilities?: {
     chat: boolean;
     stream: boolean;
-    /** true = LIVE-verified; "experimental" = may accept tools but unverified; false = do not advertise. */
-    tools: boolean | "experimental";
+    /** true = LIVE-verified whitelist only (P974); never default-true from theory. */
+    tools: boolean;
     image: boolean;
     coding: boolean;
   };

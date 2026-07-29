@@ -57,6 +57,7 @@ const ALLOWED_HTTP = new Set([400, 422, 502, 503]);
 const TOOL_FAIL_CODES = new Set([
   "tool_call_not_generated",
   "provider_tool_call_not_supported",
+  "model_not_tool_capable",
 ]);
 
 /** @type {{ id: string, ok: boolean, soft?: boolean, detail?: string }[]} */
@@ -151,7 +152,8 @@ function staticChecks() {
 
   record(
     "static_stream_sse_path",
-    early.includes("forcedToolFailureToSseBody") &&
+    (early.includes("forcedToolFailureToSseBody") ||
+      early.includes("notBillableErrorToSseBody")) &&
       early.includes("forcedToolFailureSseResponse") &&
       early.includes("isForcedToolFailureCode"),
     "stream uses SSE error + DONE"

@@ -26,14 +26,14 @@ TOKFAI_P971_FAKE_TOOL_CALL_GUARD_PASS
 - **PASS** `static_fake_guard_wired` — executeChatCompletion guard before debit
 - **PASS** `static_error_envelope` — 502 + tokfai not_billable
 - **PASS** `static_logger_fields` — P971 log allowlist
-- **PASS** `static_capabilities_conservative` — catalog tools true|experimental|false
+- **PASS** `static_capabilities_conservative` — catalog tools whitelist-only (P974)
 - **PASS** `static_mock_p971` — offline mock mirrors guard
 - **PASS** `static_prior_smokes_present` — P954/P961/P968/P970 scripts intact
-- **PASS** `models_auto_fast_tools_not_true` — auto-fast.tools=false experimental=true true=0
-- **PASS** `forced_tool_choice_billable_tool_calls` — charged=0.000001 finish=tool_calls
-- **PASS** `forced_fake_content_not_billable` — code=tool_call_not_generated charged=0
-- **PASS** `require_tool_call_fake_not_billable` — code=tool_call_not_generated
-- **PASS** `auto_no_tool_call_allowed` — content=42
+- **PASS** `models_auto_fast_tools_not_true` — auto-fast.tools=false toolsTrue=false true=0
+- **SOFT** `forced_tool_choice_billable_tool_calls` — guard/not_billable code=model_not_tool_capable
+- **PASS** `forced_fake_content_not_billable` — code=model_not_tool_capable charged=0
+- **PASS** `require_tool_call_fake_not_billable` — code=model_not_tool_capable
+- **PASS** `auto_no_tool_call_allowed` — content=ok
 - **PASS** `invalid_model_tools_not_billable` — status=400 code=model_not_available
 - **PASS** `ordinary_chat_unaffected` — len=2
 - **PASS** `image_chat_isolation_unaffected` — status=400 code=image_model_not_for_chat

@@ -248,6 +248,12 @@ const Schema = z
     .transform((raw) => raw === "true" || raw === "1"),
   TOKFAI_REDIS_URL: z.string().url().optional(),
   TOKFAI_REDIS_KEY_PREFIX: z.string().min(1).default("tokfai"),
+  /**
+   * P974 — Comma/space-separated model ids verified for real tool_calls in LIVE.
+   * Empty (default) → no model advertises capabilities.tools=true; forced tools
+   * requests return model_not_tool_capable (not_billable).
+   */
+  VERIFIED_TOOLS_CAPABLE_MODEL_IDS: z.string().default(""),
   BOT_MODEL: z.string().min(1).default("auto-fast"),
 
   STRIPE_SECRET_KEY: z.string().min(1).optional(),

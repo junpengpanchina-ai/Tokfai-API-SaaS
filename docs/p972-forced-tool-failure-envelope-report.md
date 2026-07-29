@@ -26,8 +26,8 @@ TOKFAI_P972_FORCED_TOOL_FAILURE_ENVELOPE_PASS
 - **PASS** `static_p971_billing_untouched` — P971 guard still present
 - **PASS** `static_mock_stream_sse` — mock stream returns SSE on forced fail
 - **PASS** `static_prior_scripts` — prior smokes intact
-- **PASS** `nonstream_forced_tool_json_envelope` — status=502 code=tool_call_not_generated charged=0
-- **PASS** `stream_forced_tool_sse_error_done` — code=tool_call_not_generated done=true charged=0 ct=true
+- **PASS** `nonstream_forced_tool_json_envelope` — status=400 code=model_not_tool_capable charged=0
+- **PASS** `stream_forced_tool_sse_error_done` — code=model_not_tool_capable done=true charged=0 ct=true
 - **PASS** `ordinary_chat_unaffected` — len=2
 - **PASS** `ordinary_stream_unaffected` — SSE DONE present
 - **PASS** `image_path_unaffected` — status=400 code=image_model_not_for_chat

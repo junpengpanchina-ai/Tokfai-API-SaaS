@@ -6,16 +6,19 @@ import { isSlowExperimentalChatModel } from "../catalog/modelRegistry.js";
 import {
   ALL_TOOL_UPSTREAMS_UNAVAILABLE_CODE,
   MODEL_NOT_TOOL_CAPABLE_CODE,
+  MODEL_NOT_TOOL_CAPABLE_MESSAGE,
   TOOL_CALL_NOT_GENERATED_CODE,
   TOOLS_CAPABLE_FALLBACK_MODELS,
   clientRequiresToolCall,
   extractResponseFinishReason,
   isStrictToolCallRequest,
+  isVerifiedToolCapableModel,
   modelSupportsTools,
   normalizeToolCallsOnChatCompletion,
   requestHasTools,
   resolveToolsCapableAttempts,
   responseHasToolCalls,
+  stripToolsFromChatBody,
   toolChoiceSummary,
 } from "./toolCallCapability.js";
 import { chatBodyKeys } from "./chatCompletionDiagnostics.js";
@@ -271,7 +274,7 @@ export async function executeChatCompletion(
   /** Internal catalog / alias id after consumer compatibility rewrite. */
   const requestedModel = resolvedRequest.canonicalId;
 
-  const timeoutPolicy = resolveUpstreamTimeoutPolicy({
+  let timeoutPolicy = resolveUpstreamTimeoutPolicy({
     route,
     requestedModel: requestedRaw,
     resolvedModel: requestedModel,
@@ -453,31 +456,98 @@ export async function executeChatCompletion(
     return failureResult(err, requestId, requestedModel);
   }
 
-  // P970 — tools / tool_choice: prefer tools-capable attempts; never swallow tools.
+  // P974 — tools routing: verified whitelist only; auto may degrade to chat.
   const hasTools = requestHasTools(body);
-  const supportsToolsRequested = modelSupportsTools(requestedRaw);
+  const strictToolCallRequest = isStrictToolCallRequest(body);
+  const verifiedRequested =
+    isVerifiedToolCapableModel(requestedRaw) ||
+    isVerifiedToolCapableModel(requestedModel);
   let toolsFallbackApplied = false;
-  if (hasTools) {
+  let toolsDegradedToChat = false;
+  let upstreamBodySource: ChatCompletionRequestBody = body;
+
+  if (hasTools && strictToolCallRequest && !verifiedRequested) {
+    const errorCode = MODEL_NOT_TOOL_CAPABLE_CODE;
+    const errorMessage = MODEL_NOT_TOOL_CAPABLE_MESSAGE;
+    const suggestedModels = toolsCapableSuggestions().filter((id) =>
+      isVerifiedToolCapableModel(id)
+    );
+    log.warn("model_not_tool_capable", {
+      code: errorCode,
+      route,
+      requestId,
+      requestedModel: requestedRaw,
+      resolvedModel: requestedModel,
+      attemptedModel: attempts[0] ?? requestedModel,
+      supportsTools: false,
+      hasTools: true,
+      toolChoice: toolChoiceSummary(body),
+      requireToolCall: clientRequiresToolCall(body),
+      strictToolCall: true,
+      bodyKeys: chatBodyKeys(body).join(","),
+      billing_status: "not_billable",
+      credits_charged: 0,
+    });
+    await writeUsageLog(
+      failedUsageLog({
+        user_id: caller.userId,
+        api_key_id: caller.apiKeyId,
+        tenant_id: caller.tenantId,
+        model: requestedRaw,
+        status: "failed",
+        request_id: requestId,
+        error_code: errorCode,
+        error_message: errorMessage,
+        latency_ms: Date.now() - startedAt,
+        billing_status: "not_billable",
+        billable: false,
+        credits_charged: 0,
+      }),
+      route
+    );
+    return {
+      ok: false,
+      errorCode,
+      errorMessage,
+      requestId,
+      httpStatus: 400,
+      ...(suggestedModels.length ? { suggestedModels } : {}),
+    };
+  }
+
+  if (hasTools && !strictToolCallRequest && !verifiedRequested) {
+    // tool_choice:auto on unverified model → ordinary chat (no forged tool_calls).
+    toolsDegradedToChat = true;
+    upstreamBodySource = stripToolsFromChatBody(
+      body as Record<string, unknown>
+    ) as ChatCompletionRequestBody;
+    log.info("chat_tools_degraded_to_chat", {
+      requestId,
+      route,
+      requestedModel: requestedRaw,
+      resolvedModel: requestedModel,
+      hasTools: true,
+      toolChoice: toolChoiceSummary(body),
+      autoNoToolCall: true,
+      supportsTools: false,
+    });
+  } else if (hasTools && verifiedRequested) {
     const toolsResolved = resolveToolsCapableAttempts({
       requestedModel: requestedRaw,
       attempts: attempts.length > 0 ? attempts : [requestedModel],
     });
     if (!toolsResolved) {
       const errorCode = MODEL_NOT_TOOL_CAPABLE_CODE;
-      const errorMessage =
-        "This model does not support OpenAI-compatible tool calling. Use a tools-capable model (e.g. auto-pro, gpt-5.5).";
-      const suggestedModels = toolsCapableSuggestions();
+      const errorMessage = MODEL_NOT_TOOL_CAPABLE_MESSAGE;
       log.warn("model_not_tool_capable", {
         code: errorCode,
         route,
         requestId,
         requestedModel: requestedRaw,
         resolvedModel: requestedModel,
-        attemptedModel: attempts[0] ?? requestedModel,
         supportsTools: false,
         hasTools: true,
         toolChoice: toolChoiceSummary(body),
-        bodyKeys: chatBodyKeys(body).join(","),
         billing_status: "not_billable",
         credits_charged: 0,
       });
@@ -504,7 +574,6 @@ export async function executeChatCompletion(
         errorMessage,
         requestId,
         httpStatus: 400,
-        suggestedModels,
       };
     }
     toolsFallbackApplied = toolsResolved.fallbackApplied;
@@ -516,7 +585,7 @@ export async function executeChatCompletion(
       resolvedModel: requestedModel,
       attemptedModel: attempts[0] ?? null,
       supportsTools: toolsResolved.supportsTools,
-      supportsToolsRequested,
+      supportsToolsRequested: verifiedRequested,
       hasTools: true,
       toolChoice: toolChoiceSummary(body),
       bodyKeys: chatBodyKeys(body).join(","),
@@ -529,10 +598,20 @@ export async function executeChatCompletion(
       route,
       requestedModel: requestedRaw,
       resolvedModel: requestedModel,
-      supportsTools: supportsToolsRequested,
+      supportsTools: verifiedRequested,
       hasTools: false,
       toolChoice: toolChoiceSummary(body),
       bodyKeys: chatBodyKeys(body).join(","),
+    });
+  }
+
+  if (toolsDegradedToChat) {
+    timeoutPolicy = resolveUpstreamTimeoutPolicy({
+      route,
+      requestedModel: requestedRaw,
+      resolvedModel: requestedModel,
+      body: upstreamBodySource,
+      clientStream,
     });
   }
 
@@ -621,7 +700,9 @@ export async function executeChatCompletion(
         requestId,
         route,
         limitKey,
-        body,
+        body: upstreamBodySource,
+        clientBody: body,
+        toolsDegradedToChat,
         requestedRaw,
         requestedModel,
         isAlias,
@@ -681,7 +762,11 @@ async function runProviderAttempts(args: {
   requestId: string;
   route: string;
   limitKey: string;
+  /** Body forwarded upstream (tools may be stripped for P974 auto degrade). */
   body: ChatCompletionRequestBody;
+  /** Original client body (for tools / guard logging). */
+  clientBody: ChatCompletionRequestBody;
+  toolsDegradedToChat: boolean;
   requestedRaw: string;
   requestedModel: string;
   isAlias: boolean;
@@ -698,6 +783,8 @@ async function runProviderAttempts(args: {
     route,
     limitKey,
     body,
+    clientBody,
+    toolsDegradedToChat,
     requestedRaw,
     requestedModel,
     isAlias,
@@ -1018,9 +1105,10 @@ async function runProviderAttempts(args: {
           data as unknown as Record<string, unknown>
         );
 
-        const hasToolsReq = requestHasTools(body);
-        const strictToolCall = isStrictToolCallRequest(body);
-        const requireToolCall = clientRequiresToolCall(body);
+        const hasToolsClient = requestHasTools(clientBody);
+        const strictToolCall =
+          !toolsDegradedToChat && isStrictToolCallRequest(clientBody);
+        const requireToolCall = clientRequiresToolCall(clientBody);
         const upstreamReturnedToolCalls = responseHasToolCalls(normalizedData);
         const finishReasonRaw =
           extractResponseFinishReason(normalizedData) ??
@@ -1046,8 +1134,8 @@ async function runProviderAttempts(args: {
             attemptedModel: attemptModel,
             attemptModel,
             providerId: provider.id,
-            hasTools: hasToolsReq,
-            toolChoice: toolChoiceSummary(body),
+            hasTools: hasToolsClient,
+            toolChoice: toolChoiceSummary(clientBody),
             requireToolCall,
             strictToolCall: true,
             upstreamReturnedToolCalls: false,
@@ -1076,10 +1164,42 @@ async function runProviderAttempts(args: {
             );
 
         const autoNoToolCall =
-          hasToolsReq && !strictToolCall && !upstreamReturnedToolCalls;
+          toolsDegradedToChat ||
+          (hasToolsClient && !strictToolCall && !upstreamReturnedToolCalls);
+
+        // P974 — never forge tool_calls after auto degrade to ordinary chat.
+        let responseData = normalizedData;
+        if (toolsDegradedToChat && upstreamReturnedToolCalls) {
+          responseData = {
+            ...normalizedData,
+            choices: (Array.isArray(normalizedData.choices)
+              ? normalizedData.choices
+              : []
+            ).map((choice, index) => {
+              if (!choice || typeof choice !== "object" || Array.isArray(choice)) {
+                return choice;
+              }
+              const row = { ...(choice as Record<string, unknown>) };
+              const message =
+                row.message &&
+                typeof row.message === "object" &&
+                !Array.isArray(row.message)
+                  ? { ...(row.message as Record<string, unknown>) }
+                  : null;
+              if (message) {
+                delete message.tool_calls;
+                row.message = message;
+              }
+              if (index === 0 && row.finish_reason === "tool_calls") {
+                row.finish_reason = "stop";
+              }
+              return row;
+            }),
+          };
+        }
 
         const response: Record<string, unknown> = {
-          ...normalizedData,
+          ...responseData,
           // Upstream may omit or send empty object; OpenAI clients require this.
           object: "chat.completion",
           model: resolvedModel,
@@ -1096,11 +1216,16 @@ async function runProviderAttempts(args: {
               ? { upstream_stream_fallback: true }
               : {}),
             ...(autoNoToolCall ? { auto_no_tool_call: true } : {}),
-            ...(hasToolsReq
+            ...(hasToolsClient
               ? {
                   has_tools: true,
                   strict_tool_call: strictToolCall,
-                  upstream_returned_tool_calls: upstreamReturnedToolCalls,
+                  upstream_returned_tool_calls: toolsDegradedToChat
+                    ? false
+                    : upstreamReturnedToolCalls,
+                  ...(toolsDegradedToChat
+                    ? { tools_degraded_to_chat: true }
+                    : {}),
                 }
               : {}),
           },
@@ -1124,7 +1249,7 @@ async function runProviderAttempts(args: {
             latency_ms: Date.now() - startedAt,
             billable: true,
             finish_reason: extractFinishReason(
-              normalizedData as unknown as ChatCompletionResponse
+              responseData as unknown as ChatCompletionResponse
             ),
             upstream_status: null,
             upstream_error_code: null,
@@ -1138,7 +1263,7 @@ async function runProviderAttempts(args: {
         );
 
         const finishReason = extractFinishReason(
-          normalizedData as unknown as ChatCompletionResponse
+          responseData as unknown as ChatCompletionResponse
         );
         log.info("chat_completion_succeeded", {
           requestId,
@@ -1154,16 +1279,18 @@ async function runProviderAttempts(args: {
           providerId: provider.id,
           providerIndex,
           supportsTools: modelSupportsTools(attemptModel),
-          hasTools: hasToolsReq,
-          toolChoice: toolChoiceSummary(body),
+          hasTools: hasToolsClient,
+          toolChoice: toolChoiceSummary(clientBody),
           requireToolCall,
           strictToolCall,
-          upstreamReturnedToolCalls,
+          upstreamReturnedToolCalls: toolsDegradedToChat
+            ? false
+            : upstreamReturnedToolCalls,
           finishReason,
           finish_reason: finishReason,
           fakeToolCallGuard: false,
           autoNoToolCall,
-          bodyKeys: chatBodyKeys(body).join(","),
+          bodyKeys: chatBodyKeys(clientBody).join(","),
           upstreamStatus: 200,
           upstreamErrorCode: null,
           billing_status: "charged",
@@ -1344,7 +1471,7 @@ async function runProviderAttempts(args: {
     }
   }
 
-  const fallbackErr = requestHasTools(body)
+  const fallbackErr = requestHasTools(clientBody)
     ? allToolUpstreamsUnavailableError(lastError)
     : (lastError ?? allUpstreamsUnavailableError());
   await logChatFailure({

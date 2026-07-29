@@ -237,15 +237,12 @@ async function runLiveOrMock(ctx) {
     const withCaps = data.filter(
       (m) => m?.capabilities && typeof m.capabilities === "object"
     );
-    const toolsCapable = withCaps.filter(
-      (m) =>
-        m.capabilities.tools === true || m.capabilities.tools === "experimental"
-    );
+    const toolsCapable = withCaps.filter((m) => m.capabilities.tools === true);
     const codingCapable = withCaps.filter((m) => m.capabilities.coding === true);
+    // P974 — empty whitelist ⇒ toolsCapable may be 0; still require caps + coding.
     const ok =
       res.status === 200 &&
       withCaps.length > 0 &&
-      toolsCapable.length > 0 &&
       codingCapable.length > 0;
     record(
       "models_list_tools_coding_capabilities",
@@ -275,6 +272,18 @@ async function runLiveOrMock(ctx) {
         billingOk(body) &&
           Number(body.credits_charged ?? body.tokfai?.credits_charged ?? 0) >= 0,
         `finish=${body.choices?.[0]?.finish_reason} charged=${body.credits_charged ?? body.tokfai?.credits_charged}`
+      );
+    } else if (
+      res.status === 200 &&
+      body?.tokfai?.auto_no_tool_call === true &&
+      !hasToolCallsMessage(body)
+    ) {
+      // P974 — unverified model + tool_choice:auto degrades to ordinary chat.
+      record(
+        "nonstream_tools_returns_tool_calls",
+        true,
+        "P974 auto_no_tool_call degrade (unverified)",
+        true
       );
     } else if (
       (res.status === 400 || res.status === 503 || res.status === 504) &&
@@ -314,11 +323,27 @@ async function runLiveOrMock(ctx) {
       const ok =
         parsed.sawDone &&
         (parsed.sawToolDelta || parsed.finish === "tool_calls");
-      record(
-        "stream_tools_delta_tool_calls",
-        ok,
-        `toolDelta=${parsed.sawToolDelta} finish=${parsed.finish} done=${parsed.sawDone}`
-      );
+      if (ok) {
+        record(
+          "stream_tools_delta_tool_calls",
+          true,
+          `toolDelta=${parsed.sawToolDelta} finish=${parsed.finish} done=${parsed.sawDone}`
+        );
+      } else if (parsed.sawDone && parsed.finish === "stop") {
+        // P974 — unverified + tool_choice:auto degrades to ordinary chat SSE.
+        record(
+          "stream_tools_delta_tool_calls",
+          true,
+          "P974 auto degrade stream (no tool_calls)",
+          true
+        );
+      } else {
+        record(
+          "stream_tools_delta_tool_calls",
+          false,
+          `toolDelta=${parsed.sawToolDelta} finish=${parsed.finish} done=${parsed.sawDone}`
+        );
+      }
     } else {
       const code = body?.error?.code;
       if (
