@@ -37,6 +37,16 @@ Tokfai 是 **OpenAI-compatible API 网关**（`api.tokfai.com`）：
 | `docs/model-capability-commercial-matrix.zh.md` | 销售 / 实施 | 模型分类与承诺边界 |
 | `docs/error-and-request-id-sop.zh.md` | 售后 / 客户 | 错误码与反馈模板 |
 
+Hermes / 开发者 Agent 场景（P981）：
+
+| 文件 | 给谁用 | 用途 |
+|---|---|---|
+| `docs/hermes-developer-agent-customer-profile.zh.md` | 销售 | Hermes 画像 |
+| `docs/cursor-codex-commercial-sop.zh.md` | 实施 / 客户 | Cursor·Codex SOP |
+| `docs/developer-agent-model-routing.zh.md` | 销售 / 实施 | A–E 模型分层 |
+| `docs/hermes-objection-handling.zh.md` | 销售 / 售后 | 异议应答 |
+| `docs/developer-agent-delivery-checklist.zh.md` | 全员 | 交付打勾清单 |
+
 配套（P978/P979）：
 
 - `docs/customer-onboarding-playbook.zh.md`

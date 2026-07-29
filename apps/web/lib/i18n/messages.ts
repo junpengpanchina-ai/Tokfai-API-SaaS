@@ -4971,6 +4971,15 @@ export const messages = {
         recommendedModelsLabel: "Recommended models:",
         firstRunEntryHint:
           "Customer first-run entry: Dashboard → First-run integration (/dashboard/integration-workbench) · Docs #quickstart / #cursor.",
+        developerCursorTipTitle: "Developer / Cursor scene",
+        developerCursorTipDesc:
+          "Hermes-like delivery hints — do not overpromise tools or “fully compatible”.",
+        developerCursorTipScene:
+          "Cursor / Codex: OpenAI Compatible · Base URL above · start with auto-fast; coding prefer auto-pro / gpt-5.5.",
+        developerCursorTipTools:
+          "Tool Call is not a default promise — check /v1/models capabilities.tools and the verified whitelist.",
+        developerCursorTipRequestId:
+          "Support tickets must include request_id (plus model, time, stream, tools). Failures are usually not charged.",
         todayRequests: "Today's requests",
         todaySuccess: "Today's successful",
         todayFailed: "Today's failed",
@@ -10269,6 +10278,15 @@ export const messages = {
         recommendedModelsLabel: "推荐模型：",
         firstRunEntryHint:
           "客户首次接入入口：Dashboard → 首次接入（/dashboard/integration-workbench）· Docs #quickstart / #cursor。",
+        developerCursorTipTitle: "开发者接入 / Cursor 场景",
+        developerCursorTipDesc:
+          "Hermes 型交付提示——勿夸大 tools 或 fully compatible。",
+        developerCursorTipScene:
+          "Cursor / Codex：OpenAI Compatible · Base URL 如上 · 先用 auto-fast；写代码优先 auto-pro / gpt-5.5。",
+        developerCursorTipTools:
+          "Tool Call 非默认承诺——以 /v1/models 的 capabilities.tools 与白名单为准。",
+        developerCursorTipRequestId:
+          "问题反馈必须带 request_id（并附模型、时间、是否 stream、是否 tools）。失败通常不扣费。",
         todayRequests: "今日请求数",
         todaySuccess: "今日成功",
         todayFailed: "今日失败",

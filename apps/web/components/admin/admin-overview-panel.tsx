@@ -306,6 +306,42 @@ export function AdminOverviewPanel({
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">
+                {t("admin.overview.developerCursorTipTitle")}
+              </CardTitle>
+              <CardDescription>
+                {t("admin.overview.developerCursorTipDesc")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>
+                <span className="font-medium text-foreground">Base URL:</span>{" "}
+                <code className="font-mono text-xs">
+                  https://api.tokfai.com/v1
+                </code>
+              </p>
+              <p>
+                <span className="font-medium text-foreground">
+                  {t("admin.overview.recommendedModelsLabel")}
+                </span>{" "}
+                <code className="font-mono text-xs">auto-fast</code>
+                {" · "}
+                <code className="font-mono text-xs">auto-pro</code>
+                {" · "}
+                <code className="font-mono text-xs">auto-cheap</code>
+                {" / "}
+                <code className="font-mono text-xs">gpt-5.5</code>
+              </p>
+              <ul className="list-disc space-y-1 pl-5">
+                <li>{t("admin.overview.developerCursorTipScene")}</li>
+                <li>{t("admin.overview.developerCursorTipTools")}</li>
+                <li>{t("admin.overview.developerCursorTipRequestId")}</li>
+              </ul>
+            </CardContent>
+          </Card>
+
           <Card className="border-destructive/30">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">
