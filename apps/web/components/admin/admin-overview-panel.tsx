@@ -282,6 +282,27 @@ export function AdminOverviewPanel({
                   value={formatCount(summary.recent_errors?.length ?? 0)}
                 />
               </div>
+              <div className="mt-4 flex flex-col gap-2 rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                <p>
+                  <span className="font-medium text-foreground">
+                    {t("admin.overview.recommendedModelsLabel")}
+                  </span>{" "}
+                  <code className="font-mono text-xs">auto-fast</code>
+                  {" · "}
+                  <code className="font-mono text-xs">auto-pro</code>
+                  {" · "}
+                  <code className="font-mono text-xs">auto-cheap</code>
+                </p>
+                <Link
+                  href="/admin/logs"
+                  className="text-sm text-primary hover:underline"
+                >
+                  {t("admin.overview.viewAllLogs")}
+                </Link>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {t("admin.overview.firstRunEntryHint")}
+              </p>
             </CardContent>
           </Card>
 

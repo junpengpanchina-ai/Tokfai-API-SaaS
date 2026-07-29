@@ -42,6 +42,8 @@
 | `model_not_image_capable` | 文本模型不能走文生图 | 否 | 改用 `nano-banana` 等图片模型 |
 | `image_model_not_available` | 当前图片模型不可用 | 否 | 切换其他图片模型 |
 | `model_not_tool_capable` | 该模型未通过 tools 白名单验证 | 否 | 去掉强制 tools，或改用已验证模型（见商业矩阵） |
+| `upstream_model_busy` | 上游模型繁忙 | 否 | 稍后重试；可换 `auto-fast` |
+| `all_upstreams_unavailable` | 所有上游暂时不可用 | 否 | 稍后重试；保留 `request_id` 升级 |
 
 ---
 

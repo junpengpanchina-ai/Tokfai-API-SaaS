@@ -4962,12 +4962,15 @@ export const messages = {
         partialLoadTitle: "Some metrics could not be loaded",
         partialLoadDesc:
           "Failed queries show as —; remaining data is still available.",
-        firstRunOpsTitle: "First-run ops glance",
+        firstRunOpsTitle: "Today's onboarding glance",
         firstRunOpsDesc:
-          "New signups today, today's success/fail, credits charged, and recent errors.",
+          "New users, success/fail, credits charged, recent errors — plus recommended models for first-run delivery.",
         firstRunUsersToday: "New users today",
         firstRunUsersTodayHint:
           "Signups today — cross-check Usage for first API calls.",
+        recommendedModelsLabel: "Recommended models:",
+        firstRunEntryHint:
+          "Customer first-run entry: Dashboard → First-run integration (/dashboard/integration-workbench) · Docs #quickstart / #cursor.",
         todayRequests: "Today's requests",
         todaySuccess: "Today's successful",
         todayFailed: "Today's failed",
@@ -10257,12 +10260,15 @@ export const messages = {
         betaStatusUnknown: "未知",
         partialLoadTitle: "部分指标未能加载",
         partialLoadDesc: "失败的查询显示为 —，其余数据仍可用。",
-        firstRunOpsTitle: "首调经营一眼看",
+        firstRunOpsTitle: "今日接入概览",
         firstRunOpsDesc:
-          "今日新用户、今日成功/失败、今日扣费与最近错误条数。",
+          "今日新用户、成功/失败、扣费与最近错误；附推荐模型与客户首次接入入口说明。",
         firstRunUsersToday: "今日新用户（首调相关）",
         firstRunUsersTodayHint:
           "今日注册用户——到 Usage 核对是否已发生首次调用。",
+        recommendedModelsLabel: "推荐模型：",
+        firstRunEntryHint:
+          "客户首次接入入口：Dashboard → 首次接入（/dashboard/integration-workbench）· Docs #quickstart / #cursor。",
         todayRequests: "今日请求数",
         todaySuccess: "今日成功",
         todayFailed: "今日失败",
