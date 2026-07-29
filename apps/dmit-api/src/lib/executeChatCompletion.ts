@@ -6,11 +6,16 @@ import { isSlowExperimentalChatModel } from "../catalog/modelRegistry.js";
 import {
   ALL_TOOL_UPSTREAMS_UNAVAILABLE_CODE,
   MODEL_NOT_TOOL_CAPABLE_CODE,
+  TOOL_CALL_NOT_GENERATED_CODE,
   TOOLS_CAPABLE_FALLBACK_MODELS,
+  clientRequiresToolCall,
+  extractResponseFinishReason,
+  isStrictToolCallRequest,
   modelSupportsTools,
   normalizeToolCallsOnChatCompletion,
   requestHasTools,
   resolveToolsCapableAttempts,
+  responseHasToolCalls,
   toolChoiceSummary,
 } from "./toolCallCapability.js";
 import { chatBodyKeys } from "./chatCompletionDiagnostics.js";
@@ -1009,6 +1014,54 @@ async function runProviderAttempts(args: {
         await recordModelSuccess(attemptModel);
         await recordProviderModelSuccess(provider.id, attemptModel);
 
+        const normalizedData = normalizeToolCallsOnChatCompletion(
+          data as unknown as Record<string, unknown>
+        );
+
+        const hasToolsReq = requestHasTools(body);
+        const strictToolCall = isStrictToolCallRequest(body);
+        const requireToolCall = clientRequiresToolCall(body);
+        const upstreamReturnedToolCalls = responseHasToolCalls(normalizedData);
+        const finishReasonRaw =
+          extractResponseFinishReason(normalizedData) ??
+          extractFinishReason(normalizedData as unknown as ChatCompletionResponse);
+
+        // P971 — fake tool-call guard: strict request without tool_calls must not bill.
+        if (strictToolCall && !upstreamReturnedToolCalls) {
+          const guardErr = new ApiError({
+            status: 502,
+            message:
+              "Upstream did not return tool_calls for a strict tools request.",
+            code: TOOL_CALL_NOT_GENERATED_CODE,
+            type: "upstream_error",
+            publicMessage:
+              "模型未返回 tool_calls。请改用已验证支持 tool calling 的模型，或关闭 require_tool_call。",
+            upstreamStatus: 200,
+          });
+          log.warn("fake_tool_call_guard_triggered", {
+            requestId,
+            route,
+            requestedModel: requestedRaw,
+            resolvedModel: requestedModel,
+            attemptedModel: attemptModel,
+            attemptModel,
+            providerId: provider.id,
+            hasTools: hasToolsReq,
+            toolChoice: toolChoiceSummary(body),
+            requireToolCall,
+            strictToolCall: true,
+            upstreamReturnedToolCalls: false,
+            finishReason: finishReasonRaw,
+            fakeToolCallGuard: true,
+            billing_status: "not_billable",
+            credits_charged: 0,
+            upstreamStatus: 200,
+            upstreamErrorCode: TOOL_CALL_NOT_GENERATED_CODE,
+          });
+          // Do not debit; treat as attempt failure so alias chains can retry.
+          throw guardErr;
+        }
+
         const usage = normalizeUsage(data.usage);
         // Consumer-facing resolved id = Tokfai catalog/alias (e.g. gpt-5-pro).
         // Bill by the concrete attempt that served the request (never alias floor price).
@@ -1022,9 +1075,8 @@ async function runProviderAttempts(args: {
               caller.tenantId
             );
 
-        const normalizedData = normalizeToolCallsOnChatCompletion(
-          data as unknown as Record<string, unknown>
-        );
+        const autoNoToolCall =
+          hasToolsReq && !strictToolCall && !upstreamReturnedToolCalls;
 
         const response: Record<string, unknown> = {
           ...normalizedData,
@@ -1038,9 +1090,18 @@ async function runProviderAttempts(args: {
             request_id: requestId,
             requested_model: requestedRaw,
             resolved_model: resolvedModel,
+            ...(upstreamId ? { upstream_request_id: upstreamId } : {}),
             ...(isAlias ? { fallback_attempts: attemptIndex + 1 } : {}),
             ...(viaStreamFallback
               ? { upstream_stream_fallback: true }
+              : {}),
+            ...(autoNoToolCall ? { auto_no_tool_call: true } : {}),
+            ...(hasToolsReq
+              ? {
+                  has_tools: true,
+                  strict_tool_call: strictToolCall,
+                  upstream_returned_tool_calls: upstreamReturnedToolCalls,
+                }
               : {}),
           },
         };
@@ -1093,10 +1154,16 @@ async function runProviderAttempts(args: {
           providerId: provider.id,
           providerIndex,
           supportsTools: modelSupportsTools(attemptModel),
-          hasTools: requestHasTools(body),
+          hasTools: hasToolsReq,
           toolChoice: toolChoiceSummary(body),
-          bodyKeys: chatBodyKeys(body).join(","),
+          requireToolCall,
+          strictToolCall,
+          upstreamReturnedToolCalls,
+          finishReason,
           finish_reason: finishReason,
+          fakeToolCallGuard: false,
+          autoNoToolCall,
+          bodyKeys: chatBodyKeys(body).join(","),
           upstreamStatus: 200,
           upstreamErrorCode: null,
           billing_status: "charged",
@@ -1637,6 +1704,10 @@ async function logChatFailure(args: {
     route
   );
 
+  const fakeToolCallGuard =
+    err.code === TOOL_CALL_NOT_GENERATED_CODE ||
+    err.code === "provider_tool_call_not_supported";
+
   log.warn("chat_completion_failed", {
     requestId,
     route,
@@ -1653,6 +1724,14 @@ async function logChatFailure(args: {
     upstreamErrorMessage: (lastAttempt ?? err).upstreamErrorSnippet,
     latencyMs: Date.now() - startedAt,
     ...(typeof timeoutMs === "number" ? { timeoutMs } : {}),
+    fakeToolCallGuard,
+    ...(fakeToolCallGuard
+      ? {
+          hasTools: true,
+          strictToolCall: true,
+          upstreamReturnedToolCalls: false,
+        }
+      : {}),
     billing_status: "not_billable",
     credits_charged: 0,
     fallbackSkippedReason:

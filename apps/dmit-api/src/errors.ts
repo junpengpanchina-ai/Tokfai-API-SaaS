@@ -51,6 +51,8 @@ export const STATUS_BY_ERROR_CODE: Record<string, number> = {
   upstream_image_error: 502,
   model_not_tool_capable: 400,
   tool_call_not_supported: 400,
+  tool_call_not_generated: 502,
+  provider_tool_call_not_supported: 502,
 };
 
 /** Stable error.type for known codes — never leave type undefined on envelopes. */
@@ -92,9 +94,14 @@ export function errorTypeForCode(
     code === "model_not_image_capable" ||
     code === "image_model_not_available" ||
     code === "model_not_tool_capable" ||
-    code === "tool_call_not_supported"
+    code === "tool_call_not_supported" ||
+    code === "tool_call_not_generated" ||
+    code === "provider_tool_call_not_supported"
   ) {
-    return "invalid_request_error";
+    return code === "tool_call_not_generated" ||
+      code === "provider_tool_call_not_supported"
+      ? "upstream_error"
+      : "invalid_request_error";
   }
   if (status === 401 || status === 403) return "auth_error";
   if (status === 404) return "not_found";

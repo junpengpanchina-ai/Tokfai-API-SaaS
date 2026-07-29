@@ -545,11 +545,12 @@ export type OpenAiModelListItem = {
   title: string;
   /** Present when id is a consumer compatibility alias. */
   alias_of?: string;
-  /** P970 — OpenAI-compatible capability markers for Cursor / clients. */
+  /** P970/P971 — OpenAI-compatible capability markers for Cursor / clients. */
   capabilities?: {
     chat: boolean;
     stream: boolean;
-    tools: boolean;
+    /** true = LIVE-verified; "experimental" = may accept tools but unverified; false = do not advertise. */
+    tools: boolean | "experimental";
     image: boolean;
     coding: boolean;
   };

@@ -570,6 +570,71 @@ function mockNormalizeClientChatBody(rawBody) {
   return { noop: false, body: { ...body, messages: normalizedMessages } };
 }
 
+function mockClientRequiresToolCall(body) {
+  if (!body || typeof body !== "object") return false;
+  const tokfai = body.tokfai;
+  if (tokfai && typeof tokfai === "object" && !Array.isArray(tokfai)) {
+    const flag = tokfai.require_tool_call;
+    if (flag === true || flag === "true" || flag === 1) return true;
+  }
+  const top = body.require_tool_call;
+  return top === true || top === "true" || top === 1;
+}
+
+function mockIsStrictToolCall(body) {
+  const hasTools =
+    (Array.isArray(body?.tools) && body.tools.length > 0) ||
+    (body?.tool_choice != null && body.tool_choice !== "none");
+  if (!hasTools) return false;
+  if (mockClientRequiresToolCall(body)) return true;
+  const choice = body?.tool_choice;
+  if (choice === "required") return true;
+  if (choice && typeof choice === "object" && !Array.isArray(choice)) {
+    if (choice.type === "function") return true;
+    if (choice.function && typeof choice.function === "object") return true;
+    if (typeof choice.name === "string" && choice.name.trim()) return true;
+  }
+  return false;
+}
+
+function mockToolsCapabilityMark(id) {
+  const m = String(id ?? "").toLowerCase();
+  if (m === "auto-fast" || m === "auto-cheap") return false;
+  if (
+    m === "auto-pro" ||
+    m.startsWith("gpt-5") ||
+    m.startsWith("gpt-4") ||
+    m === "gemini-2.5-flash" ||
+    m === "gemini-2.5-pro" ||
+    m === "gemini-3-pro"
+  ) {
+    // Offline mock always returns real tool_calls — advertise experimental
+    // until LIVE verifies tools:true in production catalog.
+    return "experimental";
+  }
+  return false;
+}
+
+function mockFakeToolCallGuardError(requestId, requestedModel) {
+  return {
+    error: {
+      message: "Upstream did not return tool_calls for a strict tools request.",
+      code: "tool_call_not_generated",
+      type: "upstream_error",
+      request_id: requestId,
+    },
+    request_id: requestId,
+    tokfai: {
+      billing_status: "not_billable",
+      credits_charged: 0,
+      request_id: requestId,
+      requested_model: requestedModel,
+      fake_tool_call_guard: true,
+    },
+    credits_charged: 0,
+  };
+}
+
 function chatCompletionBody(body) {
   const requestedModel = typeof body.model === "string" ? body.model : "auto-fast";
   const resolvedModel = resolveMockCanonicalModel(requestedModel);
@@ -578,6 +643,11 @@ function chatCompletionBody(body) {
   const hasTools =
     (Array.isArray(body.tools) && body.tools.length > 0) ||
     (body.tool_choice != null && body.tool_choice !== "none");
+  const strictToolCall = mockIsStrictToolCall(body);
+  const requireToolCall = mockClientRequiresToolCall(body);
+  const forceFakeContent =
+    typeof firstContent === "string" &&
+    /TOKFAI_FAKE_TOOL_CALL/i.test(firstContent);
   const content =
     typeof firstContent === "string" &&
     /TOKFAI_CHAT_ALIAS_READY/i.test(firstContent)
@@ -588,6 +658,61 @@ function chatCompletionBody(body) {
         : hasTools
           ? null
           : "ok";
+
+  // P971 — simulate upstream fake compatibility (plain content, no tool_calls).
+  if (hasTools && forceFakeContent) {
+    return {
+      id: `chatcmpl_${meta.request_id}`,
+      object: "chat.completion",
+      created: Math.floor(Date.now() / 1000),
+      model: resolvedModel,
+      choices: [
+        {
+          index: 0,
+          message: { role: "assistant", content: "42", tool_calls: null },
+          finish_reason: "stop",
+        },
+      ],
+      usage: { prompt_tokens: 12, completion_tokens: 2, total_tokens: 14 },
+      request_id: meta.request_id,
+      credits_charged: meta.credits_charged,
+      tokfai: { ...meta.tokfai },
+      __p971_fake_content: true,
+      __p971_strict: strictToolCall,
+    };
+  }
+
+  // tool_choice:auto without require → allow ordinary content (OpenAI semantics).
+  if (
+    hasTools &&
+    !strictToolCall &&
+    (body.tool_choice === "auto" || body.tool_choice == null) &&
+    typeof firstContent === "string" &&
+    /TOKFAI_AUTO_NO_TOOL/i.test(firstContent)
+  ) {
+    return {
+      id: `chatcmpl_${meta.request_id}`,
+      object: "chat.completion",
+      created: Math.floor(Date.now() / 1000),
+      model: resolvedModel,
+      choices: [
+        {
+          index: 0,
+          message: { role: "assistant", content: "42" },
+          finish_reason: "stop",
+        },
+      ],
+      usage: { prompt_tokens: 12, completion_tokens: 2, total_tokens: 14 },
+      ...meta,
+      tokfai: {
+        ...meta.tokfai,
+        auto_no_tool_call: true,
+        has_tools: true,
+        strict_tool_call: false,
+        upstream_returned_tool_calls: false,
+      },
+    };
+  }
 
   if (hasTools) {
     const toolName =
@@ -622,6 +747,13 @@ function chatCompletionBody(body) {
       ],
       usage: { prompt_tokens: 12, completion_tokens: 8, total_tokens: 20 },
       ...meta,
+      tokfai: {
+        ...meta.tokfai,
+        has_tools: true,
+        strict_tool_call: strictToolCall,
+        require_tool_call: requireToolCall,
+        upstream_returned_tool_calls: true,
+      },
     };
   }
 
@@ -1388,7 +1520,7 @@ export function startMockGateway(options = {}) {
               capabilities: {
                 chat: true,
                 stream: true,
-                tools: true,
+                tools: mockToolsCapabilityMark(id),
                 image: false,
                 coding,
               },
@@ -1494,6 +1626,50 @@ export function startMockGateway(options = {}) {
             return sendJson(res, 400, modelNotAvailableBody());
           }
           const completion = chatCompletionBody(normalizedBody);
+          // P971 — strict tools + fake content → not_billable (mirror DMIT guard).
+          if (completion?.__p971_fake_content) {
+            const rid = completion.request_id ?? makeRequestId();
+            console.warn(
+              JSON.stringify({
+                level: "warn",
+                msg: "fake_tool_call_guard_triggered",
+                requestId: rid,
+                hasTools: true,
+                toolChoice:
+                  typeof normalizedBody?.tool_choice === "string"
+                    ? normalizedBody.tool_choice
+                    : normalizedBody?.tool_choice != null
+                      ? "object"
+                      : null,
+                requireToolCall: mockClientRequiresToolCall(normalizedBody),
+                strictToolCall: completion.__p971_strict === true,
+                upstreamReturnedToolCalls: false,
+                finishReason: "stop",
+                fakeToolCallGuard: true,
+                billing_status: "not_billable",
+                credits_charged: 0,
+              })
+            );
+            if (completion.__p971_strict) {
+              return sendJson(
+                res,
+                502,
+                mockFakeToolCallGuardError(rid, model)
+              );
+            }
+            // Non-strict (auto): allow content but mark auto_no_tool_call.
+            delete completion.__p971_fake_content;
+            delete completion.__p971_strict;
+            const charged = Number(completion.credits_charged ?? 0.000001);
+            completion.credits_charged = charged;
+            completion.tokfai = {
+              ...(completion.tokfai ?? {}),
+              auto_no_tool_call: true,
+              billing_status: "charged",
+              credits_charged: charged,
+              upstream_returned_tool_calls: false,
+            };
+          }
           if (idemKey && normalizedBody?.stream !== true) {
             chatIdempotency.set(idemKey, {
               requestId: completion.request_id,

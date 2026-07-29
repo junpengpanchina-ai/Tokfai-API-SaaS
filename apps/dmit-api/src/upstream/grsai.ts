@@ -105,6 +105,9 @@ export function isChatFallbackEligible(err: ApiError): boolean {
     "model_not_supported",
     "upstream_timeout",
     "upstream_rate_limited",
+    // P971 — retry next alias/provider when strict tools got plain content
+    "tool_call_not_generated",
+    "provider_tool_call_not_supported",
   ].includes(code);
 }
 

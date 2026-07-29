@@ -104,6 +104,13 @@ const ALLOWED_FIELD_KEYS = new Set([
   "clientStream",
   "viaStreamFallback",
   "fallbackSkippedReason",
+  // P971 fake tool-call guard
+  "requireToolCall",
+  "strictToolCall",
+  "upstreamReturnedToolCalls",
+  "finishReason",
+  "fakeToolCallGuard",
+  "autoNoToolCall",
 ]);
 
 /**

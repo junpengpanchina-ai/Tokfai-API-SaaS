@@ -237,7 +237,10 @@ async function runLiveOrMock(ctx) {
     const withCaps = data.filter(
       (m) => m?.capabilities && typeof m.capabilities === "object"
     );
-    const toolsCapable = withCaps.filter((m) => m.capabilities.tools === true);
+    const toolsCapable = withCaps.filter(
+      (m) =>
+        m.capabilities.tools === true || m.capabilities.tools === "experimental"
+    );
     const codingCapable = withCaps.filter((m) => m.capabilities.coding === true);
     const ok =
       res.status === 200 &&

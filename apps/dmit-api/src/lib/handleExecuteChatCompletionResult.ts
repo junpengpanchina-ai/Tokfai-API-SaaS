@@ -124,6 +124,21 @@ export function respondExecuteChatCompletionFailure(
     );
   }
 
+  const notBillableTokfai =
+    code === "tool_call_not_generated" ||
+    code === "provider_tool_call_not_supported" ||
+    code === "model_not_tool_capable" ||
+    code === "all_tool_upstreams_unavailable" ||
+    code === "tool_call_not_supported"
+      ? {
+          tokfai: {
+            billing_status: "not_billable" as const,
+            credits_charged: 0,
+            ...(requestId ? { request_id: requestId } : {}),
+          },
+        }
+      : null;
+
   // Timeout / upstream errors may include suggestedModels when the provider
   // circuit is degraded — surface them without changing the error envelope.
   if (result.suggestedModels?.length) {
@@ -136,7 +151,19 @@ export function respondExecuteChatCompletionFailure(
     });
     return respondJsonError(c, err, requestId, {
       suggestedModels: result.suggestedModels,
+      ...(notBillableTokfai ?? {}),
     });
+  }
+
+  if (notBillableTokfai) {
+    const err = new ApiError({
+      status: result.httpStatus,
+      message,
+      publicMessage: message,
+      code,
+      type: errorTypeForCode(code, result.httpStatus),
+    });
+    return respondJsonError(c, err, requestId, notBillableTokfai);
   }
 
   return respondApiError(
