@@ -240,6 +240,51 @@ export function AdminOverviewPanel({
 
       {summary ? (
         <>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">
+                {t("admin.overview.firstRunOpsTitle")}
+              </CardTitle>
+              <CardDescription>
+                {t("admin.overview.firstRunOpsDesc")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <AdminStatCard
+                  label={t("admin.overview.firstRunUsersToday")}
+                  value={formatCount(summary.today_new_users)}
+                  hint={t("admin.overview.firstRunUsersTodayHint")}
+                />
+                <AdminStatCard
+                  label={t("admin.overview.todaySuccess")}
+                  value={formatCount(summary.today_successful_requests)}
+                />
+                <AdminStatCard
+                  label={t("admin.overview.todayFailed")}
+                  value={formatCount(summary.today_failed_requests)}
+                  tone={
+                    (summary.today_failed_requests ?? 0) > 0
+                      ? "warning"
+                      : "default"
+                  }
+                />
+                <AdminStatCard
+                  label={t("admin.overview.todayCredits")}
+                  value={
+                    summary.today_credits_consumed != null
+                      ? formatCreditsPrecise(summary.today_credits_consumed)
+                      : "—"
+                  }
+                />
+                <AdminStatCard
+                  label={t("admin.overview.recentErrorsTitle")}
+                  value={formatCount(summary.recent_errors?.length ?? 0)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="border-destructive/30">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">

@@ -276,11 +276,13 @@ export const messages = {
         desc:
           "Create API Key → copy one-line curl → paste in any terminal → reconcile in Usage and Credits.",
         highlightBaseUrl: "Base URL: {baseUrl}",
-        highlightModel: "Recommended model: {model}",
+        highlightModel: "Recommended models: {models}",
         highlightOneKey:
           "One API key routes Chat, Image, and Batch.",
+        highlightBilling:
+          "Successful requests debit credits; failed requests are not charged.",
         highlightRequestId:
-          "Copy request_id from responses → Dashboard → Usage / Credits.",
+          "Copy request_id from responses → Dashboard → Usage / Credits for support.",
         flowStep1: "Create an API Key and copy the full sk-tokfai_… secret.",
         flowStep2:
           "Copy the one-line chat curl from API Keys or Docs Quick Start.",
@@ -289,7 +291,7 @@ export const messages = {
         flowStep4:
           "Open Dashboard → Usage and Credits to search request_id and reconcile.",
         createApiKey: "Create API key",
-        integrationWorkbench: "Integration Workbench",
+        integrationWorkbench: "First-run integration",
         quickStart: "Quick Start curl",
         tryPlayground: "Try Chat Playground",
         cursorGuide: "View Cursor guide",
@@ -298,6 +300,39 @@ export const messages = {
         viewIntegrationDocs: "View integration docs",
         allComplete:
           "First-run setup complete — your key, test call, and usage trail are ready.",
+      },
+      firstRunAcceptance: {
+        title: "First-run integration (≈10 min)",
+        desc:
+          "Everything a new customer needs: Base URL, API Key, recommended models, curl, Cursor, billing, and request_id.",
+        connectTitle: "Connect",
+        connectDesc:
+          "Copy Base URL, create a key, pick a recommended model, then verify with curl or Cursor.",
+        recommendedModels: "Recommended models",
+        recommendedModelsHint:
+          "auto-fast for daily use · auto-pro for quality · auto-cheap for cost control.",
+        createApiKey: "Create / copy API Key",
+        openQuickstart: "Quickstart docs",
+        openCursor: "Cursor guide",
+        openUsage: "Usage (reconcile)",
+        curlTitle: "curl example",
+        curlDesc:
+          "Replace the placeholder with your sk-tokfai_… key from API Keys.",
+        copyCurl: "Copy curl",
+        cursorTitle: "Cursor example",
+        cursorDesc:
+          "OpenAI Compatible provider — Base URL must be api.tokfai.com/v1.",
+        copyCursor: "Copy Cursor config",
+        billingTitle: "Billing & support",
+        billingSuccess: "Successful requests debit compute credits.",
+        billingFail:
+          "Failed requests are not charged (not_billable / credits_charged=0).",
+        billingRequestId:
+          "Always keep request_id from the response — use it in Usage and when contacting support.",
+        openBilling: "Billing docs",
+        openErrors: "Error codes",
+        copy: "Copy",
+        copied: "Copied",
       },
       shell: {
         productTagline: "OpenAI-compatible API gateway",
@@ -4927,6 +4962,12 @@ export const messages = {
         partialLoadTitle: "Some metrics could not be loaded",
         partialLoadDesc:
           "Failed queries show as —; remaining data is still available.",
+        firstRunOpsTitle: "First-run ops glance",
+        firstRunOpsDesc:
+          "New signups today, today's success/fail, credits charged, and recent errors.",
+        firstRunUsersToday: "New users today",
+        firstRunUsersTodayHint:
+          "Signups today — cross-check Usage for first API calls.",
         todayRequests: "Today's requests",
         todaySuccess: "Today's successful",
         todayFailed: "Today's failed",
@@ -5757,10 +5798,11 @@ export const messages = {
         desc:
           "创建 API Key → 复制单行 curl → 任意终端粘贴运行 → 在 Usage / Credits 对账。",
         highlightBaseUrl: "Base URL：{baseUrl}",
-        highlightModel: "推荐模型：{model}",
+        highlightModel: "推荐模型：{models}",
         highlightOneKey: "一把 API Key 可用于 Chat、Image、Batch。",
+        highlightBilling: "成功请求扣算力积分；失败请求不扣费。",
         highlightRequestId:
-          "从响应复制 request_id → Dashboard → Usage / Credits。",
+          "从响应复制 request_id → Dashboard → Usage / Credits，用于对账与反馈。",
         flowStep1: "创建 API Key 并复制完整 sk-tokfai_… secret。",
         flowStep2: "从 API Keys 或 Docs Quick Start 复制单行 chat curl。",
         flowStep3:
@@ -5768,7 +5810,7 @@ export const messages = {
         flowStep4:
           "打开 Dashboard → Usage 与 Credits，搜索 request_id 并核对。",
         createApiKey: "创建 API Key",
-        integrationWorkbench: "接入工作台",
+        integrationWorkbench: "首次接入说明",
         quickStart: "Quick Start curl",
         tryPlayground: "打开 Chat Playground",
         cursorGuide: "查看 Cursor 指南",
@@ -5777,6 +5819,38 @@ export const messages = {
         viewIntegrationDocs: "查看接入文档",
         allComplete:
           "首次接入已完成——密钥、测试调用与用量记录已就绪。",
+      },
+      firstRunAcceptance: {
+        title: "首次接入（约 10 分钟）",
+        desc:
+          "新客户需要的全部入口：Base URL、API Key、推荐模型、curl、Cursor、账单与 request_id。",
+        connectTitle: "接入要点",
+        connectDesc:
+          "复制 Base URL，创建 Key，选择推荐模型，再用 curl 或 Cursor 验证。",
+        recommendedModels: "推荐模型",
+        recommendedModelsHint:
+          "auto-fast 日常 · auto-pro 质量 · auto-cheap 控成本。",
+        createApiKey: "创建 / 复制 API Key",
+        openQuickstart: "快速开始文档",
+        openCursor: "Cursor 指南",
+        openUsage: "Usage（对账）",
+        curlTitle: "curl 示例",
+        curlDesc: "将占位符替换为 API Keys 中的 sk-tokfai_… 密钥。",
+        copyCurl: "复制 curl",
+        cursorTitle: "Cursor 接入示例",
+        cursorDesc:
+          "OpenAI Compatible 供应商 — Base URL 必须为 api.tokfai.com/v1。",
+        copyCursor: "复制 Cursor 配置",
+        billingTitle: "账单与反馈",
+        billingSuccess: "成功请求会扣除算力积分。",
+        billingFail:
+          "失败请求不扣费（not_billable / credits_charged=0）。",
+        billingRequestId:
+          "务必保留响应中的 request_id——在 Usage 对账，并向支持反馈问题时提供。",
+        openBilling: "账单说明",
+        openErrors: "错误码",
+        copy: "复制",
+        copied: "已复制",
       },
       shell: {
         productTagline: "OpenAI 兼容 API 网关",
@@ -10183,6 +10257,12 @@ export const messages = {
         betaStatusUnknown: "未知",
         partialLoadTitle: "部分指标未能加载",
         partialLoadDesc: "失败的查询显示为 —，其余数据仍可用。",
+        firstRunOpsTitle: "首调经营一眼看",
+        firstRunOpsDesc:
+          "今日新用户、今日成功/失败、今日扣费与最近错误条数。",
+        firstRunUsersToday: "今日新用户（首调相关）",
+        firstRunUsersTodayHint:
+          "今日注册用户——到 Usage 核对是否已发生首次调用。",
         todayRequests: "今日请求数",
         todaySuccess: "今日成功",
         todayFailed: "今日失败",

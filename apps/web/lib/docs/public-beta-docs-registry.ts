@@ -199,10 +199,13 @@ Tokfai 是 **KA 大客户 AI 聚合平台**：文本与代码（GPT / Gemini）�
 
 API Key 不绑定模型。每次请求通过 \`model\` 参数选择模型。
 
+**首次接入推荐别名：** \`auto-fast\`（日常）· \`auto-pro\`（质量）· \`auto-cheap\`（控成本）。
+
 \`\`\`json
 {
-  "model": "gpt-5.5",
-  "input": "Say OK in one short sentence."
+  "model": "auto-fast",
+  "messages": [{"role":"user","content":"Say OK in one short sentence."}],
+  "stream": false
 }
 \`\`\`
 
@@ -215,9 +218,10 @@ ${QUICKSTART_CURL}
 \`\`\`
 
 说明：
-- Base URL 必须是 \`https://api.tokfai.com\`
-- 第三方客户端（Cherry Studio / Chatbox 等）必须选择 **Tokfai**（界面常显示为 \`| tokfai\`）供应商下的模型
-- 成功请求按用量扣算力积分；失败通常不扣费，以 Usage / Credits 为准
+- Base URL 必须是 \`https://api.tokfai.com\`（客户端常填 \`https://api.tokfai.com/v1\`）
+- 第三方客户端（Cursor / Cherry Studio / Chatbox 等）必须选择 **Tokfai**（界面常显示为 \`| tokfai\`）供应商下的模型
+- 成功请求按用量扣算力积分；失败通常不扣费，以 Usage / Credits 为准；用 \`request_id\` 对账与反馈
+- Cursor 分步见 [Cursor 接入](/docs/cursor)
 
 ## MATLAB 用户
 
@@ -247,10 +251,13 @@ Create an \`sk-tokfai_xxx\` API key in the dashboard. **The API key is not bound
 
 API keys are not bound to a model. Pass \`model\` on every request.
 
+**First-run recommended aliases:** \`auto-fast\` (daily) · \`auto-pro\` (quality) · \`auto-cheap\` (cost).
+
 \`\`\`json
 {
-  "model": "gpt-5.5",
-  "input": "Say OK in one short sentence."
+  "model": "auto-fast",
+  "messages": [{"role":"user","content":"Say OK in one short sentence."}],
+  "stream": false
 }
 \`\`\`
 
@@ -263,9 +270,10 @@ ${QUICKSTART_CURL}
 \`\`\`
 
 Notes:
-- Base URL must be \`https://api.tokfai.com\`
-- In third-party clients (Cherry Studio / Chatbox, etc.), always pick models under the **Tokfai** provider (often shown as \`| tokfai\`)
-- Successful calls debit compute credits; failures are usually not charged — Usage / Credits are authoritative
+- Base URL must be \`https://api.tokfai.com\` (clients often use \`https://api.tokfai.com/v1\`)
+- In third-party clients (Cursor / Cherry Studio / Chatbox, etc.), always pick models under the **Tokfai** provider (often shown as \`| tokfai\`)
+- Successful calls debit compute credits; failures are usually not charged — Usage / Credits are authoritative; use \`request_id\` to reconcile and report issues
+- Cursor steps: [Cursor](/docs/cursor)
 
 ## MATLAB users
 
@@ -1038,6 +1046,71 @@ If edit intent is clear but no reference image is provided:
   }
 }
 \`\`\``,
+    },
+  },
+  {
+    slug: "cursor",
+    title: { zh: "Cursor 接入", en: "Cursor" },
+    audience: "consumer",
+    category: "quickstart",
+    language: "zh",
+    apiPaths: ["POST /v1/chat/completions", "GET /v1/models"],
+    updatedAt: UPDATED_AT,
+    markdown: {
+      zh: `# Cursor 接入
+
+约 2 分钟完成首次配置。
+
+## 配置
+
+| 项 | 值 |
+|---|---|
+| 类型 | OpenAI Compatible / Custom OpenAI |
+| Base URL | \`https://api.tokfai.com/v1\` |
+| API Key | 控制台 \`sk-tokfai_…\`（Dashboard → API Keys） |
+| 推荐模型 | \`auto-fast\`（日常）· \`auto-pro\`（质量）· \`auto-cheap\`（控成本） |
+
+## 步骤
+
+1. Cursor Settings → Models / OpenAI Compatible（以当前 Cursor UI 为准）
+2. 填入 Base URL 与 API Key
+3. 首次验证使用 \`auto-fast\`
+4. 成功后到 Dashboard → Usage 核对 \`request_id\` 与扣费
+
+## 账单与反馈
+
+- **成功**请求会扣除算力积分；**失败**请求通常不计费（\`not_billable\` / \`credits_charged=0\`）
+- 报错时复制响应中的 \`request_id\`，到 Usage 搜索后反馈支持
+- Tools / Agent function calling **不作为默认公开承诺**；未验证模型强制 tools 可能返回 \`model_not_tool_capable\` 且不计费
+
+完整客户 SOP 见仓库 \`docs/customer-onboarding-playbook.zh.md\`。`,
+      en: `# Cursor
+
+About two minutes for first-run setup.
+
+## Settings
+
+| Field | Value |
+|---|---|
+| Type | OpenAI Compatible / Custom OpenAI |
+| Base URL | \`https://api.tokfai.com/v1\` |
+| API Key | Console \`sk-tokfai_…\` (Dashboard → API Keys) |
+| Recommended models | \`auto-fast\` (daily) · \`auto-pro\` (quality) · \`auto-cheap\` (cost) |
+
+## Steps
+
+1. Cursor Settings → Models / OpenAI Compatible (per current Cursor UI)
+2. Paste Base URL and API Key
+3. First test with \`auto-fast\`
+4. Reconcile \`request_id\` and charges in Dashboard → Usage
+
+## Billing & support
+
+- **Successful** requests debit compute credits; **failed** requests are usually not charged (\`not_billable\` / \`credits_charged=0\`)
+- On errors, copy \`request_id\` from the response and look it up in Usage before contacting support
+- Tools / Agent function calling is **not** a default public promise; forced tools on unverified models may return \`model_not_tool_capable\` with no charge
+
+See \`docs/customer-onboarding-playbook.zh.md\` for the full customer SOP.`,
     },
   },
   {

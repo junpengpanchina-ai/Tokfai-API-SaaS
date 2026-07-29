@@ -1,11 +1,19 @@
-import { DashboardSafeFallback } from "@/lib/dashboard-safe/fallback-page";
+import { DashboardFirstRunAcceptancePanel } from "@/components/dashboard-first-run-acceptance";
 
 export const metadata = {
-  title: "Integration Workbench",
+  title: "First-run integration",
   description:
-    "Create a key, verify a request, plan capacity, copy templates, and hand off production integration.",
+    "Base URL, API Key, recommended models, curl, Cursor, billing, and request_id — first-run acceptance.",
 };
 
+/**
+ * P979 — replace heavy Integration Workbench safe-mode with a minimal first-run surface.
+ * Core Chat/Billing untouched; links into API Keys / Docs / Usage.
+ */
 export default function IntegrationWorkbenchPage() {
-  return <DashboardSafeFallback page="integration-workbench" />;
+  return (
+    <div className="w-full max-w-3xl">
+      <DashboardFirstRunAcceptancePanel />
+    </div>
+  );
 }

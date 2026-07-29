@@ -22,7 +22,7 @@ import {
 import { useDashboardLabels } from "@/lib/dashboard-safe/use-dashboard-labels";
 import {
   TOKFAI_API_BASE_URL,
-  TOKFAI_RECOMMENDED_MODEL,
+  TOKFAI_SMART_MODEL_ALIASES,
 } from "@/lib/dashboard-safe/constants";
 
 export interface DashboardFirstRunOnboardingProps {
@@ -50,6 +50,7 @@ const HIGHLIGHT_KEYS = [
   "dashboard.firstRun.highlightBaseUrl",
   "dashboard.firstRun.highlightModel",
   "dashboard.firstRun.highlightOneKey",
+  "dashboard.firstRun.highlightBilling",
   "dashboard.firstRun.highlightRequestId",
 ] as const;
 
@@ -122,7 +123,9 @@ export function DashboardFirstRunOnboardingCard({
                 {key === "dashboard.firstRun.highlightBaseUrl"
                   ? formatMessage(t(key), { baseUrl: TOKFAI_API_BASE_URL })
                   : key === "dashboard.firstRun.highlightModel"
-                    ? formatMessage(t(key), { model: TOKFAI_RECOMMENDED_MODEL })
+                    ? formatMessage(t(key), {
+                        models: TOKFAI_SMART_MODEL_ALIASES.join(" · "),
+                      })
                     : t(key)}
               </span>
             </li>
