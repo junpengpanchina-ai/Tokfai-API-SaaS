@@ -166,7 +166,7 @@ function UsageTable({
 
   return (
     <ResponsiveTableScroll>
-      <table className="w-full min-w-[720px] text-sm">
+      <table className="w-full min-w-[880px] text-sm">
         <thead>
           <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
             <th className="py-2 pr-3 font-medium whitespace-nowrap">
@@ -174,6 +174,9 @@ function UsageTable({
             </th>
             <th className="py-2 pr-3 font-medium whitespace-nowrap">
               {t("dashboard.usage.colModel")}
+            </th>
+            <th className="py-2 pr-3 font-medium whitespace-nowrap">
+              {t("dashboard.usage.colType")}
             </th>
             <th className="py-2 pr-3 font-medium whitespace-nowrap">
               {t("dashboard.usage.colRoute")}
@@ -192,6 +195,9 @@ function UsageTable({
             </th>
             <th className="py-2 pr-3 text-right font-medium whitespace-nowrap">
               {t("dashboard.usage.colCredits")}
+            </th>
+            <th className="py-2 pr-3 font-medium whitespace-nowrap">
+              {t("dashboard.usage.colError")}
             </th>
             <th
               className="py-2 pr-0 font-medium whitespace-nowrap"
@@ -247,6 +253,13 @@ function UsageRow({
       <td className="max-w-[9rem] py-2.5 pr-3 font-mono text-xs break-all sm:max-w-none">
         {dashboardGetModelLabel(row.model)}
       </td>
+      <td className="py-2.5 pr-3 whitespace-nowrap">
+        <Badge variant="secondary">
+          {kind === "image"
+            ? t("dashboard.usage.kindImage")
+            : t("dashboard.usage.kindChat")}
+        </Badge>
+      </td>
       <td className="py-2.5 pr-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
         {dashboardResolveUsageRoute(row.model)}
       </td>
@@ -270,6 +283,13 @@ function UsageRow({
       </td>
       <td className="py-2.5 pr-3 text-right text-xs whitespace-nowrap">
         {dashboardFormatUsageCredits(row, kind, locale)}
+      </td>
+      <td className="max-w-[8rem] py-2.5 pr-3 font-mono text-xs text-muted-foreground break-all">
+        {row.error_code?.trim() ? (
+          <span title={row.error_code}>{row.error_code}</span>
+        ) : (
+          <span>—</span>
+        )}
       </td>
       <td className="py-2.5 pr-0">
         {row.request_id ? (

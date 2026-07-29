@@ -338,6 +338,22 @@ export function AdminOverviewPanel({
               value={formatCount(summary.today_requests)}
             />
             <AdminStatCard
+              label={t("admin.overview.todaySuccess")}
+              value={formatCount(summary.today_successful_requests)}
+            />
+            <AdminStatCard
+              label={t("admin.overview.todayFailed")}
+              value={formatCount(summary.today_failed_requests)}
+              tone={
+                (summary.today_failed_requests ?? 0) > 0 ? "warning" : "default"
+              }
+            />
+            <AdminStatCard
+              label={t("admin.overview.todayNotBillable")}
+              value={formatCount(summary.today_not_billable_failures)}
+              hint={t("admin.overview.todayNotBillableHint")}
+            />
+            <AdminStatCard
               label={t("admin.overview.todayCredits")}
               value={
                 summary.today_credits_consumed != null
@@ -518,6 +534,115 @@ export function AdminOverviewPanel({
                           </td>
                           <td className="py-2 text-right">
                             {formatInt(row.request_count)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">
+                  {t("admin.overview.topUsersTitle")}
+                </CardTitle>
+                <CardDescription>
+                  {t("admin.overview.topUsersDesc")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(summary.top_users_7d ?? summary.high_consumption_users_7d ?? [])
+                  .length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {t("admin.overview.topUsersEmpty")}
+                  </p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="pb-2 pr-3 font-medium">
+                          {t("admin.overview.colUser")}
+                        </th>
+                        <th className="pb-2 pr-3 text-right font-medium">
+                          {t("admin.overview.colCredits")}
+                        </th>
+                        <th className="pb-2 text-right font-medium">
+                          {t("admin.overview.colRequests")}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(
+                        summary.top_users_7d ??
+                        summary.high_consumption_users_7d ??
+                        []
+                      ).map((row) => (
+                        <tr key={row.user_id} className="border-b last:border-0">
+                          <td className="py-2 pr-3">
+                            <div className="truncate text-sm">
+                              {row.email ?? "—"}
+                            </div>
+                            <div className="truncate font-mono text-xs text-muted-foreground">
+                              {row.user_id.slice(0, 8)}…
+                            </div>
+                          </td>
+                          <td className="py-2 pr-3 text-right">
+                            {formatCreditsPrecise(row.credits_charged)}
+                          </td>
+                          <td className="py-2 text-right">
+                            {formatInt(row.request_count)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">
+                  {t("admin.overview.lowBalanceTitle")}
+                </CardTitle>
+                <CardDescription>
+                  {t("admin.overview.lowBalanceDesc")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(summary.low_balance_users ?? []).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {t("admin.overview.lowBalanceEmpty")}
+                  </p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="pb-2 pr-3 font-medium">
+                          {t("admin.overview.colUser")}
+                        </th>
+                        <th className="pb-2 text-right font-medium">
+                          {t("admin.overview.colBalance")}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(summary.low_balance_users ?? []).map((row) => (
+                        <tr key={row.user_id} className="border-b last:border-0">
+                          <td className="py-2 pr-3">
+                            <div className="truncate text-sm">
+                              {row.email ?? "—"}
+                            </div>
+                            <div className="truncate font-mono text-xs text-muted-foreground">
+                              {row.user_id.slice(0, 8)}…
+                            </div>
+                          </td>
+                          <td className="py-2 text-right">
+                            {formatCreditsPrecise(row.credits_balance)}
                           </td>
                         </tr>
                       ))}

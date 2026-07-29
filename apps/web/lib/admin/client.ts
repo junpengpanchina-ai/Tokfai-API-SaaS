@@ -192,6 +192,19 @@ export type AdminDashboardModelTopRow = {
   request_count: number;
 };
 
+export type AdminDashboardTopUserRow = {
+  user_id: string;
+  email: string | null;
+  credits_charged: number;
+  request_count: number;
+};
+
+export type AdminDashboardBalanceUserRow = {
+  user_id: string;
+  email: string | null;
+  credits_balance: number;
+};
+
 export type AdminDashboardRecentError = {
   id: string;
   request_id: string | null;
@@ -226,6 +239,9 @@ export type AdminDashboardSummary = {
   recent_users: AdminDashboardRecentUser[];
 
   today_requests: number | null;
+  today_successful_requests?: number | null;
+  today_failed_requests?: number | null;
+  today_not_billable_failures?: number | null;
   today_credits_consumed: number | null;
   last_7d_requests?: number | null;
   last_7d_credits_consumed?: number | null;
@@ -235,6 +251,9 @@ export type AdminDashboardSummary = {
   error_rate_percent: number | null;
   request_sparkline_7d: AdminDashboardSparklinePoint[];
   model_top_10: AdminDashboardModelTopRow[];
+  top_users_7d?: AdminDashboardTopUserRow[];
+  low_balance_users?: AdminDashboardBalanceUserRow[];
+  high_consumption_users_7d?: AdminDashboardTopUserRow[];
   recent_errors: AdminDashboardRecentError[];
 
   total_balance_credits?: number | null;

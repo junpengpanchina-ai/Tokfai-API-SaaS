@@ -1335,14 +1335,14 @@ export const messages = {
       usage: {
         title: "Usage",
         subtitle:
-          "Review API requests, models, status, token counts, and credits charged for your account.",
+          "Review API requests, models, type, status, tokens, credits charged, error codes, and request_id. Failed requests are not charged.",
         statRequests24h: "Requests (24h)",
         statRequests7d: "Requests (7d)",
         statTokens7d: "Tokens (7d)",
         statCredits7d: "Credits used (7d)",
         howItWorksTitle: "Reading this page",
         howItWorksItem1:
-          "Each row is one API request with model, route, status, tokens, credits charged, and request_id.",
+          "Each row is one API request with model, type, route, status, tokens, credits charged, error code, and request_id.",
         howItWorksItem2:
           "Chat rows show prompt, completion, and total tokens. Image rows show credits per generation.",
         howItWorksItem3:
@@ -4928,6 +4928,11 @@ export const messages = {
         partialLoadDesc:
           "Failed queries show as —; remaining data is still available.",
         todayRequests: "Today's requests",
+        todaySuccess: "Today's successful",
+        todayFailed: "Today's failed",
+        todayNotBillable: "Not billable (today)",
+        todayNotBillableHint:
+          "usage_logs with billing_status=not_billable since UTC midnight.",
         todayCredits: "Today's credits consumed",
         todayRevenue: "Today's revenue",
         activeUsers7d: "Active users (7d)",
@@ -4968,6 +4973,15 @@ export const messages = {
         modelTop10Empty: "No model usage yet.",
         colModel: "Model",
         colRequests: "Requests",
+        topUsersTitle: "Top users by spend (7d)",
+        topUsersDesc: "Highest credits charged in the last 7 days.",
+        topUsersEmpty: "No user spend yet.",
+        lowBalanceTitle: "Low-balance users",
+        lowBalanceDesc: "Users with credits_balance under 100.",
+        lowBalanceEmpty: "No low-balance users.",
+        colUser: "User",
+        colCredits: "Credits",
+        colBalance: "Balance",
         recentErrorsTitle: "Recent errors",
         recentErrorsDesc: "Latest failed or errored requests.",
         recentErrorsEmpty: "No recent errors.",
@@ -6746,14 +6760,14 @@ export const messages = {
       usage: {
         title: "用量",
         subtitle:
-          "查看 API 请求、model、状态、token 用量与 credits 消耗。",
+          "查看 API 请求、模型、类型、状态、tokens、扣费积分、错误码与 request_id。失败请求不扣费。",
         statRequests24h: "最近 24 小时请求数",
         statRequests7d: "最近 7 天请求数",
         statTokens7d: "最近 7 天 tokens",
         statCredits7d: "最近 7 天 credits 消耗",
         howItWorksTitle: "如何阅读本页",
         howItWorksItem1:
-          "每一行对应一次 API 请求，包含 model、route、状态、tokens、credits_charged 与 request_id。",
+          "每一行对应一次 API 请求，包含 model、类型、route、状态、tokens、扣费积分、错误码与 request_id。",
         howItWorksItem2:
           "对话行展示 prompt / completion / total tokens；图像行展示每次生成的 credits。",
         howItWorksItem3:
@@ -10170,6 +10184,11 @@ export const messages = {
         partialLoadTitle: "部分指标未能加载",
         partialLoadDesc: "失败的查询显示为 —，其余数据仍可用。",
         todayRequests: "今日请求数",
+        todaySuccess: "今日成功",
+        todayFailed: "今日失败",
+        todayNotBillable: "今日不计费",
+        todayNotBillableHint:
+          "自 UTC 零点起 billing_status=not_billable 的 usage_logs 条数。",
         todayCredits: "今日消耗算力积分",
         todayRevenue: "今日收入",
         activeUsers7d: "活跃用户（7 天）",
@@ -10210,6 +10229,15 @@ export const messages = {
         modelTop10Empty: "暂无模型用量。",
         colModel: "模型",
         colRequests: "请求数",
+        topUsersTitle: "高消耗用户 Top（7 天）",
+        topUsersDesc: "近 7 天扣除算力积分最高的用户。",
+        topUsersEmpty: "暂无用户消耗。",
+        lowBalanceTitle: "余额偏低用户",
+        lowBalanceDesc: "credits_balance 低于 100 的用户。",
+        lowBalanceEmpty: "暂无低余额用户。",
+        colUser: "用户",
+        colCredits: "消耗积分",
+        colBalance: "余额",
         recentErrorsTitle: "最近错误",
         recentErrorsDesc: "最新失败或带错误的请求。",
         recentErrorsEmpty: "暂无错误记录。",

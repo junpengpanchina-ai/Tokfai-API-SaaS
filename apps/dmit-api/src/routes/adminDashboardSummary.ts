@@ -31,6 +31,19 @@ export type AdminDashboardModelTopRow = {
   request_count: number;
 };
 
+export type AdminDashboardTopUserRow = {
+  user_id: string;
+  email: string | null;
+  credits_charged: number;
+  request_count: number;
+};
+
+export type AdminDashboardBalanceUserRow = {
+  user_id: string;
+  email: string | null;
+  credits_balance: number;
+};
+
 export type AdminDashboardRecentError = {
   id: string;
   request_id: string | null;
@@ -75,6 +88,9 @@ export type AdminDashboardSummary = {
   recent_users: AdminDashboardRecentUser[];
 
   today_requests: number | null;
+  today_successful_requests: number | null;
+  today_failed_requests: number | null;
+  today_not_billable_failures: number | null;
   today_credits_consumed: number | null;
   last_7d_requests: number | null;
   last_7d_credits_consumed: number | null;
@@ -84,6 +100,9 @@ export type AdminDashboardSummary = {
   error_rate_percent: number | null;
   request_sparkline_7d: AdminDashboardSparklinePoint[];
   model_top_10: AdminDashboardModelTopRow[];
+  top_users_7d: AdminDashboardTopUserRow[];
+  low_balance_users: AdminDashboardBalanceUserRow[];
+  high_consumption_users_7d: AdminDashboardTopUserRow[];
   recent_errors: AdminDashboardRecentError[];
 
   /** Platform sum of profiles.credits_balance (open liability). */
@@ -696,6 +715,153 @@ async function buildModelTop10(): Promise<{
   }
 }
 
+async function countUsageSinceWithStatus(
+  iso: string,
+  statuses: string[]
+): Promise<SafeCountResult> {
+  return safeCount("usage_logs", (q) =>
+    q.gte("created_at", iso).in("status", statuses)
+  );
+}
+
+/**
+ * Failures that did not bill (P978 commercial glance).
+ * Prefer billing_status=not_billable since today; display-only.
+ */
+async function countTodayNotBillableFailures(
+  iso: string
+): Promise<SafeCountResult> {
+  return safeCount("usage_logs", (q) =>
+    q.gte("created_at", iso).eq("billing_status", "not_billable")
+  );
+}
+
+async function buildTopUsersByCredits7d(): Promise<{
+  rows: AdminDashboardTopUserRow[];
+  warning?: string;
+}> {
+  try {
+    const since7d = isoSinceDays(7);
+    const byUser = new Map<
+      string,
+      { credits_charged: number; request_count: number }
+    >();
+
+    for (let from = 0; ; from += PAGE_SIZE) {
+      const to = from + PAGE_SIZE - 1;
+      const { data, error } = await supabase()
+        .from("usage_logs")
+        .select("user_id, credits_charged")
+        .gte("created_at", since7d)
+        .range(from, to);
+
+      if (error) {
+        return { rows: [], warning: `top users 7d: ${error.message}` };
+      }
+
+      const page = (data ?? []) as Array<{
+        user_id: string | null;
+        credits_charged: number | string | null;
+      }>;
+
+      for (const row of page) {
+        const uid = row.user_id?.trim();
+        if (!uid) continue;
+        const prev = byUser.get(uid) ?? {
+          credits_charged: 0,
+          request_count: 0,
+        };
+        prev.credits_charged += toNumber(row.credits_charged);
+        prev.request_count += 1;
+        byUser.set(uid, prev);
+      }
+
+      if (page.length < PAGE_SIZE) break;
+      // Cap scan for dashboard responsiveness
+      if (from + PAGE_SIZE >= PAGE_SIZE * 10) break;
+    }
+
+    const topIds = [...byUser.entries()]
+      .sort((a, b) => b[1].credits_charged - a[1].credits_charged)
+      .slice(0, 10);
+
+    if (topIds.length === 0) return { rows: [] };
+
+    const ids = topIds.map(([id]) => id);
+    const { data: profiles, error: profileError } = await supabase()
+      .from("profiles")
+      .select("id, email")
+      .in("id", ids);
+
+    if (profileError) {
+      return {
+        rows: topIds.map(([user_id, stats]) => ({
+          user_id,
+          email: null,
+          credits_charged: stats.credits_charged,
+          request_count: stats.request_count,
+        })),
+        warning: `top users email lookup: ${profileError.message}`,
+      };
+    }
+
+    const emailById = new Map<string, string | null>();
+    for (const p of (profiles ?? []) as Array<{
+      id: string;
+      email: string | null;
+    }>) {
+      emailById.set(p.id, p.email);
+    }
+
+    return {
+      rows: topIds.map(([user_id, stats]) => ({
+        user_id,
+        email: emailById.get(user_id) ?? null,
+        credits_charged: stats.credits_charged,
+        request_count: stats.request_count,
+      })),
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { rows: [], warning: `top users 7d: ${message}` };
+  }
+}
+
+const LOW_BALANCE_THRESHOLD = 100;
+
+async function fetchLowBalanceUsers(): Promise<{
+  rows: AdminDashboardBalanceUserRow[];
+  warning?: string;
+}> {
+  try {
+    const { data, error } = await supabase()
+      .from("profiles")
+      .select("id, email, credits_balance")
+      .lt("credits_balance", LOW_BALANCE_THRESHOLD)
+      .order("credits_balance", { ascending: true })
+      .limit(10);
+
+    if (error) {
+      return { rows: [], warning: `low balance users: ${error.message}` };
+    }
+
+    return {
+      rows: ((data ?? []) as Array<{
+        id: string;
+        email: string | null;
+        credits_balance: number | string | null;
+      }>).map((row) => ({
+        user_id: row.id,
+        email: row.email,
+        credits_balance: toNumber(row.credits_balance),
+      })),
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { rows: [], warning: `low balance users: ${message}` };
+  }
+}
+
 function inferDashboardRoute(model: string | null): string | null {
   if (!model) return null;
   const id = model.toLowerCase();
@@ -1143,6 +1309,10 @@ export async function buildAdminDashboardSummary(): Promise<{
     chatImageCredits,
     moneyBagRisks,
     recentImageTasks,
+    todaySuccessfulRequests,
+    todayNotBillableFailures,
+    topUsersResult,
+    lowBalanceResult,
   ] = await Promise.all([
     safeCount("profiles"),
     safeCount("admin_users"),
@@ -1172,12 +1342,23 @@ export async function buildAdminDashboardSummary(): Promise<{
     sumChatAndImageCredits(),
     buildMoneyBagRisks(),
     fetchRecentImageTasks(),
+    countUsageSinceWithStatus(sinceToday, USAGE_SUCCESS_STATUSES),
+    countTodayNotBillableFailures(sinceToday),
+    buildTopUsersByCredits7d(),
+    fetchLowBalanceUsers(),
   ]);
 
   const failedRequests: SafeCountResult = {
     value:
       totalRequests.value != null && successfulRequests.value != null
         ? Math.max(0, totalRequests.value - successfulRequests.value)
+        : null,
+  };
+
+  const todayFailedRequests: SafeCountResult = {
+    value:
+      todayRequests.value != null && todaySuccessfulRequests.value != null
+        ? Math.max(0, todayRequests.value - todaySuccessfulRequests.value)
         : null,
   };
 
@@ -1209,6 +1390,10 @@ export async function buildAdminDashboardSummary(): Promise<{
   collectWarning(warnings, chatImageCredits);
   collectWarning(warnings, moneyBagRisks);
   collectWarning(warnings, recentImageTasks);
+  collectWarning(warnings, todaySuccessfulRequests);
+  collectWarning(warnings, todayNotBillableFailures);
+  collectWarning(warnings, topUsersResult);
+  collectWarning(warnings, lowBalanceResult);
 
   return {
     summary: {
@@ -1237,6 +1422,9 @@ export async function buildAdminDashboardSummary(): Promise<{
       recent_users: recentUsersResult.users,
 
       today_requests: todayRequests.value,
+      today_successful_requests: todaySuccessfulRequests.value,
+      today_failed_requests: todayFailedRequests.value,
+      today_not_billable_failures: todayNotBillableFailures.value,
       today_credits_consumed: todayCredits.value,
       last_7d_requests: last7dRequests.value,
       last_7d_credits_consumed: last7dCredits.value,
@@ -1249,6 +1437,9 @@ export async function buildAdminDashboardSummary(): Promise<{
       ),
       request_sparkline_7d: sparklineResult.points,
       model_top_10: modelTopResult.rows,
+      top_users_7d: topUsersResult.rows,
+      low_balance_users: lowBalanceResult.rows,
+      high_consumption_users_7d: topUsersResult.rows,
       recent_errors: recentErrorsResult.errors,
 
       total_balance_credits: totalBalanceCredits.value,
