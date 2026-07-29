@@ -1651,11 +1651,14 @@ export function startMockGateway(options = {}) {
               })
             );
             if (completion.__p971_strict) {
-              return sendJson(
-                res,
-                502,
-                mockFakeToolCallGuardError(rid, model)
-              );
+              const errBody = mockFakeToolCallGuardError(rid, model);
+              // P972 — stream: SSE error chunk + [DONE]; non-stream: JSON.
+              if (normalizedBody?.stream === true) {
+                const sse =
+                  `data: ${JSON.stringify(errBody)}\n\n` + "data: [DONE]\n\n";
+                return sendSse(res, sse);
+              }
+              return sendJson(res, 502, errBody);
             }
             // Non-strict (auto): allow content but mark auto_no_tool_call.
             delete completion.__p971_fake_content;

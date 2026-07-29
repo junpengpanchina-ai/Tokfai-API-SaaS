@@ -1,13 +1,13 @@
 import type { Context } from "hono";
 
 import { ApiError, buildClientErrorBody, errorTypeForCode } from "../errors.js";
+import type { ExecuteChatCompletionResult } from "./executeChatCompletion.js";
+import { executeChatCompletion } from "./executeChatCompletion.js";
 import {
   chatCompletionRoleSseFrame,
   chatCompletionSseBodyAfterRole,
   chatCompletionToSseBody,
 } from "./chatCompletionSse.js";
-import type { ExecuteChatCompletionResult } from "./executeChatCompletion.js";
-import { executeChatCompletion } from "./executeChatCompletion.js";
 import {
   createEarlySseResponse,
   runWithEarlySseGate,
@@ -20,10 +20,24 @@ import {
   responsesToSseBody,
 } from "./responsesSse.js";
 import { safeInvalidRequestMessage } from "./chatCompletionDiagnostics.js";
+import {
+  forcedToolFailureSseResponse,
+  forcedToolFailureToSseBody,
+  isForcedToolFailureCode,
+} from "./toolCallFailureEnvelope.js";
 
 function failureToSseEnvelope(
   result: ExecuteChatCompletionResult & { ok: false }
 ): string {
+  // P972 — forced tool failures share the graceful SSE contract.
+  if (isForcedToolFailureCode(result.errorCode)) {
+    return forcedToolFailureToSseBody({
+      code: result.errorCode,
+      message: result.errorMessage,
+      requestId: result.requestId,
+      httpStatus: result.httpStatus,
+    });
+  }
   const message = safeInvalidRequestMessage(
     result.errorMessage,
     "Invalid request."
@@ -40,7 +54,6 @@ function failureToSseEnvelope(
     type: errorTypeForCode(code, status),
   });
   const body = buildClientErrorBody(err, result.requestId);
-  // Mid-stream failure: preserve standard envelope shape; never charge.
   const payload = {
     ...body,
     tokfai: { billing_status: "not_billable", credits_charged: 0 },
@@ -64,6 +77,7 @@ function writeResponsesRest(
  * stream=true /v1/chat/completions: flush role chunk immediately after precheck,
  * then synthesize remaining SSE from the completed upstream response.
  * Precheck failures still return the JSON error envelope (no SSE, no charge).
+ * P972: forced tool failures always return SSE error + [DONE] (not_billable).
  */
 export async function respondChatCompletionEarlySse(
   c: Context,
@@ -101,6 +115,15 @@ export async function respondChatCompletionEarlySse(
 
   const result = gated.earlyDone;
   if (!result.ok) {
+    // P972 — stream forced-tool failure before/without early flush still SSE.
+    if (isForcedToolFailureCode(result.errorCode)) {
+      return forcedToolFailureSseResponse({
+        code: result.errorCode,
+        message: result.errorMessage,
+        requestId: result.requestId || args.requestId,
+        httpStatus: result.httpStatus,
+      });
+    }
     return respondExecuteChatCompletionFailure(c, result);
   }
 
@@ -161,6 +184,14 @@ export async function respondResponsesEarlySse(
 
   const result = gated.earlyDone;
   if (!result.ok) {
+    if (isForcedToolFailureCode(result.errorCode)) {
+      return forcedToolFailureSseResponse({
+        code: result.errorCode,
+        message: result.errorMessage,
+        requestId: result.requestId || args.requestId,
+        httpStatus: result.httpStatus,
+      });
+    }
     return respondExecuteChatCompletionFailure(c, result);
   }
 

@@ -4,10 +4,14 @@ import { ApiError, buildClientErrorBody, errorTypeForCode } from "../errors.js";
 import { respondApiError } from "../middleware/error.js";
 import type { ExecuteChatCompletionResult } from "./executeChatCompletion.js";
 import { safeInvalidRequestMessage } from "./chatCompletionDiagnostics.js";
+import {
+  forcedToolFailureJsonResponse,
+  isForcedToolFailureCode,
+} from "./toolCallFailureEnvelope.js";
 
 function requestIdFromContext(c: Context): string | undefined {
   const fromCtx = c.get("requestId" as never);
-  return typeof fromCtx === "string" && fromCtx.trim() ? fromCtx : undefined;
+  return typeof fromCtx === "string" && fromCtx.trim() ? fromCtx.trim() : undefined;
 }
 
 function respondJsonError(
@@ -63,7 +67,10 @@ function respondJsonError(
 /**
  * Always return the standard Tokfai error envelope — never an empty body
  * and never code/message/request_id null or the literal string "undefined".
- * stream=true failures must still be application/json (not SSE).
+ *
+ * P972: forced tool failures (tool_call_not_generated / …) always return
+ * parseable JSON with tokfai not_billable (never 504 / HTML / empty).
+ * stream=true mid-path failures use SSE via respondEarlySse instead.
  */
 export function respondExecuteChatCompletionFailure(
   c: Context,
@@ -81,6 +88,16 @@ export function respondExecuteChatCompletionFailure(
   const code =
     (typeof result.errorCode === "string" && result.errorCode.trim()) ||
     "invalid_request_error";
+
+  // P972 — graceful JSON for forced tool-call failures (billing unchanged).
+  if (isForcedToolFailureCode(code)) {
+    return forcedToolFailureJsonResponse({
+      code,
+      message,
+      requestId,
+      httpStatus: result.httpStatus,
+    });
+  }
 
   if (result.httpStatus === 400) {
     const err = new ApiError({
@@ -125,8 +142,6 @@ export function respondExecuteChatCompletionFailure(
   }
 
   const notBillableTokfai =
-    code === "tool_call_not_generated" ||
-    code === "provider_tool_call_not_supported" ||
     code === "model_not_tool_capable" ||
     code === "all_tool_upstreams_unavailable" ||
     code === "tool_call_not_supported"

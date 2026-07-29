@@ -3,25 +3,12 @@
 > 日期：2026-07-29
 > 范围：strict tool-call 判定、假兼容计费拦截、capabilities 保守标注、auto 语义保留
 > 约束：未破坏 P954/P961/P968/P970；未打印 API Key 明文
-> 验证：`npm run typecheck` + `npm run build` + offline `p971` / `p970` / `p954` / `p961` smokes
 
 ## 最终结论
 
 ```
 TOKFAI_P971_FAKE_TOOL_CALL_GUARD_PASS
 ```
-
-## 核心改动
-
-| 文件 | 作用 |
-|---|---|
-| `apps/dmit-api/src/lib/toolCallCapability.ts` | strict 判定、`require_tool_call`、capabilities `true\|experimental\|false` |
-| `apps/dmit-api/src/lib/executeChatCompletion.ts` | 成功路径 debit 前 fake guard；`auto_no_tool_call`；日志字段 |
-| `apps/dmit-api/src/lib/handleExecuteChatCompletionResult.ts` | `tool_call_not_generated` 等错误附带 `tokfai.not_billable` |
-| `apps/dmit-api/src/upstream/grsai.ts` | fake guard 错误可走 alias/provider fallback |
-| `apps/dmit-api/src/errors.ts` / `logger.ts` / `catalog/modelPricing.ts` | 错误码、日志白名单、capabilities 类型 |
-| `scripts/p786-offline-customer-mock.mjs` | 离线镜像 guard + 保守 tools 标注 |
-| `scripts/p971-fake-tool-call-guard-smoke.mjs` | 验收 smoke |
 
 ## 行为摘要
 
@@ -56,8 +43,6 @@ TOKFAI_P971_FAKE_TOOL_CALL_GUARD_PASS
 ## 日志字段（必记）
 
 `hasTools`, `toolChoice`, `requireToolCall`, `strictToolCall`, `upstreamReturnedToolCalls`, `finishReason`, `fakeToolCallGuard`, `billing_status`, `credits_charged`
-
-事件：`fake_tool_call_guard_triggered`
 
 ## 验收标记
 
