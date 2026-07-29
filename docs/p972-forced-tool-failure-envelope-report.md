@@ -3,23 +3,12 @@
 > 日期：2026-07-29
 > 范围：forced tool 失败时 OpenAI-compatible JSON / SSE 错误信封；不改 P971 计费
 > 约束：不破坏普通 Chat/stream/图片；不破坏 P954/P961/P970/P971
-> 验证：`npm run typecheck` + `npm run build` + offline p972（含 prior smokes）
 
 ## 最终结论
 
 ```
 TOKFAI_P972_FORCED_TOOL_FAILURE_ENVELOPE_PASS
 ```
-
-## 核心改动
-
-| 文件 | 作用 |
-|---|---|
-| `apps/dmit-api/src/lib/toolCallFailureEnvelope.ts` | 统一 JSON / SSE 信封；HTTP clamp 到 400/422/502/503 |
-| `apps/dmit-api/src/lib/handleExecuteChatCompletionResult.ts` | non-stream forced tool → 可解析 JSON + not_billable |
-| `apps/dmit-api/src/lib/respondEarlySse.ts` | stream forced tool → SSE error + `[DONE]` |
-| `scripts/p786-offline-customer-mock.mjs` | mock stream 镜像 SSE error |
-| `scripts/p972-forced-tool-failure-envelope-smoke.mjs` | 验收 smoke |
 
 ## 行为
 
@@ -31,28 +20,24 @@ TOKFAI_P972_FORCED_TOOL_FAILURE_ENVELOPE_PASS
 
 ## 用例结果
 
-- **PASS** `static_envelope_helper`
-- **PASS** `static_nonstream_json_path`
-- **PASS** `static_stream_sse_path`
-- **PASS** `static_p971_billing_untouched`
-- **PASS** `static_mock_stream_sse`
-- **PASS** `static_prior_scripts`
-- **PASS** `nonstream_forced_tool_json_envelope`
-- **PASS** `stream_forced_tool_sse_error_done`
-- **PASS** `ordinary_chat_unaffected`
-- **PASS** `ordinary_stream_unaffected`
-- **PASS** `image_path_unaffected`
-- **PASS** `prior_p971-fake-tool-call-guard-smoke`
-- **PASS** `prior_p970-cursor-tool-call-smoke`
-- **PASS** `prior_p954-image-provider-routing-isolation-smoke`
-- **PASS** `prior_p961-image-cost-reconciliation-smoke`
+- **PASS** `static_envelope_helper` — P972 envelope helper + status clamp
+- **PASS** `static_nonstream_json_path` — non-stream uses graceful JSON
+- **PASS** `static_stream_sse_path` — stream uses SSE error + DONE
+- **PASS** `static_p971_billing_untouched` — P971 guard still present
+- **PASS** `static_mock_stream_sse` — mock stream returns SSE on forced fail
+- **PASS** `static_prior_scripts` — prior smokes intact
+- **PASS** `nonstream_forced_tool_json_envelope` — status=502 code=tool_call_not_generated charged=0
+- **PASS** `stream_forced_tool_sse_error_done` — code=tool_call_not_generated done=true charged=0 ct=true
+- **PASS** `ordinary_chat_unaffected` — len=2
+- **PASS** `ordinary_stream_unaffected` — SSE DONE present
+- **PASS** `image_path_unaffected` — status=400 code=image_model_not_for_chat
+- **PASS** `prior_p971-fake-tool-call-guard-smoke` — exit 0
+- **PASS** `prior_p970-cursor-tool-call-smoke` — exit 0
+- **PASS** `prior_p954-image-provider-routing-isolation-smoke` — exit 0
+- **PASS** `prior_p961-image-cost-reconciliation-smoke` — exit 0
 
 ## 验收标记
 
 ```
 TOKFAI_P972_FORCED_TOOL_FAILURE_ENVELOPE_PASS
 ```
-
-## Deploy note
-
-上线后 grep pm2 / error logs：不应出现 `bad_billing` / `charged_missing_url` / `provider_success_unpaid` / `Cannot set headers` / `api_error_500`（forced tool 路径）。
