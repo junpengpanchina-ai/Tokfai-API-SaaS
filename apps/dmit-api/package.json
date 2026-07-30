@@ -13,7 +13,8 @@
     "start:pm2": "pm2 start ecosystem.config.cjs",
     "reload:pm2": "pm2 reload ecosystem.config.cjs --update-env",
     "typecheck": "tsc --noEmit",
-    "release-gate": "node ../../scripts/tokfai-release-gate.mjs"
+    "release-gate": "node ../../scripts/tokfai-release-gate.mjs",
+    "brutal-harness": "node ../../scripts/p986-brutal-engineering-harness.mjs"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",

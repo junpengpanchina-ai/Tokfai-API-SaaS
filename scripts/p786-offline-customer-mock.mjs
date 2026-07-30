@@ -432,12 +432,16 @@ function sendJson(res, status, body) {
   res.end(payload);
 }
 
-function sendSse(res, bodyText) {
-  res.writeHead(200, {
+function sendSse(res, bodyText, opts = {}) {
+  const headers = {
     "Content-Type": "text/event-stream; charset=utf-8",
     "Cache-Control": "no-cache, no-transform",
     Connection: "keep-alive",
-  });
+  };
+  if (typeof opts.requestId === "string" && opts.requestId.trim()) {
+    headers["X-Request-Id"] = opts.requestId.trim();
+  }
+  res.writeHead(200, headers);
   res.end(bodyText);
 }
 
@@ -445,6 +449,21 @@ function chatCompletionToSse(completion) {
   const id = completion.id ?? `chatcmpl_mock`;
   const created = completion.created ?? Math.floor(Date.now() / 1000);
   const model = completion.model ?? "gemini-3-flash";
+  const requestId =
+    typeof completion.request_id === "string"
+      ? completion.request_id
+      : typeof completion.tokfai?.request_id === "string"
+        ? completion.tokfai.request_id
+        : null;
+  const creditsCharged = Number(
+    completion.credits_charged ?? completion.tokfai?.credits_charged ?? 0
+  );
+  const billingStatus =
+    typeof completion.tokfai?.billing_status === "string"
+      ? completion.tokfai.billing_status
+      : creditsCharged > 0
+        ? "charged"
+        : "not_billable";
   const message = completion.choices?.[0]?.message ?? {};
   const content =
     typeof message.content === "string" ? message.content : "";
@@ -452,7 +471,13 @@ function chatCompletionToSse(completion) {
   const finishReason =
     completion.choices?.[0]?.finish_reason ??
     (toolCalls ? "tool_calls" : "stop");
-  const base = { id, object: "chat.completion.chunk", created, model };
+  const base = {
+    id,
+    object: "chat.completion.chunk",
+    created,
+    model,
+    ...(requestId ? { request_id: requestId } : {}),
+  };
   const chunks = [
     `data: ${JSON.stringify({
       ...base,
@@ -500,6 +525,20 @@ function chatCompletionToSse(completion) {
     `data: ${JSON.stringify({
       ...base,
       choices: [{ index: 0, delta: {}, finish_reason: finishReason }],
+      usage: completion.usage ?? {
+        prompt_tokens: 1,
+        completion_tokens: 1,
+        total_tokens: 2,
+      },
+      credits_charged: creditsCharged,
+      tokfai: {
+        ...(completion.tokfai && typeof completion.tokfai === "object"
+          ? completion.tokfai
+          : {}),
+        ...(requestId ? { request_id: requestId } : {}),
+        billing_status: billingStatus,
+        credits_charged: creditsCharged,
+      },
     })}\n\n`
   );
   chunks.push("data: [DONE]\n\n");
@@ -1722,7 +1761,9 @@ export function startMockGateway(options = {}) {
               },
             };
             if (body?.stream === true) {
-              return sendSse(res, chatCompletionToSse(noop));
+              return sendSse(res, chatCompletionToSse(noop), {
+                requestId,
+              });
             }
             return sendJson(res, 200, noop);
           }
@@ -1756,7 +1797,7 @@ export function startMockGateway(options = {}) {
             if (normalizedBody?.stream === true) {
               const sse =
                 `data: ${JSON.stringify(errBody)}\n\n` + "data: [DONE]\n\n";
-              return sendSse(res, sse);
+              return sendSse(res, sse, { requestId: rid });
             }
             return sendJson(res, 400, errBody);
           }
@@ -1791,7 +1832,7 @@ export function startMockGateway(options = {}) {
               if (normalizedBody?.stream === true) {
                 const sse =
                   `data: ${JSON.stringify(errBody)}\n\n` + "data: [DONE]\n\n";
-                return sendSse(res, sse);
+                return sendSse(res, sse, { requestId: rid });
               }
               return sendJson(res, 502, errBody);
             }
@@ -1816,7 +1857,9 @@ export function startMockGateway(options = {}) {
             });
           }
           if (normalizedBody?.stream === true) {
-            return sendSse(res, chatCompletionToSse(completion));
+            return sendSse(res, chatCompletionToSse(completion), {
+              requestId: completion.request_id,
+            });
           }
           return sendJson(res, 200, completion);
         } finally {
@@ -1853,7 +1896,9 @@ export function startMockGateway(options = {}) {
           }
           const response = responsesBody(body);
           if (body?.stream === true) {
-            return sendSse(res, responsesToSse(response));
+            return sendSse(res, responsesToSse(response), {
+              requestId: response?.id ?? response?.request_id,
+            });
           }
           return sendJson(res, 200, response);
         } finally {

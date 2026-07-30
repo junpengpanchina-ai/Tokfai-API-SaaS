@@ -26,6 +26,8 @@
  *   p948 Nano Banana capability is mock/static by default (never real
  *   upstream in the gate). Real Nano Banana:
  *   LIVE=1 MODEL=nano-banana node scripts/p948-nano-banana-image-smoke.mjs
+ *   Optional brutal harness (not a default PASS marker):
+ *   INCLUDE_P986=1 node scripts/tokfai-release-gate.mjs
  */
 
 import { spawnSync } from "node:child_process";
@@ -151,6 +153,16 @@ const STEPS = [
     cmd: "node",
     args: ["scripts/public-beta-ready-all.mjs"],
     marker: "TOKFAI_PUBLIC_BETA_READY_ALL_PASS",
+  },
+  {
+    id: "p986",
+    label: "10. OPTIONAL p986 brutal engineering harness (INCLUDE_P986=1)",
+    cwd: ROOT,
+    cmd: "node",
+    args: ["scripts/p986-brutal-engineering-harness.mjs"],
+    // PASS or intentional BLOCKED both produce a report; gate only accepts PASS.
+    marker: "TOKFAI_P986_BRUTAL_ENGINEERING_HARNESS_PASS",
+    optionalIncludeEnv: "INCLUDE_P986",
   },
 ];
 
@@ -371,6 +383,17 @@ async function main() {
   }
 
   for (const step of STEPS) {
+    if (
+      step.optionalIncludeEnv &&
+      process.env[step.optionalIncludeEnv] !== "1" &&
+      process.env[step.optionalIncludeEnv] !== "true"
+    ) {
+      console.log(
+        `\n(skip optional step ${step.id}: set ${step.optionalIncludeEnv}=1 to include)`
+      );
+      continue;
+    }
+
     printSection(step.label);
 
     const env = {};
