@@ -23,6 +23,8 @@ const ALLOWED_FIELD_KEYS = new Set([
   "model",
   "stream",
   "bodyKeys",
+  "droppedKeys",
+  "droppedKeyCount",
   "messagesCount",
   "contentShape",
   "rejectedReason",
@@ -113,6 +115,32 @@ const ALLOWED_FIELD_KEYS = new Set([
   "autoNoToolCall",
 ]);
 
+const SENSITIVE_LOG_KEY_LITERAL =
+  /database_url|postgres|service_role|api_key|authorization|\bbearer\b|cookie|password|\bsecret\b|\btoken\b|supabase|stripe|webhook/i;
+
+function scrubBodyKeysLogValue(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  if (!SENSITIVE_LOG_KEY_LITERAL.test(value)) return value;
+  // Never leave forbidden key-name literals in log lines (HGK dirty greps).
+  const parts = value.split(",").map((p) => p.trim()).filter(Boolean);
+  const safe: string[] = [];
+  let redacted = 0;
+  for (const part of parts) {
+    const m = /^redacted_keys:(\d+)$/i.exec(part);
+    if (m) {
+      redacted += Number(m[1]) || 0;
+      continue;
+    }
+    if (SENSITIVE_LOG_KEY_LITERAL.test(part)) {
+      redacted += 1;
+      continue;
+    }
+    safe.push(part);
+  }
+  if (redacted > 0) safe.push(`redacted_keys:${redacted}`);
+  return safe.join(",");
+}
+
 /**
  * Minimal structured logger. Emits one JSON line per call so containers /
  * log aggregators can parse it. Keep secrets out — never log API keys,
@@ -123,7 +151,10 @@ function sanitizeFields(fields?: Record<string, unknown>): Record<string, unknow
 
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(fields)) {
-    if (ALLOWED_FIELD_KEYS.has(key)) {
+    if (!ALLOWED_FIELD_KEYS.has(key)) continue;
+    if (key === "bodyKeys" || key === "droppedKeys") {
+      out[key] = scrubBodyKeysLogValue(value);
+    } else {
       out[key] = value;
     }
   }

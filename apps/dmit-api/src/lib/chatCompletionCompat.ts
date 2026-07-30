@@ -400,7 +400,7 @@ const UPSTREAM_CHAT_BODY_ALLOWLIST_SET = new Set<string>(
 
 /**
  * Forbidden client top-level key names (case-insensitive substring / exact).
- * Never forwarded; names may be audited without values.
+ * Never forwarded; names must not appear in logs (HGK dirty greps).
  */
 export const FORBIDDEN_UPSTREAM_CHAT_KEY_PATTERNS = [
   /^api_key$/i,
@@ -422,6 +422,15 @@ export const FORBIDDEN_UPSTREAM_CHAT_KEY_PATTERNS = [
   /api[_-]?key/i,
   /service[_-]?role/i,
   /database[_-]?url/i,
+  /authorization/i,
+  /\bbearer\b/i,
+  /password/i,
+  /postgres/i,
+  /supabase/i,
+  /\bsecret\b/i,
+  /\bcookie\b/i,
+  /\bstripe\b/i,
+  /\bwebhook\b/i,
 ] as const;
 
 /** True when a client body key must never be forwarded upstream. */
@@ -430,8 +439,35 @@ export function isForbiddenUpstreamChatKey(key: string): boolean {
 }
 
 /**
- * List top-level client keys that will not be forwarded (names only).
- * Safe for audit logs — never includes values.
+ * Scrub sensitive key *names* for logs. Never logs values.
+ * Returns allowlisted / benign names only + `redacted_keys:N` when any were hidden.
+ */
+export function redactBodyKeyNamesForLog(keys: string[]): string[] {
+  const safe: string[] = [];
+  let redacted = 0;
+  for (const key of keys) {
+    if (isForbiddenUpstreamChatKey(key)) {
+      redacted += 1;
+      continue;
+    }
+    // Belt-and-suspenders: never emit forbidden literals even as substrings.
+    if (
+      /database_url|postgres|service_role|api_key|authorization|bearer|cookie|password|\bsecret\b|\btoken\b|supabase|stripe|webhook/i.test(
+        key
+      )
+    ) {
+      redacted += 1;
+      continue;
+    }
+    safe.push(key);
+  }
+  if (redacted > 0) safe.push(`redacted_keys:${redacted}`);
+  return safe;
+}
+
+/**
+ * List top-level client keys that will not be forwarded.
+ * For logs use {@link redactBodyKeyNamesForLog} — never print forbidden names.
  */
 export function listDroppedUpstreamChatKeys(
   body: Record<string, unknown> | null | undefined
@@ -444,6 +480,13 @@ export function listDroppedUpstreamChatKeys(
     }
   }
   return dropped.sort();
+}
+
+/** Names-only audit list safe for structured logs (forbidden names scrubbed). */
+export function listDroppedUpstreamChatKeysForLog(
+  body: Record<string, unknown> | null | undefined
+): string[] {
+  return redactBodyKeyNamesForLog(listDroppedUpstreamChatKeys(body));
 }
 
 /**

@@ -10,6 +10,7 @@ import type { ZodError } from "zod";
 
 import { sanitizePublicErrorMessage } from "../errors.js";
 import { log } from "../logger.js";
+import { redactBodyKeyNamesForLog } from "./chatCompletionCompat.js";
 import { resolveChatModel } from "../upstream/modelAliases.js";
 
 export type ChatCompletion400Diagnostic = {
@@ -30,6 +31,14 @@ export type ChatCompletion400Diagnostic = {
 export function chatBodyKeys(body: unknown): string[] {
   if (!body || typeof body !== "object" || Array.isArray(body)) return [];
   return Object.keys(body as Record<string, unknown>).sort();
+}
+
+/**
+ * Log-safe body key list — never emits forbidden/sensitive key names
+ * (database_url, postgres, secret, service_role, api_key, …).
+ */
+export function chatBodyKeysForLog(body: unknown): string {
+  return redactBodyKeyNamesForLog(chatBodyKeys(body)).join(",");
 }
 
 /**
@@ -168,7 +177,7 @@ export function logChatCompletionInvalidRequest(
     ...(requestedModel ? { requestedModel } : {}),
     ...(resolvedModel ? { resolvedModel } : {}),
     stream,
-    bodyKeys: chatBodyKeys(body).join(","),
+    bodyKeys: chatBodyKeysForLog(body),
     messagesCount,
     contentShape: chatContentShape(messages),
     rejectedReason: safeInvalidRequestMessage(diag.rejectedReason),
@@ -228,7 +237,7 @@ export function logChatCompletionEmptyMessagesNoop(args: {
     ...(requestedModel ? { requestedModel } : {}),
     ...(resolvedModel ? { resolvedModel } : {}),
     stream,
-    bodyKeys: chatBodyKeys(bodyForShape).join(","),
+    bodyKeys: chatBodyKeysForLog(bodyForShape),
     messagesCount: Array.isArray(shapeMessages) ? shapeMessages.length : 0,
     contentShape: chatContentShape(shapeMessages),
     rejectedReason: args.rejectedReason ?? "empty_messages",
@@ -279,6 +288,10 @@ export function buildEmptyMessagesNoopChatCompletion(args: {
       request_id: args.requestId,
       requested_model: model,
       resolved_model: model,
+      routing_strategy: "direct",
+      attempted_models: [model],
+      fallback_attempts: 0,
+      latency_ms: 0,
       billing_status: "not_billable",
       rejectedReason: "empty_messages",
     },
@@ -286,8 +299,31 @@ export function buildEmptyMessagesNoopChatCompletion(args: {
 }
 
 /**
- * Redacted log when a client body was sanitized before schema (not a noop).
+ * Minimal not_billable routing envelope for early chat validation failures
+ * (schema / normalize) so Agent clients always see request_id + routing fields.
  */
+export function buildChatValidationFailureTokfai(args: {
+  requestId: string;
+  requestedModel?: string | null;
+  errorCode?: string | null;
+}): Record<string, unknown> {
+  const model =
+    typeof args.requestedModel === "string" && args.requestedModel.trim()
+      ? args.requestedModel.trim()
+      : "unknown";
+  return {
+    request_id: args.requestId,
+    requested_model: model,
+    resolved_model: null,
+    routing_strategy: "direct",
+    attempted_models: model !== "unknown" ? [model] : [],
+    fallback_attempts: 0,
+    latency_ms: 0,
+    billing_status: "not_billable",
+    credits_charged: 0,
+    ...(args.errorCode ? { error_code: args.errorCode } : {}),
+  };
+}
 export function logChatCompletionClientNormalized(args: {
   requestId: string;
   route?: string;
@@ -311,7 +347,7 @@ export function logChatCompletionClientNormalized(args: {
     ...(requestedModel ? { requestedModel } : {}),
     ...(resolvedModel ? { resolvedModel } : {}),
     stream,
-    bodyKeys: chatBodyKeys(bodyForShape).join(","),
+    bodyKeys: chatBodyKeysForLog(bodyForShape),
     messagesCount,
     contentShape: chatContentShape(messages),
     normalized: true,

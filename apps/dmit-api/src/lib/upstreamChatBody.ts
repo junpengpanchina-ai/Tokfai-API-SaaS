@@ -1,7 +1,7 @@
 import { resolveMaxOutputTokens } from "../gateway/keySafetyLimits.js";
 import {
   coerceOptionalNumber,
-  listDroppedUpstreamChatKeys,
+  listDroppedUpstreamChatKeysForLog,
   normalizeChatMessages,
   sanitizeUpstreamChatBody,
   type SanitizeChatBodyInput,
@@ -16,7 +16,7 @@ import type { ChatCompletionRequestBody } from "./executeChatCompletion.js";
  * - Map max_completion_tokens → clamped max_tokens
  * - Strip GPT sampling params (temperature / top_p) that many GPT models reject
  * - Accept stream_options without forwarding (upstream always non-stream)
- * - Audit dropped top-level key *names* only (never values)
+ * - Audit dropped top-level key *names* only (never values; sensitive names scrubbed)
  */
 export function buildUpstreamChatBody(
   body: ChatCompletionRequestBody,
@@ -51,11 +51,11 @@ export function buildUpstreamChatBody(
   return upstream;
 }
 
-/** Names-only audit helper for gateway logs. */
+/** Names-only audit helper for gateway logs (forbidden names scrubbed). */
 export function droppedUpstreamChatKeysForAudit(
   body: ChatCompletionRequestBody | Record<string, unknown>
 ): string[] {
-  return listDroppedUpstreamChatKeys(body as Record<string, unknown>);
+  return listDroppedUpstreamChatKeysForLog(body as Record<string, unknown>);
 }
 
 export { normalizeChatMessages };

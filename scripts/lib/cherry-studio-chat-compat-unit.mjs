@@ -20,6 +20,7 @@ import {
   shouldStripGptSamplingParams,
   sanitizeUpstreamChatBody,
   coerceOptionalNumber,
+  redactBodyKeyNamesForLog,
 } from "./src/lib/chatCompletionCompat.ts";
 import {
   ApiError,
@@ -323,6 +324,26 @@ assert(
     canarySanitize.droppedKeys.includes("api_key") &&
     canarySanitize.droppedKeys.includes("tokfai_unknown_client_field"),
   "p986r droppedKeys names-only audit"
+);
+
+const scrubbed = redactBodyKeyNamesForLog([
+  "model",
+  "messages",
+  "api_key",
+  "postgres",
+  "database_url",
+  "secret",
+  "service_role",
+]);
+assert(
+  !scrubbed.some((k) =>
+    /api_key|postgres|database_url|secret|service_role/i.test(k)
+  ),
+  "p987r log scrub hides sensitive key names"
+);
+assert(
+  scrubbed.some((k) => /^redacted_keys:\\d+$/.test(k)),
+  "p987r log scrub counts redacted keys"
 );
 
 const gpt = sanitizeUpstreamChatBody(

@@ -21,7 +21,7 @@ import {
   stripToolsFromChatBody,
   toolChoiceSummary,
 } from "./toolCallCapability.js";
-import { chatBodyKeys } from "./chatCompletionDiagnostics.js";
+import { chatBodyKeysForLog } from "./chatCompletionDiagnostics.js";
 
 function toolsCapableSuggestions(): string[] {
   return [
@@ -569,7 +569,7 @@ export async function executeChatCompletion(
       toolChoice: toolChoiceSummary(body),
       requireToolCall: clientRequiresToolCall(body),
       strictToolCall: true,
-      bodyKeys: chatBodyKeys(body).join(","),
+      bodyKeys: chatBodyKeysForLog(body),
     });
     const routing = makeFailRouting({
       errorCode,
@@ -688,7 +688,7 @@ export async function executeChatCompletion(
       supportsToolsRequested: verifiedRequested,
       hasTools: true,
       toolChoice: toolChoiceSummary(body),
-      bodyKeys: chatBodyKeys(body).join(","),
+      bodyKeys: chatBodyKeysForLog(body),
       toolsFallbackApplied,
       attempts,
     });
@@ -701,7 +701,7 @@ export async function executeChatCompletion(
       supportsTools: verifiedRequested,
       hasTools: false,
       toolChoice: toolChoiceSummary(body),
-      bodyKeys: chatBodyKeys(body).join(","),
+      bodyKeys: chatBodyKeysForLog(body),
     });
   }
 
@@ -1418,6 +1418,14 @@ async function runProviderAttempts(args: {
           model: resolvedModel,
           credits_charged: creditsCharged,
           request_id: requestId,
+          // Always present for Agent/OpenAI clients (does not change debit math).
+          usage: {
+            prompt_tokens: usage.promptTokens ?? 0,
+            completion_tokens: usage.completionTokens ?? 0,
+            total_tokens:
+              usage.totalTokens ??
+              (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0),
+          },
           tokfai: mergeTokfaiRouting(
             {
               ...(upstreamId ? { upstream_request_id: upstreamId } : {}),
@@ -1503,7 +1511,7 @@ async function runProviderAttempts(args: {
           finish_reason: finishReason,
           fakeToolCallGuard: false,
           autoNoToolCall,
-          bodyKeys: chatBodyKeys(clientBody).join(","),
+          bodyKeys: chatBodyKeysForLog(clientBody),
           timeoutMs: perAttemptTimeoutMs,
           viaStreamFallback,
           userId: caller.userId,

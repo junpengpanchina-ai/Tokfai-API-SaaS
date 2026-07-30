@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-import { ApiError } from "../errors.js";
+import { ApiError, buildClientErrorBody } from "../errors.js";
 import {
   getChatCaller,
   requireApiKeyOrSupabaseJwt,
@@ -17,6 +17,7 @@ import {
   normalizeClientChatCompletionBody,
 } from "../lib/chatCompletionCompat.js";
 import {
+  buildChatValidationFailureTokfai,
   buildEmptyMessagesNoopChatCompletion,
   formatZodIssues,
   logChatCompletionClientNormalized,
@@ -37,6 +38,37 @@ import {
 } from "../lib/respondEarlySse.js";
 import { resolveChatModel } from "../upstream/modelAliases.js";
 import { logGatewayRejection } from "./chatGatewayLogs.js";
+import type { Context } from "hono";
+
+function respondChatValidationError(
+  c: Context,
+  err: ApiError,
+  requestId: string,
+  requestedModel?: string | null
+): Response {
+  const tokfai = buildChatValidationFailureTokfai({
+    requestId,
+    requestedModel,
+    errorCode: err.code ?? "invalid_request_error",
+  });
+  const body = {
+    ...buildClientErrorBody(err, requestId),
+    tokfai,
+  };
+  const text = JSON.stringify(body);
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json; charset=utf-8",
+    "Content-Length": String(Buffer.byteLength(text, "utf8")),
+    "Cache-Control": "no-store",
+    "X-Request-Id": requestId,
+  };
+  try {
+    c.header("X-Request-Id", requestId);
+  } catch {
+    // ignore
+  }
+  return new Response(text, { status: err.status || 400, headers });
+}
 
 /**
  * /v1/chat/completions — OpenAI-compatible chat completions, customer-facing.
@@ -157,10 +189,13 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       normalized: clientNorm.normalized,
       noop: false,
     });
-    return respondApiError(
+    return respondChatValidationError(
       c,
       ApiError.badRequest(rejectedReason, "invalid_request_error"),
-      requestId
+      requestId,
+      typeof (rawBody as { model?: unknown })?.model === "string"
+        ? (rawBody as { model: string }).model
+        : null
     );
   }
 
@@ -179,10 +214,11 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       normalized: clientNorm.normalized,
       noop: false,
     });
-    return respondApiError(
+    return respondChatValidationError(
       c,
       ApiError.badRequest(rejectedReason, "invalid_request_error"),
-      requestId
+      requestId,
+      parsed.data.model ?? null
     );
   }
 
@@ -200,10 +236,11 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       normalized: clientNorm.normalized,
       noop: false,
     });
-    return respondApiError(
+    return respondChatValidationError(
       c,
       ApiError.badRequest(rejectedReason, "invalid_idempotency_key"),
-      requestId
+      requestId,
+      parsed.data.model ?? null
     );
   }
 
