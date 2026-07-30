@@ -61,7 +61,7 @@ import {
   recordProviderModelTimeout,
 } from "../upstream/providerModelCircuitBreaker.js";
 import { providerFetchChatStreamAssembled } from "../upstream/providerFetchChatStreamAssembled.js";
-import { buildUpstreamChatBody } from "./upstreamChatBody.js";
+import { buildUpstreamChatBody, droppedUpstreamChatKeysForAudit } from "./upstreamChatBody.js";
 import {
   isGemini25FlashNonStreamStreamFallbackPath,
   isGemini25FlashStreamFallbackEligible,
@@ -1131,6 +1131,20 @@ async function runProviderAttempts(args: {
 
       try {
         const upstreamBody = buildUpstreamChatBody(body, attemptModel);
+        if (attemptIndex === 0) {
+          const droppedKeys = droppedUpstreamChatKeysForAudit(
+            clientBody as Record<string, unknown>
+          );
+          if (droppedKeys.length > 0) {
+            log.info("upstream_chat_body_keys_dropped", {
+              requestId,
+              route,
+              // Names only — never log client field values.
+              droppedKeys: droppedKeys.slice(0, 40),
+              droppedKeyCount: droppedKeys.length,
+            });
+          }
+        }
 
         const perAttemptTimeoutMs = Math.min(
           timeoutPolicy.upstreamTimeoutMs,

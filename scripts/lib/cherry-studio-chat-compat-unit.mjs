@@ -282,6 +282,49 @@ assert(
   "gemini upstream has no null values"
 );
 
+// P986R — unknown / sensitive top-level keys must never reach upstream (values never logged).
+const canary = "TOKFAI_P986_CANARY_SECRET_unit_test_xyz";
+const canarySanitize = sanitizeUpstreamChatBody(
+  {
+    messages: [{ role: "user", content: "say hi only" }],
+    max_tokens: 8,
+    tokfai_unknown_client_field: canary,
+    api_key: canary,
+    authorization: canary,
+    postgres: canary,
+    supabase: canary,
+    database_url: canary,
+    service_role: canary,
+    stripe: canary,
+    webhook: canary,
+    headers: { Authorization: canary },
+    env: { TOKFAI: canary },
+    process: { env: canary },
+    cookie: canary,
+    password: canary,
+    secret: canary,
+    token: canary,
+    bearer: canary,
+  },
+  "auto-fast"
+);
+assert(canarySanitize.ok === true, "p986r canary sanitize ok");
+const upstreamJson = JSON.stringify(canarySanitize.upstream);
+assert(!upstreamJson.includes(canary), "p986r canary absent from upstream JSON");
+assert(
+  canarySanitize.upstream.api_key === undefined &&
+    canarySanitize.upstream.authorization === undefined &&
+    canarySanitize.upstream.postgres === undefined &&
+    canarySanitize.upstream.supabase === undefined,
+  "p986r forbidden keys absent from upstream object"
+);
+assert(
+  Array.isArray(canarySanitize.droppedKeys) &&
+    canarySanitize.droppedKeys.includes("api_key") &&
+    canarySanitize.droppedKeys.includes("tokfai_unknown_client_field"),
+  "p986r droppedKeys names-only audit"
+);
+
 const gpt = sanitizeUpstreamChatBody(
   {
     messages: [{ role: "user", content: [{ type: "text", text: "hi" }] }],

@@ -358,25 +358,119 @@ export type SanitizeChatBodyInput = {
   tool_choice?: unknown;
   response_format?: unknown;
   user?: unknown;
+  n?: unknown;
+  seed?: unknown;
+  logprobs?: unknown;
+  top_logprobs?: unknown;
   [key: string]: unknown;
 };
 
 /**
+ * OpenAI-compatible top-level fields that MAY be considered for upstream.
+ * Anything else is dropped (never passthrough). Values are never logged.
+ *
+ * Note: not every allowlisted field is forwarded today — GPT sampling /
+ * max_completion_tokens / stream_options remain intentionally stripped or
+ * remapped so we do not change the proven Chat/Stream main path.
+ */
+export const UPSTREAM_CHAT_BODY_ALLOWLIST = [
+  "model",
+  "messages",
+  "stream",
+  "tools",
+  "tool_choice",
+  "response_format",
+  "max_tokens",
+  "max_completion_tokens",
+  "temperature",
+  "top_p",
+  "stop",
+  "presence_penalty",
+  "frequency_penalty",
+  "seed",
+  "user",
+  "n",
+  "logprobs",
+  "top_logprobs",
+] as const;
+
+const UPSTREAM_CHAT_BODY_ALLOWLIST_SET = new Set<string>(
+  UPSTREAM_CHAT_BODY_ALLOWLIST
+);
+
+/**
+ * Forbidden client top-level key names (case-insensitive substring / exact).
+ * Never forwarded; names may be audited without values.
+ */
+export const FORBIDDEN_UPSTREAM_CHAT_KEY_PATTERNS = [
+  /^api_key$/i,
+  /^authorization$/i,
+  /^bearer$/i,
+  /^password$/i,
+  /^secret$/i,
+  /^token$/i,
+  /^postgres$/i,
+  /^database_url$/i,
+  /^supabase$/i,
+  /^service_role$/i,
+  /^stripe$/i,
+  /^webhook$/i,
+  /^headers$/i,
+  /^env$/i,
+  /^process$/i,
+  /^cookie$/i,
+  /api[_-]?key/i,
+  /service[_-]?role/i,
+  /database[_-]?url/i,
+] as const;
+
+/** True when a client body key must never be forwarded upstream. */
+export function isForbiddenUpstreamChatKey(key: string): boolean {
+  return FORBIDDEN_UPSTREAM_CHAT_KEY_PATTERNS.some((re) => re.test(key));
+}
+
+/**
+ * List top-level client keys that will not be forwarded (names only).
+ * Safe for audit logs — never includes values.
+ */
+export function listDroppedUpstreamChatKeys(
+  body: Record<string, unknown> | null | undefined
+): string[] {
+  if (!body || typeof body !== "object") return [];
+  const dropped: string[] = [];
+  for (const key of Object.keys(body)) {
+    if (!UPSTREAM_CHAT_BODY_ALLOWLIST_SET.has(key) || isForbiddenUpstreamChatKey(key)) {
+      dropped.push(key);
+    }
+  }
+  return dropped.sort();
+}
+
+/**
  * Build a whitelist-only upstream chat body.
  * Unknown Cherry / SDK fields (metadata, provider_options, enable_thinking, …)
- * are intentionally dropped — never passthrough to upstream.
+ * and forbidden secret-shaped keys are intentionally dropped — never passthrough.
  */
 export function sanitizeUpstreamChatBody(
   body: SanitizeChatBodyInput,
   model: string
 ):
-  | { ok: true; upstream: Record<string, unknown> }
-  | { ok: false; message: string } {
+  | {
+      ok: true;
+      upstream: Record<string, unknown>;
+      droppedKeys: string[];
+    }
+  | { ok: false; message: string; droppedKeys: string[] } {
+  const droppedKeys = listDroppedUpstreamChatKeys(
+    body as Record<string, unknown>
+  );
+
   const normalized = normalizeChatMessages(body.messages);
   if (!normalized.ok) {
-    return { ok: false, message: normalized.message };
+    return { ok: false, message: normalized.message, droppedKeys };
   }
 
+  // Start from an empty object — never Object.assign / spread the client body.
   const upstream: Record<string, unknown> = {
     model,
     messages: normalized.messages,
@@ -433,8 +527,9 @@ export function sanitizeUpstreamChatBody(
     }
   }
 
-  // stream_options / presence_penalty / frequency_penalty / Cherry extras:
-  // intentionally omitted from whitelist — accepted at schema, never forwarded.
+  // n / seed / logprobs / top_logprobs / presence_penalty / frequency_penalty /
+  // stream_options / Cherry extras: accepted at schema when present, but not
+  // newly expanded onto the upstream payload here (preserves proven main path).
 
   // Final safety: never forward null/undefined keys (Cherry sends many nulls).
   for (const key of Object.keys(upstream)) {
@@ -443,5 +538,13 @@ export function sanitizeUpstreamChatBody(
     }
   }
 
-  return { ok: true, upstream };
+  // Absolute guard: upstream object may only contain allowlisted keys.
+  for (const key of Object.keys(upstream)) {
+    if (!UPSTREAM_CHAT_BODY_ALLOWLIST_SET.has(key) || isForbiddenUpstreamChatKey(key)) {
+      delete upstream[key];
+      if (!droppedKeys.includes(key)) droppedKeys.push(key);
+    }
+  }
+
+  return { ok: true, upstream, droppedKeys: [...droppedKeys].sort() };
 }

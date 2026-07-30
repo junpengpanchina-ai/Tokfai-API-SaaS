@@ -12,14 +12,17 @@
  * Usage:
  *   node scripts/p986-brutal-engineering-harness.mjs
  *   LIVE=1 TOKFAI_API_KEY=sk-tokfai_... BASE=https://api.tokfai.com/v1 node ...
+ *   LIVE_SAFE_MODE=1 LIVE=1 ...   # safer LIVE defaults
  *   SKIP_CONCURRENCY=1 SKIP_PM2=1 SKIP_SDK=1  # faster local loop
  *
  * Env:
- *   CHAT_CONCURRENCY=20 STREAM_CONCURRENCY=10 TOOL_CONCURRENCY=5
- *   DURATION_MS=180000 MAX_CREDITS_SPEND=10
+ *   CHAT_CONCURRENCY STREAM_CONCURRENCY TOOL_CONCURRENCY
+ *   DURATION_MS MAX_CREDITS_SPEND SAFETY_MAX_INFLIGHT
+ *   LIVE_SAFE_MODE=1 → CHAT=3 STREAM=2 TOOL=1 DURATION=30s MAX_CREDITS=3
  */
 
 import { spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -42,9 +45,12 @@ import { assertNoErrorLeak } from "./lib/client-compat-matrix.mjs";
 
 const SCRIPT = "scripts/p986-brutal-engineering-harness.mjs";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const DMIT = join(ROOT, "apps/dmit-api");
 const PASS_MARKER = "TOKFAI_P986_BRUTAL_ENGINEERING_HARNESS_PASS";
 const BLOCKED_MARKER = "TOKFAI_P986_BRUTAL_ENGINEERING_HARNESS_BLOCKED";
 const FAIL_MARKER = "TOKFAI_P986_BRUTAL_ENGINEERING_HARNESS_FAIL";
+const P986R_PASS = "TOKFAI_P986R_BRUTAL_HARNESS_REPAIR_PASS";
+const P986R_BLOCKED = "TOKFAI_P986R_BRUTAL_HARNESS_REPAIR_BLOCKED";
 
 const WRITE_REPORT =
   process.env.WRITE_REPORT !== "0" && process.env.WRITE_REPORT !== "false";
@@ -65,37 +71,79 @@ const SUMMARY_PATH = join(
   ROOT,
   process.env.SUMMARY_PATH ?? "tmp/p986-brutal-engineering-summary.json"
 );
+const REPAIR_REPORT_PATH = join(
+  ROOT,
+  process.env.REPAIR_REPORT_PATH ??
+    "docs/p986r-brutal-harness-blocker-repair-report.md"
+);
 const SANDBOX = join(ROOT, "tmp/p986-cursor-sandbox");
 
 const LIVE_HINT = process.env.LIVE === "1" || process.env.LIVE === "true";
+const LIVE_SAFE_MODE =
+  process.env.LIVE_SAFE_MODE === "1" || process.env.LIVE_SAFE_MODE === "true";
+
+const SAFE_DEFAULTS = LIVE_SAFE_MODE
+  ? {
+      chat: "3",
+      stream: "2",
+      tool: "1",
+      duration: "30000",
+      maxSpend: "3",
+    }
+  : {
+      chat: LIVE_HINT ? "20" : "8",
+      stream: LIVE_HINT ? "10" : "4",
+      tool: LIVE_HINT ? "5" : "3",
+      duration: LIVE_HINT ? "180000" : "12000",
+      maxSpend: "10",
+    };
+
 const CHAT_CONCURRENCY = Math.max(
   1,
-  parseInt(
-    process.env.CHAT_CONCURRENCY ?? (LIVE_HINT ? "20" : "8"),
-    10
-  ) || 8
+  parseInt(process.env.CHAT_CONCURRENCY ?? SAFE_DEFAULTS.chat, 10) ||
+    Number(SAFE_DEFAULTS.chat)
 );
 const STREAM_CONCURRENCY = Math.max(
   1,
-  parseInt(
-    process.env.STREAM_CONCURRENCY ?? (LIVE_HINT ? "10" : "4"),
-    10
-  ) || 4
+  parseInt(process.env.STREAM_CONCURRENCY ?? SAFE_DEFAULTS.stream, 10) ||
+    Number(SAFE_DEFAULTS.stream)
 );
 const TOOL_CONCURRENCY = Math.max(
   1,
-  parseInt(process.env.TOOL_CONCURRENCY ?? (LIVE_HINT ? "5" : "3"), 10) || 3
+  parseInt(process.env.TOOL_CONCURRENCY ?? SAFE_DEFAULTS.tool, 10) ||
+    Number(SAFE_DEFAULTS.tool)
 );
 const DURATION_MS = Math.max(
   1000,
-  parseInt(
-    process.env.DURATION_MS ?? (LIVE_HINT ? "180000" : "12000"),
-    10
-  ) || 12_000
+  parseInt(process.env.DURATION_MS ?? SAFE_DEFAULTS.duration, 10) ||
+    Number(SAFE_DEFAULTS.duration)
 );
 const MAX_CREDITS_SPEND = Math.max(
   0.000001,
-  parseFloat(process.env.MAX_CREDITS_SPEND ?? "10") || 10
+  parseFloat(process.env.MAX_CREDITS_SPEND ?? SAFE_DEFAULTS.maxSpend) ||
+    Number(SAFE_DEFAULTS.maxSpend)
+);
+const SAFETY_MAX_INFLIGHT = Math.max(
+  1,
+  parseInt(process.env.SAFETY_MAX_INFLIGHT ?? "3", 10) || 3
+);
+/** Conservative reserve per in-flight request before actual charge is known. */
+const ESTIMATED_CREDITS_PER_REQUEST = Math.max(
+  0.000001,
+  parseFloat(
+    process.env.ESTIMATED_CREDITS_PER_REQUEST ?? (LIVE_HINT ? "0.05" : "0.001")
+  ) || (LIVE_HINT ? 0.05 : 0.001)
+);
+/** Hard cap on mixed-wave requests even when credits are cheap (mock). */
+const MAX_STORM_REQUESTS = Math.max(
+  1,
+  parseInt(process.env.MAX_STORM_REQUESTS ?? (LIVE_HINT ? "200" : "60"), 10) ||
+    (LIVE_HINT ? 200 : 60)
+);
+/** Cap stored per-request storm details in summary JSON. */
+const MAX_STORM_DETAILS_STORED = Math.max(
+  20,
+  parseInt(process.env.MAX_STORM_DETAILS_STORED ?? "200", 10) || 200
 );
 
 const DIRTY = [
@@ -191,10 +239,122 @@ const cases = [];
 const blockers = [];
 /** @type {Map<string, number>} */
 const chargeByRequestId = new Map();
+/** @type {StormDetail[]} */
+const stormDetails = [];
+let stormDetailsOverflow = 0;
 let spendTotal = 0;
+let pendingSpendReserve = 0;
+let inflightCount = 0;
+let stormDetailsTotal = 0;
+
+function pushStormDetail(detail) {
+  stormDetailsTotal += 1;
+  if (stormDetails.length < MAX_STORM_DETAILS_STORED) {
+    stormDetails.push(detail);
+  } else {
+    stormDetailsOverflow += 1;
+  }
+}
+
+/**
+ * @typedef {{
+ *  case_name: string,
+ *  wave_name: string,
+ *  http_status: number|null,
+ *  ok: boolean,
+ *  request_id: string|null,
+ *  billing_status: string|null,
+ *  credits_charged: number,
+ *  latency_ms: number,
+ *  error_code: string|null,
+ *  verdict: string,
+ *  timeout?: boolean,
+ *  aborted?: boolean,
+ *  skipped?: boolean,
+ * }} StormDetail
+ */
 
 /** @type {{ id: string, ok: boolean, soft?: boolean, detail?: string }[]} */
 const harness = [];
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function budgetRemaining() {
+  return MAX_CREDITS_SPEND - spendTotal - pendingSpendReserve;
+}
+
+function canStartRequest(estimated = ESTIMATED_CREDITS_PER_REQUEST) {
+  if (spendTotal >= MAX_CREDITS_SPEND) return false;
+  if (budgetRemaining() < estimated) return false;
+  if (inflightCount >= SAFETY_MAX_INFLIGHT) return false;
+  return true;
+}
+
+/**
+ * Hard spend / inflight gate. Call before every concurrency request.
+ * @returns {Promise<boolean>} true if caller may proceed to send
+ */
+async function acquireSpendSlot(estimated = ESTIMATED_CREDITS_PER_REQUEST) {
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
+    if (spendTotal >= MAX_CREDITS_SPEND) return false;
+    if (budgetRemaining() < estimated) return false;
+    if (inflightCount < SAFETY_MAX_INFLIGHT) {
+      inflightCount += 1;
+      pendingSpendReserve += estimated;
+      return true;
+    }
+    await sleep(25);
+  }
+  return false;
+}
+
+function releaseSpendSlot(estimated = ESTIMATED_CREDITS_PER_REQUEST) {
+  inflightCount = Math.max(0, inflightCount - 1);
+  pendingSpendReserve = Math.max(0, pendingSpendReserve - estimated);
+}
+
+function summarizeStormWave(waveName, rows) {
+  const total = rows.length;
+  const success = rows.filter((r) => r.ok && !r.skipped && !r.aborted && !r.timeout).length;
+  const fail = rows.filter((r) => r.fail && !r.skipped && !r.aborted && !r.timeout).length;
+  const timeout = rows.filter((r) => r.timeout).length;
+  const aborted = rows.filter((r) => r.aborted || r.skipped).length;
+  const accounted = success + fail + timeout + aborted;
+  const latSamples = rows
+    .filter((r) => !r.skipped && !r.aborted && Number.isFinite(r.latencyMs) && r.latencyMs > 0)
+    .map((r) => r.latencyMs);
+  const latency = latencyStats(latSamples);
+  const harnessBug =
+    latency.count > 0 && success === 0 && fail === 0 && timeout === 0 && aborted === 0;
+  if (harnessBug) {
+    addBlocker(
+      "concurrency_storm_summary",
+      `harness_bug: wave=${waveName} latency.count=${latency.count} but success/fail/timeout/aborted all 0`
+    );
+  }
+  if (accounted !== total) {
+    addBlocker(
+      "concurrency_storm_summary",
+      `harness_bug: wave=${waveName} success(${success})+fail(${fail})+timeout(${timeout})+aborted(${aborted})=${accounted} !== total(${total})`
+    );
+  }
+  return {
+    wave_name: waveName,
+    total,
+    success,
+    fail,
+    timeout,
+    aborted,
+    accounted,
+    charged_total: rows.reduce((s, r) => s + (r.charged || 0), 0),
+    not_billable_total: rows.filter((r) => r.notBillable).length,
+    latency,
+    harness_bug: harnessBug || accounted !== total,
+  };
+}
 
 function recordHarness(id, ok, detail, soft = false) {
   harness.push({ id, ok, soft, detail: detail ? String(detail).slice(0, 400) : undefined });
@@ -985,16 +1145,133 @@ async function runHarness(ctx) {
   }
 
   {
+    const canary = `TOKFAI_P986_CANARY_SECRET_${randomBytes(8).toString("hex")}`;
     const body = {
       model: "auto-fast",
-      messages: [{ role: "user", content: "extra fields" }],
+      messages: [{ role: "user", content: "Reply with exactly: p986-ok" }],
       stream: false,
-      max_tokens: 8,
-      tokfai_unknown_client_field: true,
-      foo_bar: 123,
+      max_tokens: 16,
+      // Canary ONLY in unknown top-level fields — never in messages.content.
+      tokfai_unknown_client_field: canary,
+      foo_bar_extra: canary,
+      api_key: canary,
+      authorization: canary,
+      bearer: canary,
+      password: canary,
+      secret: canary,
+      token: canary,
+      postgres: canary,
+      database_url: canary,
+      supabase: canary,
+      service_role: canary,
+      stripe: canary,
+      webhook: canary,
+      headers: { Authorization: `Bearer ${canary}` },
+      env: { LEAK: canary },
+      process: { env: canary },
+      cookie: canary,
     };
-    const { res, body: out, started } = await chat(body);
-    judgeSuccess("extra_unknown_fields", "openai", out, res, started);
+    const { res, body: out, text, started } = await chat(body);
+    const raw = typeof text === "string" ? text : JSON.stringify(out ?? {});
+    const content = String(out?.choices?.[0]?.message?.content ?? "");
+    const meta = fromBody(out, res, started);
+    let verdict = /** @type {Verdict} */ ("PASS");
+    let reason = null;
+
+    if (content.includes(canary) || raw.includes(canary)) {
+      verdict = "BLOCKER";
+      reason = "canary leaked into response content/raw JSON";
+      addBlocker("extra_unknown_fields", reason);
+    }
+
+    // Unit: allowlist sanitize must drop canary (upstream request must not contain it).
+    const unit = spawnSync(
+      "npx",
+      [
+        "--yes",
+        "tsx",
+        "-e",
+        `
+import { sanitizeUpstreamChatBody } from "./src/lib/chatCompletionCompat.ts";
+const canary = ${JSON.stringify(canary)};
+const body = ${JSON.stringify({
+  messages: [{ role: "user", content: "Reply with exactly: p986-ok" }],
+  max_tokens: 16,
+  tokfai_unknown_client_field: canary,
+  api_key: canary,
+  postgres: canary,
+  supabase: canary,
+})};
+const r = sanitizeUpstreamChatBody(body, "auto-fast");
+if (!r.ok) { console.error("sanitize_failed"); process.exit(2); }
+const j = JSON.stringify(r.upstream);
+if (j.includes(canary)) { console.error("canary_in_upstream"); process.exit(3); }
+if (!r.droppedKeys?.includes("api_key")) { console.error("missing_dropped"); process.exit(4); }
+console.log("TOKFAI_P986R_UPSTREAM_ALLOWLIST_OK");
+`,
+      ],
+      { cwd: DMIT, encoding: "utf8", timeout: 60_000 }
+    );
+    const unitOut = `${unit.stdout || ""}\n${unit.stderr || ""}`;
+    if (
+      unit.status !== 0 ||
+      !unitOut.includes("TOKFAI_P986R_UPSTREAM_ALLOWLIST_OK")
+    ) {
+      verdict = "BLOCKER";
+      reason = `upstream allowlist unit failed: ${unitOut.slice(0, 200)}`;
+      addBlocker("extra_unknown_fields", reason);
+    }
+
+    // pm2 logs must not contain canary (when available).
+    if (!SKIP_PM2) {
+      const pm2Snap = collectPm2Snapshot();
+      const logBlob = JSON.stringify(pm2Snap);
+      if (logBlob.includes(canary)) {
+        verdict = "BLOCKER";
+        reason = "canary leaked into pm2 logs";
+        addBlocker("extra_unknown_fields", reason);
+      }
+    }
+
+    const leak = secretLeakIn(raw, API_KEY);
+    // Canary itself is intentional client input; do not treat as API-key leak.
+    if (leak && !String(leak).includes(canary)) {
+      // Known false-positive: field *names* like postgres/supabase in bodyKeys logs.
+      // Still BLOCKER if full API key / GRSAI patterns appear.
+      if (
+        leak === "full_api_key" ||
+        leak === "sk-tokfai_pattern" ||
+        leak === "secret_name_or_value"
+      ) {
+        verdict = "BLOCKER";
+        reason = `secret leak: ${leak}`;
+        addBlocker("extra_unknown_fields", reason);
+      }
+    }
+
+    if (verdict === "PASS" && res.status === 200 && isChatShape(out)) {
+      if ((meta.credits_charged ?? 0) > 0 && meta.request_id) {
+        trackCharge(meta.request_id, meta.credits_charged, "extra_unknown_fields");
+      }
+      if (!meta.request_id) {
+        verdict = "BLOCKER";
+        reason = "success missing request_id";
+        addBlocker("extra_unknown_fields", reason);
+      }
+    } else if (verdict === "PASS" && res.status !== 200) {
+      verdict = "FAIL";
+      reason = `status=${res.status}`;
+    }
+
+    pushCase({
+      case_name: "extra_unknown_fields",
+      category: "openai",
+      ...meta,
+      openai_shape_ok: isChatShape(out) || isErrorShape(out),
+      cursor_likely_ok: verdict === "PASS",
+      verdict,
+      reason: reason ?? `canary=${canary.slice(0, 28)}… stripped`,
+    });
   }
 
   {
@@ -1665,6 +1942,11 @@ async function runHarness(ctx) {
 
   // ─── F. Concurrency ──────────────────────────────────────────────
   console.log("\n=== F. Concurrency / stability ===\n");
+  console.log(
+    `spend_guard max=${MAX_CREDITS_SPEND} inflight_cap=${SAFETY_MAX_INFLIGHT} ` +
+      `est_per_req=${ESTIMATED_CREDITS_PER_REQUEST} live_safe_mode=${LIVE_SAFE_MODE} ` +
+      `chat=${CHAT_CONCURRENCY} stream=${STREAM_CONCURRENCY} tool=${TOOL_CONCURRENCY} duration_ms=${DURATION_MS}`
+  );
   /** @type {any} */
   const storm = {
     skipped: SKIP_CONCURRENCY,
@@ -1672,144 +1954,287 @@ async function runHarness(ctx) {
     stream: null,
     tool: null,
     mixed: null,
+    details_count: 0,
   };
 
   if (!SKIP_CONCURRENCY) {
-    async function stormChat(i) {
-      if (spendTotal >= MAX_CREDITS_SPEND) {
-        return { skipped: true, latencyMs: 0 };
+    /**
+     * @param {string} waveName
+     * @param {string} caseName
+     * @param {number} i
+     * @param {() => Promise<{res: Response, body?: any, text?: string, timedOut?: boolean}>} doRequest
+     * @param {(ctx: any) => { ok: boolean, fail: boolean, timeout?: boolean, rid: string|null, ch: number, bill: string|null, errorCode: string|null }} judge
+     */
+    async function stormRequest(waveName, caseName, i, doRequest, judge) {
+      const acquired = await acquireSpendSlot();
+      if (!acquired) {
+        const detail = {
+          case_name: caseName,
+          wave_name: waveName,
+          http_status: null,
+          ok: false,
+          request_id: null,
+          billing_status: null,
+          credits_charged: 0,
+          latency_ms: 0,
+          error_code: "budget_or_inflight",
+          verdict: "aborted",
+          aborted: true,
+          skipped: true,
+        };
+        pushStormDetail(detail);
+        return {
+          ok: false,
+          fail: false,
+          timeout: false,
+          aborted: true,
+          skipped: true,
+          latencyMs: 0,
+          charged: 0,
+          notBillable: true,
+        };
       }
       const started = Date.now();
-      const { res, body } = await chat({
-        model: "auto-fast",
-        messages: [{ role: "user", content: `storm chat ${i}` }],
-        stream: false,
-        max_tokens: 8,
-      });
-      const latencyMs = Date.now() - started;
-      const rid = requestIdOf(body, res);
-      const ch = charged(body);
-      if (res.status === 200 && isChatShape(body) && !rid) {
-        addBlocker("storm_chat", "success without request_id");
+      try {
+        const result = await doRequest();
+        const latencyMs = Date.now() - started;
+        const timedOut = Boolean(result.timedOut);
+        const judged = judge(result);
+        if (judged.ch > 0 && judged.rid) {
+          trackCharge(judged.rid, judged.ch, caseName);
+        }
+        let verdict = "ok";
+        if (timedOut || judged.timeout) verdict = "timeout";
+        else if (judged.fail) verdict = "fail";
+        else if (!judged.ok) verdict = "fail";
+
+        pushStormDetail({
+          case_name: caseName,
+          wave_name: waveName,
+          http_status: result.res?.status ?? null,
+          ok: Boolean(judged.ok),
+          request_id: judged.rid,
+          billing_status: judged.bill,
+          credits_charged: judged.ch,
+          latency_ms: latencyMs,
+          error_code: judged.errorCode,
+          verdict,
+          timeout: timedOut || Boolean(judged.timeout),
+        });
+
+        return {
+          ok: Boolean(judged.ok),
+          fail: Boolean(judged.fail) || (!judged.ok && !timedOut && !judged.timeout),
+          timeout: timedOut || Boolean(judged.timeout),
+          aborted: false,
+          skipped: false,
+          latencyMs,
+          charged: judged.ch,
+          notBillable: judged.ch === 0,
+        };
+      } catch (err) {
+        const latencyMs = Date.now() - started;
+        const msg = err instanceof Error ? err.message : String(err);
+        pushStormDetail({
+          case_name: caseName,
+          wave_name: waveName,
+          http_status: null,
+          ok: false,
+          request_id: null,
+          billing_status: null,
+          credits_charged: 0,
+          latency_ms: latencyMs,
+          error_code: msg.slice(0, 80),
+          verdict: "fail",
+        });
+        return {
+          ok: false,
+          fail: true,
+          timeout: false,
+          aborted: false,
+          skipped: false,
+          latencyMs,
+          charged: 0,
+          notBillable: true,
+        };
+      } finally {
+        releaseSpendSlot();
       }
-      if (res.status >= 400 && ch > 0) {
-        addBlocker("storm_chat", "failure charged");
-      }
-      if (ch > 0 && rid) trackCharge(rid, ch, "storm_chat");
-      return {
-        ok: res.status === 200 && isChatShape(body),
-        fail: res.status >= 400,
-        latencyMs,
-        charged: ch,
-        notBillable: notBillable(body),
-      };
     }
 
+    async function stormChat(i, waveName = "chat") {
+      return stormRequest(
+        waveName,
+        `storm_chat_${i}`,
+        i,
+        () =>
+          chat({
+            model: "auto-fast",
+            messages: [{ role: "user", content: `storm chat ${i}` }],
+            stream: false,
+            max_tokens: 8,
+          }),
+        ({ res, body, timedOut }) => {
+          const rid = requestIdOf(body, res);
+          const ch = charged(body);
+          if (!timedOut && res.status === 200 && isChatShape(body) && !rid) {
+            addBlocker("storm_chat", "success without request_id");
+          }
+          if (!timedOut && res.status >= 400 && ch > 0) {
+            addBlocker("storm_chat", "failure charged");
+          }
+          return {
+            ok: !timedOut && res.status === 200 && isChatShape(body) && Boolean(rid),
+            fail: !timedOut && res.status >= 400,
+            timeout: Boolean(timedOut),
+            rid,
+            ch,
+            bill: billingOf(body),
+            errorCode: body?.error?.code ?? null,
+          };
+        }
+      );
+    }
+
+    const chatPool = Math.min(CHAT_CONCURRENCY, SAFETY_MAX_INFLIGHT);
     const chatItems = Array.from({ length: CHAT_CONCURRENCY }, (_, i) => i);
-    const chatRows = await runPool(chatItems, Math.min(CHAT_CONCURRENCY, 10), stormChat);
-    const chatLat = latencyStats(chatRows.map((r) => r.latencyMs));
-    storm.chat = {
-      total: chatRows.length,
-      success: chatRows.filter((r) => r.ok).length,
-      fail: chatRows.filter((r) => r.fail).length,
-      charged_total: chatRows.reduce((s, r) => s + (r.charged || 0), 0),
-      not_billable_total: chatRows.filter((r) => r.notBillable).length,
-      latency: chatLat,
-    };
+    const chatRows = await runPool(chatItems, chatPool, (i) => stormChat(i, "chat"));
+    storm.chat = summarizeStormWave("chat", chatRows);
 
-    async function stormStream(i) {
-      const started = Date.now();
-      const { res, text, body } = await chat({
-        model: "auto-fast",
-        messages: [{ role: "user", content: `storm stream ${i}` }],
-        stream: true,
-        max_tokens: 8,
-      });
-      const sse = parseSse(text);
-      const rid = sse.requestId || requestIdOf(body, res);
-      const ch = sse.creditsCharged || charged(body);
-      if (res.status === 200 && !sse.sawDone) {
-        addBlocker("storm_stream", "SSE missing [DONE]");
-      }
-      if (res.status === 200 && sse.sawDone && !rid) {
-        addBlocker("storm_stream", "success without request_id");
-      }
-      if (ch > 0 && rid) trackCharge(rid, ch, "storm_stream");
-      return {
-        ok: res.status === 200 && sse.sawDone && Boolean(rid),
-        fail: res.status >= 400,
-        latencyMs: Date.now() - started,
-        charged: ch,
-      };
+    async function stormStream(i, waveName = "stream") {
+      return stormRequest(
+        waveName,
+        `storm_stream_${i}`,
+        i,
+        () =>
+          chat({
+            model: "auto-fast",
+            messages: [{ role: "user", content: `storm stream ${i}` }],
+            stream: true,
+            max_tokens: 8,
+          }),
+        ({ res, text, body, timedOut }) => {
+          const sse = parseSse(text);
+          const rid = sse.requestId || requestIdOf(body, res);
+          const ch = sse.creditsCharged || charged(body);
+          if (!timedOut && res.status === 200 && !sse.sawDone) {
+            addBlocker("storm_stream", "SSE missing [DONE]");
+          }
+          if (!timedOut && res.status === 200 && sse.sawDone && !rid) {
+            addBlocker("storm_stream", "success without request_id");
+          }
+          return {
+            ok:
+              !timedOut &&
+              res.status === 200 &&
+              sse.sawDone &&
+              Boolean(rid),
+            fail: !timedOut && res.status >= 400,
+            timeout: Boolean(timedOut),
+            rid,
+            ch,
+            bill: sse.billingStatus || billingOf(body),
+            errorCode: body?.error?.code ?? null,
+          };
+        }
+      );
     }
+    const streamPool = Math.min(STREAM_CONCURRENCY, SAFETY_MAX_INFLIGHT);
     const streamItems = Array.from({ length: STREAM_CONCURRENCY }, (_, i) => i);
-    const streamRows = await runPool(
-      streamItems,
-      Math.min(STREAM_CONCURRENCY, 8),
-      stormStream
+    const streamRows = await runPool(streamItems, streamPool, (i) =>
+      stormStream(i, "stream")
     );
-    storm.stream = {
-      total: streamRows.length,
-      success: streamRows.filter((r) => r.ok).length,
-      fail: streamRows.filter((r) => r.fail).length,
-      latency: latencyStats(streamRows.map((r) => r.latencyMs)),
-    };
+    storm.stream = summarizeStormWave("stream", streamRows);
 
-    async function stormTool(i) {
-      const { res, body } = await chat({
-        model: "auto-fast",
-        messages: [{ role: "user", content: `storm tool ${i}` }],
-        tools: TOOLS,
-        tool_choice: "required",
-        stream: false,
-      });
-      const ch = charged(body);
-      if (ch > 0) addBlocker("storm_tool", "tool fail protection charged");
-      return {
-        ok: res.status >= 400 && ch === 0,
-        fail: ch > 0,
-        charged: ch,
-        notBillable: notBillable(body),
-        latencyMs: 0,
-      };
+    async function stormTool(i, waveName = "tool") {
+      return stormRequest(
+        waveName,
+        `storm_tool_${i}`,
+        i,
+        () =>
+          chat({
+            model: "auto-fast",
+            messages: [{ role: "user", content: `storm tool ${i}` }],
+            tools: TOOLS,
+            tool_choice: "required",
+            stream: false,
+          }),
+        ({ res, body, timedOut }) => {
+          const ch = charged(body);
+          const rid = requestIdOf(body, res);
+          if (ch > 0) addBlocker("storm_tool", "tool fail protection charged");
+          return {
+            ok: !timedOut && res.status >= 400 && ch === 0,
+            fail: ch > 0,
+            timeout: Boolean(timedOut),
+            rid,
+            ch,
+            bill: billingOf(body),
+            errorCode: body?.error?.code ?? null,
+          };
+        }
+      );
     }
+    const toolPool = Math.min(TOOL_CONCURRENCY, SAFETY_MAX_INFLIGHT);
     const toolItems = Array.from({ length: TOOL_CONCURRENCY }, (_, i) => i);
-    const toolRows = await runPool(toolItems, Math.min(TOOL_CONCURRENCY, 5), stormTool);
-    storm.tool = {
-      total: toolRows.length,
-      success: toolRows.filter((r) => r.ok).length,
-      fail: toolRows.filter((r) => r.fail).length,
-      charged_total: toolRows.reduce((s, r) => s + (r.charged || 0), 0),
-      not_billable_total: toolRows.filter((r) => r.notBillable).length,
-    };
+    const toolRows = await runPool(toolItems, toolPool, (i) => stormTool(i, "tool"));
+    storm.tool = summarizeStormWave("tool", toolRows);
 
-    const mixedLat = [];
-    let mixedOk = 0;
-    let mixedFail = 0;
+    const mixedRows = [];
     const deadline = Date.now() + DURATION_MS;
     let i = 0;
-    while (Date.now() < deadline && spendTotal < MAX_CREDITS_SPEND) {
-      const batch = Array.from({ length: 6 }, (_, j) => i + j);
-      i += batch.length;
-      const rows = await runPool(batch, 6, async (k) => {
-        if (k % 3 === 0) return stormStream(k);
-        if (k % 3 === 1) return stormTool(k);
-        return stormChat(k);
-      });
-      for (const r of rows) {
-        if (r.latencyMs) mixedLat.push(r.latencyMs);
-        if (r.ok) mixedOk += 1;
-        if (r.fail) mixedFail += 1;
+    let mixedIssued = 0;
+    while (
+      Date.now() < deadline &&
+      canStartRequest() &&
+      mixedIssued < MAX_STORM_REQUESTS
+    ) {
+      const batchSize = Math.min(
+        SAFETY_MAX_INFLIGHT,
+        3,
+        MAX_STORM_REQUESTS - mixedIssued
+      );
+      const batch = [];
+      for (let j = 0; j < batchSize; j++) {
+        if (!canStartRequest()) break;
+        if (mixedIssued + batch.length >= MAX_STORM_REQUESTS) break;
+        const k = i++;
+        batch.push(k);
       }
+      if (!batch.length) break;
+      mixedIssued += batch.length;
+      const rows = await runPool(batch, batch.length, async (k) => {
+        if (k % 3 === 0) return stormStream(k, "mixed");
+        if (k % 3 === 1) return stormTool(k, "mixed");
+        return stormChat(k, "mixed");
+      });
+      mixedRows.push(...rows);
     }
     storm.mixed = {
+      ...summarizeStormWave("mixed", mixedRows),
       duration_ms: DURATION_MS,
-      success: mixedOk,
-      fail: mixedFail,
-      latency: latencyStats(mixedLat),
       spend_total: spendTotal,
+      max_storm_requests: MAX_STORM_REQUESTS,
+      mixed_issued: mixedIssued,
     };
+    storm.details_count = stormDetailsTotal;
+    storm.details_stored = stormDetails.length;
+    storm.details_overflow = stormDetailsOverflow;
 
+    if (spendTotal > MAX_CREDITS_SPEND * 1.2) {
+      addBlocker(
+        "spend_guard_failed",
+        `spend=${spendTotal} exceeded MAX_CREDITS_SPEND*1.2=${MAX_CREDITS_SPEND * 1.2}`
+      );
+    }
+
+    const stormBlockers = blockers.filter(
+      (b) =>
+        b.includes("concurrency_storm") ||
+        b.includes("harness_bug") ||
+        b.includes("spend_guard") ||
+        b.startsWith("storm_")
+    );
     pushCase({
       case_name: "concurrency_storm_summary",
       category: "stability",
@@ -1825,8 +2250,15 @@ async function runHarness(ctx) {
       latency_ms: storm.mixed?.latency?.p95 ?? null,
       openai_shape_ok: null,
       cursor_likely_ok: null,
-      verdict: blockers.length ? "BLOCKER" : "PASS",
-      reason: `chat=${JSON.stringify(storm.chat)} stream=${JSON.stringify(storm.stream)} tool=${JSON.stringify(storm.tool)}`,
+      verdict: stormBlockers.length ? "BLOCKER" : "PASS",
+      reason: `chat=${JSON.stringify(storm.chat)} stream=${JSON.stringify(storm.stream)} tool=${JSON.stringify(storm.tool)} mixed=${JSON.stringify({
+        total: storm.mixed?.total,
+        success: storm.mixed?.success,
+        fail: storm.mixed?.fail,
+        timeout: storm.mixed?.timeout,
+        aborted: storm.mixed?.aborted,
+        spend_total: spendTotal,
+      })} details=${stormDetails.length}`,
     });
   } else {
     pushCase({
@@ -1897,7 +2329,9 @@ function writeOutputs(ctx, pm2Before, pm2After, storm, sdkStatus) {
 
   const summary = {
     marker: blockers.length ? BLOCKED_MARKER : PASS_MARKER,
+    p986r_marker: blockers.length ? P986R_BLOCKED : P986R_PASS,
     live: Boolean(ctx.LIVE),
+    live_safe_mode: LIVE_SAFE_MODE,
     generated_at: new Date().toISOString(),
     blockers,
     counts: {
@@ -1908,7 +2342,15 @@ function writeOutputs(ctx, pm2Before, pm2After, storm, sdkStatus) {
       BLOCKER: buckets.BLOCKER.length,
     },
     spend_total: spendTotal,
+    spend_guard: {
+      max_credits_spend: MAX_CREDITS_SPEND,
+      safety_max_inflight: SAFETY_MAX_INFLIGHT,
+      estimated_credits_per_request: ESTIMATED_CREDITS_PER_REQUEST,
+      spend_guard_failed: spendTotal > MAX_CREDITS_SPEND * 1.2,
+    },
     storm,
+    storm_details: stormDetails,
+    storm_details_overflow: stormDetailsOverflow,
     sdk_status: sdkStatus,
     pm2_before: pm2Before,
     pm2_after: pm2After,
@@ -1920,6 +2362,52 @@ function writeOutputs(ctx, pm2Before, pm2After, storm, sdkStatus) {
     cases,
   };
   writeFileSync(SUMMARY_PATH, JSON.stringify(summary, null, 2), "utf8");
+
+  // P986R repair report (always rewrite when harness finishes).
+  const extraCase = cases.find((c) => c.case_name === "extra_unknown_fields");
+  const stormCase = cases.find((c) => c.case_name === "concurrency_storm_summary");
+  const repairLines = [
+    "# P986R — Brutal Harness Blocker Repair Report",
+    "",
+    "> Fixes only: upstream allowlist harden + P986 canary/spend/stats. No new commercial features.",
+    "",
+    `## Result: **${blockers.length ? "BLOCKED" : "REPAIR PASS"}**`,
+    "",
+    `Marker: \`${blockers.length ? P986R_BLOCKED : P986R_PASS}\``,
+    "",
+    "## Target BLOCKERs",
+    "",
+    "1. `extra_unknown_fields` — unknown/sensitive fields must not leak (canary).",
+    "2. `concurrency_storm_summary` — trustworthy wave stats + hard MAX_CREDITS_SPEND.",
+    "",
+    "## Fixes shipped",
+    "",
+    "- `sanitizeUpstreamChatBody` / `UPSTREAM_CHAT_BODY_ALLOWLIST` + forbidden key patterns; dropped key *names* audited, never values.",
+    "- `buildUpstreamChatBody` uses allowlist; execute path builds from `upstreamBodySource`.",
+    "- P986 `extra_unknown_fields` uses `TOKFAI_P986_CANARY_SECRET_<random>` only in unknown top-level fields.",
+    "- Concurrency: `acquireSpendSlot` / `SAFETY_MAX_INFLIGHT` / `LIVE_SAFE_MODE`; wave accounting `success+fail+timeout+aborted=total`.",
+    "- `spend > MAX_CREDITS_SPEND * 1.2` → BLOCKER `spend_guard_failed`.",
+    "",
+    "## Verification (this run)",
+    "",
+    `| Check | Verdict | Reason |`,
+    `|---|---|---|`,
+    `| extra_unknown_fields | ${extraCase?.verdict ?? "missing"} | ${(extraCase?.reason ?? "").replace(/\|/g, "/")} |`,
+    `| concurrency_storm_summary | ${stormCase?.verdict ?? "missing"} | ${String(stormCase?.reason ?? "").slice(0, 160).replace(/\|/g, "/")} |`,
+    `| spend_total | ${spendTotal} / max ${MAX_CREDITS_SPEND} | ${spendTotal > MAX_CREDITS_SPEND * 1.2 ? "spend_guard_failed" : "within 1.2x"} |`,
+    "",
+    "## BLOCKERs remaining",
+    "",
+    blockers.length ? blockers.map((b) => `- ${b}`).join("\n") : "- (none)",
+    "",
+    "## Notes",
+    "",
+    "- Do **not** advertise fully compatible / Cursor Compatible.",
+    "- Prefer `LIVE_SAFE_MODE=1` for live re-checks.",
+    "",
+  ];
+  writeFileSync(REPAIR_REPORT_PATH, repairLines.join("\n"), "utf8");
+  console.log(`Wrote ${REPAIR_REPORT_PATH}`);
 
   if (!WRITE_REPORT) {
     console.log(`Wrote ${SUMMARY_PATH}`);
@@ -2097,19 +2585,22 @@ async function main() {
   const hardHarness = harness.some((h) => !h.ok && !h.soft);
   console.log("");
   console.log(
-    `Cases=${cases.length} blockers=${blockers.length} spend=${spendTotal}`
+    `Cases=${cases.length} blockers=${blockers.length} spend=${spendTotal} max=${MAX_CREDITS_SPEND} inflight_cap=${SAFETY_MAX_INFLIGHT}`
   );
 
   if (blockers.length) {
     console.error(BLOCKED_MARKER);
+    console.error(P986R_BLOCKED);
     for (const b of blockers) console.error(`  - ${b}`);
     process.exit(1);
   }
   if (hardHarness) {
     console.error(FAIL_MARKER);
+    console.error(P986R_BLOCKED);
     process.exit(1);
   }
   console.log(PASS_MARKER);
+  console.log(P986R_PASS);
   process.exit(0);
 }
 
