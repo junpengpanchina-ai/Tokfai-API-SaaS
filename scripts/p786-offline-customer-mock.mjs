@@ -869,11 +869,58 @@ function chatCompletionBody(body) {
   }
 
   if (hasTools) {
-    const toolName =
-      body.tools?.[0]?.function?.name &&
-      typeof body.tools[0].function.name === "string"
-        ? body.tools[0].function.name
-        : "get_weather";
+    const toolNames = (Array.isArray(body.tools) ? body.tools : [])
+      .map((t) =>
+        typeof t?.function?.name === "string" ? t.function.name : null
+      )
+      .filter(Boolean);
+    const contentLower = String(firstContent ?? "").toLowerCase();
+    const forcedName =
+      typeof body.tool_choice === "object" &&
+      body.tool_choice &&
+      !Array.isArray(body.tool_choice) &&
+      typeof body.tool_choice.function?.name === "string"
+        ? body.tool_choice.function.name
+        : null;
+    const pick =
+      (forcedName && toolNames.includes(forcedName) ? forcedName : null) ||
+      (contentLower.includes("list") &&
+        toolNames.find((n) => /list_(dir|files)/i.test(n))) ||
+      (contentLower.includes("read") &&
+        toolNames.find((n) => /read_file/i.test(n))) ||
+      (contentLower.includes("diff") &&
+        toolNames.find((n) => /run_terminal|git_diff|shell/i.test(n))) ||
+      ((contentLower.includes("str_replace") ||
+        contentLower.includes("apply_patch")) &&
+        toolNames.find((n) => /str_replace|apply_patch|edit/i.test(n))) ||
+      ((contentLower.includes("create") || contentLower.includes("write")) &&
+        toolNames.find((n) => /write_file/i.test(n))) ||
+      ((contentLower.includes("modify") || contentLower.includes("edit")) &&
+        toolNames.find((n) => /str_replace|apply_patch|edit|write_file/i.test(n))) ||
+      toolNames[0] ||
+      "get_weather";
+
+    let args = { location: "Shanghai" };
+    if (/list_(dir|files)/i.test(pick)) {
+      args = { path: "tmp/p987-agent-sandbox" };
+    } else if (/read_file/i.test(pick)) {
+      args = { path: "tmp/p987-agent-sandbox/seed.ts" };
+    } else if (/write_file/i.test(pick)) {
+      args = {
+        path: "tmp/p987-agent-sandbox/cursor-agent-test.ts",
+        contents:
+          "export function greet(name: string): string {\n  return `hi ${name}`;\n}\n",
+      };
+    } else if (/str_replace|apply_patch|edit/i.test(pick)) {
+      args = {
+        path: "tmp/p987-agent-sandbox/cursor-agent-test.ts",
+        old_string: "return `hi ${name}`;",
+        new_string: "return `hello ${name}`;",
+      };
+    } else if (/run_terminal|git_diff|shell/i.test(pick)) {
+      args = { command: "git diff -- tmp/p987-agent-sandbox" };
+    }
+
     return {
       id: `chatcmpl_${meta.request_id}`,
       object: "chat.completion",
@@ -887,11 +934,11 @@ function chatCompletionBody(body) {
             content: null,
             tool_calls: [
               {
-                id: "call_mock_p970",
+                id: "call_mock_p987",
                 type: "function",
                 function: {
-                  name: toolName,
-                  arguments: JSON.stringify({ location: "Shanghai" }),
+                  name: pick,
+                  arguments: JSON.stringify(args),
                 },
               },
             ],

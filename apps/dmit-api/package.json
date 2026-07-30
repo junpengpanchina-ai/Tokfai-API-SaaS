@@ -14,7 +14,8 @@
     "reload:pm2": "pm2 reload ecosystem.config.cjs --update-env",
     "typecheck": "tsc --noEmit",
     "release-gate": "node ../../scripts/tokfai-release-gate.mjs",
-    "brutal-harness": "node ../../scripts/p986-brutal-engineering-harness.mjs"
+    "brutal-harness": "node ../../scripts/p986-brutal-engineering-harness.mjs",
+    "agent-runtime": "node ../../scripts/p987-agent-runtime-compatibility-smoke.mjs"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
