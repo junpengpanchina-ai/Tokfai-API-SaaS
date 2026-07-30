@@ -4980,6 +4980,13 @@ export const messages = {
           "Tool Call is not a default promise — check /v1/models capabilities.tools and the verified whitelist.",
         developerCursorTipRequestId:
           "Support tickets must include request_id (plus model, time, stream, tools). Failures are usually not charged.",
+        trialRiskTipTitle: "Trial / quota risk control",
+        trialRiskTipDesc:
+          "P982: trial keys use allowed models + credit caps. Over-quota and blocked models fail with not_billable.",
+        trialRiskTipModels:
+          "Default trial models: auto-fast · auto-cheap. High-cost models should stay trial_mode off.",
+        trialRiskTipErrors:
+          "Guard codes: trial_limit_exceeded · daily_limit_exceeded · quota_exceeded · trial_model_not_allowed.",
         todayRequests: "Today's requests",
         todaySuccess: "Today's successful",
         todayFailed: "Today's failed",
@@ -10287,6 +10294,13 @@ export const messages = {
           "Tool Call 非默认承诺——以 /v1/models 的 capabilities.tools 与白名单为准。",
         developerCursorTipRequestId:
           "问题反馈必须带 request_id（并附模型、时间、是否 stream、是否 tools）。失败通常不扣费。",
+        trialRiskTipTitle: "试用额度 / 配额风控",
+        trialRiskTipDesc:
+          "P982：试用 Key 限制可用模型与积分上限。超额或禁用模型失败，且不计费。",
+        trialRiskTipModels:
+          "默认试用模型：auto-fast · auto-cheap。高成本模型请保持 trial_mode=false。",
+        trialRiskTipErrors:
+          "风控错误码：trial_limit_exceeded · daily_limit_exceeded · quota_exceeded · trial_model_not_allowed。",
         todayRequests: "今日请求数",
         todaySuccess: "今日成功",
         todayFailed: "今日失败",

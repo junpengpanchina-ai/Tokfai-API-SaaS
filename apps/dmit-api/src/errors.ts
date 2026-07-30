@@ -32,6 +32,13 @@ export const GATEWAY_GUARD_ERROR_CODES = new Set([
   "gateway_overloaded",
   "request_body_too_large",
   "upstream_timeout",
+  "quota_exceeded",
+  "daily_limit_exceeded",
+  "monthly_limit_exceeded",
+  "trial_limit_exceeded",
+  "trial_model_not_allowed",
+  "daily_credit_limit_exceeded",
+  "monthly_credit_limit_exceeded",
 ]);
 
 /** Canonical HTTP status for known gateway / upstream guard codes. */
@@ -53,6 +60,13 @@ export const STATUS_BY_ERROR_CODE: Record<string, number> = {
   tool_call_not_supported: 400,
   tool_call_not_generated: 502,
   provider_tool_call_not_supported: 502,
+  quota_exceeded: 429,
+  daily_limit_exceeded: 429,
+  monthly_limit_exceeded: 429,
+  trial_limit_exceeded: 429,
+  trial_model_not_allowed: 403,
+  daily_credit_limit_exceeded: 429,
+  monthly_credit_limit_exceeded: 429,
 };
 
 /** Stable error.type for known codes — never leave type undefined on envelopes. */
@@ -65,9 +79,18 @@ export function errorTypeForCode(
     code === "upstream_rate_limited" ||
     code === "rate_limited" ||
     code === "too_many_requests" ||
-    code === "too_many_concurrent_requests"
+    code === "too_many_concurrent_requests" ||
+    code === "quota_exceeded" ||
+    code === "daily_limit_exceeded" ||
+    code === "monthly_limit_exceeded" ||
+    code === "trial_limit_exceeded" ||
+    code === "daily_credit_limit_exceeded" ||
+    code === "monthly_credit_limit_exceeded"
   ) {
     return "rate_limit_error";
+  }
+  if (code === "trial_model_not_allowed") {
+    return "invalid_request_error";
   }
   if (
     code === "upstream_model_busy" ||

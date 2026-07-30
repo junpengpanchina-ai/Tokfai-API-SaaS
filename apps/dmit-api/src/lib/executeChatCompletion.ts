@@ -79,6 +79,11 @@ import {
   logUnlimitedBillingGranted,
   resolveMaxOutputTokens,
 } from "../gateway/keySafetyLimits.js";
+import {
+  assertTrialQuotaGuards,
+  logCommercialRequestTrace,
+  TRIAL_QUOTA_ERROR_CODES,
+} from "../gateway/trialQuotaGuard.js";
 import { logGatewayOverloaded } from "../routes/chatGatewayLogs.js";
 import {
   lookupBillingIdempotency,
@@ -661,6 +666,17 @@ export async function executeChatCompletion(
         keyId: caller.keyId,
         tenantId: caller.tenantId,
       });
+      // P982 — per-key trial model allowlist + trial/daily/monthly caps (before upstream).
+      await assertTrialQuotaGuards({
+        userId: caller.userId,
+        apiKeyId: caller.apiKeyId,
+        keyId: caller.keyId,
+        tenantId: caller.tenantId,
+        model: requestedModel,
+        requestedRaw,
+        requestId,
+        route,
+      });
     }
 
     const rawMaxOut =
@@ -720,6 +736,35 @@ export async function executeChatCompletion(
     }
   } catch (err) {
     if (err instanceof ApiError) {
+      // P982 / period caps: precheck throws without usage_log — write not_billable row.
+      if (
+        TRIAL_QUOTA_ERROR_CODES.has(err.code ?? "") ||
+        err.code === "daily_limit_exceeded" ||
+        err.code === "quota_exceeded" ||
+        err.code === "insufficient_credits" ||
+        err.code === "daily_credit_limit_exceeded" ||
+        err.code === "monthly_credit_limit_exceeded"
+      ) {
+        await logChatFailure({
+          caller,
+          requestId,
+          requestedModel,
+          startedAt,
+          err,
+          route,
+        });
+        logCommercialRequestTrace({
+          phase: "guard",
+          requestId,
+          route,
+          userId: caller.userId,
+          apiKeyId: caller.apiKeyId,
+          model: requestedModel,
+          status: "failed",
+          creditsCharged: 0,
+          errorCode: err.code ?? null,
+        });
+      }
       return failureResult(err, requestId, requestedModel);
     }
 
@@ -1298,6 +1343,21 @@ async function runProviderAttempts(args: {
           latencyMs: Date.now() - startedAt,
           timeoutMs: perAttemptTimeoutMs,
           viaStreamFallback,
+          userId: caller.userId,
+          apiKeyIdMasked: caller.apiKeyId
+            ? `${String(caller.apiKeyId).slice(0, 8)}…`
+            : null,
+        });
+
+        logCommercialRequestTrace({
+          phase: "success",
+          requestId,
+          route,
+          userId: caller.userId,
+          apiKeyId: caller.apiKeyId,
+          model: resolvedModel,
+          status: "succeeded",
+          creditsCharged,
         });
 
         return {

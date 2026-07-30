@@ -342,6 +342,28 @@ export function AdminOverviewPanel({
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">
+                {t("admin.overview.trialRiskTipTitle")}
+              </CardTitle>
+              <CardDescription>
+                {t("admin.overview.trialRiskTipDesc")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>{t("admin.overview.trialRiskTipModels")}</p>
+              <p className="font-mono text-xs">
+                {t("admin.overview.trialRiskTipErrors")}
+              </p>
+              <p className="text-xs">
+                Today: success {formatCount(summary.today_successful_requests)} ·
+                fail {formatCount(summary.today_failed_requests)} · not_billable{" "}
+                {formatCount(summary.today_not_billable_failures)}
+              </p>
+            </CardContent>
+          </Card>
+
           <Card className="border-destructive/30">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">

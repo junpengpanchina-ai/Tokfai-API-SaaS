@@ -172,6 +172,31 @@ function mockErrorForModel(rawModel) {
       message:
         "Insufficient balance. Please top up credits in the Tokfai dashboard.",
     },
+    "__tokfai_mock_trial_limit_exceeded": {
+      status: 429,
+      code: "trial_limit_exceeded",
+      type: "rate_limit_error",
+      message: "Trial credit limit exceeded. This request was not charged.",
+    },
+    "__tokfai_mock_daily_limit_exceeded": {
+      status: 429,
+      code: "daily_limit_exceeded",
+      type: "rate_limit_error",
+      message: "Daily credit limit exceeded. This request was not charged.",
+    },
+    "__tokfai_mock_quota_exceeded": {
+      status: 429,
+      code: "quota_exceeded",
+      type: "rate_limit_error",
+      message: "Credit quota exceeded. This request was not charged.",
+    },
+    "__tokfai_mock_trial_model_not_allowed": {
+      status: 403,
+      code: "trial_model_not_allowed",
+      type: "invalid_request_error",
+      message:
+        "Model not allowed for trial API keys. Use auto-fast or auto-cheap.",
+    },
     "__tokfai_mock_rate_limited": {
       status: 429,
       code: "too_many_requests",

@@ -27,6 +27,11 @@ export interface ApiKeyRow {
   encrypted_secret: string | null;
   can_reveal: boolean;
   tenant_id?: string | null;
+  /** P982 — trial commercial guard */
+  trial_mode?: boolean;
+  trial_credits_limit?: number | string | null;
+  daily_credit_limit?: number | string | null;
+  monthly_credit_limit?: number | string | null;
   created_at: string;
   last_used_at: string | null;
   revoked_at: string | null;

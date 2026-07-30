@@ -47,6 +47,13 @@ Hermes / 开发者 Agent 场景（P981）：
 | `docs/hermes-objection-handling.zh.md` | 销售 / 售后 | 异议应答 |
 | `docs/developer-agent-delivery-checklist.zh.md` | 全员 | 交付打勾清单 |
 
+试用额度 / 风控（P982）：
+
+| 文件 | 给谁用 | 用途 |
+|---|---|---|
+| `docs/trial-quota-commercial-guard.zh.md` | 运维 / 销售 | 试用额度与错误码 |
+| `docs/customer-risk-control-sop.zh.md` | 售后 / 实施 | 灰度与排障 SOP |
+
 配套（P978/P979）：
 
 - `docs/customer-onboarding-playbook.zh.md`

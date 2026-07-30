@@ -219,10 +219,10 @@ export async function assertCreditPeriodLimits(
     throw new ApiError({
       status: 429,
       message: "Daily credit limit exceeded.",
-      code: "daily_credit_limit_exceeded",
+      code: "daily_limit_exceeded",
       type: "rate_limit_error",
       publicMessage:
-        "Daily credit limit exceeded. Please try again tomorrow or contact support.",
+        "今日额度已用尽。请明日再试或联系支持，本次请求未扣费。",
     });
   }
 
@@ -230,10 +230,10 @@ export async function assertCreditPeriodLimits(
     throw new ApiError({
       status: 429,
       message: "Monthly credit limit exceeded.",
-      code: "monthly_credit_limit_exceeded",
+      code: "quota_exceeded",
       type: "rate_limit_error",
       publicMessage:
-        "Monthly credit limit exceeded. Please try again next month or contact support.",
+        "本月配额已用尽。请下月再试或联系支持，本次请求未扣费。",
     });
   }
 }

@@ -149,6 +149,35 @@ const Schema = z
   TOKFAI_DAILY_CREDIT_LIMIT: z.coerce.number().positive().default(10_000),
   /** Per-user monthly credit spend cap (charged usage_logs sum). */
   TOKFAI_MONTHLY_CREDIT_LIMIT: z.coerce.number().positive().default(100_000),
+  /**
+   * P982 — Trial / per-key commercial guard (early block before upstream).
+   * When false, per-key trial_mode columns are ignored.
+   */
+  TOKFAI_TRIAL_GUARD_ENABLED: z
+    .string()
+    .optional()
+    .default("true")
+    .transform((raw) => raw === "true" || raw === "1"),
+  /** Models allowed for api_keys.trial_mode=true (comma/space separated). */
+  TOKFAI_TRIAL_ALLOWED_MODELS: z
+    .string()
+    .default("auto-fast,auto-cheap")
+    .transform(csv),
+  /** Lifetime charged-credits cap when trial_mode and trial_credits_limit is null. */
+  TOKFAI_TRIAL_DEFAULT_CREDITS_LIMIT: z.coerce
+    .number()
+    .nonnegative()
+    .default(500),
+  /** Daily charged-credits cap for trial keys when daily_credit_limit is null. */
+  TOKFAI_TRIAL_DAILY_CREDIT_LIMIT: z.coerce
+    .number()
+    .nonnegative()
+    .default(200),
+  /** Monthly charged-credits cap for trial keys when monthly_credit_limit is null. */
+  TOKFAI_TRIAL_MONTHLY_CREDIT_LIMIT: z.coerce
+    .number()
+    .nonnegative()
+    .default(500),
   /** Hard ceiling for max_tokens / max_completion_tokens / max_output_tokens. */
   TOKFAI_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().default(16_384),
   /**

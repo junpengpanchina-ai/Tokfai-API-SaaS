@@ -128,23 +128,34 @@ export function respondExecuteChatCompletionFailure(
   }
 
   if (result.httpStatus === 402) {
-    return respondApiError(
-      c,
-      new ApiError({
-        status: 402,
-        message,
-        publicMessage: message,
-        code,
-        type: "billing_error",
-      }),
-      requestId
-    );
+    const err = new ApiError({
+      status: 402,
+      message,
+      publicMessage: message,
+      code,
+      type: "billing_error",
+    });
+    return respondJsonError(c, err, requestId, {
+      tokfai: {
+        billing_status: "not_billable",
+        credits_charged: 0,
+        ...(requestId ? { request_id: requestId } : {}),
+      },
+    });
   }
 
   const notBillableTokfai =
     code === "model_not_tool_capable" ||
     code === "all_tool_upstreams_unavailable" ||
-    code === "tool_call_not_supported"
+    code === "tool_call_not_supported" ||
+    code === "quota_exceeded" ||
+    code === "daily_limit_exceeded" ||
+    code === "monthly_limit_exceeded" ||
+    code === "trial_limit_exceeded" ||
+    code === "trial_model_not_allowed" ||
+    code === "daily_credit_limit_exceeded" ||
+    code === "monthly_credit_limit_exceeded" ||
+    code === "insufficient_credits"
       ? {
           tokfai: {
             billing_status: "not_billable" as const,
