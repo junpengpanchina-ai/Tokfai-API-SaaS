@@ -8,10 +8,37 @@ import {
   forcedToolFailureJsonResponse,
   isForcedToolFailureCode,
 } from "./toolCallFailureEnvelope.js";
+import {
+  mergeTokfaiRouting,
+  type TokfaiRoutingEvidence,
+} from "./routingEvidence.js";
 
 function requestIdFromContext(c: Context): string | undefined {
   const fromCtx = c.get("requestId" as never);
   return typeof fromCtx === "string" && fromCtx.trim() ? fromCtx.trim() : undefined;
+}
+
+function tokfaiFromResult(
+  result: ExecuteChatCompletionResult & { ok: false },
+  requestId: string | undefined
+): Record<string, unknown> {
+  const base: Record<string, unknown> = {
+    billing_status: "not_billable",
+    credits_charged: 0,
+    ...(requestId ? { request_id: requestId } : {}),
+  };
+  if (result.routing) {
+    return mergeTokfaiRouting(base, {
+      ...result.routing,
+      request_id: result.routing.request_id || requestId || result.requestId,
+      billing_status: "not_billable",
+      credits_charged: 0,
+      error_code: result.routing.error_code ?? result.errorCode,
+      fallback_reason:
+        result.routing.fallback_reason ?? result.errorCode ?? null,
+    } satisfies TokfaiRoutingEvidence);
+  }
+  return base;
 }
 
 function respondJsonError(
@@ -71,6 +98,8 @@ function respondJsonError(
  * P972: forced tool failures (tool_call_not_generated / …) always return
  * parseable JSON with tokfai not_billable (never 504 / HTML / empty).
  * stream=true mid-path failures use SSE via respondEarlySse instead.
+ *
+ * P984: attach routing evidence on tokfai when present on the result.
  */
 export function respondExecuteChatCompletionFailure(
   c: Context,
@@ -89,6 +118,8 @@ export function respondExecuteChatCompletionFailure(
     (typeof result.errorCode === "string" && result.errorCode.trim()) ||
     "invalid_request_error";
 
+  const tokfai = tokfaiFromResult(result, requestId);
+
   // P972 — graceful JSON for forced tool-call failures (billing unchanged).
   if (isForcedToolFailureCode(code)) {
     return forcedToolFailureJsonResponse({
@@ -96,6 +127,7 @@ export function respondExecuteChatCompletionFailure(
       message,
       requestId,
       httpStatus: result.httpStatus,
+      tokfai,
     });
   }
 
@@ -107,12 +139,7 @@ export function respondExecuteChatCompletionFailure(
       code,
       type: errorTypeForCode(code, 400),
     });
-    const extra: Record<string, unknown> = {
-      tokfai: {
-        billing_status: "not_billable",
-        credits_charged: 0,
-      },
-    };
+    const extra: Record<string, unknown> = { tokfai };
     if (result.suggestedModels?.length) {
       extra.suggestedModels = result.suggestedModels;
     }
@@ -135,35 +162,8 @@ export function respondExecuteChatCompletionFailure(
       code,
       type: "billing_error",
     });
-    return respondJsonError(c, err, requestId, {
-      tokfai: {
-        billing_status: "not_billable",
-        credits_charged: 0,
-        ...(requestId ? { request_id: requestId } : {}),
-      },
-    });
+    return respondJsonError(c, err, requestId, { tokfai });
   }
-
-  const notBillableTokfai =
-    code === "model_not_tool_capable" ||
-    code === "all_tool_upstreams_unavailable" ||
-    code === "tool_call_not_supported" ||
-    code === "quota_exceeded" ||
-    code === "daily_limit_exceeded" ||
-    code === "monthly_limit_exceeded" ||
-    code === "trial_limit_exceeded" ||
-    code === "trial_model_not_allowed" ||
-    code === "daily_credit_limit_exceeded" ||
-    code === "monthly_credit_limit_exceeded" ||
-    code === "insufficient_credits"
-      ? {
-          tokfai: {
-            billing_status: "not_billable" as const,
-            credits_charged: 0,
-            ...(requestId ? { request_id: requestId } : {}),
-          },
-        }
-      : null;
 
   // Timeout / upstream errors may include suggestedModels when the provider
   // circuit is degraded — surface them without changing the error envelope.
@@ -177,30 +177,16 @@ export function respondExecuteChatCompletionFailure(
     });
     return respondJsonError(c, err, requestId, {
       suggestedModels: result.suggestedModels,
-      ...(notBillableTokfai ?? {}),
+      tokfai,
     });
   }
 
-  if (notBillableTokfai) {
-    const err = new ApiError({
-      status: result.httpStatus,
-      message,
-      publicMessage: message,
-      code,
-      type: errorTypeForCode(code, result.httpStatus),
-    });
-    return respondJsonError(c, err, requestId, notBillableTokfai);
-  }
-
-  return respondApiError(
-    c,
-    new ApiError({
-      status: result.httpStatus,
-      message,
-      publicMessage: message,
-      code,
-      type: errorTypeForCode(code, result.httpStatus),
-    }),
-    requestId
-  );
+  const err = new ApiError({
+    status: result.httpStatus,
+    message,
+    publicMessage: message,
+    code,
+    type: errorTypeForCode(code, result.httpStatus),
+  });
+  return respondJsonError(c, err, requestId, { tokfai });
 }

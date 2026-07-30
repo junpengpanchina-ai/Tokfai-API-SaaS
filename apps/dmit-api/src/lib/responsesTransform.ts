@@ -232,6 +232,21 @@ export function chatCompletionResponseToResponses(
       credits_charged: tokfai.credits_charged ?? creditsCharged,
       requested_model: tokfai.requested_model,
       resolved_model: tokfai.resolved_model ?? model,
+      ...(typeof tokfai.routing_strategy === "string"
+        ? { routing_strategy: tokfai.routing_strategy }
+        : {}),
+      ...(Array.isArray(tokfai.attempted_models)
+        ? { attempted_models: tokfai.attempted_models }
+        : {}),
+      ...(typeof tokfai.fallback_attempts === "number"
+        ? { fallback_attempts: tokfai.fallback_attempts }
+        : {}),
+      ...(typeof tokfai.latency_ms === "number"
+        ? { latency_ms: tokfai.latency_ms }
+        : {}),
+      ...(typeof tokfai.billing_status === "string"
+        ? { billing_status: tokfai.billing_status }
+        : {}),
     },
   };
 }

@@ -905,19 +905,25 @@ export function AdminOverviewPanel({
                           {t("admin.overview.colResolvedModel")}
                         </th>
                         <th className="pb-2 pr-3 font-medium whitespace-nowrap">
-                          {t("admin.overview.colRoute")}
-                        </th>
-                        <th className="pb-2 pr-3 font-medium whitespace-nowrap">
-                          {t("admin.overview.colStatus")}
+                          {t("admin.overview.colAttemptedModels")}
                         </th>
                         <th className="pb-2 pr-3 text-right font-medium whitespace-nowrap">
-                          {t("admin.overview.colTokens")}
+                          {t("admin.overview.colFallbackAttempts")}
+                        </th>
+                        <th className="pb-2 pr-3 font-medium whitespace-nowrap">
+                          {t("admin.overview.colRoutingStrategy")}
+                        </th>
+                        <th className="pb-2 pr-3 font-medium whitespace-nowrap">
+                          {t("admin.overview.colFallbackReason")}
+                        </th>
+                        <th className="pb-2 pr-3 text-right font-medium whitespace-nowrap">
+                          {t("admin.overview.colLatency")}
+                        </th>
+                        <th className="pb-2 pr-3 font-medium whitespace-nowrap">
+                          {t("admin.overview.colBilling")}
                         </th>
                         <th className="pb-2 pr-3 text-right font-medium whitespace-nowrap">
                           {t("admin.overview.colCreditsCharged")}
-                        </th>
-                        <th className="pb-2 pr-3 font-medium whitespace-nowrap">
-                          {t("admin.overview.colCode")}
                         </th>
                         <th className="pb-2 font-medium whitespace-nowrap">
                           {t("admin.overview.colRequestId")}
@@ -939,22 +945,40 @@ export function AdminOverviewPanel({
                           <td className="py-2 pr-3 font-mono text-xs">
                             {row.resolved_model ?? "—"}
                           </td>
-                          <td className="py-2 pr-3 font-mono text-xs">
-                            {row.route ?? "—"}
+                          <td
+                            className="max-w-[12rem] truncate py-2 pr-3 font-mono text-xs"
+                            title={(row.attempted_models ?? []).join(" → ") || undefined}
+                          >
+                            {(row.attempted_models ?? []).length
+                              ? row.attempted_models!.join(" → ")
+                              : "—"}
                           </td>
-                          <td className="py-2 pr-3">{row.status ?? "—"}</td>
                           <td className="py-2 pr-3 text-right font-mono text-xs">
-                            {row.total_tokens == null
+                            {row.fallback_attempts == null
                               ? "—"
-                              : formatInt(row.total_tokens)}
+                              : formatInt(row.fallback_attempts)}
+                          </td>
+                          <td className="py-2 pr-3 font-mono text-xs">
+                            {row.routing_strategy ?? "—"}
+                          </td>
+                          <td
+                            className="max-w-[10rem] truncate py-2 pr-3 font-mono text-xs"
+                            title={row.fallback_reason ?? row.error_code ?? undefined}
+                          >
+                            {row.fallback_reason ?? row.error_code ?? "—"}
+                          </td>
+                          <td className="py-2 pr-3 text-right font-mono text-xs">
+                            {row.latency_ms == null
+                              ? "—"
+                              : `${formatInt(row.latency_ms)}ms`}
+                          </td>
+                          <td className="py-2 pr-3 font-mono text-xs">
+                            {row.billing_status ?? "—"}
                           </td>
                           <td className="py-2 pr-3 text-right font-mono text-xs">
                             {row.credits_charged == null
                               ? "—"
                               : formatCreditsPrecise(row.credits_charged)}
-                          </td>
-                          <td className="py-2 pr-3 font-mono text-xs">
-                            {row.error_code ?? "—"}
                           </td>
                           <td className="py-2 font-mono text-xs">
                             {row.request_id ? (

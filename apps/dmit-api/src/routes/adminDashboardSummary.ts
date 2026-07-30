@@ -55,7 +55,7 @@ export type AdminDashboardRecentError = {
   created_at: string;
 };
 
-/** P983 — customer billing evidence row for sales / support screenshots. */
+/** P983/P984 — customer billing + model routing evidence (no full secrets). */
 export type AdminDashboardRecentRequest = {
   id: string;
   created_at: string;
@@ -63,6 +63,11 @@ export type AdminDashboardRecentRequest = {
   masked_api_key: string | null;
   requested_model: string | null;
   resolved_model: string | null;
+  attempted_models: string[] | null;
+  fallback_attempts: number | null;
+  routing_strategy: string | null;
+  fallback_reason: string | null;
+  latency_ms: number | null;
   route: string | null;
   status: string | null;
   prompt_tokens: number | null;
@@ -937,7 +942,7 @@ async function fetchRecentRequests(): Promise<{
     const { data, error } = await supabase()
       .from("usage_logs")
       .select(
-        "id, created_at, api_key_id, model, status, prompt_tokens, completion_tokens, total_tokens, credits_charged, error_code, request_id, billing_status, endpoint, safety_reason"
+        "id, created_at, api_key_id, model, status, prompt_tokens, completion_tokens, total_tokens, credits_charged, error_code, request_id, billing_status, endpoint, safety_reason, latency_ms, response_snapshot"
       )
       .order("created_at", { ascending: false })
       .limit(25);
@@ -961,6 +966,8 @@ async function fetchRecentRequests(): Promise<{
       billing_status: string | null;
       endpoint: string | null;
       safety_reason: string | null;
+      latency_ms: number | null;
+      response_snapshot: Record<string, unknown> | null;
     }>;
 
     const apiKeyIds = [
@@ -997,14 +1004,60 @@ async function fetchRecentRequests(): Promise<{
       requests: rows.map((row) => {
         const credits =
           row.credits_charged == null ? null : Number(row.credits_charged);
+        const snapTokfai =
+          row.response_snapshot &&
+          typeof row.response_snapshot === "object" &&
+          row.response_snapshot.tokfai &&
+          typeof row.response_snapshot.tokfai === "object"
+            ? (row.response_snapshot.tokfai as Record<string, unknown>)
+            : null;
+        const attempted = Array.isArray(snapTokfai?.attempted_models)
+          ? (snapTokfai!.attempted_models as unknown[]).filter(
+              (m): m is string => typeof m === "string"
+            )
+          : null;
+        const requestedFromSnap =
+          typeof snapTokfai?.requested_model === "string"
+            ? snapTokfai.requested_model
+            : null;
+        const resolvedFromSnap =
+          typeof snapTokfai?.resolved_model === "string"
+            ? snapTokfai.resolved_model
+            : null;
+        const fallbackAttempts =
+          typeof snapTokfai?.fallback_attempts === "number"
+            ? snapTokfai.fallback_attempts
+            : null;
+        const routingStrategy =
+          typeof snapTokfai?.routing_strategy === "string"
+            ? snapTokfai.routing_strategy
+            : null;
+        const fallbackReason =
+          typeof snapTokfai?.fallback_reason === "string"
+            ? snapTokfai.fallback_reason
+            : typeof snapTokfai?.error_code === "string"
+              ? snapTokfai.error_code
+              : row.error_code;
+        const latencyFromSnap =
+          typeof snapTokfai?.latency_ms === "number"
+            ? snapTokfai.latency_ms
+            : null;
+
         return {
           id: row.id,
           created_at: row.created_at,
           masked_api_key: maskApiKeyPrefix(
             row.api_key_id ? prefixes.get(row.api_key_id) : null
           ),
-          requested_model: deriveRequestedModel(row.model, row.safety_reason),
-          resolved_model: row.model,
+          requested_model:
+            requestedFromSnap ??
+            deriveRequestedModel(row.model, row.safety_reason),
+          resolved_model: resolvedFromSnap ?? row.model,
+          attempted_models: attempted,
+          fallback_attempts: fallbackAttempts,
+          routing_strategy: routingStrategy,
+          fallback_reason: fallbackReason,
+          latency_ms: latencyFromSnap ?? row.latency_ms,
           route: row.endpoint?.trim() || inferDashboardRoute(row.model),
           status: row.status,
           prompt_tokens: row.prompt_tokens,
@@ -1013,7 +1066,10 @@ async function fetchRecentRequests(): Promise<{
           credits_charged: Number.isFinite(credits) ? credits : null,
           error_code: row.error_code,
           request_id: row.request_id,
-          billing_status: row.billing_status,
+          billing_status:
+            (typeof snapTokfai?.billing_status === "string"
+              ? snapTokfai.billing_status
+              : null) ?? row.billing_status,
         };
       }),
     };

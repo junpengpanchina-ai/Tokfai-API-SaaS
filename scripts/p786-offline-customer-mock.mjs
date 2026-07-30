@@ -119,7 +119,7 @@ function isMockModelAllowed(raw) {
   );
 }
 
-function modelNotAvailableBody() {
+function modelNotAvailableBody(requestedModel = "unknown") {
   const requestId = makeRequestId();
   return {
     error: {
@@ -129,11 +129,11 @@ function modelNotAvailableBody() {
       type: "invalid_request_error",
       request_id: requestId,
     },
-    ...notBillableExtras(requestId),
+    ...notBillableExtras(requestId, requestedModel),
   };
 }
 
-function imageModelNotForChatBody(requestId = makeRequestId()) {
+function imageModelNotForChatBody(requestId = makeRequestId(), requestedModel = "unknown") {
   return {
     error: {
       message:
@@ -142,7 +142,7 @@ function imageModelNotForChatBody(requestId = makeRequestId()) {
       type: "invalid_request_error",
       request_id: requestId,
     },
-    ...notBillableExtras(requestId),
+    ...notBillableExtras(requestId, requestedModel),
   };
 }
 
@@ -150,14 +150,27 @@ function imageModelNotForChatBody(requestId = makeRequestId()) {
  * Offline-only error triggers for client error-copy smoke (p914).
  * Never hit production; model ids are reserved for mock gateways.
  */
-function notBillableExtras(requestId) {
+function notBillableExtras(requestId, requestedModel = "unknown") {
+  const strategy =
+    requestedModel === "auto-fast" ||
+    requestedModel === "auto-pro" ||
+    requestedModel === "auto-cheap"
+      ? requestedModel
+      : "direct";
   return {
     request_id: requestId,
     credits_charged: 0,
     tokfai: {
       request_id: requestId,
+      requested_model: requestedModel,
+      resolved_model: null,
+      routing_strategy: strategy,
+      attempted_models: [requestedModel],
+      fallback_attempts: 1,
+      latency_ms: 1,
       credits_charged: 0,
       billing_status: "not_billable",
+      fallback_reason: "failed",
     },
   };
 }
@@ -241,7 +254,7 @@ function mockErrorForModel(rawModel) {
         type: hit.type,
         request_id: requestId,
       },
-      ...notBillableExtras(requestId),
+      ...notBillableExtras(requestId, id),
     },
   };
 }
@@ -249,6 +262,22 @@ function mockErrorForModel(rawModel) {
 function tokfaiMeta(requestedModel = "auto-fast", resolvedModel = "gemini-3-flash") {
   const requestId = makeRequestId();
   const creditsCharged = 0.000001;
+  const strategy =
+    requestedModel === "auto-fast" ||
+    requestedModel === "auto-pro" ||
+    requestedModel === "auto-cheap"
+      ? requestedModel
+      : requestedModel.startsWith("gpt-5")
+        ? `alias:${requestedModel}`
+        : "direct";
+  const attempted =
+    requestedModel === "auto-fast"
+      ? [resolvedModel]
+      : requestedModel === "auto-pro"
+        ? [resolvedModel]
+        : requestedModel === "auto-cheap"
+          ? [resolvedModel]
+          : [resolvedModel];
   return {
     request_id: requestId,
     credits_charged: creditsCharged,
@@ -257,6 +286,10 @@ function tokfaiMeta(requestedModel = "auto-fast", resolvedModel = "gemini-3-flas
       credits_charged: creditsCharged,
       requested_model: requestedModel,
       resolved_model: resolvedModel,
+      routing_strategy: strategy,
+      attempted_models: attempted,
+      fallback_attempts: 1,
+      latency_ms: 12,
       billing_status: "charged",
     },
   };
@@ -646,6 +679,7 @@ function mockToolsCapabilityMark(id) {
 }
 
 function mockModelNotToolCapableError(requestId, requestedModel) {
+  const extras = notBillableExtras(requestId, requestedModel);
   return {
     error: {
       message:
@@ -654,14 +688,12 @@ function mockModelNotToolCapableError(requestId, requestedModel) {
       type: "invalid_request_error",
       request_id: requestId,
     },
-    request_id: requestId,
+    ...extras,
     tokfai: {
-      billing_status: "not_billable",
-      credits_charged: 0,
-      request_id: requestId,
-      requested_model: requestedModel,
+      ...extras.tokfai,
+      fallback_reason: "model_not_tool_capable",
+      error_code: "model_not_tool_capable",
     },
-    credits_charged: 0,
   };
 }
 
@@ -1703,10 +1735,10 @@ export function startMockGateway(options = {}) {
           if (forced) return sendJson(res, forced.status, forced.body);
           // Image models are isolated — never chat fallback / billing.
           if (isMockImageModel(model) || MOCK_UNAVAILABLE_IMAGE_MODELS.has(String(model).toLowerCase()) || String(model).toLowerCase().startsWith("nano-banana") || String(model).toLowerCase().startsWith("gpt-image")) {
-            return sendJson(res, 400, imageModelNotForChatBody());
+            return sendJson(res, 400, imageModelNotForChatBody(undefined, model));
           }
           if (!isMockModelAllowed(model)) {
-            return sendJson(res, 400, modelNotAvailableBody());
+            return sendJson(res, 400, modelNotAvailableBody(model));
           }
           // P974 — forced tools on non-whitelist → model_not_tool_capable.
           const hasToolsReq =
@@ -1814,10 +1846,10 @@ export function startMockGateway(options = {}) {
           const forced = mockErrorForModel(model);
           if (forced) return sendJson(res, forced.status, forced.body);
           if (isMockImageModel(model) || MOCK_UNAVAILABLE_IMAGE_MODELS.has(String(model).toLowerCase()) || String(model).toLowerCase().startsWith("nano-banana") || String(model).toLowerCase().startsWith("gpt-image")) {
-            return sendJson(res, 400, imageModelNotForChatBody());
+            return sendJson(res, 400, imageModelNotForChatBody(undefined, model));
           }
           if (!isMockModelAllowed(model)) {
-            return sendJson(res, 400, modelNotAvailableBody());
+            return sendJson(res, 400, modelNotAvailableBody(model));
           }
           const response = responsesBody(body);
           if (body?.stream === true) {

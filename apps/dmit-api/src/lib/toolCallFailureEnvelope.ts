@@ -55,6 +55,7 @@ export function buildNotBillableToolErrorPayload(args: {
   httpStatus?: number;
   defaultCode?: string;
   defaultMessage?: string;
+  tokfai?: Record<string, unknown>;
 }): {
   status: number;
   payload: Record<string, unknown>;
@@ -88,13 +89,17 @@ export function buildNotBillableToolErrorPayload(args: {
   });
 
   const body = buildClientErrorBody(err, requestId);
+  const tokfai = {
+    billing_status: "not_billable" as const,
+    credits_charged: 0,
+    ...(requestId ? { request_id: requestId } : {}),
+    ...(args.tokfai ?? {}),
+  };
+  tokfai.billing_status = "not_billable";
+  tokfai.credits_charged = 0;
   const payload: Record<string, unknown> = {
     ...body,
-    tokfai: {
-      billing_status: "not_billable",
-      credits_charged: 0,
-      ...(requestId ? { request_id: requestId } : {}),
-    },
+    tokfai,
     credits_charged: 0,
   };
 
@@ -106,6 +111,7 @@ export function buildForcedToolFailurePayload(args: {
   message?: string | null;
   requestId?: string | null;
   httpStatus?: number;
+  tokfai?: Record<string, unknown>;
 }): {
   status: number;
   payload: Record<string, unknown>;
@@ -119,6 +125,7 @@ export function forcedToolFailureJsonResponse(args: {
   message?: string | null;
   requestId?: string | null;
   httpStatus?: number;
+  tokfai?: Record<string, unknown>;
 }): Response {
   const { status, payload } = buildForcedToolFailurePayload(args);
   const text = JSON.stringify(payload);

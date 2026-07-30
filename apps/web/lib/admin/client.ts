@@ -216,13 +216,18 @@ export type AdminDashboardRecentError = {
   created_at: string;
 };
 
-/** P983 — recent request billing evidence (masked key only). */
+/** P983/P984 — recent request billing + routing evidence (masked key only). */
 export type AdminDashboardRecentRequest = {
   id: string;
   created_at: string;
   masked_api_key: string | null;
   requested_model: string | null;
   resolved_model: string | null;
+  attempted_models?: string[] | null;
+  fallback_attempts?: number | null;
+  routing_strategy?: string | null;
+  fallback_reason?: string | null;
+  latency_ms?: number | null;
   route: string | null;
   status: string | null;
   prompt_tokens: number | null;

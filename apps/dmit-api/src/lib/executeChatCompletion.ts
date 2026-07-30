@@ -90,6 +90,14 @@ import {
   recordSuccessfulUsageAndDebit as persistSuccessfulUsageAndDebit,
 } from "./usageBilling.js";
 import { resolveUpstreamTimeoutPolicy } from "./upstreamTimeoutPolicy.js";
+import {
+  buildFailureRoutingEvidence,
+  buildSuccessRoutingEvidence,
+  mergeTokfaiRouting,
+  routingEvidenceSnapshot,
+  routingEvidenceToLogFields,
+  type TokfaiRoutingEvidence,
+} from "./routingEvidence.js";
 
 /**
  * Client fields that must NEVER influence billing or tenant resolution.
@@ -260,6 +268,8 @@ export type ExecuteChatCompletionResult =
       requestId: string;
       httpStatus: number;
       suggestedModels?: string[];
+      /** P984 — client-safe routing / billing evidence for error tokfai. */
+      routing?: TokfaiRoutingEvidence;
     };
 
 export async function executeChatCompletion(
@@ -279,6 +289,30 @@ export async function executeChatCompletion(
   /** Internal catalog / alias id after consumer compatibility rewrite. */
   const requestedModel = resolvedRequest.canonicalId;
 
+  const makeFailRouting = (opts?: {
+    errorCode?: string | null;
+    attemptedModels?: string[];
+    resolvedModel?: string | null;
+    fallbackAttempts?: number;
+    fallbackReason?: string | null;
+  }): TokfaiRoutingEvidence =>
+    buildFailureRoutingEvidence({
+      requestId,
+      requestedRaw,
+      canonicalId: requestedModel,
+      isAlias: resolvedRequest.isAlias,
+      resolvedModel: opts?.resolvedModel ?? null,
+      attemptedModels:
+        opts?.attemptedModels ??
+        (resolvedRequest.attempts.length > 0
+          ? resolvedRequest.attempts
+          : [requestedModel]),
+      fallbackAttempts: opts?.fallbackAttempts,
+      latencyMs: Date.now() - startedAt,
+      fallbackReason: opts?.fallbackReason ?? opts?.errorCode ?? null,
+      errorCode: opts?.errorCode ?? null,
+    });
+
   let timeoutPolicy = resolveUpstreamTimeoutPolicy({
     route,
     requestedModel: requestedRaw,
@@ -288,10 +322,17 @@ export async function executeChatCompletion(
   });
 
   log.info("upstream_timeout_policy", {
-    requestId,
-    route,
-    requestedModel: requestedRaw,
-    resolvedModel: requestedModel,
+    ...routingEvidenceToLogFields(
+      makeFailRouting({ attemptedModels: resolvedRequest.attempts }),
+      {
+        route,
+        status: null,
+        providerId: null,
+        providerLabel: null,
+        upstreamStatus: null,
+        upstreamErrorCode: null,
+      }
+    ),
     tier: timeoutPolicy.tier,
     isHeavy: timeoutPolicy.isHeavy,
     timeoutMs: timeoutPolicy.upstreamTimeoutMs,
@@ -299,6 +340,9 @@ export async function executeChatCompletion(
     totalTimeoutMs: timeoutPolicy.totalTimeoutMs,
     reason: timeoutPolicy.reason,
     clientStream,
+    // Policy log is pre-attempt; not a billing event.
+    billing_status: "not_billable",
+    credits_charged: 0,
   });
 
   if (
@@ -336,6 +380,11 @@ export async function executeChatCompletion(
       supportedModels: suggestedModels,
     });
 
+    const routing = makeFailRouting({
+      errorCode,
+      fallbackReason: "image_capability_isolation",
+    });
+
     await writeUsageLog(
       failedUsageLog({
         user_id: caller.userId,
@@ -351,7 +400,8 @@ export async function executeChatCompletion(
         billable: false,
         credits_charged: 0,
       }),
-      route
+      route,
+      routingEvidenceSnapshot(routing)
     );
 
     return {
@@ -361,6 +411,7 @@ export async function executeChatCompletion(
       requestId,
       httpStatus: 400,
       suggestedModels,
+      routing,
     };
   }
 
@@ -377,7 +428,11 @@ export async function executeChatCompletion(
       normalizedModel: resolvedRequest.normalized,
       resolvedModel: requestedModel,
       supportedModels: suggestedModels,
+      billing_status: "not_billable",
+      credits_charged: 0,
     });
+
+    const routing = makeFailRouting({ errorCode });
 
     await writeUsageLog(
       failedUsageLog({
@@ -390,8 +445,12 @@ export async function executeChatCompletion(
         error_code: errorCode,
         error_message: errorMessage,
         latency_ms: Date.now() - startedAt,
+        billing_status: "not_billable",
+        billable: false,
+        credits_charged: 0,
       }),
-      route
+      route,
+      routingEvidenceSnapshot(routing)
     );
 
     return {
@@ -401,12 +460,14 @@ export async function executeChatCompletion(
       requestId,
       httpStatus: 400,
       suggestedModels,
+      routing,
     };
   }
 
   if (!(await isModelEnabledForTenant(caller.tenantId, requestedModel))) {
     const errorCode = "model_disabled_for_tenant";
     const errorMessage = `Model is not available on this site: ${requestedRaw}`;
+    const routing = makeFailRouting({ errorCode });
 
     await writeUsageLog(
       failedUsageLog({
@@ -419,8 +480,12 @@ export async function executeChatCompletion(
         error_code: errorCode,
         error_message: errorMessage,
         latency_ms: Date.now() - startedAt,
+        billing_status: "not_billable",
+        billable: false,
+        credits_charged: 0,
       }),
-      route
+      route,
+      routingEvidenceSnapshot(routing)
     );
 
     return {
@@ -429,6 +494,7 @@ export async function executeChatCompletion(
       errorMessage,
       requestId,
       httpStatus: 403,
+      routing,
     };
   }
 
@@ -450,15 +516,18 @@ export async function executeChatCompletion(
 
   if (isAlias && attempts.length === 0) {
     const err = allUpstreamsUnavailableError();
-    await logChatFailure({
+    const routing = await logChatFailure({
       caller,
       requestId,
       requestedModel,
+      requestedRaw,
+      isAlias,
+      attemptedModels: [],
       startedAt,
       err,
       route,
     });
-    return failureResult(err, requestId, requestedModel);
+    return failureResult(err, requestId, requestedModel, routing);
   }
 
   // P974 — tools routing: verified whitelist only; auto may degrade to chat.
@@ -479,19 +548,33 @@ export async function executeChatCompletion(
     );
     log.warn("model_not_tool_capable", {
       code: errorCode,
-      route,
-      requestId,
-      requestedModel: requestedRaw,
-      resolvedModel: requestedModel,
-      attemptedModel: attempts[0] ?? requestedModel,
+      ...routingEvidenceToLogFields(
+        makeFailRouting({
+          errorCode,
+          attemptedModels: attempts.length > 0 ? attempts : [requestedModel],
+          fallbackReason: "model_not_tool_capable",
+        }),
+        {
+          route,
+          status: 400,
+          attemptedModel: attempts[0] ?? requestedModel,
+          providerId: null,
+          providerLabel: null,
+          upstreamStatus: null,
+          upstreamErrorCode: null,
+        }
+      ),
       supportsTools: false,
       hasTools: true,
       toolChoice: toolChoiceSummary(body),
       requireToolCall: clientRequiresToolCall(body),
       strictToolCall: true,
       bodyKeys: chatBodyKeys(body).join(","),
-      billing_status: "not_billable",
-      credits_charged: 0,
+    });
+    const routing = makeFailRouting({
+      errorCode,
+      attemptedModels: attempts.length > 0 ? attempts : [requestedModel],
+      fallbackReason: "model_not_tool_capable",
     });
     await writeUsageLog(
       failedUsageLog({
@@ -508,7 +591,8 @@ export async function executeChatCompletion(
         billable: false,
         credits_charged: 0,
       }),
-      route
+      route,
+      routingEvidenceSnapshot(routing)
     );
     return {
       ok: false,
@@ -517,6 +601,7 @@ export async function executeChatCompletion(
       requestId,
       httpStatus: 400,
       ...(suggestedModels.length ? { suggestedModels } : {}),
+      routing,
     };
   }
 
@@ -544,17 +629,25 @@ export async function executeChatCompletion(
     if (!toolsResolved) {
       const errorCode = MODEL_NOT_TOOL_CAPABLE_CODE;
       const errorMessage = MODEL_NOT_TOOL_CAPABLE_MESSAGE;
+      const routing = makeFailRouting({
+        errorCode,
+        attemptedModels: attempts.length > 0 ? attempts : [requestedModel],
+        fallbackReason: "model_not_tool_capable",
+      });
       log.warn("model_not_tool_capable", {
         code: errorCode,
-        route,
-        requestId,
-        requestedModel: requestedRaw,
-        resolvedModel: requestedModel,
+        ...routingEvidenceToLogFields(routing, {
+          route,
+          status: 400,
+          attemptedModel: attempts[0] ?? requestedModel,
+          providerId: null,
+          providerLabel: null,
+          upstreamStatus: null,
+          upstreamErrorCode: null,
+        }),
         supportsTools: false,
         hasTools: true,
         toolChoice: toolChoiceSummary(body),
-        billing_status: "not_billable",
-        credits_charged: 0,
       });
       await writeUsageLog(
         failedUsageLog({
@@ -571,7 +664,8 @@ export async function executeChatCompletion(
           billable: false,
           credits_charged: 0,
         }),
-        route
+        route,
+        routingEvidenceSnapshot(routing)
       );
       return {
         ok: false,
@@ -579,6 +673,7 @@ export async function executeChatCompletion(
         errorMessage,
         requestId,
         httpStatus: 400,
+        routing,
       };
     }
     toolsFallbackApplied = toolsResolved.fallbackApplied;
@@ -693,16 +788,19 @@ export async function executeChatCompletion(
     if (timeoutPolicy.isHeavy) {
       if (!(await tryAcquireHeavyResponses(limitKey))) {
         const err = ApiError.heavyResponsesRateLimited();
-        await logChatFailure({
+        const routing = await logChatFailure({
           caller,
           requestId,
           requestedModel,
+          requestedRaw,
+          isAlias,
+          attemptedModels: attempts,
           startedAt,
           err,
           route,
           timeoutMs: timeoutPolicy.upstreamTimeoutMs,
         });
-        return failureResult(err, requestId, requestedModel);
+        return failureResult(err, requestId, requestedModel, routing);
       }
       heavySlotHeld = true;
     }
@@ -749,6 +847,9 @@ export async function executeChatCompletion(
           caller,
           requestId,
           requestedModel,
+          requestedRaw,
+          isAlias,
+          attemptedModels: attempts,
           startedAt,
           err,
           route,
@@ -765,9 +866,21 @@ export async function executeChatCompletion(
           errorCode: err.code ?? null,
         });
       }
-      return failureResult(err, requestId, requestedModel);
+      return failureResult(
+        err,
+        requestId,
+        requestedModel,
+        makeFailRouting({
+          errorCode: err.code,
+          attemptedModels: attempts,
+        })
+      );
     }
 
+    const serverRouting = makeFailRouting({
+      errorCode: "server_error",
+      attemptedModels: attempts,
+    });
     await writeUsageLog(
       failedUsageLog({
         user_id: caller.userId,
@@ -779,17 +892,26 @@ export async function executeChatCompletion(
         error_code: "server_error",
         error_message: "Internal error.",
         latency_ms: Date.now() - startedAt,
+        billing_status: "not_billable",
+        billable: false,
+        credits_charged: 0,
       }),
-      route
+      route,
+      routingEvidenceSnapshot(serverRouting)
     );
 
     log.error("chat_completion_failed", {
-      requestId,
-      route,
-      status: 500,
+      ...routingEvidenceToLogFields(serverRouting, {
+        route,
+        status: 500,
+        attemptedModel: attempts[0] ?? requestedModel,
+        providerId: null,
+        providerLabel: null,
+        upstreamStatus: null,
+        upstreamErrorCode: null,
+      }),
       code: "server_error",
       message: "Internal error.",
-      requestedModel,
     });
 
     return {
@@ -798,6 +920,7 @@ export async function executeChatCompletion(
       errorMessage: "Internal error.",
       requestId,
       httpStatus: 500,
+      routing: serverRouting,
     };
   }
 }
@@ -908,10 +1031,13 @@ async function runProviderAttempts(args: {
         billing_status: "not_billable",
         fallbackSkippedReason: "provider_model_degraded",
       });
-      await logChatFailure({
+      const routing = await logChatFailure({
         caller,
         requestId,
         requestedModel,
+      requestedRaw,
+      isAlias,
+      attemptedModels: attempts,
         startedAt,
         err: timeoutErr,
         route,
@@ -919,6 +1045,7 @@ async function runProviderAttempts(args: {
         timeoutMs: timeoutPolicy.upstreamTimeoutMs,
       });
       return failureResultWithSuggestions(timeoutErr, requestId, requestedModel, {
+            routing,
         suggestSwitchModel: true,
       });
     }
@@ -939,10 +1066,13 @@ async function runProviderAttempts(args: {
         const timeoutErr = ApiError.requestTimeout();
         if (isAlias && attemptIndex > 0) {
           const exhausted = allUpstreamsUnavailableError();
-          await logChatFailure({
+          const routing = await logChatFailure({
             caller,
             requestId,
             requestedModel,
+      requestedRaw,
+      isAlias,
+      attemptedModels: attempts,
             startedAt,
             err: exhausted,
             lastAttempt: timeoutErr,
@@ -950,29 +1080,28 @@ async function runProviderAttempts(args: {
             providerId: provider.id,
             timeoutMs: timeoutPolicy.upstreamTimeoutMs,
           });
-          return failureResultWithSuggestions(
-            exhausted,
-            requestId,
-            requestedModel,
-            { suggestSwitchModel: true }
-          );
+          return failureResultWithSuggestions(exhausted, requestId, requestedModel, {
+            routing,
+            suggestSwitchModel: true,
+          });
         }
-        await logChatFailure({
+        const routing = await logChatFailure({
           caller,
           requestId,
           requestedModel,
+      requestedRaw,
+      isAlias,
+      attemptedModels: attempts,
           startedAt,
           err: timeoutErr,
           route,
           providerId: provider.id,
           timeoutMs: timeoutPolicy.upstreamTimeoutMs,
         });
-        return failureResultWithSuggestions(
-          timeoutErr,
-          requestId,
-          requestedModel,
-          { suggestSwitchModel: true }
-        );
+        return failureResultWithSuggestions(timeoutErr, requestId, requestedModel, {
+            routing,
+            suggestSwitchModel: true,
+          });
       }
 
       if (!(await tryAcquireGlobalUpstream())) {
@@ -987,7 +1116,17 @@ async function runProviderAttempts(args: {
           requestedModel,
           startedAt,
         });
-        return failureResult(err, requestId, requestedModel);
+        const overloadedRouting = buildFailureRoutingEvidence({
+          requestId,
+          requestedRaw,
+          canonicalId: requestedModel,
+          isAlias,
+          attemptedModels: attempts,
+          latencyMs: Date.now() - startedAt,
+          errorCode: err.code ?? "gateway_overloaded",
+          fallbackReason: "gateway_overloaded",
+        });
+        return failureResult(err, requestId, requestedModel, overloadedRouting);
       }
 
       try {
@@ -1243,6 +1382,21 @@ async function runProviderAttempts(args: {
           };
         }
 
+        const latencyMs = Date.now() - startedAt;
+        const triedModels = attempts.slice(0, attemptIndex + 1);
+        const routing = buildSuccessRoutingEvidence({
+          requestId,
+          requestedRaw,
+          canonicalId: requestedModel,
+          isAlias,
+          resolvedModel,
+          attemptedModels: triedModels.length > 0 ? triedModels : [attemptModel],
+          fallbackAttempts: attemptIndex + 1,
+          latencyMs,
+          creditsCharged,
+          billingStatus: unlimited || creditsCharged <= 0 ? "not_billable" : "charged",
+        });
+
         const response: Record<string, unknown> = {
           ...responseData,
           // Upstream may omit or send empty object; OpenAI clients require this.
@@ -1250,30 +1404,28 @@ async function runProviderAttempts(args: {
           model: resolvedModel,
           credits_charged: creditsCharged,
           request_id: requestId,
-          tokfai: {
-            credits_charged: creditsCharged,
-            request_id: requestId,
-            requested_model: requestedRaw,
-            resolved_model: resolvedModel,
-            ...(upstreamId ? { upstream_request_id: upstreamId } : {}),
-            ...(isAlias ? { fallback_attempts: attemptIndex + 1 } : {}),
-            ...(viaStreamFallback
-              ? { upstream_stream_fallback: true }
-              : {}),
-            ...(autoNoToolCall ? { auto_no_tool_call: true } : {}),
-            ...(hasToolsClient
-              ? {
-                  has_tools: true,
-                  strict_tool_call: strictToolCall,
-                  upstream_returned_tool_calls: toolsDegradedToChat
-                    ? false
-                    : upstreamReturnedToolCalls,
-                  ...(toolsDegradedToChat
-                    ? { tools_degraded_to_chat: true }
-                    : {}),
-                }
-              : {}),
-          },
+          tokfai: mergeTokfaiRouting(
+            {
+              ...(upstreamId ? { upstream_request_id: upstreamId } : {}),
+              ...(viaStreamFallback
+                ? { upstream_stream_fallback: true }
+                : {}),
+              ...(autoNoToolCall ? { auto_no_tool_call: true } : {}),
+              ...(hasToolsClient
+                ? {
+                    has_tools: true,
+                    strict_tool_call: strictToolCall,
+                    upstream_returned_tool_calls: toolsDegradedToChat
+                      ? false
+                      : upstreamReturnedToolCalls,
+                    ...(toolsDegradedToChat
+                      ? { tools_degraded_to_chat: true }
+                      : {}),
+                  }
+                : {}),
+            },
+            routing
+          ),
         };
 
         await recordSuccessfulUsageAndDebit(
@@ -1311,17 +1463,19 @@ async function runProviderAttempts(args: {
           responseData as unknown as ChatCompletionResponse
         );
         log.info("chat_completion_succeeded", {
-          requestId,
-          route,
-          status: 200,
+          ...routingEvidenceToLogFields(routing, {
+            route,
+            status: 200,
+            attemptedModel: attemptModel,
+            providerId: provider.id,
+            providerLabel: provider.id,
+            upstreamStatus: 200,
+            upstreamErrorCode: null,
+          }),
           code: "succeeded",
           message: "Chat completion succeeded.",
-          requestedModel: requestedRaw,
-          resolvedModel,
-          attemptedModel: attemptModel,
           attemptModel,
           attemptIndex,
-          providerId: provider.id,
           providerIndex,
           supportsTools: modelSupportsTools(attemptModel),
           hasTools: hasToolsClient,
@@ -1336,11 +1490,6 @@ async function runProviderAttempts(args: {
           fakeToolCallGuard: false,
           autoNoToolCall,
           bodyKeys: chatBodyKeys(clientBody).join(","),
-          upstreamStatus: 200,
-          upstreamErrorCode: null,
-          billing_status: "charged",
-          credits_charged: creditsCharged,
-          latencyMs: Date.now() - startedAt,
           timeoutMs: perAttemptTimeoutMs,
           viaStreamFallback,
           userId: caller.userId,
@@ -1489,10 +1638,13 @@ async function runProviderAttempts(args: {
 
         if (isAlias && isChatFallbackEligible(err)) {
           const exhausted = allUpstreamsUnavailableError();
-          await logChatFailure({
+          const routing = await logChatFailure({
             caller,
             requestId,
             requestedModel,
+      requestedRaw,
+      isAlias,
+      attemptedModels: attempts,
             startedAt,
             err: exhausted,
             lastAttempt: err,
@@ -1500,18 +1652,19 @@ async function runProviderAttempts(args: {
             providerId: provider.id,
             timeoutMs: attemptTimeoutMs,
           });
-          return failureResultWithSuggestions(
-            exhausted,
-            requestId,
-            requestedModel,
-            { suggestSwitchModel: true }
-          );
+          return failureResultWithSuggestions(exhausted, requestId, requestedModel, {
+            routing,
+            suggestSwitchModel: true,
+          });
         }
 
-        await logChatFailure({
+        const routing = await logChatFailure({
           caller,
           requestId,
           requestedModel,
+      requestedRaw,
+      isAlias,
+      attemptedModels: attempts,
           startedAt,
           err,
           route,
@@ -1519,6 +1672,7 @@ async function runProviderAttempts(args: {
           timeoutMs: attemptTimeoutMs,
         });
         return failureResultWithSuggestions(err, requestId, requestedModel, {
+            routing,
           suggestSwitchModel: isTimeout,
         });
       } finally {
@@ -1534,10 +1688,13 @@ async function runProviderAttempts(args: {
   const fallbackErr = requestHasTools(clientBody)
     ? allToolUpstreamsUnavailableError(lastError)
     : (lastError ?? allUpstreamsUnavailableError());
-  await logChatFailure({
+  const routing = await logChatFailure({
     caller,
     requestId,
     requestedModel,
+    requestedRaw,
+    isAlias,
+    attemptedModels: attempts,
     startedAt,
     err: fallbackErr,
     route,
@@ -1545,13 +1702,15 @@ async function runProviderAttempts(args: {
   });
   return failureResultWithSuggestions(fallbackErr, requestId, requestedModel, {
     suggestSwitchModel: true,
+    routing,
   });
 }
 
 function failureResult(
   err: ApiError,
   requestId: string,
-  requestedModel?: string
+  requestedModel?: string,
+  routing?: TokfaiRoutingEvidence
 ): Extract<ExecuteChatCompletionResult, { ok: false }> {
   let errorMessage = err.publicMessage;
   const errorCode = err.code ?? "failed";
@@ -1571,6 +1730,7 @@ function failureResult(
     errorMessage,
     requestId,
     httpStatus: err.status,
+    ...(routing ? { routing } : {}),
   };
 }
 
@@ -1578,9 +1738,12 @@ async function failureResultWithSuggestions(
   err: ApiError,
   requestId: string,
   requestedModel: string,
-  opts?: { suggestSwitchModel?: boolean }
+  opts?: {
+    suggestSwitchModel?: boolean;
+    routing?: TokfaiRoutingEvidence;
+  }
 ): Promise<Extract<ExecuteChatCompletionResult, { ok: false }>> {
-  const base = failureResult(err, requestId, requestedModel);
+  const base = failureResult(err, requestId, requestedModel, opts?.routing);
   if (!opts?.suggestSwitchModel) return base;
 
   let errorMessage = base.errorMessage;
@@ -1839,17 +2002,25 @@ async function logChatFailure(args: {
   caller: ChatCaller;
   requestId: string;
   requestedModel: string;
+  /** Client-facing requested id when different from canonical. */
+  requestedRaw?: string;
+  isAlias?: boolean;
+  attemptedModels?: string[];
   startedAt: number;
   err: ApiError;
   lastAttempt?: ApiError;
   route: string;
   providerId?: string;
   timeoutMs?: number;
-}): Promise<void> {
+  routing?: TokfaiRoutingEvidence;
+}): Promise<TokfaiRoutingEvidence> {
   const {
     caller,
     requestId,
     requestedModel,
+    requestedRaw = requestedModel,
+    isAlias = false,
+    attemptedModels,
     startedAt,
     err,
     lastAttempt,
@@ -1870,6 +2041,24 @@ async function logChatFailure(args: {
       ? "rate_limited"
       : "failed";
 
+  const routing =
+    args.routing ??
+    buildFailureRoutingEvidence({
+      requestId,
+      requestedRaw,
+      canonicalId: requestedModel,
+      isAlias,
+      resolvedModel: null,
+      attemptedModels:
+        attemptedModels && attemptedModels.length > 0
+          ? attemptedModels
+          : [requestedModel],
+      fallbackAttempts: attemptedModels?.length ?? 1,
+      latencyMs: Date.now() - startedAt,
+      fallbackReason: err.code ?? "failed",
+      errorCode: err.code ?? "failed",
+    });
+
   await writeUsageLog(
     failedUsageLog({
       user_id: caller.userId,
@@ -1888,7 +2077,8 @@ async function logChatFailure(args: {
       safety_reason: providerId ? `provider=${providerId}` : null,
       ...upstreamFailureFields(lastAttempt ?? err),
     }),
-    route
+    route,
+    routingEvidenceSnapshot(routing)
   );
 
   const fakeToolCallGuard =
@@ -1896,20 +2086,19 @@ async function logChatFailure(args: {
     err.code === "provider_tool_call_not_supported";
 
   log.warn("chat_completion_failed", {
-    requestId,
-    route,
-    requestedModel,
-    resolvedModel: requestedModel,
-    attemptedModel: requestedModel,
-    providerId: providerId ?? null,
-    supportsTools: modelSupportsTools(requestedModel),
-    status: err.status,
+    ...routingEvidenceToLogFields(routing, {
+      route,
+      status: err.status,
+      attemptedModel:
+        attemptedModels?.[attemptedModels.length - 1] ?? requestedModel,
+      providerId: providerId ?? null,
+      providerLabel: providerId ?? null,
+      upstreamStatus: (lastAttempt ?? err).upstreamStatus ?? null,
+      upstreamErrorCode: (lastAttempt ?? err).code ?? null,
+    }),
     code: err.code ?? "failed",
     message: err.publicMessage,
-    upstreamStatus: (lastAttempt ?? err).upstreamStatus,
-    upstreamErrorCode: (lastAttempt ?? err).code ?? null,
     upstreamErrorMessage: (lastAttempt ?? err).upstreamErrorSnippet,
-    latencyMs: Date.now() - startedAt,
     ...(typeof timeoutMs === "number" ? { timeoutMs } : {}),
     fakeToolCallGuard,
     ...(fakeToolCallGuard
@@ -1919,11 +2108,12 @@ async function logChatFailure(args: {
           upstreamReturnedToolCalls: false,
         }
       : {}),
-    billing_status: "not_billable",
-    credits_charged: 0,
+    supportsTools: modelSupportsTools(requestedModel),
     fallbackSkippedReason:
       err.code === "upstream_timeout" ? "request_failed" : null,
   });
+
+  return routing;
 }
 
 function insufficientCreditsError(): ApiError {
@@ -1951,7 +2141,8 @@ function stripClientBillingOverrides(
 
 async function writeUsageLog(
   entry: UsageLogInsert,
-  endpoint: string
+  endpoint: string,
+  responseSnapshot?: Record<string, unknown> | null
 ): Promise<void> {
   const { error } = await supabase().from("usage_logs").insert({
     ...entry,
@@ -1959,6 +2150,7 @@ async function writeUsageLog(
     billing_status: entry.billing_status ?? "not_billable",
     idempotency_key: entry.idempotency_key ?? null,
     billing_error: entry.billing_error ?? null,
+    ...(responseSnapshot ? { response_snapshot: responseSnapshot } : {}),
   });
   if (error) {
     log.warn("usage_log_insert_failed", {
