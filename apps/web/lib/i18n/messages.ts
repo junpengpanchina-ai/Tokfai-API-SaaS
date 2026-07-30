@@ -1370,21 +1370,24 @@ export const messages = {
       usage: {
         title: "Usage",
         subtitle:
-          "Review API requests, models, type, status, tokens, credits charged, error codes, and request_id. Failed requests are not charged.",
+          "Review API requests, models, type, status, tokens, credits charged, billing_status, error codes, and request_id. Failed requests are not charged.",
         statRequests24h: "Requests (24h)",
         statRequests7d: "Requests (7d)",
         statTokens7d: "Tokens (7d)",
         statCredits7d: "Credits used (7d)",
         howItWorksTitle: "Reading this page",
         howItWorksItem1:
-          "Each row is one API request with model, type, route, status, tokens, credits charged, error code, and request_id.",
+          "Each row is one API request with model, type, route, status, tokens, credits charged, billing_status, error code, and request_id.",
         howItWorksItem2:
-          "Chat rows show prompt, completion, and total tokens. Image rows show credits per generation.",
+          "Successful requests show request_id, model, tokens, credits_charged, and status.",
         howItWorksItem3:
-          "Balance and totals on Credits match this page — Usage and Credits are the source of truth.",
-        howItWorksItem4: "Failed requests are listed here but are not charged.",
+          "Failed requests show request_id, error_code, billing_status=not_billable, and credits_charged=0.",
+        howItWorksItem4:
+          "Balance and totals on Credits match this page — Usage and Credits are the source of truth for reconciliation.",
         howItWorksItem5:
-          "Failed requests help with troubleshooting and are usually not charged; successful requests record tokens and credits_charged.",
+          "Copy request_id when contacting support. Do not share your full API key.",
+        howItWorksItem6:
+          "Sales and support can screenshot this table as customer billing evidence.",
         integrationWorkbenchLink: "Integration Workbench — reconcile request_id",
         recentRequests: "Recent requests",
         recentRequestsDesc:
@@ -1401,6 +1404,8 @@ export const messages = {
         colCompletion: "Completion",
         colTotal: "Total",
         colCredits: "Credits charged",
+        colBilling: "Billing",
+        billingNotBillableHint: "Not billable — credits_charged is 0",
         colRequestId: "Request ID",
         colRequestIdHint: "Use when contacting support to trace a request",
         copyRequestId: "Copy request ID",
@@ -4987,6 +4992,15 @@ export const messages = {
           "Default trial models: auto-fast · auto-cheap. High-cost models should stay trial_mode off.",
         trialRiskTipErrors:
           "Guard codes: trial_limit_exceeded · daily_limit_exceeded · quota_exceeded · trial_model_not_allowed.",
+        billingEvidenceTipTitle: "Customer billing evidence",
+        billingEvidenceTipDesc:
+          "P983: Usage + Admin recent requests are screenshot-ready for sales and support reconciliation.",
+        billingEvidenceTipSuccess:
+          "Success: request_id · model · tokens · credits_charged · status.",
+        billingEvidenceTipFailure:
+          "Failure: request_id · error_code · billing_status=not_billable · credits_charged=0.",
+        billingEvidenceTipMask:
+          "Show masked API key prefix only — never ask for or display the full secret.",
         todayRequests: "Today's requests",
         todaySuccess: "Today's successful",
         todayFailed: "Today's failed",
@@ -5045,6 +5059,16 @@ export const messages = {
         recentErrorsTitle: "Recent errors",
         recentErrorsDesc: "Latest failed or errored requests.",
         recentErrorsEmpty: "No recent errors.",
+        recentRequestsTitle: "Recent requests (billing evidence)",
+        recentRequestsDesc:
+          "Latest usage rows with masked key, models, route, tokens, credits, error_code, and request_id.",
+        recentRequestsEmpty: "No recent requests.",
+        viewAllUsage: "View all usage",
+        colMaskedKey: "Masked key",
+        colRequestedModel: "Requested model",
+        colResolvedModel: "Resolved model",
+        colTokens: "Tokens",
+        colCreditsCharged: "Credits charged",
         colRequestId: "Request ID",
         colRoute: "Route",
         colStatus: "Status",
@@ -5547,12 +5571,18 @@ export const messages = {
         loading: "Loading usage logs…",
         empty: "No usage logs found.",
         colEmail: "Email",
+        colPrefix: "Masked key",
+        colRequestedModel: "Requested model",
+        colResolvedModel: "Resolved model",
+        colRoute: "Route",
         colModel: "Model",
         colStatus: "Status",
         colPrompt: "Prompt",
         colCompletion: "Completion",
         colTotal: "Total",
         colCredits: "Credits",
+        colBilling: "Billing",
+        colError: "Error code",
         colRequestId: "Request ID",
         colCreated: "Created",
         emailFilterTitle: "Email filter active",
@@ -6853,21 +6883,24 @@ export const messages = {
       usage: {
         title: "用量",
         subtitle:
-          "查看 API 请求、模型、类型、状态、tokens、扣费积分、错误码与 request_id。失败请求不扣费。",
+          "查看 API 请求、模型、类型、状态、tokens、扣费积分、billing_status、错误码与 request_id。失败请求不扣费。",
         statRequests24h: "最近 24 小时请求数",
         statRequests7d: "最近 7 天请求数",
         statTokens7d: "最近 7 天 tokens",
         statCredits7d: "最近 7 天 credits 消耗",
         howItWorksTitle: "如何阅读本页",
         howItWorksItem1:
-          "每一行对应一次 API 请求，包含 model、类型、route、状态、tokens、扣费积分、错误码与 request_id。",
+          "每一行对应一次 API 请求，包含 model、类型、route、状态、tokens、扣费积分、billing_status、错误码与 request_id。",
         howItWorksItem2:
-          "对话行展示 prompt / completion / total tokens；图像行展示每次生成的 credits。",
+          "成功请求展示 request_id、model、tokens、credits_charged 与 status。",
         howItWorksItem3:
-          "Credits 页余额与本页记录一致——Usage 与 Credits 是核账来源。",
-        howItWorksItem4: "失败请求会显示在此，但不扣费。",
+          "失败请求展示 request_id、error_code、billing_status=not_billable，且 credits_charged=0。",
+        howItWorksItem4:
+          "Credits 页余额与本页记录一致——Usage 与 Credits 是客户对账来源。",
         howItWorksItem5:
-          "失败请求用于排查，一般不扣 credits；成功请求会记录 tokens 与 credits_charged。",
+          "联系支持时请复制 request_id。不要分享完整 API Key。",
+        howItWorksItem6:
+          "销售与售后可截图本表作为客户账单证据。",
         integrationWorkbenchLink: "接入工作台 — 对账 request_id",
         recentRequests: "最近请求",
         recentRequestsDesc:
@@ -6884,6 +6917,8 @@ export const messages = {
         colCompletion: "Completion",
         colTotal: "Total",
         colCredits: "扣除算力积分",
+        colBilling: "计费",
+        billingNotBillableHint: "不计费 — credits_charged 为 0",
         colRequestId: "请求 ID",
         colRequestIdHint: "联系支持排查问题时提供",
         copyRequestId: "复制 request_id",
@@ -10301,6 +10336,15 @@ export const messages = {
           "默认试用模型：auto-fast · auto-cheap。高成本模型请保持 trial_mode=false。",
         trialRiskTipErrors:
           "风控错误码：trial_limit_exceeded · daily_limit_exceeded · quota_exceeded · trial_model_not_allowed。",
+        billingEvidenceTipTitle: "客户账单证据",
+        billingEvidenceTipDesc:
+          "P983：Usage 与 Admin 最近请求明细可供销售截图、售后对账。",
+        billingEvidenceTipSuccess:
+          "成功：request_id · model · tokens · credits_charged · status。",
+        billingEvidenceTipFailure:
+          "失败：request_id · error_code · billing_status=not_billable · credits_charged=0。",
+        billingEvidenceTipMask:
+          "仅展示 masked API Key 前缀——绝不索要或展示完整密钥。",
         todayRequests: "今日请求数",
         todaySuccess: "今日成功",
         todayFailed: "今日失败",
@@ -10359,6 +10403,16 @@ export const messages = {
         recentErrorsTitle: "最近错误",
         recentErrorsDesc: "最新失败或带错误的请求。",
         recentErrorsEmpty: "暂无错误记录。",
+        recentRequestsTitle: "最近请求明细（账单证据）",
+        recentRequestsDesc:
+          "最近用量：masked key、requested/resolved model、route、tokens、credits、error_code、request_id。",
+        recentRequestsEmpty: "暂无请求记录。",
+        viewAllUsage: "查看全部用量",
+        colMaskedKey: "Masked Key",
+        colRequestedModel: "Requested model",
+        colResolvedModel: "Resolved model",
+        colTokens: "Tokens",
+        colCreditsCharged: "扣除积分",
         colRequestId: "Request ID",
         colRoute: "路由",
         colStatus: "状态",
@@ -10851,12 +10905,18 @@ export const messages = {
         loading: "正在加载用量日志…",
         empty: "暂无用量记录。",
         colEmail: "邮箱",
+        colPrefix: "Masked Key",
+        colRequestedModel: "Requested model",
+        colResolvedModel: "Resolved model",
+        colRoute: "Route",
         colModel: "Model",
         colStatus: "状态",
         colPrompt: "Prompt",
         colCompletion: "Completion",
         colTotal: "Total",
         colCredits: "扣除算力积分",
+        colBilling: "计费",
+        colError: "错误码",
         colRequestId: "请求 ID",
         colCreated: "时间",
         emailFilterTitle: "邮箱筛选已启用",

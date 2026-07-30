@@ -90,6 +90,7 @@ export function UsageViewClient({ state }: { state: UsagePageState | null | unde
             <li>{t("dashboard.usage.howItWorksItem3")}</li>
             <li>{t("dashboard.usage.howItWorksItem4")}</li>
             <li>{t("dashboard.usage.howItWorksItem5")}</li>
+            <li>{t("dashboard.usage.howItWorksItem6")}</li>
           </ul>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button asChild size="sm" variant="outline">
@@ -197,6 +198,9 @@ function UsageTable({
               {t("dashboard.usage.colCredits")}
             </th>
             <th className="py-2 pr-3 font-medium whitespace-nowrap">
+              {t("dashboard.usage.colBilling")}
+            </th>
+            <th className="py-2 pr-3 font-medium whitespace-nowrap">
               {t("dashboard.usage.colError")}
             </th>
             <th
@@ -283,6 +287,26 @@ function UsageRow({
       </td>
       <td className="py-2.5 pr-3 text-right text-xs whitespace-nowrap">
         {dashboardFormatUsageCredits(row, kind, locale)}
+      </td>
+      <td className="py-2.5 pr-3 font-mono text-xs whitespace-nowrap">
+        {row.billing_status?.trim() ? (
+          <span
+            className={
+              row.billing_status === "not_billable"
+                ? "text-muted-foreground"
+                : undefined
+            }
+            title={
+              row.billing_status === "not_billable"
+                ? t("dashboard.usage.billingNotBillableHint")
+                : undefined
+            }
+          >
+            {row.billing_status}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
       </td>
       <td className="max-w-[8rem] py-2.5 pr-3 font-mono text-xs text-muted-foreground break-all">
         {row.error_code?.trim() ? (

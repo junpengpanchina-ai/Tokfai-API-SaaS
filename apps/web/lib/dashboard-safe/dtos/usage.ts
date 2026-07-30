@@ -18,6 +18,8 @@ export interface UsagePageLog {
   credits_charged: number | null;
   request_id: string | null;
   error_code: string | null;
+  /** P983 — charged | not_billable | … */
+  billing_status: string | null;
 }
 
 export type UsagePageState =

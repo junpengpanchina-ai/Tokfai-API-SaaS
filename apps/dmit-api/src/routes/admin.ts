@@ -102,6 +102,9 @@ type UsageAdminDetailRow = {
   request_id: string | null;
   error_code: string | null;
   error_message: string | null;
+  billing_status: string | null;
+  endpoint: string | null;
+  safety_reason: string | null;
 };
 
 type UsageCreditRow = {
@@ -473,7 +476,7 @@ async function listAdminUsageLogs() {
   const { data, error } = await supabase()
     .from("usage_logs")
     .select(
-      "id, user_id, api_key_id, created_at, model, status, prompt_tokens, completion_tokens, total_tokens, credits_charged, request_id, error_code, error_message"
+      "id, user_id, api_key_id, created_at, model, status, prompt_tokens, completion_tokens, total_tokens, credits_charged, request_id, error_code, error_message, billing_status, endpoint, safety_reason"
     )
     .order("created_at", { ascending: false })
     .limit(100);
@@ -546,13 +549,29 @@ async function listAdminUsageLogs() {
 
   return logs.map((row) => {
     const apiKey = row.api_key_id ? apiKeys.get(row.api_key_id) : null;
+    const prefix = apiKey?.prefix ?? null;
+    const masked =
+      prefix && prefix.length > 48 ? `${prefix.slice(0, 24)}…` : prefix;
+    const safety = row.safety_reason;
+    const requested =
+      safety &&
+      !safety.startsWith("provider=") &&
+      !safety.startsWith("usage_type=") &&
+      /^[a-zA-Z0-9._:-]+$/.test(safety) &&
+      safety.length < 128
+        ? safety
+        : row.model;
 
     return {
+      id: row.id,
       created_at: row.created_at,
       email: emails.get(row.user_id) ?? null,
-      prefix: apiKey?.prefix ?? null,
+      prefix: masked,
       api_key_name: apiKey?.name ?? null,
+      requested_model: requested,
+      resolved_model: row.model,
       model: row.model,
+      route: row.endpoint?.trim() || null,
       status: row.status,
       prompt_tokens: row.prompt_tokens,
       completion_tokens: row.completion_tokens,
@@ -561,6 +580,7 @@ async function listAdminUsageLogs() {
       request_id: row.request_id,
       error_code: row.error_code,
       error_message: row.error_message,
+      billing_status: row.billing_status,
     };
   });
 }

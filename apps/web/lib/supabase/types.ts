@@ -26,6 +26,7 @@ export interface UsageLogRow {
   credits_charged: number | null;
   request_id: string | null;
   error_code?: string | null;
+  billing_status?: string | null;
 }
 
 export interface ProfileRow {

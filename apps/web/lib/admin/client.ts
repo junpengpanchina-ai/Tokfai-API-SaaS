@@ -216,6 +216,24 @@ export type AdminDashboardRecentError = {
   created_at: string;
 };
 
+/** P983 — recent request billing evidence (masked key only). */
+export type AdminDashboardRecentRequest = {
+  id: string;
+  created_at: string;
+  masked_api_key: string | null;
+  requested_model: string | null;
+  resolved_model: string | null;
+  route: string | null;
+  status: string | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  credits_charged: number | null;
+  error_code: string | null;
+  request_id: string | null;
+  billing_status: string | null;
+};
+
 export type AdminDashboardSummary = {
   total_users: number | null;
   admin_user_count: number | null;
@@ -255,6 +273,7 @@ export type AdminDashboardSummary = {
   low_balance_users?: AdminDashboardBalanceUserRow[];
   high_consumption_users_7d?: AdminDashboardTopUserRow[];
   recent_errors: AdminDashboardRecentError[];
+  recent_requests?: AdminDashboardRecentRequest[];
 
   total_balance_credits?: number | null;
   chat_credits_consumed?: number | null;

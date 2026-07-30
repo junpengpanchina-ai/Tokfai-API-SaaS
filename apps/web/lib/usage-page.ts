@@ -15,7 +15,7 @@ export type { UsagePageLog, UsagePageState, UsagePageStats } from "@/lib/dashboa
 export const USAGE_RECENT_LIMIT = 50;
 
 const USAGE_LOG_SELECT =
-  "id, created_at, model, status, prompt_tokens, completion_tokens, total_tokens, credits_charged, request_id, error_code";
+  "id, created_at, model, status, prompt_tokens, completion_tokens, total_tokens, credits_charged, request_id, error_code, billing_status";
 
 function toNumber(value: number | string | null | undefined): number {
   if (value == null) return 0;
@@ -36,6 +36,7 @@ function mapUsageLog(row: UsageLogRow): UsagePageLog {
       row.credits_charged != null ? toNumber(row.credits_charged) : null,
     request_id: row.request_id,
     error_code: row.error_code ?? null,
+    billing_status: row.billing_status ?? null,
   };
 }
 

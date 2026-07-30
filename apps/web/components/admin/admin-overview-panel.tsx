@@ -364,6 +364,24 @@ export function AdminOverviewPanel({
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">
+                {t("admin.overview.billingEvidenceTipTitle")}
+              </CardTitle>
+              <CardDescription>
+                {t("admin.overview.billingEvidenceTipDesc")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>{t("admin.overview.billingEvidenceTipSuccess")}</p>
+              <p>{t("admin.overview.billingEvidenceTipFailure")}</p>
+              <p className="text-xs">
+                {t("admin.overview.billingEvidenceTipMask")}
+              </p>
+            </CardContent>
+          </Card>
+
           <Card className="border-destructive/30">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">
@@ -835,6 +853,120 @@ export function AdminOverviewPanel({
                           <td className="py-2 pr-3">{row.error_code ?? "—"}</td>
                           <td className="py-2 font-mono text-xs">
                             {row.request_id ?? "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="text-base">
+                    {t("admin.overview.recentRequestsTitle")}
+                  </CardTitle>
+                  <CardDescription>
+                    {t("admin.overview.recentRequestsDesc")}
+                  </CardDescription>
+                </div>
+                <Link
+                  href="/admin/usage"
+                  className="text-sm text-primary hover:underline"
+                >
+                  {t("admin.overview.viewAllUsage")}
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {(summary.recent_requests ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {t("admin.overview.recentRequestsEmpty")}
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="pb-2 pr-3 font-medium whitespace-nowrap">
+                          {t("admin.overview.colCreated")}
+                        </th>
+                        <th className="pb-2 pr-3 font-medium whitespace-nowrap">
+                          {t("admin.overview.colMaskedKey")}
+                        </th>
+                        <th className="pb-2 pr-3 font-medium whitespace-nowrap">
+                          {t("admin.overview.colRequestedModel")}
+                        </th>
+                        <th className="pb-2 pr-3 font-medium whitespace-nowrap">
+                          {t("admin.overview.colResolvedModel")}
+                        </th>
+                        <th className="pb-2 pr-3 font-medium whitespace-nowrap">
+                          {t("admin.overview.colRoute")}
+                        </th>
+                        <th className="pb-2 pr-3 font-medium whitespace-nowrap">
+                          {t("admin.overview.colStatus")}
+                        </th>
+                        <th className="pb-2 pr-3 text-right font-medium whitespace-nowrap">
+                          {t("admin.overview.colTokens")}
+                        </th>
+                        <th className="pb-2 pr-3 text-right font-medium whitespace-nowrap">
+                          {t("admin.overview.colCreditsCharged")}
+                        </th>
+                        <th className="pb-2 pr-3 font-medium whitespace-nowrap">
+                          {t("admin.overview.colCode")}
+                        </th>
+                        <th className="pb-2 font-medium whitespace-nowrap">
+                          {t("admin.overview.colRequestId")}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(summary.recent_requests ?? []).map((row) => (
+                        <tr key={row.id} className="border-b last:border-0">
+                          <td className="py-2 pr-3 whitespace-nowrap">
+                            {formatDateTime(row.created_at)}
+                          </td>
+                          <td className="py-2 pr-3 font-mono text-xs">
+                            {row.masked_api_key ?? "—"}
+                          </td>
+                          <td className="py-2 pr-3 font-mono text-xs">
+                            {row.requested_model ?? "—"}
+                          </td>
+                          <td className="py-2 pr-3 font-mono text-xs">
+                            {row.resolved_model ?? "—"}
+                          </td>
+                          <td className="py-2 pr-3 font-mono text-xs">
+                            {row.route ?? "—"}
+                          </td>
+                          <td className="py-2 pr-3">{row.status ?? "—"}</td>
+                          <td className="py-2 pr-3 text-right font-mono text-xs">
+                            {row.total_tokens == null
+                              ? "—"
+                              : formatInt(row.total_tokens)}
+                          </td>
+                          <td className="py-2 pr-3 text-right font-mono text-xs">
+                            {row.credits_charged == null
+                              ? "—"
+                              : formatCreditsPrecise(row.credits_charged)}
+                          </td>
+                          <td className="py-2 pr-3 font-mono text-xs">
+                            {row.error_code ?? "—"}
+                          </td>
+                          <td className="py-2 font-mono text-xs">
+                            {row.request_id ? (
+                              <Link
+                                href={`/admin/logs?request_id=${encodeURIComponent(row.request_id)}`}
+                                className="text-primary hover:underline"
+                              >
+                                {row.request_id}
+                              </Link>
+                            ) : (
+                              "—"
+                            )}
                           </td>
                         </tr>
                       ))}

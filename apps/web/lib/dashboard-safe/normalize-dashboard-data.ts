@@ -239,6 +239,12 @@ function normalizeUsagePageLog(raw: unknown, index: number): UsagePageLog {
         : row.error_code == null
           ? null
           : safeDashboardString(row.error_code) || null,
+    billing_status:
+      typeof row.billing_status === "string"
+        ? row.billing_status
+        : row.billing_status == null
+          ? null
+          : safeDashboardString(row.billing_status) || null,
   };
 }
 

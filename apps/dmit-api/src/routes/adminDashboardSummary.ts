@@ -55,6 +55,25 @@ export type AdminDashboardRecentError = {
   created_at: string;
 };
 
+/** P983 — customer billing evidence row for sales / support screenshots. */
+export type AdminDashboardRecentRequest = {
+  id: string;
+  created_at: string;
+  /** Masked API key prefix only — never full secret. */
+  masked_api_key: string | null;
+  requested_model: string | null;
+  resolved_model: string | null;
+  route: string | null;
+  status: string | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  credits_charged: number | null;
+  error_code: string | null;
+  request_id: string | null;
+  billing_status: string | null;
+};
+
 export type AdminDashboardSummary = {
   /** Terminal users from public.profiles (one row per auth.users). */
   total_users: number | null;
@@ -104,6 +123,8 @@ export type AdminDashboardSummary = {
   low_balance_users: AdminDashboardBalanceUserRow[];
   high_consumption_users_7d: AdminDashboardTopUserRow[];
   recent_errors: AdminDashboardRecentError[];
+  /** P983 — recent request billing evidence (masked key; no full secrets). */
+  recent_requests: AdminDashboardRecentRequest[];
 
   /** Platform sum of profiles.credits_balance (open liability). */
   total_balance_credits: number | null;
@@ -878,6 +899,130 @@ function inferDashboardRoute(model: string | null): string | null {
   return "/v1/chat/completions";
 }
 
+/**
+ * Alias successes store the client-requested id in safety_reason.
+ * Metadata markers (provider= / usage_type=) are not model ids.
+ */
+function deriveRequestedModel(
+  model: string | null,
+  safetyReason: string | null
+): string | null {
+  if (!safetyReason) return model;
+  if (
+    safetyReason.startsWith("provider=") ||
+    safetyReason.startsWith("usage_type=")
+  ) {
+    return model;
+  }
+  if (/^[a-zA-Z0-9._:-]+$/.test(safetyReason) && safetyReason.length < 128) {
+    return safetyReason;
+  }
+  return model;
+}
+
+function maskApiKeyPrefix(prefix: string | null | undefined): string | null {
+  if (!prefix || typeof prefix !== "string") return null;
+  const trimmed = prefix.trim();
+  if (!trimmed) return null;
+  // Never surface anything that looks like a full sk-tokfai_ secret.
+  if (trimmed.length > 48) return `${trimmed.slice(0, 24)}…`;
+  return trimmed;
+}
+
+async function fetchRecentRequests(): Promise<{
+  requests: AdminDashboardRecentRequest[];
+  warning?: string;
+}> {
+  try {
+    const { data, error } = await supabase()
+      .from("usage_logs")
+      .select(
+        "id, created_at, api_key_id, model, status, prompt_tokens, completion_tokens, total_tokens, credits_charged, error_code, request_id, billing_status, endpoint, safety_reason"
+      )
+      .order("created_at", { ascending: false })
+      .limit(25);
+
+    if (error) {
+      return { requests: [], warning: `recent requests: ${error.message}` };
+    }
+
+    const rows = (data ?? []) as Array<{
+      id: string;
+      created_at: string;
+      api_key_id: string | null;
+      model: string | null;
+      status: string | null;
+      prompt_tokens: number | null;
+      completion_tokens: number | null;
+      total_tokens: number | null;
+      credits_charged: number | string | null;
+      error_code: string | null;
+      request_id: string | null;
+      billing_status: string | null;
+      endpoint: string | null;
+      safety_reason: string | null;
+    }>;
+
+    const apiKeyIds = [
+      ...new Set(
+        rows
+          .map((row) => row.api_key_id)
+          .filter((id): id is string => Boolean(id))
+      ),
+    ];
+
+    const prefixes = new Map<string, string | null>();
+    if (apiKeyIds.length > 0) {
+      const { data: keys, error: keyError } = await supabase()
+        .from("api_keys")
+        .select("id, prefix")
+        .in("id", apiKeyIds);
+
+      if (keyError) {
+        return {
+          requests: [],
+          warning: `recent requests api keys: ${keyError.message}`,
+        };
+      }
+
+      for (const key of (keys ?? []) as Array<{
+        id: string;
+        prefix: string | null;
+      }>) {
+        prefixes.set(key.id, key.prefix);
+      }
+    }
+
+    return {
+      requests: rows.map((row) => {
+        const credits =
+          row.credits_charged == null ? null : Number(row.credits_charged);
+        return {
+          id: row.id,
+          created_at: row.created_at,
+          masked_api_key: maskApiKeyPrefix(
+            row.api_key_id ? prefixes.get(row.api_key_id) : null
+          ),
+          requested_model: deriveRequestedModel(row.model, row.safety_reason),
+          resolved_model: row.model,
+          route: row.endpoint?.trim() || inferDashboardRoute(row.model),
+          status: row.status,
+          prompt_tokens: row.prompt_tokens,
+          completion_tokens: row.completion_tokens,
+          total_tokens: row.total_tokens,
+          credits_charged: Number.isFinite(credits) ? credits : null,
+          error_code: row.error_code,
+          request_id: row.request_id,
+          billing_status: row.billing_status,
+        };
+      }),
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { requests: [], warning: `recent requests: ${message}` };
+  }
+}
+
 async function fetchRecentErrors(): Promise<{
   errors: AdminDashboardRecentError[];
   warning?: string;
@@ -1305,6 +1450,7 @@ export async function buildAdminDashboardSummary(): Promise<{
     sparklineResult,
     modelTopResult,
     recentErrorsResult,
+    recentRequestsResult,
     totalBalanceCredits,
     chatImageCredits,
     moneyBagRisks,
@@ -1338,6 +1484,7 @@ export async function buildAdminDashboardSummary(): Promise<{
     buildRequestSparkline7d(),
     buildModelTop10(),
     fetchRecentErrors(),
+    fetchRecentRequests(),
     sumProfilesBalanceCredits(),
     sumChatAndImageCredits(),
     buildMoneyBagRisks(),
@@ -1386,6 +1533,7 @@ export async function buildAdminDashboardSummary(): Promise<{
   collectWarning(warnings, sparklineResult);
   collectWarning(warnings, modelTopResult);
   collectWarning(warnings, recentErrorsResult);
+  collectWarning(warnings, recentRequestsResult);
   collectWarning(warnings, totalBalanceCredits);
   collectWarning(warnings, chatImageCredits);
   collectWarning(warnings, moneyBagRisks);
@@ -1441,6 +1589,7 @@ export async function buildAdminDashboardSummary(): Promise<{
       low_balance_users: lowBalanceResult.rows,
       high_consumption_users_7d: topUsersResult.rows,
       recent_errors: recentErrorsResult.errors,
+      recent_requests: recentRequestsResult.requests,
 
       total_balance_credits: totalBalanceCredits.value,
       chat_credits_consumed: chatImageCredits.chat,
