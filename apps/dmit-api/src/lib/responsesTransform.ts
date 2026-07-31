@@ -1,6 +1,11 @@
 import { z } from "zod";
 
 import type { ChatCompletionRequestBody } from "./executeChatCompletion.js";
+import {
+  chatFinishReasonToResponsesIncompleteDetails,
+  normalizeOpenAiFinishReason,
+  normalizeOpenAiFinishReasonOnResponsesPayload,
+} from "./openaiFinishReason.js";
 
 /**
  * OpenAI Responses API request → chat completions conversion (minimal MVP).
@@ -201,54 +206,79 @@ export function chatCompletionResponseToResponses(
         ? chatResponse.request_id
         : requestId;
 
-  return {
-    id: `resp_${resolvedRequestId}`,
-    object: "response",
-    created_at: createdAt,
-    status: "completed",
-    model,
-    output: [
-      {
-        type: "message",
-        role: "assistant",
-        content: [
-          {
-            type: "output_text",
-            text: outputText,
-          },
-        ],
+  const choices = Array.isArray(chatResponse.choices)
+    ? chatResponse.choices
+    : [];
+  const firstChoice =
+    choices[0] && typeof choices[0] === "object" && !Array.isArray(choices[0])
+      ? (choices[0] as Record<string, unknown>)
+      : null;
+  const wireFinishReason =
+    normalizeOpenAiFinishReason(firstChoice?.finish_reason, {
+      allowNull: false,
+      route: "/v1/responses",
+    }) ?? "stop";
+  const finishReason =
+    wireFinishReason === "length" || wireFinishReason === "content_filter"
+      ? wireFinishReason
+      : "stop";
+  const incompleteDetails =
+    chatFinishReasonToResponsesIncompleteDetails(finishReason);
+  const status = incompleteDetails ? "incomplete" : "completed";
+
+  return normalizeOpenAiFinishReasonOnResponsesPayload(
+    {
+      id: `resp_${resolvedRequestId}`,
+      object: "response",
+      created_at: createdAt,
+      status,
+      model,
+      output: [
+        {
+          type: "message",
+          role: "assistant",
+          content: [
+            {
+              type: "output_text",
+              text: outputText,
+            },
+          ],
+        },
+      ],
+      output_text: outputText,
+      usage: {
+        input_tokens: usageRaw?.prompt_tokens ?? 0,
+        output_tokens: usageRaw?.completion_tokens ?? 0,
+        total_tokens: usageRaw?.total_tokens ?? 0,
       },
-    ],
-    output_text: outputText,
-    usage: {
-      input_tokens: usageRaw?.prompt_tokens ?? 0,
-      output_tokens: usageRaw?.completion_tokens ?? 0,
-      total_tokens: usageRaw?.total_tokens ?? 0,
+      incomplete_details: incompleteDetails,
+      finish_reason: finishReason,
+      request_id: resolvedRequestId,
+      credits_charged: creditsCharged,
+      tokfai: {
+        request_id: tokfai.request_id ?? resolvedRequestId,
+        credits_charged: tokfai.credits_charged ?? creditsCharged,
+        requested_model: tokfai.requested_model,
+        resolved_model: tokfai.resolved_model ?? model,
+        ...(typeof tokfai.routing_strategy === "string"
+          ? { routing_strategy: tokfai.routing_strategy }
+          : {}),
+        ...(Array.isArray(tokfai.attempted_models)
+          ? { attempted_models: tokfai.attempted_models }
+          : {}),
+        ...(typeof tokfai.fallback_attempts === "number"
+          ? { fallback_attempts: tokfai.fallback_attempts }
+          : {}),
+        ...(typeof tokfai.latency_ms === "number"
+          ? { latency_ms: tokfai.latency_ms }
+          : {}),
+        ...(typeof tokfai.billing_status === "string"
+          ? { billing_status: tokfai.billing_status }
+          : {}),
+      },
     },
-    request_id: resolvedRequestId,
-    credits_charged: creditsCharged,
-    tokfai: {
-      request_id: tokfai.request_id ?? resolvedRequestId,
-      credits_charged: tokfai.credits_charged ?? creditsCharged,
-      requested_model: tokfai.requested_model,
-      resolved_model: tokfai.resolved_model ?? model,
-      ...(typeof tokfai.routing_strategy === "string"
-        ? { routing_strategy: tokfai.routing_strategy }
-        : {}),
-      ...(Array.isArray(tokfai.attempted_models)
-        ? { attempted_models: tokfai.attempted_models }
-        : {}),
-      ...(typeof tokfai.fallback_attempts === "number"
-        ? { fallback_attempts: tokfai.fallback_attempts }
-        : {}),
-      ...(typeof tokfai.latency_ms === "number"
-        ? { latency_ms: tokfai.latency_ms }
-        : {}),
-      ...(typeof tokfai.billing_status === "string"
-        ? { billing_status: tokfai.billing_status }
-        : {}),
-    },
-  };
+    { route: "/v1/responses" }
+  );
 }
 
 export function isResponsesFormatResponse(

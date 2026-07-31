@@ -210,6 +210,10 @@ export async function respondResponsesEarlySse(
     firstFrame: responsesCreatedSseFrame({
       responseId: typeof response.id === "string" ? response.id : undefined,
       model: typeof response.model === "string" ? response.model : undefined,
+      createdAt:
+        typeof response.created_at === "number"
+          ? response.created_at
+          : undefined,
     }),
     produceRest: async (write) => {
       writeResponsesRest(write, response);

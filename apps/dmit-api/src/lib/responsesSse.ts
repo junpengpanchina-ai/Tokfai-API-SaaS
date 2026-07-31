@@ -9,7 +9,20 @@
  * For stream=true main path, response.created is flushed early (before upstream)
  * via responsesCreatedSseFrame(); remaining events use
  * responsesSseBodyAfterCreated().
+ *
+ * AI SDK (@ai-sdk/openai Responses): finishReason defaults to "other" until a
+ * valid `response.completed` / `response.incomplete` chunk is parsed. That
+ * chunk schema requires `response.usage` — omitting usage leaves finishReason
+ * stuck on "other" (Cherry Studio AI_FinishReasonError).
  */
+
+import {
+  chatFinishReasonToResponsesIncompleteDetails,
+  normalizeOpenAiFinishReason,
+  normalizeOpenAiFinishReasonOnResponsesSsePayload,
+} from "./openaiFinishReason.js";
+
+const RESPONSES_ROUTE = "/v1/responses";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object"
@@ -18,7 +31,10 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 function sseEvent(event: string, payload: unknown): string {
-  return `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
+  const safe = normalizeOpenAiFinishReasonOnResponsesSsePayload(payload, {
+    route: RESPONSES_ROUTE,
+  });
+  return `event: ${event}\ndata: ${JSON.stringify(safe)}\n\n`;
 }
 
 function extractOutputText(response: Record<string, unknown>): string {
@@ -41,10 +57,50 @@ function extractOutputText(response: Record<string, unknown>): string {
   return parts.join("");
 }
 
+function extractResponsesUsage(response: Record<string, unknown>): {
+  input_tokens: number;
+  output_tokens: number;
+  input_tokens_details?: unknown;
+  output_tokens_details?: unknown;
+} {
+  const usage = asRecord(response.usage);
+  const inputTokens =
+    typeof usage?.input_tokens === "number" && Number.isFinite(usage.input_tokens)
+      ? usage.input_tokens
+      : 0;
+  const outputTokens =
+    typeof usage?.output_tokens === "number" && Number.isFinite(usage.output_tokens)
+      ? usage.output_tokens
+      : 0;
+  return {
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+    ...(usage && "input_tokens_details" in usage
+      ? { input_tokens_details: usage.input_tokens_details }
+      : {}),
+    ...(usage && "output_tokens_details" in usage
+      ? { output_tokens_details: usage.output_tokens_details }
+      : {}),
+  };
+}
+
+function extractWireFinishReason(response: Record<string, unknown>): string {
+  const normalized = normalizeOpenAiFinishReason(response.finish_reason, {
+    allowNull: false,
+    route: RESPONSES_ROUTE,
+  });
+  if (normalized === "length" || normalized === "content_filter") {
+    return normalized;
+  }
+  // tool_calls / function_call / stop / other → stop for text Responses wire
+  return "stop";
+}
+
 function responsesSseIds(response: Record<string, unknown>): {
   responseId: string;
   model: string;
   messageId: string;
+  createdAt: number;
 } {
   const responseId =
     typeof response.id === "string" && response.id.length > 0
@@ -55,7 +111,11 @@ function responsesSseIds(response: Record<string, unknown>): {
       ? response.model
       : "unknown";
   const messageId = `msg_${responseId.replace(/^resp_/, "")}`;
-  return { responseId, model, messageId };
+  const createdAt =
+    typeof response.created_at === "number" && Number.isFinite(response.created_at)
+      ? response.created_at
+      : Math.floor(Date.now() / 1000);
+  return { responseId, model, messageId, createdAt };
 }
 
 /**
@@ -65,6 +125,7 @@ function responsesSseIds(response: Record<string, unknown>): {
 export function responsesCreatedSseFrame(args?: {
   responseId?: string;
   model?: string;
+  createdAt?: number;
 }): string {
   const responseId =
     typeof args?.responseId === "string" && args.responseId.length > 0
@@ -74,12 +135,17 @@ export function responsesCreatedSseFrame(args?: {
     typeof args?.model === "string" && args.model.length > 0
       ? args.model
       : "unknown";
+  const createdAt =
+    typeof args?.createdAt === "number" && Number.isFinite(args.createdAt)
+      ? args.createdAt
+      : Math.floor(Date.now() / 1000);
 
   return sseEvent("response.created", {
     type: "response.created",
     response: {
       id: responseId,
       object: "response",
+      created_at: createdAt,
       status: "in_progress",
       model,
     },
@@ -93,10 +159,15 @@ export function responsesSseBodyAfterCreated(
   response: Record<string, unknown>,
   opts?: { skipCreated?: boolean }
 ): string {
-  const { responseId, model, messageId } = responsesSseIds(response);
+  const { responseId, model, messageId, createdAt } = responsesSseIds(response);
   // Cherry requires a non-empty delta; fall back only if upstream text is blank.
   const rawText = extractOutputText(response);
   const outputText = rawText.length > 0 ? rawText : " ";
+  const usage = extractResponsesUsage(response);
+  const finishReason = extractWireFinishReason(response);
+  const incompleteDetails =
+    chatFinishReasonToResponsesIncompleteDetails(finishReason);
+  const status = incompleteDetails ? "incomplete" : "completed";
 
   const completedItem = {
     id: messageId,
@@ -106,10 +177,13 @@ export function responsesSseBodyAfterCreated(
     content: [{ type: "output_text", text: outputText }],
   };
 
-  const completedResponse = {
+  // AI SDK requires `usage` on response.completed / response.incomplete or the
+  // chunk is dropped and finishReason stays default "other".
+  const finishedResponse = {
     id: responseId,
     object: "response",
-    status: "completed",
+    created_at: createdAt,
+    status,
     model,
     output: [
       {
@@ -119,13 +193,16 @@ export function responsesSseBodyAfterCreated(
       },
     ],
     output_text: outputText,
+    usage,
+    incomplete_details: incompleteDetails,
+    finish_reason: finishReason,
   };
 
   const chunks: string[] = [];
 
   if (!opts?.skipCreated) {
     chunks.push(
-      responsesCreatedSseFrame({ responseId, model })
+      responsesCreatedSseFrame({ responseId, model, createdAt })
     );
   }
 
@@ -191,10 +268,12 @@ export function responsesSseBodyAfterCreated(
     })
   );
 
+  const finishedType =
+    status === "incomplete" ? "response.incomplete" : "response.completed";
   chunks.push(
-    sseEvent("response.completed", {
-      type: "response.completed",
-      response: completedResponse,
+    sseEvent(finishedType, {
+      type: finishedType,
+      response: finishedResponse,
     })
   );
 

@@ -151,3 +151,113 @@ export function normalizeOpenAiFinishReasonOnSseChunk(
 
   return { ...row, choices: nextChoices };
 }
+
+const RESPONSES_ROUTE = "/v1/responses";
+
+/**
+ * Map chat finish_reason → Responses `incomplete_details`.
+ * Never put "stop"/"other" into incomplete_details.reason — AI SDK maps
+ * unrecognized reasons to unified "other".
+ */
+export function chatFinishReasonToResponsesIncompleteDetails(
+  finishReason: string | null
+): { reason: string } | null {
+  if (finishReason === "length") return { reason: "max_output_tokens" };
+  if (finishReason === "content_filter") return { reason: "content_filter" };
+  return null;
+}
+
+/**
+ * Normalize Responses incomplete_details.reason on the wire.
+ * other / unknown / stop / "" / undefined → null (clean completed).
+ */
+export function normalizeResponsesIncompleteDetails(
+  details: unknown,
+  opts?: { route?: string }
+): { reason: string } | null {
+  const route = opts?.route ?? RESPONSES_ROUTE;
+  if (details === null || details === undefined) return null;
+  const row = asRecord(details);
+  if (!row) return null;
+  const reason = row.reason;
+  if (reason === null || reason === undefined) return null;
+  if (typeof reason !== "string" || !reason.trim()) {
+    logNormalizeFinishReason(reason, null, route);
+    return null;
+  }
+  const lower = reason.trim().toLowerCase();
+  if (
+    lower === "other" ||
+    lower === "unknown" ||
+    lower === "stop" ||
+    lower === "end_turn"
+  ) {
+    logNormalizeFinishReason(reason, null, route);
+    return null;
+  }
+  if (lower === "max_output_tokens" || lower === "content_filter") {
+    return { reason: lower };
+  }
+  logNormalizeFinishReason(reason, null, route);
+  return null;
+}
+
+/**
+ * Normalize finish_reason + incomplete_details on a Responses API object.
+ * Does not touch usage / credits / request_id / routing fields.
+ */
+export function normalizeOpenAiFinishReasonOnResponsesPayload(
+  data: Record<string, unknown>,
+  opts?: { route?: string }
+): Record<string, unknown> {
+  const route = opts?.route ?? RESPONSES_ROUTE;
+  const next = { ...data };
+
+  if ("finish_reason" in next) {
+    const normalized = normalizeOpenAiFinishReason(next.finish_reason, {
+      // Responses completed bodies should not leave null (AI SDK default other).
+      allowNull: false,
+      route,
+    });
+    next.finish_reason = normalized ?? "stop";
+  }
+
+  if ("incomplete_details" in next) {
+    next.incomplete_details = normalizeResponsesIncompleteDetails(
+      next.incomplete_details,
+      { route }
+    );
+  }
+
+  return next;
+}
+
+/**
+ * Wire-level Responses SSE payload safety before JSON.stringify.
+ * Walks nested `response` objects for finish_reason / incomplete_details.
+ */
+export function normalizeOpenAiFinishReasonOnResponsesSsePayload(
+  payload: unknown,
+  opts?: { route?: string }
+): unknown {
+  const row = asRecord(payload);
+  if (!row) return payload;
+  const route = opts?.route ?? RESPONSES_ROUTE;
+  let next: Record<string, unknown> = { ...row };
+
+  const nested = asRecord(next.response);
+  if (nested) {
+    next = {
+      ...next,
+      response: normalizeOpenAiFinishReasonOnResponsesPayload(nested, {
+        route,
+      }),
+    };
+  }
+
+  if ("finish_reason" in next || "incomplete_details" in next) {
+    next = normalizeOpenAiFinishReasonOnResponsesPayload(next, { route });
+  }
+
+  return next;
+}
