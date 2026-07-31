@@ -25,6 +25,8 @@ const KNOWN_LABELS: Record<string, string> = {
   "gemini-3-pro": "Gemini 3 Pro",
   "gemini-3.5-flash": "Gemini 3.5 Flash",
   "gemini-3.1-pro": "Gemini 3.1 Pro",
+  "deepseek-chat": "DeepSeek Chat",
+  "deepseek-v3": "DeepSeek V3",
 };
 
 function humanizeModelId(modelId: string): string {
@@ -38,6 +40,7 @@ function humanizeModelId(modelId: string): string {
       if (/^\d+(\.\d+)?$/.test(part)) return part;
       if (/^gpt$/i.test(part)) return "GPT";
       if (/^gemini$/i.test(part)) return "Gemini";
+      if (/^deepseek$/i.test(part)) return "DeepSeek";
       if (/^auto$/i.test(part)) return "Auto";
       return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
     })

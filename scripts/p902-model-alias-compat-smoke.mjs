@@ -56,6 +56,9 @@ const ALIAS_CASES = [
   ["GPT 5.4 Pro", "gpt-5-pro"],
   ["gpt-5.5", "gpt-5.5"],
   ["gpt5.5", "gpt-5.5"],
+  ["deepseek-chat", "deepseek-chat"],
+  ["deepseek-v3", "deepseek-chat"],
+  ["deepseek/deepseek-chat", "deepseek-chat"],
   ["gemini-3-pro", "gemini-3-pro"],
   ["gemini-2.5-flash", "gemini-2.5-flash"],
 ];
@@ -121,7 +124,8 @@ async function run() {
     if (
       /model not register/i.test(aliases) ||
       !aliases.includes("This model is not available on Tokfai") ||
-      !aliases.includes('"gpt-5.4-pro": "gpt-5-pro"')
+      !aliases.includes('"gpt-5.4-pro": "gpt-5-pro"') ||
+      !aliases.includes('"deepseek-chat"')
     ) {
       ok = fail("static alias + error copy", "modelAliases.ts incomplete") && ok;
     } else {
@@ -148,6 +152,7 @@ async function run() {
         "gpt-5.4",
         "gpt-5.4-pro",
         "gpt-5.5",
+        "deepseek-chat",
         "gemini-3-pro",
         "gemini-2.5-flash",
       ];
@@ -235,6 +240,35 @@ async function run() {
           ) && ok;
       } else {
         ok = pass("unknown model → model_not_available (safe message)") && ok;
+      }
+    }
+  }
+
+  // Responses keeps the same standard error for unsupported models.
+  {
+    const { res, body } = await postJson("/v1/responses", {
+      model: "definitely-not-a-tokfai-model-xyz",
+      input: "hi",
+      stream: false,
+    });
+    if (!assertAuthOk(res, "responses unknown model auth")) {
+      ok = false;
+    } else {
+      const code = body?.error?.code;
+      const message = String(body?.error?.message ?? "");
+      if (
+        res.status !== 400 ||
+        code !== "model_not_available" ||
+        !message.includes("This model is not available on Tokfai")
+      ) {
+        ok =
+          fail(
+            "responses unknown model → model_not_available",
+            `HTTP ${res.status} code=${code} msg=${message.slice(0, 120)}`
+          ) && ok;
+      } else {
+        ok =
+          pass("responses unknown model → model_not_available") && ok;
       }
     }
   }

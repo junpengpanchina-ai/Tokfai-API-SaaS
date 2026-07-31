@@ -31,6 +31,11 @@ export const MODEL_ALIAS_CHAINS = {
    */
   "gemini-3.1-flash": ["gemini-3-flash"],
   "gemini-3.1-pro": ["gemini-3-pro"],
+  /**
+   * deepseek-chat: consumer compatibility alias (not a separate upstream SKU).
+   * Routes to low-cost Gemini chat tiers so /v1/chat/completions accepts the id.
+   */
+  "deepseek-chat": ["gemini-2.5-flash", "gemini-3-flash"],
 } as const;
 
 export type ModelAliasId = keyof typeof MODEL_ALIAS_CHAINS;
@@ -68,6 +73,11 @@ export const CLIENT_MODEL_REWRITES: Record<string, string> = {
   // Gemini display / vendor-prefix variants (after normalizeClientModelId)
   "gemini-3-pro-preview": "gemini-3-pro",
   "gemini-2.5-flash-preview": "gemini-2.5-flash",
+  // DeepSeek client ids → Tokfai deepseek-chat alias
+  deepseek: "deepseek-chat",
+  "deepseek-v3": "deepseek-chat",
+  "deepseek-v3-chat": "deepseek-chat",
+  "deepseek-chat-v3": "deepseek-chat",
 };
 
 /**
@@ -77,6 +87,7 @@ export const CLIENT_MODEL_REWRITES: Record<string, string> = {
 export const CATALOG_COMPAT_ALIAS_ENTRIES = [
   { id: "gpt-5.4", alias_of: "gpt-5" },
   { id: "gpt-5.4-pro", alias_of: "gpt-5-pro" },
+  { id: "deepseek-v3", alias_of: "deepseek-chat" },
 ] as const;
 
 export type ResolvedChatModel = {
@@ -115,6 +126,7 @@ export function normalizeClientModelId(raw: string): string {
   value = value.replace(/^openai\//i, "");
   value = value.replace(/^google\//i, "");
   value = value.replace(/^grsai\//i, "");
+  value = value.replace(/^deepseek\//i, "");
 
   value = value.trim().toLowerCase();
   value = value.replace(/[_\s]+/g, "-");
@@ -194,6 +206,7 @@ export const CATALOG_ALIAS_IDS: ModelAliasId[] = [
   "gpt-5-pro",
   "gpt-5.1",
   "gpt-5.2",
+  "deepseek-chat",
 ];
 
 export type CatalogAliasListItem = {
@@ -249,6 +262,7 @@ export function formatSupportedChatModelsMessage(
     "gpt-5-pro",
     "gpt-5.4-pro",
     "gpt-5.5",
+    "deepseek-chat",
     "gemini-3-pro",
     "gemini-2.5-flash",
   ];

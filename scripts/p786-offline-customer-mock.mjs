@@ -66,6 +66,8 @@ const MOCK_ALLOWED_MODELS = new Set([
   "gpt-5.4",
   "gpt-5.4-pro",
   "gpt-5.5",
+  "deepseek-chat",
+  "deepseek-v3",
   "gemini-2.5-flash",
   "gemini-2.5-pro",
   "gemini-3-flash",
@@ -83,6 +85,7 @@ function resolveMockCanonicalModel(raw) {
   value = value.toLowerCase();
   value = value.replace(/^models\//, "").replace(/^openai\//, "");
   value = value.replace(/^google\//, "").replace(/^grsai\//, "");
+  value = value.replace(/^deepseek\//, "");
   value = value.replace(/[_\s]+/g, "-").replace(/^gpt(\d)/, "gpt-$1");
   value = value.replace(/-+/g, "-").replace(/^-|-$/g, "");
   const rewrites = {
@@ -103,6 +106,10 @@ function resolveMockCanonicalModel(raw) {
     "gpt-5-5": "gpt-5.5",
     "gemini-3-pro-preview": "gemini-3-pro",
     "gemini-2.5-flash-preview": "gemini-2.5-flash",
+    deepseek: "deepseek-chat",
+    "deepseek-v3": "deepseek-chat",
+    "deepseek-v3-chat": "deepseek-chat",
+    "deepseek-chat-v3": "deepseek-chat",
   };
   return rewrites[value] ?? value;
 }
@@ -1677,6 +1684,8 @@ export function startMockGateway(options = {}) {
           "gpt-5.2",
           "gpt-5.5",
           "gpt-5.4",
+          "deepseek-chat",
+          "deepseek-v3",
           "gemini-2.5-flash",
           "gemini-3-pro",
           "gemini-3-flash",
@@ -1693,6 +1702,8 @@ export function startMockGateway(options = {}) {
           "gpt-5.2": "Tokfai GPT-5.2",
           "gpt-5.5": "Tokfai GPT-5.5",
           "gpt-5.4": "Tokfai GPT-5.4",
+          "deepseek-chat": "Tokfai DeepSeek Chat",
+          "deepseek-v3": "Tokfai DeepSeek V3",
           "gemini-2.5-flash": "Tokfai Gemini 2.5 Flash",
           "gemini-3-pro": "Tokfai Gemini 3 Pro",
           "gemini-3-flash": "Tokfai Gemini 3 Flash",
@@ -1700,6 +1711,7 @@ export function startMockGateway(options = {}) {
         const aliasOf = {
           "gpt-5.4": "gpt-5",
           "gpt-5.4-pro": "gpt-5-pro",
+          "deepseek-v3": "deepseek-chat",
         };
         return sendJson(res, 200, {
           object: "list",
