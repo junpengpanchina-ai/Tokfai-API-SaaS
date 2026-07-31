@@ -122,8 +122,12 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 /**
  * Wire-level SSE chunk safety: normalize choices[].finish_reason before
- * JSON.stringify. Empty delta ({}) is treated as the terminal chunk —
- * null/other/unknown → "stop". Mid-stream null is preserved.
+ * JSON.stringify.
+ *
+ * - other / unknown / "" / undefined → always "stop"
+ * - null on terminal chunks (missing or empty delta {}) → "stop"
+ *   (AI SDK maps final null → "other" → Cherry AI_FinishReasonError)
+ * - null on mid-stream chunks (delta has role/content/tool_calls) → keep null
  */
 export function normalizeOpenAiFinishReasonOnSseChunk(
   payload: unknown,
@@ -139,11 +143,11 @@ export function normalizeOpenAiFinishReasonOnSseChunk(
     }
     const c = { ...(choice as Record<string, unknown>) };
     const delta = asRecord(c.delta);
-    const emptyDelta = delta !== null && Object.keys(delta).length === 0;
-    // Terminal chunk: delta {} — never leave null/other for Cherry / AI SDK.
-    // Mid-stream: allow null finish_reason only.
+    // Missing delta OR {} ⇒ terminal finish frame (not mid-stream).
+    const hasMidStreamDelta =
+      delta !== null && Object.keys(delta).length > 0;
     c.finish_reason = normalizeOpenAiFinishReason(c.finish_reason, {
-      allowNull: !emptyDelta,
+      allowNull: hasMidStreamDelta,
       route,
     });
     return c;

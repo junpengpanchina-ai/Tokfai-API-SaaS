@@ -55,7 +55,7 @@ let ok = true;
     [
       "SSE wire normalizeOpenAiFinishReasonOnSseChunk exists",
       finishTs.includes("normalizeOpenAiFinishReasonOnSseChunk") &&
-        finishTs.includes("emptyDelta"),
+        finishTs.includes("hasMidStreamDelta"),
     ],
     [
       "executeChatCompletion applies wire normalize",

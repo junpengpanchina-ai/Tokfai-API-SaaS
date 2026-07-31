@@ -64,15 +64,29 @@ function extractFinishReason(response: Record<string, unknown>): string {
   const choices = Array.isArray(response.choices) ? response.choices : [];
   const first = asRecord(choices[0]);
   const reason = first?.finish_reason;
-  if (typeof reason === "string" && reason.length > 0) {
-    const normalized = normalizeOpenAiFinishReason(reason, {
+  if (extractToolCalls(response)) {
+    // Prefer tool_calls when message carries tools, even if upstream said other.
+    const normalized = normalizeOpenAiFinishReason(reason ?? "tool_calls", {
       allowNull: false,
       route: SSE_ROUTE,
     });
-    // Final SSE chunk must carry a string finish_reason (not null).
-    return normalized ?? "stop";
+    if (normalized === "tool_calls" || normalized === "function_call") {
+      return normalized;
+    }
+    return "tool_calls";
   }
-  if (extractToolCalls(response)) return "tool_calls";
+  const normalized = normalizeOpenAiFinishReason(reason, {
+    allowNull: false,
+    route: SSE_ROUTE,
+  });
+  // Final SSE chunk: never null / other / undefined (Cherry → AI_FinishReasonError).
+  if (
+    normalized === "stop" ||
+    normalized === "length" ||
+    normalized === "content_filter"
+  ) {
+    return normalized;
+  }
   return "stop";
 }
 
