@@ -50,7 +50,12 @@ let ok = true;
       "openaiFinishReason module maps other/unknown → stop",
       finishTs.includes('lower === "other"') &&
         finishTs.includes('lower === "unknown"') &&
-        finishTs.includes('return "stop"'),
+        finishTs.includes('after = "stop"'),
+    ],
+    [
+      "SSE wire normalizeOpenAiFinishReasonOnSseChunk exists",
+      finishTs.includes("normalizeOpenAiFinishReasonOnSseChunk") &&
+        finishTs.includes("emptyDelta"),
     ],
     [
       "executeChatCompletion applies wire normalize",
@@ -64,6 +69,10 @@ let ok = true;
     [
       "SSE extractFinishReason uses normalizeOpenAiFinishReason",
       sseTs.includes("normalizeOpenAiFinishReason"),
+    ],
+    [
+      "SSE sseLine applies OnSseChunk before stringify",
+      sseTs.includes("normalizeOpenAiFinishReasonOnSseChunk"),
     ],
   ];
 
@@ -90,7 +99,7 @@ if (!existsSync(distFinish) || !existsSync(distSse)) {
   const { chatCompletionToSseBody } = await import(pathToFileURL(distSse).href);
 
   const unitCases = [
-    [null, null],
+    [null, "stop"],
     [undefined, "stop"],
     ["", "stop"],
     ["other", "stop"],
@@ -113,6 +122,57 @@ if (!existsSync(distFinish) || !existsSync(distSse)) {
     ) && ok;
   }
 
+  {
+    const mid = normalizeOpenAiFinishReason(null, { allowNull: true });
+    ok =
+      (mid === null ? pass : fail)(
+        "mid-stream allowNull keeps null",
+        `got ${JSON.stringify(mid)}`
+      ) && ok;
+  }
+
+  const {
+    normalizeOpenAiFinishReasonOnSseChunk,
+  } = await import(pathToFileURL(distFinish).href);
+
+  {
+    const terminal = normalizeOpenAiFinishReasonOnSseChunk({
+      choices: [{ index: 0, delta: {}, finish_reason: "other" }],
+    });
+    const fr = terminal?.choices?.[0]?.finish_reason;
+    ok =
+      (fr === "stop" ? pass : fail)(
+        "SSE wire delta{} other → stop",
+        `got ${JSON.stringify(fr)}`
+      ) && ok;
+  }
+
+  {
+    const terminalNull = normalizeOpenAiFinishReasonOnSseChunk({
+      choices: [{ index: 0, delta: {}, finish_reason: null }],
+    });
+    const fr = terminalNull?.choices?.[0]?.finish_reason;
+    ok =
+      (fr === "stop" ? pass : fail)(
+        "SSE wire delta{} null → stop (AI SDK other guard)",
+        `got ${JSON.stringify(fr)}`
+      ) && ok;
+  }
+
+  {
+    const mid = normalizeOpenAiFinishReasonOnSseChunk({
+      choices: [
+        { index: 0, delta: { content: "hi" }, finish_reason: null },
+      ],
+    });
+    const fr = mid?.choices?.[0]?.finish_reason;
+    ok =
+      (fr === null ? pass : fail)(
+        "SSE wire mid-stream null preserved",
+        `got ${JSON.stringify(fr)}`
+      ) && ok;
+  }
+
   const normalized = normalizeOpenAiFinishReasonOnChatCompletion({
     id: "chatcmpl_test",
     object: "chat.completion",
@@ -130,6 +190,24 @@ if (!existsSync(distFinish) || !existsSync(distSse)) {
       "non-stream body finish_reason other → stop",
       `got ${JSON.stringify(fr)}`
     ) && ok;
+
+  {
+    const nullBody = normalizeOpenAiFinishReasonOnChatCompletion({
+      choices: [
+        {
+          index: 0,
+          message: { role: "assistant", content: "hi" },
+          finish_reason: null,
+        },
+      ],
+    });
+    const nfr = nullBody.choices?.[0]?.finish_reason;
+    ok =
+      (nfr === "stop" ? pass : fail)(
+        "non-stream body finish_reason null → stop",
+        `got ${JSON.stringify(nfr)}`
+      ) && ok;
+  }
 
   const sse = chatCompletionToSseBody({
     id: "chatcmpl_test",

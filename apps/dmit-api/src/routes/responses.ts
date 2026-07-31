@@ -31,6 +31,7 @@ import {
   ResponsesRequestSchema,
   responsesBodyToChatBody,
 } from "../lib/responsesTransform.js";
+import { normalizeOpenAiFinishReasonOnChatCompletion } from "../lib/openaiFinishReason.js";
 import { logGatewayRejection } from "./chatGatewayLogs.js";
 
 /**
@@ -231,12 +232,14 @@ responsesRoutes.post("/v1/responses", async (c) => {
       limitKey,
       idempotencyKey,
       toResponsesPayload: (result) => {
-        const response = isResponsesFormatResponse(result.response)
+        const chatBody = isResponsesFormatResponse(result.response)
           ? result.response
-          : chatCompletionResponseToResponses(
-              result.response,
-              result.requestId
-            );
+          : normalizeOpenAiFinishReasonOnChatCompletion(result.response, {
+              route,
+            });
+        const response = isResponsesFormatResponse(chatBody)
+          ? chatBody
+          : chatCompletionResponseToResponses(chatBody, result.requestId);
         if (
           !response ||
           typeof response !== "object" ||
@@ -280,7 +283,12 @@ responsesRoutes.post("/v1/responses", async (c) => {
 
   const response = isResponsesFormatResponse(result.response)
     ? result.response
-    : chatCompletionResponseToResponses(result.response, result.requestId);
+    : chatCompletionResponseToResponses(
+        normalizeOpenAiFinishReasonOnChatCompletion(result.response, {
+          route,
+        }),
+        result.requestId
+      );
 
   // Never return an empty / non-response payload on the success path.
   if (

@@ -1,4 +1,7 @@
-import { normalizeOpenAiFinishReason } from "./openaiFinishReason.js";
+import {
+  normalizeOpenAiFinishReason,
+  normalizeOpenAiFinishReasonOnSseChunk,
+} from "./openaiFinishReason.js";
 
 /**
  * Convert a completed OpenAI ChatCompletion JSON body into OpenAI-compatible
@@ -14,6 +17,8 @@ import { normalizeOpenAiFinishReason } from "./openaiFinishReason.js";
  * via chatCompletionRoleSseFrame(); remaining events use
  * chatCompletionSseBodyAfterRole().
  */
+
+const SSE_ROUTE = "/v1/chat/completions";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object"
@@ -60,7 +65,10 @@ function extractFinishReason(response: Record<string, unknown>): string {
   const first = asRecord(choices[0]);
   const reason = first?.finish_reason;
   if (typeof reason === "string" && reason.length > 0) {
-    const normalized = normalizeOpenAiFinishReason(reason);
+    const normalized = normalizeOpenAiFinishReason(reason, {
+      allowNull: false,
+      route: SSE_ROUTE,
+    });
     // Final SSE chunk must carry a string finish_reason (not null).
     return normalized ?? "stop";
   }
@@ -68,8 +76,12 @@ function extractFinishReason(response: Record<string, unknown>): string {
   return "stop";
 }
 
+/** Last-exit wire normalize before every SSE data frame is serialized. */
 function sseLine(payload: unknown): string {
-  return `data: ${JSON.stringify(payload)}\n\n`;
+  const safe = normalizeOpenAiFinishReasonOnSseChunk(payload, {
+    route: SSE_ROUTE,
+  });
+  return `data: ${JSON.stringify(safe)}\n\n`;
 }
 
 /**

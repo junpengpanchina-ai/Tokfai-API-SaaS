@@ -731,7 +731,8 @@ export async function executeChatCompletion(
       });
 
       const snapshot = normalizeOpenAiFinishReasonOnChatCompletion(
-        replay.responseSnapshot
+        replay.responseSnapshot,
+        { route }
       );
       const resolvedModel =
         typeof snapshot.model === "string"
@@ -1416,7 +1417,8 @@ async function runProviderAttempts(args: {
 
         // Wire-facing normalize only (other/unknown → stop). Usage below
         // still records the upstream finish_reason from responseData.
-        const response = normalizeOpenAiFinishReasonOnChatCompletion({
+        const response = normalizeOpenAiFinishReasonOnChatCompletion(
+          {
           ...responseData,
           // Upstream may omit or send empty object; OpenAI clients require this.
           object: "chat.completion",
@@ -1453,7 +1455,9 @@ async function runProviderAttempts(args: {
             },
             routing
           ),
-        });
+        },
+          { route }
+        );
 
         await recordSuccessfulUsageAndDebit(
           {

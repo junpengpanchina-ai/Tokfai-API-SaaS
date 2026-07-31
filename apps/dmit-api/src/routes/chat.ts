@@ -36,6 +36,7 @@ import {
   respondBufferedChatSse,
   respondChatCompletionEarlySse,
 } from "../lib/respondEarlySse.js";
+import { normalizeOpenAiFinishReasonOnChatCompletion } from "../lib/openaiFinishReason.js";
 import { resolveChatModel } from "../upstream/modelAliases.js";
 import { logGatewayRejection } from "./chatGatewayLogs.js";
 import type { Context } from "hono";
@@ -141,10 +142,13 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
       normalized: clientNorm.normalized,
       rejectedReason: clientNorm.rejectedReason,
     });
-    const noop = buildEmptyMessagesNoopChatCompletion({
-      requestId,
-      body: clientNorm.body,
-    });
+    const noop = normalizeOpenAiFinishReasonOnChatCompletion(
+      buildEmptyMessagesNoopChatCompletion({
+        requestId,
+        body: clientNorm.body,
+      }),
+      { route }
+    );
     const wantsStream =
       (clientNorm.body !== null &&
         typeof clientNorm.body === "object" &&
@@ -318,5 +322,7 @@ chatRoutes.post("/v1/chat/completions", async (c) => {
     return respondExecuteChatCompletionFailure(c, result);
   }
 
-  return c.json(result.response);
+  return c.json(
+    normalizeOpenAiFinishReasonOnChatCompletion(result.response, { route })
+  );
 });
