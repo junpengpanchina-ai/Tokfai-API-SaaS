@@ -1,3 +1,5 @@
+import { normalizeOpenAiFinishReason } from "./openaiFinishReason.js";
+
 /**
  * Convert a completed OpenAI ChatCompletion JSON body into OpenAI-compatible
  * SSE chunks ending with `data: [DONE]`.
@@ -57,7 +59,11 @@ function extractFinishReason(response: Record<string, unknown>): string {
   const choices = Array.isArray(response.choices) ? response.choices : [];
   const first = asRecord(choices[0]);
   const reason = first?.finish_reason;
-  if (typeof reason === "string" && reason.length > 0) return reason;
+  if (typeof reason === "string" && reason.length > 0) {
+    const normalized = normalizeOpenAiFinishReason(reason);
+    // Final SSE chunk must carry a string finish_reason (not null).
+    return normalized ?? "stop";
+  }
   if (extractToolCalls(response)) return "tool_calls";
   return "stop";
 }

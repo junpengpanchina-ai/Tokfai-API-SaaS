@@ -21,6 +21,7 @@ import {
   stripToolsFromChatBody,
   toolChoiceSummary,
 } from "./toolCallCapability.js";
+import { normalizeOpenAiFinishReasonOnChatCompletion } from "./openaiFinishReason.js";
 import { chatBodyKeysForLog } from "./chatCompletionDiagnostics.js";
 
 function toolsCapableSuggestions(): string[] {
@@ -729,7 +730,9 @@ export async function executeChatCompletion(
         idempotencyKey: input.idempotencyKey,
       });
 
-      const snapshot = replay.responseSnapshot;
+      const snapshot = normalizeOpenAiFinishReasonOnChatCompletion(
+        replay.responseSnapshot
+      );
       const resolvedModel =
         typeof snapshot.model === "string"
           ? snapshot.model
@@ -1411,7 +1414,9 @@ async function runProviderAttempts(args: {
           billingStatus: unlimited || creditsCharged <= 0 ? "not_billable" : "charged",
         });
 
-        const response: Record<string, unknown> = {
+        // Wire-facing normalize only (other/unknown → stop). Usage below
+        // still records the upstream finish_reason from responseData.
+        const response = normalizeOpenAiFinishReasonOnChatCompletion({
           ...responseData,
           // Upstream may omit or send empty object; OpenAI clients require this.
           object: "chat.completion",
@@ -1448,7 +1453,7 @@ async function runProviderAttempts(args: {
             },
             routing
           ),
-        };
+        });
 
         await recordSuccessfulUsageAndDebit(
           {
