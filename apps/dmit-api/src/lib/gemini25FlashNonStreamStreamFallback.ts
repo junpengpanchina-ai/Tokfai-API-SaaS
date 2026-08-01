@@ -1,13 +1,16 @@
 /**
  * Narrow gate for gemini-2.5-flash /v1/chat/completions:
- * when upstream non-stream times out or is unavailable, drain upstream
- * stream=true and assemble chat.completion JSON (then synthesize client SSE
- * when the client asked for stream=true).
  *
- * Client stream=true is enabled only for /v1/chat/completions so /v1/responses
- * and gemini-3-pro stream paths stay untouched.
+ * Client stream=false: prefer native non-stream upstream first. Stream
+ * assemble is FALLBACK ONLY after native failure / no non-stream capability
+ * — never the default path.
  *
- * Does not touch aliases, Cherry compat, or image paths.
+ * Client stream=true: same non-stream-first policy, then synthesize OpenAI
+ * SSE for the client; may skip a doomed non-stream attempt when the
+ * non-stream circuit is already open.
+ *
+ * Enabled only for /v1/chat/completions so /v1/responses and gemini-3-pro
+ * stream paths stay untouched. Does not touch aliases, Cherry, or image.
  */
 
 import type { ApiError } from "../errors.js";

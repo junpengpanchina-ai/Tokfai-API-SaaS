@@ -180,20 +180,26 @@ async function runStaticChecks() {
       : fail("fallback gate scoped to gemini-2.5-flash")) && ok;
 
   ok =
-    (exec.includes("providerFetchChatStreamAssembled") &&
+    (exec.includes("providerFetchChatPreferNativeNonStream") &&
+    exec.includes("chat_gemini25_flash_prefer_native_nonstream") &&
     exec.includes("chat_gemini25_flash_nonstream_stream_fallback") &&
     exec.includes("isGemini25FlashNonStreamStreamFallbackPath") &&
     exec.includes("recordSuccessfulUsageAndDebit")
-      ? pass("executeChatCompletion wires stream assemble fallback")
-      : fail("executeChatCompletion wires stream assemble fallback")) && ok;
+      ? pass("executeChatCompletion prefers native non-stream then assemble fallback")
+      : fail(
+          "executeChatCompletion prefers native non-stream then assemble fallback"
+        )) && ok;
 
   ok =
-    (streamFetch.includes("stream: true") &&
+    (streamFetch.includes("providerFetchChatPreferNativeNonStream") &&
+    streamFetch.includes("nativeNonStreamAvailable") &&
+    streamFetch.includes("stream: true") &&
+    streamFetch.includes("stream: false") &&
     streamFetch.includes("assembleChatCompletionFromUpstreamSse") &&
     streamFetch.includes("idleTimeoutMs") &&
     streamFetch.includes('billing_status: "not_billable"')
-      ? pass("upstream stream drain + assemble helper")
-      : fail("upstream stream drain + assemble helper")) && ok;
+      ? pass("upstream prefer-native + stream assemble helper")
+      : fail("upstream prefer-native + stream assemble helper")) && ok;
 
   ok =
     (assemble.includes("assembleChatCompletionFromUpstreamSse") &&

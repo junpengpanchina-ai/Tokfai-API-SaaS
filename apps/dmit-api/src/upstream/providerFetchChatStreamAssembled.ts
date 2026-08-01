@@ -1,8 +1,17 @@
 /**
- * Upstream chat fetch with stream=true, idle-timeout drain, assemble JSON.
+ * Upstream chat fetch helpers for gemini-2.5-flash /v1/chat/completions.
  *
- * Narrow helper for gemini-2.5-flash /v1/chat/completions stream=false
- * fallback — does not change Cherry synthesis or client stream paths.
+ * Policy for client stream=false (non-stream requests):
+ *   1. Prefer native non-stream upstream JSON (`stream: false`).
+ *   2. NEVER default to stream assemble.
+ *   3. Stream assemble only when native non-stream is unavailable or fails
+ *      with an eligible upstream error — then drain stream=true and assemble.
+ *
+ * `providerFetchChatStreamAssembled` is the FALLBACK drain helper only.
+ * Callers of ordinary non-stream traffic must use
+ * `providerFetchChatPreferNativeNonStream` (or equivalent native-first logic).
+ *
+ * Does not change Cherry synthesis, alias routing, billing, or image paths.
  */
 
 import { env } from "../env.js";
@@ -14,6 +23,7 @@ import {
 import { log } from "../logger.js";
 import {
   mapUpstreamError,
+  providerFetch,
   type UpstreamFetchOptions,
   type UpstreamLogContext,
 } from "./grsai.js";
@@ -74,9 +84,169 @@ function isAbortTimeout(err: unknown): boolean {
   return err.name === "TimeoutError" || err.name === "AbortError";
 }
 
+export type PreferNativeChatFetchResult<T = AssembledChatCompletion> = {
+  data: T;
+  upstreamId: string | null;
+  /** True only when the response was recovered via stream assemble fallback. */
+  viaStreamAssemble: boolean;
+};
+
+export type PreferNativeChatFetchOptions = UpstreamFetchOptions & {
+  json: Record<string, unknown>;
+  /** Wall-clock budget for the native non-stream attempt. */
+  timeoutMs: number;
+  /**
+   * When false, skip native non-stream and use stream assemble only.
+   * Set only when the provider truly has no usable non-stream capability
+   * (e.g. client stream=true and non-stream circuit already open).
+   * Default true — ordinary non-stream requests must always try native first.
+   */
+  nativeNonStreamAvailable?: boolean;
+  /** After native failure, attempt stream assemble. Default true. */
+  allowStreamAssembleFallback?: boolean;
+  /** Decide if a native failure may use stream assemble. */
+  isStreamAssembleEligible?: (err: ApiError) => boolean;
+  /** Wall-clock cap for stream drain (in addition to idle). */
+  streamAssembleTimeoutMs: number;
+  /** Abort stream drain when no bytes arrive for this long. */
+  streamAssembleIdleTimeoutMs: number;
+};
+
+/**
+ * Prefer native non-stream upstream. Stream assemble is FALLBACK ONLY.
+ *
+ * Non-stream client requests must call this (or equivalent) — never jump
+ * straight to `providerFetchChatStreamAssembled`.
+ */
+export async function providerFetchChatPreferNativeNonStream<T = AssembledChatCompletion>(
+  provider: UpstreamProvider,
+  path: string,
+  options: PreferNativeChatFetchOptions,
+  logContext: UpstreamLogContext = {}
+): Promise<PreferNativeChatFetchResult<T>> {
+  const {
+    json,
+    headers,
+    timeoutMs,
+    nativeNonStreamAvailable = true,
+    allowStreamAssembleFallback = true,
+    isStreamAssembleEligible,
+    streamAssembleTimeoutMs,
+    streamAssembleIdleTimeoutMs,
+    ...init
+  } = options;
+
+  const runAssemble = async (reason: string, priorErr?: ApiError) => {
+    log.warn("chat_prefer_native_stream_assemble_fallback", {
+      requestId: logContext.requestId,
+      route: logContext.route,
+      model: logContext.model,
+      requestedModel: logContext.requestedModel,
+      resolvedModel: logContext.resolvedModel ?? logContext.model,
+      providerId: provider.id,
+      reason,
+      nativeNonStreamAvailable,
+      upstreamStatus: priorErr?.upstreamStatus ?? null,
+      upstreamErrorCode: priorErr?.code ?? null,
+      billing_status: "not_billable",
+      streamAssemble: true,
+    });
+    const assembled = await providerFetchChatStreamAssembled(
+      provider,
+      path,
+      {
+        ...init,
+        headers,
+        json,
+        timeoutMs: streamAssembleTimeoutMs,
+        idleTimeoutMs: streamAssembleIdleTimeoutMs,
+      },
+      logContext
+    );
+    return {
+      data: assembled.data as T,
+      upstreamId: assembled.upstreamId,
+      viaStreamAssemble: true as const,
+    };
+  };
+
+  // No usable non-stream capability → assemble fallback only.
+  if (!nativeNonStreamAvailable) {
+    if (!allowStreamAssembleFallback) {
+      throw (
+        ApiError.requestTimeout(
+          "Upstream non-stream unavailable and stream assemble disabled.",
+          "上游模型响应超时，请稍后重试或切换模型。"
+        )
+      );
+    }
+    try {
+      return await runAssemble("native_nonstream_unavailable");
+    } catch (streamErr) {
+      if (
+        streamErr instanceof ApiError &&
+        streamErr.code === "upstream_timeout"
+      ) {
+        return await runAssemble("stream_assemble_retry", streamErr);
+      }
+      throw streamErr;
+    }
+  }
+
+  // Prefer native non-stream JSON (force stream:false — never default assemble).
+  const nonStreamJson: Record<string, unknown> = { ...json, stream: false };
+  try {
+    const fetched = await providerFetch<T>(
+      provider,
+      path,
+      {
+        ...init,
+        headers,
+        json: nonStreamJson,
+        timeoutMs,
+        // Do not pass idleTimeoutMs — that would override the non-stream wall.
+      },
+      logContext
+    );
+    return {
+      data: fetched.data,
+      upstreamId: fetched.upstreamId,
+      viaStreamAssemble: false,
+    };
+  } catch (nonStreamErr) {
+    if (!(nonStreamErr instanceof ApiError) || !allowStreamAssembleFallback) {
+      throw nonStreamErr;
+    }
+    const eligible =
+      typeof isStreamAssembleEligible === "function"
+        ? isStreamAssembleEligible(nonStreamErr)
+        : false;
+    if (!eligible) {
+      throw nonStreamErr;
+    }
+    try {
+      return await runAssemble(
+        nonStreamErr.code ?? "upstream_error",
+        nonStreamErr
+      );
+    } catch (streamErr) {
+      if (
+        streamErr instanceof ApiError &&
+        streamErr.code === "upstream_timeout"
+      ) {
+        return await runAssemble("stream_assemble_retry", streamErr);
+      }
+      throw streamErr;
+    }
+  }
+}
+
 /**
  * POST upstream with stream:true, reset idle timer on each chunk, drain SSE,
  * assemble a standard chat.completion object.
+ *
+ * FALLBACK ONLY — do not call this as the default path for client stream=false.
+ * Prefer `providerFetchChatPreferNativeNonStream`.
  */
 export async function providerFetchChatStreamAssembled(
   provider: UpstreamProvider,

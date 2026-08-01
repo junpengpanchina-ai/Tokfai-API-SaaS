@@ -61,7 +61,7 @@ import {
   recordProviderModelSuccess,
   recordProviderModelTimeout,
 } from "../upstream/providerModelCircuitBreaker.js";
-import { providerFetchChatStreamAssembled } from "../upstream/providerFetchChatStreamAssembled.js";
+import { providerFetchChatPreferNativeNonStream } from "../upstream/providerFetchChatStreamAssembled.js";
 import { buildUpstreamChatBody, droppedUpstreamChatKeysForAudit } from "./upstreamChatBody.js";
 import {
   isGemini25FlashNonStreamStreamFallbackPath,
@@ -1163,9 +1163,8 @@ async function runProviderAttempts(args: {
             route,
           });
 
-        // Non-stream JSON must use absolute timeoutMs (incl. 20s probe).
-        // Passing idleTimeoutMs would override the probe via ?? in providerFetch.
-        // Idle timeout applies only to real upstream SSE drain below.
+        // Idle timeout applies only to real client-stream SSE paths that do
+        // not use the gemini-2.5-flash native-first helper below.
         const idleTimeoutMs =
           clientStream && !useGemini25FlashStreamFallback
             ? Math.min(timeoutPolicy.idleTimeoutMs, remainingTotalMs)
@@ -1184,120 +1183,94 @@ async function runProviderAttempts(args: {
         let upstreamId: string | null;
         let viaStreamFallback = false;
 
-        const runGemini25FlashStreamAssemble = async (
-          reason: string,
-          priorErr?: ApiError
-        ) => {
+        if (useGemini25FlashStreamFallback) {
+          // Non-stream client requests: ALWAYS prefer native non-stream with
+          // the full attempt budget. Never default to stream assemble.
+          // Client stream=true: short native probe; if non-stream circuit is
+          // already open, treat native as unavailable → assemble fallback.
           const remainingMs =
             timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt);
-          if (remainingMs <= 5_000) {
-            throw (
-              priorErr ??
-              ApiError.requestTimeout(
-                "Upstream provider timed out.",
-                "上游模型响应超时，请稍后重试或切换模型。"
-              )
+          if (remainingMs <= 5_000 && allDegraded && clientStream) {
+            throw ApiError.requestTimeout(
+              "Upstream provider timed out.",
+              "上游模型响应超时，请稍后重试或切换模型。"
             );
           }
-          // Do NOT cap stream drain to the short chat attempt budget — that is
-          // exactly what just failed for non-stream JSON.
           const streamWallMs = Math.max(5_000, remainingMs);
           const streamIdleMs = Math.min(
             timeoutPolicy.idleTimeoutMs,
             streamWallMs
           );
-          log.warn("chat_gemini25_flash_nonstream_stream_fallback", {
+          const nativeTimeoutMs = clientStream
+            ? Math.min(20_000, perAttemptTimeoutMs)
+            : perAttemptTimeoutMs;
+          // Client stream=false must never skip native due to circuit alone.
+          const nativeNonStreamAvailable = !(allDegraded && clientStream);
+
+          log.info("chat_gemini25_flash_prefer_native_nonstream", {
             requestId,
             route,
             requestedModel,
             attemptModel,
             providerId: provider.id,
-            reason,
             clientStream,
-            upstreamStatus: priorErr?.upstreamStatus ?? null,
-            billing_status: "not_billable",
-            remainingMs,
+            nativeNonStreamAvailable,
+            nativeTimeoutMs,
             streamWallMs,
             streamIdleMs,
+            billing_status: "not_billable",
           });
-          return providerFetchChatStreamAssembled(
-            provider,
-            provider.chatPath,
-            {
-              method: "POST",
-              json: upstreamBody,
-              timeoutMs: streamWallMs,
-              idleTimeoutMs: streamIdleMs,
-            },
-            logCtx
-          );
-        };
 
-        // When the non-stream circuit is already open, skip the doomed JSON
-        // attempt and go straight to upstream stream assemble for this model.
-        if (useGemini25FlashStreamFallback && allDegraded) {
-          const assembled = await runGemini25FlashStreamAssemble(
-            "provider_model_degraded"
-          );
-          data = assembled.data;
-          upstreamId = assembled.upstreamId;
-          viaStreamFallback = true;
-        } else {
-          try {
-            // Short non-stream probe for this path — pivot to stream assemble
-            // quickly when GRSAI JSON hangs (prod chat budget can be ~45s).
-            // Client stream=true still synthesizes OpenAI SSE from the JSON.
-            const nonStreamProbeMs = useGemini25FlashStreamFallback
-              ? Math.min(20_000, perAttemptTimeoutMs)
-              : perAttemptTimeoutMs;
-            const fetched = await providerFetch<ChatCompletionResponse>(
+          const fetched =
+            await providerFetchChatPreferNativeNonStream<ChatCompletionResponse>(
               provider,
               provider.chatPath,
               {
                 method: "POST",
                 json: upstreamBody,
-                timeoutMs: nonStreamProbeMs,
-                ...(idleTimeoutMs != null ? { idleTimeoutMs } : {}),
+                timeoutMs: nativeTimeoutMs,
+                nativeNonStreamAvailable,
+                allowStreamAssembleFallback: true,
+                isStreamAssembleEligible: isGemini25FlashStreamFallbackEligible,
+                streamAssembleTimeoutMs: streamWallMs,
+                streamAssembleIdleTimeoutMs: streamIdleMs,
               },
               logCtx
             );
-            data = fetched.data;
-            upstreamId = fetched.upstreamId;
-          } catch (nonStreamErr) {
-            if (
-              !(nonStreamErr instanceof ApiError) ||
-              !useGemini25FlashStreamFallback ||
-              !isGemini25FlashStreamFallbackEligible(nonStreamErr)
-            ) {
-              throw nonStreamErr;
-            }
-
-            try {
-              const assembled = await runGemini25FlashStreamAssemble(
-                nonStreamErr.code ?? "upstream_error",
-                nonStreamErr
-              );
-              data = assembled.data;
-              upstreamId = assembled.upstreamId;
-              viaStreamFallback = true;
-            } catch (streamErr) {
-              // One immediate stream retry when the first drain also times out.
-              if (
-                streamErr instanceof ApiError &&
-                streamErr.code === "upstream_timeout"
-              ) {
-                const assembled = await runGemini25FlashStreamAssemble(
-                  "stream_assemble_retry",
-                  streamErr
-                );
-                data = assembled.data;
-                upstreamId = assembled.upstreamId;
-                viaStreamFallback = true;
-              } else {
-                throw streamErr;
-              }
-            }
+          if (fetched.viaStreamAssemble) {
+            log.warn("chat_gemini25_flash_nonstream_stream_fallback", {
+              requestId,
+              route,
+              requestedModel,
+              attemptModel,
+              providerId: provider.id,
+              reason: nativeNonStreamAvailable
+                ? "native_nonstream_failed"
+                : "native_nonstream_unavailable",
+              clientStream,
+              billing_status: "not_billable",
+              remainingMs,
+              streamWallMs,
+              streamIdleMs,
+            });
           }
+          data = fetched.data;
+          upstreamId = fetched.upstreamId;
+          viaStreamFallback = fetched.viaStreamAssemble;
+        } else {
+          const fetched = await providerFetch<ChatCompletionResponse>(
+            provider,
+            provider.chatPath,
+            {
+              method: "POST",
+              json: upstreamBody,
+              timeoutMs: perAttemptTimeoutMs,
+              ...(idleTimeoutMs != null ? { idleTimeoutMs } : {}),
+            },
+            logCtx
+          );
+          data = fetched.data;
+          upstreamId = fetched.upstreamId;
         }
 
         await recordModelSuccess(attemptModel);
