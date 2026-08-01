@@ -70,11 +70,117 @@ function writeChatRest(write: EarlySseWrite, result: ExecuteChatCompletionResult
   write(chatCompletionSseBodyAfterRole(result.response));
 }
 
+function asSseRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+/**
+ * P991 last-mile SSE sanitizer for Cherry Studio /v1/responses.
+ * Only patches `response.completed` blocks when `response.status === "completed"`
+ * so clients get an explicit stop signal (not inferred "other").
+ * Does not rewrite the business response object; does not touch chat/completions;
+ * never upgrades failed / errored / incomplete into stop.
+ */
+export function sanitizeResponsesCompletedForCherry(sseText: string): string {
+  if (!sseText || !sseText.includes("response.completed")) return sseText;
+
+  const blocks = sseText.split("\n\n");
+  const out: string[] = [];
+
+  for (const block of blocks) {
+    if (!block.trim()) {
+      out.push(block);
+      continue;
+    }
+    out.push(sanitizeOneResponsesCompletedBlock(block));
+  }
+
+  return out.join("\n\n");
+}
+
+function sanitizeOneResponsesCompletedBlock(block: string): string {
+  const lines = block.split("\n");
+  let eventName: string | undefined;
+  let dataIdx = -1;
+  let dataRaw: string | undefined;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (line.startsWith("event:")) {
+      eventName = line.slice(6).trim();
+    } else if (line.startsWith("data:")) {
+      dataIdx = i;
+      dataRaw = line.startsWith("data: ")
+        ? line.slice(6)
+        : line.slice(5).trimStart();
+    }
+  }
+
+  if (
+    dataIdx < 0 ||
+    dataRaw === undefined ||
+    !dataRaw ||
+    dataRaw === "[DONE]" ||
+    dataRaw[0] !== "{"
+  ) {
+    return block;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(dataRaw);
+  } catch {
+    return block;
+  }
+
+  const payload = asSseRecord(parsed);
+  if (!payload) return block;
+
+  const isCompletedEvent =
+    eventName === "response.completed" ||
+    payload.type === "response.completed";
+  if (!isCompletedEvent) return block;
+
+  // Never rewrite failure / incomplete terminals as stop.
+  if (
+    eventName === "response.failed" ||
+    eventName === "response.incomplete" ||
+    eventName === "response.errored" ||
+    payload.type === "response.failed" ||
+    payload.type === "response.incomplete" ||
+    payload.type === "error"
+  ) {
+    return block;
+  }
+
+  const response = asSseRecord(payload.response);
+  if (!response || response.status !== "completed") return block;
+
+  const nextResponse: Record<string, unknown> = { ...response };
+  if (!("incomplete_details" in nextResponse)) {
+    nextResponse.incomplete_details = null;
+  }
+  nextResponse.finish_reason = "stop";
+
+  const nextPayload: Record<string, unknown> = {
+    ...payload,
+    response: nextResponse,
+    finish_reason: "stop",
+  };
+
+  const nextLines = [...lines];
+  nextLines[dataIdx] = `data: ${JSON.stringify(nextPayload)}`;
+  return nextLines.join("\n");
+}
+
 function writeResponsesRest(
   write: EarlySseWrite,
   response: Record<string, unknown>
 ) {
-  write(responsesSseBodyAfterCreated(response, { skipCreated: true }));
+  const raw = responsesSseBodyAfterCreated(response, { skipCreated: true });
+  write(sanitizeResponsesCompletedForCherry(raw));
 }
 
 /**
