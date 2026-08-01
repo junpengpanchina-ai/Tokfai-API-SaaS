@@ -94,8 +94,11 @@ if (!existsSync(distFinish) || !existsSync(distSse)) {
       `missing ${!existsSync(distFinish) ? distFinish : distSse}`
     ) && ok;
 } else {
-  const { normalizeOpenAiFinishReason, normalizeOpenAiFinishReasonOnChatCompletion } =
-    await import(pathToFileURL(distFinish).href);
+  const {
+    normalizeFinishReason,
+    normalizeOpenAiFinishReason,
+    normalizeOpenAiFinishReasonOnChatCompletion,
+  } = await import(pathToFileURL(distFinish).href);
   const { chatCompletionToSseBody } = await import(pathToFileURL(distSse).href);
 
   const unitCases = [
@@ -104,22 +107,34 @@ if (!existsSync(distFinish) || !existsSync(distSse)) {
     ["", "stop"],
     ["other", "stop"],
     ["Other", "stop"],
+    ["OTHER", "stop"],
     ["unknown", "stop"],
     ["stop", "stop"],
+    ["STOP", "stop"],
     ["length", "length"],
+    ["MAX_TOKENS", "length"],
+    ["max_tokens", "length"],
     ["content_filter", "content_filter"],
+    ["SAFETY", "content_filter"],
+    ["safety", "content_filter"],
     ["tool_calls", "tool_calls"],
     ["function_call", "function_call"],
     ["end_turn", "stop"],
   ];
 
   for (const [input, expected] of unitCases) {
-    const got = normalizeOpenAiFinishReason(input);
-    const label = `normalizeOpenAiFinishReason(${JSON.stringify(input)}) → ${JSON.stringify(expected)}`;
+    const got = normalizeFinishReason(input);
+    const aliasGot = normalizeOpenAiFinishReason(input);
+    const label = `normalizeFinishReason(${JSON.stringify(input)}) → ${JSON.stringify(expected)}`;
     ok = (got === expected ? pass : fail)(
       label,
       got === expected ? undefined : `got ${JSON.stringify(got)}`
     ) && ok;
+    ok =
+      (aliasGot === expected ? pass : fail)(
+        `normalizeOpenAiFinishReason alias(${JSON.stringify(input)})`,
+        aliasGot === expected ? undefined : `got ${JSON.stringify(aliasGot)}`
+      ) && ok;
   }
 
   {

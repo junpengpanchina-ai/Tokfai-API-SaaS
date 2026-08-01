@@ -156,6 +156,28 @@ if (!existsSync(distSse) || !existsSync(distFinish)) {
       ) && ok;
   }
 
+  {
+    const maxTokens = normalizeOpenAiFinishReasonOnSseChunk({
+      choices: [{ index: 0, delta: {}, finish_reason: "MAX_TOKENS" }],
+    });
+    ok =
+      (maxTokens?.choices?.[0]?.finish_reason === "length" ? pass : fail)(
+        "wire delta{} MAX_TOKENS → length",
+        JSON.stringify(maxTokens?.choices?.[0]?.finish_reason)
+      ) && ok;
+  }
+
+  {
+    const safety = normalizeOpenAiFinishReasonOnSseChunk({
+      choices: [{ index: 0, delta: {}, finish_reason: "SAFETY" }],
+    });
+    ok =
+      (safety?.choices?.[0]?.finish_reason === "content_filter" ? pass : fail)(
+        "wire delta{} SAFETY → content_filter",
+        JSON.stringify(safety?.choices?.[0]?.finish_reason)
+      ) && ok;
+  }
+
   const sseFromOther = chatCompletionToSseBody({
     id: "chatcmpl_p990",
     object: "chat.completion",

@@ -3,18 +3,18 @@
  *
  * Cherry Studio (and some SDKs) reject finish_reason "other" with
  * AI_FinishReasonError. AI SDK maps null/unknown/other → "other".
- * Map non-OpenAI reasons to "stop" on the wire only —
+ * Map non-OpenAI reasons on the wire only —
  * does not change billing, usage debit, routing, or provider fallback.
+ *
+ * Canonical map (outbound adapter):
+ *   STOP / stop / end_turn     → stop
+ *   MAX_TOKENS / max_tokens    → length
+ *   SAFETY                     → content_filter
+ *   OTHER / other / unknown / null → stop
  */
 
-const PASSTHROUGH = new Set([
-  "stop",
-  "length",
-  "content_filter",
-  // OpenAI tool / legacy function calling — must not be rewritten to stop.
-  "tool_calls",
-  "function_call",
-]);
+/** OpenAI tool / legacy function calling — must not be rewritten to stop. */
+const TOOL_FINISH = new Set(["tool_calls", "function_call"]);
 
 export type NormalizeFinishReasonOpts = {
   /**
@@ -56,11 +56,15 @@ function logNormalizeFinishReason(
 }
 
 /**
- * Normalize a single finish_reason for OpenAI clients.
- * - other / unknown / "" / undefined / unrecognized → "stop"
+ * Unified outbound finish_reason normalize for OpenAI Chat Completion clients.
+ * - STOP / stop / end_turn → "stop"
+ * - MAX_TOKENS / max_tokens → "length"
+ * - SAFETY → "content_filter"
+ * - OTHER / other / unknown / "" / undefined / unrecognized → "stop"
  * - null → "stop" unless allowNull (mid-stream SSE only)
+ * - tool_calls / function_call → passthrough
  */
-export function normalizeOpenAiFinishReason(
+export function normalizeFinishReason(
   reason: unknown,
   opts?: NormalizeFinishReasonOpts
 ): string | null {
@@ -79,8 +83,12 @@ export function normalizeOpenAiFinishReason(
       after = "stop";
     } else {
       const lower = trimmed.toLowerCase();
-      if (lower === "other" || lower === "unknown") after = "stop";
-      else if (PASSTHROUGH.has(lower)) after = lower;
+      if (lower === "stop" || lower === "end_turn") after = "stop";
+      else if (lower === "max_tokens" || lower === "length") after = "length";
+      else if (lower === "safety" || lower === "content_filter") {
+        after = "content_filter";
+      } else if (lower === "other" || lower === "unknown") after = "stop";
+      else if (TOOL_FINISH.has(lower)) after = lower;
       else after = "stop";
     }
   }
@@ -88,6 +96,9 @@ export function normalizeOpenAiFinishReason(
   logNormalizeFinishReason(reason, after, opts?.route);
   return after;
 }
+
+/** Alias — existing call sites / smokes use this name. */
+export const normalizeOpenAiFinishReason = normalizeFinishReason;
 
 /** Mutate-free: normalize choices[].finish_reason on a chat.completion body. */
 export function normalizeOpenAiFinishReasonOnChatCompletion(
