@@ -7,6 +7,7 @@ import {
   chatCompletionRoleSseFrame,
   chatCompletionSseBodyAfterRole,
   chatCompletionToSseBody,
+  sanitizeChatCompletionSseOutboundText,
 } from "./chatCompletionSse.js";
 import {
   createEarlySseResponse,
@@ -226,7 +227,10 @@ export function respondBufferedChatSse(
   response: Record<string, unknown>,
   requestId: string
 ): Response {
-  const sseBody = chatCompletionToSseBody(response);
+  // Same last-mile sanitize as controller.enqueue (noop / buffered path).
+  const sseBody = sanitizeChatCompletionSseOutboundText(
+    chatCompletionToSseBody(response)
+  );
   return new Response(sseBody, {
     status: 200,
     headers: {

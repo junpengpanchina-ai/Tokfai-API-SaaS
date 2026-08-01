@@ -4,7 +4,17 @@
  * After auth, rate-limit, balance precheck, and schema normalize succeed, the
  * first SSE frame must be written immediately — before waiting on upstream.
  * Heartbeat comment frames (`: ping`) are sent when idle for 10s.
+ *
+ * Final client bytes leave via controller.enqueue — chat.completion.chunk
+ * frames are sanitized here so finish_reason never reaches the client as
+ * other|unknown|null (Cherry Studio AI_FinishReasonError).
  */
+
+import {
+  chatCompletionEmergencyStopSseFrame,
+  sanitizeChatCompletionSseOutboundText,
+  sseTextHasOpenAiWireFinish,
+} from "./chatCompletionSse.js";
 
 export const EARLY_SSE_HEADERS = {
   "Content-Type": "text/event-stream; charset=utf-8",
@@ -21,6 +31,13 @@ const DEFAULT_HEARTBEAT_MS = 10_000;
 
 export type EarlySseWrite = (chunk: string) => void;
 
+function looksLikeChatCompletionSse(firstFrame: string): boolean {
+  return (
+    firstFrame.includes('"choices"') &&
+    (firstFrame.includes('"delta"') || firstFrame.includes("chat.completion"))
+  );
+}
+
 /**
  * Build a chunked SSE Response that flushes `firstFrame` before `produceRest`.
  * Does not set Content-Length (required for incremental flush).
@@ -33,15 +50,26 @@ export function createEarlySseResponse(args: {
 }): Response {
   const encoder = new TextEncoder();
   const heartbeatMs = args.heartbeatMs ?? DEFAULT_HEARTBEAT_MS;
+  const chatSse = looksLikeChatCompletionSse(args.firstFrame);
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let closed = false;
       let lastActivityAt = Date.now();
+      let sawWireFinish = false;
+      let sawDone = false;
 
       const write: EarlySseWrite = (chunk) => {
         if (closed || !chunk) return;
-        controller.enqueue(encoder.encode(chunk));
+        // Ultimate SSE exit for /v1/chat/completions stream=true.
+        const outbound = chatSse
+          ? sanitizeChatCompletionSseOutboundText(chunk)
+          : chunk;
+        if (chatSse) {
+          if (sseTextHasOpenAiWireFinish(outbound)) sawWireFinish = true;
+          if (/data:\s*\[DONE\]/i.test(outbound)) sawDone = true;
+        }
+        controller.enqueue(encoder.encode(outbound));
         lastActivityAt = Date.now();
       };
 
@@ -60,6 +88,18 @@ export function createEarlySseResponse(args: {
         // Best-effort: never throw out of the stream start callback.
       } finally {
         clearInterval(heartbeat);
+        try {
+          // AI SDK defaults finishReason to "other" when the stream closes
+          // without a string finish_reason — always emit one for chat SSE.
+          if (!closed && chatSse && !sawWireFinish) {
+            write(chatCompletionEmergencyStopSseFrame());
+          }
+          if (!closed && chatSse && !sawDone) {
+            write("data: [DONE]\n\n");
+          }
+        } catch {
+          // ignore ensure-finish failures
+        }
         closed = true;
         try {
           controller.close();

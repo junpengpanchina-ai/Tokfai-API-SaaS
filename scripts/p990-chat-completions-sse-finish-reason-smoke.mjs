@@ -92,7 +92,11 @@ const distFinish = join(ROOT, "apps/dmit-api/dist/lib/openaiFinishReason.js");
 if (!existsSync(distSse) || !existsSync(distFinish)) {
   ok = fail("dist present — run npm run build in apps/dmit-api") && ok;
 } else {
-  const { chatCompletionToSseBody } = await import(pathToFileURL(distSse).href);
+  const {
+    chatCompletionToSseBody,
+    applyOutboundChatCompletionFinishReasons,
+    sanitizeChatCompletionSseOutboundText,
+  } = await import(pathToFileURL(distSse).href);
   const { normalizeOpenAiFinishReasonOnSseChunk } = await import(
     pathToFileURL(distFinish).href
   );
@@ -138,8 +142,14 @@ if (!existsSync(distSse) || !existsSync(distFinish)) {
     });
     ok =
       (mid?.choices?.[0]?.finish_reason === null ? pass : fail)(
-        "wire mid-stream null preserved",
+        "OnSseChunk mid-stream null preserved (pre-outbound)",
         JSON.stringify(mid?.choices?.[0]?.finish_reason)
+      ) && ok;
+    const outbound = applyOutboundChatCompletionFinishReasons(mid);
+    ok =
+      (!("finish_reason" in (outbound?.choices?.[0] ?? {})) ? pass : fail)(
+        "outbound mid-stream omits finish_reason (never null)",
+        JSON.stringify(outbound?.choices?.[0])
       ) && ok;
   }
 
@@ -151,8 +161,34 @@ if (!existsSync(distSse) || !existsSync(distFinish)) {
     });
     ok =
       (midOther?.choices?.[0]?.finish_reason === "stop" ? pass : fail)(
-        "wire mid-stream other → stop",
+        "OnSseChunk mid-stream other → stop",
         JSON.stringify(midOther?.choices?.[0]?.finish_reason)
+      ) && ok;
+    const outboundOther = applyOutboundChatCompletionFinishReasons(midOther);
+    ok =
+      (!("finish_reason" in (outboundOther?.choices?.[0] ?? {}))
+        ? pass
+        : fail)(
+        "outbound mid-stream omits finish_reason after other→stop",
+        JSON.stringify(outboundOther?.choices?.[0])
+      ) && ok;
+  }
+
+  {
+    const dirty = [
+      'data: {"choices":[{"index":0,"delta":{"content":"x"},"finish_reason":null}]}\n\n',
+      'data: {"choices":[{"index":0,"delta":{},"finish_reason":"other"}]}\n\n',
+      "data: [DONE]\n\n",
+    ].join("");
+    const cleaned = sanitizeChatCompletionSseOutboundText(dirty);
+    ok = assertNoOther(cleaned, "enqueue sanitize") && ok;
+    ok =
+      (!/"finish_reason"\s*:\s*null/i.test(cleaned) ? pass : fail)(
+        "enqueue sanitize: no finish_reason null"
+      ) && ok;
+    ok =
+      (/"finish_reason"\s*:\s*"stop"/i.test(cleaned) ? pass : fail)(
+        "enqueue sanitize: terminal other → stop"
       ) && ok;
   }
 

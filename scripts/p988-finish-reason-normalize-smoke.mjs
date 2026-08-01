@@ -183,8 +183,32 @@ if (!existsSync(distFinish) || !existsSync(distSse)) {
     const fr = mid?.choices?.[0]?.finish_reason;
     ok =
       (fr === null ? pass : fail)(
-        "SSE wire mid-stream null preserved",
+        "OnSseChunk mid-stream null preserved (pre-outbound)",
         `got ${JSON.stringify(fr)}`
+      ) && ok;
+  }
+
+  {
+    const { applyOutboundChatCompletionFinishReasons } = await import(
+      pathToFileURL(distSse).href
+    );
+    const outbound = applyOutboundChatCompletionFinishReasons({
+      choices: [
+        { index: 0, delta: { content: "hi" }, finish_reason: null },
+      ],
+    });
+    ok =
+      (!("finish_reason" in (outbound?.choices?.[0] ?? {})) ? pass : fail)(
+        "outbound mid-stream omits finish_reason (never null)",
+        JSON.stringify(outbound?.choices?.[0])
+      ) && ok;
+    const terminal = applyOutboundChatCompletionFinishReasons({
+      choices: [{ index: 0, delta: {}, finish_reason: "other" }],
+    });
+    ok =
+      (terminal?.choices?.[0]?.finish_reason === "stop" ? pass : fail)(
+        "outbound terminal other → stop",
+        JSON.stringify(terminal?.choices?.[0]?.finish_reason)
       ) && ok;
   }
 
@@ -243,6 +267,12 @@ if (!existsSync(distFinish) || !existsSync(distSse)) {
     (otherHits.length === 0 ? pass : fail)(
       "SSE body never emits finish_reason other",
       otherHits.length ? `matches=${otherHits.length}` : undefined
+    ) && ok;
+  const nullHits = [...sse.matchAll(/"finish_reason"\s*:\s*null/gi)];
+  ok =
+    (nullHits.length === 0 ? pass : fail)(
+      "SSE body never emits finish_reason null",
+      nullHits.length ? `matches=${nullHits.length}` : undefined
     ) && ok;
 
   const stopHits = [...sse.matchAll(/"finish_reason"\s*:\s*"stop"/g)];

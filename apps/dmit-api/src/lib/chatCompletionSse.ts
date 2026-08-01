@@ -1,4 +1,5 @@
 import {
+  normalizeFinishReason,
   normalizeOpenAiFinishReason,
   normalizeOpenAiFinishReasonOnSseChunk,
 } from "./openaiFinishReason.js";
@@ -16,14 +17,127 @@ import {
  * For stream=true main path, the role chunk is flushed early (before upstream)
  * via chatCompletionRoleSseFrame(); remaining events use
  * chatCompletionSseBodyAfterRole().
+ *
+ * Final client wire (sseLine / earlySseStream enqueue): never emit
+ * finish_reason other|unknown|null — AI SDK defaults missing finish → "other".
  */
 
 const SSE_ROUTE = "/v1/chat/completions";
+
+const OPENAI_WIRE_FINISH = new Set([
+  "stop",
+  "length",
+  "content_filter",
+  "tool_calls",
+  "function_call",
+]);
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object"
     ? (value as Record<string, unknown>)
     : null;
+}
+
+/**
+ * Last-mile outbound adapter for a chat.completion.chunk payload.
+ * - Terminal (empty/missing delta): finish_reason = normalizeFinishReason(...)
+ *   → always stop|length|content_filter|tool_calls|function_call
+ * - Mid-stream (non-empty delta): omit finish_reason (never null on the wire)
+ */
+export function applyOutboundChatCompletionFinishReasons(
+  payload: unknown
+): unknown {
+  const row = asRecord(payload);
+  if (!row || !Array.isArray(row.choices)) return payload;
+
+  const nextChoices = row.choices.map((choice) => {
+    if (!choice || typeof choice !== "object" || Array.isArray(choice)) {
+      return choice;
+    }
+    const c = { ...(choice as Record<string, unknown>) };
+    const delta = asRecord(c.delta);
+    const midStream = delta !== null && Object.keys(delta).length > 0;
+
+    if (midStream) {
+      // OpenAI mid-stream uses null; Cherry/AI SDK treat stream-end-without
+      // a string finish as "other". Omit the field instead of sending null.
+      delete c.finish_reason;
+      return c;
+    }
+
+    // User contract: finish_reason = normalizeFinishReason(finish_reason)
+    const normalized = normalizeFinishReason(c.finish_reason, {
+      allowNull: false,
+      route: SSE_ROUTE,
+    });
+    const wire =
+      typeof normalized === "string" && OPENAI_WIRE_FINISH.has(normalized)
+        ? normalized
+        : "stop";
+    c.finish_reason = wire;
+    return c;
+  });
+
+  return { ...row, choices: nextChoices };
+}
+
+/**
+ * Rewrite every `data: {...}` JSON line's choices[].finish_reason before
+ * controller.enqueue / buffered Response body hits the client.
+ */
+export function sanitizeChatCompletionSseOutboundText(text: string): string {
+  if (!text.includes('"choices"')) return text;
+  const lines = text.split("\n");
+  const out: string[] = [];
+  for (const line of lines) {
+    if (!line.startsWith("data:")) {
+      out.push(line);
+      continue;
+    }
+    const raw = line.startsWith("data: ")
+      ? line.slice(6)
+      : line.slice(5).trimStart();
+    if (!raw || raw === "[DONE]" || raw[0] !== "{") {
+      out.push(line);
+      continue;
+    }
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (!asRecord(parsed)?.choices) {
+        out.push(line);
+        continue;
+      }
+      const safe = applyOutboundChatCompletionFinishReasons(parsed);
+      out.push(`data: ${JSON.stringify(safe)}`);
+    } catch {
+      out.push(line);
+    }
+  }
+  return out.join("\n");
+}
+
+/** True when SSE text already contains a wire-legal terminal finish_reason. */
+export function sseTextHasOpenAiWireFinish(text: string): boolean {
+  return /"finish_reason"\s*:\s*"(stop|length|content_filter|tool_calls|function_call)"/i.test(
+    text
+  );
+}
+
+/** Emergency terminal frame if the stream would otherwise close without finish. */
+export function chatCompletionEmergencyStopSseFrame(): string {
+  return sseLine({
+    id: `chatcmpl_${Date.now()}`,
+    object: "chat.completion.chunk",
+    created: Math.floor(Date.now() / 1000),
+    model: "unknown",
+    choices: [
+      {
+        index: 0,
+        delta: {},
+        finish_reason: "stop",
+      },
+    ],
+  });
 }
 
 function extractAssistantContent(response: Record<string, unknown>): string {
@@ -90,17 +204,22 @@ function extractFinishReason(response: Record<string, unknown>): string {
   return "stop";
 }
 
-/** Last-exit wire normalize before every SSE data frame is serialized. */
+/**
+ * Last-exit wire serialize before bytes leave this module.
+ * controller.enqueue (earlySseStream) also re-sanitizes for defense in depth.
+ */
 function sseLine(payload: unknown): string {
-  const safe = normalizeOpenAiFinishReasonOnSseChunk(payload, {
+  const normalized = normalizeOpenAiFinishReasonOnSseChunk(payload, {
     route: SSE_ROUTE,
   });
+  const safe = applyOutboundChatCompletionFinishReasons(normalized);
   return `data: ${JSON.stringify(safe)}\n\n`;
 }
 
 /**
  * First SSE frame for stream=true — flushed immediately after prechecks.
  * Minimal OpenAI-compatible role chunk (no upstream wait).
+ * Mid-stream: no finish_reason key (never null on the wire).
  */
 export function chatCompletionRoleSseFrame(): string {
   return sseLine({
@@ -108,7 +227,6 @@ export function chatCompletionRoleSseFrame(): string {
       {
         index: 0,
         delta: { role: "assistant", content: "" },
-        finish_reason: null,
       },
     ],
   });
@@ -164,7 +282,7 @@ export function chatCompletionSseBodyAfterRole(
           {
             index: 0,
             delta: { content },
-            finish_reason: null,
+            // mid-stream: omit finish_reason (sseLine strips null)
           },
         ],
       })
@@ -194,13 +312,13 @@ export function chatCompletionSseBodyAfterRole(
           {
             index: 0,
             delta: { tool_calls: deltaToolCalls },
-            finish_reason: null,
           },
         ],
       })
     );
   }
 
+  // Terminal chunk — finish_reason always a wire-legal string after sseLine.
   chunks.push(
     sseLine({
       ...base,
