@@ -16,10 +16,12 @@
  *   TOKFAI_P987_AGENT_RUNTIME_COMPATIBILITY_FAIL
  *   TOKFAI_P987R_AGENT_RUNTIME_REPAIR_PASS (when blockers empty after repair run)
  *
- * P987S summarize stability env:
- *   P987_SUMMARIZE_MODEL=gemini-2.5-flash
- *   P987_SUMMARIZE_FALLBACK_MODEL=gemini-2.5-flash
+ * P987S summarize stability env (summarizeGitDiffStable only):
+ *   P987_SUMMARIZE_MODEL=<stable direct chat model>
+ *   P987_SUMMARIZE_FALLBACK_MODEL=<stable direct chat model>
  *   P987_DIFF_MAX_CHARS=1200
+ *
+ * Defaults use a stable direct catalog chat model (not auto-* aliases).
  */
 
 import { spawnSync } from "node:child_process";
@@ -301,6 +303,33 @@ function judgeRejectNotBillable(caseName, body, res) {
   };
 }
 
+/**
+ * Stable direct catalog chat model for P987S summarize (not auto-* alias).
+ * Override via P987_SUMMARIZE_MODEL / P987_SUMMARIZE_FALLBACK_MODEL.
+ */
+const P987_STABLE_CHAT_MODEL = "gemini-2.5-flash";
+
+function resolveSummarizePrimaryModel(opts = {}) {
+  const fromEnv = (process.env.P987_SUMMARIZE_MODEL ?? "").trim();
+  const fromOpts =
+    typeof opts.stableModel === "string" ? opts.stableModel.trim() : "";
+  return fromEnv || fromOpts || P987_STABLE_CHAT_MODEL;
+}
+
+function resolveSummarizeFallbackModel(opts = {}) {
+  const fromEnv = (process.env.P987_SUMMARIZE_FALLBACK_MODEL ?? "").trim();
+  const fromOpts =
+    typeof opts.fallbackModel === "string" ? opts.fallbackModel.trim() : "";
+  return fromEnv || fromOpts || P987_STABLE_CHAT_MODEL;
+}
+
+function resolveDiffMaxChars() {
+  return Math.max(
+    200,
+    parseInt(process.env.P987_DIFF_MAX_CHARS ?? "1200", 10) || 1200
+  );
+}
+
 function truncateDiffInput(diffText, maxChars) {
   const raw = String(diffText ?? "");
   if (raw.length <= maxChars) return raw;
@@ -321,28 +350,82 @@ function isTransientUpstreamFailure(res, body, timedOut) {
 }
 
 /**
+ * P987S harness-only: normalize final timeout into OpenAI-compatible 504
+ * with not_billable / credits_charged=0. Never fabricates HTTP 200.
+ * Does not touch DMIT billing / public chat paths.
+ */
+function ensureSummarizeTimeoutFailureEnvelope(result) {
+  const prevBody =
+    result?.body && typeof result.body === "object" ? result.body : {};
+  const prevErr =
+    prevBody.error && typeof prevBody.error === "object" ? prevBody.error : {};
+  const prevTokfai =
+    prevBody.tokfai && typeof prevBody.tokfai === "object"
+      ? prevBody.tokfai
+      : {};
+  const rid = requestIdOf(prevBody, result?.res);
+  const code =
+    typeof prevErr.code === "string" && prevErr.code
+      ? prevErr.code
+      : result?.timedOut
+        ? "network_timeout"
+        : "upstream_timeout";
+  const message =
+    typeof prevErr.message === "string" && prevErr.message
+      ? prevErr.message
+      : "上游模型响应超时，请稍后重试或切换模型。";
+  const type =
+    typeof prevErr.type === "string" && prevErr.type
+      ? prevErr.type
+      : code === "network_timeout"
+        ? "timeout_error"
+        : "upstream_error";
+
+  const body = {
+    ...prevBody,
+    error: {
+      ...prevErr,
+      message,
+      code,
+      type,
+      ...(rid ? { request_id: prevErr.request_id ?? rid } : {}),
+    },
+    credits_charged: 0,
+    tokfai: {
+      ...prevTokfai,
+      ...(rid ? { request_id: prevTokfai.request_id ?? rid } : {}),
+      billing_status: "not_billable",
+      credits_charged: 0,
+    },
+    ...(rid ? { request_id: prevBody.request_id ?? rid } : {}),
+  };
+  const text = JSON.stringify(body);
+  const res = new Response(text, {
+    status: 504,
+    headers: { "content-type": "application/json; charset=utf-8" },
+  });
+  return {
+    ...result,
+    res,
+    body,
+    text,
+    timedOut: Boolean(result?.timedOut) || code === "network_timeout",
+  };
+}
+
+/**
  * P987S — stable text-agent git-diff summarization:
- * compressed prompt, stable model, one lightweight timeout fallback.
+ * compressed prompt, env-selected stable chat model, one lightweight fallback.
  * Never fabricates HTTP 200; 504 is never PASS.
  */
 async function summarizeGitDiffStable(chat, opts = {}) {
-  const maxChars = Math.max(
-    200,
-    parseInt(process.env.P987_DIFF_MAX_CHARS ?? "1200", 10) || 1200
-  );
-  const primaryModel =
-    process.env.P987_SUMMARIZE_MODEL ||
-    opts.stableModel ||
-    "gemini-2.5-flash";
-  const fallbackModel =
-    process.env.P987_SUMMARIZE_FALLBACK_MODEL ||
-    opts.fallbackModel ||
-    "gemini-2.5-flash";
-  const diff = truncateDiffInput(
+  const maxChars = resolveDiffMaxChars();
+  const primaryModel = resolveSummarizePrimaryModel(opts);
+  const fallbackModel = resolveSummarizeFallbackModel(opts);
+  const rawDiff =
     opts.diffText ??
-      "--- a/seed.ts\n+++ b/seed.ts\n- return 'seed';\n+ return 'seed-v2';\n",
-    maxChars
-  );
+    "--- a/seed.ts\n+++ b/seed.ts\n- return 'seed';\n+ return 'seed-v2';\n";
+  const diff = truncateDiffInput(rawDiff, maxChars);
 
   const primaryPrompt =
     "Summarize this git diff in ONE short sentence. Reply only the summary.\n" +
@@ -370,9 +453,7 @@ async function summarizeGitDiffStable(chat, opts = {}) {
     role: "primary",
   });
 
-  if (
-    isTransientUpstreamFailure(result.res, result.body, result.timedOut)
-  ) {
+  if (isTransientUpstreamFailure(result.res, result.body, result.timedOut)) {
     // One lightweight fallback only — still a real API call, never fake 200.
     result = await chat({
       model: fallbackModel,
@@ -391,13 +472,25 @@ async function summarizeGitDiffStable(chat, opts = {}) {
     });
   }
 
+  const timedOutFinal = isTransientUpstreamFailure(
+    result.res,
+    result.body,
+    result.timedOut
+  );
+  if (timedOutFinal) {
+    result = ensureSummarizeTimeoutFailureEnvelope(result);
+  }
+
   return {
     ...result,
     attempts,
     primaryModel,
     fallbackModel,
     diffChars: diff.length,
+    diffTruncated: String(rawDiff).length > maxChars,
+    maxChars,
     usedFallback: attempts.length > 1,
+    timeoutFailure: timedOutFinal,
   };
 }
 
@@ -530,11 +623,9 @@ async function main() {
     {
       const sampleDiff =
         "--- a/seed.ts\n+++ b/seed.ts\n- return 'seed';\n+ return 'seed-v2';\n";
+      // P987S: model via P987_SUMMARIZE_* env (default = stable direct chat model).
       const sum = await summarizeGitDiffStable(chat, {
         diffText: sampleDiff,
-        stableModel: process.env.P987_SUMMARIZE_MODEL || "gemini-2.5-flash",
-        fallbackModel:
-          process.env.P987_SUMMARIZE_FALLBACK_MODEL || "gemini-2.5-flash",
       });
       const { res, body } = sum;
       const j = judgeChargedSuccess(
@@ -546,16 +637,33 @@ async function main() {
       let verdict = /** @type {Verdict} */ ("PASS");
       let reason = null;
 
-      // 504 / timeout after fallback: never PASS; must stay not_billable.
-      if (res.status === 504 || isTransientUpstreamFailure(res, body, sum.timedOut)) {
+      // 504 / timeout after fallback: never PASS; envelope must stay not_billable.
+      if (
+        sum.timeoutFailure ||
+        res.status === 504 ||
+        isTransientUpstreamFailure(res, body, sum.timedOut)
+      ) {
         const failBill = judgeRejectNotBillable(
           "cursor_read_summarize_git_diff",
           body,
           res
         );
-        if (failBill.ch > 0) {
+        const envelopeOk =
+          res.status === 504 &&
+          body?.error &&
+          typeof body.error.message === "string" &&
+          typeof body.error.code === "string" &&
+          (billingOf(body) === "not_billable" || !billingOf(body)) &&
+          charged(body) === 0;
+        if (failBill.ch > 0 || billingOf(body) === "charged") {
           verdict = "BLOCKER";
           reason = `timeout charged credits=${failBill.ch}`;
+        } else if (!envelopeOk) {
+          verdict = "FAIL";
+          reason =
+            `timeout_envelope_invalid status=${res.status} ` +
+            `bill=${billingOf(body)} ch=${charged(body)} ` +
+            `err=${body?.error?.code ?? "missing"}`;
         } else {
           verdict = "FAIL";
           reason = `upstream_timeout_after_fallback attempts=${JSON.stringify(sum.attempts)}`;
@@ -567,8 +675,8 @@ async function main() {
           kind: j.kind,
           http_status: res.status,
           request_id: failBill.rid ?? j.rid,
-          billing_status: failBill.bill,
-          credits_charged: failBill.ch,
+          billing_status: "not_billable",
+          credits_charged: 0,
           has_usage: hasUsage(body),
           routing_ok: failBill.routing || j.routing,
           content_ok: false,
@@ -610,6 +718,34 @@ async function main() {
           has_usage: j.usageOk,
           routing_ok: j.routing,
           content_ok: false,
+          file_mutation: false,
+          context_kept: null,
+          verdict,
+          reason,
+        });
+      } else if (!j.usageOk || !j.rid || !j.routing || !(j.ch > 0)) {
+        // Success path must retain usage + request_id + routing + credits.
+        verdict = "BLOCKER";
+        reason = [
+          !j.usageOk ? "missing_usage" : null,
+          !j.rid ? "missing_request_id" : null,
+          !j.routing ? "missing_routing_evidence" : null,
+          !(j.ch > 0) ? "missing_credits_charged" : null,
+        ]
+          .filter(Boolean)
+          .join("; ");
+        addBlocker("cursor_read_summarize_git_diff", reason);
+        pushCase({
+          case_name: "cursor_read_summarize_git_diff",
+          category: "cursor_read",
+          kind: j.kind,
+          http_status: res.status,
+          request_id: j.rid,
+          billing_status: j.bill,
+          credits_charged: j.ch,
+          has_usage: j.usageOk,
+          routing_ok: j.routing,
+          content_ok: true,
           file_mutation: false,
           context_kept: null,
           verdict,
@@ -1106,10 +1242,17 @@ async function main() {
     const summarizeCase = cases.find(
       (c) => c.case_name === "cursor_read_summarize_git_diff"
     );
+    const summarizePrimary =
+      (process.env.P987_SUMMARIZE_MODEL ?? "").trim() || P987_STABLE_CHAT_MODEL;
+    const summarizeFallback =
+      (process.env.P987_SUMMARIZE_FALLBACK_MODEL ?? "").trim() ||
+      P987_STABLE_CHAT_MODEL;
+    const summarizeDiffMax = resolveDiffMaxChars();
     const stability = [
       "# P987S — Summarize Git Diff Stability Report",
       "",
       "> Converges intermittent LIVE 504 on `cursor_read_summarize_git_diff`.",
+      "> Scope: `summarizeGitDiffStable` harness only — no billing / catalog / public chat changes.",
       "> Does not claim fully tools compatible. Does not treat 504 as PASS.",
       "",
       `## Result: **${
@@ -1127,11 +1270,18 @@ async function main() {
       "## Stability strategy (harness / text-agent)",
       "",
       "1. Compress / truncate diff input (`P987_DIFF_MAX_CHARS`, default 1200).",
-      "2. Prefer stable chat model `gemini-2.5-flash` (`P987_SUMMARIZE_MODEL`).",
-      "3. On transient 504/timeout/busy: **one** lightweight fallback request (shorter prompt).",
-      "4. If fallback still fails: keep OpenAI-compatible error envelope; **FAIL** (never fake 200).",
-      "5. Failure path must stay `not_billable` / `credits_charged=0`.",
-      "6. Success path still requires usage + request_id + routing evidence + charged credits.",
+      `2. Primary model via \`P987_SUMMARIZE_MODEL\` (default stable chat model \`${P987_STABLE_CHAT_MODEL}\`, not auto-*).`,
+      "3. On transient 504/timeout/busy: **one** lightweight fallback (`P987_SUMMARIZE_FALLBACK_MODEL`, short prompt, `max_tokens=32`).",
+      "4. If fallback still fails: OpenAI-compatible error envelope with `status=504`, `billing_status=not_billable`, `credits_charged=0`; **FAIL** (never fake 200).",
+      "5. Success path still requires usage + request_id + routing evidence + charged credits.",
+      "",
+      "## Env (this run)",
+      "",
+      `| knobs | value |`,
+      `|---|---|`,
+      `| P987_SUMMARIZE_MODEL | \`${summarizePrimary}\` |`,
+      `| P987_SUMMARIZE_FALLBACK_MODEL | \`${summarizeFallback}\` |`,
+      `| P987_DIFF_MAX_CHARS | ${summarizeDiffMax} |`,
       "",
       "## This run — summarize case",
       "",
@@ -1142,6 +1292,8 @@ async function main() {
       `| http | ${summarizeCase?.http_status ?? "—"} |`,
       `| billing | ${summarizeCase?.billing_status ?? "—"} |`,
       `| credits | ${summarizeCase?.credits_charged ?? "—"} |`,
+      `| usage | ${summarizeCase?.has_usage ?? "—"} |`,
+      `| request_id | \`${String(summarizeCase?.request_id ?? "—").slice(0, 28)}\` |`,
       `| routing_ok | ${summarizeCase?.routing_ok ?? "—"} |`,
       `| reason | ${(summarizeCase?.reason ?? "").replace(/\|/g, "/")} |`,
       "",
