@@ -54,6 +54,8 @@ Failures are never rewritten into successful `stop` completions.
 
 ## Verification
 
+### Offline smoke
+
 ```bash
 cd apps/dmit-api && npm run typecheck && npm run build
 node scripts/p988-finish-reason-normalize-smoke.mjs
@@ -67,8 +69,43 @@ Expected marker:
 TOKFAI_P991_RESPONSES_SSE_CHERRY_PASS
 ```
 
+### HGK live (curl, real `sk-tokfai_` token)
+
+| Check | Result |
+|---|---|
+| `http://127.0.0.1:8788/v1/responses` | **200 OK** |
+| `https://api.tokfai.com/v1/responses` | **200 OK** |
+| Nginx upstream | `127.0.0.1:8788` (Authorization not stripped) |
+| SSE events | `response.created` → item/content/text → `response.completed` → `data: [DONE]` |
+| `response.completed` | `status=completed`, `incomplete_details=null`, `finish_reason=stop` |
+| top-level `finish_reason` | `stop` |
+| Wire no longer emits | `finish_reason="other"` on completed public responses |
+
+### Cherry Studio client (2026-08-01)
+
+| Item | Value |
+|---|---|
+| Provider | `tokfairespe` (OpenAI Responses) |
+| API base | `https://api.tokfai.com/v1` |
+| Preview path | `/v1/responses` |
+| Connection | OK |
+| Models verified | `gpt-5`, `gpt-5.4`, `gpt-5.4-pro`, `gpt-5.5` |
+| Client error | **No longer** shows `Response ended with finish reason "other"` |
+
+## Status
+
+**P991 COMPLETE / CLIENT VERIFIED** — server wire + Cherry Studio UI both pass.
+
+## Freeze (do not reopen for this ticket)
+
+- billing / routing / catalog
+- finish_reason normalize (`/v1/chat/completions` path)
+- `respondEarlySse` / `responsesSse` / `responsesTransform`
+- Nginx / PM2
+- OpenAI Responses compatibility layer
+
 ## Files
 
-- `apps/dmit-api/src/lib/respondEarlySse.ts` (modified)
+- `apps/dmit-api/src/lib/respondEarlySse.ts` (modified; shipped in `17ebb41`)
 - `scripts/p991-responses-sse-cherry-smoke.mjs` (added)
-- `docs/p991-cherry-responses-finish-reason-report.md` (added)
+- `docs/p991-cherry-responses-finish-reason-report.md` (this report)
