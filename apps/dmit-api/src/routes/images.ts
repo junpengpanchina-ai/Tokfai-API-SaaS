@@ -27,6 +27,13 @@ import {
   buildPublicImageTaskResponse,
 } from "../images/publicResponse.js";
 import {
+  hydrateImageCircuitFromRedis,
+  imageCircuitKey,
+  operationFromImageMode,
+  peekImageCircuit,
+} from "../images/imageCircuitBreaker.js";
+import { buildImageAttemptChain } from "../images/imageFallbackRouting.js";
+import {
   insertImageTask,
   loadOwnedImageTask,
   lookupImageTaskByIdempotency,
@@ -303,6 +310,73 @@ imageRoutes.post("/v1/images/generations", async (c) => {
     responseFormat,
     requestedModel,
   };
+
+  // P993-IMAGE-CIRCUIT: if every attempt is OPEN/busy, fail fast — no task, no cost.
+  {
+    const operation = operationFromImageMode(mode);
+    const chain = await buildImageAttemptChain({
+      requestedModel,
+      resolvedModel,
+      operation,
+      imagesCount: normalized.imagesCount,
+      tenantId: caller.tenantId,
+    });
+    let anyAllowed = false;
+    let sawOpen = false;
+    let sawBusy = false;
+    for (const candidate of chain) {
+      const key = imageCircuitKey(
+        candidate.provider,
+        candidate.model,
+        operation
+      );
+      await hydrateImageCircuitFromRedis(key);
+      const peek = peekImageCircuit(key);
+      if (peek.allowed) {
+        anyAllowed = true;
+        break;
+      }
+      if (peek.skippedReason === "breaker_half_open_busy") sawBusy = true;
+      else sawOpen = true;
+    }
+    if (!anyAllowed && chain.length > 0) {
+      const code =
+        !sawOpen && sawBusy
+          ? "breaker_half_open_busy"
+          : "all_image_upstreams_unavailable";
+      log.warn("image_circuit_reject_preflight", {
+        requestId,
+        code,
+        requestedModel,
+        resolvedModel,
+        billing_status: "not_billable",
+        credits_charged: 0,
+      });
+      return c.json(
+        {
+          error: {
+            message:
+              code === "breaker_half_open_busy"
+                ? "Image upstream is probing recovery. Please retry shortly."
+                : "All image upstreams are temporarily unavailable. Please retry shortly.",
+            code,
+            type: "upstream_error",
+            request_id: requestId,
+          },
+          status: "failed",
+          processing: false,
+          billing_status: "not_billable",
+          credits_charged: 0,
+          data: [],
+          tokfai: {
+            billing_status: "not_billable",
+            credits_charged: 0,
+          },
+        },
+        503
+      );
+    }
+  }
 
   let task;
   try {

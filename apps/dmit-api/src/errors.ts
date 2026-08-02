@@ -50,6 +50,8 @@ export const STATUS_BY_ERROR_CODE: Record<string, number> = {
   upstream_model_busy: 503,
   upstream_model_unavailable: 503,
   all_upstreams_unavailable: 503,
+  all_image_upstreams_unavailable: 503,
+  breaker_half_open_busy: 503,
   all_tool_upstreams_unavailable: 503,
   request_body_too_large: 413,
   upstream_timeout: 504,
@@ -104,7 +106,9 @@ export function errorTypeForCode(
     code === "upstream_error" ||
     code === "upstream_auth_error" ||
     code === "all_upstreams_unavailable" ||
+    code === "all_image_upstreams_unavailable" ||
     code === "all_tool_upstreams_unavailable" ||
+    code === "breaker_half_open_busy" ||
     code === "gateway_overloaded" ||
     code === "image_generation_timeout" ||
     code === "image_task_timeout" ||

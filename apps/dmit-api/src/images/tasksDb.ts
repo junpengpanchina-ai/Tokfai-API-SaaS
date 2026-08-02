@@ -247,11 +247,16 @@ export async function finalizeImageTaskFailure(args: {
   errorMessage: string;
   reconcileResult?: string | null;
   keepReconcilePending?: boolean;
+  usage?: Record<string, unknown>;
 }): Promise<void> {
   const now = new Date().toISOString();
   const msgs = messagesForStatus(args.status);
   const progress = STATUS_PROGRESS[args.status];
   const keepPending = Boolean(args.keepReconcilePending);
+  const usage: Record<string, unknown> = {
+    ...(args.usage && typeof args.usage === "object" ? args.usage : {}),
+    credits_charged: 0,
+  };
   const { error } = await supabase()
     .from("image_generation_tasks")
     .update({
@@ -262,7 +267,7 @@ export async function finalizeImageTaskFailure(args: {
       error_code: args.errorCode,
       error_message: args.errorMessage || msgs.en,
       credits_charged: 0,
-      usage: { credits_charged: 0 },
+      usage,
       billing_status: "not_billable",
       reconcile_status: keepPending ? "pending" : "reconciled",
       reconcile_result:

@@ -113,7 +113,9 @@ export function buildPublicImageTaskResponse(
           task.error_code === "provider_asset_invalid" ||
           task.error_code === "asset_persist_failed" ||
           task.error_code === "asset_verify_failed" ||
-          task.error_code === "missing_url"
+          task.error_code === "missing_url" ||
+          task.error_code === "all_image_upstreams_unavailable" ||
+          task.error_code === "breaker_half_open_busy"
             ? "upstream_error"
             : "server_error",
         request_id: task.request_id,
@@ -132,6 +134,31 @@ export function buildPublicImageTaskResponse(
 
   // Keep granular async status (queued/generating/…) for Workbench.
   // Tokfai media contract also exposes task_id + tokfai.billing_status.
+  const usageObj =
+    usage && typeof usage === "object" && !Array.isArray(usage)
+      ? (usage as Record<string, unknown>)
+      : {};
+  const snapshot =
+    task.input_snapshot &&
+    typeof task.input_snapshot === "object" &&
+    !Array.isArray(task.input_snapshot)
+      ? (task.input_snapshot as Record<string, unknown>)
+      : {};
+  const requestedModel =
+    (typeof usageObj.requested_model === "string" && usageObj.requested_model) ||
+    (typeof snapshot.requestedModel === "string" && snapshot.requestedModel) ||
+    task.model;
+  const resolvedModel =
+    (typeof usageObj.resolved_model === "string" && usageObj.resolved_model) ||
+    task.model;
+  const attemptModel =
+    (typeof usageObj.attempt_model === "string" && usageObj.attempt_model) ||
+    (isCompleted ? task.model : null);
+  const provider =
+    (typeof usageObj.provider === "string" && usageObj.provider) || null;
+  const fallbackUsed = Boolean(usageObj.fallback_used);
+  const attempts = Array.isArray(usageObj.attempts) ? usageObj.attempts : [];
+
   const base: Record<string, unknown> = {
     id: task.request_id,
     task_id: task.request_id,
@@ -146,12 +173,23 @@ export function buildPublicImageTaskResponse(
     billing_status: billingStatusTop,
     processing: !(isCompleted || isFailed),
     provider_task_id: providerTaskId,
+    requested_model: requestedModel,
+    resolved_model: resolvedModel,
+    attempt_model: attemptModel,
+    provider,
+    fallback_used: fallbackUsed,
+    attempts,
     tokfai: {
       request_id: task.request_id,
       billing_status: billingStatusTokfai,
       credits_charged: charged ? creditsCharged : 0,
       mode: task.mode ?? null,
       prompt_mode: task.prompt_mode ?? null,
+      requested_model: requestedModel,
+      resolved_model: resolvedModel,
+      attempt_model: attemptModel,
+      provider,
+      fallback_used: fallbackUsed,
       ...(pollRequestId ? { poll_request_id: pollRequestId } : {}),
       ...(softTimedOut
         ? {

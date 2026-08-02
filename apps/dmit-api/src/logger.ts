@@ -88,6 +88,17 @@ const ALLOWED_FIELD_KEYS = new Set([
   "reconcile_status",
   "orphan_cost_audit",
   "orphan_alarms",
+  // P993 image circuit breaker
+  "breaker_key",
+  "breaker_state_before",
+  "breaker_state_after",
+  "attempt_model",
+  "requested_model",
+  "resolved_model",
+  "fallback_used",
+  "failure_category",
+  "task_id",
+  "provider",
   // P970 Cursor / OpenAI tool call compatibility
   "attemptedModel",
   "supportsTools",

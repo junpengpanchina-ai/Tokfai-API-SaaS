@@ -18,6 +18,20 @@ import {
   markImageGenerationActive,
 } from "./activeImageTasks.js";
 import { recordImageUsageAndDebit } from "./imageBilling.js";
+import {
+  acquireImageCircuit,
+  classifyImageFailureCode,
+  hydrateImageCircuitFromRedis,
+  imageCircuitKey,
+  IMAGE_CIRCUIT_PROVIDER_ID,
+  operationFromImageMode,
+  recordImageCircuitResult,
+} from "./imageCircuitBreaker.js";
+import {
+  buildImageAttemptChain,
+  sanitizePublicAttempts,
+  type ImagePublicAttempt,
+} from "./imageFallbackRouting.js";
 import { downloadValidateAndPersistProviderImage } from "./imageResultAssetGate.js";
 import { messagesForStatus } from "./progressMessages.js";
 import {
@@ -111,116 +125,424 @@ async function processImageGeneration(requestId: string): Promise<void> {
       status: "generating",
     });
 
-    let providerUrl: string;
-    let upstreamId: string | null = null;
-
-    try {
-      const generateParams = {
-        requestId,
-        resolvedModel: task.model,
-        prompt: input.prompt,
-        aspectRatio: input.aspectRatio,
-        imageSize: input.imageSize,
-        imageUrls: input.imageUrls,
-        imageUrlSources: input.imageUrlSources as ImageUrlResolveSource[],
-        mode: input.mode,
-        promptMode: input.promptMode,
-        onUpstreamSubmitted: async (info: {
-          providerTaskId: string;
-          upstreamRequestId: string;
-          providerStatus: string | null;
-        }) => {
-          // P961: persist provider_task_id / upstream_request_id / tokfai_request_id
-          // as soon as upstream accepts — before soft/hard timeout.
-          submittedProviderTaskId = info.providerTaskId;
-          await markImageTaskUpstreamSubmitted({
-            requestId,
-            providerTaskId: info.providerTaskId,
-            upstreamRequestId: info.upstreamRequestId,
-            providerStatus: info.providerStatus,
-          });
-          log.info("image_upstream_submitted", {
-            tokfai_request_id: requestId,
-            requestId,
-            provider_task_id: info.providerTaskId,
-            upstream_request_id: info.upstreamRequestId,
-            provider_status: info.providerStatus ?? "pending",
-            customer_billing_status: "pending",
-            credits_charged: 0,
-            reconcile_result: "pending",
-            code: "image_upstream_submitted",
-          });
-        },
-        onSoftWaitExceeded: async () => {
-          // P957/P961: keep task in-flight (timeout_pending); not billed;
-          // enter background reconcile via reconcile_status=pending.
-          await markImageTaskWaitWindowExceeded(requestId);
-          log.info("image_timeout_pending", {
-            tokfai_request_id: requestId,
-            requestId,
-            provider_task_id: submittedProviderTaskId ?? undefined,
-            provider_status: "processing",
-            customer_billing_status: "pending",
-            credits_charged: 0,
-            reconcile_result: "timeout_pending",
-            code: "image_task_timeout_pending",
-          });
-        },
-      };
-      const result = isNanoBananaImageModel(task.model)
-        ? await runNanoBananaImageGeneration(generateParams)
-        : await runImageGenerationWithPolling(generateParams);
-      providerUrl = result.url;
-      upstreamId = result.upstreamId ?? submittedProviderTaskId;
-    } catch (err) {
-      await handleGenerationError(task, err, startedAt, submittedProviderTaskId);
-      return;
-    }
-
-    await updateImageTaskProgress({
-      requestId,
-      status: "saving_result",
+    const operation = operationFromImageMode(input.mode);
+    const requestedModel = input.requestedModel || task.model;
+    const resolvedModel = task.model;
+    const attemptChain = await buildImageAttemptChain({
+      requestedModel,
+      resolvedModel,
+      operation,
+      imagesCount: input.imagesCount,
+      tenantId: task.tenant_id,
     });
 
-    // P993: provider URL string is not success — GET + persist + verify first.
-    let tokfaiUrl: string;
-    try {
-      const persisted = await downloadValidateAndPersistProviderImage({
-        providerUrl,
-        requestId,
-        userId: task.user_id,
-      });
-      tokfaiUrl = persisted.publicUrl;
-    } catch (err) {
-      if (err instanceof ApiError && ASSET_GATE_ERROR_CODES.has(err.code ?? "")) {
+    const publicAttempts: ImagePublicAttempt[] = [];
+    let providerUrl: string | null = null;
+    let upstreamId: string | null = null;
+    let attemptModelUsed: string | null = null;
+    let lastProviderError: ApiError | null = null;
+    let sawNonSkipFailure = false;
+    let allSkippedOpenOrBusy = attemptChain.length > 0;
+
+    for (const candidate of attemptChain) {
+      const breakerKey = imageCircuitKey(
+        candidate.provider,
+        candidate.model,
+        operation
+      );
+      await hydrateImageCircuitFromRedis(breakerKey);
+      const acquired = acquireImageCircuit(breakerKey);
+      const attemptStarted = Date.now();
+
+      if (!acquired.allowed) {
+        publicAttempts.push({
+          model: candidate.model,
+          provider: candidate.provider,
+          result: "skipped",
+          skipped_reason: acquired.skippedReason ?? "circuit_open",
+          failure_category: null,
+          failure_code: null,
+          duration_ms: Date.now() - attemptStarted,
+          breaker_key: breakerKey,
+          breaker_state_before: acquired.stateBefore,
+          breaker_state_after: acquired.stateAfter,
+        });
+        log.info("image_circuit_attempt", {
+          requestId,
+          tokfai_request_id: requestId,
+          task_id: requestId,
+          breaker_key: breakerKey,
+          breaker_state_before: acquired.stateBefore,
+          breaker_state_after: acquired.stateAfter,
+          attempt_model: candidate.model,
+          provider: candidate.provider,
+          result: "skipped",
+          failure_category: null,
+          duration_ms: Date.now() - attemptStarted,
+          fallback_used: candidate.model !== resolvedModel,
+          code: acquired.skippedReason ?? "circuit_open",
+        });
+        continue;
+      }
+
+      allSkippedOpenOrBusy = false;
+      submittedProviderTaskId = null;
+
+      try {
+        const generateParams = {
+          requestId,
+          resolvedModel: candidate.model,
+          prompt: input.prompt,
+          aspectRatio: input.aspectRatio,
+          imageSize: input.imageSize,
+          imageUrls: input.imageUrls,
+          imageUrlSources: input.imageUrlSources as ImageUrlResolveSource[],
+          mode: input.mode,
+          promptMode: input.promptMode,
+          onUpstreamSubmitted: async (info: {
+            providerTaskId: string;
+            upstreamRequestId: string;
+            providerStatus: string | null;
+          }) => {
+            submittedProviderTaskId = info.providerTaskId;
+            await markImageTaskUpstreamSubmitted({
+              requestId,
+              providerTaskId: info.providerTaskId,
+              upstreamRequestId: info.upstreamRequestId,
+              providerStatus: info.providerStatus,
+            });
+            log.info("image_upstream_submitted", {
+              tokfai_request_id: requestId,
+              requestId,
+              provider_task_id: info.providerTaskId,
+              upstream_request_id: info.upstreamRequestId,
+              provider_status: info.providerStatus ?? "pending",
+              customer_billing_status: "pending",
+              credits_charged: 0,
+              reconcile_result: "pending",
+              attempt_model: candidate.model,
+              code: "image_upstream_submitted",
+            });
+          },
+          onSoftWaitExceeded: async () => {
+            await markImageTaskWaitWindowExceeded(requestId);
+            log.info("image_timeout_pending", {
+              tokfai_request_id: requestId,
+              requestId,
+              provider_task_id: submittedProviderTaskId ?? undefined,
+              provider_status: "processing",
+              customer_billing_status: "pending",
+              credits_charged: 0,
+              reconcile_result: "timeout_pending",
+              attempt_model: candidate.model,
+              code: "image_task_timeout_pending",
+            });
+          },
+        };
+
+        const result = isNanoBananaImageModel(candidate.model)
+          ? await runNanoBananaImageGeneration(generateParams)
+          : await runImageGenerationWithPolling(generateParams);
+
+        await updateImageTaskProgress({
+          requestId,
+          status: "saving_result",
+        });
+
+        // P993 URL gate — provider URL alone is not success.
+        let tokfaiUrl: string;
+        try {
+          const persisted = await downloadValidateAndPersistProviderImage({
+            providerUrl: result.url,
+            requestId,
+            userId: task.user_id,
+          });
+          tokfaiUrl = persisted.publicUrl;
+        } catch (assetErr) {
+          const code =
+            assetErr instanceof ApiError
+              ? assetErr.code ?? "provider_asset_unavailable"
+              : "provider_asset_unavailable";
+          const category = classifyImageFailureCode(code);
+          const snap = recordImageCircuitResult({
+            key: breakerKey,
+            success: false,
+            code,
+            category,
+          });
+          publicAttempts.push({
+            model: candidate.model,
+            provider: candidate.provider,
+            result: "failed",
+            failure_category: category,
+            failure_code: code,
+            duration_ms: Date.now() - attemptStarted,
+            breaker_key: breakerKey,
+            breaker_state_before: acquired.stateBefore,
+            breaker_state_after: snap.state,
+          });
+          log.info("image_circuit_attempt", {
+            requestId,
+            tokfai_request_id: requestId,
+            task_id: requestId,
+            breaker_key: breakerKey,
+            breaker_state_before: acquired.stateBefore,
+            breaker_state_after: snap.state,
+            attempt_model: candidate.model,
+            provider: candidate.provider,
+            result: "failed",
+            failure_category: category,
+            duration_ms: Date.now() - attemptStarted,
+            fallback_used: candidate.model !== resolvedModel,
+            code,
+          });
+
+          // Internal storage/verify failures: do not burn fallbacks indefinitely.
+          if (category === "internal" || !ASSET_GATE_ERROR_CODES.has(code)) {
+            await failTask(
+              task,
+              code,
+              assetErr instanceof ApiError
+                ? safePublicMessage(assetErr)
+                : "Image asset handling failed.",
+              startedAt,
+              "failed",
+              {
+                keepReconcilePending: false,
+                reconcileResult: code,
+                routingUsage: buildRoutingUsage({
+                  requestedModel,
+                  resolvedModel,
+                  attemptModel: candidate.model,
+                  provider: candidate.provider,
+                  attempts: publicAttempts,
+                  creditsCharged: 0,
+                }),
+              }
+            );
+            return;
+          }
+
+          // Provider asset failures count + try next attempt.
+          sawNonSkipFailure = true;
+          lastProviderError =
+            assetErr instanceof ApiError
+              ? assetErr
+              : ApiError.internal("Provider asset unavailable.", code);
+          continue;
+        }
+
+        const snapOk = recordImageCircuitResult({
+          key: breakerKey,
+          success: true,
+          category: "provider",
+        });
+        publicAttempts.push({
+          model: candidate.model,
+          provider: candidate.provider,
+          result: "success",
+          duration_ms: Date.now() - attemptStarted,
+          breaker_key: breakerKey,
+          breaker_state_before: acquired.stateBefore,
+          breaker_state_after: snapOk.state,
+        });
+        log.info("image_circuit_attempt", {
+          requestId,
+          tokfai_request_id: requestId,
+          task_id: requestId,
+          breaker_key: breakerKey,
+          breaker_state_before: acquired.stateBefore,
+          breaker_state_after: snapOk.state,
+          attempt_model: candidate.model,
+          provider: candidate.provider,
+          result: "success",
+          failure_category: null,
+          duration_ms: Date.now() - attemptStarted,
+          fallback_used: candidate.model !== resolvedModel,
+          code: "succeeded",
+        });
+
+        providerUrl = tokfaiUrl;
+        upstreamId = result.upstreamId ?? submittedProviderTaskId;
+        attemptModelUsed = candidate.model;
+        break;
+      } catch (err) {
+        const code =
+          err instanceof ApiError ? err.code ?? "upstream_image_error" : "server_error";
+        const category = classifyImageFailureCode(code);
+        const snap = recordImageCircuitResult({
+          key: breakerKey,
+          success: false,
+          code,
+          category,
+        });
+        const isTimeout =
+          code === "image_generation_timeout" ||
+          code === "image_task_timeout" ||
+          code === "upstream_timeout" ||
+          code === "retryable_timeout";
+        publicAttempts.push({
+          model: candidate.model,
+          provider: candidate.provider,
+          result: isTimeout ? "timeout" : "failed",
+          failure_category: category,
+          failure_code: code,
+          duration_ms: Date.now() - attemptStarted,
+          breaker_key: breakerKey,
+          breaker_state_before: acquired.stateBefore,
+          breaker_state_after: snap.state,
+        });
+        log.info("image_circuit_attempt", {
+          requestId,
+          tokfai_request_id: requestId,
+          task_id: requestId,
+          breaker_key: breakerKey,
+          breaker_state_before: acquired.stateBefore,
+          breaker_state_after: snap.state,
+          attempt_model: candidate.model,
+          provider: candidate.provider,
+          result: isTimeout ? "timeout" : "failed",
+          failure_category: category,
+          duration_ms: Date.now() - attemptStarted,
+          fallback_used: candidate.model !== resolvedModel,
+          code,
+        });
+
+        // Client errors (bad prompt / policy): stop, do not fallback.
+        if (category === "client") {
+          await handleGenerationError(
+            task,
+            err,
+            startedAt,
+            submittedProviderTaskId,
+            buildRoutingUsage({
+              requestedModel,
+              resolvedModel,
+              attemptModel: candidate.model,
+              provider: candidate.provider,
+              attempts: publicAttempts,
+              creditsCharged: 0,
+            })
+          );
+          return;
+        }
+
+        // Soft/hard timeout with provider_task_id: keep reconcile path, no more attempts.
+        if (
+          err instanceof ApiError &&
+          (code === "image_generation_timeout" ||
+            code === "image_task_timeout" ||
+            code === "upstream_timeout" ||
+            code === "retryable_timeout") &&
+          (submittedProviderTaskId || task.provider_task_id)
+        ) {
+          await handleGenerationError(
+            task,
+            err,
+            startedAt,
+            submittedProviderTaskId,
+            buildRoutingUsage({
+              requestedModel,
+              resolvedModel,
+              attemptModel: candidate.model,
+              provider: candidate.provider,
+              attempts: publicAttempts,
+              creditsCharged: 0,
+            })
+          );
+          return;
+        }
+
+        sawNonSkipFailure = true;
+        lastProviderError =
+          err instanceof ApiError
+            ? err
+            : ApiError.internal("Image generation failed.", "server_error");
+        continue;
+      }
+    }
+
+    if (!providerUrl || !attemptModelUsed) {
+      if (allSkippedOpenOrBusy && !sawNonSkipFailure) {
+        const busyOnly = publicAttempts.every(
+          (a) =>
+            a.skipped_reason === "circuit_open" ||
+            a.skipped_reason === "breaker_half_open_busy"
+        );
+        const code = busyOnly
+          ? publicAttempts.every((a) => a.skipped_reason === "breaker_half_open_busy")
+            ? "breaker_half_open_busy"
+            : "all_image_upstreams_unavailable"
+          : "all_image_upstreams_unavailable";
         await failTask(
           task,
-          err.code ?? "provider_asset_unavailable",
-          safePublicMessage(err),
+          code,
+          code === "breaker_half_open_busy"
+            ? "Image upstream is probing recovery. Please retry shortly."
+            : "All image upstreams are temporarily unavailable. Please retry shortly.",
           startedAt,
           "failed",
           {
             keepReconcilePending: false,
-            reconcileResult: err.code ?? "provider_asset_unavailable",
+            reconcileResult: code,
+            routingUsage: buildRoutingUsage({
+              requestedModel,
+              resolvedModel,
+              attemptModel: null,
+              provider: IMAGE_CIRCUIT_PROVIDER_ID,
+              attempts: publicAttempts,
+              creditsCharged: 0,
+            }),
           }
         );
         return;
       }
-      await handleGenerationError(task, err, startedAt, submittedProviderTaskId);
+
+      await handleGenerationError(
+        task,
+        lastProviderError ??
+          new ApiError({
+            status: 502,
+            message: "Image generation failed.",
+            code: "upstream_image_error",
+            type: "upstream_error",
+            publicMessage: "Image generation is temporarily unavailable. Please retry shortly.",
+          }),
+        startedAt,
+        submittedProviderTaskId,
+        buildRoutingUsage({
+          requestedModel,
+          resolvedModel,
+          attemptModel: null,
+          provider: IMAGE_CIRCUIT_PROVIDER_ID,
+          attempts: publicAttempts,
+          creditsCharged: 0,
+        })
+      );
       return;
     }
 
+    // Charge only after Tokfai URL verified — once, for the winning attempt model.
     const creditsCharged = await priceCreditsForImage(
-      task.model,
+      attemptModelUsed,
       task.tenant_id
     );
+
+    const routingUsage = buildRoutingUsage({
+      requestedModel,
+      resolvedModel,
+      attemptModel: attemptModelUsed,
+      provider: IMAGE_CIRCUIT_PROVIDER_ID,
+      attempts: publicAttempts,
+      creditsCharged,
+    });
 
     try {
       await recordImageUsageAndDebit({
         user_id: task.user_id,
         api_key_id: task.api_key_id,
         tenant_id: task.tenant_id,
-        model: task.model,
+        model: attemptModelUsed,
         status: "succeeded",
         prompt_tokens: null,
         completion_tokens: null,
@@ -241,12 +563,25 @@ async function processImageGeneration(requestId: string): Promise<void> {
         billing_status: "charged",
       });
     } catch (err) {
+      // Billing failure is internal — release does not hurt provider health.
+      recordImageCircuitResult({
+        key: imageCircuitKey(
+          IMAGE_CIRCUIT_PROVIDER_ID,
+          attemptModelUsed,
+          operation
+        ),
+        success: false,
+        code: "usage_billing_failed",
+        category: "internal",
+      });
       if (err instanceof ApiError) {
         await failTask(
           task,
           err.code ?? "usage_billing_failed",
           safePublicMessage(err),
-          startedAt
+          startedAt,
+          "failed",
+          { routingUsage: { ...routingUsage, credits_charged: 0 } }
         );
         return;
       }
@@ -254,17 +589,18 @@ async function processImageGeneration(requestId: string): Promise<void> {
         task,
         "usage_billing_failed",
         "Billing failed. You were not charged for this image.",
-        startedAt
+        startedAt,
+        "failed",
+        { routingUsage: { ...routingUsage, credits_charged: 0 } }
       );
       return;
     }
 
-    const usage = { credits_charged: creditsCharged };
     await finalizeImageTaskSuccess({
       requestId,
-      resultData: [{ url: tokfaiUrl, revised_prompt: null }],
+      resultData: [{ url: providerUrl, revised_prompt: null }],
       creditsCharged,
-      usage,
+      usage: routingUsage,
       upstreamId,
       mode: input.mode,
       promptMode: input.promptMode,
@@ -277,7 +613,12 @@ async function processImageGeneration(requestId: string): Promise<void> {
       route: "/v1/images/generations",
       status: 200,
       code: "succeeded",
-      model: task.model,
+      model: attemptModelUsed,
+      requested_model: requestedModel,
+      resolved_model: resolvedModel,
+      attempt_model: attemptModelUsed,
+      provider: IMAGE_CIRCUIT_PROVIDER_ID,
+      fallback_used: attemptModelUsed !== resolvedModel,
       provider_task_id: upstreamId ?? undefined,
       provider_status: "completed",
       customer_billing_status: creditsCharged > 0 ? "charged" : "not_billable",
@@ -300,11 +641,34 @@ async function processImageGeneration(requestId: string): Promise<void> {
   }
 }
 
+function buildRoutingUsage(args: {
+  requestedModel: string;
+  resolvedModel: string;
+  attemptModel: string | null;
+  provider: string;
+  attempts: ImagePublicAttempt[];
+  creditsCharged: number;
+}): Record<string, unknown> {
+  const attempts = sanitizePublicAttempts(args.attempts);
+  return {
+    credits_charged: args.creditsCharged,
+    requested_model: args.requestedModel,
+    resolved_model: args.resolvedModel,
+    attempt_model: args.attemptModel,
+    provider: args.provider,
+    fallback_used: Boolean(
+      args.attemptModel && args.attemptModel !== args.resolvedModel
+    ),
+    attempts,
+  };
+}
+
 async function handleGenerationError(
   task: ImageGenerationTaskRow,
   err: unknown,
   startedAt: number,
-  providerTaskId: string | null
+  providerTaskId: string | null,
+  routingUsage?: Record<string, unknown>
 ): Promise<void> {
   if (err instanceof ApiError) {
     const isTimeout =
@@ -329,6 +693,7 @@ async function handleGenerationError(
           keepReconcilePending: Boolean(
             providerTaskId || task.upstream_id || task.provider_task_id
           ),
+          routingUsage,
         }
       );
       return;
@@ -337,11 +702,14 @@ async function handleGenerationError(
     await failTask(task, code, safePublicMessage(err), startedAt, "failed", {
       keepReconcilePending: false,
       reconcileResult: "provider_failed",
+      routingUsage,
     });
     return;
   }
 
-  await failTask(task, "server_error", "Internal error.", startedAt);
+  await failTask(task, "server_error", "Internal error.", startedAt, "failed", {
+    routingUsage,
+  });
 }
 
 async function failTask(
@@ -350,7 +718,11 @@ async function failTask(
   errorMessage: string,
   startedAt: number,
   status: "failed" | "retryable_timeout" = "failed",
-  opts?: { keepReconcilePending?: boolean; reconcileResult?: string | null }
+  opts?: {
+    keepReconcilePending?: boolean;
+    reconcileResult?: string | null;
+    routingUsage?: Record<string, unknown>;
+  }
 ): Promise<void> {
   const keepReconcilePending = Boolean(opts?.keepReconcilePending);
   await finalizeImageTaskFailure({
@@ -362,6 +734,7 @@ async function failTask(
     reconcileResult:
       opts?.reconcileResult ??
       (status === "retryable_timeout" ? "hard_timeout" : "provider_failed"),
+    usage: opts?.routingUsage ?? { credits_charged: 0 },
   });
 
   const providerTaskId = task.provider_task_id || task.upstream_id || null;
