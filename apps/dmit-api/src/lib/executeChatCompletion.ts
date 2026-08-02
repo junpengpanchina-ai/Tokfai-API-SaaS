@@ -64,6 +64,12 @@ import {
 import { providerFetchChatPreferNativeNonStream } from "../upstream/providerFetchChatStreamAssembled.js";
 import { buildUpstreamChatBody, droppedUpstreamChatKeysForAudit } from "./upstreamChatBody.js";
 import {
+  CHAT_USAGE_ESTIMATION_ALGORITHM,
+  coalesceUpstreamUsageTotal,
+  estimateChatUsageFromPayload,
+  shouldEstimateChatUsage,
+} from "./chatUsageFallback.js";
+import {
   isGemini25FlashNonStreamStreamFallbackPath,
   isGemini25FlashStreamFallbackEligible,
 } from "./gemini25FlashNonStreamStreamFallback.js";
@@ -1325,7 +1331,38 @@ async function runProviderAttempts(args: {
           throw guardErr;
         }
 
-        const usage = normalizeUsage(data.usage);
+        const upstreamUsage = normalizeUsage(data.usage);
+        const shouldEstimateUsage = shouldEstimateChatUsage({
+          providerId: provider.id,
+          usage: upstreamUsage,
+          responseBody: normalizedData,
+        });
+        // P998 — GRSAI all-zero usage + billable output → local UTF-8 estimate.
+        // Any positive upstream usage is trusted as-is (total may be coalesced).
+        const usage = shouldEstimateUsage
+          ? estimateChatUsageFromPayload({
+              requestBody: upstreamBody,
+              responseBody: normalizedData,
+            })
+          : coalesceUpstreamUsageTotal(upstreamUsage);
+
+        if (shouldEstimateUsage) {
+          log.warn("chat_usage_estimated", {
+            requestId,
+            route,
+            providerId: provider.id,
+            attemptedModel: attemptModel,
+            usageSource: "estimated",
+            estimationAlgorithm: CHAT_USAGE_ESTIMATION_ALGORITHM,
+            upstreamPromptTokens: upstreamUsage.promptTokens,
+            upstreamCompletionTokens: upstreamUsage.completionTokens,
+            upstreamTotalTokens: upstreamUsage.totalTokens,
+            estimatedPromptTokens: usage.promptTokens,
+            estimatedCompletionTokens: usage.completionTokens,
+            estimatedTotalTokens: usage.totalTokens,
+          });
+        }
+
         // Consumer-facing resolved id = Tokfai catalog/alias (e.g. gpt-5-pro).
         // Bill by the concrete attempt that served the request (never alias floor price).
         const resolvedModel = requestedModel;
