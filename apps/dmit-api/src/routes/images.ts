@@ -38,6 +38,7 @@ import {
   loadOwnedImageTask,
   lookupImageTaskByIdempotency,
 } from "../images/tasksDb.js";
+import { assertImageQuotaGuards } from "../images/imageQuotaGuards.js";
 import { enqueueImageGeneration } from "../images/worker.js";
 import type { ImageGenerationTaskInputSnapshot } from "../types.js";
 import {
@@ -284,6 +285,20 @@ imageRoutes.post("/v1/images/generations", async (c) => {
     if (err instanceof ApiError) throw err;
     throw err;
   }
+
+  // P995 — soft quota parity with chat/responses (before expensive ref-image I/O
+  // and before insertImageTask). Period caps may slightly overshoot under
+  // concurrency; balance remains protected by atomic debit.
+  await assertImageQuotaGuards({
+    userId: caller.userId,
+    apiKeyId: caller.apiKeyId,
+    keyId: caller.keyId,
+    tenantId: caller.tenantId,
+    model: resolvedModel,
+    requestedRaw: requestedModel,
+    requestId,
+    route: "/v1/images/generations",
+  });
 
   let resolvedImageUrls: string[] = [];
   let imageUrlSources: ImageUrlResolveSource[] = [];

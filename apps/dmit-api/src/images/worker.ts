@@ -18,6 +18,7 @@ import {
   markImageGenerationActive,
 } from "./activeImageTasks.js";
 import { recordImageUsageAndDebit } from "./imageBilling.js";
+import { assertImageQuotaGuards } from "./imageQuotaGuards.js";
 import {
   acquireImageCircuit,
   classifyImageFailureCode,
@@ -100,8 +101,19 @@ async function processImageGeneration(requestId: string): Promise<void> {
       status: "billing_check",
     });
 
+    // P995 — re-check balance + daily/monthly + trial before upstream.
+    // Soft-check parity with text; queue delay may exhaust caps after POST.
     try {
-      await assertHasCredits(task.user_id);
+      await assertImageQuotaGuards({
+        userId: task.user_id,
+        apiKeyId: task.api_key_id,
+        keyId: null,
+        tenantId: task.tenant_id,
+        model: task.model,
+        requestedRaw: input.requestedModel,
+        requestId,
+        route: "/v1/images/generations",
+      });
     } catch (err) {
       if (err instanceof ApiError) {
         await failTask(
@@ -794,36 +806,6 @@ function upstreamFailureFields(
     upstream_status: upstreamStatus,
     upstream_error_code: code,
   };
-}
-
-async function assertHasCredits(userId: string): Promise<void> {
-  const { data, error } = await supabase()
-    .from("profiles")
-    .select("credits_balance")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (error) {
-    throw ApiError.internal(
-      `Credit precheck failed: ${error.message}`,
-      "credit_precheck_failed"
-    );
-  }
-
-  const balance =
-    typeof data?.credits_balance === "number"
-      ? data.credits_balance
-      : Number(data?.credits_balance ?? 0);
-
-  if (!data || balance <= 0) {
-    throw new ApiError({
-      status: 402,
-      message: "Insufficient credits.",
-      code: "insufficient_credits",
-      type: "billing_error",
-      publicMessage: "算力积分不足，请充值后再试。",
-    });
-  }
 }
 
 async function writeFailedUsageLog(
