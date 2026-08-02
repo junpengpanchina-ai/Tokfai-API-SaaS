@@ -16,10 +16,11 @@
 import { priceCreditsForImage } from "../catalog/modelCatalog.js";
 import { ApiError } from "../errors.js";
 import { log } from "../logger.js";
-import { supabase } from "../supabase.js";
-import type { ImageGenerationTaskRow, UsageLogInsert } from "../types.js";
+import type { ImageGenerationTaskRow } from "../types.js";
 import { pollImageGenerationTask } from "../upstream/imageAsyncProvider.js";
 import { isImageGenerationActive } from "./activeImageTasks.js";
+import { recordImageUsageAndDebit } from "./imageBilling.js";
+import { downloadValidateAndPersistProviderImage } from "./imageResultAssetGate.js";
 import { IMAGE_HARD_WAIT_MS, isSoftTimeoutCode } from "./imageTimeoutPolicy.js";
 import {
   auditOrphanCost,
@@ -36,9 +37,16 @@ import {
   updateImageTaskReconcileMeta,
 } from "./tasksDb.js";
 
-const IMAGE_LEDGER_REASON = "Image generation usage";
 const RECONCILE_INTERVAL_MS = 30_000;
 const RECONCILE_BATCH = 20;
+
+const ASSET_GATE_ERROR_CODES = new Set([
+  "provider_asset_unavailable",
+  "provider_asset_invalid",
+  "asset_persist_failed",
+  "asset_verify_failed",
+  "missing_url",
+]);
 
 let reconcileTimer: ReturnType<typeof setInterval> | null = null;
 let sweepInFlight = false;
@@ -252,7 +260,7 @@ async function applyLaterCompleted(args: {
   const tokfaiRequestId = task.request_id;
   const input = parseInputSnapshot(task.input_snapshot);
 
-  // Idempotent: already charged
+  // Idempotent: already charged with Tokfai-controlled URL
   if (
     task.status === "completed" &&
     Number(task.credits_charged ?? 0) > 0 &&
@@ -269,22 +277,61 @@ async function applyLaterCompleted(args: {
     return;
   }
 
+  // P993: never charge on provider URL string alone.
+  let tokfaiUrl: string;
+  try {
+    const persisted = await downloadValidateAndPersistProviderImage({
+      providerUrl,
+      requestId: tokfaiRequestId,
+      userId: task.user_id,
+    });
+    tokfaiUrl = persisted.publicUrl;
+  } catch (err) {
+    const code =
+      err instanceof ApiError && ASSET_GATE_ERROR_CODES.has(err.code ?? "")
+        ? (err.code as string)
+        : "provider_asset_unavailable";
+    const message =
+      err instanceof ApiError
+        ? err.publicMessage || err.message
+        : "Provider image asset could not be verified.";
+
+    await finalizeImageTaskFailure({
+      requestId: tokfaiRequestId,
+      status: "failed",
+      errorCode: code,
+      errorMessage: message,
+      reconcileResult: code,
+      keepReconcilePending: false,
+    });
+
+    await updateImageTaskReconcileMeta({
+      requestId: tokfaiRequestId,
+      reconcileStatus: "reconciled",
+      reconcileResult: code,
+      providerStatus,
+      orphanCostFlags: {},
+      markReconciledAt: true,
+    });
+
+    logImageReconcile({
+      tokfaiRequestId,
+      providerTaskId,
+      providerStatus,
+      customerBillingStatus: "not_billable",
+      creditsCharged: 0,
+      reconcileResult: code,
+      orphanAlarms: [],
+    });
+    return;
+  }
+
   let creditsCharged = 0;
-  let charged = false;
 
   try {
     creditsCharged = await priceCreditsForImage(task.model, task.tenant_id);
-    if (creditsCharged > 0) {
-      await debitImageCredits({
-        userId: task.user_id,
-        amount: creditsCharged,
-        requestId: tokfaiRequestId,
-        tenantId: task.tenant_id,
-      });
-      charged = true;
-    }
 
-    await writeSucceededUsageLog({
+    await recordImageUsageAndDebit({
       user_id: task.user_id,
       api_key_id: task.api_key_id,
       tenant_id: task.tenant_id,
@@ -311,7 +358,7 @@ async function applyLaterCompleted(args: {
 
     await finalizeImageTaskSuccess({
       requestId: tokfaiRequestId,
-      resultData: [{ url: providerUrl, revised_prompt: null }],
+      resultData: [{ url: tokfaiUrl, revised_prompt: null }],
       creditsCharged,
       usage: { credits_charged: creditsCharged },
       upstreamId: providerTaskId,
@@ -320,6 +367,7 @@ async function applyLaterCompleted(args: {
       reconcileResult: "later_completed",
     });
 
+    const charged = creditsCharged > 0;
     const audit = auditOrphanCost({
       providerSuccess: true,
       customerCharged: charged || creditsCharged === 0,
@@ -337,7 +385,7 @@ async function applyLaterCompleted(args: {
       orphanAlarms: audit.alarms,
     });
   } catch (err) {
-    // Provider succeeded but we could not charge → orphan cost alarm.
+    // Asset verified but we could not charge → orphan cost alarm.
     const audit = auditOrphanCost({
       providerSuccess: true,
       customerCharged: false,
@@ -533,59 +581,6 @@ function logImageReconcile(args: {
     orphan_alarms: args.orphanAlarms.join(",") || undefined,
     code: "image_cost_reconcile",
   });
-}
-
-async function debitImageCredits(args: {
-  userId: string;
-  amount: number;
-  requestId: string;
-  tenantId: string | null;
-}): Promise<void> {
-  const { error: debitError } = await supabase().rpc("debit_credits", {
-    p_user_id: args.userId,
-    p_amount: args.amount,
-    p_reason: IMAGE_LEDGER_REASON,
-    p_reference_id: args.requestId,
-    p_tenant_id: args.tenantId ?? null,
-  });
-
-  if (debitError) {
-    if (
-      debitError.code === "P0001" ||
-      debitError.message.toLowerCase().includes("insufficient_credits")
-    ) {
-      throw new ApiError({
-        status: 402,
-        message: "Insufficient credits.",
-        code: "insufficient_credits",
-        type: "billing_error",
-        publicMessage: "算力积分不足，请充值后再试。",
-      });
-    }
-    throw ApiError.internal(
-      `Usage billing failed: ${debitError.message}`,
-      "usage_billing_failed"
-    );
-  }
-}
-
-async function writeSucceededUsageLog(entry: UsageLogInsert): Promise<void> {
-  const { error } = await supabase().from("usage_logs").insert({
-    ...entry,
-    status: "succeeded",
-  });
-  if (error) {
-    // Idempotent re-reconcile may hit unique request_id — ignore duplicates.
-    const msg = error.message.toLowerCase();
-    if (msg.includes("duplicate") || msg.includes("unique")) return;
-    log.warn("usage_log_insert_failed", {
-      requestId: entry.request_id,
-      tokfai_request_id: entry.request_id,
-      route: "/v1/images/generations",
-      code: "usage_log_insert_failed",
-      message: "Failed to write usage log.",
-    });
-  }
 }
 
 /** Re-export for tests / ops scripts. */

@@ -71,6 +71,7 @@ let ok = true;
 {
   const route = read("apps/dmit-api/src/routes/images.ts");
   const worker = read("apps/dmit-api/src/images/worker.ts");
+  const billing = read("apps/dmit-api/src/images/imageBilling.ts");
   const pub = read("apps/dmit-api/src/images/publicResponse.ts");
   const msgs = read("apps/dmit-api/src/images/progressMessages.ts");
 
@@ -81,7 +82,12 @@ let ok = true;
     ["GET api/result", route.includes('imageRoutes.get("/v1/api/result"')],
     ["parseIdempotencyKey", route.includes("parseIdempotencyKey")],
     ["runImageGenerationWithPolling in worker", worker.includes("runImageGenerationWithPolling")],
-    ["finalize charge on success", worker.includes("debit_credits")],
+    [
+      "finalize charge on success",
+      worker.includes("recordImageUsageAndDebit") &&
+        worker.includes("downloadValidateAndPersistProviderImage") &&
+        billing.includes("debit_credits"),
+    ],
     ["no charge on fail path", worker.includes("not_billable")],
     ["retryable_timeout", worker.includes("retryable_timeout")],
     ["public progress field", pub.includes("progress:")],

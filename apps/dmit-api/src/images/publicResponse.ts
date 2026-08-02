@@ -39,8 +39,18 @@ export function buildPublicImageTaskResponse(
       const url = (item as Record<string, unknown>).url;
       return typeof url === "string" && url.trim().length > 0;
     });
-  const billingStatus =
-    isCompleted && hasUrl && creditsCharged > 0 ? "billable" : "not_billable";
+  // Top-level P993 contract uses charged/not_billable; tokfai keeps
+  // billable for existing Cherry / smoke clients.
+  const charged =
+    isCompleted && hasUrl && creditsCharged > 0;
+  const billingStatusTop = charged
+    ? "charged"
+    : isCompleted ||
+        task.status === "failed" ||
+        task.status === "retryable_timeout"
+      ? "not_billable"
+      : "pending";
+  const billingStatusTokfai = charged ? "billable" : "not_billable";
 
   const usage =
     isCompleted &&
@@ -48,7 +58,7 @@ export function buildPublicImageTaskResponse(
     typeof task.usage === "object" &&
     !Array.isArray(task.usage)
       ? (task.usage as Record<string, unknown>)
-      : { credits_charged: isCompleted && hasUrl ? creditsCharged : 0 };
+      : { credits_charged: charged ? creditsCharged : 0 };
 
   const message = {
     en: task.message_en ?? "",
@@ -98,7 +108,12 @@ export function buildPublicImageTaskResponse(
           task.error_code === "image_generation_timeout" ||
           task.error_code === "retryable_timeout" ||
           task.error_code === "processing_timeout" ||
-          task.error_code === "image_task_timeout_pending"
+          task.error_code === "image_task_timeout_pending" ||
+          task.error_code === "provider_asset_unavailable" ||
+          task.error_code === "provider_asset_invalid" ||
+          task.error_code === "asset_persist_failed" ||
+          task.error_code === "asset_verify_failed" ||
+          task.error_code === "missing_url"
             ? "upstream_error"
             : "server_error",
         request_id: task.request_id,
@@ -106,6 +121,14 @@ export function buildPublicImageTaskResponse(
         message_zh: message.zh,
       }
     : null;
+
+  const providerTaskId =
+    (typeof task.provider_task_id === "string" && task.provider_task_id.trim()
+      ? task.provider_task_id.trim()
+      : null) ||
+    (typeof task.upstream_id === "string" && task.upstream_id.trim()
+      ? task.upstream_id.trim()
+      : null);
 
   // Keep granular async status (queued/generating/…) for Workbench.
   // Tokfai media contract also exposes task_id + tokfai.billing_status.
@@ -120,10 +143,13 @@ export function buildPublicImageTaskResponse(
     message,
     data: publicData,
     usage,
+    billing_status: billingStatusTop,
+    processing: !(isCompleted || isFailed),
+    provider_task_id: providerTaskId,
     tokfai: {
       request_id: task.request_id,
-      billing_status: billingStatus,
-      credits_charged: isCompleted && hasUrl ? creditsCharged : 0,
+      billing_status: billingStatusTokfai,
+      credits_charged: charged ? creditsCharged : 0,
       mode: task.mode ?? null,
       prompt_mode: task.prompt_mode ?? null,
       ...(pollRequestId ? { poll_request_id: pollRequestId } : {}),
@@ -136,12 +162,8 @@ export function buildPublicImageTaskResponse(
         : {}),
     },
     request_id: task.request_id,
-    credits_charged: isCompleted && hasUrl ? creditsCharged : 0,
+    credits_charged: charged ? creditsCharged : 0,
   };
-
-  if (!isCompleted && !isFailed) {
-    base.processing = true;
-  }
 
   // P957: past wait window while still in-flight — soft signal, poll continues.
   if (softTimedOut) {

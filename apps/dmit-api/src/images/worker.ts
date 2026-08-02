@@ -17,6 +17,8 @@ import {
   clearImageGenerationActive,
   markImageGenerationActive,
 } from "./activeImageTasks.js";
+import { recordImageUsageAndDebit } from "./imageBilling.js";
+import { downloadValidateAndPersistProviderImage } from "./imageResultAssetGate.js";
 import { messagesForStatus } from "./progressMessages.js";
 import {
   finalizeImageTaskFailure,
@@ -29,8 +31,6 @@ import {
   updateImageTaskProgress,
 } from "./tasksDb.js";
 
-const IMAGE_LEDGER_REASON = "Image generation usage";
-
 const UPSTREAM_ERROR_CODES = new Set([
   "upstream_auth_error",
   "upstream_rate_limited",
@@ -40,6 +40,19 @@ const UPSTREAM_ERROR_CODES = new Set([
   "image_generation_timeout",
   "image_task_timeout",
   "upstream_image_error",
+  "provider_asset_unavailable",
+  "provider_asset_invalid",
+  "asset_persist_failed",
+  "asset_verify_failed",
+  "missing_url",
+]);
+
+const ASSET_GATE_ERROR_CODES = new Set([
+  "provider_asset_unavailable",
+  "provider_asset_invalid",
+  "asset_persist_failed",
+  "asset_verify_failed",
+  "missing_url",
 ]);
 
 export function enqueueImageGeneration(requestId: string): void {
@@ -98,7 +111,7 @@ async function processImageGeneration(requestId: string): Promise<void> {
       status: "generating",
     });
 
-    let url: string;
+    let providerUrl: string;
     let upstreamId: string | null = null;
 
     try {
@@ -157,7 +170,7 @@ async function processImageGeneration(requestId: string): Promise<void> {
       const result = isNanoBananaImageModel(task.model)
         ? await runNanoBananaImageGeneration(generateParams)
         : await runImageGenerationWithPolling(generateParams);
-      url = result.url;
+      providerUrl = result.url;
       upstreamId = result.upstreamId ?? submittedProviderTaskId;
     } catch (err) {
       await handleGenerationError(task, err, startedAt, submittedProviderTaskId);
@@ -168,6 +181,34 @@ async function processImageGeneration(requestId: string): Promise<void> {
       requestId,
       status: "saving_result",
     });
+
+    // P993: provider URL string is not success — GET + persist + verify first.
+    let tokfaiUrl: string;
+    try {
+      const persisted = await downloadValidateAndPersistProviderImage({
+        providerUrl,
+        requestId,
+        userId: task.user_id,
+      });
+      tokfaiUrl = persisted.publicUrl;
+    } catch (err) {
+      if (err instanceof ApiError && ASSET_GATE_ERROR_CODES.has(err.code ?? "")) {
+        await failTask(
+          task,
+          err.code ?? "provider_asset_unavailable",
+          safePublicMessage(err),
+          startedAt,
+          "failed",
+          {
+            keepReconcilePending: false,
+            reconcileResult: err.code ?? "provider_asset_unavailable",
+          }
+        );
+        return;
+      }
+      await handleGenerationError(task, err, startedAt, submittedProviderTaskId);
+      return;
+    }
 
     const creditsCharged = await priceCreditsForImage(
       task.model,
@@ -221,7 +262,7 @@ async function processImageGeneration(requestId: string): Promise<void> {
     const usage = { credits_charged: creditsCharged };
     await finalizeImageTaskSuccess({
       requestId,
-      resultData: [{ url, revised_prompt: null }],
+      resultData: [{ url: tokfaiUrl, revised_prompt: null }],
       creditsCharged,
       usage,
       upstreamId,
@@ -408,54 +449,6 @@ async function assertHasCredits(userId: string): Promise<void> {
       code: "insufficient_credits",
       type: "billing_error",
       publicMessage: "算力积分不足，请充值后再试。",
-    });
-  }
-}
-
-async function recordImageUsageAndDebit(entry: UsageLogInsert): Promise<void> {
-  const creditsCharged = entry.credits_charged ?? 0;
-
-  if (creditsCharged > 0) {
-    const { error: debitError } = await supabase().rpc("debit_credits", {
-      p_user_id: entry.user_id,
-      p_amount: creditsCharged,
-      p_reason: IMAGE_LEDGER_REASON,
-      p_reference_id: entry.request_id,
-      p_tenant_id: entry.tenant_id ?? null,
-    });
-
-    if (debitError) {
-      if (
-        debitError.code === "P0001" ||
-        debitError.message.toLowerCase().includes("insufficient_credits")
-      ) {
-        throw new ApiError({
-          status: 402,
-          message: "Insufficient credits.",
-          code: "insufficient_credits",
-          type: "billing_error",
-          publicMessage: "算力积分不足，请充值后再试。",
-        });
-      }
-
-      throw ApiError.internal(
-        `Usage billing failed: ${debitError.message}`,
-        "usage_billing_failed"
-      );
-    }
-  }
-
-  const { error: logError } = await supabase().from("usage_logs").insert({
-    ...entry,
-    status: "succeeded",
-  });
-
-  if (logError) {
-    log.warn("usage_log_insert_failed", {
-      requestId: entry.request_id,
-      route: "/v1/images/generations",
-      code: "usage_log_insert_failed",
-      message: "Failed to write usage log.",
     });
   }
 }

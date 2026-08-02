@@ -56,6 +56,11 @@ export const STATUS_BY_ERROR_CODE: Record<string, number> = {
   image_generation_timeout: 504,
   image_task_timeout: 504,
   upstream_image_error: 502,
+  provider_asset_unavailable: 502,
+  provider_asset_invalid: 502,
+  asset_persist_failed: 502,
+  asset_verify_failed: 502,
+  missing_url: 502,
   model_not_tool_capable: 400,
   tool_call_not_supported: 400,
   tool_call_not_generated: 502,
@@ -102,7 +107,12 @@ export function errorTypeForCode(
     code === "all_tool_upstreams_unavailable" ||
     code === "gateway_overloaded" ||
     code === "image_generation_timeout" ||
-    code === "image_task_timeout"
+    code === "image_task_timeout" ||
+    code === "provider_asset_unavailable" ||
+    code === "provider_asset_invalid" ||
+    code === "asset_persist_failed" ||
+    code === "asset_verify_failed" ||
+    code === "missing_url"
   ) {
     return "upstream_error";
   }
