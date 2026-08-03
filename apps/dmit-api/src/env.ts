@@ -104,6 +104,36 @@ const Schema = z
     .int()
     .positive()
     .default(2),
+  /**
+   * P1001 — In-process Heavy /v1/responses bounded FIFO queue.
+   * Default false: keep fail-fast 429 when concurrency is saturated.
+   */
+  TOKFAI_HEAVY_QUEUE_ENABLED: z
+    .string()
+    .optional()
+    .default("false")
+    .transform((raw) => raw === "true" || raw === "1"),
+  /** Max waiting Heavy requests per limitKey when queue is enabled. */
+  TOKFAI_HEAVY_QUEUE_MAX_WAITERS_PER_KEY: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .default(4),
+  /** Max waiting Heavy requests across all keys in this process. */
+  TOKFAI_HEAVY_QUEUE_MAX_WAITERS_GLOBAL: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(1000)
+    .default(20),
+  /** Max time a Heavy request may wait for a concurrency slot (ms). */
+  TOKFAI_HEAVY_QUEUE_WAIT_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .max(120_000)
+    .default(30_000),
   /** Overall request wall clock (non-tool chat); keep moderate. */
   TOKFAI_TOTAL_REQUEST_TIMEOUT_MS: z.coerce
     .number()

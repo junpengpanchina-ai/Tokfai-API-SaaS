@@ -83,6 +83,14 @@ function respondJsonError(
         // finalized context — Response headers still set
       }
     }
+    if (
+      typeof err.retryAfterSeconds === "number" &&
+      Number.isFinite(err.retryAfterSeconds)
+    ) {
+      headers["Retry-After"] = String(
+        Math.max(1, Math.trunc(err.retryAfterSeconds))
+      );
+    }
     return new Response(text, {
       status: err.status || 400,
       headers,
@@ -187,6 +195,9 @@ export function respondExecuteChatCompletionFailure(
     publicMessage: message,
     code,
     type: errorTypeForCode(code, result.httpStatus),
+    ...(typeof result.retryAfterSeconds === "number"
+      ? { retryAfterSeconds: result.retryAfterSeconds }
+      : {}),
   });
   return respondJsonError(c, err, requestId, { tokfai });
 }

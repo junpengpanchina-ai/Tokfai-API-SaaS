@@ -75,10 +75,12 @@ import {
 } from "./gemini25FlashNonStreamStreamFallback.js";
 import {
   releaseGlobalUpstream,
-  releaseHeavyResponses,
   tryAcquireGlobalUpstream,
-  tryAcquireHeavyResponses,
 } from "../gateway/concurrency.js";
+import {
+  acquireHeavyResponsesPermit,
+  type HeavyQueueAcquireResult,
+} from "../gateway/heavyResponsesQueue.js";
 import {
   assertCreditPeriodLimits,
   assertTokenBudget,
@@ -254,9 +256,11 @@ export interface ExecuteChatCompletionInput {
    * Called after model/credit/budget prechecks succeed and immediately before
    * upstream provider attempts. Used by stream=true to flush the first SSE
    * frame without waiting on the model. Not invoked on precheck failures or
-   * idempotent replay.
+   * idempotent replay. Heavy queue wait (P1001) completes before this hook.
    */
   onAfterPrecheck?: () => void | Promise<void>;
+  /** Client disconnect signal — Heavy queue wait aborts when aborted (P1001). */
+  abortSignal?: AbortSignal;
 }
 
 export type ExecuteChatCompletionResult =
@@ -274,6 +278,8 @@ export type ExecuteChatCompletionResult =
       errorMessage: string;
       requestId: string;
       httpStatus: number;
+      /** Optional Retry-After seconds for Heavy queue capacity errors (P1001). */
+      retryAfterSeconds?: number;
       suggestedModels?: string[];
       /** P984 — client-safe routing / billing evidence for error tokfai. */
       routing?: TokfaiRoutingEvidence;
@@ -794,28 +800,63 @@ export async function executeChatCompletion(
     const estimatedTokens = 1_024 + maxOut;
     await assertTokenBudget(limitKey, estimatedTokens);
 
-    let heavySlotHeld = false;
+    let heavyPermit: HeavyQueueAcquireResult | null = null;
     if (timeoutPolicy.isHeavy) {
-      if (!(await tryAcquireHeavyResponses(limitKey))) {
-        const err = ApiError.heavyResponsesRateLimited();
-        const routing = await logChatFailure({
-          caller,
+      try {
+        heavyPermit = await acquireHeavyResponsesPermit({
+          limitKey,
+          concurrencyLimit: env.TOKFAI_HEAVY_RESPONSES_MAX_CONCURRENCY,
+          queueEnabled: env.TOKFAI_HEAVY_QUEUE_ENABLED,
+          maxWaitersPerKey: env.TOKFAI_HEAVY_QUEUE_MAX_WAITERS_PER_KEY,
+          maxWaitersGlobal: env.TOKFAI_HEAVY_QUEUE_MAX_WAITERS_GLOBAL,
+          waitTimeoutMs: env.TOKFAI_HEAVY_QUEUE_WAIT_TIMEOUT_MS,
+          signal: input.abortSignal,
           requestId,
-          requestedModel,
-          requestedRaw,
-          isAlias,
-          attemptedModels: attempts,
-          startedAt,
-          err,
           route,
-          timeoutMs: timeoutPolicy.upstreamTimeoutMs,
+          model: requestedModel,
         });
-        return failureResult(err, requestId, requestedModel, routing);
+      } catch (acquireErr) {
+        if (acquireErr instanceof ApiError) {
+          const routing = await logChatFailure({
+            caller,
+            requestId,
+            requestedModel,
+            requestedRaw,
+            isAlias,
+            attemptedModels: attempts,
+            startedAt,
+            err: acquireErr,
+            route,
+            timeoutMs: timeoutPolicy.upstreamTimeoutMs,
+          });
+          return failureResult(acquireErr, requestId, requestedModel, routing);
+        }
+        throw acquireErr;
       }
-      heavySlotHeld = true;
     }
 
     try {
+      // After a queue wait, re-check dynamic limits before SSE / Provider.
+      if (heavyPermit?.queued && !unlimited) {
+        await assertHasCredits(caller.userId);
+        await assertCreditPeriodLimits(caller.userId, {
+          apiKeyId: caller.apiKeyId,
+          keyId: caller.keyId,
+          tenantId: caller.tenantId,
+        });
+        await assertTrialQuotaGuards({
+          userId: caller.userId,
+          apiKeyId: caller.apiKeyId,
+          keyId: caller.keyId,
+          tenantId: caller.tenantId,
+          model: requestedModel,
+          requestedRaw,
+          requestId,
+          route,
+        });
+        await assertTokenBudget(limitKey, estimatedTokens);
+      }
+
       if (input.onAfterPrecheck) {
         await input.onAfterPrecheck();
       }
@@ -838,9 +879,7 @@ export async function executeChatCompletion(
         clientStream,
       });
     } finally {
-      if (heavySlotHeld) {
-        await releaseHeavyResponses(limitKey);
-      }
+      heavyPermit?.release();
     }
   } catch (err) {
     if (err instanceof ApiError) {
@@ -1771,6 +1810,9 @@ function failureResult(
     errorMessage,
     requestId,
     httpStatus: err.status,
+    ...(typeof err.retryAfterSeconds === "number"
+      ? { retryAfterSeconds: err.retryAfterSeconds }
+      : {}),
     ...(routing ? { routing } : {}),
   };
 }
@@ -2077,6 +2119,9 @@ async function logChatFailure(args: {
     err.code === "all_upstreams_unavailable" ||
     err.code === ALL_TOOL_UPSTREAMS_UNAVAILABLE_CODE ||
     err.code === "rate_limited" ||
+    err.code === "heavy_queue_full" ||
+    err.code === "heavy_queue_timeout" ||
+    err.code === "heavy_queue_aborted" ||
     err.code === "too_many_requests" ||
     err.code === "too_many_concurrent_requests"
       ? "rate_limited"

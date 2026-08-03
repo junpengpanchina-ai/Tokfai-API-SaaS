@@ -29,6 +29,9 @@ export const GATEWAY_GUARD_ERROR_CODES = new Set([
   "too_many_requests",
   "too_many_concurrent_requests",
   "rate_limited",
+  "heavy_queue_full",
+  "heavy_queue_timeout",
+  "heavy_queue_aborted",
   "gateway_overloaded",
   "request_body_too_large",
   "upstream_timeout",
@@ -46,6 +49,9 @@ export const STATUS_BY_ERROR_CODE: Record<string, number> = {
   too_many_requests: 429,
   too_many_concurrent_requests: 429,
   rate_limited: 429,
+  heavy_queue_full: 429,
+  heavy_queue_timeout: 429,
+  heavy_queue_aborted: 400,
   gateway_overloaded: 503,
   upstream_model_busy: 503,
   upstream_model_unavailable: 503,
@@ -85,6 +91,8 @@ export function errorTypeForCode(
   if (
     code === "upstream_rate_limited" ||
     code === "rate_limited" ||
+    code === "heavy_queue_full" ||
+    code === "heavy_queue_timeout" ||
     code === "too_many_requests" ||
     code === "too_many_concurrent_requests" ||
     code === "quota_exceeded" ||
@@ -286,6 +294,8 @@ export class ApiError extends Error {
   readonly upstreamStatus?: number;
   /** Truncated upstream body snippet (server logs only). */
   readonly upstreamErrorSnippet?: string;
+  /** Optional Retry-After hint (seconds) for 429 capacity errors. */
+  readonly retryAfterSeconds?: number;
 
   constructor(args: {
     status: number;
@@ -296,6 +306,7 @@ export class ApiError extends Error {
     publicMessage?: string;
     upstreamStatus?: number;
     upstreamErrorSnippet?: string;
+    retryAfterSeconds?: number;
   }) {
     super(args.message);
     this.name = "ApiError";
@@ -305,6 +316,7 @@ export class ApiError extends Error {
     this.publicMessage = args.publicMessage ?? args.message;
     this.upstreamStatus = args.upstreamStatus;
     this.upstreamErrorSnippet = args.upstreamErrorSnippet;
+    this.retryAfterSeconds = args.retryAfterSeconds;
   }
 
   toJSON(): { error: ApiErrorPayload } {
@@ -398,6 +410,55 @@ export class ApiError extends Error {
       publicMessage,
       code: "rate_limited",
       type: "rate_limit_error",
+    });
+  }
+
+  /** Heavy queue waiter cap exceeded (P1001). */
+  static heavyQueueFull(
+    message = "Heavy responses wait queue is full.",
+    publicMessage = "当前长任务等待队列已满，请稍后重试。"
+  ) {
+    return new ApiError({
+      status: 429,
+      message,
+      publicMessage,
+      code: "heavy_queue_full",
+      type: "rate_limit_error",
+      retryAfterSeconds: 30,
+    });
+  }
+
+  /** Heavy queue wait timeout (P1001). */
+  static heavyQueueTimeout(
+    waitTimeoutMs = 30_000,
+    message = "Heavy responses wait queue timed out.",
+    publicMessage = "当前长任务等待超时，请稍后重试。"
+  ) {
+    const retryAfterSeconds = Math.max(
+      1,
+      Math.ceil(Math.max(1, waitTimeoutMs) / 1000)
+    );
+    return new ApiError({
+      status: 429,
+      message,
+      publicMessage,
+      code: "heavy_queue_timeout",
+      type: "rate_limit_error",
+      retryAfterSeconds,
+    });
+  }
+
+  /** Client disconnected while waiting in Heavy queue (P1001). */
+  static heavyQueueAborted(
+    message = "Heavy responses wait aborted.",
+    publicMessage = "请求已取消。"
+  ) {
+    return new ApiError({
+      status: 400,
+      message,
+      publicMessage,
+      code: "heavy_queue_aborted",
+      type: "invalid_request_error",
     });
   }
 

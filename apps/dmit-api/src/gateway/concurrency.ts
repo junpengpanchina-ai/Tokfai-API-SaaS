@@ -241,6 +241,13 @@ function releaseHeavyResponsesMemory(limitKey: string): void {
   heavyResponsesInflight.set(limitKey, current - 1);
 }
 
+/** Test-only: clear in-memory heavy / key / global inflight counters. */
+export function __concurrencyTestReset(): void {
+  keyInflight.clear();
+  heavyResponsesInflight.clear();
+  globalUpstreamInflight = 0;
+}
+
 async function tryIncrementCounter(
   redis: NonNullable<ReturnType<typeof getRedisClient>>,
   key: string,

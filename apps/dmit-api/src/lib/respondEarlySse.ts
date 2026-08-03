@@ -261,6 +261,8 @@ export async function respondResponsesEarlySse(
     body: Parameters<typeof executeChatCompletion>[0]["body"];
     limitKey: string;
     idempotencyKey: string | null;
+    /** P1001 — forward client disconnect into Heavy queue wait. */
+    abortSignal?: AbortSignal;
     toResponsesPayload: (
       result: ExecuteChatCompletionResult & { ok: true }
     ) => Record<string, unknown>;
@@ -279,6 +281,7 @@ export async function respondResponsesEarlySse(
         route: "/v1/responses",
         clientStream: true,
         onAfterPrecheck,
+        abortSignal: args.abortSignal,
       }),
     isFailure: (result) => !result.ok,
     writeRest: (write, result) => {
@@ -297,6 +300,19 @@ export async function respondResponsesEarlySse(
 
   const result = gated.earlyDone;
   if (!result.ok) {
+    if (
+      typeof result.retryAfterSeconds === "number" &&
+      Number.isFinite(result.retryAfterSeconds)
+    ) {
+      try {
+        c.header(
+          "Retry-After",
+          String(Math.max(1, Math.trunc(result.retryAfterSeconds)))
+        );
+      } catch {
+        // Context may already be finalized.
+      }
+    }
     if (
       isForcedToolFailureCode(result.errorCode) ||
       isToolRoutingGuardErrorCode(result.errorCode)

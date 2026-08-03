@@ -224,6 +224,9 @@ responsesRoutes.post("/v1/responses", async (c) => {
     );
   }
 
+  // P1001 — client disconnect aborts Heavy queue wait (not Provider mid-flight).
+  const abortSignal = c.req.raw.signal;
+
   if (wantsStream) {
     return respondResponsesEarlySse(c, {
       caller,
@@ -231,6 +234,7 @@ responsesRoutes.post("/v1/responses", async (c) => {
       body: chatParsed.data,
       limitKey,
       idempotencyKey,
+      abortSignal,
       toResponsesPayload: (result) => {
         const chatBody = isResponsesFormatResponse(result.response)
           ? result.response
@@ -263,9 +267,16 @@ responsesRoutes.post("/v1/responses", async (c) => {
     idempotencyKey,
     route: "/v1/responses",
     clientStream: false,
+    abortSignal,
   });
 
   if (!result.ok) {
+    if (
+      typeof result.retryAfterSeconds === "number" &&
+      Number.isFinite(result.retryAfterSeconds)
+    ) {
+      c.header("Retry-After", String(Math.max(1, Math.trunc(result.retryAfterSeconds))));
+    }
     if (result.httpStatus === 400) {
       logChatCompletionInvalidRequest({
         requestId: result.requestId || requestId,

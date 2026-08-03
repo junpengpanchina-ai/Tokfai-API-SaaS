@@ -89,16 +89,25 @@ export function respondApiError(
     });
   }
 
-  const byteLength = Buffer.byteLength(text, "utf8");
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json; charset=utf-8",
+    "Content-Length": String(Buffer.byteLength(text, "utf8")),
+    "X-Request-Id": resolvedId,
+    "Cache-Control": "no-store",
+    Connection: "close",
+  };
+  if (
+    typeof err.retryAfterSeconds === "number" &&
+    Number.isFinite(err.retryAfterSeconds)
+  ) {
+    headers["Retry-After"] = String(
+      Math.max(1, Math.trunc(err.retryAfterSeconds))
+    );
+  }
+
   return new Response(text, {
     status: err.status || 400,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Content-Length": String(byteLength),
-      "X-Request-Id": resolvedId,
-      "Cache-Control": "no-store",
-      Connection: "close",
-    },
+    headers,
   });
 }
 
