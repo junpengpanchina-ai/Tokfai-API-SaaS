@@ -116,6 +116,28 @@ assert(
   );
 }
 
+// P1001.1 — exactly one production await assertTokenBudget in main path
+{
+  const awaits = [...exec.matchAll(/await assertTokenBudget\(/g)];
+  assert(
+    awaits.length === 1,
+    "exec: single await assertTokenBudget (no post-queue re-reserve)",
+    `count=${awaits.length}`
+  );
+  assert(
+    exec.includes(
+      "Re-reserving after wait would double-count the same request."
+    ),
+    "exec: documents why post-queue TPM re-reserve is omitted"
+  );
+  const tpmCall = exec.indexOf("await assertTokenBudget(");
+  const acq = exec.indexOf("heavyPermit = await acquireHeavyResponsesPermit");
+  assert(
+    tpmCall > 0 && acq > tpmCall,
+    "exec: TPM reserve remains before Heavy queue admission"
+  );
+}
+
 assert(
   responses.includes("c.req.raw.signal") &&
     responses.includes("abortSignal") &&

@@ -854,7 +854,8 @@ export async function executeChatCompletion(
           requestId,
           route,
         });
-        await assertTokenBudget(limitKey, estimatedTokens);
+        // TPM is already reserved before Heavy queue admission.
+        // Re-reserving after wait would double-count the same request.
       }
 
       if (input.onAfterPrecheck) {

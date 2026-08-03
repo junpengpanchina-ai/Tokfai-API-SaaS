@@ -39,7 +39,8 @@ ensureModuleMocks();
 
 function ensureDummyEnv(): void {
   const set = (k: string, v: string) => {
-    process.env[k] = v;
+    // Preserve parent overrides (e.g. QUEUE_ENABLED=false for disabled TPM case).
+    if (process.env[k] == null || process.env[k] === "") process.env[k] = v;
   };
   set("NODE_ENV", "test");
   set("SUPABASE_URL", "https://example.supabase.co");
@@ -66,6 +67,8 @@ type Counts = {
   debit: number;
   usageInsert: number;
   creditChecks: number;
+  /** REAL EXECUTE ENTRY: assertTokenBudget invocations (TPM reservation). */
+  tpmReservations: number;
 };
 
 let counts: Counts = {
@@ -73,6 +76,7 @@ let counts: Counts = {
   debit: 0,
   usageInsert: 0,
   creditChecks: 0,
+  tpmReservations: 0,
 };
 
 let creditsBalance = 100;
@@ -83,13 +87,25 @@ let idempotencyReplay: {
   creditsCharged: number;
   requestId: string;
 } | null = null;
+/** When true, next assertCreditPeriodLimits throws (secondary guard). */
+let failPeriodLimits = false;
+/** When true, next assertTrialQuotaGuards throws (secondary guard). */
+let failTrialGuards = false;
 
 function resetCounts(): void {
-  counts = { provider: 0, debit: 0, usageInsert: 0, creditChecks: 0 };
+  counts = {
+    provider: 0,
+    debit: 0,
+    usageInsert: 0,
+    creditChecks: 0,
+    tpmReservations: 0,
+  };
   creditsBalance = 100;
   providerBehavior = "ok";
   hangResolvers = [];
   idempotencyReplay = null;
+  failPeriodLimits = false;
+  failTrialGuards = false;
 }
 
 function installMocks(): void {
@@ -162,9 +178,21 @@ function installMocks(): void {
       logUnlimitedBillingGranted: () => {},
       assertCreditPeriodLimits: async () => {
         counts.creditChecks += 1;
+        if (failPeriodLimits) {
+          const { ApiError } = await import(
+            fileUrl("apps/dmit-api/src/errors.ts")
+          );
+          throw new (ApiError as any)({
+            status: 429,
+            message: "Daily credit limit exceeded.",
+            code: "daily_limit_exceeded",
+            type: "rate_limit_error",
+            publicMessage: "今日额度已用尽。",
+          });
+        }
       },
       assertTokenBudget: async () => {
-        counts.creditChecks += 1;
+        counts.tpmReservations += 1;
       },
     },
   });
@@ -177,6 +205,18 @@ function installMocks(): void {
       ]),
       assertTrialQuotaGuards: async () => {
         counts.creditChecks += 1;
+        if (failTrialGuards) {
+          const { ApiError } = await import(
+            fileUrl("apps/dmit-api/src/errors.ts")
+          );
+          throw new (ApiError as any)({
+            status: 429,
+            message: "Trial credit limit exceeded.",
+            code: "trial_limit_exceeded",
+            type: "rate_limit_error",
+            publicMessage: "试用额度已用尽。",
+          });
+        }
       },
       logCommercialRequestTrace: () => {},
     },
@@ -342,6 +382,46 @@ function resetAll(): void {
 
 async function sleep(ms: number) {
   await new Promise((r) => setTimeout(r, ms));
+}
+
+const TPM_PASS = "TOKFAI_P1001_SINGLE_TPM_RESERVATION_PASS";
+const TPM_FAIL = "TOKFAI_P1001_SINGLE_TPM_RESERVATION_FAIL";
+
+// Child-only: Queue disabled Heavy success → assertTokenBudget exactly once.
+if (process.argv.includes("--tpm-disabled-case")) {
+  resetAll();
+  providerBehavior = "ok";
+  const r = await executeChatCompletion({
+    caller: caller(),
+    requestId: "tpm_disabled_ok",
+    body: heavyBody(),
+    limitKey: "key-tpm-disabled",
+    route: "/v1/responses",
+  });
+  let ok = true;
+  const check = (cond: boolean, label: string, detail?: string) => {
+    if (cond) console.log(`PASS  [REAL EXECUTE ENTRY][SINGLE TPM] ${label}`);
+    else {
+      ok = false;
+      console.error(
+        `FAIL  [REAL EXECUTE ENTRY][SINGLE TPM] ${label}${detail ? ` — ${detail}` : ""}`
+      );
+    }
+  };
+  check(r.ok === true, "1 disabled Heavy success");
+  check(
+    counts.tpmReservations === 1,
+    "1 assertTokenBudget=1",
+    `tpm=${counts.tpmReservations}`
+  );
+  check(counts.provider === 1, "1 Provider=1");
+  check(counts.debit === 1, "1 Debit=1");
+  if (!ok) {
+    console.error(TPM_FAIL);
+    process.exit(1);
+  }
+  console.log(TPM_PASS);
+  process.exit(0);
 }
 
 // ── 1) concurrency=2: two occupy, third waits, then runs ───────────────
@@ -769,6 +849,406 @@ async function sleep(ms: number) {
 }
 
 void ApiError;
+
+// ── P1001.1 — single TPM reservation (REAL EXECUTE ENTRY) ──────────────
+let tpmFailed = 0;
+
+function tpmPass(label: string) {
+  console.log(`PASS  [REAL EXECUTE ENTRY][SINGLE TPM] ${label}`);
+}
+function tpmFail(label: string, detail?: string) {
+  tpmFailed += 1;
+  failed += 1;
+  console.error(
+    `FAIL  [REAL EXECUTE ENTRY][SINGLE TPM] ${label}${detail ? ` — ${detail}` : ""}`
+  );
+}
+function tpmAssert(cond: boolean, label: string, detail?: string) {
+  if (cond) tpmPass(label);
+  else tpmFail(label, detail);
+}
+
+async function holdTwoThenAwaitThird(
+  limitKey: string,
+  afterQueued: () => void | Promise<void>
+) {
+  providerBehavior = "hang";
+  const a = executeChatCompletion({
+    caller: caller(),
+    requestId: `${limitKey}_a`,
+    body: heavyBody(),
+    limitKey,
+    route: "/v1/responses",
+  });
+  const b = executeChatCompletion({
+    caller: caller(),
+    requestId: `${limitKey}_b`,
+    body: heavyBody(),
+    limitKey,
+    route: "/v1/responses",
+  });
+  await sleep(30);
+  const cP = executeChatCompletion({
+    caller: caller(),
+    requestId: `${limitKey}_c`,
+    body: heavyBody(),
+    limitKey,
+    route: "/v1/responses",
+  });
+  await sleep(40);
+  await afterQueued();
+  // Allow woken waiter / remaining holds to finish without re-hanging.
+  providerBehavior = "ok";
+  hangResolvers.shift()?.();
+  await a;
+  const c = await cP;
+  while (hangResolvers.length) hangResolvers.shift()?.();
+  await Promise.allSettled([b]);
+  return c;
+}
+
+{
+  // 1) Queue disabled — spawn child with TOKFAI_HEAVY_QUEUE_ENABLED=false
+  const loader = join(ROOT, "apps/dmit-api/node_modules/tsx/dist/loader.mjs");
+  const child = spawnSync(
+    process.execPath,
+    ["--experimental-test-module-mocks", "--import", loader, SELF, "--tpm-disabled-case"],
+    {
+      cwd: ROOT,
+      env: {
+        ...process.env,
+        TOKFAI_HEAVY_QUEUE_ENABLED: "false",
+      },
+      encoding: "utf8",
+    }
+  );
+  const out = `${child.stdout ?? ""}\n${child.stderr ?? ""}`;
+  tpmAssert(
+    child.status === 0 && out.includes(TPM_PASS),
+    "1 Queue disabled Heavy success assertTokenBudget=1 (child)",
+    `status=${child.status}`
+  );
+}
+
+{
+  // 2) Queue enabled, immediate permit
+  resetAll();
+  providerBehavior = "ok";
+  const r = await executeChatCompletion({
+    caller: caller(),
+    requestId: "tpm_imm",
+    body: heavyBody(),
+    limitKey: "key-tpm-imm",
+    route: "/v1/responses",
+  });
+  tpmAssert(r.ok === true, "2 immediate success");
+  tpmAssert(counts.tpmReservations === 1, "2 assertTokenBudget=1", `tpm=${counts.tpmReservations}`);
+}
+
+{
+  // 3) Queue enabled, queued then success
+  resetAll();
+  const c = await holdTwoThenAwaitThird("key-tpm-qok", async () => {});
+  tpmAssert(c.ok === true, "3 queued then success");
+  // A+B+C each reserve once = 3 total for 3 requests
+  tpmAssert(
+    counts.tpmReservations === 3,
+    "3 three requests → assertTokenBudget=3 (1 each)",
+    `tpm=${counts.tpmReservations}`
+  );
+}
+
+{
+  // 4) Queued then secondary balance fail
+  resetAll();
+  const c = await holdTwoThenAwaitThird("key-tpm-bal", async () => {
+    creditsBalance = 0;
+  });
+  tpmAssert(!c.ok, "4 secondary balance fail", c.ok ? "ok" : c.errorCode);
+  // A+B reserved; C reserved once before queue then secondary fail → 3
+  tpmAssert(
+    counts.tpmReservations === 3,
+    "4 assertTokenBudget=1 per request (incl C)",
+    `tpm=${counts.tpmReservations}`
+  );
+  tpmAssert(counts.provider === 2, "4 Provider=2 (only A/B)", `p=${counts.provider}`);
+}
+
+{
+  // 5) Queued then secondary period fail
+  resetAll();
+  const c = await holdTwoThenAwaitThird("key-tpm-per", async () => {
+    failPeriodLimits = true;
+  });
+  tpmAssert(
+    !c.ok && c.errorCode === "daily_limit_exceeded",
+    "5 secondary period fail",
+    c.ok ? "ok" : c.errorCode
+  );
+  tpmAssert(
+    counts.tpmReservations === 3,
+    "5 assertTokenBudget=1 each",
+    `tpm=${counts.tpmReservations}`
+  );
+  tpmAssert(counts.provider === 2, "5 Provider only A/B (C=0)", `p=${counts.provider}`);
+}
+
+{
+  // 6) Queued then secondary trial fail
+  resetAll();
+  const c = await holdTwoThenAwaitThird("key-tpm-trial", async () => {
+    failTrialGuards = true;
+  });
+  tpmAssert(
+    !c.ok && c.errorCode === "trial_limit_exceeded",
+    "6 secondary trial fail",
+    c.ok ? "ok" : c.errorCode
+  );
+  tpmAssert(
+    counts.tpmReservations === 3,
+    "6 assertTokenBudget=1 each",
+    `tpm=${counts.tpmReservations}`
+  );
+  tpmAssert(counts.provider === 2, "6 Provider only A/B (C=0)", `p=${counts.provider}`);
+}
+
+{
+  // 7) Queue full
+  resetAll();
+  providerBehavior = "hang";
+  const holds = [0, 1].map((i) =>
+    executeChatCompletion({
+      caller: caller(),
+      requestId: `tpm_full_h${i}`,
+      body: heavyBody(),
+      limitKey: "key-tpm-full",
+      route: "/v1/responses",
+    })
+  );
+  await sleep(30);
+  const waiters = [0, 1, 2, 3].map((i) =>
+    executeChatCompletion({
+      caller: caller(),
+      requestId: `tpm_full_w${i}`,
+      body: heavyBody(),
+      limitKey: "key-tpm-full",
+      route: "/v1/responses",
+    })
+  );
+  await sleep(30);
+  const tpmBeforeReject = counts.tpmReservations;
+  const full = await executeChatCompletion({
+    caller: caller(),
+    requestId: "tpm_full_r",
+    body: heavyBody(),
+    limitKey: "key-tpm-full",
+    route: "/v1/responses",
+  });
+  tpmAssert(
+    !full.ok && full.errorCode === "heavy_queue_full",
+    "7 queue full",
+    full.ok ? "ok" : full.errorCode
+  );
+  tpmAssert(
+    counts.tpmReservations === tpmBeforeReject + 1,
+    "7 reject path assertTokenBudget=+1 only",
+    `tpm=${counts.tpmReservations} before=${tpmBeforeReject}`
+  );
+  tpmAssert(counts.provider === 2, "7 Provider=2 (reject 0)");
+  __heavyQueueTestReset();
+  while (hangResolvers.length) hangResolvers.shift()?.();
+  await Promise.allSettled([...holds, ...waiters]);
+}
+
+{
+  // 8) Queue timeout
+  resetAll();
+  providerBehavior = "hang";
+  const a = executeChatCompletion({
+    caller: caller(),
+    requestId: "tpm_to_a",
+    body: heavyBody(),
+    limitKey: "key-tpm-to",
+    route: "/v1/responses",
+  });
+  const b = executeChatCompletion({
+    caller: caller(),
+    requestId: "tpm_to_b",
+    body: heavyBody(),
+    limitKey: "key-tpm-to",
+    route: "/v1/responses",
+  });
+  await sleep(30);
+  const tpmBefore = counts.tpmReservations;
+  const c = await executeChatCompletion({
+    caller: caller(),
+    requestId: "tpm_to_c",
+    body: heavyBody(),
+    limitKey: "key-tpm-to",
+    route: "/v1/responses",
+  });
+  tpmAssert(
+    !c.ok && c.errorCode === "heavy_queue_timeout",
+    "8 queue timeout",
+    c.ok ? "ok" : c.errorCode
+  );
+  tpmAssert(
+    counts.tpmReservations === tpmBefore + 1,
+    "8 timeout assertTokenBudget=+1",
+    `tpm=${counts.tpmReservations}`
+  );
+  tpmAssert(counts.provider === 2, "8 Provider unchanged for C");
+  while (hangResolvers.length) hangResolvers.shift()?.();
+  await Promise.allSettled([a, b]);
+}
+
+{
+  // 9) Queue abort
+  resetAll();
+  providerBehavior = "hang";
+  const a = executeChatCompletion({
+    caller: caller(),
+    requestId: "tpm_ab_a",
+    body: heavyBody(),
+    limitKey: "key-tpm-ab",
+    route: "/v1/responses",
+  });
+  const b = executeChatCompletion({
+    caller: caller(),
+    requestId: "tpm_ab_b",
+    body: heavyBody(),
+    limitKey: "key-tpm-ab",
+    route: "/v1/responses",
+  });
+  await sleep(30);
+  const tpmBefore = counts.tpmReservations;
+  const ac = new AbortController();
+  const cP = executeChatCompletion({
+    caller: caller(),
+    requestId: "tpm_ab_c",
+    body: heavyBody(),
+    limitKey: "key-tpm-ab",
+    route: "/v1/responses",
+    abortSignal: ac.signal,
+  });
+  await sleep(20);
+  ac.abort();
+  const c = await cP;
+  tpmAssert(
+    !c.ok && c.errorCode === "heavy_queue_aborted",
+    "9 queue abort",
+    c.ok ? "ok" : c.errorCode
+  );
+  tpmAssert(
+    counts.tpmReservations === tpmBefore + 1,
+    "9 abort assertTokenBudget=+1",
+    `tpm=${counts.tpmReservations}`
+  );
+  tpmAssert(counts.provider === 2, "9 Provider C=0");
+  while (hangResolvers.length) hangResolvers.shift()?.();
+  await Promise.allSettled([a, b]);
+}
+
+{
+  // 10) Provider success
+  resetAll();
+  providerBehavior = "ok";
+  const r = await executeChatCompletion({
+    caller: caller(),
+    requestId: "tpm_ok",
+    body: heavyBody(),
+    limitKey: "key-tpm-ok",
+    route: "/v1/responses",
+  });
+  tpmAssert(r.ok === true, "10 provider success");
+  tpmAssert(counts.tpmReservations === 1, "10 assertTokenBudget=1");
+  tpmAssert(counts.provider === 1, "10 Provider=1");
+  tpmAssert(counts.debit === 1, "10 Debit=1");
+}
+
+{
+  // 11) Provider failure
+  resetAll();
+  providerBehavior = "fail";
+  const r = await executeChatCompletion({
+    caller: caller(),
+    requestId: "tpm_pf",
+    body: heavyBody(),
+    limitKey: "key-tpm-pf",
+    route: "/v1/responses",
+  });
+  tpmAssert(!r.ok, "11 provider fail");
+  tpmAssert(counts.tpmReservations === 1, "11 assertTokenBudget=1");
+  tpmAssert(counts.provider === 1, "11 Provider=1");
+  tpmAssert(counts.debit === 0, "11 Debit=0");
+}
+
+{
+  // 12) Idempotency replay — assert real order (TPM after replay lookup)
+  resetAll();
+  idempotencyReplay = {
+    requestId: "replayed-tpm",
+    creditsCharged: 0.02,
+    responseSnapshot: {
+      id: "chatcmpl-replay-tpm",
+      object: "chat.completion",
+      model: "gpt-5.5",
+      choices: [
+        {
+          index: 0,
+          message: { role: "assistant", content: "replay" },
+          finish_reason: "stop",
+        },
+      ],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+    },
+  };
+  const r = await executeChatCompletion({
+    caller: caller(),
+    requestId: "tpm_idem",
+    body: heavyBody(),
+    limitKey: "key-tpm-idem",
+    route: "/v1/responses",
+    idempotencyKey: "idem-tpm-1",
+  });
+  tpmAssert(r.ok === true, "12 idempotency replay ok");
+  tpmAssert(
+    counts.tpmReservations === 0,
+    "12 replay before TPM → assertTokenBudget=0",
+    `tpm=${counts.tpmReservations}`
+  );
+  tpmAssert(counts.provider === 0, "12 Provider=0");
+  tpmAssert(counts.debit === 0, "12 Debit=0");
+}
+
+{
+  // 13) P998 zero usage
+  resetAll();
+  providerBehavior = "zero_usage";
+  const r = await executeChatCompletion({
+    caller: caller(),
+    requestId: "tpm_p998",
+    body: heavyBody(),
+    limitKey: "key-tpm-p998",
+    route: "/v1/responses",
+  });
+  tpmAssert(r.ok === true, "13 P998 success");
+  tpmAssert(counts.tpmReservations === 1, "13 assertTokenBudget=1");
+  if (r.ok) {
+    tpmAssert(
+      typeof r.creditsCharged === "number" && r.creditsCharged > 0,
+      "13 charged > 0",
+      String(r.creditsCharged)
+    );
+  }
+  tpmAssert(counts.debit === 1, "13 Debit=1");
+}
+
+if (tpmFailed === 0) {
+  console.log(TPM_PASS);
+} else {
+  console.error(TPM_FAIL);
+}
 
 if (failed > 0) {
   console.error(FAIL);
