@@ -546,6 +546,38 @@ export function makeParallelToolCallIntent(): string {
   });
 }
 
+/** OpenAI-native message.tool_calls payload for gpt-5.5 / gpt-5.4 mocks. */
+export function makeNativeToolCalls(
+  name: string,
+  args: Record<string, unknown>,
+  id = `call_native_${name}`
+): NonNullable<Extract<ProviderReply, { kind: "completion" }>["tool_calls"]> {
+  return [
+    {
+      id,
+      type: "function",
+      function: {
+        name,
+        arguments: JSON.stringify(args),
+      },
+    },
+  ];
+}
+
+export function nativeToolCompletion(
+  name: string,
+  args: Record<string, unknown>,
+  opts?: { model?: string; id?: string }
+): Extract<ProviderReply, { kind: "completion" }> {
+  return {
+    kind: "completion",
+    content: null,
+    tool_calls: makeNativeToolCalls(name, args, opts?.id),
+    finish_reason: "tool_calls",
+    ...(opts?.model ? { model: opts.model } : {}),
+  };
+}
+
 export async function loadExecuteChatCompletion() {
   return import(fileUrl("apps/dmit-api/src/lib/executeChatCompletion.ts"));
 }

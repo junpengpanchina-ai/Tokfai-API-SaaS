@@ -20,6 +20,7 @@ import {
   loadRespondEarlySse,
   makeAssistantTextIntent,
   makeToolCallIntent,
+  nativeToolCompletion,
   resetScenario,
 } from "./fixtures/p1018-tool-intent-harness.mts";
 
@@ -136,16 +137,11 @@ function collectDeltas(events: unknown[]) {
 
 console.log("P1018 STREAM REGRESSION — respondChatCompletionEarlySse\n");
 
-// ── 13. stream tool_call ─────────────────────────────────────────────────
+// ── 13. stream tool_call (gpt-5.5 native) ────────────────────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
-    scripts: [
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("get_weather", { city: "Paris" }),
-      }),
-    ],
+    scripts: [() => nativeToolCompletion("get_weather", { city: "Paris" })],
   });
   const res = await streamChat(
     {
@@ -161,8 +157,7 @@ console.log("P1018 STREAM REGRESSION — respondChatCompletionEarlySse\n");
   const c = getCounts();
   const rawLeak =
     text.includes('"type":"tool_call"') ||
-    text.includes("get_weather") && text.includes('"arguments":{');
-  // OpenAI delta may include function name; raw envelope type=tool_call must not appear as content
+    (text.includes("get_weather") && text.includes('"arguments":{'));
   const contentJoined = d.contents.join("");
   const noRawContent =
     !contentJoined.includes('"type":"tool_call"') &&
@@ -190,8 +185,58 @@ console.log("P1018 STREAM REGRESSION — respondChatCompletionEarlySse\n");
 }
 
 function assert13(cond: boolean, meta: Record<string, unknown>) {
-  if (cond) pass("13. stream=true emulated tool_call → delta.tool_calls", meta);
+  if (cond) pass("13. stream=true native tool_call → delta.tool_calls", meta);
   else fail("13. stream tool_call", JSON.stringify(meta));
+}
+
+// ── 13b. stream emulated tool_call (gemini-3-pro) ────────────────────────
+{
+  resetScenario({
+    providers: defaultProviders(["grsai-primary"]),
+    scripts: [
+      () => ({
+        kind: "completion",
+        content: makeToolCallIntent("get_weather", { city: "Paris" }),
+      }),
+    ],
+  });
+  const res = await streamChat(
+    {
+      model: "gemini-3-pro",
+      messages: [{ role: "user", content: "weather" }],
+      tools: WEATHER_TOOLS,
+      tool_choice: "required",
+    },
+    "req_p1018_s13b"
+  );
+  const { text, events, status } = await readSse(res);
+  const d = collectDeltas(events);
+  const c = getCounts();
+  const contentJoined = d.contents.join("");
+  const noRawContent =
+    !contentJoined.includes('"type":"tool_call"') &&
+    !contentJoined.includes('"tool_calls":[');
+  if (
+    status === 200 &&
+      d.toolCallChunks.length >= 1 &&
+      d.finish === "tool_calls" &&
+      d.sawDone &&
+      noRawContent &&
+      c.debitCallCount === 1 &&
+      !d.errorCode
+  ) {
+    pass("13b. stream=true emulated tool_call → delta.tool_calls", {
+      status,
+      finish: d.finish,
+      toolCallChunks: d.toolCallChunks.length,
+      debitCallCount: c.debitCallCount,
+    });
+  } else {
+    fail(
+      "13b. stream emulated tool_call",
+      JSON.stringify({ status, d, c, text: text.slice(0, 300) })
+    );
+  }
 }
 
 // ── 14. stream assistant_text ────────────────────────────────────────────
@@ -207,7 +252,7 @@ function assert13(cond: boolean, meta: Record<string, unknown>) {
   });
   const res = await streamChat(
     {
-      model: "gpt-5.5",
+      model: "gemini-3-pro",
       messages: [{ role: "user", content: "hi" }],
       tools: WEATHER_TOOLS,
       tool_choice: "auto",
@@ -245,7 +290,7 @@ function assert13(cond: boolean, meta: Record<string, unknown>) {
   });
   const res = await streamChat(
     {
-      model: "gpt-5.5",
+      model: "gemini-3-pro",
       messages: [{ role: "user", content: "bad" }],
       tools: WEATHER_TOOLS,
       tool_choice: "required",
@@ -255,7 +300,6 @@ function assert13(cond: boolean, meta: Record<string, unknown>) {
   const { text, events, status } = await readSse(res);
   const d = collectDeltas(events);
   const c = getCounts();
-  // Failure may be SSE error envelope or JSON error depending on early-gate timing.
   const bodyHasError =
     Boolean(d.errorCode) ||
     text.includes("tool_intent_invalid_json") ||
@@ -265,7 +309,6 @@ function assert13(cond: boolean, meta: Record<string, unknown>) {
     status !== 200 || bodyHasError
       ? c.debitCallCount === 0 && !leakedRawAsContent && bodyHasError
       : false;
-  // Prefer: non-200 OR sse error; never debit; never stream bad JSON as content
   const strictOk =
     c.debitCallCount === 0 &&
     !leakedRawAsContent &&

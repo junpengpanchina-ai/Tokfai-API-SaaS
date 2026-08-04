@@ -23,6 +23,7 @@ import {
   makeAssistantTextIntent,
   makeParallelToolCallIntent,
   makeToolCallIntent,
+  nativeToolCompletion,
   resetScenario,
   type AssertMeta,
 } from "./fixtures/p1018-tool-intent-harness.mts";
@@ -118,7 +119,55 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
   );
 }
 
-// ── 2. emulated_json single tool required ────────────────────────────────
+// ── 2. gpt-5.5 native tool required ──────────────────────────────────────
+{
+  resetScenario({
+    providers: defaultProviders(["grsai-primary"]),
+    scripts: [
+      (ctx) => {
+        if (ctx.hasCompiler) {
+          return {
+            kind: "completion",
+            content: makeToolCallIntent("get_weather", { city: "Shanghai" }),
+          };
+        }
+        return nativeToolCompletion("get_weather", { city: "Shanghai" });
+      },
+    ],
+  });
+  const result = await exec(
+    {
+      model: "gpt-5.5",
+      messages: [{ role: "user", content: "weather?" }],
+      tools: WEATHER_TOOLS,
+      tool_choice: "required",
+    },
+    "req_p1018_02"
+  );
+  const meta = billingSnapshot(result);
+  const m = msg(result);
+  const tc = m?.tool_calls?.[0];
+  const argsStr = tc?.function?.arguments;
+  assert(
+    result.ok === true &&
+      meta.providerCallCount === 1 &&
+      meta.debitCallCount === 1 &&
+      meta.compilerSeenCount === 0 &&
+      (result.response?.tokfai as any)?.tool_calling_mode === "native" &&
+      Array.isArray(m?.tool_calls) &&
+      m.tool_calls.length === 1 &&
+      tc?.function?.name === "get_weather" &&
+      typeof argsStr === "string" &&
+      JSON.parse(argsStr).city === "Shanghai" &&
+      result.response.choices[0].finish_reason === "tool_calls" &&
+      (m.content === null || m.content === ""),
+    "2. gpt-5.5 native required tool_call → message.tool_calls, debit×1",
+    meta,
+    JSON.stringify({ ok: result.ok, m, finish: result.response?.choices?.[0]?.finish_reason, meta, tokfai: result.response?.tokfai })
+  );
+}
+
+// ── 2b. gemini-3-pro emulated_json single tool required ──────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -139,12 +188,12 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
   });
   const result = await exec(
     {
-      model: "gpt-5.5",
+      model: "gemini-3-pro",
       messages: [{ role: "user", content: "weather?" }],
       tools: WEATHER_TOOLS,
       tool_choice: "required",
     },
-    "req_p1018_02"
+    "req_p1018_02b"
   );
   const meta = billingSnapshot(result);
   const m = msg(result);
@@ -156,6 +205,7 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
       meta.providerCallCount === 1 &&
       meta.debitCallCount === 1 &&
       meta.compilerSeenCount >= 1 &&
+      (result.response?.tokfai as any)?.tool_calling_mode === "emulated_json" &&
       Array.isArray(m?.tool_calls) &&
       m.tool_calls.length === 1 &&
       tc?.function?.name === "get_weather" &&
@@ -165,7 +215,7 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
       (m.content === null || m.content === "") &&
       !String(m.content ?? "").includes('"type":"tool_call"') &&
       !String(m.content ?? "").includes(rawJson),
-    "2. emulated required tool_call → message.tool_calls, debit×1",
+    "2b. gemini emulated required tool_call → message.tool_calls, debit×1",
     meta,
     JSON.stringify({ ok: result.ok, m, finish: result.response?.choices?.[0]?.finish_reason, meta })
   );
@@ -184,7 +234,7 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
   });
   const result = await exec(
     {
-      model: "gpt-5.5",
+      model: "gemini-3-pro",
       messages: [{ role: "user", content: "weather only" }],
       tools: WEATHER_TOOLS,
       tool_choice: {
@@ -220,7 +270,7 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
   });
   const result = await exec(
     {
-      model: "gpt-5.5",
+      model: "gemini-3-pro",
       messages: [{ role: "user", content: "say hi" }],
       tools: WEATHER_TOOLS,
       tool_choice: "auto",
@@ -255,7 +305,7 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
   });
   const result = await exec(
     {
-      model: "gpt-5.5",
+      model: "gemini-3-pro",
       messages: [{ role: "user", content: "must tool" }],
       tools: WEATHER_TOOLS,
       tool_choice: "required",
@@ -362,7 +412,7 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
   });
   const result = await exec(
     {
-      model: "gpt-5.5",
+      model: "gemini-3-pro",
       messages: [{ role: "user", content: "bad args" }],
       tools: WEATHER_TOOLS,
       tool_choice: "required",
@@ -395,7 +445,7 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
   });
   const result = await exec(
     {
-      model: "gpt-5.5",
+      model: "gemini-3-pro",
       messages: [{ role: "user", content: "two tools" }],
       tools: WEATHER_TOOLS,
       tool_choice: "required",
@@ -420,7 +470,7 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
 // ── 10. role=tool second round ───────────────────────────────────────────
 {
   let firstToolCallId = "";
-  // Round 1
+  // Round 1 — gemini emulated
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
@@ -432,7 +482,7 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
   });
   const r1 = await exec(
     {
-      model: "gpt-5.5",
+      model: "gemini-3-pro",
       messages: [{ role: "user", content: "weather tokyo" }],
       tools: WEATHER_TOOLS,
       tool_choice: "required",
@@ -459,7 +509,7 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
   });
   const r2 = await exec(
     {
-      model: "gpt-5.5",
+      model: "gemini-3-pro",
       messages: [
         { role: "user", content: "weather tokyo" },
         {
@@ -504,16 +554,19 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
   );
 }
 
-// ── 11. auto-pro alias + provider fallback (P1019 fixed) ─────────────────
+// ── 11. auto-pro alias + provider fallback (P1020 native) ────────────────
 {
   // 11a — auto-pro + required must reach provider (no early alias reject)
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("get_weather", { city: "Seoul" }),
-      }),
+      (ctx) =>
+        ctx.hasCompiler
+          ? {
+              kind: "completion",
+              content: makeToolCallIntent("get_weather", { city: "Seoul" }),
+            }
+          : nativeToolCompletion("get_weather", { city: "Seoul" }),
     ],
   });
   const aliasResult = await exec(
@@ -532,7 +585,7 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
     aliasMeta.debitCallCount === 1 &&
     msg(aliasResult)?.tool_calls?.[0]?.function?.name === "get_weather";
 
-  // 11b — concrete model: first provider fails, second decides emulated mode
+  // 11b — concrete model: first provider fails, second decides native mode
   resetScenario({
     providers: defaultProviders([
       "grsai-primary",
@@ -548,11 +601,9 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
             message: "busy",
           };
         }
-        return {
-          kind: "completion",
-          content: makeToolCallIntent("get_weather", { city: "Seoul" }),
+        return nativeToolCompletion("get_weather", { city: "Seoul" }, {
           model: ctx.attemptModel ?? "gpt-5.5",
-        };
+        });
       },
     ],
   });
@@ -574,8 +625,8 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
       meta.fallbackCount >= 1 &&
       c.lastProviderIds.includes("openai-compatible-secondary") &&
       msg(result)?.tool_calls?.[0]?.function?.name === "get_weather" &&
-      (result.response?.tokfai as any)?.tool_calling_mode === "emulated_json",
-    "11. auto-pro required works; gpt-5.5 provider fallback mode=emulated_json debit×1",
+      (result.response?.tokfai as any)?.tool_calling_mode === "native",
+    "11. auto-pro required works; gpt-5.5 provider fallback mode=native debit×1",
     {
       ...meta,
       aliasOk,
@@ -635,10 +686,15 @@ console.log("\n── P1019 hotfix scenarios A–G ──\n");
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("get_weather", { city: "CursorCity" }),
-      }),
+      (ctx) =>
+        ctx.hasCompiler
+          ? {
+              kind: "completion",
+              content: makeToolCallIntent("get_weather", {
+                city: "CursorCity",
+              }),
+            }
+          : nativeToolCompletion("get_weather", { city: "CursorCity" }),
     ],
   });
   const result = await exec(
@@ -664,19 +720,19 @@ console.log("\n── P1019 hotfix scenarios A–G ──\n");
   );
 }
 
-// ── B. auto-pro + auto + intent → tool_calls (no degrade) ────────────────
+// ── B. auto-pro + auto + native tool_calls (no degrade) ──────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
       (ctx) => {
-        if (!ctx.hasCompiler) {
-          return { kind: "completion", content: "DEGRADED_PLAIN" };
+        if (ctx.hasCompiler) {
+          return {
+            kind: "completion",
+            content: makeToolCallIntent("get_weather", { city: "AutoCity" }),
+          };
         }
-        return {
-          kind: "completion",
-          content: makeToolCallIntent("get_weather", { city: "AutoCity" }),
-        };
+        return nativeToolCompletion("get_weather", { city: "AutoCity" });
       },
     ],
   });
@@ -693,11 +749,12 @@ console.log("\n── P1019 hotfix scenarios A–G ──\n");
   const m = msg(result);
   assert(
     result.ok === true &&
-      meta.compilerSeenCount >= 1 &&
       meta.debitCallCount === 1 &&
       Array.isArray(m?.tool_calls) &&
       m.tool_calls.length === 1 &&
-      m.content !== "DEGRADED_PLAIN",
+      m.content !== "DEGRADED_PLAIN" &&
+      ((result.response?.tokfai as any)?.tool_calling_mode === "native" ||
+        meta.compilerSeenCount >= 1),
     "B. auto-pro + auto intent → tool_calls (not degraded)",
     meta,
     JSON.stringify({ m, meta, tokfai: result.response?.tokfai })

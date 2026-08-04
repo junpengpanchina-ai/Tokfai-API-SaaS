@@ -19,6 +19,10 @@ export {
   modelHasToolCallingSupport,
   bestToolCallingModeForModel,
   resolveToolCallingAttempts,
+  canNativeEmulatedRepair,
+  listRegistryNativeModels,
+  listRegistryEmulatedModels,
+  listRegistryToolCapableModels,
   type ToolCallingMode,
 } from "./toolCallingModeRegistry.js";
 

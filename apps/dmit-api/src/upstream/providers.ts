@@ -126,6 +126,22 @@ function buildProviderRegistry(): Map<string, UpstreamProvider> {
         supportedModels: ALL_MODELS,
       },
     ],
+    // P1020 — reserved Hermes / provider-official adapter slot (disabled).
+    [
+      "hermes-official",
+      {
+        id: "hermes-official",
+        label: "Hermes Official",
+        baseUrl: "",
+        apiKey: "",
+        chatPath: "/v1/chat/completions",
+        enabled: false,
+        priority: 13,
+        weight: 0,
+        timeoutMs,
+        supportedModels: ALL_MODELS,
+      },
+    ],
   ]);
 }
 

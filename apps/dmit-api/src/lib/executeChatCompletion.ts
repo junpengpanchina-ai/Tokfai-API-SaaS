@@ -18,9 +18,11 @@ import {
   requestHasTools,
   resolveToolsCapableAttempts,
   resolveToolCallingMode,
+  canNativeEmulatedRepair,
   responseHasToolCalls,
   stripToolsFromChatBody,
   toolChoiceSummary,
+  type ToolCallingMode,
 } from "./toolCallCapability.js";
 import { compileEmulatedUpstreamBody } from "./toolIntentCompiler.js";
 import {
@@ -1172,10 +1174,10 @@ async function runProviderAttempts(args: {
 
       try {
         const hasToolsClient = requestHasTools(clientBody);
-        const toolMode =
+        const toolMode: ToolCallingMode =
           hasToolsClient && !toolsDegradedToChat
             ? resolveToolCallingMode(provider.id, attemptModel)
-            : ("unsupported" as const);
+            : "unsupported";
 
         if (
           hasToolsClient &&
@@ -1185,6 +1187,10 @@ async function runProviderAttempts(args: {
           throw toolIntentApiError(TOOL_EMULATION_UNAVAILABLE_CODE);
         }
 
+        // P1020 — active mode may switch native → emulated_json once for
+        // controlled repair; reported tool_calling_mode follows the mode that
+        // produced the final success (or the last attempt on failure).
+        let activeToolMode: ToolCallingMode = toolMode;
         let repairAttempted = false;
         let data: ChatCompletionResponse;
         let upstreamId: string | null = null;
@@ -1194,6 +1200,7 @@ async function runProviderAttempts(args: {
         let upstreamBody: Record<string, unknown> = {};
 
         // Emulated path may do one same-provider repair retry (no debit yet).
+        // Native strict may do one controlled emulated_json repair (P1020).
         // P1019 — recompute remaining budget every loop iteration (including repair).
         let lastFreshRemainingTotalMs = remainingTotalMs;
         for (;;) {
@@ -1205,7 +1212,7 @@ async function runProviderAttempts(args: {
           }
 
           upstreamBody = buildUpstreamChatBody(body, attemptModel);
-          if (toolMode === "emulated_json") {
+          if (activeToolMode === "emulated_json") {
             upstreamBody = compileEmulatedUpstreamBody(
               upstreamBody,
               clientBody as Record<string, unknown>,
@@ -1370,8 +1377,11 @@ async function runProviderAttempts(args: {
           );
           upstreamReturnedToolCalls = responseHasToolCalls(normalizedData);
 
+          const strictToolCallPending =
+            !toolsDegradedToChat && isStrictToolCallRequest(clientBody);
+
           // P1017 — emulated_json: map content → OpenAI tool_calls (or text).
-          if (toolMode === "emulated_json") {
+          if (activeToolMode === "emulated_json") {
             if (!upstreamReturnedToolCalls) {
               try {
                 const intent = parseToolIntentFromContent({
@@ -1403,6 +1413,7 @@ async function runProviderAttempts(args: {
                     providerId: provider.id,
                     attemptModel,
                     code: parseErr.code,
+                    activeToolMode,
                     freshRemainingTotalMs: Math.max(
                       0,
                       timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt)
@@ -1414,10 +1425,83 @@ async function runProviderAttempts(args: {
                 throw parseErr;
               }
             }
+            break;
+          }
+
+          // P1020 — native: accept message.tool_calls as-is when present.
+          // Strict/required with no tool_calls may do ONE controlled
+          // emulated_json repair — never fake plain text as success.
+          if (activeToolMode === "native") {
+            if (upstreamReturnedToolCalls) {
+              break;
+            }
+            if (
+              strictToolCallPending &&
+              !repairAttempted &&
+              canNativeEmulatedRepair(provider.id, attemptModel)
+            ) {
+              repairAttempted = true;
+              activeToolMode = "emulated_json";
+              log.warn("native_tool_call_emulated_repair", {
+                requestId,
+                route,
+                providerId: provider.id,
+                attemptModel,
+                reason: "native_no_tool_calls",
+                freshRemainingTotalMs: Math.max(
+                  0,
+                  timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt)
+                ),
+                billing_status: "not_billable",
+              });
+              continue;
+            }
+            if (strictToolCallPending) {
+              const guardErr = new ApiError({
+                status: 502,
+                message:
+                  "Upstream did not return tool_calls for a strict tools request.",
+                code: TOOL_CALL_NOT_GENERATED_CODE,
+                type: "upstream_error",
+                publicMessage:
+                  "模型未返回 tool_calls。请改用已验证支持 tool calling 的模型，或关闭 require_tool_call。",
+                upstreamStatus: 200,
+              });
+              log.warn("fake_tool_call_guard_triggered", {
+                requestId,
+                route,
+                requestedModel: requestedRaw,
+                resolvedModel: requestedModel,
+                attemptedModel: attemptModel,
+                attemptModel,
+                providerId: provider.id,
+                hasTools: hasToolsClient,
+                toolChoice: toolChoiceSummary(clientBody),
+                requireToolCall: clientRequiresToolCall(clientBody),
+                strictToolCall: true,
+                upstreamReturnedToolCalls: false,
+                finishReason:
+                  extractResponseFinishReason(normalizedData) ??
+                  extractFinishReason(
+                    normalizedData as unknown as ChatCompletionResponse
+                  ),
+                fakeToolCallGuard: true,
+                billing_status: "not_billable",
+                credits_charged: 0,
+                upstreamStatus: 200,
+                upstreamErrorCode: TOOL_CALL_NOT_GENERATED_CODE,
+              });
+              throw guardErr;
+            }
+            // tool_choice=auto: plain text is allowed; preserve user semantics.
+            break;
           }
 
           break;
         }
+
+        // Final reported mode is whatever produced the accepted response.
+        const reportedToolMode = activeToolMode;
 
         await recordModelSuccess(attemptModel);
         await recordProviderModelSuccess(provider.id, attemptModel);
@@ -1429,10 +1513,10 @@ async function runProviderAttempts(args: {
           extractResponseFinishReason(normalizedData) ??
           extractFinishReason(normalizedData as unknown as ChatCompletionResponse);
 
-        // P971 — native/strict guard: must not bill without tool_calls.
+        // P971 — safety net: never bill strict without tool_calls.
         // Emulated path already enforced required/forced via parser.
         if (
-          toolMode !== "emulated_json" &&
+          reportedToolMode !== "emulated_json" &&
           strictToolCall &&
           !upstreamReturnedToolCalls
         ) {
@@ -1598,7 +1682,7 @@ async function runProviderAttempts(args: {
                 ? {
                     has_tools: true,
                     strict_tool_call: strictToolCall,
-                    tool_calling_mode: toolMode,
+                    tool_calling_mode: reportedToolMode,
                     upstream_returned_tool_calls: toolsDegradedToChat
                       ? false
                       : upstreamReturnedToolCalls,

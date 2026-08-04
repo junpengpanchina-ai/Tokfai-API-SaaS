@@ -94,20 +94,31 @@ check("01_no_tools_request", () => {
   assert.equal(requestHasTools({ messages: [] }), false);
 });
 
-check("02_registry_grsai_emulated", () => {
-  assert.equal(resolveToolCallingMode("grsai-primary", "gpt-5.5"), "emulated_json");
+check("02_registry_grsai_modes", () => {
+  assert.equal(resolveToolCallingMode("grsai-primary", "gpt-5.5"), "native");
+  assert.equal(resolveToolCallingMode("grsai-primary", "gpt-5.4"), "native");
+  assert.equal(
+    resolveToolCallingMode("grsai-primary", "gemini-3-pro"),
+    "emulated_json"
+  );
   assert.equal(resolveToolCallingMode("openai-official", "gpt-5.5"), "native");
+  assert.equal(resolveToolCallingMode("hermes-official", "gpt-5.5"), "native");
   assert.equal(resolveToolCallingMode("grsai-primary", "nano-banana"), "unsupported");
   assert.equal(modelHasToolCallingSupport("gpt-5.5"), true);
+  assert.equal(modelHasToolCallingSupport("gemini-3-pro"), true);
   assert.equal(modelHasToolCallingSupport("totally-unknown-model"), false);
 });
 
 check("03_alias_not_capability_key", () => {
   // Alias ids themselves are not registry keys unless listed.
   assert.equal(resolveToolCallingMode("grsai-primary", "auto-pro"), "unsupported");
-  // Concrete model on GRSAI is emulated; best across registry prefers native slots.
-  assert.equal(resolveToolCallingMode("grsai-primary", "gpt-5.5"), "emulated_json");
+  // Concrete GPT on GRSAI is native; best across registry is also native.
+  assert.equal(resolveToolCallingMode("grsai-primary", "gpt-5.5"), "native");
   assert.equal(bestToolCallingModeForModel("gpt-5.5"), "native");
+  assert.equal(
+    resolveToolCallingMode("grsai-primary", "gemini-3-pro"),
+    "emulated_json"
+  );
 });
 
 check("04_compiler_strips_native_tools", () => {

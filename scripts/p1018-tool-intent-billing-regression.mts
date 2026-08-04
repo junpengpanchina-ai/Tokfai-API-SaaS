@@ -19,6 +19,7 @@ import {
   loadExecuteChatCompletion,
   makeAssistantTextIntent,
   makeToolCallIntent,
+  nativeToolCompletion,
   resetScenario,
 } from "./fixtures/p1018-tool-intent-harness.mts";
 
@@ -74,7 +75,7 @@ const cases: Case[] = [
     scripts: [() => ({ kind: "completion", content: "ok" })],
   },
   {
-    id: "B2_success_tool_call",
+    id: "B2_success_native_tool_call",
     expectSuccess: true,
     body: {
       model: "gpt-5.5",
@@ -82,18 +83,13 @@ const cases: Case[] = [
       tools: WEATHER_TOOLS,
       tool_choice: "required",
     },
-    scripts: [
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("get_weather", { city: "X" }),
-      }),
-    ],
+    scripts: [() => nativeToolCompletion("get_weather", { city: "X" })],
   },
   {
-    id: "B3_success_assistant_text",
+    id: "B3_success_emulated_assistant_text",
     expectSuccess: true,
     body: {
-      model: "gpt-5.5",
+      model: "gemini-3-pro",
       messages: [{ role: "user", content: "text" }],
       tools: WEATHER_TOOLS,
       tool_choice: "auto",
@@ -109,7 +105,7 @@ const cases: Case[] = [
     id: "B4_fail_required_missing",
     expectSuccess: false,
     body: {
-      model: "gpt-5.5",
+      model: "gemini-3-pro",
       messages: [{ role: "user", content: "req" }],
       tools: WEATHER_TOOLS,
       tool_choice: "required",
@@ -125,7 +121,7 @@ const cases: Case[] = [
     id: "B5_fail_invalid_json_after_repair",
     expectSuccess: false,
     body: {
-      model: "gpt-5.5",
+      model: "gemini-3-pro",
       messages: [{ role: "user", content: "bad" }],
       tools: WEATHER_TOOLS,
       tool_choice: "required",
@@ -136,7 +132,7 @@ const cases: Case[] = [
     id: "B6_fail_name_not_allowed",
     expectSuccess: false,
     body: {
-      model: "gpt-5.5",
+      model: "gemini-3-pro",
       messages: [{ role: "user", content: "forced" }],
       tools: WEATHER_TOOLS,
       tool_choice: {
@@ -152,7 +148,7 @@ const cases: Case[] = [
     ],
   },
   {
-    id: "B7_success_after_repair",
+    id: "B7_success_after_native_emulated_repair",
     expectSuccess: true,
     body: {
       model: "gpt-5.5",

@@ -294,7 +294,7 @@ section("3. Capability Registry audit");
     id: "C1_future_providers_mode_isolation",
     verdict: "SAFE",
     detail:
-      "resolveToolCallingMode(providerId, model) keys by concrete provider; disabled openai-official/azure/future slots cannot be selected by resolveProviderAttempts. Runtime mode for grsai-primary remains emulated_json.",
+      "resolveToolCallingMode(providerId, model) keys by concrete provider; disabled openai-official/azure/future/hermes slots cannot be selected by resolveProviderAttempts. Runtime: gpt-5.5/gpt-5.4=native on grsai-primary; gemini-*=emulated_json unless LIVE_VERIFIED_NATIVE.",
   });
 
   const modelHasScansAll = /for \(const \[key, mode\] of MODE_TABLE\)/.test(reg);
@@ -302,7 +302,7 @@ section("3. Capability Registry audit");
     id: "C2_modelHasToolCallingSupport_scans_registry",
     verdict: "SAFE",
     detail:
-      "Scanning full MODE_TABLE can mark a model tool-capable because future-native rows exist, but those models also have grsai emulated_json rows. It does NOT flip grsai runtime mode to native. bestToolCallingModeForModel may return native due to future rows (misleading preference only; not used for debit).",
+      "Scanning full MODE_TABLE can mark a model tool-capable because future-native rows exist. Runtime mode still comes from resolveToolCallingMode(providerId, attemptModel) only.",
   });
 
   const runtimeReResolve = execSrc.includes(

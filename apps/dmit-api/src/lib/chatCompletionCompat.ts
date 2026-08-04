@@ -379,6 +379,7 @@ export const UPSTREAM_CHAT_BODY_ALLOWLIST = [
   "stream",
   "tools",
   "tool_choice",
+  "parallel_tool_calls",
   "response_format",
   "max_tokens",
   "max_completion_tokens",
@@ -558,6 +559,10 @@ export function sanitizeUpstreamChatBody(
     upstream.tools = body.tools;
     if (body.tool_choice !== undefined && body.tool_choice !== null) {
       upstream.tool_choice = body.tool_choice;
+    }
+    // OpenAI-compatible parallel_tool_calls (Cursor Agent / GPT native path).
+    if (typeof body.parallel_tool_calls === "boolean") {
+      upstream.parallel_tool_calls = body.parallel_tool_calls;
     }
   }
 
