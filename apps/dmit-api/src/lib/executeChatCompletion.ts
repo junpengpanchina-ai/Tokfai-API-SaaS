@@ -93,7 +93,15 @@ import {
   coalesceUpstreamUsageTotal,
   estimateChatUsageFromPayload,
   shouldEstimateChatUsage,
+  type NormalizedChatUsage,
 } from "./chatUsageFallback.js";
+import {
+  cloneNormalizedUsage,
+  hasBillableUsageStage,
+  mergeNormalizedUsages,
+  type BillableUsageComponent,
+  type BillableUsageStage,
+} from "./billableUsageAggregation.js";
 import {
   isGemini25FlashNonStreamStreamFallbackPath,
   isGemini25FlashStreamFallbackEligible,
@@ -1284,6 +1292,9 @@ async function runProviderAttempts(args: {
         let autoIntentArbitrationAttempted = false;
         let autoIntentArbitrationInFlight = false;
         let savedNativeForArbitration: Record<string, unknown> | null = null;
+        // P1030 — request-scoped billable usage components for this
+        // provider/model attempt only (discarded on provider fallback throw).
+        const billableUsageComponents: BillableUsageComponent[] = [];
         // Definite assignment: loop always assigns before success path, but
         // closure-based arbitration restore is opaque to tsc control flow.
         let data = null as unknown as ChatCompletionResponse;
@@ -1292,6 +1303,30 @@ async function runProviderAttempts(args: {
         let normalizedData: Record<string, unknown> = {};
         let upstreamReturnedToolCalls = false;
         let upstreamBody: Record<string, unknown> = {};
+
+        const pushBillableUsageComponent = (
+          stage: BillableUsageStage,
+          args: {
+            dataUsage: ChatCompletionUsage | undefined;
+            requestBody: Record<string, unknown>;
+            responseBody: Record<string, unknown>;
+          }
+        ) => {
+          if (hasBillableUsageStage(billableUsageComponents, stage)) return;
+          const resolved = resolveChatAttemptUsage({
+            providerId: provider.id,
+            dataUsage: args.dataUsage,
+            requestBody: args.requestBody,
+            responseBody: args.responseBody,
+          });
+          billableUsageComponents.push({
+            stage,
+            providerId: provider.id,
+            attemptedModel: attemptModel,
+            billableModel: attemptModel,
+            usage: cloneNormalizedUsage(resolved.usage),
+          });
+        };
 
         const logAutoArbitration = (fields: {
           arbitrationResult:
@@ -1577,6 +1612,16 @@ async function runProviderAttempts(args: {
           );
           upstreamReturnedToolCalls = responseHasToolCalls(normalizedData);
 
+          // P1030 — capture arbitration HTTP 200 usage before parse/mutation.
+          // Transport/timeout failures never reach here (no forged component).
+          if (autoIntentArbitrationInFlight) {
+            pushBillableUsageComponent("auto_arbitration", {
+              dataUsage: data.usage,
+              requestBody: upstreamBody,
+              responseBody: normalizedData,
+            });
+          }
+
           const strictToolCallPending =
             !toolsDegradedToChat && isStrictToolCallRequest(clientBody);
 
@@ -1803,6 +1848,13 @@ async function runProviderAttempts(args: {
                 ),
               })
             ) {
+              // P1030 — capture Native HTTP 200 usage before arbitration
+              // overwrites `data` (value-copied; later mutation safe).
+              pushBillableUsageComponent("native", {
+                dataUsage: data.usage,
+                requestBody: upstreamBody,
+                responseBody: normalizedData,
+              });
               autoIntentArbitrationAttempted = true;
               autoIntentArbitrationInFlight = true;
               savedNativeForArbitration = structuredClone(normalizedData);
@@ -1876,49 +1928,86 @@ async function runProviderAttempts(args: {
           lastFreshRemainingTotalMs
         );
 
-        const upstreamUsage = normalizeUsage(data.usage);
-        const shouldEstimateUsage = shouldEstimateChatUsage({
-          providerId: provider.id,
-          usage: upstreamUsage,
-          responseBody: normalizedData,
-        });
-        // P998 — GRSAI all-zero usage + billable output → local UTF-8 estimate.
-        // Any positive upstream usage is trusted as-is (total may be coalesced).
-        const usage = shouldEstimateUsage
-          ? estimateChatUsageFromPayload({
-              requestBody: upstreamBody,
-              responseBody: normalizedData,
-            })
-          : coalesceUpstreamUsageTotal(upstreamUsage);
-
-        if (shouldEstimateUsage) {
-          log.warn("chat_usage_estimated", {
-            requestId,
-            route,
-            providerId: provider.id,
-            attemptedModel: attemptModel,
-            usageSource: "estimated",
-            estimationAlgorithm: CHAT_USAGE_ESTIMATION_ALGORITHM,
-            upstreamPromptTokens: upstreamUsage.promptTokens,
-            upstreamCompletionTokens: upstreamUsage.completionTokens,
-            upstreamTotalTokens: upstreamUsage.totalTokens,
-            estimatedPromptTokens: usage.promptTokens,
-            estimatedCompletionTokens: usage.completionTokens,
-            estimatedTotalTokens: usage.totalTokens,
-          });
-        }
-
         // Consumer-facing resolved id = Tokfai catalog/alias (e.g. gpt-5-pro).
         // Bill by the concrete attempt that served the request (never alias floor price).
         const resolvedModel = requestedModel;
         const billableModel = attemptModel;
-        const creditsCharged = unlimited
-          ? 0
-          : await calculateCreditsCharged(
-              billableModel,
-              usage,
-              caller.tenantId
+
+        // P1030 — single-component path keeps pre-change math; multi-component
+        // (native + auto_arbitration) prices each stage then sums once.
+        const finalUsageResolved = resolveChatAttemptUsage({
+          providerId: provider.id,
+          dataUsage: data.usage,
+          requestBody: upstreamBody,
+          responseBody: normalizedData,
+        });
+
+        let usage: NormalizedChatUsage;
+        let clientFacingUsage: NormalizedChatUsage;
+        let creditsCharged: number;
+
+        if (billableUsageComponents.length === 0) {
+          usage = finalUsageResolved.usage;
+          clientFacingUsage = usage;
+          if (finalUsageResolved.estimated) {
+            log.warn("chat_usage_estimated", {
+              requestId,
+              route,
+              providerId: provider.id,
+              attemptedModel: attemptModel,
+              usageSource: "estimated",
+              estimationAlgorithm: CHAT_USAGE_ESTIMATION_ALGORITHM,
+              upstreamPromptTokens: finalUsageResolved.upstreamUsage.promptTokens,
+              upstreamCompletionTokens:
+                finalUsageResolved.upstreamUsage.completionTokens,
+              upstreamTotalTokens: finalUsageResolved.upstreamUsage.totalTokens,
+              estimatedPromptTokens: usage.promptTokens,
+              estimatedCompletionTokens: usage.completionTokens,
+              estimatedTotalTokens: usage.totalTokens,
+            });
+          }
+          creditsCharged = unlimited
+            ? 0
+            : await calculateCreditsCharged(
+                billableModel,
+                usage,
+                caller.tenantId
+              );
+        } else {
+          usage = mergeNormalizedUsages(
+            billableUsageComponents.map((c) => c.usage)
+          );
+          // Public usage follows the accepted response body (native on restore,
+          // arbitration on accepted arb result) — not the internal cost sum.
+          if (activeToolMode === "native") {
+            const nativeComp = billableUsageComponents.find(
+              (c) => c.stage === "native"
             );
+            clientFacingUsage = nativeComp
+              ? cloneNormalizedUsage(nativeComp.usage)
+              : finalUsageResolved.usage;
+          } else {
+            const arbComp = billableUsageComponents.find(
+              (c) => c.stage === "auto_arbitration"
+            );
+            clientFacingUsage = arbComp
+              ? cloneNormalizedUsage(arbComp.usage)
+              : finalUsageResolved.usage;
+          }
+          if (unlimited) {
+            creditsCharged = 0;
+          } else {
+            let creditsSum = 0;
+            for (const component of billableUsageComponents) {
+              creditsSum += await calculateCreditsCharged(
+                component.billableModel,
+                component.usage,
+                caller.tenantId
+              );
+            }
+            creditsCharged = roundCreditAmount(creditsSum);
+          }
+        }
 
         const autoNoToolCall =
           toolsDegradedToChat ||
@@ -1981,12 +2070,15 @@ async function runProviderAttempts(args: {
           credits_charged: creditsCharged,
           request_id: requestId,
           // Always present for Agent/OpenAI clients (does not change debit math).
+          // P1030 — public usage follows accepted completion; debit/log use
+          // aggregated `usage` when native + arbitration both succeeded.
           usage: {
-            prompt_tokens: usage.promptTokens ?? 0,
-            completion_tokens: usage.completionTokens ?? 0,
+            prompt_tokens: clientFacingUsage.promptTokens ?? 0,
+            completion_tokens: clientFacingUsage.completionTokens ?? 0,
             total_tokens:
-              usage.totalTokens ??
-              (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0),
+              clientFacingUsage.totalTokens ??
+              (clientFacingUsage.promptTokens ?? 0) +
+                (clientFacingUsage.completionTokens ?? 0),
           },
           tokfai: mergeTokfaiRouting(
             {
@@ -2398,6 +2490,35 @@ function normalizeUsage(usage: ChatCompletionUsage | undefined): {
     completionTokens: toTokenCount(usage?.completion_tokens),
     totalTokens: toTokenCount(usage?.total_tokens),
   };
+}
+
+/**
+ * Resolve billable usage for one upstream HTTP 200 completion.
+ * P998 — GRSAI all-zero usage + billable output → local UTF-8 estimate.
+ */
+function resolveChatAttemptUsage(args: {
+  providerId: string;
+  dataUsage: ChatCompletionUsage | undefined;
+  requestBody: Record<string, unknown>;
+  responseBody: Record<string, unknown>;
+}): {
+  usage: NormalizedChatUsage;
+  upstreamUsage: NormalizedChatUsage;
+  estimated: boolean;
+} {
+  const upstreamUsage = normalizeUsage(args.dataUsage);
+  const estimated = shouldEstimateChatUsage({
+    providerId: args.providerId,
+    usage: upstreamUsage,
+    responseBody: args.responseBody,
+  });
+  const usage = estimated
+    ? estimateChatUsageFromPayload({
+        requestBody: args.requestBody,
+        responseBody: args.responseBody,
+      })
+    : coalesceUpstreamUsageTotal(upstreamUsage);
+  return { usage, upstreamUsage, estimated };
 }
 
 function toTokenCount(value: unknown): number | null {
