@@ -79,6 +79,53 @@ function buildProviderRegistry(): Map<string, UpstreamProvider> {
   return new Map([
     [grsaiPrimary.id, grsaiPrimary],
     [openaiCompatibleSecondary.id, openaiCompatibleSecondary],
+    // P1017 — reserved Provider slots (disabled until env/credentials exist).
+    // Capability registry already maps these ids to native for known models.
+    [
+      "openai-official",
+      {
+        id: "openai-official",
+        label: "OpenAI Official",
+        baseUrl: "",
+        apiKey: "",
+        chatPath: "/v1/chat/completions",
+        enabled: false,
+        priority: 10,
+        weight: 0,
+        timeoutMs,
+        supportedModels: ALL_MODELS,
+      },
+    ],
+    [
+      "azure-openai",
+      {
+        id: "azure-openai",
+        label: "Azure OpenAI",
+        baseUrl: "",
+        apiKey: "",
+        chatPath: "/v1/chat/completions",
+        enabled: false,
+        priority: 11,
+        weight: 0,
+        timeoutMs,
+        supportedModels: ALL_MODELS,
+      },
+    ],
+    [
+      "future-official-agent",
+      {
+        id: "future-official-agent",
+        label: "Future Official Agent",
+        baseUrl: "",
+        apiKey: "",
+        chatPath: "/v1/chat/completions",
+        enabled: false,
+        priority: 12,
+        weight: 0,
+        timeoutMs,
+        supportedModels: ALL_MODELS,
+      },
+    ],
   ]);
 }
 

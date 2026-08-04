@@ -108,6 +108,11 @@ export function isChatFallbackEligible(err: ApiError): boolean {
     // P971 — retry next alias/provider when strict tools got plain content
     "tool_call_not_generated",
     "provider_tool_call_not_supported",
+    // P1017 — emulated intent failures that may succeed on another provider
+    "tool_intent_not_generated",
+    "required_tool_call_missing",
+    "tool_emulation_unavailable",
+    "tool_intent_invalid_json",
   ].includes(code);
 }
 

@@ -9,6 +9,18 @@
 import { env } from "../env.js";
 import { normalizeClientModelId } from "../upstream/modelAliases.js";
 import { isImageModel } from "../capabilities/modelCapabilityPolicy.js";
+import {
+  modelHasToolCallingSupport,
+  resolveToolCallingAttempts,
+} from "./toolCallingModeRegistry.js";
+
+export {
+  resolveToolCallingMode,
+  modelHasToolCallingSupport,
+  bestToolCallingModeForModel,
+  resolveToolCallingAttempts,
+  type ToolCallingMode,
+} from "./toolCallingModeRegistry.js";
 
 export const MODEL_NOT_TOOL_CAPABLE_CODE = "model_not_tool_capable" as const;
 export const ALL_TOOL_UPSTREAMS_UNAVAILABLE_CODE =
@@ -22,7 +34,7 @@ export const PROVIDER_TOOL_CALL_NOT_SUPPORTED_CODE =
 export const MODEL_NOT_TOOL_CAPABLE_MESSAGE =
   "This model is not verified for tool calling on Tokfai. Choose a verified tool-capable model or remove tool_choice.";
 
-/** Preferred concrete models when falling back among *verified* tools models. */
+/** Preferred concrete models when falling back among tool-capable models. */
 export const TOOLS_CAPABLE_FALLBACK_MODELS = [
   "gpt-5.5",
   "gpt-5.4",
@@ -56,8 +68,9 @@ export function parseVerifiedToolsCapableModelIds(
 }
 
 /**
- * P974 — true only when modelId is in VERIFIED_TOOLS_CAPABLE_MODEL_IDS.
- * auto-fast / auto-pro are false unless explicitly listed.
+ * P974/P1017 — tool-capable when registry has native|emulated for the model,
+ * or (legacy) when listed in VERIFIED_TOOLS_CAPABLE_MODEL_IDS.
+ * auto-fast / auto-pro are false unless their concrete attempts are capable.
  */
 export function isVerifiedToolCapableModel(modelId: string): boolean {
   const m = normalizeClientModelId(modelId);
@@ -65,6 +78,7 @@ export function isVerifiedToolCapableModel(modelId: string): boolean {
   if (isImageModel(m) || m.startsWith("gpt-image") || m.includes("nano-banana")) {
     return false;
   }
+  if (modelHasToolCallingSupport(m)) return true;
   return parseVerifiedToolsCapableModelIds().has(m);
 }
 
@@ -200,24 +214,31 @@ export function stripToolsFromChatBody<T extends Record<string, unknown>>(
 }
 
 /**
- * Reorder attempt chain among verified tools-capable models only.
- * Returns null when no verified attempt remains (caller rejects or degrades).
+ * Reorder attempt chain among tool-capable models (registry native|emulated).
+ * Returns null when no capable attempt remains (caller rejects or degrades).
  */
 export function resolveToolsCapableAttempts(args: {
   requestedModel: string;
   attempts: string[];
 }): { attempts: string[]; supportsTools: boolean; fallbackApplied: boolean } | null {
-  const filtered = args.attempts.filter((id) => isVerifiedToolCapableModel(id));
+  const fromRegistry = resolveToolCallingAttempts(args);
+  if (fromRegistry) return fromRegistry;
+
+  // Legacy whitelist fallback when registry empty but env lists models.
+  const filtered = args.attempts.filter((id) =>
+    parseVerifiedToolsCapableModelIds().has(normalizeClientModelId(id))
+  );
   if (filtered.length > 0) {
-    const supportsRequested = isVerifiedToolCapableModel(args.requestedModel);
     return {
       attempts: filtered,
       supportsTools: true,
-      fallbackApplied: !supportsRequested || filtered[0] !== args.attempts[0],
+      fallbackApplied:
+        !parseVerifiedToolsCapableModelIds().has(
+          normalizeClientModelId(args.requestedModel)
+        ) || filtered[0] !== args.attempts[0],
     };
   }
 
-  // Do not invent unverified fallbacks — P974 whitelist only.
   const verifiedFallbacks = TOOLS_CAPABLE_FALLBACK_MODELS.filter((id) =>
     isVerifiedToolCapableModel(id)
   );

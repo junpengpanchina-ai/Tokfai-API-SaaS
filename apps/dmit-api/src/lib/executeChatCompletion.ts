@@ -17,10 +17,22 @@ import {
   normalizeToolCallsOnChatCompletion,
   requestHasTools,
   resolveToolsCapableAttempts,
+  resolveToolCallingMode,
   responseHasToolCalls,
   stripToolsFromChatBody,
   toolChoiceSummary,
 } from "./toolCallCapability.js";
+import { compileEmulatedUpstreamBody } from "./toolIntentCompiler.js";
+import {
+  applyToolIntentToChatCompletion,
+  extractAssistantContentFromCompletion,
+  parseToolIntentFromContent,
+} from "./toolIntentParser.js";
+import {
+  TOOL_EMULATION_UNAVAILABLE_CODE,
+  isToolIntentRepairableCode,
+  toolIntentApiError,
+} from "./toolIntentErrors.js";
 import { normalizeOpenAiFinishReasonOnChatCompletion } from "./openaiFinishReason.js";
 import { chatBodyKeysForLog } from "./chatCompletionDiagnostics.js";
 
@@ -195,6 +207,7 @@ export const ChatCompletionRequestSchema = z
     stop: z.unknown().optional(),
     tools: z.unknown().optional(),
     tool_choice: z.unknown().optional(),
+    parallel_tool_calls: optionalBoolean,
     response_format: z.unknown().optional(),
     metadata: z.unknown().optional(),
     user: z.preprocess(
@@ -1180,163 +1193,233 @@ async function runProviderAttempts(args: {
       }
 
       try {
-        const upstreamBody = buildUpstreamChatBody(body, attemptModel);
-        if (attemptIndex === 0) {
-          const droppedKeys = droppedUpstreamChatKeysForAudit(
-            clientBody as Record<string, unknown>
-          );
-          if (droppedKeys.length > 0) {
-            log.info("upstream_chat_body_keys_dropped", {
-              requestId,
-              route,
-              // Names only — never log client field values.
-              droppedKeys: droppedKeys.slice(0, 40),
-              droppedKeyCount: droppedKeys.length,
-            });
-          }
+        const hasToolsClient = requestHasTools(clientBody);
+        const toolMode =
+          hasToolsClient && !toolsDegradedToChat
+            ? resolveToolCallingMode(provider.id, attemptModel)
+            : ("unsupported" as const);
+
+        if (
+          hasToolsClient &&
+          !toolsDegradedToChat &&
+          toolMode === "unsupported"
+        ) {
+          throw toolIntentApiError(TOOL_EMULATION_UNAVAILABLE_CODE);
         }
 
-        const perAttemptTimeoutMs = Math.min(
-          timeoutPolicy.upstreamTimeoutMs,
-          remainingTotalMs
-        );
-
-        const useGemini25FlashStreamFallback =
-          isGemini25FlashNonStreamStreamFallbackPath({
-            clientStream,
-            attemptModel,
-            requestedModel,
-            route,
-          });
-
-        // Idle timeout applies only to real client-stream SSE paths that do
-        // not use the gemini-2.5-flash native-first helper below.
-        const idleTimeoutMs =
-          clientStream && !useGemini25FlashStreamFallback
-            ? Math.min(timeoutPolicy.idleTimeoutMs, remainingTotalMs)
-            : undefined;
-
-        const logCtx = {
-          requestId,
-          route,
-          model: attemptModel,
-          requestedModel,
-          resolvedModel: requestedModel,
-          providerId: provider.id,
-        };
-
+        let repairAttempted = false;
         let data: ChatCompletionResponse;
-        let upstreamId: string | null;
+        let upstreamId: string | null = null;
         let viaStreamFallback = false;
+        let normalizedData: Record<string, unknown>;
+        let upstreamReturnedToolCalls = false;
+        let upstreamBody: Record<string, unknown> = {};
 
-        if (useGemini25FlashStreamFallback) {
-          // Non-stream client requests: ALWAYS prefer native non-stream with
-          // the full attempt budget. Never default to stream assemble.
-          // Client stream=true: short native probe; if non-stream circuit is
-          // already open, treat native as unavailable → assemble fallback.
-          const remainingMs =
-            timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt);
-          if (remainingMs <= 5_000 && allDegraded && clientStream) {
-            throw ApiError.requestTimeout(
-              "Upstream provider timed out.",
-              "上游模型响应超时，请稍后重试或切换模型。"
+        // Emulated path may do one same-provider repair retry (no debit yet).
+        for (;;) {
+          upstreamBody = buildUpstreamChatBody(body, attemptModel);
+          if (toolMode === "emulated_json") {
+            upstreamBody = compileEmulatedUpstreamBody(
+              upstreamBody,
+              clientBody as Record<string, unknown>,
+              { repair: repairAttempted }
             );
           }
-          const streamWallMs = Math.max(5_000, remainingMs);
-          const streamIdleMs = Math.min(
-            timeoutPolicy.idleTimeoutMs,
-            streamWallMs
-          );
-          const nativeTimeoutMs = clientStream
-            ? Math.min(20_000, perAttemptTimeoutMs)
-            : perAttemptTimeoutMs;
-          // Client stream=false must never skip native due to circuit alone.
-          const nativeNonStreamAvailable = !(allDegraded && clientStream);
 
-          log.info("chat_gemini25_flash_prefer_native_nonstream", {
+          if (attemptIndex === 0 && !repairAttempted) {
+            const droppedKeys = droppedUpstreamChatKeysForAudit(
+              clientBody as Record<string, unknown>
+            );
+            if (droppedKeys.length > 0) {
+              log.info("upstream_chat_body_keys_dropped", {
+                requestId,
+                route,
+                droppedKeys: droppedKeys.slice(0, 40),
+                droppedKeyCount: droppedKeys.length,
+              });
+            }
+          }
+
+          const perAttemptTimeoutMs = Math.min(
+            timeoutPolicy.upstreamTimeoutMs,
+            remainingTotalMs
+          );
+
+          const useGemini25FlashStreamFallback =
+            isGemini25FlashNonStreamStreamFallbackPath({
+              clientStream,
+              attemptModel,
+              requestedModel,
+              route,
+            });
+
+          const idleTimeoutMs =
+            clientStream && !useGemini25FlashStreamFallback
+              ? Math.min(timeoutPolicy.idleTimeoutMs, remainingTotalMs)
+              : undefined;
+
+          const logCtx = {
             requestId,
             route,
+            model: attemptModel,
             requestedModel,
-            attemptModel,
+            resolvedModel: requestedModel,
             providerId: provider.id,
-            clientStream,
-            nativeNonStreamAvailable,
-            nativeTimeoutMs,
-            streamWallMs,
-            streamIdleMs,
-            billing_status: "not_billable",
-          });
+          };
 
-          const fetched =
-            await providerFetchChatPreferNativeNonStream<ChatCompletionResponse>(
-              provider,
-              provider.chatPath,
-              {
-                method: "POST",
-                json: upstreamBody,
-                timeoutMs: nativeTimeoutMs,
-                nativeNonStreamAvailable,
-                allowStreamAssembleFallback: true,
-                isStreamAssembleEligible: isGemini25FlashStreamFallbackEligible,
-                streamAssembleTimeoutMs: streamWallMs,
-                streamAssembleIdleTimeoutMs: streamIdleMs,
-              },
-              logCtx
+          if (useGemini25FlashStreamFallback) {
+            const remainingMs =
+              timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt);
+            if (remainingMs <= 5_000 && allDegraded && clientStream) {
+              throw ApiError.requestTimeout(
+                "Upstream provider timed out.",
+                "上游模型响应超时，请稍后重试或切换模型。"
+              );
+            }
+            const streamWallMs = Math.max(5_000, remainingMs);
+            const streamIdleMs = Math.min(
+              timeoutPolicy.idleTimeoutMs,
+              streamWallMs
             );
-          if (fetched.viaStreamAssemble) {
-            log.warn("chat_gemini25_flash_nonstream_stream_fallback", {
+            const nativeTimeoutMs = clientStream
+              ? Math.min(20_000, perAttemptTimeoutMs)
+              : perAttemptTimeoutMs;
+            const nativeNonStreamAvailable = !(allDegraded && clientStream);
+
+            log.info("chat_gemini25_flash_prefer_native_nonstream", {
               requestId,
               route,
               requestedModel,
               attemptModel,
               providerId: provider.id,
-              reason: nativeNonStreamAvailable
-                ? "native_nonstream_failed"
-                : "native_nonstream_unavailable",
               clientStream,
-              billing_status: "not_billable",
-              remainingMs,
+              nativeNonStreamAvailable,
+              nativeTimeoutMs,
               streamWallMs,
               streamIdleMs,
+              billing_status: "not_billable",
             });
+
+            const fetched =
+              await providerFetchChatPreferNativeNonStream<ChatCompletionResponse>(
+                provider,
+                provider.chatPath,
+                {
+                  method: "POST",
+                  json: upstreamBody,
+                  timeoutMs: nativeTimeoutMs,
+                  nativeNonStreamAvailable,
+                  allowStreamAssembleFallback: true,
+                  isStreamAssembleEligible:
+                    isGemini25FlashStreamFallbackEligible,
+                  streamAssembleTimeoutMs: streamWallMs,
+                  streamAssembleIdleTimeoutMs: streamIdleMs,
+                },
+                logCtx
+              );
+            if (fetched.viaStreamAssemble) {
+              log.warn("chat_gemini25_flash_nonstream_stream_fallback", {
+                requestId,
+                route,
+                requestedModel,
+                attemptModel,
+                providerId: provider.id,
+                reason: nativeNonStreamAvailable
+                  ? "native_nonstream_failed"
+                  : "native_nonstream_unavailable",
+                clientStream,
+                billing_status: "not_billable",
+                remainingMs,
+                streamWallMs,
+                streamIdleMs,
+              });
+            }
+            data = fetched.data;
+            upstreamId = fetched.upstreamId;
+            viaStreamFallback = fetched.viaStreamAssemble;
+          } else {
+            const fetched = await providerFetch<ChatCompletionResponse>(
+              provider,
+              provider.chatPath,
+              {
+                method: "POST",
+                json: upstreamBody,
+                timeoutMs: perAttemptTimeoutMs,
+                ...(idleTimeoutMs != null ? { idleTimeoutMs } : {}),
+              },
+              logCtx
+            );
+            data = fetched.data;
+            upstreamId = fetched.upstreamId;
           }
-          data = fetched.data;
-          upstreamId = fetched.upstreamId;
-          viaStreamFallback = fetched.viaStreamAssemble;
-        } else {
-          const fetched = await providerFetch<ChatCompletionResponse>(
-            provider,
-            provider.chatPath,
-            {
-              method: "POST",
-              json: upstreamBody,
-              timeoutMs: perAttemptTimeoutMs,
-              ...(idleTimeoutMs != null ? { idleTimeoutMs } : {}),
-            },
-            logCtx
+
+          normalizedData = normalizeToolCallsOnChatCompletion(
+            data as unknown as Record<string, unknown>
           );
-          data = fetched.data;
-          upstreamId = fetched.upstreamId;
+          upstreamReturnedToolCalls = responseHasToolCalls(normalizedData);
+
+          // P1017 — emulated_json: map content → OpenAI tool_calls (or text).
+          if (toolMode === "emulated_json") {
+            if (!upstreamReturnedToolCalls) {
+              try {
+                const intent = parseToolIntentFromContent({
+                  content: extractAssistantContentFromCompletion(normalizedData),
+                  clientTools: (clientBody as { tools?: unknown }).tools,
+                  toolChoice: (clientBody as { tool_choice?: unknown })
+                    .tool_choice,
+                  parallelToolCalls: (clientBody as {
+                    parallel_tool_calls?: unknown;
+                  }).parallel_tool_calls,
+                });
+                normalizedData = applyToolIntentToChatCompletion(
+                  normalizedData,
+                  intent
+                );
+                normalizedData =
+                  normalizeToolCallsOnChatCompletion(normalizedData);
+                upstreamReturnedToolCalls = responseHasToolCalls(normalizedData);
+              } catch (parseErr) {
+                if (
+                  parseErr instanceof ApiError &&
+                  !repairAttempted &&
+                  isToolIntentRepairableCode(parseErr.code)
+                ) {
+                  repairAttempted = true;
+                  log.warn("tool_intent_repair_retry", {
+                    requestId,
+                    route,
+                    providerId: provider.id,
+                    attemptModel,
+                    code: parseErr.code,
+                    billing_status: "not_billable",
+                  });
+                  continue;
+                }
+                throw parseErr;
+              }
+            }
+          }
+
+          break;
         }
 
         await recordModelSuccess(attemptModel);
         await recordProviderModelSuccess(provider.id, attemptModel);
 
-        const normalizedData = normalizeToolCallsOnChatCompletion(
-          data as unknown as Record<string, unknown>
-        );
-
-        const hasToolsClient = requestHasTools(clientBody);
         const strictToolCall =
           !toolsDegradedToChat && isStrictToolCallRequest(clientBody);
         const requireToolCall = clientRequiresToolCall(clientBody);
-        const upstreamReturnedToolCalls = responseHasToolCalls(normalizedData);
         const finishReasonRaw =
           extractResponseFinishReason(normalizedData) ??
           extractFinishReason(normalizedData as unknown as ChatCompletionResponse);
 
-        // P971 — fake tool-call guard: strict request without tool_calls must not bill.
-        if (strictToolCall && !upstreamReturnedToolCalls) {
+        // P971 — native/strict guard: must not bill without tool_calls.
+        // Emulated path already enforced required/forced via parser.
+        if (
+          toolMode !== "emulated_json" &&
+          strictToolCall &&
+          !upstreamReturnedToolCalls
+        ) {
           const guardErr = new ApiError({
             status: 502,
             message:
@@ -1367,9 +1450,14 @@ async function runProviderAttempts(args: {
             upstreamStatus: 200,
             upstreamErrorCode: TOOL_CALL_NOT_GENERATED_CODE,
           });
-          // Do not debit; treat as attempt failure so alias chains can retry.
           throw guardErr;
         }
+
+        // Keep a local alias used by later logging that expected the old name.
+        const perAttemptTimeoutMs = Math.min(
+          timeoutPolicy.upstreamTimeoutMs,
+          remainingTotalMs
+        );
 
         const upstreamUsage = normalizeUsage(data.usage);
         const shouldEstimateUsage = shouldEstimateChatUsage({
@@ -1494,6 +1582,7 @@ async function runProviderAttempts(args: {
                 ? {
                     has_tools: true,
                     strict_tool_call: strictToolCall,
+                    tool_calling_mode: toolMode,
                     upstream_returned_tool_calls: toolsDegradedToChat
                       ? false
                       : upstreamReturnedToolCalls,

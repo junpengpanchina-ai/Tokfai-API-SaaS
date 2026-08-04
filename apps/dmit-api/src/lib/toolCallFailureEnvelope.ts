@@ -15,17 +15,20 @@ import {
   TOOL_CALL_NOT_GENERATED_CODE,
   TOOL_CALL_NOT_SUPPORTED_CODE,
 } from "./toolCallCapability.js";
+import { TOOL_INTENT_ERROR_CODES } from "./toolIntentErrors.js";
 import { safeInvalidRequestMessage } from "./chatCompletionDiagnostics.js";
 
 const FORCED_TOOL_FAILURE_CODES = new Set<string>([
   TOOL_CALL_NOT_GENERATED_CODE,
   PROVIDER_TOOL_CALL_NOT_SUPPORTED_CODE,
+  ...TOOL_INTENT_ERROR_CODES,
 ]);
 
 const TOOL_ROUTING_GUARD_CODES = new Set<string>([
   MODEL_NOT_TOOL_CAPABLE_CODE,
   TOOL_CALL_NOT_SUPPORTED_CODE,
   ALL_TOOL_UPSTREAMS_UNAVAILABLE_CODE,
+  "tool_emulation_unavailable",
 ]);
 
 /** HTTP statuses allowed for non-stream tool-guard failure JSON. */
