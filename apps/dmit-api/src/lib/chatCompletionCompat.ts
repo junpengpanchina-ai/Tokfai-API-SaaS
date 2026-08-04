@@ -5,7 +5,10 @@
  * - Never forward unknown / vendor-incompatible fields upstream
  * - Strip GPT-rejected sampling params so upstream 400s do not leak
  * - Pre-schema client-body sanitize for Cherry Studio malformed payloads
+ * - P1027: normalize oversize tool call ids on the upstream copy only
  */
+
+import { normalizeToolCallIdsInUpstreamMessages } from "./upstreamToolCallId.js";
 
 export type NormalizedChatMessage = {
   role: string;
@@ -514,10 +517,15 @@ export function sanitizeUpstreamChatBody(
     return { ok: false, message: normalized.message, droppedKeys };
   }
 
+  // P1027 — provider-boundary call_id clamp (client body untouched).
+  const upstreamMessages = normalizeToolCallIdsInUpstreamMessages(
+    normalized.messages
+  );
+
   // Start from an empty object — never Object.assign / spread the client body.
   const upstream: Record<string, unknown> = {
     model,
-    messages: normalized.messages,
+    messages: upstreamMessages,
     stream: false,
   };
 
@@ -554,7 +562,9 @@ export function sanitizeUpstreamChatBody(
   }
 
   // Non-empty tools only — empty tools:[] from Cherry must not be forwarded.
-  // tool_choice: null / undefined is never forwarded (upstream rejects null).
+  // P1027: tool_choice null / undefined ≡ OpenAI "auto" — keep tools, omit
+  // tool_choice (upstream rejects explicit null). Never strip tools solely
+  // because tool_choice is missing.
   if (Array.isArray(body.tools) && body.tools.length > 0) {
     upstream.tools = body.tools;
     if (body.tool_choice !== undefined && body.tool_choice !== null) {

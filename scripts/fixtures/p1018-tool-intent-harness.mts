@@ -68,11 +68,15 @@ export type Counts = {
   lastDebitEntry: Record<string, unknown> | null;
   /** timeoutMs passed into each providerFetch call (P1019 budget proof). */
   fetchTimeoutMs: number[];
-  /** Shallow outbound json snapshots per providerFetch (P1024 adapter proof). */
+  /** Shallow outbound json snapshots per providerFetch (P1024/P1027 proof). */
   outboundBodies: Array<{
     providerId: string;
     tool_choice: unknown;
     toolNames: string[];
+    /** True when outbound json includes a non-empty tools array. */
+    hasTools: boolean;
+    parallel_tool_calls: unknown;
+    messages: unknown[];
   }>;
 };
 
@@ -142,6 +146,9 @@ export function getCounts(): Counts {
     outboundBodies: counts.outboundBodies.map((b) => ({
       ...b,
       toolNames: [...b.toolNames],
+      messages: Array.isArray(b.messages)
+        ? (JSON.parse(JSON.stringify(b.messages)) as unknown[])
+        : [],
     })),
   };
 }
@@ -465,6 +472,11 @@ export async function installP1018Mocks(): Promise<void> {
           providerId: provider.id,
           tool_choice: json.tool_choice ?? null,
           toolNames,
+          hasTools: Array.isArray(json.tools) && json.tools.length > 0,
+          parallel_tool_calls: json.parallel_tool_calls ?? null,
+          messages: Array.isArray(json.messages)
+            ? (JSON.parse(JSON.stringify(json.messages)) as unknown[])
+            : [],
         });
 
         const script =

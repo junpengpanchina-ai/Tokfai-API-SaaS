@@ -86,10 +86,30 @@ export function isVerifiedToolCapableModel(modelId: string): boolean {
   return parseVerifiedToolsCapableModelIds().has(m);
 }
 
+/** True when the client sent a non-empty tools array (Cursor Agent signal). */
+export function requestHasNonEmptyTools(body: unknown): boolean {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return false;
+  const tools = (body as Record<string, unknown>).tools;
+  return Array.isArray(tools) && tools.length > 0;
+}
+
+/**
+ * P1027 — missing / null tool_choice with tools present ≡ OpenAI "auto".
+ * Never treat null/undefined as "tools not requested".
+ */
+export function effectiveToolChoice(body: unknown): unknown {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return undefined;
+  const choice = (body as Record<string, unknown>).tool_choice;
+  if (choice === undefined || choice === null) {
+    return requestHasNonEmptyTools(body) ? "auto" : undefined;
+  }
+  return choice;
+}
+
 export function requestHasTools(body: unknown): boolean {
   if (!body || typeof body !== "object" || Array.isArray(body)) return false;
   const record = body as Record<string, unknown>;
-  if (Array.isArray(record.tools) && record.tools.length > 0) return true;
+  if (requestHasNonEmptyTools(record)) return true;
   if (record.tool_choice != null && record.tool_choice !== "none") return true;
   return false;
 }
@@ -239,13 +259,11 @@ export function resolveToolsCapableAttempts(args: {
     parseVerifiedToolsCapableModelIds().has(normalizeClientModelId(id))
   );
   if (filtered.length > 0) {
+    // P1027 — same as registry: reorder/drop only, not "requested id unverified".
     return {
       attempts: filtered,
       supportsTools: true,
-      fallbackApplied:
-        !parseVerifiedToolsCapableModelIds().has(
-          normalizeClientModelId(args.requestedModel)
-        ) || filtered[0] !== args.attempts[0],
+      fallbackApplied: filtered[0] !== args.attempts[0],
     };
   }
 

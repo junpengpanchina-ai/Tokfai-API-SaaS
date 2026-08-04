@@ -16,6 +16,7 @@ import {
   modelSupportsTools,
   normalizeToolCallsOnChatCompletion,
   requestHasTools,
+  requestHasNonEmptyTools,
   resolveToolsCapableAttempts,
   resolveToolCallingMode,
   canNativeEmulatedRepair,
@@ -566,11 +567,15 @@ export async function executeChatCompletion(
     return failureResult(err, requestId, requestedModel, routing);
   }
 
-  // P974/P1019 — tools routing.
+  // P974/P1019/P1027 — tools routing.
   // Alias (auto-pro / gpt-5-pro / …): capability is decided by concrete
   // attempts via resolveToolsCapableAttempts — never by alias id alone.
   // Direct models keep an explicit verifiedRequested gate.
+  // P1027: non-empty tools ⇒ supportsToolsRequested=true; missing/null
+  // tool_choice ≡ auto (not "tools not requested"); do not strip tools
+  // solely because tool_choice is absent.
   const hasTools = requestHasTools(body);
+  const supportsToolsRequested = requestHasNonEmptyTools(body);
   const strictToolCallRequest = isStrictToolCallRequest(body);
   const verifiedRequested =
     isVerifiedToolCapableModel(requestedRaw) ||
@@ -628,6 +633,7 @@ export async function executeChatCompletion(
         ),
         supportsTools: false,
         hasTools: true,
+        supportsToolsRequested,
         toolChoice: toolChoiceSummary(body),
         requireToolCall: clientRequiresToolCall(body),
         strictToolCall: true,
@@ -670,7 +676,8 @@ export async function executeChatCompletion(
     }
 
     if (!strictToolCallRequest && !concreteToolAttemptsAvailable) {
-      // tool_choice:auto with no concrete capable attempt → ordinary chat.
+      // tool_choice:auto (incl. missing/null) with no concrete capable
+      // attempt → ordinary chat. Unsupported/image keep this degrade path.
       toolsDegradedToChat = true;
       upstreamBodySource = stripToolsFromChatBody(
         body as Record<string, unknown>
@@ -681,6 +688,7 @@ export async function executeChatCompletion(
         requestedModel: requestedRaw,
         resolvedModel: requestedModel,
         hasTools: true,
+        supportsToolsRequested,
         toolChoice: toolChoiceSummary(body),
         autoNoToolCall: true,
         supportsTools: false,
@@ -697,7 +705,7 @@ export async function executeChatCompletion(
         resolvedModel: requestedModel,
         attemptedModel: attempts[0] ?? null,
         supportsTools: toolsResolved.supportsTools,
-        supportsToolsRequested: verifiedRequested,
+        supportsToolsRequested,
         hasTools: true,
         toolChoice: toolChoiceSummary(body),
         bodyKeys: chatBodyKeysForLog(body),
@@ -713,6 +721,7 @@ export async function executeChatCompletion(
       requestedModel: requestedRaw,
       resolvedModel: requestedModel,
       supportsTools: verifiedRequested,
+      supportsToolsRequested: false,
       hasTools: false,
       toolChoice: toolChoiceSummary(body),
       bodyKeys: chatBodyKeysForLog(body),
@@ -926,6 +935,8 @@ export async function executeChatCompletion(
         body: upstreamBodySource,
         clientBody: body,
         toolsDegradedToChat,
+        toolsFallbackApplied,
+        supportsToolsRequested,
         forcedToolName,
         requestedRaw,
         requestedModel,
@@ -1043,6 +1054,10 @@ async function runProviderAttempts(args: {
   /** Original client body (for tools / guard logging). */
   clientBody: ChatCompletionRequestBody;
   toolsDegradedToChat: boolean;
+  /** P1027 — true only when the capable attempt chain was reordered/injected. */
+  toolsFallbackApplied: boolean;
+  /** P1027 — true when client sent a non-empty tools array. */
+  supportsToolsRequested: boolean;
   /** Client object tool_choice forced function name (P1024), or null. */
   forcedToolName: string | null;
   requestedRaw: string;
@@ -1063,6 +1078,8 @@ async function runProviderAttempts(args: {
     body,
     clientBody,
     toolsDegradedToChat,
+    toolsFallbackApplied,
+    supportsToolsRequested,
     forcedToolName,
     requestedRaw,
     requestedModel,
@@ -1814,6 +1831,8 @@ async function runProviderAttempts(args: {
               ...(hasToolsClient
                 ? {
                     has_tools: true,
+                    supports_tools_requested: supportsToolsRequested,
+                    tools_fallback_applied: toolsFallbackApplied,
                     strict_tool_call: strictToolCall,
                     tool_calling_mode: reportedToolMode,
                     upstream_returned_tool_calls: toolsDegradedToChat

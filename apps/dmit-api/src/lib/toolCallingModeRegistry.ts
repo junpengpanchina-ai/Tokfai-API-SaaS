@@ -177,12 +177,14 @@ export function resolveToolCallingAttempts(args: {
 } | null {
   const filtered = args.attempts.filter((id) => modelHasToolCallingSupport(id));
   if (filtered.length > 0) {
-    const supportsRequested = modelHasToolCallingSupport(args.requestedModel);
+    // P1027 — fallbackApplied only when the concrete attempt chain actually
+    // changes (reorder / drop). Alias ids (e.g. gpt-5) are not themselves in
+    // the registry; using the first capable member of the planned chain is
+    // NOT a tools fallback.
     return {
       attempts: filtered,
       supportsTools: true,
-      fallbackApplied:
-        !supportsRequested || filtered[0] !== args.attempts[0],
+      fallbackApplied: filtered[0] !== args.attempts[0],
     };
   }
 
