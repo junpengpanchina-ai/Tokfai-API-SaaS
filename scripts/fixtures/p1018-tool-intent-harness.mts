@@ -68,6 +68,12 @@ export type Counts = {
   lastDebitEntry: Record<string, unknown> | null;
   /** timeoutMs passed into each providerFetch call (P1019 budget proof). */
   fetchTimeoutMs: number[];
+  /** Shallow outbound json snapshots per providerFetch (P1024 adapter proof). */
+  outboundBodies: Array<{
+    providerId: string;
+    tool_choice: unknown;
+    toolNames: string[];
+  }>;
 };
 
 export type ProviderReply =
@@ -124,6 +130,7 @@ export function freshCounts(): Counts {
     lastProviderIds: [],
     lastDebitEntry: null,
     fetchTimeoutMs: [],
+    outboundBodies: [],
   };
 }
 
@@ -132,6 +139,10 @@ export function getCounts(): Counts {
     ...counts,
     lastProviderIds: [...counts.lastProviderIds],
     fetchTimeoutMs: [...counts.fetchTimeoutMs],
+    outboundBodies: counts.outboundBodies.map((b) => ({
+      ...b,
+      toolNames: [...b.toolNames],
+    })),
   };
 }
 
@@ -437,6 +448,24 @@ export async function installP1018Mocks(): Promise<void> {
         const isRepair = flat.includes(REPAIR_MARKER);
         if (hasCompiler) counts.compilerSeenCount += 1;
         if (isRepair) counts.repairCallCount += 1;
+
+        const toolNames: string[] = [];
+        if (Array.isArray(json.tools)) {
+          for (const row of json.tools) {
+            if (!row || typeof row !== "object") continue;
+            const rec = row as Record<string, unknown>;
+            const fn =
+              rec.function && typeof rec.function === "object"
+                ? (rec.function as Record<string, unknown>)
+                : rec;
+            if (typeof fn.name === "string") toolNames.push(fn.name);
+          }
+        }
+        counts.outboundBodies.push({
+          providerId: provider.id,
+          tool_choice: json.tool_choice ?? null,
+          toolNames,
+        });
 
         const script =
           providerScripts[providerScriptIndex] ??

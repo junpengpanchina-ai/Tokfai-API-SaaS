@@ -32,9 +32,17 @@ import {
 } from "./toolIntentParser.js";
 import {
   TOOL_EMULATION_UNAVAILABLE_CODE,
+  TOOL_NAME_NOT_ALLOWED_CODE,
   isToolIntentRepairableCode,
   toolIntentApiError,
 } from "./toolIntentErrors.js";
+import {
+  adaptGrsaiNativeForcedToolChoiceBody,
+  assertNativeForcedToolCallsMatch,
+  forcedToolChoiceClientError,
+  resolveForcedToolChoice,
+  shouldAdaptGrsaiNativeObjectToolChoice,
+} from "./grsaiNativeToolChoiceAdapter.js";
 import { normalizeOpenAiFinishReasonOnChatCompletion } from "./openaiFinishReason.js";
 import { chatBodyKeysForLog } from "./chatCompletionDiagnostics.js";
 
@@ -721,6 +729,62 @@ export async function executeChatCompletion(
     });
   }
 
+  // P1024 — validate object tool_choice before any provider call.
+  let forcedToolName: string | null = null;
+  if (hasTools && !toolsDegradedToChat) {
+    const forced = resolveForcedToolChoice({
+      toolChoice: body.tool_choice,
+      tools: body.tools,
+    });
+    if (forced.kind === "invalid") {
+      const err = forcedToolChoiceClientError(forced.reason);
+      const errorCode = err.code ?? TOOL_NAME_NOT_ALLOWED_CODE;
+      const errorMessage = err.publicMessage;
+      const routing = makeFailRouting({
+        errorCode,
+        attemptedModels: attempts,
+        fallbackReason: "invalid_tool_choice",
+      });
+      log.warn("forced_tool_choice_invalid", {
+        requestId,
+        route,
+        reason: forced.reason,
+        code: errorCode,
+        billing_status: "not_billable",
+        credits_charged: 0,
+      });
+      await writeUsageLog(
+        failedUsageLog({
+          user_id: caller.userId,
+          api_key_id: caller.apiKeyId,
+          tenant_id: caller.tenantId,
+          model: requestedRaw,
+          status: "failed",
+          request_id: requestId,
+          error_code: errorCode,
+          error_message: errorMessage,
+          latency_ms: Date.now() - startedAt,
+          billing_status: "not_billable",
+          billable: false,
+          credits_charged: 0,
+        }),
+        route,
+        routingEvidenceSnapshot(routing)
+      );
+      return {
+        ok: false,
+        errorCode,
+        errorMessage,
+        requestId,
+        httpStatus: err.status,
+        routing,
+      };
+    }
+    if (forced.kind === "forced") {
+      forcedToolName = forced.name;
+    }
+  }
+
   if (input.idempotencyKey && caller.apiKeyId) {
     const replay = await lookupBillingIdempotency({
       apiKeyId: caller.apiKeyId,
@@ -862,6 +926,7 @@ export async function executeChatCompletion(
         body: upstreamBodySource,
         clientBody: body,
         toolsDegradedToChat,
+        forcedToolName,
         requestedRaw,
         requestedModel,
         isAlias,
@@ -978,6 +1043,8 @@ async function runProviderAttempts(args: {
   /** Original client body (for tools / guard logging). */
   clientBody: ChatCompletionRequestBody;
   toolsDegradedToChat: boolean;
+  /** Client object tool_choice forced function name (P1024), or null. */
+  forcedToolName: string | null;
   requestedRaw: string;
   requestedModel: string;
   isAlias: boolean;
@@ -996,6 +1063,7 @@ async function runProviderAttempts(args: {
     body,
     clientBody,
     toolsDegradedToChat,
+    forcedToolName,
     requestedRaw,
     requestedModel,
     isAlias,
@@ -1218,6 +1286,28 @@ async function runProviderAttempts(args: {
               clientBody as Record<string, unknown>,
               { repair: repairAttempted }
             );
+          } else if (
+            shouldAdaptGrsaiNativeObjectToolChoice({
+              providerId: provider.id,
+              toolCallingMode: activeToolMode,
+              forcedToolName,
+            })
+          ) {
+            // P1024 — GRSAI rejects object tool_choice; adapt a copy only.
+            const adapted = adaptGrsaiNativeForcedToolChoiceBody(
+              upstreamBody,
+              forcedToolName!
+            );
+            upstreamBody = adapted.body;
+            log.info("grsai_native_tool_choice_object_adapted", {
+              requestId,
+              route,
+              providerId: provider.id,
+              attemptModel,
+              toolChoiceObjectAdapted: true,
+              forcedToolName: adapted.forcedToolName,
+              outboundToolCount: adapted.outboundToolCount,
+            });
           }
 
           if (attemptIndex === 0 && !repairAttempted) {
@@ -1431,8 +1521,44 @@ async function runProviderAttempts(args: {
           // P1020 — native: accept message.tool_calls as-is when present.
           // Strict/required with no tool_calls may do ONE controlled
           // emulated_json repair — never fake plain text as success.
+          // P1024 — when forcedToolName is set, all tool_call names must match.
           if (activeToolMode === "native") {
             if (upstreamReturnedToolCalls) {
+              if (forcedToolName) {
+                try {
+                  assertNativeForcedToolCallsMatch({
+                    data: normalizedData,
+                    forcedToolName,
+                    parallelToolCalls: (
+                      clientBody as { parallel_tool_calls?: unknown }
+                    ).parallel_tool_calls,
+                  });
+                } catch (matchErr) {
+                  if (
+                    matchErr instanceof ApiError &&
+                    !repairAttempted &&
+                    canNativeEmulatedRepair(provider.id, attemptModel)
+                  ) {
+                    repairAttempted = true;
+                    activeToolMode = "emulated_json";
+                    log.warn("native_tool_call_emulated_repair", {
+                      requestId,
+                      route,
+                      providerId: provider.id,
+                      attemptModel,
+                      reason: "forced_tool_name_mismatch",
+                      forcedToolName,
+                      freshRemainingTotalMs: Math.max(
+                        0,
+                        timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt)
+                      ),
+                      billing_status: "not_billable",
+                    });
+                    continue;
+                  }
+                  throw matchErr;
+                }
+              }
               break;
             }
             if (
