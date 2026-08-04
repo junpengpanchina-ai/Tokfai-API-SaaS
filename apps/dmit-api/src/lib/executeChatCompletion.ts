@@ -1482,6 +1482,13 @@ async function runProviderAttempts(args: {
                   parallelToolCalls: (clientBody as {
                     parallel_tool_calls?: unknown;
                   }).parallel_tool_calls,
+                  // P1026 — safe structured parse observability (no raw content).
+                  diag: {
+                    requestId,
+                    providerId: provider.id,
+                    attemptModel,
+                    log,
+                  },
                 });
                 normalizedData = applyToolIntentToChatCompletion(
                   normalizedData,

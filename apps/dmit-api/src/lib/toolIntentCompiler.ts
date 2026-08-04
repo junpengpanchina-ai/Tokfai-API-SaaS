@@ -1,16 +1,20 @@
 /**
- * P1017 — Compile client tools/tool_choice into emulated JSON instructions.
+ * P1017 / P1026 — Compile client tools/tool_choice into emulated JSON instructions.
  * Upstream body must NOT include native tools / tool_choice fields.
  */
 
 export const EMULATED_TOOL_INTENT_SYSTEM_PROMPT = `You are a strict JSON Tool Intent emitter for Tokfai Emulated Tool Calling.
 
-You MUST output exactly one JSON object and nothing else.
-Do NOT use Markdown code fences.
-Do NOT output explanations, prefixes, suffixes, or any characters outside the JSON object.
+Return exactly one minified JSON object.
+Do not use Markdown or code fences.
+Do not explain your answer.
+Never reproduce tool descriptions.
+Select only names from the supplied tool list.
+arguments must be a JSON object.
+When tool_choice is required, assistant_text is forbidden.
+
 Do NOT generate tool_call_id or id fields (Tokfai generates ids later).
-Tool names MUST be chosen only from the provided tool list.
-arguments MUST be a JSON object (not a string).
+Do NOT output any characters outside the single JSON object.
 
 Exactly one of these two envelopes is allowed:
 
@@ -24,8 +28,14 @@ If you call tools, type must be "tool_call" and you must not include content.
 If you answer with text, type must be "assistant_text" and you must not include tool_calls.`;
 
 export const EMULATED_REPAIR_USER_MESSAGE = `Your previous reply was not valid Tool Intent JSON.
-Return ONLY one JSON object matching the required envelope.
-No markdown fences. No extra text. No tool_call_id.`;
+Return exactly one minified JSON object matching the required envelope.
+Do not use Markdown or code fences.
+Do not explain your answer.
+Never reproduce tool descriptions.
+Select only names from the supplied tool list.
+arguments must be a JSON object.
+When tool_choice is required, assistant_text is forbidden.
+No tool_call_id.`;
 
 type ToolFn = {
   name: string;
@@ -63,7 +73,7 @@ export function summarizeToolChoice(toolChoice: unknown): string {
     return "none: return assistant_text only; do not call tools.";
   }
   if (toolChoice === "required") {
-    return "required: you MUST return type=tool_call with at least one tool.";
+    return "required: you MUST return type=tool_call with at least one tool. assistant_text is forbidden.";
   }
   if (typeof toolChoice === "object" && !Array.isArray(toolChoice)) {
     const row = toolChoice as Record<string, unknown>;
@@ -73,7 +83,7 @@ export function summarizeToolChoice(toolChoice: unknown): string {
         : row;
     const name = typeof fn.name === "string" ? fn.name.trim() : "";
     if (name) {
-      return `forced function: you MUST call only "${name}".`;
+      return `forced function: you MUST call only "${name}". assistant_text is forbidden.`;
     }
   }
   return "auto: you may return tool_call or assistant_text.";

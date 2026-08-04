@@ -1,5 +1,5 @@
 /**
- * P1017 — Emulated Tool Intent error codes + ApiError factories.
+ * P1017 / P1026 — Emulated Tool Intent error codes + ApiError factories.
  * All failures are not_billable (caller must not debit).
  */
 
@@ -9,6 +9,8 @@ export const TOOL_INTENT_NOT_GENERATED_CODE =
   "tool_intent_not_generated" as const;
 export const TOOL_INTENT_INVALID_JSON_CODE =
   "tool_intent_invalid_json" as const;
+export const TOOL_INTENT_AMBIGUOUS_JSON_CODE =
+  "tool_intent_ambiguous_json" as const;
 export const TOOL_NAME_NOT_ALLOWED_CODE = "tool_name_not_allowed" as const;
 export const TOOL_ARGUMENTS_INVALID_CODE = "tool_arguments_invalid" as const;
 export const REQUIRED_TOOL_CALL_MISSING_CODE =
@@ -20,6 +22,7 @@ export const TOOL_EMULATION_UNAVAILABLE_CODE =
 export const TOOL_INTENT_ERROR_CODES = [
   TOOL_INTENT_NOT_GENERATED_CODE,
   TOOL_INTENT_INVALID_JSON_CODE,
+  TOOL_INTENT_AMBIGUOUS_JSON_CODE,
   TOOL_NAME_NOT_ALLOWED_CODE,
   TOOL_ARGUMENTS_INVALID_CODE,
   REQUIRED_TOOL_CALL_MISSING_CODE,
@@ -34,6 +37,8 @@ const PUBLIC_MESSAGES: Record<ToolIntentErrorCode, string> = {
     "Model did not return a valid tool intent. Retry or choose another model.",
   tool_intent_invalid_json:
     "Model returned invalid tool intent JSON. Please retry.",
+  tool_intent_ambiguous_json:
+    "Model returned multiple JSON candidates. Please retry with a single JSON object.",
   tool_name_not_allowed:
     "Model selected a tool that is not allowed for this request.",
   tool_arguments_invalid:
@@ -49,6 +54,7 @@ const PUBLIC_MESSAGES: Record<ToolIntentErrorCode, string> = {
 export function isToolIntentRepairableCode(code: string | undefined): boolean {
   return (
     code === TOOL_INTENT_INVALID_JSON_CODE ||
+    code === TOOL_INTENT_AMBIGUOUS_JSON_CODE ||
     code === TOOL_ARGUMENTS_INVALID_CODE
   );
 }
@@ -59,7 +65,8 @@ export function isToolIntentFallbackEligible(code: string | undefined): boolean 
     code === TOOL_INTENT_NOT_GENERATED_CODE ||
     code === REQUIRED_TOOL_CALL_MISSING_CODE ||
     code === TOOL_EMULATION_UNAVAILABLE_CODE ||
-    code === TOOL_INTENT_INVALID_JSON_CODE
+    code === TOOL_INTENT_INVALID_JSON_CODE ||
+    code === TOOL_INTENT_AMBIGUOUS_JSON_CODE
   );
 }
 

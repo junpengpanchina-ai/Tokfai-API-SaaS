@@ -209,26 +209,23 @@ check("09_invalid_json", () => {
 });
 
 check("10_markdown_json", () => {
-  assert.throws(
-    () =>
-      parseToolIntentFromContent({
-        content:
-          '```json\n{"type":"assistant_text","content":"x"}\n```',
-        clientTools: TOOLS,
-      }),
-    (e) => e?.code === "tool_intent_invalid_json"
-  );
+  // P1026 — single fenced JSON candidate is accepted (was rejected in P1017).
+  const intent = parseToolIntentFromContent({
+    content: '```json\n{"type":"assistant_text","content":"x"}\n```',
+    clientTools: TOOLS,
+  });
+  assert.equal(intent.kind, "assistant_text");
+  assert.equal(intent.content, "x");
 });
 
 check("11_outside_text", () => {
-  assert.throws(
-    () =>
-      parseToolIntentFromContent({
-        content: 'Here: {"type":"assistant_text","content":"x"}',
-        clientTools: TOOLS,
-      }),
-    (e) => e?.code === "tool_intent_invalid_json"
-  );
+  // P1026 — unique balanced JSON with prefix text is accepted.
+  const intent = parseToolIntentFromContent({
+    content: 'Here: {"type":"assistant_text","content":"x"}',
+    clientTools: TOOLS,
+  });
+  assert.equal(intent.kind, "assistant_text");
+  assert.equal(intent.content, "x");
 });
 
 check("12_unknown_tool", () => {
