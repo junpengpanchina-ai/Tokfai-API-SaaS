@@ -131,6 +131,28 @@ const ALLOWED_FIELD_KEYS = new Set([
   "toolCallCount",
   "fallbackToOriginalText",
   "freshRemainingTotalMs",
+  // P1031 Cursor Agent protocol telemetry (no prompts / args / secrets)
+  "toolsCount",
+  "toolChoiceKind",
+  "parallelToolCalls",
+  "messageCount",
+  "roleCounts",
+  "incomingToolMessageCount",
+  "incomingToolCallIdMaxLength",
+  "mode",
+  "toolNames",
+  "toolCallIdLengths",
+  "argumentsLengths",
+  "contentIsNull",
+  "toolMessageCount",
+  "toolCallIds",
+  "mappedToolCallIds",
+  "unmatchedToolCallIdCount",
+  "emittedToolCallCount",
+  "emittedToolIndexes",
+  "emittedFinishReason",
+  "doneFrameEmitted",
+  "clientDisconnected",
 ]);
 
 const SENSITIVE_LOG_KEY_LITERAL =

@@ -8,7 +8,9 @@ import {
   chatCompletionSseBodyAfterRole,
   chatCompletionToSseBody,
   sanitizeChatCompletionSseOutboundText,
+  summarizeChatCompletionSseEmission,
 } from "./chatCompletionSse.js";
+import { log } from "../logger.js";
 import {
   createEarlySseResponse,
   runWithEarlySseGate,
@@ -67,8 +69,19 @@ function failureToSseEnvelope(
 
 function writeChatRest(write: EarlySseWrite, result: ExecuteChatCompletionResult) {
   if (!result.ok) return;
-  write(chatCompletionSseBodyAfterRole(result.response));
+  const body = chatCompletionSseBodyAfterRole(result.response);
+  write(body);
+  const emission = summarizeChatCompletionSseEmission(result.response);
+  log.info("cursor_tool_sse_completed", {
+    requestId: result.requestId,
+    emittedToolCallCount: emission.emittedToolCallCount,
+    emittedToolIndexes: emission.emittedToolIndexes,
+    emittedFinishReason: emission.emittedFinishReason,
+    doneFrameEmitted: emission.doneFrameEmitted,
+    clientDisconnected: false,
+  });
 }
+
 
 function asSseRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -245,7 +258,7 @@ export async function respondChatCompletionEarlySse(
     requestId: result.requestId,
     firstFrame: chatCompletionRoleSseFrame(),
     produceRest: async (write) => {
-      write(chatCompletionSseBodyAfterRole(result.response));
+      writeChatRest(write, result);
     },
   });
 }

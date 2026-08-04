@@ -368,7 +368,9 @@ export function normalizeToolCallsOnChatCompletion(
     const toolCalls = message.tool_calls;
     const hasToolCalls = Array.isArray(toolCalls) && toolCalls.length > 0;
     if (hasToolCalls) {
-      if (message.content === undefined) message.content = null;
+      // P1031 — OpenAI / Cursor: tool_calls responses must use content=null.
+      // Do not leave "" or assistant prose alongside tool_calls (breaks agents).
+      message.content = null;
       row.message = message;
       if (index === 0) {
         row.finish_reason = "tool_calls";

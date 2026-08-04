@@ -103,6 +103,14 @@ import {
   type BillableUsageStage,
 } from "./billableUsageAggregation.js";
 import {
+  analyzeToolRoundTrip,
+  countTools,
+  ensureClientSafeToolCallIdsOnCompletion,
+  extractResponseToolCallMeta,
+  summarizeRoleCounts,
+  toolChoiceKind,
+} from "./cursorToolProtocol.js";
+import {
   isGemini25FlashNonStreamStreamFallbackPath,
   isGemini25FlashStreamFallbackEligible,
 } from "./gemini25FlashNonStreamStreamFallback.js";
@@ -736,6 +744,88 @@ export async function executeChatCompletion(
       toolChoice: toolChoiceSummary(body),
       bodyKeys: chatBodyKeysForLog(body),
     });
+  }
+
+  // P1031 — Cursor protocol telemetry + role=tool round-trip id checks.
+  const roundTrip = analyzeToolRoundTrip(
+    (body as { messages?: unknown }).messages
+  );
+  if (supportsToolsRequested || roundTrip.toolMessageCount > 0) {
+    const parallelRaw = (body as { parallel_tool_calls?: unknown })
+      .parallel_tool_calls;
+    log.info("cursor_tool_request_received", {
+      requestId,
+      route,
+      requestedModel: requestedRaw,
+      resolvedModel: requestedModel,
+      stream: clientStream,
+      toolsCount: countTools((body as { tools?: unknown }).tools),
+      toolChoiceKind: toolChoiceKind(
+        (body as { tool_choice?: unknown }).tool_choice
+      ),
+      parallelToolCalls:
+        typeof parallelRaw === "boolean" ? parallelRaw : null,
+      messageCount: roundTrip.messageCount,
+      roleCounts: summarizeRoleCounts(
+        (body as { messages?: unknown }).messages
+      ),
+      incomingToolMessageCount: roundTrip.toolMessageCount,
+      incomingToolCallIdMaxLength: roundTrip.incomingToolCallIdMaxLength,
+      hasTools,
+      supportsToolsRequested,
+    });
+  }
+  if (roundTrip.toolMessageCount > 0) {
+    log.info("cursor_tool_round2_received", {
+      requestId,
+      route,
+      toolMessageCount: roundTrip.toolMessageCount,
+      toolCallIds: roundTrip.toolCallIds.slice(0, 32),
+      mappedToolCallIds: roundTrip.mappedToolCallIds.slice(0, 32),
+      unmatchedToolCallIdCount: roundTrip.unmatchedToolCallIdCount,
+      messageCount: roundTrip.messageCount,
+    });
+    if (
+      roundTrip.knownAssistantToolCallIdCount > 0 &&
+      roundTrip.unmatchedToolCallIdCount > 0
+    ) {
+      const err = ApiError.badRequest(
+        "tool message tool_call_id does not match any assistant tool_calls id in messages.",
+        "invalid_tool_call_id"
+      );
+      const routing = makeFailRouting({
+        errorCode: err.code ?? "invalid_tool_call_id",
+        attemptedModels: attempts,
+        fallbackReason: "invalid_tool_call_id",
+      });
+      log.warn("cursor_tool_round2_unmatched_id", {
+        requestId,
+        route,
+        unmatchedToolCallIdCount: roundTrip.unmatchedToolCallIdCount,
+        toolMessageCount: roundTrip.toolMessageCount,
+        billing_status: "not_billable",
+        credits_charged: 0,
+      });
+      await writeUsageLog(
+        failedUsageLog({
+          user_id: caller.userId,
+          api_key_id: caller.apiKeyId,
+          tenant_id: caller.tenantId,
+          model: requestedRaw,
+          status: "failed",
+          request_id: requestId,
+          error_code: err.code ?? "invalid_tool_call_id",
+          error_message: err.publicMessage,
+          latency_ms: Date.now() - startedAt,
+          billing_status: "not_billable",
+          billable: false,
+          credits_charged: 0,
+        }),
+        route,
+        routingEvidenceSnapshot(routing)
+      );
+      return failureResult(err, requestId, requestedModel, routing);
+    }
   }
 
   if (toolsDegradedToChat) {
@@ -2042,6 +2132,27 @@ async function runProviderAttempts(args: {
               return row;
             }),
           };
+        }
+
+        // P1031 — clamp client-visible tool_call ids to ASCII <=64 before wire.
+        responseData = ensureClientSafeToolCallIdsOnCompletion(responseData);
+        if (hasToolsClient) {
+          const toolMeta = extractResponseToolCallMeta(responseData);
+          log.info("cursor_tool_response_generated", {
+            requestId,
+            route,
+            mode: reportedToolMode,
+            stream: clientStream,
+            toolCallCount: toolMeta.toolCallCount,
+            toolNames: toolMeta.toolNames.slice(0, 32),
+            toolCallIdLengths: toolMeta.toolCallIdLengths.slice(0, 32),
+            argumentsLengths: toolMeta.argumentsLengths.slice(0, 32),
+            contentIsNull: toolMeta.contentIsNull,
+            finishReason: toolMeta.finishReason,
+            billing_status:
+              unlimited || creditsCharged <= 0 ? "not_billable" : "charged",
+            credits_charged: creditsCharged,
+          });
         }
 
         const latencyMs = Date.now() - startedAt;

@@ -222,11 +222,13 @@ function sseLine(payload: unknown): string {
  * Mid-stream: no finish_reason key (never null on the wire).
  */
 export function chatCompletionRoleSseFrame(): string {
+  // P1031 — OpenAI-compatible role opener without empty content (Cursor Agent
+  // treats content deltas as prose; tool_calls path must not start with "").
   return sseLine({
     choices: [
       {
         index: 0,
-        delta: { role: "assistant", content: "" },
+        delta: { role: "assistant" },
       },
     ],
   });
@@ -274,7 +276,8 @@ export function chatCompletionSseBodyAfterRole(
 
   const chunks: string[] = [];
 
-  if (content.length > 0) {
+  // P1031 — tool_calls path must not also emit ordinary content deltas.
+  if (!toolCalls && content.length > 0) {
     chunks.push(
       sseLine({
         ...base,
@@ -289,33 +292,71 @@ export function chatCompletionSseBodyAfterRole(
     );
   }
 
-  // OpenAI-compatible streaming tool_calls: one delta with the full array
-  // (assembled from non-stream upstream). Clients that merge by index still work.
+  // OpenAI-compatible streaming tool_calls (from non-stream upstream assemble):
+  // 1) init frame per index: id + type + name + arguments:""
+  // 2) arguments frame per index: arguments JSON string (never as object)
+  // Clients that concatenate by index reconstruct the full call.
   if (toolCalls) {
-    const deltaToolCalls = toolCalls.map((tc, index) => {
+    const prepared = toolCalls.map((tc, index) => {
       const row = asRecord(tc) ?? {};
       const fn = asRecord(row.function);
-      return {
-        index: typeof row.index === "number" ? row.index : index,
-        id: typeof row.id === "string" ? row.id : `call_${index}`,
-        type: typeof row.type === "string" ? row.type : "function",
-        function: {
-          name: typeof fn?.name === "string" ? fn.name : "",
-          arguments: typeof fn?.arguments === "string" ? fn.arguments : "",
-        },
-      };
+      const idx = typeof row.index === "number" ? row.index : index;
+      const id = typeof row.id === "string" ? row.id : `call_${index}`;
+      const type = typeof row.type === "string" ? row.type : "function";
+      const name = typeof fn?.name === "string" ? fn.name : "";
+      const args =
+        typeof fn?.arguments === "string"
+          ? fn.arguments
+          : fn?.arguments == null
+            ? ""
+            : "";
+      return { index: idx, id, type, name, args };
     });
-    chunks.push(
-      sseLine({
-        ...base,
-        choices: [
-          {
-            index: 0,
-            delta: { tool_calls: deltaToolCalls },
-          },
-        ],
-      })
-    );
+
+    for (const tc of prepared) {
+      chunks.push(
+        sseLine({
+          ...base,
+          choices: [
+            {
+              index: 0,
+              delta: {
+                tool_calls: [
+                  {
+                    index: tc.index,
+                    id: tc.id,
+                    type: tc.type,
+                    function: { name: tc.name, arguments: "" },
+                  },
+                ],
+              },
+            },
+          ],
+        })
+      );
+    }
+
+    for (const tc of prepared) {
+      if (!tc.args) continue;
+      chunks.push(
+        sseLine({
+          ...base,
+          choices: [
+            {
+              index: 0,
+              delta: {
+                tool_calls: [
+                  {
+                    index: tc.index,
+                    function: { arguments: tc.args },
+                  },
+                ],
+              },
+            },
+          ],
+        })
+      );
+    }
   }
 
   // Terminal chunk — finish_reason always a wire-legal string after sseLine.
@@ -334,6 +375,33 @@ export function chatCompletionSseBodyAfterRole(
 
   chunks.push("data: [DONE]\n\n");
   return chunks.join("");
+}
+
+/** Safe metadata for cursor_tool_sse_completed (no argument contents). */
+export function summarizeChatCompletionSseEmission(
+  response: Record<string, unknown>
+): {
+  emittedToolCallCount: number;
+  emittedToolIndexes: number[];
+  emittedFinishReason: string;
+  doneFrameEmitted: true;
+} {
+  const toolCalls = extractToolCalls(response);
+  const indexes: number[] = [];
+  if (toolCalls) {
+    toolCalls.forEach((tc, index) => {
+      const row = asRecord(tc);
+      indexes.push(
+        typeof row?.index === "number" ? (row.index as number) : index
+      );
+    });
+  }
+  return {
+    emittedToolCallCount: toolCalls?.length ?? 0,
+    emittedToolIndexes: indexes,
+    emittedFinishReason: extractFinishReason(response),
+    doneFrameEmitted: true,
+  };
 }
 
 /** Build the full SSE body (role + content/tool_calls + finish + [DONE]). */
