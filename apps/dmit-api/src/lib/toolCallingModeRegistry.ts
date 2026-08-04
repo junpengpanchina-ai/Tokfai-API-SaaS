@@ -108,6 +108,12 @@ export function bestToolCallingModeForModel(
 export function resolveToolCallingAttempts(args: {
   requestedModel: string;
   attempts: string[];
+  /**
+   * When false, do not inject GRSAI_EMULATED_MODELS after an empty filter.
+   * Used for alias gates (auto-pro / gpt-5-pro): only concrete chain members
+   * count — avoids pretending unsupported alias attempts are capable.
+   */
+  allowGlobalFallback?: boolean;
 }): {
   attempts: string[];
   supportsTools: boolean;
@@ -122,6 +128,10 @@ export function resolveToolCallingAttempts(args: {
       fallbackApplied:
         !supportsRequested || filtered[0] !== args.attempts[0],
     };
+  }
+
+  if (args.allowGlobalFallback === false) {
+    return null;
   }
 
   const fallbacks = GRSAI_EMULATED_MODELS.filter((id) =>

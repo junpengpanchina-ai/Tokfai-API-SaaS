@@ -19,10 +19,11 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(ROOT, "apps/dmit-api/src");
-const TARGET = "f49db6a66c3f212f903089f217503473d7640f9a";
-
-const PASS = "TOKFAI_P1018_PREDEPLOY_REAL_ENTRY_PASS";
-const BLOCKED = "TOKFAI_P1018_PREDEPLOY_BLOCKED";
+const TARGET = null; // P1019: accept current HEAD; src SHA verified separately
+const PASS = "TOKFAI_P1019_CURSOR_TOOLS_HOTFIX_PASS";
+const BLOCKED = "TOKFAI_P1019_CURSOR_TOOLS_HOTFIX_BLOCKED";
+const P1018_ENTRY = "TOKFAI_P1018_TOOL_INTENT_REAL_ROUTE_ENTRY_PASS";
+const P1019_SCENARIOS = "TOKFAI_P1019_CURSOR_TOOLS_HOTFIX_SCENARIOS_PASS";
 
 function sh(cmd, opts = {}) {
   const r = spawnSync(cmd, {
@@ -80,7 +81,7 @@ console.log("git status --short:\n" + (statusShort || "(clean)"));
 console.log("git diff --check status:", diffCheck.status);
 console.log(showStat.stdout);
 
-if (head !== TARGET) {
+if (TARGET && head !== TARGET) {
   blockers.push(`HEAD ${head} != target ${TARGET}`);
 }
 
@@ -136,62 +137,30 @@ function conclude(id, verdict, lines, detail, severity = "P2") {
   );
   const L_debit = lineOf("await recordSuccessfulUsageAndDebit(");
   const L_repairFlag = lineOf("let repairAttempted = false;");
-  const L_geminiRem = lineOf(
-    "const remainingMs =\n              timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt);"
-  );
+  const L_fresh = lineOf("const freshRemainingTotalMs =");
+  const L_freshLe0 = lineOf("if (freshRemainingTotalMs <= 0)");
 
-  // 1. remainingTotalMs recalculated before repair retry?
+  // 1–3. P1019: freshRemainingTotalMs recomputed every repair loop iteration
   {
-    const remLine = L_rem ?? L_rem_alt;
-    const loopLine = L_loop;
-    const perLine = L_per_alt ?? L_per;
-    const contLine = L_continue;
-    if (
-      remLine &&
-      loopLine &&
-      perLine &&
-      contLine &&
-      remLine < loopLine &&
-      perLine > loopLine &&
-      contLine > loopLine
-    ) {
-      // remainingTotalMs assigned once before for(;;); continue does not reassign
-      const between = execLines.slice(loopLine - 1, contLine).join("\n");
-      const recalcsInside = /remainingTotalMs\s*=/.test(between);
-      if (!recalcsInside) {
-        conclude(
-        "T1_remainingTotalMs_before_repair",
-        "BUG",
-        [remLine, loopLine, perLine, contLine],
-        "remainingTotalMs is computed once before the repair for(;;) and reused on continue; second repair attempt can receive the pre-first-call budget and exceed totalTimeoutMs.",
-        "P1"
-      );
-      } else {
-        conclude(
-          "T1_remainingTotalMs_before_repair",
-          "SAFE",
-          [remLine, loopLine, perLine],
-          "remainingTotalMs reassigned inside repair loop."
-        );
-      }
-    } else {
-      conclude(
-        "T1_remainingTotalMs_before_repair",
-        "NEEDS_TEST",
-        [remLine, loopLine, perLine, contLine].filter(Boolean),
-        "Could not locate remainingTotalMs / repair loop anchors."
-      );
-    }
+    const hasFresh =
+      L_fresh &&
+      L_loop &&
+      L_fresh > L_loop &&
+      L_freshLe0 &&
+      /Math\.min\(\s*timeoutPolicy\.upstreamTimeoutMs,\s*freshRemainingTotalMs/.test(
+        execSrc
+      ) &&
+      !/Math\.max\(\s*5_000,\s*remaining/.test(execSrc);
+    conclude(
+      "T1_T2_T3_freshRemainingTotalMs",
+      hasFresh ? "SAFE" : "BUG",
+      [L_loop, L_fresh, L_freshLe0, L_continue].filter(Boolean),
+      hasFresh
+        ? "Each repair for(;;) iteration recomputes freshRemainingTotalMs; fetch timeouts capped to it; no Math.max(5000, remaining) budget inflate."
+        : "freshRemainingTotalMs missing or fetch still uses stale remainingTotalMs / Math.max(5000) inflate.",
+      "P1"
+    );
   }
-
-  // 2+3. Second repair may use full first remainingTotalMs / breach totalTimeoutMs
-  conclude(
-    "T2_T3_repair_budget_reuse",
-    "BUG",
-    [L_rem_alt, L_per_alt, L_continue].filter(Boolean),
-    "Repair continue reuses stale remainingTotalMs for perAttemptTimeoutMs; wall-clock can approach ~2× remaining budget vs totalTimeoutMs.",
-    "P1"
-  );
 
   // 4. duplicate perAttemptTimeoutMs after success for logging
   {
@@ -199,7 +168,9 @@ function conclude(id, verdict, lines, detail, severity = "P2") {
     for (let i = 0; i < execLines.length; i++) {
       if (
         execLines[i].includes("const perAttemptTimeoutMs = Math.min(") &&
-        execLines[i + 2]?.includes("remainingTotalMs")
+        (execLines[i + 2]?.includes("remainingTotalMs") ||
+          execLines[i + 2]?.includes("freshRemainingTotalMs") ||
+          execLines[i + 2]?.includes("lastFreshRemainingTotalMs"))
       ) {
         dup.push(i + 1);
       }
@@ -209,7 +180,7 @@ function conclude(id, verdict, lines, detail, severity = "P2") {
       dup.length >= 2 ? "SAFE" : "NEEDS_TEST",
       dup,
       dup.length >= 2
-        ? "Second perAttemptTimeoutMs after success is log-only (stale remainingTotalMs); does not change debit. SAFE for billing; inaccurate timeout log only."
+        ? "Second perAttemptTimeoutMs after success is log-only; does not change debit."
         : "Expected two perAttemptTimeoutMs sites (fetch + post-success log)."
     );
   }
@@ -300,8 +271,6 @@ function conclude(id, verdict, lines, detail, severity = "P2") {
       // already BUG
     }
   }
-
-  void L_geminiRem;
 }
 
 // ── 3. Capability registry audit ─────────────────────────────────────────
@@ -379,14 +348,35 @@ section("3. Capability Registry audit");
 
   findings.push({
     id: "C8_auto_pro_strict_tools_early_reject",
-    verdict: "BUG",
+    verdict: /isAlias[\s\S]*allowGlobalFallback:\s*false/.test(execSrc)
+      ? "SAFE"
+      : "BUG",
     severity: "P1",
     detail:
-      "executeChatCompletion rejects hasTools+strictToolCall when !isVerifiedToolCapableModel(alias). auto-pro is not in MODE_TABLE, so required tools never reach resolveToolsCapableAttempts / provider×model mode. Runtime evidence: model_not_tool_capable, providerCallCount=0.",
+      /isAlias[\s\S]*allowGlobalFallback:\s*false/.test(execSrc)
+        ? "P1019: alias tools path uses resolveToolsCapableAttempts(allowGlobalFallback:false) on concrete attempts — auto-pro no longer rejected by alias id alone."
+        : "Alias strict tools still appears to reject before concrete attempt resolve.",
   });
-  blockers.push(
-    "C8/P1 auto-pro (and aliases) + tool_choice=required rejected before attempt chain — breaks advertised auto-pro tools path"
-  );
+  if (!/isAlias[\s\S]*allowGlobalFallback:\s*false/.test(execSrc)) {
+    blockers.push(
+      "C8/P1 auto-pro alias strict tools early reject not fixed"
+    );
+  }
+
+  findings.push({
+    id: "KNOWN_P2_client_abort_repair",
+    verdict: "BUG",
+    severity: "P2",
+    detail:
+      "Known risk (not blocking): client abortSignal still not threaded into providerFetch/repair.",
+  });
+  findings.push({
+    id: "KNOWN_P2_catalog_tools_semantics",
+    verdict: "BUG",
+    severity: "P2",
+    detail:
+      "Known risk (not blocking): catalog capabilities.tools still means registry presence, not LIVE-verified.",
+  });
 
   for (const f of findings.filter((x) => String(x.id).startsWith("C"))) {
     console.log(`[${f.verdict}] ${f.id}: ${f.detail}`);
@@ -411,17 +401,22 @@ const runs = [
   {
     name: "real-route-entry",
     cmd: "npx tsx scripts/p1018-tool-intent-real-route-entry.mts",
-    marker: "TOKFAI_P1018_TOOL_INTENT_REAL_ROUTE_ENTRY_PASS",
+    markers: [P1018_ENTRY, P1019_SCENARIOS],
   },
   {
     name: "billing-regression",
     cmd: "npx tsx scripts/p1018-tool-intent-billing-regression.mts",
-    marker: "TOKFAI_P1018_TOOL_INTENT_BILLING_REGRESSION_PASS",
+    markers: ["TOKFAI_P1018_TOOL_INTENT_BILLING_REGRESSION_PASS"],
   },
   {
     name: "stream-regression",
     cmd: "npx tsx scripts/p1018-tool-intent-stream-regression.mts",
-    marker: "TOKFAI_P1018_TOOL_INTENT_STREAM_REGRESSION_PASS",
+    markers: ["TOKFAI_P1018_TOOL_INTENT_STREAM_REGRESSION_PASS"],
+  },
+  {
+    name: "p1017-unit",
+    cmd: "npx tsx scripts/p1017-tool-intent-compiler-unit.mjs",
+    markers: ["TOKFAI_P1017_TOOL_INTENT_COMPILER_UNIT_PASS"],
   },
 ];
 
@@ -429,9 +424,14 @@ const runResults = {};
 for (const r of runs) {
   const out = runNode(r.cmd);
   const text = out.stdout + out.stderr;
-  const ok = out.status === 0 && text.includes(r.marker);
-  runResults[r.name] = { ok, status: out.status, marker: r.marker };
-  if (!ok) blockers.push(`${r.name} failed (status=${out.status})`);
+  const missing = r.markers.filter((m) => !text.includes(m));
+  const ok = out.status === 0 && missing.length === 0;
+  runResults[r.name] = { ok, status: out.status, markers: r.markers, missing };
+  if (!ok) {
+    blockers.push(
+      `${r.name} failed (status=${out.status}, missing=${missing.join(",") || "n/a"})`
+    );
+  }
 }
 
 section("5. typecheck / build / git diff --check");

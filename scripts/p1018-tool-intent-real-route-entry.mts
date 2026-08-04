@@ -32,6 +32,9 @@ ensureDummyEnv();
 await installP1018Mocks();
 
 const { executeChatCompletion } = await loadExecuteChatCompletion();
+const { __toolsCapableAttemptsTestSet } = await import(
+  "../apps/dmit-api/src/lib/toolCallCapability.ts"
+);
 
 const PASS = "TOKFAI_P1018_TOOL_INTENT_REAL_ROUTE_ENTRY_PASS";
 const FAIL = "TOKFAI_P1018_TOOL_INTENT_REAL_ROUTE_ENTRY_FAIL";
@@ -501,16 +504,11 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
   );
 }
 
-// ── 11. alias auto-pro guard + concrete provider fallback ────────────────
+// ── 11. auto-pro alias + provider fallback (P1019 fixed) ─────────────────
 {
-  // 11a — P1017 P1: auto-pro + strict tools rejected before attempt resolve
-  // because isVerifiedToolCapableModel("auto-pro") is false (alias not in
-  // MODE_TABLE), even though gpt-5.5 attempts are emulated_json-capable.
+  // 11a — auto-pro + required must reach provider (no early alias reject)
   resetScenario({
-    providers: defaultProviders([
-      "grsai-primary",
-      "openai-compatible-secondary",
-    ]),
+    providers: defaultProviders(["grsai-primary"]),
     scripts: [
       () => ({
         kind: "completion",
@@ -528,11 +526,11 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
     "req_p1018_11a"
   );
   const aliasMeta = billingSnapshot(aliasResult);
-  const aliasP1 =
-    aliasResult.ok === false &&
-    aliasResult.errorCode === "model_not_tool_capable" &&
-    aliasMeta.providerCallCount === 0 &&
-    aliasMeta.debitCallCount === 0;
+  const aliasOk =
+    aliasResult.ok === true &&
+    aliasMeta.providerCallCount >= 1 &&
+    aliasMeta.debitCallCount === 1 &&
+    msg(aliasResult)?.tool_calls?.[0]?.function?.name === "get_weather";
 
   // 11b — concrete model: first provider fails, second decides emulated mode
   resetScenario({
@@ -570,23 +568,21 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
   const meta = billingSnapshot(result);
   const c = getCounts();
   assert(
-    aliasP1 &&
+    aliasOk &&
       result.ok === true &&
       meta.debitCallCount === 1 &&
       meta.fallbackCount >= 1 &&
       c.lastProviderIds.includes("openai-compatible-secondary") &&
       msg(result)?.tool_calls?.[0]?.function?.name === "get_weather" &&
       (result.response?.tokfai as any)?.tool_calling_mode === "emulated_json",
-    "11. auto-pro P1 guard observed; gpt-5.5 provider fallback mode=emulated_json debit×1",
+    "11. auto-pro required works; gpt-5.5 provider fallback mode=emulated_json debit×1",
     {
       ...meta,
-      aliasP1,
-      aliasError: aliasResult.ok ? null : aliasResult.errorCode,
+      aliasOk,
       aliasMeta,
-      note: "P1: auto-pro+required tools fails before attempt chain (model_not_tool_capable)",
     },
     JSON.stringify({
-      aliasP1,
+      aliasOk,
       alias: aliasResult,
       ok: result.ok,
       providers: c.lastProviderIds,
@@ -632,8 +628,286 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
   );
 }
 
+console.log("\n── P1019 hotfix scenarios A–G ──\n");
+
+// ── A. auto-pro + required → tool_calls, debit×1 ─────────────────────────
+{
+  resetScenario({
+    providers: defaultProviders(["grsai-primary"]),
+    scripts: [
+      () => ({
+        kind: "completion",
+        content: makeToolCallIntent("get_weather", { city: "CursorCity" }),
+      }),
+    ],
+  });
+  const result = await exec(
+    {
+      model: "auto-pro",
+      messages: [{ role: "user", content: "A required" }],
+      tools: WEATHER_TOOLS,
+      tool_choice: "required",
+    },
+    "req_p1019_A"
+  );
+  const meta = billingSnapshot(result);
+  assert(
+    result.ok === true &&
+      result.errorCode !== "model_not_tool_capable" &&
+      meta.providerCallCount >= 1 &&
+      meta.debitCallCount === 1 &&
+      msg(result)?.tool_calls?.[0]?.function?.name === "get_weather" &&
+      result.response.choices[0].finish_reason === "tool_calls",
+    "A. auto-pro + required → tool_calls, debit×1",
+    meta,
+    JSON.stringify({ ok: result.ok, err: (result as any).errorCode, meta, m: msg(result) })
+  );
+}
+
+// ── B. auto-pro + auto + intent → tool_calls (no degrade) ────────────────
+{
+  resetScenario({
+    providers: defaultProviders(["grsai-primary"]),
+    scripts: [
+      (ctx) => {
+        if (!ctx.hasCompiler) {
+          return { kind: "completion", content: "DEGRADED_PLAIN" };
+        }
+        return {
+          kind: "completion",
+          content: makeToolCallIntent("get_weather", { city: "AutoCity" }),
+        };
+      },
+    ],
+  });
+  const result = await exec(
+    {
+      model: "auto-pro",
+      messages: [{ role: "user", content: "B auto" }],
+      tools: WEATHER_TOOLS,
+      tool_choice: "auto",
+    },
+    "req_p1019_B"
+  );
+  const meta = billingSnapshot(result);
+  const m = msg(result);
+  assert(
+    result.ok === true &&
+      meta.compilerSeenCount >= 1 &&
+      meta.debitCallCount === 1 &&
+      Array.isArray(m?.tool_calls) &&
+      m.tool_calls.length === 1 &&
+      m.content !== "DEGRADED_PLAIN",
+    "B. auto-pro + auto intent → tool_calls (not degraded)",
+    meta,
+    JSON.stringify({ m, meta, tokfai: result.response?.tokfai })
+  );
+}
+
+// ── C. auto-pro + tools but no concrete capable → reject, debit=0 ────────
+{
+  __toolsCapableAttemptsTestSet(true);
+  try {
+    resetScenario({
+      providers: defaultProviders(["grsai-primary"]),
+      scripts: [
+        () => ({
+          kind: "completion",
+          content: makeToolCallIntent("get_weather", { city: "X" }),
+        }),
+      ],
+    });
+    const result = await exec(
+      {
+        model: "auto-pro",
+        messages: [{ role: "user", content: "C none capable" }],
+        tools: WEATHER_TOOLS,
+        tool_choice: "required",
+      },
+      "req_p1019_C"
+    );
+    const meta = billingSnapshot(result);
+    assert(
+      result.ok === false &&
+        result.errorCode === "model_not_tool_capable" &&
+        result.httpStatus !== 200 &&
+        meta.providerCallCount === 0 &&
+        meta.debitCallCount === 0 &&
+        meta.billing_status === "not_billable",
+      "C. auto-pro + no concrete capable → model_not_tool_capable, debit=0",
+      meta,
+      JSON.stringify(result)
+    );
+  } finally {
+    __toolsCapableAttemptsTestSet(null);
+  }
+}
+
+// ── D. image + required tools (keep reject) ──────────────────────────────
+{
+  resetScenario({
+    providers: defaultProviders(["grsai-primary"]),
+    scripts: [
+      () => ({ kind: "completion", content: "nope" }),
+    ],
+  });
+  const result = await exec(
+    {
+      model: "nano-banana",
+      messages: [{ role: "user", content: "D image" }],
+      tools: WEATHER_TOOLS,
+      tool_choice: "required",
+    },
+    "req_p1019_D"
+  );
+  const meta = billingSnapshot(result);
+  assert(
+    result.ok === false &&
+      meta.providerCallCount === 0 &&
+      meta.debitCallCount === 0 &&
+      result.errorCode === "image_model_not_for_chat",
+    "D. image + required tools → reject, debit=0",
+    meta,
+    JSON.stringify(result)
+  );
+}
+
+// ── E. repair timeout budget shrink / exhaust ────────────────────────────
+{
+  const wallStart = Date.now();
+  resetScenario({
+    providers: defaultProviders(["grsai-primary"]),
+    timeoutPolicy: {
+      upstreamTimeoutMs: 200,
+      idleTimeoutMs: 200,
+      totalTimeoutMs: 200,
+    },
+    scripts: [
+      (ctx) => {
+        if (!ctx.isRepair) {
+          // Consume most of the 200ms total budget before repair.
+          return {
+            kind: "completion",
+            content: "NOT_JSON{{",
+            delayMs: 120,
+          };
+        }
+        // Repair should see a strictly smaller timeoutMs budget.
+        return {
+          kind: "completion",
+          content: "STILL_BAD",
+          delayMs: 5,
+        };
+      },
+    ],
+  });
+  const result = await exec(
+    {
+      model: "gpt-5.5",
+      messages: [{ role: "user", content: "E repair budget" }],
+      tools: WEATHER_TOOLS,
+      tool_choice: "required",
+    },
+    "req_p1019_E"
+  );
+  const meta = billingSnapshot(result);
+  const c = getCounts();
+  const elapsed = Date.now() - wallStart;
+  const t0 = c.fetchTimeoutMs[0] ?? 0;
+  const t1 = c.fetchTimeoutMs[1];
+  const budgetOk =
+    c.fetchTimeoutMs.length >= 1 &&
+    t0 <= 200 &&
+    (t1 === undefined || t1 < t0) &&
+    elapsed <= 200 + 150; // totalTimeout + test tolerance
+  const failOk =
+    result.ok === false &&
+    meta.debitCallCount === 0 &&
+    meta.providerCallCount <= 2;
+  assert(
+    budgetOk && failOk,
+    "E. repair freshRemainingTotalMs shrink; timeout/fail debit=0",
+    {
+      ...meta,
+      fetchTimeoutMs: c.fetchTimeoutMs,
+      elapsed,
+      budgetOk,
+    },
+    JSON.stringify({
+      ok: result.ok,
+      code: (result as any).errorCode,
+      fetchTimeoutMs: c.fetchTimeoutMs,
+      elapsed,
+      meta,
+    })
+  );
+}
+
+// ── F. repair success — provider×2 repair×1 debit×1 ──────────────────────
+{
+  resetScenario({
+    providers: defaultProviders(["grsai-primary"]),
+    scripts: [
+      (ctx) =>
+        ctx.isRepair
+          ? {
+              kind: "completion",
+              content: makeToolCallIntent("get_weather", { city: "Fixed" }),
+            }
+          : { kind: "completion", content: "<<<" },
+    ],
+  });
+  const result = await exec(
+    {
+      model: "gpt-5.5",
+      messages: [{ role: "user", content: "F repair ok" }],
+      tools: WEATHER_TOOLS,
+      tool_choice: "required",
+    },
+    "req_p1019_F"
+  );
+  const meta = billingSnapshot(result);
+  assert(
+    result.ok === true &&
+      meta.providerCallCount === 2 &&
+      meta.repairCallCount === 1 &&
+      meta.debitCallCount === 1,
+    "F. repair success — provider×2, repair×1, debit×1",
+    meta,
+    JSON.stringify({ ok: result.ok, meta })
+  );
+}
+
+// ── G. repair still fails — provider≤2 debit=0 ───────────────────────────
+{
+  resetScenario({
+    providers: defaultProviders(["grsai-primary"]),
+    scripts: [() => ({ kind: "completion", content: "{not-json" })],
+  });
+  const result = await exec(
+    {
+      model: "gpt-5.5",
+      messages: [{ role: "user", content: "G repair fail" }],
+      tools: WEATHER_TOOLS,
+      tool_choice: "required",
+    },
+    "req_p1019_G"
+  );
+  const meta = billingSnapshot(result);
+  assert(
+    result.ok === false &&
+      meta.providerCallCount <= 2 &&
+      meta.repairCallCount === 1 &&
+      meta.debitCallCount === 0,
+    "G. repair fail — provider≤2, debit=0",
+    meta,
+    JSON.stringify(result)
+  );
+}
+
 if (failed > 0) {
   console.error(`\n${FAIL} (${failed} failed)`);
   process.exit(1);
 }
 console.log(`\n${PASS}`);
+console.log("TOKFAI_P1019_CURSOR_TOOLS_HOTFIX_SCENARIOS_PASS");

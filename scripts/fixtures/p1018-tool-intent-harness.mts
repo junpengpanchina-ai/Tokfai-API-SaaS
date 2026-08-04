@@ -66,6 +66,8 @@ export type Counts = {
   compilerSeenCount: number;
   lastProviderIds: string[];
   lastDebitEntry: Record<string, unknown> | null;
+  /** timeoutMs passed into each providerFetch call (P1019 budget proof). */
+  fetchTimeoutMs: number[];
 };
 
 export type ProviderReply =
@@ -121,22 +123,47 @@ export function freshCounts(): Counts {
     compilerSeenCount: 0,
     lastProviderIds: [],
     lastDebitEntry: null,
+    fetchTimeoutMs: [],
   };
 }
 
 export function getCounts(): Counts {
-  return { ...counts, lastProviderIds: [...counts.lastProviderIds] };
+  return {
+    ...counts,
+    lastProviderIds: [...counts.lastProviderIds],
+    fetchTimeoutMs: [...counts.fetchTimeoutMs],
+  };
+}
+
+export type TimeoutPolicyOverride = {
+  upstreamTimeoutMs: number;
+  idleTimeoutMs: number;
+  totalTimeoutMs: number;
+};
+
+let timeoutPolicyOverride: TimeoutPolicyOverride | null = null;
+
+export function setTimeoutPolicyOverride(
+  policy: TimeoutPolicyOverride | null
+): void {
+  timeoutPolicyOverride = policy;
 }
 
 export function resetScenario(opts?: {
   scripts?: ProviderScript[];
   providers?: typeof fixedProviders;
+  timeoutPolicy?: TimeoutPolicyOverride | null;
 }): void {
   counts = freshCounts();
   providerScripts = opts?.scripts ? [...opts.scripts] : [];
   providerScriptIndex = 0;
   if (opts && "providers" in opts) {
     fixedProviders = opts.providers ?? null;
+  }
+  if (opts && "timeoutPolicy" in opts) {
+    timeoutPolicyOverride = opts.timeoutPolicy ?? null;
+  } else {
+    timeoutPolicyOverride = null;
   }
 }
 
@@ -316,6 +343,32 @@ export async function installP1018Mocks(): Promise<void> {
     },
   });
 
+  // Optional short budgets for repair timeout proof (scenario E).
+  mock.module(fileUrl("apps/dmit-api/src/lib/upstreamTimeoutPolicy.ts"), {
+    namedExports: {
+      UPSTREAM_TIMEOUT_DEFAULTS: {
+        chat: 60_000,
+        streamIdle: 60_000,
+        responses: 60_000,
+        heavy: 180_000,
+      },
+      isHeavyResponsesModel: () => false,
+      isSlowChatGemini3Model: () => false,
+      hasHeavyBodySignals: () => false,
+      resolveUpstreamTimeoutPolicy: () => {
+        const o = timeoutPolicyOverride;
+        return {
+          tier: "standard",
+          isHeavy: false,
+          upstreamTimeoutMs: o?.upstreamTimeoutMs ?? 60_000,
+          idleTimeoutMs: o?.idleTimeoutMs ?? 60_000,
+          totalTimeoutMs: o?.totalTimeoutMs ?? 60_000,
+          reason: o ? "p1018_timeout_override" : "p1018_default",
+        };
+      },
+    },
+  });
+
   // Mocked providerFetch boundary (no network). Fallback eligibility mirrored
   // from production grsai.ts P1017 list for realistic attempt chaining.
   mock.module(fileUrl("apps/dmit-api/src/upstream/grsai.ts"), {
@@ -350,12 +403,19 @@ export async function installP1018Mocks(): Promise<void> {
       providerFetch: async (
         provider: { id: string },
         _path: string,
-        options: { json?: Record<string, unknown> } = {},
+        options: {
+          json?: Record<string, unknown>;
+          timeoutMs?: number;
+          idleTimeoutMs?: number;
+        } = {},
         logContext: { model?: string } = {}
       ) => {
         const errorsMod = await import(errorsUrl);
         counts.providerCallCount += 1;
         counts.lastProviderIds.push(provider.id);
+        if (typeof options.timeoutMs === "number") {
+          counts.fetchTimeoutMs.push(options.timeoutMs);
+        }
         if (
           counts.lastProviderIds.length >= 2 &&
           counts.lastProviderIds[counts.lastProviderIds.length - 1] !==

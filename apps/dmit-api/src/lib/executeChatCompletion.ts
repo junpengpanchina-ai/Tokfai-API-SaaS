@@ -556,7 +556,10 @@ export async function executeChatCompletion(
     return failureResult(err, requestId, requestedModel, routing);
   }
 
-  // P974 — tools routing: verified whitelist only; auto may degrade to chat.
+  // P974/P1019 — tools routing.
+  // Alias (auto-pro / gpt-5-pro / …): capability is decided by concrete
+  // attempts via resolveToolsCapableAttempts — never by alias id alone.
+  // Direct models keep an explicit verifiedRequested gate.
   const hasTools = requestHasTools(body);
   const strictToolCallRequest = isStrictToolCallRequest(body);
   const verifiedRequested =
@@ -566,114 +569,66 @@ export async function executeChatCompletion(
   let toolsDegradedToChat = false;
   let upstreamBodySource: ChatCompletionRequestBody = body;
 
-  if (hasTools && strictToolCallRequest && !verifiedRequested) {
-    const errorCode = MODEL_NOT_TOOL_CAPABLE_CODE;
-    const errorMessage = MODEL_NOT_TOOL_CAPABLE_MESSAGE;
-    const suggestedModels = toolsCapableSuggestions().filter((id) =>
-      isVerifiedToolCapableModel(id)
-    );
-    log.warn("model_not_tool_capable", {
-      code: errorCode,
-      ...routingEvidenceToLogFields(
-        makeFailRouting({
-          errorCode,
-          attemptedModels: attempts.length > 0 ? attempts : [requestedModel],
-          fallbackReason: "model_not_tool_capable",
-        }),
-        {
-          route,
-          status: 400,
-          attemptedModel: attempts[0] ?? requestedModel,
-          providerId: null,
-          providerLabel: null,
-          upstreamStatus: null,
-          upstreamErrorCode: null,
-        }
-      ),
-      supportsTools: false,
-      hasTools: true,
-      toolChoice: toolChoiceSummary(body),
-      requireToolCall: clientRequiresToolCall(body),
-      strictToolCall: true,
-      bodyKeys: chatBodyKeysForLog(body),
-    });
-    const routing = makeFailRouting({
-      errorCode,
-      attemptedModels: attempts.length > 0 ? attempts : [requestedModel],
-      fallbackReason: "model_not_tool_capable",
-    });
-    await writeUsageLog(
-      failedUsageLog({
-        user_id: caller.userId,
-        api_key_id: caller.apiKeyId,
-        tenant_id: caller.tenantId,
-        model: requestedRaw,
-        status: "failed",
-        request_id: requestId,
-        error_code: errorCode,
-        error_message: errorMessage,
-        latency_ms: Date.now() - startedAt,
-        billing_status: "not_billable",
-        billable: false,
-        credits_charged: 0,
-      }),
-      route,
-      routingEvidenceSnapshot(routing)
-    );
-    return {
-      ok: false,
-      errorCode,
-      errorMessage,
-      requestId,
-      httpStatus: 400,
-      ...(suggestedModels.length ? { suggestedModels } : {}),
-      routing,
-    };
-  }
+  if (hasTools) {
+    const attemptChain =
+      attempts.length > 0 ? attempts : [requestedModel];
 
-  if (hasTools && !strictToolCallRequest && !verifiedRequested) {
-    // tool_choice:auto on unverified model → ordinary chat (no forged tool_calls).
-    toolsDegradedToChat = true;
-    upstreamBodySource = stripToolsFromChatBody(
-      body as Record<string, unknown>
-    ) as ChatCompletionRequestBody;
-    log.info("chat_tools_degraded_to_chat", {
-      requestId,
-      route,
-      requestedModel: requestedRaw,
-      resolvedModel: requestedModel,
-      hasTools: true,
-      toolChoice: toolChoiceSummary(body),
-      autoNoToolCall: true,
-      supportsTools: false,
-    });
-  } else if (hasTools && verifiedRequested) {
-    const toolsResolved = resolveToolsCapableAttempts({
-      requestedModel: requestedRaw,
-      attempts: attempts.length > 0 ? attempts : [requestedModel],
-    });
-    if (!toolsResolved) {
+    // Alias → resolve concrete tool-capable attempts (no global fallback inject).
+    // Direct → keep verifiedRequested as the primary gate; when verified,
+    // still reorder/filter via resolveToolsCapableAttempts.
+    const toolsResolved = isAlias
+      ? resolveToolsCapableAttempts({
+          requestedModel: requestedRaw,
+          attempts: attemptChain,
+          allowGlobalFallback: false,
+        })
+      : verifiedRequested
+        ? resolveToolsCapableAttempts({
+            requestedModel: requestedRaw,
+            attempts: attemptChain,
+          })
+        : null;
+
+    const concreteToolAttemptsAvailable =
+      toolsResolved != null && toolsResolved.attempts.length > 0;
+
+    if (strictToolCallRequest && !concreteToolAttemptsAvailable) {
       const errorCode = MODEL_NOT_TOOL_CAPABLE_CODE;
       const errorMessage = MODEL_NOT_TOOL_CAPABLE_MESSAGE;
-      const routing = makeFailRouting({
-        errorCode,
-        attemptedModels: attempts.length > 0 ? attempts : [requestedModel],
-        fallbackReason: "model_not_tool_capable",
-      });
+      const suggestedModels = toolsCapableSuggestions().filter((id) =>
+        isVerifiedToolCapableModel(id)
+      );
       log.warn("model_not_tool_capable", {
         code: errorCode,
-        ...routingEvidenceToLogFields(routing, {
-          route,
-          status: 400,
-          attemptedModel: attempts[0] ?? requestedModel,
-          providerId: null,
-          providerLabel: null,
-          upstreamStatus: null,
-          upstreamErrorCode: null,
-        }),
+        ...routingEvidenceToLogFields(
+          makeFailRouting({
+            errorCode,
+            attemptedModels: attemptChain,
+            fallbackReason: "model_not_tool_capable",
+          }),
+          {
+            route,
+            status: 400,
+            attemptedModel: attemptChain[0] ?? requestedModel,
+            providerId: null,
+            providerLabel: null,
+            upstreamStatus: null,
+            upstreamErrorCode: null,
+          }
+        ),
         supportsTools: false,
         hasTools: true,
         toolChoice: toolChoiceSummary(body),
+        requireToolCall: clientRequiresToolCall(body),
+        strictToolCall: true,
+        isAlias,
+        verifiedRequested,
+        bodyKeys: chatBodyKeysForLog(body),
+      });
+      const routing = makeFailRouting({
+        errorCode,
+        attemptedModels: attemptChain,
+        fallbackReason: "model_not_tool_capable",
       });
       await writeUsageLog(
         failedUsageLog({
@@ -699,25 +654,48 @@ export async function executeChatCompletion(
         errorMessage,
         requestId,
         httpStatus: 400,
+        ...(suggestedModels.length ? { suggestedModels } : {}),
         routing,
       };
     }
-    toolsFallbackApplied = toolsResolved.fallbackApplied;
-    attempts = toolsResolved.attempts;
-    log.info("chat_tools_capability", {
-      requestId,
-      route,
-      requestedModel: requestedRaw,
-      resolvedModel: requestedModel,
-      attemptedModel: attempts[0] ?? null,
-      supportsTools: toolsResolved.supportsTools,
-      supportsToolsRequested: verifiedRequested,
-      hasTools: true,
-      toolChoice: toolChoiceSummary(body),
-      bodyKeys: chatBodyKeysForLog(body),
-      toolsFallbackApplied,
-      attempts,
-    });
+
+    if (!strictToolCallRequest && !concreteToolAttemptsAvailable) {
+      // tool_choice:auto with no concrete capable attempt → ordinary chat.
+      toolsDegradedToChat = true;
+      upstreamBodySource = stripToolsFromChatBody(
+        body as Record<string, unknown>
+      ) as ChatCompletionRequestBody;
+      log.info("chat_tools_degraded_to_chat", {
+        requestId,
+        route,
+        requestedModel: requestedRaw,
+        resolvedModel: requestedModel,
+        hasTools: true,
+        toolChoice: toolChoiceSummary(body),
+        autoNoToolCall: true,
+        supportsTools: false,
+        isAlias,
+        verifiedRequested,
+      });
+    } else if (concreteToolAttemptsAvailable && toolsResolved) {
+      toolsFallbackApplied = toolsResolved.fallbackApplied;
+      attempts = toolsResolved.attempts;
+      log.info("chat_tools_capability", {
+        requestId,
+        route,
+        requestedModel: requestedRaw,
+        resolvedModel: requestedModel,
+        attemptedModel: attempts[0] ?? null,
+        supportsTools: toolsResolved.supportsTools,
+        supportsToolsRequested: verifiedRequested,
+        hasTools: true,
+        toolChoice: toolChoiceSummary(body),
+        bodyKeys: chatBodyKeysForLog(body),
+        toolsFallbackApplied,
+        isAlias,
+        attempts,
+      });
+    }
   } else {
     log.info("chat_request_capability", {
       requestId,
@@ -1216,7 +1194,16 @@ async function runProviderAttempts(args: {
         let upstreamBody: Record<string, unknown> = {};
 
         // Emulated path may do one same-provider repair retry (no debit yet).
+        // P1019 — recompute remaining budget every loop iteration (including repair).
+        let lastFreshRemainingTotalMs = remainingTotalMs;
         for (;;) {
+          const freshRemainingTotalMs =
+            timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt);
+          lastFreshRemainingTotalMs = freshRemainingTotalMs;
+          if (freshRemainingTotalMs <= 0) {
+            throw ApiError.requestTimeout();
+          }
+
           upstreamBody = buildUpstreamChatBody(body, attemptModel);
           if (toolMode === "emulated_json") {
             upstreamBody = compileEmulatedUpstreamBody(
@@ -1242,7 +1229,7 @@ async function runProviderAttempts(args: {
 
           const perAttemptTimeoutMs = Math.min(
             timeoutPolicy.upstreamTimeoutMs,
-            remainingTotalMs
+            freshRemainingTotalMs
           );
 
           const useGemini25FlashStreamFallback =
@@ -1255,7 +1242,7 @@ async function runProviderAttempts(args: {
 
           const idleTimeoutMs =
             clientStream && !useGemini25FlashStreamFallback
-              ? Math.min(timeoutPolicy.idleTimeoutMs, remainingTotalMs)
+              ? Math.min(timeoutPolicy.idleTimeoutMs, freshRemainingTotalMs)
               : undefined;
 
           const logCtx = {
@@ -1268,22 +1255,34 @@ async function runProviderAttempts(args: {
           };
 
           if (useGemini25FlashStreamFallback) {
-            const remainingMs =
-              timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt);
-            if (remainingMs <= 5_000 && allDegraded && clientStream) {
+            // Never invent budget above the fresh remaining total.
+            if (freshRemainingTotalMs <= 0) {
               throw ApiError.requestTimeout(
                 "Upstream provider timed out.",
                 "上游模型响应超时，请稍后重试或切换模型。"
               );
             }
-            const streamWallMs = Math.max(5_000, remainingMs);
+            if (freshRemainingTotalMs <= 5_000 && allDegraded && clientStream) {
+              throw ApiError.requestTimeout(
+                "Upstream provider timed out.",
+                "上游模型响应超时，请稍后重试或切换模型。"
+              );
+            }
+            const streamWallMs = Math.min(
+              freshRemainingTotalMs,
+              Math.max(1, freshRemainingTotalMs)
+            );
             const streamIdleMs = Math.min(
               timeoutPolicy.idleTimeoutMs,
-              streamWallMs
+              streamWallMs,
+              freshRemainingTotalMs
             );
-            const nativeTimeoutMs = clientStream
-              ? Math.min(20_000, perAttemptTimeoutMs)
-              : perAttemptTimeoutMs;
+            const nativeTimeoutMs = Math.min(
+              freshRemainingTotalMs,
+              clientStream
+                ? Math.min(20_000, perAttemptTimeoutMs)
+                : perAttemptTimeoutMs
+            );
             const nativeNonStreamAvailable = !(allDegraded && clientStream);
 
             log.info("chat_gemini25_flash_prefer_native_nonstream", {
@@ -1297,6 +1296,8 @@ async function runProviderAttempts(args: {
               nativeTimeoutMs,
               streamWallMs,
               streamIdleMs,
+              freshRemainingTotalMs,
+              repairAttempted,
               billing_status: "not_billable",
             });
 
@@ -1329,7 +1330,7 @@ async function runProviderAttempts(args: {
                   : "native_nonstream_unavailable",
                 clientStream,
                 billing_status: "not_billable",
-                remainingMs,
+                remainingMs: freshRemainingTotalMs,
                 streamWallMs,
                 streamIdleMs,
               });
@@ -1338,6 +1339,17 @@ async function runProviderAttempts(args: {
             upstreamId = fetched.upstreamId;
             viaStreamFallback = fetched.viaStreamAssemble;
           } else {
+            log.info("chat_provider_attempt_budget", {
+              requestId,
+              route,
+              providerId: provider.id,
+              attemptModel,
+              repairAttempted,
+              freshRemainingTotalMs,
+              perAttemptTimeoutMs,
+              idleTimeoutMs: idleTimeoutMs ?? null,
+              billing_status: "not_billable",
+            });
             const fetched = await providerFetch<ChatCompletionResponse>(
               provider,
               provider.chatPath,
@@ -1391,6 +1403,10 @@ async function runProviderAttempts(args: {
                     providerId: provider.id,
                     attemptModel,
                     code: parseErr.code,
+                    freshRemainingTotalMs: Math.max(
+                      0,
+                      timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt)
+                    ),
                     billing_status: "not_billable",
                   });
                   continue;
@@ -1453,10 +1469,10 @@ async function runProviderAttempts(args: {
           throw guardErr;
         }
 
-        // Keep a local alias used by later logging that expected the old name.
+        // Log-compat timeout snapshot (post-success); use last fresh budget.
         const perAttemptTimeoutMs = Math.min(
           timeoutPolicy.upstreamTimeoutMs,
-          remainingTotalMs
+          lastFreshRemainingTotalMs
         );
 
         const upstreamUsage = normalizeUsage(data.usage);

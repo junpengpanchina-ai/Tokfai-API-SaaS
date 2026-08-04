@@ -220,7 +220,13 @@ export function stripToolsFromChatBody<T extends Record<string, unknown>>(
 export function resolveToolsCapableAttempts(args: {
   requestedModel: string;
   attempts: string[];
+  /** See resolveToolCallingAttempts.allowGlobalFallback */
+  allowGlobalFallback?: boolean;
 }): { attempts: string[]; supportsTools: boolean; fallbackApplied: boolean } | null {
+  if (_toolsCapableAttemptsTestForceNull === true) {
+    return null;
+  }
+
   const fromRegistry = resolveToolCallingAttempts(args);
   if (fromRegistry) return fromRegistry;
 
@@ -239,6 +245,10 @@ export function resolveToolsCapableAttempts(args: {
     };
   }
 
+  if (args.allowGlobalFallback === false) {
+    return null;
+  }
+
   const verifiedFallbacks = TOOLS_CAPABLE_FALLBACK_MODELS.filter((id) =>
     isVerifiedToolCapableModel(id)
   );
@@ -251,6 +261,18 @@ export function resolveToolsCapableAttempts(args: {
   }
 
   return null;
+}
+
+/**
+ * P1019 test hook (same pattern as imageQuotaGuards __testSet).
+ * When true, resolveToolsCapableAttempts returns null (no concrete capable).
+ */
+let _toolsCapableAttemptsTestForceNull: boolean | null = null;
+
+export function __toolsCapableAttemptsTestSet(
+  forceNull: boolean | null
+): void {
+  _toolsCapableAttemptsTestForceNull = forceNull;
 }
 
 /** Normalize non-stream OpenAI message so tool_calls imply finish_reason=tool_calls. */
