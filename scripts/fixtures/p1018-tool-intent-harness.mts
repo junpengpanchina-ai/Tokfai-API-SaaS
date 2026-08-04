@@ -60,6 +60,8 @@ export const WEATHER_TOOLS = [
 export type Counts = {
   providerCallCount: number;
   repairCallCount: number;
+  /** P1028 — emulated_json call used as auto intent arbitration (not repair). */
+  arbitrationCallCount: number;
   fallbackCount: number;
   debitCallCount: number;
   usageLogInsertCount: number;
@@ -127,6 +129,7 @@ export function freshCounts(): Counts {
   return {
     providerCallCount: 0,
     repairCallCount: 0,
+    arbitrationCallCount: 0,
     fallbackCount: 0,
     debitCallCount: 0,
     usageLogInsertCount: 0,
@@ -455,6 +458,16 @@ export async function installP1018Mocks(): Promise<void> {
         const isRepair = flat.includes(REPAIR_MARKER);
         if (hasCompiler) counts.compilerSeenCount += 1;
         if (isRepair) counts.repairCallCount += 1;
+        // P1028 — arbitration = first emulated compile after a prior native call
+        // on the same script sequence (no REPAIR_MARKER).
+        if (
+          hasCompiler &&
+          !isRepair &&
+          counts.outboundBodies.length > 0 &&
+          counts.outboundBodies[counts.outboundBodies.length - 1]!.hasTools
+        ) {
+          counts.arbitrationCallCount += 1;
+        }
 
         const toolNames: string[] = [];
         if (Array.isArray(json.tools)) {
@@ -654,6 +667,7 @@ export function defaultProviders(ids: string[] = ["grsai-primary"]) {
 export type AssertMeta = {
   providerCallCount: number;
   repairCallCount: number;
+  arbitrationCallCount?: number;
   fallbackCount: number;
   debitCallCount: number;
   billing_status?: string | null;
@@ -673,6 +687,7 @@ export function billingSnapshot(
     return {
       providerCallCount: c.providerCallCount,
       repairCallCount: c.repairCallCount,
+      arbitrationCallCount: c.arbitrationCallCount,
       fallbackCount: c.fallbackCount,
       debitCallCount: c.debitCallCount,
       billing_status: tokfai.billing_status ?? null,
@@ -689,6 +704,7 @@ export function billingSnapshot(
   return {
     providerCallCount: c.providerCallCount,
     repairCallCount: c.repairCallCount,
+    arbitrationCallCount: c.arbitrationCallCount,
     fallbackCount: c.fallbackCount,
     debitCallCount: c.debitCallCount,
     billing_status: "not_billable",

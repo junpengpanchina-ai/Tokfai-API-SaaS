@@ -10,6 +10,7 @@ import {
   TOOL_CALL_NOT_GENERATED_CODE,
   TOOLS_CAPABLE_FALLBACK_MODELS,
   clientRequiresToolCall,
+  effectiveToolChoice,
   extractResponseFinishReason,
   isStrictToolCallRequest,
   isVerifiedToolCapableModel,
@@ -21,6 +22,7 @@ import {
   resolveToolCallingMode,
   canNativeEmulatedRepair,
   responseHasToolCalls,
+  shouldAttemptAutoToolIntentArbitration,
   stripToolsFromChatBody,
   toolChoiceSummary,
   type ToolCallingMode,
@@ -1275,17 +1277,76 @@ async function runProviderAttempts(args: {
         // P1020 — active mode may switch native → emulated_json once for
         // controlled repair; reported tool_calling_mode follows the mode that
         // produced the final success (or the last attempt on failure).
+        // P1028 — native auto may do ONE emulated_json intent arbitration;
+        // failure safely falls back to the original native text (never 5xx).
         let activeToolMode: ToolCallingMode = toolMode;
         let repairAttempted = false;
-        let data: ChatCompletionResponse;
+        let autoIntentArbitrationAttempted = false;
+        let autoIntentArbitrationInFlight = false;
+        let savedNativeForArbitration: Record<string, unknown> | null = null;
+        // Definite assignment: loop always assigns before success path, but
+        // closure-based arbitration restore is opaque to tsc control flow.
+        let data = null as unknown as ChatCompletionResponse;
         let upstreamId: string | null = null;
         let viaStreamFallback = false;
-        let normalizedData: Record<string, unknown>;
+        let normalizedData: Record<string, unknown> = {};
         let upstreamReturnedToolCalls = false;
         let upstreamBody: Record<string, unknown> = {};
 
+        const logAutoArbitration = (fields: {
+          arbitrationResult:
+            | "tool_calls"
+            | "assistant_text"
+            | "invalid"
+            | "timeout"
+            | "transport_failure";
+          toolCallCount: number;
+          fallbackToOriginalText: boolean;
+        }) => {
+          log.info("native_auto_no_tool_intent_arbitration", {
+            requestId,
+            route,
+            providerId: provider.id,
+            attemptedModel: attemptModel,
+            activeToolMode,
+            hasTools: hasToolsClient,
+            toolChoice: toolChoiceSummary(clientBody),
+            arbitrationAttempted: true,
+            arbitrationResult: fields.arbitrationResult,
+            toolCallCount: fields.toolCallCount,
+            fallbackToOriginalText: fields.fallbackToOriginalText,
+            billing_status: "not_billable",
+            credits_charged: 0,
+            freshRemainingTotalMs: Math.max(
+              0,
+              timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt)
+            ),
+          });
+        };
+
+        const restoreNativeAfterArbitrationFailure = (result:
+          | "invalid"
+          | "timeout"
+          | "transport_failure") => {
+          if (!savedNativeForArbitration) {
+            throw new Error(
+              "P1028: missing saved native response for arbitration fallback"
+            );
+          }
+          normalizedData = savedNativeForArbitration;
+          upstreamReturnedToolCalls = responseHasToolCalls(normalizedData);
+          activeToolMode = "native";
+          autoIntentArbitrationInFlight = false;
+          logAutoArbitration({
+            arbitrationResult: result,
+            toolCallCount: 0,
+            fallbackToOriginalText: true,
+          });
+        };
+
         // Emulated path may do one same-provider repair retry (no debit yet).
         // Native strict may do one controlled emulated_json repair (P1020).
+        // Native auto may do one intent arbitration (P1028).
         // P1019 — recompute remaining budget every loop iteration (including repair).
         let lastFreshRemainingTotalMs = remainingTotalMs;
         for (;;) {
@@ -1327,7 +1388,11 @@ async function runProviderAttempts(args: {
             });
           }
 
-          if (attemptIndex === 0 && !repairAttempted) {
+          if (
+            attemptIndex === 0 &&
+            !repairAttempted &&
+            !autoIntentArbitrationAttempted
+          ) {
             const droppedKeys = droppedUpstreamChatKeysForAudit(
               clientBody as Record<string, unknown>
             );
@@ -1368,115 +1433,143 @@ async function runProviderAttempts(args: {
             providerId: provider.id,
           };
 
-          if (useGemini25FlashStreamFallback) {
-            // Never invent budget above the fresh remaining total.
-            if (freshRemainingTotalMs <= 0) {
-              throw ApiError.requestTimeout(
-                "Upstream provider timed out.",
-                "上游模型响应超时，请稍后重试或切换模型。"
+          try {
+            if (useGemini25FlashStreamFallback) {
+              // Never invent budget above the fresh remaining total.
+              if (freshRemainingTotalMs <= 0) {
+                throw ApiError.requestTimeout(
+                  "Upstream provider timed out.",
+                  "上游模型响应超时，请稍后重试或切换模型。"
+                );
+              }
+              if (freshRemainingTotalMs <= 5_000 && allDegraded && clientStream) {
+                throw ApiError.requestTimeout(
+                  "Upstream provider timed out.",
+                  "上游模型响应超时，请稍后重试或切换模型。"
+                );
+              }
+              const streamWallMs = Math.min(
+                freshRemainingTotalMs,
+                Math.max(1, freshRemainingTotalMs)
               );
-            }
-            if (freshRemainingTotalMs <= 5_000 && allDegraded && clientStream) {
-              throw ApiError.requestTimeout(
-                "Upstream provider timed out.",
-                "上游模型响应超时，请稍后重试或切换模型。"
+              const streamIdleMs = Math.min(
+                timeoutPolicy.idleTimeoutMs,
+                streamWallMs,
+                freshRemainingTotalMs
               );
-            }
-            const streamWallMs = Math.min(
-              freshRemainingTotalMs,
-              Math.max(1, freshRemainingTotalMs)
-            );
-            const streamIdleMs = Math.min(
-              timeoutPolicy.idleTimeoutMs,
-              streamWallMs,
-              freshRemainingTotalMs
-            );
-            const nativeTimeoutMs = Math.min(
-              freshRemainingTotalMs,
-              clientStream
-                ? Math.min(20_000, perAttemptTimeoutMs)
-                : perAttemptTimeoutMs
-            );
-            const nativeNonStreamAvailable = !(allDegraded && clientStream);
+              const nativeTimeoutMs = Math.min(
+                freshRemainingTotalMs,
+                clientStream
+                  ? Math.min(20_000, perAttemptTimeoutMs)
+                  : perAttemptTimeoutMs
+              );
+              const nativeNonStreamAvailable = !(allDegraded && clientStream);
 
-            log.info("chat_gemini25_flash_prefer_native_nonstream", {
-              requestId,
-              route,
-              requestedModel,
-              attemptModel,
-              providerId: provider.id,
-              clientStream,
-              nativeNonStreamAvailable,
-              nativeTimeoutMs,
-              streamWallMs,
-              streamIdleMs,
-              freshRemainingTotalMs,
-              repairAttempted,
-              billing_status: "not_billable",
-            });
-
-            const fetched =
-              await providerFetchChatPreferNativeNonStream<ChatCompletionResponse>(
-                provider,
-                provider.chatPath,
-                {
-                  method: "POST",
-                  json: upstreamBody,
-                  timeoutMs: nativeTimeoutMs,
-                  nativeNonStreamAvailable,
-                  allowStreamAssembleFallback: true,
-                  isStreamAssembleEligible:
-                    isGemini25FlashStreamFallbackEligible,
-                  streamAssembleTimeoutMs: streamWallMs,
-                  streamAssembleIdleTimeoutMs: streamIdleMs,
-                },
-                logCtx
-              );
-            if (fetched.viaStreamAssemble) {
-              log.warn("chat_gemini25_flash_nonstream_stream_fallback", {
+              log.info("chat_gemini25_flash_prefer_native_nonstream", {
                 requestId,
                 route,
                 requestedModel,
                 attemptModel,
                 providerId: provider.id,
-                reason: nativeNonStreamAvailable
-                  ? "native_nonstream_failed"
-                  : "native_nonstream_unavailable",
                 clientStream,
-                billing_status: "not_billable",
-                remainingMs: freshRemainingTotalMs,
+                nativeNonStreamAvailable,
+                nativeTimeoutMs,
                 streamWallMs,
                 streamIdleMs,
+                freshRemainingTotalMs,
+                repairAttempted,
+                billing_status: "not_billable",
               });
+
+              const fetched =
+                await providerFetchChatPreferNativeNonStream<ChatCompletionResponse>(
+                  provider,
+                  provider.chatPath,
+                  {
+                    method: "POST",
+                    json: upstreamBody,
+                    timeoutMs: nativeTimeoutMs,
+                    nativeNonStreamAvailable,
+                    allowStreamAssembleFallback: true,
+                    isStreamAssembleEligible:
+                      isGemini25FlashStreamFallbackEligible,
+                    streamAssembleTimeoutMs: streamWallMs,
+                    streamAssembleIdleTimeoutMs: streamIdleMs,
+                  },
+                  logCtx
+                );
+              if (fetched.viaStreamAssemble) {
+                log.warn("chat_gemini25_flash_nonstream_stream_fallback", {
+                  requestId,
+                  route,
+                  requestedModel,
+                  attemptModel,
+                  providerId: provider.id,
+                  reason: nativeNonStreamAvailable
+                    ? "native_nonstream_failed"
+                    : "native_nonstream_unavailable",
+                  clientStream,
+                  billing_status: "not_billable",
+                  remainingMs: freshRemainingTotalMs,
+                  streamWallMs,
+                  streamIdleMs,
+                });
+              }
+              data = fetched.data;
+              upstreamId = fetched.upstreamId;
+              viaStreamFallback = fetched.viaStreamAssemble;
+            } else {
+              log.info("chat_provider_attempt_budget", {
+                requestId,
+                route,
+                providerId: provider.id,
+                attemptModel,
+                repairAttempted,
+                freshRemainingTotalMs,
+                perAttemptTimeoutMs,
+                idleTimeoutMs: idleTimeoutMs ?? null,
+                billing_status: "not_billable",
+              });
+              const fetched = await providerFetch<ChatCompletionResponse>(
+                provider,
+                provider.chatPath,
+                {
+                  method: "POST",
+                  json: upstreamBody,
+                  timeoutMs: perAttemptTimeoutMs,
+                  ...(idleTimeoutMs != null ? { idleTimeoutMs } : {}),
+                },
+                logCtx
+              );
+              data = fetched.data;
+              upstreamId = fetched.upstreamId;
             }
-            data = fetched.data;
-            upstreamId = fetched.upstreamId;
-            viaStreamFallback = fetched.viaStreamAssemble;
-          } else {
-            log.info("chat_provider_attempt_budget", {
-              requestId,
-              route,
-              providerId: provider.id,
-              attemptModel,
-              repairAttempted,
-              freshRemainingTotalMs,
-              perAttemptTimeoutMs,
-              idleTimeoutMs: idleTimeoutMs ?? null,
-              billing_status: "not_billable",
-            });
-            const fetched = await providerFetch<ChatCompletionResponse>(
-              provider,
-              provider.chatPath,
-              {
-                method: "POST",
-                json: upstreamBody,
-                timeoutMs: perAttemptTimeoutMs,
-                ...(idleTimeoutMs != null ? { idleTimeoutMs } : {}),
-              },
-              logCtx
-            );
-            data = fetched.data;
-            upstreamId = fetched.upstreamId;
+          } catch (fetchErr) {
+            // P1028 — arbitration transport/timeout must not upgrade a prior
+            // native auto text success into provider fallback / 5xx.
+            if (
+              autoIntentArbitrationInFlight &&
+              savedNativeForArbitration &&
+              fetchErr instanceof ApiError
+            ) {
+              const remainingAfterFetch =
+                timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt);
+              const isTotalTimeout =
+                remainingAfterFetch <= 0 ||
+                fetchErr.upstreamErrorSnippet === "total_request_timeout";
+              if (isTotalTimeout) {
+                throw fetchErr instanceof ApiError &&
+                  fetchErr.code === "upstream_timeout"
+                  ? fetchErr
+                  : ApiError.requestTimeout();
+              }
+              const isTimeout = fetchErr.code === "upstream_timeout";
+              restoreNativeAfterArbitrationFailure(
+                isTimeout ? "timeout" : "transport_failure"
+              );
+              break;
+            }
+            throw fetchErr;
           }
 
           normalizedData = normalizeToolCallsOnChatCompletion(
@@ -1514,7 +1607,32 @@ async function runProviderAttempts(args: {
                 normalizedData =
                   normalizeToolCallsOnChatCompletion(normalizedData);
                 upstreamReturnedToolCalls = responseHasToolCalls(normalizedData);
+                if (autoIntentArbitrationInFlight) {
+                  const toolCallCount = upstreamReturnedToolCalls
+                    ? ((
+                        (
+                          (normalizedData.choices as unknown[])?.[0] as
+                            | Record<string, unknown>
+                            | undefined
+                        )?.message as Record<string, unknown> | undefined
+                      )?.tool_calls as unknown[] | undefined)?.length ?? 0
+                    : 0;
+                  logAutoArbitration({
+                    arbitrationResult: upstreamReturnedToolCalls
+                      ? "tool_calls"
+                      : "assistant_text",
+                    toolCallCount,
+                    fallbackToOriginalText: false,
+                  });
+                  autoIntentArbitrationInFlight = false;
+                }
               } catch (parseErr) {
+                // P1028 — auto arbitration: never repair-retry or 5xx; restore
+                // the original native plain-text success.
+                if (autoIntentArbitrationInFlight && savedNativeForArbitration) {
+                  restoreNativeAfterArbitrationFailure("invalid");
+                  break;
+                }
                 if (
                   parseErr instanceof ApiError &&
                   !repairAttempted &&
@@ -1538,6 +1656,22 @@ async function runProviderAttempts(args: {
                 }
                 throw parseErr;
               }
+            } else if (autoIntentArbitrationInFlight) {
+              // Emulated upstream already returned native-shaped tool_calls.
+              const toolCallCount =
+                ((
+                  (
+                    (normalizedData.choices as unknown[])?.[0] as
+                      | Record<string, unknown>
+                      | undefined
+                  )?.message as Record<string, unknown> | undefined
+                )?.tool_calls as unknown[] | undefined)?.length ?? 0;
+              logAutoArbitration({
+                arbitrationResult: "tool_calls",
+                toolCallCount,
+                fallbackToOriginalText: false,
+              });
+              autoIntentArbitrationInFlight = false;
             }
             break;
           }
@@ -1546,6 +1680,7 @@ async function runProviderAttempts(args: {
           // Strict/required with no tool_calls may do ONE controlled
           // emulated_json repair — never fake plain text as success.
           // P1024 — when forcedToolName is set, all tool_call names must match.
+          // P1028 — auto with no tool_calls may do ONE intent arbitration.
           if (activeToolMode === "native") {
             if (upstreamReturnedToolCalls) {
               if (forcedToolName) {
@@ -1643,6 +1778,38 @@ async function runProviderAttempts(args: {
               });
               throw guardErr;
             }
+
+            // P1028 — auto: one controlled emulated_json intent arbitration
+            // before accepting ordinary text. Safe-fallback on failure.
+            const finishForArbitration =
+              extractResponseFinishReason(normalizedData) ??
+              extractFinishReason(
+                normalizedData as unknown as ChatCompletionResponse
+              );
+            if (
+              !toolsDegradedToChat &&
+              canNativeEmulatedRepair(provider.id, attemptModel) &&
+              shouldAttemptAutoToolIntentArbitration({
+                hasTools: hasToolsClient,
+                supportsToolsRequested,
+                effectiveToolChoice: effectiveToolChoice(clientBody),
+                activeToolMode,
+                upstreamReturnedToolCalls,
+                finishReason: finishForArbitration,
+                autoIntentArbitrationAttempted,
+                freshRemainingTotalMs: Math.max(
+                  0,
+                  timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt)
+                ),
+              })
+            ) {
+              autoIntentArbitrationAttempted = true;
+              autoIntentArbitrationInFlight = true;
+              savedNativeForArbitration = structuredClone(normalizedData);
+              activeToolMode = "emulated_json";
+              continue;
+            }
+
             // tool_choice=auto: plain text is allowed; preserve user semantics.
             break;
           }

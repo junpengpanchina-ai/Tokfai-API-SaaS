@@ -124,6 +124,13 @@ const ALLOWED_FIELD_KEYS = new Set([
   "finishReason",
   "fakeToolCallGuard",
   "autoNoToolCall",
+  // P1028 native auto no-tool intent arbitration
+  "activeToolMode",
+  "arbitrationAttempted",
+  "arbitrationResult",
+  "toolCallCount",
+  "fallbackToOriginalText",
+  "freshRemainingTotalMs",
 ]);
 
 const SENSITIVE_LOG_KEY_LITERAL =

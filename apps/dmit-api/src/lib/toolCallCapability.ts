@@ -12,6 +12,7 @@ import { isImageModel } from "../capabilities/modelCapabilityPolicy.js";
 import {
   modelHasToolCallingSupport,
   resolveToolCallingAttempts,
+  type ToolCallingMode,
 } from "./toolCallingModeRegistry.js";
 
 export {
@@ -185,6 +186,55 @@ export function extractResponseFinishReason(data: unknown): string | null {
   }
   const reason = (choices[0] as Record<string, unknown>).finish_reason;
   return typeof reason === "string" && reason.trim() ? reason.trim() : null;
+}
+
+/**
+ * P1028 — finish reasons that count as ordinary text completion (not tool /
+ * length / filter). Missing / empty is treated as stop-equivalent.
+ */
+export function isPlainTextCompletionFinishReason(
+  finishReason: string | null | undefined
+): boolean {
+  if (finishReason == null || finishReason === "") return true;
+  const r = finishReason.trim().toLowerCase();
+  return r === "stop" || r === "end_turn" || r === "stop_sequence";
+}
+
+/**
+ * P1028 — Whether effective tool_choice is OpenAI "auto" (including null /
+ * undefined with tools present, already normalized by effectiveToolChoice).
+ * Pure boolean; no provider / model names.
+ */
+export function isAutoEffectiveToolChoice(choice: unknown): boolean {
+  return choice === "auto" || choice === null || choice === undefined;
+}
+
+/**
+ * P1028 — AUTO NO-TOOL INTENT ARBITRATION gate.
+ *
+ * When native returns ordinary text under client auto tools, allow at most one
+ * controlled emulated_json intent arbitration instead of accepting text
+ * immediately. Provider-agnostic: no providerId / model hardcodes.
+ */
+export function shouldAttemptAutoToolIntentArbitration(args: {
+  hasTools: boolean;
+  supportsToolsRequested: boolean;
+  effectiveToolChoice: unknown;
+  activeToolMode: ToolCallingMode | string;
+  upstreamReturnedToolCalls: boolean;
+  finishReason: string | null | undefined;
+  autoIntentArbitrationAttempted: boolean;
+  freshRemainingTotalMs: number;
+}): boolean {
+  if (!args.hasTools) return false;
+  if (!args.supportsToolsRequested) return false;
+  if (!isAutoEffectiveToolChoice(args.effectiveToolChoice)) return false;
+  if (args.activeToolMode !== "native") return false;
+  if (args.upstreamReturnedToolCalls) return false;
+  if (!isPlainTextCompletionFinishReason(args.finishReason)) return false;
+  if (args.autoIntentArbitrationAttempted) return false;
+  if (!(args.freshRemainingTotalMs > 0)) return false;
+  return true;
 }
 
 /**
