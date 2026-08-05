@@ -25,6 +25,7 @@ import {
   loadExecuteChatCompletion,
   loadRespondEarlySse,
   makeToolCallIntent,
+  nativeToolCompletion,
   resetScenario,
 } from "./fixtures/p1018-tool-intent-harness.mts";
 import {
@@ -818,6 +819,7 @@ await checkAsync(
 );
 
 // ── 28. role=tool second round does not repeat old call ──────────────────
+// P1033 — resume with raw role=tool requires native tool-transcript model.
 await checkAsync(
   "28_role_tool_second_round",
   ["REAL executeChatCompletion ENTRY", "MOCK PROVIDER", "DEBIT SPY"],
@@ -826,14 +828,15 @@ await checkAsync(
       providers: defaultProviders(["grsai-primary"]),
       scripts: [
         () => ({
-          kind: "completion",
-          content: makeToolCallIntent("get_time", { tz: "Asia/Shanghai" }),
+          ...nativeToolCompletion("get_time", { tz: "Asia/Shanghai" }, {
+            id: "call_new_time",
+          }),
         }),
       ],
     });
     const result = await exec(
       {
-        model: "gemini-3-pro",
+        model: "gpt-5.5",
         messages: [
           { role: "user", content: "time?" },
           {

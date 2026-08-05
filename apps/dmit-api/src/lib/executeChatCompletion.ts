@@ -8,6 +8,8 @@ import {
   MODEL_NOT_TOOL_CAPABLE_CODE,
   MODEL_NOT_TOOL_CAPABLE_MESSAGE,
   TOOL_CALL_NOT_GENERATED_CODE,
+  TOOL_ROUND_RESUME_UNAVAILABLE_CODE,
+  TOOL_ROUND_RESUME_UNAVAILABLE_MESSAGE,
   TOOLS_CAPABLE_FALLBACK_MODELS,
   clientRequiresToolCall,
   effectiveToolChoice,
@@ -18,6 +20,7 @@ import {
   normalizeToolCallsOnChatCompletion,
   requestHasTools,
   requestHasNonEmptyTools,
+  resolveNativeToolResumeAttempts,
   resolveToolsCapableAttempts,
   resolveToolCallingMode,
   canNativeEmulatedRepair,
@@ -103,12 +106,12 @@ import {
   type BillableUsageStage,
 } from "./billableUsageAggregation.js";
 import {
-  analyzeToolRoundTrip,
   countTools,
   ensureClientSafeToolCallIdsOnCompletion,
   extractResponseToolCallMeta,
   summarizeRoleCounts,
   toolChoiceKind,
+  validateCursorToolTranscript,
 } from "./cursorToolProtocol.js";
 import {
   isGemini25FlashNonStreamStreamFallbackPath,
@@ -746,10 +749,15 @@ export async function executeChatCompletion(
     });
   }
 
-  // P1031 — Cursor protocol telemetry + role=tool round-trip id checks.
-  const roundTrip = analyzeToolRoundTrip(
+  // P1031/P1033 — Cursor protocol telemetry + role=tool transcript validation.
+  // Legal fully-matched tool results ⇒ resumeToolRound (not first-turn intent).
+  const toolTranscript = validateCursorToolTranscript(
     (body as { messages?: unknown }).messages
   );
+  const roundTrip = toolTranscript.analysis;
+  const resumeToolRound =
+    toolTranscript.ok && toolTranscript.resumeToolRound === true;
+
   if (supportsToolsRequested || roundTrip.toolMessageCount > 0) {
     const parallelRaw = (body as { parallel_tool_calls?: unknown })
       .parallel_tool_calls;
@@ -773,6 +781,7 @@ export async function executeChatCompletion(
       incomingToolCallIdMaxLength: roundTrip.incomingToolCallIdMaxLength,
       hasTools,
       supportsToolsRequested,
+      resumeToolRound,
     });
   }
   if (roundTrip.toolMessageCount > 0) {
@@ -784,25 +793,82 @@ export async function executeChatCompletion(
       mappedToolCallIds: roundTrip.mappedToolCallIds.slice(0, 32),
       unmatchedToolCallIdCount: roundTrip.unmatchedToolCallIdCount,
       messageCount: roundTrip.messageCount,
+      resumeToolRound,
+      duplicateToolResultCount: toolTranscript.duplicateToolResultCount,
+      orderViolationCount: toolTranscript.orderViolationCount,
     });
-    if (
-      roundTrip.knownAssistantToolCallIdCount > 0 &&
-      roundTrip.unmatchedToolCallIdCount > 0
-    ) {
-      const err = ApiError.badRequest(
-        "tool message tool_call_id does not match any assistant tool_calls id in messages.",
-        "invalid_tool_call_id"
-      );
-      const routing = makeFailRouting({
-        errorCode: err.code ?? "invalid_tool_call_id",
-        attemptedModels: attempts,
-        fallbackReason: "invalid_tool_call_id",
+  }
+
+  // P1033 — reject illegal tool transcripts before any provider fetch.
+  if (!toolTranscript.ok) {
+    const err = ApiError.badRequest(toolTranscript.message, toolTranscript.code);
+    const routing = makeFailRouting({
+      errorCode: toolTranscript.code,
+      attemptedModels: attempts,
+      fallbackReason: toolTranscript.code,
+    });
+    log.warn("cursor_tool_transcript_rejected", {
+      requestId,
+      route,
+      code: toolTranscript.code,
+      unmatchedToolCallIdCount: roundTrip.unmatchedToolCallIdCount,
+      toolMessageCount: roundTrip.toolMessageCount,
+      duplicateToolResultCount: toolTranscript.duplicateToolResultCount,
+      orderViolationCount: toolTranscript.orderViolationCount,
+      knownAssistantToolCallIdCount: roundTrip.knownAssistantToolCallIdCount,
+      billing_status: "not_billable",
+      credits_charged: 0,
+    });
+    await writeUsageLog(
+      failedUsageLog({
+        user_id: caller.userId,
+        api_key_id: caller.apiKeyId,
+        tenant_id: caller.tenantId,
+        model: requestedRaw,
+        status: "failed",
+        request_id: requestId,
+        error_code: toolTranscript.code,
+        error_message: err.publicMessage,
+        latency_ms: Date.now() - startedAt,
+        billing_status: "not_billable",
+        billable: false,
+        credits_charged: 0,
+      }),
+      route,
+      routingEvidenceSnapshot(routing)
+    );
+    return failureResult(err, requestId, requestedModel, routing);
+  }
+
+  // P1033 — resume must route to native tool-transcript providers only.
+  // Emulated_json (e.g. gemini-3-pro) must not receive raw role=tool messages;
+  // that path historically surfaced upstream "Forced absorb routing could not
+  // be satisfied" as invalid_request_error after AUTO/alias fallthrough.
+  if (resumeToolRound) {
+    const nativeResumeAttempts = resolveNativeToolResumeAttempts({
+      attempts: attempts.length > 0 ? attempts : [requestedModel],
+    });
+    if (nativeResumeAttempts.length === 0) {
+      const err = new ApiError({
+        status: 400,
+        message: TOOL_ROUND_RESUME_UNAVAILABLE_MESSAGE,
+        publicMessage: TOOL_ROUND_RESUME_UNAVAILABLE_MESSAGE,
+        code: TOOL_ROUND_RESUME_UNAVAILABLE_CODE,
+        type: "invalid_request_error",
       });
-      log.warn("cursor_tool_round2_unmatched_id", {
+      const routing = makeFailRouting({
+        errorCode: TOOL_ROUND_RESUME_UNAVAILABLE_CODE,
+        attemptedModels: attempts,
+        fallbackReason: TOOL_ROUND_RESUME_UNAVAILABLE_CODE,
+      });
+      log.warn("cursor_tool_round_resume_unavailable", {
         requestId,
         route,
-        unmatchedToolCallIdCount: roundTrip.unmatchedToolCallIdCount,
+        requestedModel: requestedRaw,
+        resolvedModel: requestedModel,
+        attemptedModels: attempts,
         toolMessageCount: roundTrip.toolMessageCount,
+        resumeToolRound: true,
         billing_status: "not_billable",
         credits_charged: 0,
       });
@@ -814,7 +880,7 @@ export async function executeChatCompletion(
           model: requestedRaw,
           status: "failed",
           request_id: requestId,
-          error_code: err.code ?? "invalid_tool_call_id",
+          error_code: TOOL_ROUND_RESUME_UNAVAILABLE_CODE,
           error_message: err.publicMessage,
           latency_ms: Date.now() - startedAt,
           billing_status: "not_billable",
@@ -825,6 +891,30 @@ export async function executeChatCompletion(
         routingEvidenceSnapshot(routing)
       );
       return failureResult(err, requestId, requestedModel, routing);
+    }
+    if (
+      nativeResumeAttempts.length !== attempts.length ||
+      nativeResumeAttempts[0] !== attempts[0]
+    ) {
+      log.info("cursor_tool_resume_native_routing", {
+        requestId,
+        route,
+        requestedModel: requestedRaw,
+        priorAttempts: attempts,
+        nativeResumeAttempts,
+        resumeToolRound: true,
+      });
+    }
+    attempts = nativeResumeAttempts;
+    // Resume must keep tools + role=tool transcript (never degrade-to-chat).
+    if (toolsDegradedToChat) {
+      toolsDegradedToChat = false;
+      upstreamBodySource = body;
+      log.info("cursor_tool_resume_undegrade", {
+        requestId,
+        route,
+        resumeToolRound: true,
+      });
     }
   }
 
@@ -1037,6 +1127,7 @@ export async function executeChatCompletion(
         toolsDegradedToChat,
         toolsFallbackApplied,
         supportsToolsRequested,
+        resumeToolRound,
         forcedToolName,
         requestedRaw,
         requestedModel,
@@ -1158,6 +1249,12 @@ async function runProviderAttempts(args: {
   toolsFallbackApplied: boolean;
   /** P1027 — true when client sent a non-empty tools array. */
   supportsToolsRequested: boolean;
+  /**
+   * P1033 — legal role=tool resume transcript. Prefer native providers;
+   * skip first-turn AUTO arbitration; never forward raw tool transcript to
+   * emulated_json without a compiler.
+   */
+  resumeToolRound: boolean;
   /** Client object tool_choice forced function name (P1024), or null. */
   forcedToolName: string | null;
   requestedRaw: string;
@@ -1180,6 +1277,7 @@ async function runProviderAttempts(args: {
     toolsDegradedToChat,
     toolsFallbackApplied,
     supportsToolsRequested,
+    resumeToolRound,
     forcedToolName,
     requestedRaw,
     requestedModel,
@@ -1370,6 +1468,18 @@ async function runProviderAttempts(args: {
           toolMode === "unsupported"
         ) {
           throw toolIntentApiError(TOOL_EMULATION_UNAVAILABLE_CODE);
+        }
+
+        // P1033 — never forward raw role=tool transcript to emulated_json.
+        // (No complete transcript compiler exists; upstream Forced absorb 400.)
+        if (resumeToolRound && toolMode === "emulated_json") {
+          throw new ApiError({
+            status: 400,
+            message: TOOL_ROUND_RESUME_UNAVAILABLE_MESSAGE,
+            publicMessage: TOOL_ROUND_RESUME_UNAVAILABLE_MESSAGE,
+            code: TOOL_ROUND_RESUME_UNAVAILABLE_CODE,
+            type: "invalid_request_error",
+          });
         }
 
         // P1020 — active mode may switch native → emulated_json once for
@@ -1831,6 +1941,7 @@ async function runProviderAttempts(args: {
                   if (
                     matchErr instanceof ApiError &&
                     !repairAttempted &&
+                    !resumeToolRound &&
                     canNativeEmulatedRepair(provider.id, attemptModel)
                   ) {
                     repairAttempted = true;
@@ -1858,6 +1969,7 @@ async function runProviderAttempts(args: {
             if (
               strictToolCallPending &&
               !repairAttempted &&
+              !resumeToolRound &&
               canNativeEmulatedRepair(provider.id, attemptModel)
             ) {
               repairAttempted = true;
@@ -1923,6 +2035,7 @@ async function runProviderAttempts(args: {
               );
             if (
               !toolsDegradedToChat &&
+              !resumeToolRound &&
               canNativeEmulatedRepair(provider.id, attemptModel) &&
               shouldAttemptAutoToolIntentArbitration({
                 hasTools: hasToolsClient,
@@ -1936,6 +2049,7 @@ async function runProviderAttempts(args: {
                   0,
                   timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt)
                 ),
+                resumeToolRound,
               })
             ) {
               // P1030 — capture Native HTTP 200 usage before arbitration

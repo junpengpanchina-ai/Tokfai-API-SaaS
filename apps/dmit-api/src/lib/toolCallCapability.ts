@@ -12,6 +12,7 @@ import { isImageModel } from "../capabilities/modelCapabilityPolicy.js";
 import {
   modelHasToolCallingSupport,
   resolveToolCallingAttempts,
+  resolveToolCallingMode,
   type ToolCallingMode,
 } from "./toolCallingModeRegistry.js";
 
@@ -26,6 +27,23 @@ export {
   listRegistryToolCapableModels,
   type ToolCallingMode,
 } from "./toolCallingModeRegistry.js";
+
+/**
+ * Live provider ids that can actually serve chat today. Reserved/disabled
+ * registry slots (openai-official / azure / …) must not make Gemini look
+ * "native" for resume routing via bestToolCallingModeForModel.
+ */
+const LIVE_TOOL_RESUME_PROVIDER_IDS = [
+  "grsai-primary",
+  "openai-compatible-secondary",
+] as const;
+
+/** P1033 — explicit resume failure (not a generic invalid_request_error). */
+export const TOOL_ROUND_RESUME_UNAVAILABLE_CODE =
+  "tool_round_resume_unavailable" as const;
+
+export const TOOL_ROUND_RESUME_UNAVAILABLE_MESSAGE =
+  "Tool-round resume requires a native OpenAI tool-transcript provider; none are available for this request.";
 
 export const MODEL_NOT_TOOL_CAPABLE_CODE = "model_not_tool_capable" as const;
 export const ALL_TOOL_UPSTREAMS_UNAVAILABLE_CODE =
@@ -215,6 +233,9 @@ export function isAutoEffectiveToolChoice(choice: unknown): boolean {
  * When native returns ordinary text under client auto tools, allow at most one
  * controlled emulated_json intent arbitration instead of accepting text
  * immediately. Provider-agnostic: no providerId / model hardcodes.
+ *
+ * P1033 — never run on resumeToolRound (role=tool results already present).
+ * A legal final assistant text after tool results is not "native missed intent".
  */
 export function shouldAttemptAutoToolIntentArbitration(args: {
   hasTools: boolean;
@@ -225,7 +246,10 @@ export function shouldAttemptAutoToolIntentArbitration(args: {
   finishReason: string | null | undefined;
   autoIntentArbitrationAttempted: boolean;
   freshRemainingTotalMs: number;
+  /** P1033 — legal role=tool resume; skip first-turn AUTO arbitration. */
+  resumeToolRound?: boolean;
 }): boolean {
+  if (args.resumeToolRound === true) return false;
   if (!args.hasTools) return false;
   if (!args.supportsToolsRequested) return false;
   if (!isAutoEffectiveToolChoice(args.effectiveToolChoice)) return false;
@@ -235,6 +259,39 @@ export function shouldAttemptAutoToolIntentArbitration(args: {
   if (args.autoIntentArbitrationAttempted) return false;
   if (!(args.freshRemainingTotalMs > 0)) return false;
   return true;
+}
+
+/**
+ * P1033 — True when a live provider can consume OpenAI role=tool transcripts
+ * natively for this upstream model.
+ */
+export function modelSupportsNativeToolResume(upstreamModelId: string): boolean {
+  const model = normalizeClientModelId(upstreamModelId);
+  if (!model) return false;
+  for (const providerId of LIVE_TOOL_RESUME_PROVIDER_IDS) {
+    if (resolveToolCallingMode(providerId, model) === "native") return true;
+  }
+  return false;
+}
+
+/**
+ * P1033 — Prefer models with live native tool-transcript support for resume.
+ * Emulated_json models must not receive raw role=tool transcripts
+ * (no transcript compiler). Returns empty when none remain.
+ */
+export function resolveNativeToolResumeAttempts(args: {
+  attempts: string[];
+}): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const id of args.attempts) {
+    const model = normalizeClientModelId(id);
+    if (!model || seen.has(model)) continue;
+    if (!modelSupportsNativeToolResume(model)) continue;
+    seen.add(model);
+    out.push(model);
+  }
+  return out;
 }
 
 /**

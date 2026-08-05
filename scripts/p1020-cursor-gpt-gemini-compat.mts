@@ -364,7 +364,10 @@ console.log("P1020 CURSOR GPT/GEMINI COMPATIBILITY\n");
   );
 }
 
-// ── 5. role=tool second round (gemini) ───────────────────────────────────
+// ── 5. role=tool second round (native resume) ────────────────────────────
+// P1033 — Round-1 may be gemini emulated; Round-2 with raw role=tool must
+// route to a native tool-transcript provider (gpt-5.5). Emulated_json must
+// not receive raw role=tool (Forced absorb / tool_round_resume_unavailable).
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -392,13 +395,18 @@ console.log("P1020 CURSOR GPT/GEMINI COMPATIBILITY\n");
     scripts: [
       () => ({
         kind: "completion",
-        content: makeAssistantTextIntent("Final answer after tool"),
+        content: "Final answer after tool",
+        usage: {
+          prompt_tokens: 40,
+          completion_tokens: 6,
+          total_tokens: 46,
+        },
       }),
     ],
   });
   const r2 = await exec(
     {
-      model: "gemini-3-pro",
+      model: "gpt-5.5",
       messages: [
         { role: "user", content: "w" },
         {
@@ -432,7 +440,8 @@ console.log("P1020 CURSOR GPT/GEMINI COMPATIBILITY\n");
       meta1.debitCallCount === 1 &&
       r2.ok === true &&
       meta2.debitCallCount === 1 &&
-      msg(r2)?.content === "Final answer after tool",
+      msg(r2)?.content === "Final answer after tool" &&
+      (meta2.arbitrationCallCount ?? 0) === 0,
     "5. role=tool second round → final text, debit×1 each",
     {
       ...meta2,

@@ -148,6 +148,13 @@ const ALLOWED_FIELD_KEYS = new Set([
   "toolCallIds",
   "mappedToolCallIds",
   "unmatchedToolCallIdCount",
+  // P1033 Cursor tool-result resume
+  "resumeToolRound",
+  "duplicateToolResultCount",
+  "orderViolationCount",
+  "knownAssistantToolCallIdCount",
+  "nativeResumeAttempts",
+  "priorAttempts",
   "emittedToolCallCount",
   "emittedToolIndexes",
   "emittedFinishReason",

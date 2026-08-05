@@ -785,6 +785,8 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
 }
 
 // ── N. role=tool second round — no cross-request residue ─────────────────
+// P1033 — resumeToolRound must NOT run first-turn AUTO arbitration, so round-2
+// bills a single native component (NATIVE_USAGE), not native+arb merge.
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -810,20 +812,17 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return {
-            kind: "completion",
-            content: "done after tool",
-            usage: NATIVE_USAGE,
-          };
-        }
-        return {
-          kind: "completion",
-          content: makeAssistantTextIntent("done after tool"),
-          usage: ARB_USAGE,
-        };
-      },
+      () => ({
+        kind: "completion",
+        content: "done after tool",
+        usage: NATIVE_USAGE,
+      }),
+      // Must not be consumed — arbitration is forbidden on resumeToolRound.
+      () => ({
+        kind: "completion",
+        content: makeAssistantTextIntent("arb should not run"),
+        usage: ARB_USAGE,
+      }),
     ],
   });
   const r2 = await exec(
@@ -854,9 +853,10 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
       tok1.prompt_tokens === NATIVE_USAGE.prompt_tokens &&
       r2.ok === true &&
       meta2.debitCallCount === 1 &&
+      (meta2.arbitrationCallCount ?? 0) === 0 &&
       msg(r2)?.content === "done after tool" &&
-      tok2.prompt_tokens === EXPECT_MERGED.prompt_tokens &&
-      near(tok2.credits_charged, sumCredits),
+      tok2.prompt_tokens === NATIVE_USAGE.prompt_tokens &&
+      near(tok2.credits_charged, nativeCredits),
     "N. role=tool second round — per-request components; no residue",
     {
       ...meta2,

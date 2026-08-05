@@ -468,9 +468,12 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
 }
 
 // ── 10. role=tool second round ───────────────────────────────────────────
+// P1033 — Round-2 resume with raw role=tool must use a native tool-transcript
+// provider (gpt-5.5). Gemini emulated_json must not receive raw role=tool
+// (no transcript compiler); that historically surfaced Forced absorb 400.
 {
   let firstToolCallId = "";
-  // Round 1 — gemini emulated
+  // Round 1 — gemini emulated first-turn tool_calls (still valid)
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
@@ -497,19 +500,24 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
     typeof firstToolCallId === "string" &&
     firstToolCallId.startsWith("call_");
 
-  // Round 2
+  // Round 2 — native resume consumes OpenAI tool transcript
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
       () => ({
         kind: "completion",
-        content: makeAssistantTextIntent("Tokyo is sunny"),
+        content: "Tokyo is sunny",
+        usage: {
+          prompt_tokens: 40,
+          completion_tokens: 6,
+          total_tokens: 46,
+        },
       }),
     ],
   });
   const r2 = await exec(
     {
-      model: "gemini-3-pro",
+      model: "gpt-5.5",
       messages: [
         { role: "user", content: "weather tokyo" },
         {
@@ -543,7 +551,8 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
     round1Ok &&
       r2.ok === true &&
       meta2.debitCallCount === 1 &&
-      m2?.content === "Tokyo is sunny",
+      m2?.content === "Tokyo is sunny" &&
+      (meta2.arbitrationCallCount ?? 0) === 0,
     "10. role=tool second round — each request debit×1",
     {
       ...meta2,
