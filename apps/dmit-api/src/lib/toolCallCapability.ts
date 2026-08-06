@@ -236,6 +236,7 @@ export function isAutoEffectiveToolChoice(choice: unknown): boolean {
  *
  * P1033 — never run on resumeToolRound (role=tool results already present).
  * A legal final assistant text after tool results is not "native missed intent".
+ * P1036 — Round-N continuation uses shouldAttemptResumeToolContinuationArbitration.
  */
 export function shouldAttemptAutoToolIntentArbitration(args: {
   hasTools: boolean;
@@ -257,6 +258,49 @@ export function shouldAttemptAutoToolIntentArbitration(args: {
   if (args.upstreamReturnedToolCalls) return false;
   if (!isPlainTextCompletionFinishReason(args.finishReason)) return false;
   if (args.autoIntentArbitrationAttempted) return false;
+  if (!(args.freshRemainingTotalMs > 0)) return false;
+  return true;
+}
+
+/**
+ * P1036 — Round-2+ continuation arbitration gate (independent of P1028).
+ *
+ * After a legal fully-matched tool transcript, if native returns ordinary text
+ * with no tool_calls, allow at most one controlled emulated_json continuation
+ * so the model may emit the *next* novel tool call. Never re-runs first-turn
+ * AUTO arbitration semantics; anti-replay of completed signatures is enforced
+ * after parse.
+ */
+export function shouldAttemptResumeToolContinuationArbitration(args: {
+  hasTools: boolean;
+  supportsToolsRequested: boolean;
+  effectiveToolChoice: unknown;
+  activeToolMode: ToolCallingMode | string;
+  upstreamReturnedToolCalls: boolean;
+  finishReason: string | null | undefined;
+  resumeToolRound: boolean;
+  unmatchedToolCallIdCount: number;
+  duplicateToolResultCount: number;
+  orderViolationCount: number;
+  continuationArbitrationAttempted: boolean;
+  /** Shared with first-turn AUTO: at most one arbitration per HTTP request. */
+  autoIntentArbitrationAttempted: boolean;
+  freshRemainingTotalMs: number;
+  upstreamHttpOk: boolean;
+}): boolean {
+  if (!args.resumeToolRound) return false;
+  if (!args.hasTools) return false;
+  if (!args.supportsToolsRequested) return false;
+  if (!isAutoEffectiveToolChoice(args.effectiveToolChoice)) return false;
+  if (args.activeToolMode !== "native") return false;
+  if (args.upstreamReturnedToolCalls) return false;
+  if (!isPlainTextCompletionFinishReason(args.finishReason)) return false;
+  if (args.unmatchedToolCallIdCount !== 0) return false;
+  if (args.duplicateToolResultCount !== 0) return false;
+  if (args.orderViolationCount !== 0) return false;
+  if (args.continuationArbitrationAttempted) return false;
+  if (args.autoIntentArbitrationAttempted) return false;
+  if (!args.upstreamHttpOk) return false;
   if (!(args.freshRemainingTotalMs > 0)) return false;
   return true;
 }

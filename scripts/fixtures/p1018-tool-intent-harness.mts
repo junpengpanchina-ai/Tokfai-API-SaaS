@@ -57,6 +57,58 @@ export const WEATHER_TOOLS = [
   },
 ] as const;
 
+/** P1036 — Cursor-like agent tools for Round-N continuation tests. */
+export const AGENT_FILE_TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "Read",
+      description: "Read a file",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+        },
+        required: ["path"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "Write",
+      description: "Write a file",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          contents: { type: "string" },
+        },
+        required: ["path", "contents"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "Edit",
+      description: "Edit a file",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          old_string: { type: "string" },
+          new_string: { type: "string" },
+        },
+        required: ["path", "old_string", "new_string"],
+        additionalProperties: false,
+      },
+    },
+  },
+] as const;
+
 export type Counts = {
   providerCallCount: number;
   repairCallCount: number;

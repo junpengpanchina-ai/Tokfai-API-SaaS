@@ -26,6 +26,7 @@ import {
   canNativeEmulatedRepair,
   responseHasToolCalls,
   shouldAttemptAutoToolIntentArbitration,
+  shouldAttemptResumeToolContinuationArbitration,
   stripToolsFromChatBody,
   toolChoiceSummary,
   type ToolCallingMode,
@@ -108,7 +109,10 @@ import {
 import {
   countTools,
   ensureClientSafeToolCallIdsOnCompletion,
+  extractCompletedToolSignatures,
+  extractHistoricalToolCallIds,
   extractResponseToolCallMeta,
+  filterNovelToolCallsOnCompletion,
   summarizeRoleCounts,
   toolChoiceKind,
   validateCursorToolTranscript,
@@ -1128,6 +1132,9 @@ export async function executeChatCompletion(
         toolsFallbackApplied,
         supportsToolsRequested,
         resumeToolRound,
+        unmatchedToolCallIdCount: roundTrip.unmatchedToolCallIdCount,
+        duplicateToolResultCount: toolTranscript.duplicateToolResultCount,
+        orderViolationCount: toolTranscript.orderViolationCount,
         forcedToolName,
         requestedRaw,
         requestedModel,
@@ -1253,8 +1260,13 @@ async function runProviderAttempts(args: {
    * P1033 — legal role=tool resume transcript. Prefer native providers;
    * skip first-turn AUTO arbitration; never forward raw tool transcript to
    * emulated_json without a compiler.
+   * P1036 — may still run ONE Round-N continuation arbitration.
    */
   resumeToolRound: boolean;
+  /** P1036 — transcript anti-replay counters (0 on legal resume). */
+  unmatchedToolCallIdCount: number;
+  duplicateToolResultCount: number;
+  orderViolationCount: number;
   /** Client object tool_choice forced function name (P1024), or null. */
   forcedToolName: string | null;
   requestedRaw: string;
@@ -1278,6 +1290,9 @@ async function runProviderAttempts(args: {
     toolsFallbackApplied,
     supportsToolsRequested,
     resumeToolRound,
+    unmatchedToolCallIdCount,
+    duplicateToolResultCount,
+    orderViolationCount,
     forcedToolName,
     requestedRaw,
     requestedModel,
@@ -1487,10 +1502,13 @@ async function runProviderAttempts(args: {
         // produced the final success (or the last attempt on failure).
         // P1028 — native auto may do ONE emulated_json intent arbitration;
         // failure safely falls back to the original native text (never 5xx).
+        // P1036 — resumeToolRound may do ONE continuation arbitration instead.
         let activeToolMode: ToolCallingMode = toolMode;
         let repairAttempted = false;
         let autoIntentArbitrationAttempted = false;
+        let continuationArbitrationAttempted = false;
         let autoIntentArbitrationInFlight = false;
+        let continuationArbitrationInFlight = false;
         let savedNativeForArbitration: Record<string, unknown> | null = null;
         // P1030 — request-scoped billable usage components for this
         // provider/model attempt only (discarded on provider fallback throw).
@@ -1528,50 +1546,66 @@ async function runProviderAttempts(args: {
           });
         };
 
+        const anyArbitrationInFlight = () =>
+          autoIntentArbitrationInFlight || continuationArbitrationInFlight;
+
         const logAutoArbitration = (fields: {
           arbitrationResult:
             | "tool_calls"
             | "assistant_text"
             | "invalid"
             | "timeout"
-            | "transport_failure";
+            | "transport_failure"
+            | "duplicate_replay";
           toolCallCount: number;
           fallbackToOriginalText: boolean;
+          kind?: "first_turn" | "continuation";
         }) => {
-          log.info("native_auto_no_tool_intent_arbitration", {
-            requestId,
-            route,
-            providerId: provider.id,
-            attemptedModel: attemptModel,
-            activeToolMode,
-            hasTools: hasToolsClient,
-            toolChoice: toolChoiceSummary(clientBody),
-            arbitrationAttempted: true,
-            arbitrationResult: fields.arbitrationResult,
-            toolCallCount: fields.toolCallCount,
-            fallbackToOriginalText: fields.fallbackToOriginalText,
-            billing_status: "not_billable",
-            credits_charged: 0,
-            freshRemainingTotalMs: Math.max(
-              0,
-              timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt)
-            ),
-          });
+          const kind =
+            fields.kind ??
+            (continuationArbitrationAttempted ? "continuation" : "first_turn");
+          log.info(
+            kind === "continuation"
+              ? "cursor_tool_continuation_arbitration"
+              : "native_auto_no_tool_intent_arbitration",
+            {
+              requestId,
+              route,
+              providerId: provider.id,
+              attemptedModel: attemptModel,
+              activeToolMode,
+              hasTools: hasToolsClient,
+              toolChoice: toolChoiceSummary(clientBody),
+              arbitrationAttempted: true,
+              arbitrationResult: fields.arbitrationResult,
+              toolCallCount: fields.toolCallCount,
+              fallbackToOriginalText: fields.fallbackToOriginalText,
+              resumeToolRound,
+              billing_status: "not_billable",
+              credits_charged: 0,
+              freshRemainingTotalMs: Math.max(
+                0,
+                timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt)
+              ),
+            }
+          );
         };
 
         const restoreNativeAfterArbitrationFailure = (result:
           | "invalid"
           | "timeout"
-          | "transport_failure") => {
+          | "transport_failure"
+          | "duplicate_replay") => {
           if (!savedNativeForArbitration) {
             throw new Error(
-              "P1028: missing saved native response for arbitration fallback"
+              "P1028/P1036: missing saved native response for arbitration fallback"
             );
           }
           normalizedData = savedNativeForArbitration;
           upstreamReturnedToolCalls = responseHasToolCalls(normalizedData);
           activeToolMode = "native";
           autoIntentArbitrationInFlight = false;
+          continuationArbitrationInFlight = false;
           logAutoArbitration({
             arbitrationResult: result,
             toolCallCount: 0,
@@ -1780,10 +1814,10 @@ async function runProviderAttempts(args: {
               upstreamId = fetched.upstreamId;
             }
           } catch (fetchErr) {
-            // P1028 — arbitration transport/timeout must not upgrade a prior
+            // P1028/P1036 — arbitration transport/timeout must not upgrade a prior
             // native auto text success into provider fallback / 5xx.
             if (
-              autoIntentArbitrationInFlight &&
+              anyArbitrationInFlight() &&
               savedNativeForArbitration &&
               fetchErr instanceof ApiError
             ) {
@@ -1814,7 +1848,7 @@ async function runProviderAttempts(args: {
 
           // P1030 — capture arbitration HTTP 200 usage before parse/mutation.
           // Transport/timeout failures never reach here (no forged component).
-          if (autoIntentArbitrationInFlight) {
+          if (anyArbitrationInFlight()) {
             pushBillableUsageComponent("auto_arbitration", {
               dataUsage: data.usage,
               requestBody: upstreamBody,
@@ -1852,29 +1886,60 @@ async function runProviderAttempts(args: {
                 normalizedData =
                   normalizeToolCallsOnChatCompletion(normalizedData);
                 upstreamReturnedToolCalls = responseHasToolCalls(normalizedData);
-                if (autoIntentArbitrationInFlight) {
-                  const toolCallCount = upstreamReturnedToolCalls
-                    ? ((
-                        (
-                          (normalizedData.choices as unknown[])?.[0] as
-                            | Record<string, unknown>
-                            | undefined
-                        )?.message as Record<string, unknown> | undefined
-                      )?.tool_calls as unknown[] | undefined)?.length ?? 0
-                    : 0;
-                  logAutoArbitration({
-                    arbitrationResult: upstreamReturnedToolCalls
-                      ? "tool_calls"
-                      : "assistant_text",
-                    toolCallCount,
-                    fallbackToOriginalText: false,
-                  });
-                  autoIntentArbitrationInFlight = false;
+                if (anyArbitrationInFlight()) {
+                  if (
+                    continuationArbitrationInFlight &&
+                    upstreamReturnedToolCalls
+                  ) {
+                    const filtered = filterNovelToolCallsOnCompletion(
+                      normalizedData,
+                      {
+                        completedSignatures: extractCompletedToolSignatures(
+                          (clientBody as { messages?: unknown }).messages
+                        ),
+                        historicalIds: extractHistoricalToolCallIds(
+                          (clientBody as { messages?: unknown }).messages
+                        ),
+                      }
+                    );
+                    if (!filtered) {
+                      restoreNativeAfterArbitrationFailure("duplicate_replay");
+                      break;
+                    }
+                    normalizedData = filtered.data;
+                    upstreamReturnedToolCalls = true;
+                    logAutoArbitration({
+                      arbitrationResult: "tool_calls",
+                      toolCallCount: filtered.novelCount,
+                      fallbackToOriginalText: false,
+                      kind: "continuation",
+                    });
+                    continuationArbitrationInFlight = false;
+                  } else {
+                    const toolCallCount = upstreamReturnedToolCalls
+                      ? ((
+                          (
+                            (normalizedData.choices as unknown[])?.[0] as
+                              | Record<string, unknown>
+                              | undefined
+                          )?.message as Record<string, unknown> | undefined
+                        )?.tool_calls as unknown[] | undefined)?.length ?? 0
+                      : 0;
+                    logAutoArbitration({
+                      arbitrationResult: upstreamReturnedToolCalls
+                        ? "tool_calls"
+                        : "assistant_text",
+                      toolCallCount,
+                      fallbackToOriginalText: false,
+                    });
+                    autoIntentArbitrationInFlight = false;
+                    continuationArbitrationInFlight = false;
+                  }
                 }
               } catch (parseErr) {
-                // P1028 — auto arbitration: never repair-retry or 5xx; restore
+                // P1028/P1036 — arbitration: never repair-retry or 5xx; restore
                 // the original native plain-text success.
-                if (autoIntentArbitrationInFlight && savedNativeForArbitration) {
+                if (anyArbitrationInFlight() && savedNativeForArbitration) {
                   restoreNativeAfterArbitrationFailure("invalid");
                   break;
                 }
@@ -1901,22 +1966,49 @@ async function runProviderAttempts(args: {
                 }
                 throw parseErr;
               }
-            } else if (autoIntentArbitrationInFlight) {
+            } else if (anyArbitrationInFlight()) {
               // Emulated upstream already returned native-shaped tool_calls.
-              const toolCallCount =
-                ((
-                  (
-                    (normalizedData.choices as unknown[])?.[0] as
-                      | Record<string, unknown>
-                      | undefined
-                  )?.message as Record<string, unknown> | undefined
-                )?.tool_calls as unknown[] | undefined)?.length ?? 0;
-              logAutoArbitration({
-                arbitrationResult: "tool_calls",
-                toolCallCount,
-                fallbackToOriginalText: false,
-              });
-              autoIntentArbitrationInFlight = false;
+              if (continuationArbitrationInFlight) {
+                const filtered = filterNovelToolCallsOnCompletion(
+                  normalizedData,
+                  {
+                    completedSignatures: extractCompletedToolSignatures(
+                      (clientBody as { messages?: unknown }).messages
+                    ),
+                    historicalIds: extractHistoricalToolCallIds(
+                      (clientBody as { messages?: unknown }).messages
+                    ),
+                  }
+                );
+                if (!filtered) {
+                  restoreNativeAfterArbitrationFailure("duplicate_replay");
+                  break;
+                }
+                normalizedData = filtered.data;
+                upstreamReturnedToolCalls = true;
+                logAutoArbitration({
+                  arbitrationResult: "tool_calls",
+                  toolCallCount: filtered.novelCount,
+                  fallbackToOriginalText: false,
+                  kind: "continuation",
+                });
+                continuationArbitrationInFlight = false;
+              } else {
+                const toolCallCount =
+                  ((
+                    (
+                      (normalizedData.choices as unknown[])?.[0] as
+                        | Record<string, unknown>
+                        | undefined
+                    )?.message as Record<string, unknown> | undefined
+                  )?.tool_calls as unknown[] | undefined)?.length ?? 0;
+                logAutoArbitration({
+                  arbitrationResult: "tool_calls",
+                  toolCallCount,
+                  fallbackToOriginalText: false,
+                });
+                autoIntentArbitrationInFlight = false;
+              }
             }
             break;
           }
@@ -2028,11 +2120,17 @@ async function runProviderAttempts(args: {
 
             // P1028 — auto: one controlled emulated_json intent arbitration
             // before accepting ordinary text. Safe-fallback on failure.
+            // P1036 — resumeToolRound: one continuation arbitration instead
+            // (never reuses first-turn AUTO semantics; anti-replay after parse).
             const finishForArbitration =
               extractResponseFinishReason(normalizedData) ??
               extractFinishReason(
                 normalizedData as unknown as ChatCompletionResponse
               );
+            const freshMsForArb = Math.max(
+              0,
+              timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt)
+            );
             if (
               !toolsDegradedToChat &&
               !resumeToolRound &&
@@ -2045,10 +2143,7 @@ async function runProviderAttempts(args: {
                 upstreamReturnedToolCalls,
                 finishReason: finishForArbitration,
                 autoIntentArbitrationAttempted,
-                freshRemainingTotalMs: Math.max(
-                  0,
-                  timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt)
-                ),
+                freshRemainingTotalMs: freshMsForArb,
                 resumeToolRound,
               })
             ) {
@@ -2061,6 +2156,41 @@ async function runProviderAttempts(args: {
               });
               autoIntentArbitrationAttempted = true;
               autoIntentArbitrationInFlight = true;
+              savedNativeForArbitration = structuredClone(normalizedData);
+              activeToolMode = "emulated_json";
+              continue;
+            }
+
+            if (
+              !toolsDegradedToChat &&
+              resumeToolRound &&
+              canNativeEmulatedRepair(provider.id, attemptModel) &&
+              shouldAttemptResumeToolContinuationArbitration({
+                hasTools: hasToolsClient,
+                supportsToolsRequested,
+                effectiveToolChoice: effectiveToolChoice(clientBody),
+                activeToolMode,
+                upstreamReturnedToolCalls,
+                finishReason: finishForArbitration,
+                resumeToolRound,
+                unmatchedToolCallIdCount,
+                duplicateToolResultCount,
+                orderViolationCount,
+                continuationArbitrationAttempted,
+                autoIntentArbitrationAttempted,
+                freshRemainingTotalMs: freshMsForArb,
+                upstreamHttpOk: true,
+              })
+            ) {
+              pushBillableUsageComponent("native", {
+                dataUsage: data.usage,
+                requestBody: upstreamBody,
+                responseBody: normalizedData,
+              });
+              continuationArbitrationAttempted = true;
+              continuationArbitrationInFlight = true;
+              // Shared cap: first-turn AUTO also blocked for this request.
+              autoIntentArbitrationAttempted = true;
               savedNativeForArbitration = structuredClone(normalizedData);
               activeToolMode = "emulated_json";
               continue;

@@ -1,4 +1,4 @@
-export function remainingBudget(totalMs, startedAtMs, nowMs) {
-  const remaining = totalMs - (nowMs - startedAtMs);
-  return Math.max(5000, remaining);
+export function remainingBudget(totalTimeoutMs, startedAtMs, nowMs) {
+  const elapsedMs = nowMs - startedAtMs;
+  return Math.max(0, totalTimeoutMs - elapsedMs);
 }

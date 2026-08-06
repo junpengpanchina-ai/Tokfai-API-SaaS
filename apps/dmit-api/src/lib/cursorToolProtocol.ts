@@ -1,11 +1,13 @@
 /**
- * P1031 / P1033 — Cursor Agent tool-protocol helpers.
+ * P1031 / P1033 / P1036 — Cursor Agent tool-protocol helpers.
  *
  * - Safe telemetry (never logs prompts / arguments / secrets)
  * - role=tool round-trip analysis
  * - P1033 resumeToolRound detection + full transcript validation
+ * - P1036 completed tool signatures for Round-N continuation anti-replay
  */
 
+import { createHash, randomBytes } from "node:crypto";
 import {
   createUpstreamToolCallIdNormalizer,
   isUpstreamSafeToolCallId,
@@ -67,6 +69,7 @@ export type ToolRoundTripAnalysis = {
 export const DUPLICATE_TOOL_RESULT_CODE = "duplicate_tool_result" as const;
 export const MISSING_ASSISTANT_TOOL_CALLS_CODE =
   "missing_assistant_tool_calls" as const;
+export const MISSING_TOOL_RESULT_CODE = "missing_tool_result" as const;
 export const INVALID_TOOL_MESSAGE_ORDER_CODE =
   "invalid_tool_message_order" as const;
 export const INVALID_TOOL_CALL_ID_CODE = "invalid_tool_call_id" as const;
@@ -74,9 +77,9 @@ export const INVALID_TOOL_CALL_ID_CODE = "invalid_tool_call_id" as const;
 export type ToolTranscriptRejectCode =
   | typeof DUPLICATE_TOOL_RESULT_CODE
   | typeof MISSING_ASSISTANT_TOOL_CALLS_CODE
+  | typeof MISSING_TOOL_RESULT_CODE
   | typeof INVALID_TOOL_MESSAGE_ORDER_CODE
   | typeof INVALID_TOOL_CALL_ID_CODE;
-
 export type ToolTranscriptValidation =
   | {
       ok: true;
@@ -208,6 +211,9 @@ export function validateCursorToolTranscript(
   let unmatchedCount = 0;
   const seenSoFar = new Set<string>();
   const answered = new Set<string>();
+  /** Original assistant tool_call ids (deduped) for missing-result checks. */
+  const issuedOriginalIds: string[] = [];
+  const issuedSeen = new Set<string>();
 
   for (const raw of list) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
@@ -221,6 +227,11 @@ export function validateCursorToolTranscript(
         if (typeof id !== "string" || id.length === 0) continue;
         seenSoFar.add(id);
         seenSoFar.add(normalize(id));
+        if (!issuedSeen.has(id) && !issuedSeen.has(normalize(id))) {
+          issuedSeen.add(id);
+          issuedSeen.add(normalize(id));
+          issuedOriginalIds.push(id);
+        }
       }
     }
 
@@ -307,6 +318,26 @@ export function validateCursorToolTranscript(
       code: INVALID_TOOL_MESSAGE_ORDER_CODE,
       message:
         "tool message appears before its assistant tool_calls or in an illegal order.",
+      analysis,
+      duplicateToolResultCount,
+      orderViolationCount,
+    };
+  }
+
+  // P1036 — every historical assistant tool_call must have a matching result.
+  let missingToolResultCount = 0;
+  for (const id of issuedOriginalIds) {
+    if (!answered.has(id) && !answered.has(normalize(id))) {
+      missingToolResultCount += 1;
+    }
+  }
+  if (missingToolResultCount > 0) {
+    return {
+      ok: false,
+      resumeToolRound: false,
+      code: MISSING_TOOL_RESULT_CODE,
+      message:
+        "assistant tool_calls require a matching tool result for every tool_call_id.",
       analysis,
       duplicateToolResultCount,
       orderViolationCount,
@@ -424,5 +455,246 @@ export function extractResponseToolCallMeta(
     argumentsLengths,
     contentIsNull: message ? message.content === null : true,
     finishReason: finish,
+  };
+}
+
+/** Stable JSON for tool-call argument signatures (key-sorted objects). */
+export function canonicalizeToolArguments(args: unknown): string {
+  if (typeof args === "string") {
+    const trimmed = args.trim();
+    if (!trimmed) return "";
+    try {
+      return canonicalizeToolArguments(JSON.parse(trimmed) as unknown);
+    } catch {
+      return trimmed;
+    }
+  }
+  return stableJson(args);
+}
+
+function stableJson(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((v) => stableJson(v)).join(",")}]`;
+  }
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj).sort();
+  return `{${keys
+    .map((k) => `${JSON.stringify(k)}:${stableJson(obj[k])}`)
+    .join(",")}}`;
+}
+
+/** signature = tool name + canonicalized arguments (request-scoped anti-replay). */
+export function toolCallSignature(name: string, args: unknown): string {
+  return `${name}\n${canonicalizeToolArguments(args)}`;
+}
+
+export type CompletedToolCallRecord = {
+  id: string;
+  name: string;
+  signature: string;
+};
+
+/**
+ * P1036 — Extract completed (answered) assistant tool_call signatures from the
+ * current transcript. Stateless: derived only from messages, never global memory.
+ */
+export function extractCompletedToolCalls(
+  messages: unknown
+): CompletedToolCallRecord[] {
+  const normalize = createUpstreamToolCallIdNormalizer();
+  const list = Array.isArray(messages) ? messages : [];
+  const byId = new Map<string, { id: string; name: string; args: unknown }>();
+  const answered = new Set<string>();
+
+  for (const raw of list) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const row = raw as Record<string, unknown>;
+    const role = typeof row.role === "string" ? row.role.trim() : "";
+
+    if (role === "assistant" && Array.isArray(row.tool_calls)) {
+      for (const tc of row.tool_calls) {
+        if (!tc || typeof tc !== "object" || Array.isArray(tc)) continue;
+        const t = tc as Record<string, unknown>;
+        const id = typeof t.id === "string" ? t.id : "";
+        if (!id) continue;
+        const fn =
+          t.function && typeof t.function === "object" && !Array.isArray(t.function)
+            ? (t.function as Record<string, unknown>)
+            : null;
+        const name = typeof fn?.name === "string" ? fn.name.trim() : "";
+        if (!name) continue;
+        const rec = { id, name, args: fn?.arguments ?? {} };
+        byId.set(id, rec);
+        byId.set(normalize(id), rec);
+      }
+    }
+
+    if (role === "tool" || role === "function") {
+      const id =
+        typeof row.tool_call_id === "string" ? row.tool_call_id.trim() : "";
+      if (!id) continue;
+      answered.add(id);
+      answered.add(normalize(id));
+    }
+  }
+
+  const out: CompletedToolCallRecord[] = [];
+  const seenSig = new Set<string>();
+  const seenId = new Set<string>();
+  for (const [key, rec] of byId) {
+    if (key !== rec.id) continue; // emit once per original id
+    if (!answered.has(rec.id) && !answered.has(normalize(rec.id))) continue;
+    if (seenId.has(rec.id)) continue;
+    seenId.add(rec.id);
+    const signature = toolCallSignature(rec.name, rec.args);
+    if (seenSig.has(signature)) continue;
+    seenSig.add(signature);
+    out.push({ id: rec.id, name: rec.name, signature });
+  }
+  return out;
+}
+
+export function extractCompletedToolSignatures(messages: unknown): Set<string> {
+  return new Set(extractCompletedToolCalls(messages).map((c) => c.signature));
+}
+
+export function extractHistoricalToolCallIds(messages: unknown): Set<string> {
+  const normalize = createUpstreamToolCallIdNormalizer();
+  const out = new Set<string>();
+  const list = Array.isArray(messages) ? messages : [];
+  for (const raw of list) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const row = raw as Record<string, unknown>;
+    const role = typeof row.role === "string" ? row.role.trim() : "";
+    if (role === "assistant" && Array.isArray(row.tool_calls)) {
+      for (const tc of row.tool_calls) {
+        if (!tc || typeof tc !== "object" || Array.isArray(tc)) continue;
+        const id = (tc as Record<string, unknown>).id;
+        if (typeof id !== "string" || !id) continue;
+        out.add(id);
+        out.add(normalize(id));
+      }
+    }
+    if (role === "tool" || role === "function") {
+      const id =
+        typeof row.tool_call_id === "string" ? row.tool_call_id.trim() : "";
+      if (!id) continue;
+      out.add(id);
+      out.add(normalize(id));
+    }
+  }
+  return out;
+}
+
+function newContinuationToolCallId(used: Set<string>): string {
+  for (let i = 0; i < 8; i++) {
+    const id = `call_${randomBytes(12).toString("hex")}`;
+    if (
+      id.length <= UPSTREAM_TOOL_CALL_ID_MAX_LEN &&
+      isUpstreamSafeToolCallId(id) &&
+      !used.has(id)
+    ) {
+      used.add(id);
+      return id;
+    }
+  }
+  const fallback = `call_${createHash("sha256")
+    .update(randomBytes(16))
+    .digest("hex")
+    .slice(0, 24)}`;
+  used.add(fallback);
+  return fallback.slice(0, UPSTREAM_TOOL_CALL_ID_MAX_LEN);
+}
+
+export type OpenAiFunctionToolCall = {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+};
+
+/**
+ * P1036 — Drop tool_calls that replay a completed name+args signature, and
+ * ensure every remaining id is novel ASCII-safe (never reuse historical ids).
+ * Returns null when nothing novel remains (caller should restore native text).
+ */
+export function filterNovelToolCallsOnCompletion(
+  data: Record<string, unknown>,
+  args: {
+    completedSignatures: ReadonlySet<string>;
+    historicalIds: ReadonlySet<string>;
+  }
+): { data: Record<string, unknown>; novelCount: number; droppedCount: number } | null {
+  const choices = Array.isArray(data.choices) ? [...data.choices] : [];
+  const firstRaw =
+    choices[0] && typeof choices[0] === "object" && !Array.isArray(choices[0])
+      ? (choices[0] as Record<string, unknown>)
+      : null;
+  if (!firstRaw) return null;
+  const message =
+    firstRaw.message &&
+    typeof firstRaw.message === "object" &&
+    !Array.isArray(firstRaw.message)
+      ? { ...(firstRaw.message as Record<string, unknown>) }
+      : null;
+  if (!message || !Array.isArray(message.tool_calls)) return null;
+
+  const usedIds = new Set<string>(args.historicalIds);
+  const novel: OpenAiFunctionToolCall[] = [];
+  let droppedCount = 0;
+
+  for (const tc of message.tool_calls) {
+    if (!tc || typeof tc !== "object" || Array.isArray(tc)) {
+      droppedCount += 1;
+      continue;
+    }
+    const row = tc as Record<string, unknown>;
+    const fn =
+      row.function && typeof row.function === "object" && !Array.isArray(row.function)
+        ? (row.function as Record<string, unknown>)
+        : null;
+    const name = typeof fn?.name === "string" ? fn.name.trim() : "";
+    if (!name) {
+      droppedCount += 1;
+      continue;
+    }
+    const argsRaw = fn?.arguments ?? {};
+    const signature = toolCallSignature(name, argsRaw);
+    if (args.completedSignatures.has(signature)) {
+      droppedCount += 1;
+      continue;
+    }
+    let id = typeof row.id === "string" ? row.id : "";
+    if (
+      !id ||
+      !isUpstreamSafeToolCallId(id) ||
+      usedIds.has(id) ||
+      id.length > UPSTREAM_TOOL_CALL_ID_MAX_LEN
+    ) {
+      id = newContinuationToolCallId(usedIds);
+    } else {
+      usedIds.add(id);
+    }
+    const argsJson =
+      typeof argsRaw === "string" ? argsRaw : JSON.stringify(argsRaw ?? {});
+    novel.push({
+      id,
+      type: "function",
+      function: { name, arguments: argsJson },
+    });
+  }
+
+  if (novel.length === 0) return null;
+
+  message.tool_calls = novel;
+  message.content = null;
+  const first = { ...firstRaw, message, finish_reason: "tool_calls" };
+  choices[0] = first;
+  return {
+    data: { ...data, choices },
+    novelCount: novel.length,
+    droppedCount,
   };
 }

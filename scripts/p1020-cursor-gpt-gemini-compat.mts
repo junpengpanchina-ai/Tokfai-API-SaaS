@@ -441,7 +441,8 @@ console.log("P1020 CURSOR GPT/GEMINI COMPATIBILITY\n");
       r2.ok === true &&
       meta2.debitCallCount === 1 &&
       msg(r2)?.content === "Final answer after tool" &&
-      (meta2.arbitrationCallCount ?? 0) === 0,
+      // P1036 — Round-N continuation may run once on plain-text resume.
+      (meta2.arbitrationCallCount ?? 0) <= 1,
     "5. role=tool second round → final text, debit×1 each",
     {
       ...meta2,
