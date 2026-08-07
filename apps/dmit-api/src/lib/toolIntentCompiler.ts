@@ -65,6 +65,142 @@ export function extractClientToolFunctions(tools: unknown): ToolFn[] {
   return out;
 }
 
+export type ExplicitToolExecutionIntent = {
+  detected: boolean;
+  /** Available tool names that matched an execution cue (no prompt text). */
+  matchedToolNames: string[];
+};
+
+type ExecutionCue = {
+  pattern: RegExp;
+  matchesTool: (normalizedName: string) => boolean;
+};
+
+/** Imperative / agent cues → tool-name families (Cursor + common aliases). */
+const EXECUTION_CUES: readonly ExecutionCue[] = [
+  {
+    pattern:
+      /\b(search|grep|find(?:\s+(?:in\s+)?(?:code|files?|repo))?|ripgrep)\b|搜索|查找|检索/i,
+    matchesTool: (n) =>
+      /^(search|grep|glob|websearch|rg)$/.test(n) || n.includes("search"),
+  },
+  {
+    pattern:
+      /\b(?:read|open)(?:\s+(?:the\s+)?(?:file|code|path))?\b|读取|打开文件|读一下|读文件/i,
+    matchesTool: (n) => /^(read|cat|get_file)$/.test(n) || n.endsWith("read"),
+  },
+  {
+    pattern:
+      /\b(write|edit|modify|patch|refactor)\b|修改|编辑|写入|改一下|创建文件/i,
+    matchesTool: (n) =>
+      /^(write|edit|strreplace|applypatch|editnotebook|todowrite)$/.test(n) ||
+      n.includes("write") ||
+      n.includes("edit"),
+  },
+  {
+    pattern:
+      /\b(run|execute|shell|terminal|bash|npm\s+run|npx)\b|运行|执行|跑一下|跑测试|终端/i,
+    matchesTool: (n) =>
+      /^(shell|terminal|awaitshell|bash|run_terminal_cmd)$/.test(n) ||
+      n.includes("shell") ||
+      n.includes("terminal"),
+  },
+];
+
+/** Soft informational-only prompts must not force tool repair. */
+const INFORMATIONAL_ONLY =
+  /^(?:\s*(?:please\s+)?)?(?:explain|describe|summarize|what\s+(?:is|does)|how\s+does|解释|说明一下|讲一下|什么意思)\b/i;
+
+function collectLatestUserTexts(messages: unknown): string[] {
+  if (!Array.isArray(messages)) return [];
+  const texts: string[] = [];
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const row = messages[i];
+    if (!row || typeof row !== "object" || Array.isArray(row)) continue;
+    const role = typeof (row as { role?: unknown }).role === "string"
+      ? String((row as { role: string }).role).trim()
+      : "";
+    if (role === "tool" || role === "function") continue;
+    if (role === "assistant") {
+      // Stop at prior assistant turn — first-turn intent lives in trailing users.
+      if (texts.length > 0) break;
+      continue;
+    }
+    if (role === "user") {
+      const text = messageContentToText((row as { content?: unknown }).content);
+      if (text.trim()) texts.push(text);
+      continue;
+    }
+  }
+  return texts.reverse();
+}
+
+/**
+ * P1048 — Detect explicit tool *execution* intent from user turns using the
+ * real client tools list ({@link extractClientToolFunctions}).
+ *
+ * "tools[] present" alone is NOT enough. Informational prompts must stay false.
+ * Pure; no env / DB / network.
+ */
+export function detectExplicitToolExecutionIntent(args: {
+  messages: unknown;
+  tools: unknown;
+}): ExplicitToolExecutionIntent {
+  const tools = extractClientToolFunctions(args.tools);
+  if (tools.length === 0) {
+    return { detected: false, matchedToolNames: [] };
+  }
+  const userText = collectLatestUserTexts(args.messages).join("\n").trim();
+  if (!userText) {
+    return { detected: false, matchedToolNames: [] };
+  }
+
+  const matched = new Set<string>();
+  const normalized = tools.map((t) => ({
+    name: t.name,
+    norm: t.name.trim().toLowerCase(),
+  }));
+
+  // Direct tool-name mention (e.g. "use Read", "call Shell").
+  const namedHits = new Set<string>();
+  for (const t of normalized) {
+    if (t.norm.length < 2) continue;
+    const re = new RegExp(
+      `(?:^|[^a-z0-9_])${t.norm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:[^a-z0-9_]|$)`,
+      "i"
+    );
+    if (re.test(userText)) namedHits.add(t.name);
+  }
+
+  const cueHits = new Set<string>();
+  for (const cue of EXECUTION_CUES) {
+    if (!cue.pattern.test(userText)) continue;
+    for (const t of normalized) {
+      if (cue.matchesTool(t.norm)) cueHits.add(t.name);
+    }
+  }
+
+  // Pure informational ask without naming a tool → never force repair.
+  if (
+    INFORMATIONAL_ONLY.test(userText) &&
+    namedHits.size === 0 &&
+    !/\b(search|grep|write|edit|modify|run|execute|shell|terminal)\b|搜索|查找|读取|修改|运行|执行/i.test(
+      userText
+    )
+  ) {
+    return { detected: false, matchedToolNames: [] };
+  }
+
+  for (const n of namedHits) matched.add(n);
+  for (const n of cueHits) matched.add(n);
+
+  const matchedToolNames = [...matched];
+  return {
+    detected: matchedToolNames.length > 0,
+    matchedToolNames,
+  };
+}
+
 export function summarizeToolChoice(toolChoice: unknown): string {
   if (toolChoice == null || toolChoice === "auto") {
     return "auto: you may return tool_call or assistant_text.";

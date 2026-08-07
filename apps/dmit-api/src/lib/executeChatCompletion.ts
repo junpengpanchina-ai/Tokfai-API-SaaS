@@ -34,6 +34,7 @@ import {
 import {
   compileEmulatedResumeTranscript,
   compileEmulatedUpstreamBody,
+  detectExplicitToolExecutionIntent,
 } from "./toolIntentCompiler.js";
 import {
   applyToolIntentToChatCompletion,
@@ -1512,7 +1513,7 @@ async function runProviderAttempts(args: {
         // controlled repair; reported tool_calling_mode follows the mode that
         // produced the final success (or the last attempt on failure).
         // P1047 — under tool_choice=auto/missing, valid native text or
-        // tool_calls is final (P1028/P1036 auto arbitration gates stay closed).
+        // tool_calls is final unless P1048 explicit tool execution intent.
         // Strict/required/named still use ONE controlled emulated_json repair.
         let activeToolMode: ToolCallingMode = toolMode;
         let repairAttempted = false;
@@ -1521,6 +1522,12 @@ async function runProviderAttempts(args: {
         let autoIntentArbitrationInFlight = false;
         let continuationArbitrationInFlight = false;
         let savedNativeForArbitration: Record<string, unknown> | null = null;
+        // P1048 — real toolIntentCompiler result (not hasTools alone).
+        const toolIntentDetection = detectExplicitToolExecutionIntent({
+          messages: (clientBody as { messages?: unknown }).messages,
+          tools: (clientBody as { tools?: unknown }).tools,
+        });
+        const toolIntentDetected = toolIntentDetection.detected;
         // P1030 — request-scoped billable usage components for this
         // provider/model attempt only (discarded on provider fallback throw).
         const billableUsageComponents: BillableUsageComponent[] = [];
@@ -1642,20 +1649,33 @@ async function runProviderAttempts(args: {
             // P1040 — continuation arbitration only: sanitize Cursor tool
             // transcript to plain-text context before emulated_json compile.
             // First-turn P1028 / P1020 repair keep compileEmulatedUpstreamBody.
+            // P1048 — explicit tool-intent repair forces required tool_choice
+            // so the second provider pass must emit legal tool_calls.
+            const forceRequiredToolIntent =
+              autoIntentArbitrationInFlight && toolIntentDetected;
+            const compileClientBody = forceRequiredToolIntent
+              ? {
+                  ...(clientBody as Record<string, unknown>),
+                  tool_choice: "required",
+                }
+              : (clientBody as Record<string, unknown>);
             if (
               resumeToolRound &&
               continuationArbitrationInFlight
             ) {
               upstreamBody = compileEmulatedResumeTranscript(
                 upstreamBody,
-                clientBody as Record<string, unknown>,
+                compileClientBody,
                 { repair: repairAttempted }
               );
             } else {
               upstreamBody = compileEmulatedUpstreamBody(
                 upstreamBody,
-                clientBody as Record<string, unknown>,
-                { repair: repairAttempted }
+                compileClientBody,
+                {
+                  repair:
+                    repairAttempted || forceRequiredToolIntent,
+                }
               );
             }
           } else if (
@@ -1973,8 +1993,11 @@ async function runProviderAttempts(args: {
                 const intent = parseToolIntentFromContent({
                   content: extractAssistantContentFromCompletion(normalizedData),
                   clientTools: (clientBody as { tools?: unknown }).tools,
-                  toolChoice: (clientBody as { tool_choice?: unknown })
-                    .tool_choice,
+                  toolChoice:
+                    autoIntentArbitrationInFlight && toolIntentDetected
+                      ? "required"
+                      : (clientBody as { tool_choice?: unknown })
+                          .tool_choice,
                   parallelToolCalls: (clientBody as {
                     parallel_tool_calls?: unknown;
                   }).parallel_tool_calls,
@@ -2226,7 +2249,8 @@ async function runProviderAttempts(args: {
             }
 
             // P1047 — auto/missing: accept valid native text (or tool_calls
-            // above). Gates below stay closed; do not second-fetch solely
+            // above) unless P1048 explicit tool execution intent requires
+            // exactly one tool-intent repair. Never second-fetch solely
             // because tools[] were present. Strict repair remains above.
             const finishForArbitration =
               extractResponseFinishReason(normalizedData) ??
@@ -2251,6 +2275,7 @@ async function runProviderAttempts(args: {
                 autoIntentArbitrationAttempted,
                 freshRemainingTotalMs: freshMsForArb,
                 resumeToolRound,
+                toolIntentDetected,
               })
             ) {
               // P1030 — capture Native HTTP 200 usage before arbitration
@@ -2264,6 +2289,20 @@ async function runProviderAttempts(args: {
               autoIntentArbitrationInFlight = true;
               savedNativeForArbitration = structuredClone(normalizedData);
               activeToolMode = "emulated_json";
+              log.info("auto_tool_intent_repair_triggered", {
+                requestId,
+                route,
+                requestedModel: requestedRaw,
+                attemptedModel: attemptModel,
+                resumeToolRound,
+                toolChoiceKind: toolChoiceKind(
+                  (clientBody as { tool_choice?: unknown }).tool_choice
+                ),
+                toolIntentDetected: true,
+                nativeFinishReason: finishForArbitration,
+                billing_status: "not_billable",
+                credits_charged: 0,
+              });
               continue;
             }
 

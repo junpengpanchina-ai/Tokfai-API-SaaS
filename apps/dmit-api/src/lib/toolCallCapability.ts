@@ -228,17 +228,18 @@ export function isAutoEffectiveToolChoice(choice: unknown): boolean {
 }
 
 /**
- * P1047 — Whether a second controlled emulated_json pass is warranted after a
- * structurally valid native OpenAI-compatible response.
+ * P1047 / P1048 — Whether a second controlled emulated_json pass is warranted
+ * after a structurally valid native OpenAI-compatible response.
  *
  * OpenAI tool_choice semantics:
- * - missing / auto: assistant text OR tool_calls are both legal finals → never
+ * - missing / auto: assistant text OR tool_calls are both legal finals
+ *   (P1047 single-pass), EXCEPT P1048 when the client shows *explicit* tool
+ *   execution intent and native returned plain text with no tool_calls.
  * - required / named / require_tool_call: handled by the strict repair path
  *   (`isStrictToolCallRequest` + `canNativeEmulatedRepair`), not this gate
  *
  * "Client sent tools[]" ≠ "model must call a tool this turn".
- * Historical P1028/P1036 auto-intent / continuation arbitration violated this
- * and doubled Cursor latency (~5s → 20s+). Those paths stay callable but closed.
+ * Never open solely because hasTools=true.
  */
 export function shouldRunToolArbitrationAfterNativeResponse(args: {
   hasTools: boolean;
@@ -251,28 +252,42 @@ export function shouldRunToolArbitrationAfterNativeResponse(args: {
   freshRemainingTotalMs: number;
   /** Structurally valid OpenAI-compatible assistant response from native. */
   nativeResponseValid?: boolean;
+  /**
+   * P1048 — explicit tool execution intent from
+   * {@link detectExplicitToolExecutionIntent} (toolIntentCompiler).
+   * Resume continuation must leave this unset/false.
+   */
+  explicitToolExecutionIntent?: boolean;
 }): boolean {
-  // Keep args inspected so call sites stay type-checked / tree-shake safe.
   if (!args.hasTools) return false;
   if (!args.supportsToolsRequested) return false;
   if (args.activeToolMode !== "native") return false;
   if (args.alreadyAttempted) return false;
   if (!(args.freshRemainingTotalMs > 0)) return false;
-  // P1047 — auto/missing: valid native text and tool_calls are both final.
-  if (isAutoEffectiveToolChoice(args.effectiveToolChoice)) return false;
+  if (args.nativeResponseValid === false) return false;
+
+  if (isAutoEffectiveToolChoice(args.effectiveToolChoice)) {
+    // P1047 fast path: auto/missing valid native is final…
+    // P1048 narrow exception: explicit execution intent + plain text miss.
+    if (args.explicitToolExecutionIntent !== true) return false;
+    if (args.upstreamReturnedToolCalls) return false;
+    if (!isPlainTextCompletionFinishReason(args.finishReason)) return false;
+    return true;
+  }
+
   // Non-auto (required/named) uses the strict repair path, not this gate.
   void args.upstreamReturnedToolCalls;
   void args.finishReason;
-  void args.nativeResponseValid;
   return false;
 }
 
 /**
- * P1028 / P1047 — First-turn AUTO intent arbitration gate.
+ * P1028 / P1047 / P1048 — First-turn AUTO tool-intent repair gate.
  *
- * Historically opened when native returned plain text under tool_choice=auto.
- * P1047 closes that path: OpenAI auto treats plain text as a legal final.
- * Signature retained for regressions / call-site compatibility.
+ * P1047: auto plain text is final when there is no explicit execution intent.
+ * P1048: when toolIntentDetected (real toolIntentCompiler result) and native
+ * returned plain text, allow exactly one emulated_json tool-intent repair.
+ * Never opens solely because hasTools=true.
  */
 export function shouldAttemptAutoToolIntentArbitration(args: {
   hasTools: boolean;
@@ -285,6 +300,8 @@ export function shouldAttemptAutoToolIntentArbitration(args: {
   freshRemainingTotalMs: number;
   /** P1033 — legal role=tool resume; skip first-turn AUTO arbitration. */
   resumeToolRound?: boolean;
+  /** P1048 — from detectExplicitToolExecutionIntent().detected */
+  toolIntentDetected?: boolean;
 }): boolean {
   if (args.resumeToolRound === true) return false;
   return shouldRunToolArbitrationAfterNativeResponse({
@@ -297,6 +314,7 @@ export function shouldAttemptAutoToolIntentArbitration(args: {
     alreadyAttempted: args.autoIntentArbitrationAttempted,
     freshRemainingTotalMs: args.freshRemainingTotalMs,
     nativeResponseValid: true,
+    explicitToolExecutionIntent: args.toolIntentDetected === true,
   });
 }
 
@@ -305,7 +323,7 @@ export function shouldAttemptAutoToolIntentArbitration(args: {
  *
  * Historically opened when native returned plain text on a legal resume.
  * P1047 closes that path: valid native final text or next tool_calls are final
- * under auto. Signature retained for regressions / call-site compatibility.
+ * under auto. P1048 must NOT reopen this via execution-intent (CASE D/E).
  */
 export function shouldAttemptResumeToolContinuationArbitration(args: {
   hasTools: boolean;
@@ -340,6 +358,8 @@ export function shouldAttemptResumeToolContinuationArbitration(args: {
     alreadyAttempted: args.continuationArbitrationAttempted,
     freshRemainingTotalMs: args.freshRemainingTotalMs,
     nativeResponseValid: true,
+    // P1048 — never reopen resume continuation via first-turn intent.
+    explicitToolExecutionIntent: false,
   });
 }
 

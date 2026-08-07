@@ -167,6 +167,9 @@ const ALLOWED_FIELD_KEYS = new Set([
   "first_turn_arbitration_elapsed_ms",
   "repair_elapsed_ms",
   "nativeResumeFastPathApplied",
+  // P1048 auto tool-intent repair telemetry (no prompts / secrets)
+  "toolIntentDetected",
+  "nativeFinishReason",
 ]);
 
 const SENSITIVE_LOG_KEY_LITERAL =
