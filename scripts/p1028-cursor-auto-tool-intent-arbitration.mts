@@ -1,10 +1,12 @@
 /**
- * P1028 — Cursor AUTO NO-TOOL INTENT ARBITRATION.
+ * P1028 — Cursor AUTO tool intent (P1047 OpenAI auto semantics).
  *
- * When native + tools + tool_choice=auto returns plain text (no tool_calls),
- * run at most one controlled emulated_json intent arbitration. On failure,
- * safely fall back to the original native text (never upgrade to 5xx).
- * required / forced / strict semantics stay unchanged.
+ * P1047 CLOSED auto/missing tool_choice arbitration: a valid native plain-text
+ * or tool_calls response is FINAL (provider=1, arbitration=0). Historical
+ * native-miss → emulated_json arbitration paths are single-pass accept of
+ * native text. tool_choice=required / named still use the strict repair path
+ * (provider≥2, repairCallCount≥1). Forced object / image reject / call_id
+ * cases remain unchanged.
  *
  * Test authenticity:
  *   REAL executeChatCompletion ENTRY
@@ -32,9 +34,6 @@ import {
   installP1018Mocks,
   loadExecuteChatCompletion,
   loadRespondEarlySse,
-  makeAssistantTextIntent,
-  makeParallelToolCallIntent,
-  makeToolCallIntent,
   nativeToolCompletion,
   resetScenario,
   type AssertMeta,
@@ -169,7 +168,7 @@ function extractOutboundIds(messages: unknown[]) {
   return { toolCallIds, toolMessageIds };
 }
 
-console.log("P1028 CURSOR AUTO TOOL INTENT ARBITRATION\n");
+console.log("P1028 CURSOR AUTO TOOL INTENT (P1047 CLOSED ARBITRATION)\n");
 console.log(`Authenticity: ${LEVEL}\n`);
 
 // ── Gate unit (provider-agnostic) ────────────────────────────────────────
@@ -185,11 +184,11 @@ console.log(`Authenticity: ${LEVEL}\n`);
     freshRemainingTotalMs: 10_000,
   };
   assert(
-    shouldAttemptAutoToolIntentArbitration(base) === true &&
+    shouldAttemptAutoToolIntentArbitration(base) === false &&
       shouldAttemptAutoToolIntentArbitration({
         ...base,
         effectiveToolChoice: null,
-      }) === true &&
+      }) === false &&
       shouldAttemptAutoToolIntentArbitration({
         ...base,
         effectiveToolChoice: "required",
@@ -218,7 +217,7 @@ console.log(`Authenticity: ${LEVEL}\n`);
       isPlainTextCompletionFinishReason("length") === false &&
       effectiveToolChoice({ tools: WEATHER_TOOLS, tool_choice: null }) ===
         "auto",
-    "0. shouldAttemptAutoToolIntentArbitration gate (provider-agnostic)",
+    "0. shouldAttemptAutoToolIntentArbitration gate closed for auto (P1047)",
     {
       providerCallCount: 0,
       repairCallCount: 0,
@@ -259,20 +258,12 @@ console.log(`Authenticity: ${LEVEL}\n`);
   );
 }
 
-// ── 2. native miss → arbitration single tool ─────────────────────────────
+// ── 2. native auto plain text is FINAL (P1047; no arbitration) ───────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return { kind: "completion", content: "I should call a tool." };
-        }
-        return {
-          kind: "completion",
-          content: makeToolCallIntent("get_weather", { city: "Arb" }),
-        };
-      },
+      () => ({ kind: "completion", content: "I should call a tool." }),
     ],
   });
   const result = await exec(
@@ -288,30 +279,23 @@ console.log(`Authenticity: ${LEVEL}\n`);
   const m = msg(result);
   assert(
     result.ok === true &&
-      meta.providerCallCount === 2 &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.repairCallCount === 0 &&
       meta.debitCallCount === 1 &&
-      m?.tool_calls?.[0]?.function?.name === "get_weather" &&
-      tokfai(result).tool_calling_mode === "emulated_json" &&
-      !String(m?.content ?? "").includes('"type":"tool_call"'),
-    "2. native auto miss → arbitration single tool — provider=2 arbitration=1 debit=1",
-    { ...meta, provider: 2, arbitration: 1, tool_calls: 1, debit: 1 }
+      m?.content === "I should call a tool." &&
+      !Array.isArray(m?.tool_calls) &&
+      tokfai(result).tool_calling_mode === "native",
+    "2. native auto plain text FINAL — provider=1 arbitration=0 debit=1",
+    { ...meta, provider: 1, arbitration: 0, debit: 1 }
   );
 }
 
-// ── 3. arbitration multi tool with parallel_tool_calls=true ──────────────
+// ── 3. native auto plain text (parallel tools present) — single-pass ─────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
-    scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return { kind: "completion", content: "need tools" };
-        }
-        return { kind: "completion", content: makeParallelToolCallIntent() };
-      },
-    ],
+    scripts: [() => ({ kind: "completion", content: "need tools" })],
   });
   const result = await exec(
     {
@@ -324,35 +308,25 @@ console.log(`Authenticity: ${LEVEL}\n`);
     "req_p1028_03"
   );
   const meta = billingSnapshot(result);
-  const tcs = msg(result)?.tool_calls;
+  const m = msg(result);
   assert(
     result.ok === true &&
-      meta.providerCallCount === 2 &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
-      Array.isArray(tcs) &&
-      tcs.length === 2 &&
-      tcs[0].function.name === "get_weather" &&
-      tcs[1].function.name === "get_time",
-    "3. arbitration multi tool (parallel=true) — debit=1",
-    { ...meta, provider: 2, arbitration: 1, tool_calls: tcs?.length, debit: 1 }
+      m?.content === "need tools" &&
+      !Array.isArray(m?.tool_calls),
+    "3. native auto plain text (parallel=true) FINAL — provider=1 arbitration=0 debit=1",
+    { ...meta, provider: 1, arbitration: 0, debit: 1 }
   );
 }
 
-// ── 4. arbitration returns assistant_text ────────────────────────────────
+// ── 4. native auto plain text FINAL (no arb assistant_text rewrite) ──────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return { kind: "completion", content: "thinking about weather" };
-        }
-        return {
-          kind: "completion",
-          content: makeAssistantTextIntent("No tool needed — sunny."),
-        };
-      },
+      () => ({ kind: "completion", content: "thinking about weather" }),
     ],
   });
   const result = await exec(
@@ -368,27 +342,22 @@ console.log(`Authenticity: ${LEVEL}\n`);
   const m = msg(result);
   assert(
     result.ok === true &&
-      meta.providerCallCount === 2 &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
-      m?.content === "No tool needed — sunny." &&
+      m?.content === "thinking about weather" &&
       !Array.isArray(m?.tool_calls),
-    "4. arbitration assistant_text → 200 text, no tool_calls, debit=1",
-    { ...meta, provider: 2, arbitration: 1, debit: 1 }
+    "4. native auto plain text FINAL — 200 text, no tool_calls, debit=1",
+    { ...meta, provider: 1, arbitration: 0, debit: 1 }
   );
 }
 
-// ── 5. arbitration illegal JSON → fall back to original native text ──────
+// ── 5. native auto plain text FINAL (no arb fallback path) ───────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return { kind: "completion", content: "ORIGINAL_NATIVE_TEXT" };
-        }
-        return { kind: "completion", content: "NOT_VALID_JSON{{{" };
-      },
+      () => ({ kind: "completion", content: "ORIGINAL_NATIVE_TEXT" }),
     ],
   });
   const result = await exec(
@@ -403,32 +372,22 @@ console.log(`Authenticity: ${LEVEL}\n`);
   const meta = billingSnapshot(result);
   assert(
     result.ok === true &&
-      meta.providerCallCount === 2 &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
       msg(result)?.content === "ORIGINAL_NATIVE_TEXT" &&
       !Array.isArray(msg(result)?.tool_calls) &&
       tokfai(result).tool_calling_mode === "native",
-    "5. arbitration illegal JSON → safe fallback original text, 200, debit=1",
-    { ...meta, provider: 2, arbitration: 1, debit: 1 }
+    "5. native auto plain text FINAL — provider=1 arbitration=0 debit=1",
+    { ...meta, provider: 1, arbitration: 0, debit: 1 }
   );
 }
 
-// ── 6. arbitration unknown tool → fall back, never forge ─────────────────
+// ── 6. native auto plain text FINAL (no forged tool via arb) ─────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
-    scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return { kind: "completion", content: "keep me" };
-        }
-        return {
-          kind: "completion",
-          content: makeToolCallIntent("not_a_real_tool", { x: 1 }),
-        };
-      },
-    ],
+    scripts: [() => ({ kind: "completion", content: "keep me" })],
   });
   const result = await exec(
     {
@@ -442,30 +401,21 @@ console.log(`Authenticity: ${LEVEL}\n`);
   const meta = billingSnapshot(result);
   assert(
     result.ok === true &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
       msg(result)?.content === "keep me" &&
       !Array.isArray(msg(result)?.tool_calls),
-    "6. arbitration unknown tool → safe fallback, no forged tool, debit=1",
-    { ...meta, provider: 2, arbitration: 1, debit: 1 }
+    "6. native auto plain text FINAL — no forged tool, debit=1",
+    { ...meta, provider: 1, arbitration: 0, debit: 1 }
   );
 }
 
-// ── 7. arbitration arguments schema fail → fall back ─────────────────────
+// ── 7. native auto plain text FINAL (no schema-arb path) ─────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
-    scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return { kind: "completion", content: "schema_fallback" };
-        }
-        // missing required "city"
-        return {
-          kind: "completion",
-          content: makeToolCallIntent("get_weather", { unit: "c" }),
-        };
-      },
-    ],
+    scripts: [() => ({ kind: "completion", content: "schema_fallback" })],
   });
   const result = await exec(
     {
@@ -479,11 +429,13 @@ console.log(`Authenticity: ${LEVEL}\n`);
   const meta = billingSnapshot(result);
   assert(
     result.ok === true &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
       msg(result)?.content === "schema_fallback" &&
       !Array.isArray(msg(result)?.tool_calls),
-    "7. arbitration args schema fail → safe fallback, debit=1",
-    { ...meta, provider: 2, arbitration: 1, debit: 1 }
+    "7. native auto plain text FINAL — provider=1 arbitration=0 debit=1",
+    { ...meta, provider: 1, arbitration: 0, debit: 1 }
   );
 }
 
@@ -712,17 +664,7 @@ console.log(`Authenticity: ${LEVEL}\n`);
 
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
-    scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return { kind: "completion", content: "done after tool" };
-        }
-        return {
-          kind: "completion",
-          content: makeAssistantTextIntent("done after tool"),
-        };
-      },
-    ],
+    scripts: [() => ({ kind: "completion", content: "done after tool" })],
   });
   const r2 = await exec(
     {
@@ -751,8 +693,10 @@ console.log(`Authenticity: ${LEVEL}\n`);
       meta1.debitCallCount === 1 &&
       r2.ok === true &&
       meta2.debitCallCount === 1 &&
+      (meta2.arbitrationCallCount ?? 0) === 0 &&
+      meta2.providerCallCount === 1 &&
       msg(r2)?.content === "done after tool",
-    "13. role=tool second round — tool results submit normally, debit×1 each",
+    "13. role=tool second round — native text FINAL; debit×1 each; arb=0",
     {
       ...meta2,
       round1_debit: meta1.debitCallCount,
@@ -762,20 +706,12 @@ console.log(`Authenticity: ${LEVEL}\n`);
   );
 }
 
-// ── 14. stream=true — tool_calls via SSE, no emulated JSON leak ───────────
+// ── 14. stream=true — native tool_calls via SSE, no arbitration ───────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return { kind: "completion", content: "should arbitrate" };
-        }
-        return {
-          kind: "completion",
-          content: makeToolCallIntent("get_weather", { city: "Stream" }),
-        };
-      },
+      () => nativeToolCompletion("get_weather", { city: "Stream" }),
     ],
   });
   const body = {
@@ -811,17 +747,17 @@ console.log(`Authenticity: ${LEVEL}\n`);
     text.includes("You are a strict JSON Tool Intent");
   assert(
     res.status === 200 &&
-      meta.providerCallCount === 2 &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
       hasToolDelta &&
       !leaked,
-    "14. stream=true — SSE tool_calls, no emulated JSON leak, debit=1",
+    "14. stream=true — native SSE tool_calls; provider=1 arbitration=0 debit=1",
     { ...meta, hasToolDelta, leaked, debit: 1, httpStatus: res.status }
   );
 }
 
-// ── 15. arbitration timeout — no budget resurrection, safe fallback ──────
+// ── 15. native auto plain text FINAL (no arb timeout path) ───────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -831,17 +767,7 @@ console.log(`Authenticity: ${LEVEL}\n`);
       totalTimeoutMs: 30_000,
     },
     scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return { kind: "completion", content: "TIMEOUT_FALLBACK_TEXT" };
-        }
-        return {
-          kind: "error",
-          code: "upstream_timeout",
-          status: 504,
-          message: "arbitration timed out",
-        };
-      },
+      () => ({ kind: "completion", content: "TIMEOUT_FALLBACK_TEXT" }),
     ],
   });
   const result = await exec(
@@ -858,16 +784,18 @@ console.log(`Authenticity: ${LEVEL}\n`);
   const resurrected = timeouts.some((t) => t > 30_000);
   assert(
     result.ok === true &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       msg(result)?.content === "TIMEOUT_FALLBACK_TEXT" &&
       meta.debitCallCount === 1 &&
       !resurrected &&
       timeouts.every((t) => t > 0 && t <= 30_000),
-    "15. arbitration timeout → safe fallback original text; no budget resurrection",
+    "15. native auto plain text FINAL — no arb timeout; no budget resurrection",
     { ...meta, fetchTimeoutMs: timeouts, debit: 1 }
   );
 }
 
-// ── 16. provider fallback bounded — no infinite loop ─────────────────────
+// ── 16. provider fallback bounded — secondary native text FINAL ──────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary", "openai-compatible-secondary"]),
@@ -879,16 +807,8 @@ console.log(`Authenticity: ${LEVEL}\n`);
         status: 503,
         message: "busy",
       }),
-      // secondary native miss
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return { kind: "completion", content: "secondary miss" };
-        }
-        return {
-          kind: "completion",
-          content: makeToolCallIntent("get_weather", { city: "FB" }),
-        };
-      },
+      // secondary native plain text is FINAL under auto (P1047)
+      () => ({ kind: "completion", content: "secondary miss" }),
     ],
   });
   const result = await exec(
@@ -903,13 +823,14 @@ console.log(`Authenticity: ${LEVEL}\n`);
   const meta = billingSnapshot(result);
   assert(
     result.ok === true &&
-      meta.providerCallCount <= 4 &&
       meta.providerCallCount >= 2 &&
+      meta.providerCallCount <= 4 &&
       meta.fallbackCount >= 1 &&
-      (meta.arbitrationCallCount ?? 0) <= 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
-      msg(result)?.tool_calls?.[0]?.function?.name === "get_weather",
-    "16. provider fallback bounded — no infinite native↔emulated loop",
+      msg(result)?.content === "secondary miss" &&
+      !Array.isArray(msg(result)?.tool_calls),
+    "16. provider fallback bounded — secondary native text FINAL; arb=0 debit=1",
     {
       ...meta,
       provider: meta.providerCallCount,
@@ -919,18 +840,11 @@ console.log(`Authenticity: ${LEVEL}\n`);
   );
 }
 
-// ── 17/18. success debit once; arbitration failure does not double-debit ─
+// ── 17/18. success debit once; auto plain text never double-debits ───────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
-    scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return { kind: "completion", content: "once" };
-        }
-        return { kind: "completion", content: "BAD{{{" };
-      },
-    ],
+    scripts: [() => ({ kind: "completion", content: "once" })],
   });
   const result = await exec(
     {
@@ -944,12 +858,12 @@ console.log(`Authenticity: ${LEVEL}\n`);
   const meta = billingSnapshot(result);
   assert(
     result.ok === true &&
-      meta.providerCallCount === 2 &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
       msg(result)?.content === "once",
-    "17/18. success path debit×1; arbitration failure never double-debits",
-    { ...meta, provider: 2, arbitration: 1, debit: 1 }
+    "17/18. success path debit×1; auto plain text never double-debits",
+    { ...meta, provider: 1, arbitration: 0, debit: 1 }
   );
 }
 
@@ -959,24 +873,20 @@ console.log(
   JSON.stringify(
     {
       "1_native_hit": { provider: 1, arbitration: 0, debit: 1 },
-      "2_arb_tool": { provider: 2, arbitration: 1, debit: 1 },
-      "3_arb_multi": { provider: 2, arbitration: 1, debit: 1 },
-      "4_arb_text": { provider: 2, arbitration: 1, debit: 1 },
-      "5_arb_invalid": { provider: 2, arbitration: 1, debit: 1, fallback: true },
-      "6_arb_unknown_tool": {
-        provider: 2,
-        arbitration: 1,
-        debit: 1,
-        fallback: true,
-      },
-      "7_arb_schema": { provider: 2, arbitration: 1, debit: 1, fallback: true },
+      "2_auto_text_final": { provider: 1, arbitration: 0, debit: 1 },
+      "3_auto_text_parallel": { provider: 1, arbitration: 0, debit: 1 },
+      "4_auto_text": { provider: 1, arbitration: 0, debit: 1 },
+      "5_auto_text": { provider: 1, arbitration: 0, debit: 1 },
+      "6_auto_text": { provider: 1, arbitration: 0, debit: 1 },
+      "7_auto_text": { provider: 1, arbitration: 0, debit: 1 },
       "8_no_tools": { provider: 1, arbitration: 0, debit: 1 },
       "9_required": { debit: 0, no_text_fallback: true },
       "10_forced_object": { provider: 1, arbitration: 0, debit: 1 },
       "11_image": { provider: 0, arbitration: 0, debit: 0 },
-      "15_timeout": { debit: 1, fallback: true },
-      "16_provider_fb": { bounded: true, debit: 1 },
-      "17_debit_once": { debit: 1 },
+      "14_stream_native": { provider: 1, arbitration: 0, debit: 1 },
+      "15_auto_text": { provider: 1, arbitration: 0, debit: 1 },
+      "16_provider_fb": { bounded: true, arbitration: 0, debit: 1 },
+      "17_debit_once": { provider: 1, arbitration: 0, debit: 1 },
     },
     null,
     2

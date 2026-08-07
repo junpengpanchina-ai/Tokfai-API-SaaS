@@ -501,21 +501,12 @@ console.log("P1046 CURSOR RESUME TAIL DETECTION\n");
 }
 
 // ── J. historical tools + latest user — no resume path ───────────────────
-// Cursor may still send tools; with tool_choice=auto + plain native text,
-// first-turn P1028 AUTO may run — that is NOT resume continuation. Prove the
-// resume-specific artifacts are absent, then prove plain single-shot billing
-// on a tools-free ordinary text request (provider=1 arb=0 debit=1).
+// P1047 closed first-turn P1028 AUTO: with tools+auto+plain text, expect
+// provider=1 arb=0. Prove resume-specific artifacts are absent.
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
-      () => ({
-        kind: "completion",
-        content: "TOKFAI_CLEAN_THREAD_OK",
-        finish_reason: "stop",
-        usage: NATIVE_USAGE,
-      }),
-      // If first-turn AUTO fires, return the same final text (not tool intent).
       () => ({
         kind: "completion",
         content: "TOKFAI_CLEAN_THREAD_OK",
@@ -542,9 +533,11 @@ console.log("P1046 CURSOR RESUME TAIL DETECTION\n");
       v.analysis.toolMessageCount >= 11 &&
       result.ok === true &&
       msg(result)?.content === "TOKFAI_CLEAN_THREAD_OK" &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
       outboundHasFastPathInstruction() === false,
-    "J. history tools + latest user — resume=false; no native resume fastpath; debit once",
+    "J. history tools + latest user — resume=false; provider=1 arb=0 debit=1; no fastpath",
     {
       ...meta,
       resumeToolRound: v.resumeToolRound,

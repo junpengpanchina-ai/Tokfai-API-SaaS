@@ -1,9 +1,10 @@
 /**
- * P1030 — AUTO arbitration commercial usage aggregation.
+ * P1030 — Commercial usage / exact-once debit (P1047 auto semantics).
  *
- * Proves native + arbitration upstream costs are summed into one atomic debit
- * without a second debit RPC, and that restore-native no longer bills only
- * arbitration usage while returning native text.
+ * P1047 CLOSED auto arbitration: native plain text under tool_choice=auto is
+ * FINAL (provider=1, arbitration=0, native-only credits). Native+second-pass
+ * credit aggregation is proven via tool_choice=required → repair success
+ * (repairCallCount≥1, debit=1). Exact-once debit still holds.
  *
  * Authenticity:
  *   REAL executeChatCompletion ENTRY
@@ -31,7 +32,6 @@ import {
   getCounts,
   installP1018Mocks,
   loadExecuteChatCompletion,
-  makeAssistantTextIntent,
   makeToolCallIntent,
   nativeToolCompletion,
   resetScenario,
@@ -154,7 +154,7 @@ function near(a: number, b: number, eps = 1e-9) {
   return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= eps;
 }
 
-console.log("P1030 AUTO ARBITRATION COMMERCIAL USAGE AGGREGATION\n");
+console.log("P1030 COMMERCIAL USAGE / EXACT-ONCE DEBIT (P1047)\n");
 console.log(`Authenticity: ${LEVEL}\n`);
 
 // Unit: merge helper
@@ -238,7 +238,9 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
   );
 }
 
-// ── B. Native text → arbitration tool_calls ──────────────────────────────
+// ── B. required miss → repair success (exact-once debit on accepted repair) ─
+// Strict repair bills only the accepted repair stage (not failed-native usage).
+// P1047 closed auto native+arb aggregation; exact-once debit still holds.
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -264,7 +266,7 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
       model: "gpt-5.5",
       messages: [{ role: "user", content: "weather" }],
       tools: WEATHER_TOOLS,
-      tool_choice: "auto",
+      tool_choice: "required",
     },
     "req_p1030_b"
   );
@@ -273,48 +275,38 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
   assert(
     result.ok === true &&
       meta.providerCallCount === 2 &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      meta.repairCallCount >= 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
       Array.isArray(msg(result)?.tool_calls) &&
-      tok.prompt_tokens === EXPECT_MERGED.prompt_tokens &&
-      tok.completion_tokens === EXPECT_MERGED.completion_tokens &&
-      tok.total_tokens === EXPECT_MERGED.total_tokens &&
-      near(tok.credits_charged, sumCredits) &&
-      !near(tok.credits_charged, arbCredits) &&
+      tok.prompt_tokens === ARB_USAGE.prompt_tokens &&
+      tok.completion_tokens === ARB_USAGE.completion_tokens &&
+      tok.total_tokens === ARB_USAGE.total_tokens &&
+      near(tok.credits_charged, arbCredits) &&
       !near(tok.credits_charged, nativeCredits) &&
-      sumCredits > arbCredits &&
-      sumCredits > nativeCredits,
-    "B. native→arb tool_calls — component=2 debit=1 credits=native+arb",
+      !near(tok.credits_charged, sumCredits),
+    "B. required miss→repair tool_calls — provider=2 repair≥1 debit=1 repair-stage credits",
     {
       ...meta,
       debitTokens: tok,
       nativeCredits,
       arbCredits,
       sumCredits,
-      components: 2,
+      components: 1,
     }
   );
 }
 
-// ── C. Native text → arbitration assistant_text ──────────────────────────
+// ── C. native auto plain text FINAL — native-only credits ────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return {
-            kind: "completion",
-            content: "plain first",
-            usage: NATIVE_USAGE,
-          };
-        }
-        return {
-          kind: "completion",
-          content: makeAssistantTextIntent("final assistant"),
-          usage: ARB_USAGE,
-        };
-      },
+      () => ({
+        kind: "completion",
+        content: "plain first",
+        usage: NATIVE_USAGE,
+      }),
     ],
   });
   const result = await exec(
@@ -330,36 +322,28 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
   const tok = debitTokens();
   assert(
     result.ok === true &&
-      meta.providerCallCount === 2 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
-      msg(result)?.content === "final assistant" &&
+      msg(result)?.content === "plain first" &&
       !Array.isArray(msg(result)?.tool_calls) &&
-      tok.prompt_tokens === EXPECT_MERGED.prompt_tokens &&
-      near(tok.credits_charged, sumCredits),
-    "C. native→arb assistant_text — aggregate charge",
-    { ...meta, debitTokens: tok, sumCredits, components: 2 }
+      tok.prompt_tokens === NATIVE_USAGE.prompt_tokens &&
+      near(tok.credits_charged, nativeCredits),
+    "C. native auto plain text FINAL — provider=1 arb=0 debit=1 native-only",
+    { ...meta, debitTokens: tok, nativeCredits, components: 1 }
   );
 }
 
-// ── D. invalid JSON → restore Native ─────────────────────────────────────
+// ── D. native auto plain text FINAL (no restore-from-arb path) ───────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return {
-            kind: "completion",
-            content: "ORIGINAL_NATIVE_TEXT",
-            usage: NATIVE_USAGE,
-          };
-        }
-        return {
-          kind: "completion",
-          content: "NOT_VALID_JSON{{{",
-          usage: ARB_USAGE,
-        };
-      },
+      () => ({
+        kind: "completion",
+        content: "ORIGINAL_NATIVE_TEXT",
+        usage: NATIVE_USAGE,
+      }),
     ],
   });
   const result = await exec(
@@ -378,44 +362,34 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
     result.ok === true &&
       msg(result)?.content === "ORIGINAL_NATIVE_TEXT" &&
       !Array.isArray(msg(result)?.tool_calls) &&
-      meta.providerCallCount === 2 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
-      tok.prompt_tokens === EXPECT_MERGED.prompt_tokens &&
-      near(tok.credits_charged, sumCredits) &&
-      !near(tok.credits_charged, arbCredits) &&
-      // public usage follows restored native (not arb-only billing)
+      tok.prompt_tokens === NATIVE_USAGE.prompt_tokens &&
+      near(tok.credits_charged, nativeCredits) &&
       Number(publicUsage?.prompt_tokens) === NATIVE_USAGE.prompt_tokens &&
       Number(publicUsage?.completion_tokens) === NATIVE_USAGE.completion_tokens,
-    "D. invalid JSON restore — aggregate debit; public usage=native",
+    "D. native auto plain text FINAL — debit=1 native-only; public usage=native",
     {
       ...meta,
       debitTokens: tok,
       publicUsage,
-      sumCredits,
-      components: 2,
+      nativeCredits,
+      components: 1,
     }
   );
 }
 
-// ── E. unknown tool → restore ────────────────────────────────────────────
+// ── E. native auto plain text FINAL ──────────────────────────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return {
-            kind: "completion",
-            content: "keep me",
-            usage: NATIVE_USAGE,
-          };
-        }
-        return {
-          kind: "completion",
-          content: makeToolCallIntent("not_a_real_tool", { x: 1 }),
-          usage: ARB_USAGE,
-        };
-      },
+      () => ({
+        kind: "completion",
+        content: "keep me",
+        usage: NATIVE_USAGE,
+      }),
     ],
   });
   const result = await exec(
@@ -432,34 +406,26 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
   assert(
     result.ok === true &&
       msg(result)?.content === "keep me" &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
-      tok.prompt_tokens === EXPECT_MERGED.prompt_tokens &&
-      near(tok.credits_charged, sumCredits),
-    "E. unknown tool restore — aggregate charge",
-    { ...meta, debitTokens: tok, components: 2 }
+      tok.prompt_tokens === NATIVE_USAGE.prompt_tokens &&
+      near(tok.credits_charged, nativeCredits),
+    "E. native auto plain text FINAL — debit=1 native-only",
+    { ...meta, debitTokens: tok, components: 1 }
   );
 }
 
-// ── F. schema invalid → restore ──────────────────────────────────────────
+// ── F. native auto plain text FINAL ──────────────────────────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return {
-            kind: "completion",
-            content: "schema keep",
-            usage: NATIVE_USAGE,
-          };
-        }
-        // city must be string; pass number to fail schema
-        return {
-          kind: "completion",
-          content: makeToolCallIntent("get_weather", { city: 123 as any }),
-          usage: ARB_USAGE,
-        };
-      },
+      () => ({
+        kind: "completion",
+        content: "schema keep",
+        usage: NATIVE_USAGE,
+      }),
     ],
   });
   const result = await exec(
@@ -476,34 +442,26 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
   assert(
     result.ok === true &&
       msg(result)?.content === "schema keep" &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
-      tok.prompt_tokens === EXPECT_MERGED.prompt_tokens &&
-      near(tok.credits_charged, sumCredits),
-    "F. schema invalid restore — aggregate charge",
-    { ...meta, debitTokens: tok, components: 2 }
+      tok.prompt_tokens === NATIVE_USAGE.prompt_tokens &&
+      near(tok.credits_charged, nativeCredits),
+    "F. native auto plain text FINAL — debit=1 native-only",
+    { ...meta, debitTokens: tok, components: 1 }
   );
 }
 
-// ── G. arbitration transport failure, no usage ───────────────────────────
+// ── G. native auto plain text FINAL (no arb transport path) ──────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return {
-            kind: "completion",
-            content: "TRANSPORT_FALLBACK",
-            usage: NATIVE_USAGE,
-          };
-        }
-        return {
-          kind: "error",
-          code: "upstream_error",
-          status: 502,
-          message: "arb transport failed",
-        };
-      },
+      () => ({
+        kind: "completion",
+        content: "TRANSPORT_FALLBACK",
+        usage: NATIVE_USAGE,
+      }),
     ],
   });
   const result = await exec(
@@ -520,17 +478,18 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
   assert(
     result.ok === true &&
       msg(result)?.content === "TRANSPORT_FALLBACK" &&
-      meta.providerCallCount === 2 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
       tok.prompt_tokens === NATIVE_USAGE.prompt_tokens &&
       tok.completion_tokens === NATIVE_USAGE.completion_tokens &&
       near(tok.credits_charged, nativeCredits),
-    "G. arb transport failure — component=1 native-only debit",
+    "G. native auto plain text FINAL — component=1 native-only debit",
     { ...meta, debitTokens: tok, components: 1 }
   );
 }
 
-// ── H. arbitration timeout, remaining > 0 ────────────────────────────────
+// ── H. native auto plain text FINAL (no arb timeout path) ────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -540,21 +499,11 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
       totalTimeoutMs: 30_000,
     },
     scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return {
-            kind: "completion",
-            content: "TIMEOUT_FALLBACK_TEXT",
-            usage: NATIVE_USAGE,
-          };
-        }
-        return {
-          kind: "error",
-          code: "upstream_timeout",
-          status: 504,
-          message: "arbitration timed out",
-        };
-      },
+      () => ({
+        kind: "completion",
+        content: "TIMEOUT_FALLBACK_TEXT",
+        usage: NATIVE_USAGE,
+      }),
     ],
   });
   const result = await exec(
@@ -572,16 +521,18 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
   assert(
     result.ok === true &&
       msg(result)?.content === "TIMEOUT_FALLBACK_TEXT" &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
       tok.prompt_tokens === NATIVE_USAGE.prompt_tokens &&
       near(tok.credits_charged, nativeCredits) &&
       timeouts.every((t) => t > 0 && t <= 30_000),
-    "H. arb timeout remaining>0 — native-only debit; no budget resurrection",
+    "H. native auto plain text FINAL — native-only debit; no budget resurrection",
     { ...meta, debitTokens: tok, fetchTimeoutMs: timeouts, components: 1 }
   );
 }
 
-// ── I. total wall-clock exhausted — non-200, debit=0 ─────────────────────
+// ── I. required + repair wall-clock exhausted — non-200, debit=0 ─────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -603,7 +554,7 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
           kind: "error",
           code: "upstream_timeout",
           status: 504,
-          message: "arb after budget",
+          message: "repair after budget",
           delayMs: 120,
         };
       },
@@ -614,7 +565,7 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
       model: "gpt-5.5",
       messages: [{ role: "user", content: "total timeout" }],
       tools: WEATHER_TOOLS,
-      tool_choice: "auto",
+      tool_choice: "required",
     },
     "req_p1030_i"
   );
@@ -623,7 +574,7 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
     result.ok === false &&
       meta.debitCallCount === 0 &&
       (meta.credits_charged === 0 || meta.credits_charged == null),
-    "I. total wall-clock exhausted — non-200 debit=0",
+    "I. required repair wall-clock exhausted — non-200 debit=0",
     { ...meta, components: 0 }
   );
 }
@@ -731,7 +682,7 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
   );
 }
 
-// ── M. provider fallback — scope not polluted ────────────────────────────
+// ── M. provider fallback — secondary native text FINAL under auto ────────
 {
   resetScenario({
     providers: defaultProviders([
@@ -745,20 +696,11 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
         status: 503,
         message: "busy",
       }),
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return {
-            kind: "completion",
-            content: "secondary miss",
-            usage: NATIVE_USAGE,
-          };
-        }
-        return {
-          kind: "completion",
-          content: makeToolCallIntent("get_weather", { city: "FB" }),
-          usage: ARB_USAGE,
-        };
-      },
+      () => ({
+        kind: "completion",
+        content: "secondary miss",
+        usage: NATIVE_USAGE,
+      }),
     ],
   });
   const result = await exec(
@@ -775,18 +717,20 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
   assert(
     result.ok === true &&
       meta.fallbackCount >= 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
-      msg(result)?.tool_calls?.[0]?.function?.name === "get_weather" &&
-      tok.prompt_tokens === EXPECT_MERGED.prompt_tokens &&
-      near(tok.credits_charged, sumCredits),
-    "M. provider fallback success — only final provider components; debit=1",
-    { ...meta, debitTokens: tok, components: 2 }
+      msg(result)?.content === "secondary miss" &&
+      !Array.isArray(msg(result)?.tool_calls) &&
+      tok.prompt_tokens === NATIVE_USAGE.prompt_tokens &&
+      near(tok.credits_charged, nativeCredits),
+    "M. provider fallback — secondary native text FINAL; debit=1 native-only",
+    { ...meta, debitTokens: tok, components: 1 }
   );
 }
 
-// ── N. role=tool second round — no cross-request residue ─────────────────
+// ── N. role=tool second round — native text FINAL; arb=0 ─────────────────
 // P1033 — resumeToolRound must NOT run first-turn AUTO arbitration.
-// P1036 — Round-N continuation MAY run once; debit still aggregates in-request.
+// P1047 — continuation arbitration also closed; valid native text is FINAL.
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -817,12 +761,6 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
         content: "done after tool",
         usage: NATIVE_USAGE,
       }),
-      // Continuation may run; invalid → restore native text.
-      () => ({
-        kind: "completion",
-        content: "not-json {{{",
-        usage: ARB_USAGE,
-      }),
     ],
   });
   const r2 = await exec(
@@ -852,12 +790,13 @@ const sumCredits = roundCreditAmount(nativeCredits + arbCredits);
     r1.ok === true &&
       tok1.prompt_tokens === NATIVE_USAGE.prompt_tokens &&
       r2.ok === true &&
+      meta2.providerCallCount === 1 &&
       meta2.debitCallCount === 1 &&
-      (meta2.arbitrationCallCount ?? 0) <= 1 &&
+      (meta2.arbitrationCallCount ?? 0) === 0 &&
       msg(r2)?.content === "done after tool" &&
-      tok2.prompt_tokens >= NATIVE_USAGE.prompt_tokens &&
-      tok2.credits_charged > 0,
-    "N. role=tool second round — per-request components; no residue",
+      tok2.prompt_tokens === NATIVE_USAGE.prompt_tokens &&
+      near(tok2.credits_charged, nativeCredits),
+    "N. role=tool second round — native text FINAL; arb=0 debit=1",
     {
       ...meta2,
       round1_tokens: tok1,
@@ -946,18 +885,23 @@ console.log(
   JSON.stringify(
     {
       A_native_hit: { provider: 1, components: 1, debit: 1 },
-      B_arb_tool: { provider: 2, components: 2, debit: 1, credits: "native+arb" },
-      C_arb_text: { provider: 2, components: 2, debit: 1 },
-      D_invalid_restore: { provider: 2, components: 2, debit: 1 },
-      E_unknown_restore: { provider: 2, components: 2, debit: 1 },
-      F_schema_restore: { provider: 2, components: 2, debit: 1 },
-      G_transport: { provider: 2, components: 1, debit: 1 },
-      H_timeout: { provider: 2, components: 1, debit: 1 },
-      I_total_timeout: { debit: 0 },
+      B_required_repair: {
+        provider: 2,
+        components: 1,
+        debit: 1,
+        credits: "repair-stage-only",
+      },
+      C_auto_text: { provider: 1, components: 1, debit: 1 },
+      D_auto_text: { provider: 1, components: 1, debit: 1 },
+      E_auto_text: { provider: 1, components: 1, debit: 1 },
+      F_auto_text: { provider: 1, components: 1, debit: 1 },
+      G_auto_text: { provider: 1, components: 1, debit: 1 },
+      H_auto_text: { provider: 1, components: 1, debit: 1 },
+      I_required_timeout: { debit: 0 },
       J_required: { debit: 0 },
       K_forced: { provider: 1, components: 1, debit: 1 },
-      M_fallback: { components: 2, debit: 1 },
-      N_tool_round: { per_request: true },
+      M_fallback: { components: 1, arbitration: 0, debit: 1 },
+      N_tool_round: { provider: 1, arbitration: 0, debit: 1 },
       O_plain: { provider: 1, components: 1, debit: 1 },
       P_estimate: { debit: 1 },
       nativeCredits,

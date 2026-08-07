@@ -1511,9 +1511,9 @@ async function runProviderAttempts(args: {
         // P1020 — active mode may switch native → emulated_json once for
         // controlled repair; reported tool_calling_mode follows the mode that
         // produced the final success (or the last attempt on failure).
-        // P1028 — native auto may do ONE emulated_json intent arbitration;
-        // failure safely falls back to the original native text (never 5xx).
-        // P1036 — resumeToolRound may do ONE continuation arbitration instead.
+        // P1047 — under tool_choice=auto/missing, valid native text or
+        // tool_calls is final (P1028/P1036 auto arbitration gates stay closed).
+        // Strict/required/named still use ONE controlled emulated_json repair.
         let activeToolMode: ToolCallingMode = toolMode;
         let repairAttempted = false;
         let autoIntentArbitrationAttempted = false;
@@ -2124,7 +2124,7 @@ async function runProviderAttempts(args: {
           // Strict/required with no tool_calls may do ONE controlled
           // emulated_json repair — never fake plain text as success.
           // P1024 — when forcedToolName is set, all tool_call names must match.
-          // P1028 — auto with no tool_calls may do ONE intent arbitration.
+          // P1047 — auto with no tool_calls: accept ordinary text (no arb).
           if (activeToolMode === "native") {
             if (upstreamReturnedToolCalls) {
               if (forcedToolName) {
@@ -2225,10 +2225,9 @@ async function runProviderAttempts(args: {
               throw guardErr;
             }
 
-            // P1028 — auto: one controlled emulated_json intent arbitration
-            // before accepting ordinary text. Safe-fallback on failure.
-            // P1036 — resumeToolRound: one continuation arbitration instead
-            // (never reuses first-turn AUTO semantics; anti-replay after parse).
+            // P1047 — auto/missing: accept valid native text (or tool_calls
+            // above). Gates below stay closed; do not second-fetch solely
+            // because tools[] were present. Strict repair remains above.
             const finishForArbitration =
               extractResponseFinishReason(normalizedData) ??
               extractFinishReason(

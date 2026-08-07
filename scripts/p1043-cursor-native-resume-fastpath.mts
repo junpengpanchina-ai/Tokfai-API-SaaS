@@ -2,9 +2,10 @@
  * P1043 — Cursor Native Resume Fast Path.
  *
  * Proves resumeToolRound native first-shot prefers immediate tool_calls
- * (via a request-scoped continuation instruction), skips continuation
- * arbitration when native already returns tool_calls, preserves P1036
- * fallback + P1041 exact-once billing, and never mutates clientBody.
+ * (via a request-scoped continuation instruction). P1047: valid native text
+ * or tool_calls under auto is FINAL (provider=1 arb=0) — no continuation
+ * arbitration fallback. Preserves P1041 exact-once billing and never mutates
+ * clientBody.
  *
  * Authenticity:
  *   REAL executeChatCompletion ENTRY
@@ -173,18 +174,6 @@ function outboundHasFastPathInstruction(): boolean {
     })
     .join("\n");
   return flat.includes("Continue from the returned tool results.");
-}
-
-function hasRawToolTranscriptFields(messages: unknown[]): boolean {
-  for (const raw of messages) {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
-    const row = raw as Record<string, unknown>;
-    const role = typeof row.role === "string" ? row.role : "";
-    if (role === "tool" || role === "function") return true;
-    if (role === "assistant" && Array.isArray(row.tool_calls)) return true;
-    if (typeof row.tool_call_id === "string") return true;
-  }
-  return false;
 }
 
 function resumeMessages(): Record<string, unknown>[] {
@@ -366,7 +355,7 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
   );
 }
 
-// ── C. Native plain text → continuation arb → tool_calls ─────────────────
+// ── C. Native plain text is FINAL under auto (P1047; no continuation arb) ─
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -377,6 +366,7 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
         finish_reason: "stop",
         usage: NATIVE_USAGE,
       }),
+      // Must never be consumed under P1047 auto resume.
       () => ({
         kind: "completion",
         content: makeToolCallIntent("Read", { path: "b.ts" }),
@@ -395,34 +385,29 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
   );
   const meta = billingSnapshot(result);
   const tok = debitTokens();
-  const bodies = getCounts().outboundBodies;
-  const emulatedMsgs = bodies[1]?.messages ?? [];
   assert(
     result.ok === true &&
-      toolName(result) === "Read" &&
-      toolArgs(result)?.path === "b.ts" &&
-      meta.providerCallCount === 2 &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      msg(result)?.content === "I should continue with the next file" &&
+      !msg(result)?.tool_calls &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
-      tok.prompt_tokens ===
-        NATIVE_USAGE.prompt_tokens + ARB_USAGE.prompt_tokens &&
-      tok.completion_tokens ===
-        NATIVE_USAGE.completion_tokens + ARB_USAGE.completion_tokens &&
-      outboundHasFastPathInstruction() &&
-      !hasRawToolTranscriptFields(emulatedMsgs),
-    "C. native text → continuation arb tool_calls; provider=2 arb=1 debit=1; P1040 sanitize",
-    { ...meta, debitTokens: tok, emulatedRawTool: hasRawToolTranscriptFields(emulatedMsgs) }
+      tok.prompt_tokens === NATIVE_USAGE.prompt_tokens &&
+      tok.completion_tokens === NATIVE_USAGE.completion_tokens &&
+      outboundHasFastPathInstruction(),
+    "C. native text FINAL under auto; provider=1 arb=0 debit=1; no continuation arb",
+    { ...meta, debitTokens: tok }
   );
 }
 
-// ── D. Native plain text → arb assistant_text ────────────────────────────
+// ── D. Native plain text FINAL — no arb assistant_text second pass ───────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
       () => ({
         kind: "completion",
-        content: "native placeholder",
+        content: "final from native resume",
         usage: NATIVE_USAGE,
       }),
       () => ({
@@ -444,17 +429,17 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
   const meta = billingSnapshot(result);
   assert(
     result.ok === true &&
-      msg(result)?.content === "final from continuation" &&
+      msg(result)?.content === "final from native resume" &&
       !msg(result)?.tool_calls &&
-      meta.providerCallCount === 2 &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1,
-    "D. native text → arb assistant_text; debit=1; no forged tools",
+    "D. native text FINAL; provider=1 arb=0 debit=1; no forged tools",
     meta
   );
 }
 
-// ── E. arbitration invalid → restore Native; debit=1 ─────────────────────
+// ── E. Native text FINAL — unused invalid-JSON script never runs ─────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -487,17 +472,16 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
     result.ok === true &&
       msg(result)?.content === "keep this native text" &&
       !body.includes("not-json-at-all") &&
-      meta.providerCallCount === 2 &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
-      tok.prompt_tokens ===
-        NATIVE_USAGE.prompt_tokens + ARB_USAGE.prompt_tokens,
-    "E. arb invalid → restore native; debit=1 (aggregate native+arb HTTP 200)",
+      tok.prompt_tokens === NATIVE_USAGE.prompt_tokens,
+    "E. native text FINAL under auto; unused invalid script; debit=1",
     { ...meta, debitTokens: tok }
   );
 }
 
-// ── F. arbitration transport failure → restore Native; debit=1 ───────────
+// ── F. Native text FINAL — unused transport-error script never runs ──────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -529,11 +513,11 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
   assert(
     result.ok === true &&
       msg(result)?.content === "native before transport fail" &&
-      meta.providerCallCount === 2 &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
       tok.prompt_tokens === NATIVE_USAGE.prompt_tokens,
-    "F. arb transport failure → restore native; debit=1",
+    "F. native text FINAL under auto; unused transport-error script; debit=1",
     { ...meta, debitTokens: tok }
   );
 }
@@ -660,11 +644,6 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
         finish_reason: "stop",
         usage: NATIVE_USAGE,
       }),
-      () => ({
-        kind: "completion",
-        content: makeAssistantTextIntent("both files summarized — done"),
-        usage: ARB_USAGE,
-      }),
     ],
   });
   const result = await exec(
@@ -692,8 +671,10 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
       out0?.tool_choice === "auto" &&
       out0?.tool_choice !== "required" &&
       outboundHasFastPathInstruction() &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1,
-    "H. completed task — final text allowed; tool_choice not forced required",
+    "H. completed task — final text allowed; provider=1 arb=0; tool_choice not forced required",
     {
       ...meta,
       content: msg(result)?.content,
@@ -771,23 +752,18 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
   );
 }
 
-// ── J. P1040 resume transcript sanitization regression ───────────────────
+// ── J. Native resume keeps role=tool; native Write single-pass (P1047) ───
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
       () => ({
-        kind: "completion",
-        content: "need next tool",
+        ...nativeToolCompletion(
+          "Write",
+          { path: "out.ts", contents: "x" },
+          { id: "call_j_write" }
+        ),
         usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("Write", {
-          path: "out.ts",
-          contents: "x",
-        }),
-        usage: ARB_USAGE,
       }),
     ],
   });
@@ -808,34 +784,24 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
   const meta = billingSnapshot(result);
   const bodies = getCounts().outboundBodies;
   const nativeMsgs = bodies[0]?.messages ?? [];
-  const emulatedMsgs = bodies[1]?.messages ?? [];
   const nativeHasRoleTool = nativeMsgs.some((m) => {
     if (!m || typeof m !== "object") return false;
     return (m as { role?: unknown }).role === "tool";
   });
-  const emulatedFlat = emulatedMsgs
-    .map((m) => {
-      if (!m || typeof m !== "object") return "";
-      const c = (m as { content?: unknown }).content;
-      return typeof c === "string" ? c : JSON.stringify(c ?? "");
-    })
-    .join("\n");
   assert(
     result.ok === true &&
       toolName(result) === "Write" &&
-      meta.providerCallCount === 2 &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       nativeHasRoleTool === true &&
       outboundHasFastPathInstruction() &&
-      !hasRawToolTranscriptFields(emulatedMsgs) &&
-      emulatedFlat.includes(uniqueResult) &&
+      bodies.length === 1 &&
       meta.debitCallCount === 1,
-    "J. P1040 sanitize — native keeps role=tool; emulated has no raw tool fields",
+    "J. native resume keeps role=tool; Write single-pass; provider=1 arb=0 debit=1",
     {
       ...meta,
       nativeHasRoleTool,
-      emulatedRawTool: hasRawToolTranscriptFields(emulatedMsgs),
-      emulatedHasResult: emulatedFlat.includes(uniqueResult),
+      outboundCount: bodies.length,
     }
   );
 }

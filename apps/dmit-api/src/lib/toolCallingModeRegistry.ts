@@ -20,8 +20,8 @@ export type ToolCallingMode = "native" | "emulated_json" | "unsupported";
  * GPT family — prefer native OpenAI tools/tool_choice on current proxies.
  * Controlled emulated_json repair is allowed once when native yields no
  * tool_calls under strict/required (see executeChatCompletion).
- * P1028 — under tool_choice=auto, one controlled emulated_json intent
- * arbitration is allowed when native yields plain text (safe-fallback).
+ * P1047 — under tool_choice=auto/missing, valid native text OR tool_calls is
+ * final (no second-pass auto intent / continuation arbitration).
  */
 const GRSAI_NATIVE_MODELS = ["gpt-5.5", "gpt-5.4"] as const;
 

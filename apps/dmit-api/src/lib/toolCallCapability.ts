@@ -228,15 +228,51 @@ export function isAutoEffectiveToolChoice(choice: unknown): boolean {
 }
 
 /**
- * P1028 — AUTO NO-TOOL INTENT ARBITRATION gate.
+ * P1047 — Whether a second controlled emulated_json pass is warranted after a
+ * structurally valid native OpenAI-compatible response.
  *
- * When native returns ordinary text under client auto tools, allow at most one
- * controlled emulated_json intent arbitration instead of accepting text
- * immediately. Provider-agnostic: no providerId / model hardcodes.
+ * OpenAI tool_choice semantics:
+ * - missing / auto: assistant text OR tool_calls are both legal finals → never
+ * - required / named / require_tool_call: handled by the strict repair path
+ *   (`isStrictToolCallRequest` + `canNativeEmulatedRepair`), not this gate
  *
- * P1033 — never run on resumeToolRound (role=tool results already present).
- * A legal final assistant text after tool results is not "native missed intent".
- * P1036 — Round-N continuation uses shouldAttemptResumeToolContinuationArbitration.
+ * "Client sent tools[]" ≠ "model must call a tool this turn".
+ * Historical P1028/P1036 auto-intent / continuation arbitration violated this
+ * and doubled Cursor latency (~5s → 20s+). Those paths stay callable but closed.
+ */
+export function shouldRunToolArbitrationAfterNativeResponse(args: {
+  hasTools: boolean;
+  supportsToolsRequested: boolean;
+  effectiveToolChoice: unknown;
+  activeToolMode: ToolCallingMode | string;
+  upstreamReturnedToolCalls: boolean;
+  finishReason: string | null | undefined;
+  alreadyAttempted: boolean;
+  freshRemainingTotalMs: number;
+  /** Structurally valid OpenAI-compatible assistant response from native. */
+  nativeResponseValid?: boolean;
+}): boolean {
+  // Keep args inspected so call sites stay type-checked / tree-shake safe.
+  if (!args.hasTools) return false;
+  if (!args.supportsToolsRequested) return false;
+  if (args.activeToolMode !== "native") return false;
+  if (args.alreadyAttempted) return false;
+  if (!(args.freshRemainingTotalMs > 0)) return false;
+  // P1047 — auto/missing: valid native text and tool_calls are both final.
+  if (isAutoEffectiveToolChoice(args.effectiveToolChoice)) return false;
+  // Non-auto (required/named) uses the strict repair path, not this gate.
+  void args.upstreamReturnedToolCalls;
+  void args.finishReason;
+  void args.nativeResponseValid;
+  return false;
+}
+
+/**
+ * P1028 / P1047 — First-turn AUTO intent arbitration gate.
+ *
+ * Historically opened when native returned plain text under tool_choice=auto.
+ * P1047 closes that path: OpenAI auto treats plain text as a legal final.
+ * Signature retained for regressions / call-site compatibility.
  */
 export function shouldAttemptAutoToolIntentArbitration(args: {
   hasTools: boolean;
@@ -251,25 +287,25 @@ export function shouldAttemptAutoToolIntentArbitration(args: {
   resumeToolRound?: boolean;
 }): boolean {
   if (args.resumeToolRound === true) return false;
-  if (!args.hasTools) return false;
-  if (!args.supportsToolsRequested) return false;
-  if (!isAutoEffectiveToolChoice(args.effectiveToolChoice)) return false;
-  if (args.activeToolMode !== "native") return false;
-  if (args.upstreamReturnedToolCalls) return false;
-  if (!isPlainTextCompletionFinishReason(args.finishReason)) return false;
-  if (args.autoIntentArbitrationAttempted) return false;
-  if (!(args.freshRemainingTotalMs > 0)) return false;
-  return true;
+  return shouldRunToolArbitrationAfterNativeResponse({
+    hasTools: args.hasTools,
+    supportsToolsRequested: args.supportsToolsRequested,
+    effectiveToolChoice: args.effectiveToolChoice,
+    activeToolMode: args.activeToolMode,
+    upstreamReturnedToolCalls: args.upstreamReturnedToolCalls,
+    finishReason: args.finishReason,
+    alreadyAttempted: args.autoIntentArbitrationAttempted,
+    freshRemainingTotalMs: args.freshRemainingTotalMs,
+    nativeResponseValid: true,
+  });
 }
 
 /**
- * P1036 — Round-2+ continuation arbitration gate (independent of P1028).
+ * P1036 / P1047 — Round-2+ continuation arbitration gate.
  *
- * After a legal fully-matched tool transcript, if native returns ordinary text
- * with no tool_calls, allow at most one controlled emulated_json continuation
- * so the model may emit the *next* novel tool call. Never re-runs first-turn
- * AUTO arbitration semantics; anti-replay of completed signatures is enforced
- * after parse.
+ * Historically opened when native returned plain text on a legal resume.
+ * P1047 closes that path: valid native final text or next tool_calls are final
+ * under auto. Signature retained for regressions / call-site compatibility.
  */
 export function shouldAttemptResumeToolContinuationArbitration(args: {
   hasTools: boolean;
@@ -289,20 +325,22 @@ export function shouldAttemptResumeToolContinuationArbitration(args: {
   upstreamHttpOk: boolean;
 }): boolean {
   if (!args.resumeToolRound) return false;
-  if (!args.hasTools) return false;
-  if (!args.supportsToolsRequested) return false;
-  if (!isAutoEffectiveToolChoice(args.effectiveToolChoice)) return false;
-  if (args.activeToolMode !== "native") return false;
-  if (args.upstreamReturnedToolCalls) return false;
-  if (!isPlainTextCompletionFinishReason(args.finishReason)) return false;
   if (args.unmatchedToolCallIdCount !== 0) return false;
   if (args.duplicateToolResultCount !== 0) return false;
   if (args.orderViolationCount !== 0) return false;
-  if (args.continuationArbitrationAttempted) return false;
-  if (args.autoIntentArbitrationAttempted) return false;
   if (!args.upstreamHttpOk) return false;
-  if (!(args.freshRemainingTotalMs > 0)) return false;
-  return true;
+  if (args.autoIntentArbitrationAttempted) return false;
+  return shouldRunToolArbitrationAfterNativeResponse({
+    hasTools: args.hasTools,
+    supportsToolsRequested: args.supportsToolsRequested,
+    effectiveToolChoice: args.effectiveToolChoice,
+    activeToolMode: args.activeToolMode,
+    upstreamReturnedToolCalls: args.upstreamReturnedToolCalls,
+    finishReason: args.finishReason,
+    alreadyAttempted: args.continuationArbitrationAttempted,
+    freshRemainingTotalMs: args.freshRemainingTotalMs,
+    nativeResponseValid: true,
+  });
 }
 
 /**

@@ -1,14 +1,15 @@
 /**
- * P1040 — Cursor resume transcript → safe emulated_json continuation.
+ * P1040 — Cursor resume transcript → safe emulated_json compiler (unit) +
+ * single-pass native resume (P1047).
  *
- * Proves continuation arbitration never forwards raw role=tool /
- * assistant.tool_calls / tool_call_id into emulated outbound messages; instead
- * history is compiled to plain-text tool context while novel next tools,
- * anti-replay, native restore, and single-debit aggregation remain intact.
+ * P1047 closed auto/missing continuation arbitration: valid native text or
+ * tool_calls on resume is FINAL (provider=1 arb=0). Emulated resume transcript
+ * sanitization remains covered via compileEmulatedResumeTranscript /
+ * transformResumeTranscriptMessages unit tests (no live second-pass arb).
  *
  * Authenticity:
- *   REAL executeChatCompletion ENTRY
- *   REAL resume transcript compiler + signature anti-replay
+ *   REAL executeChatCompletion ENTRY (native single-pass resume)
+ *   REAL resume transcript compiler helpers (unit)
  *   REAL billable usage aggregation
  *   MOCK provider boundary
  *   MOCK/SPY billing boundary
@@ -30,8 +31,7 @@ import {
   getCounts,
   installP1018Mocks,
   loadExecuteChatCompletion,
-  makeAssistantTextIntent,
-  makeToolCallIntent,
+  nativeToolCompletion,
   resetScenario,
   type AssertMeta,
 } from "./fixtures/p1018-tool-intent-harness.mts";
@@ -41,6 +41,15 @@ ensureDummyEnv();
 await installP1018Mocks();
 
 const { executeChatCompletion } = await loadExecuteChatCompletion();
+const {
+  transformResumeTranscriptMessages,
+  compileEmulatedResumeTranscript,
+} = await import("../apps/dmit-api/src/lib/toolIntentCompiler.ts");
+const {
+  extractCompletedToolSignatures,
+  extractHistoricalToolCallIds,
+  filterNovelToolCallsOnCompletion,
+} = await import("../apps/dmit-api/src/lib/cursorToolProtocol.ts");
 
 const PASS = "TOKFAI_P1040_CURSOR_RESUME_TRANSCRIPT_EMULATION_PASS";
 const FAIL = "TOKFAI_P1040_CURSOR_RESUME_TRANSCRIPT_EMULATION_BLOCKED";
@@ -51,11 +60,6 @@ const NATIVE_USAGE = {
   prompt_tokens: 100,
   completion_tokens: 10,
   total_tokens: 110,
-};
-const ARB_USAGE = {
-  prompt_tokens: 40,
-  completion_tokens: 8,
-  total_tokens: 48,
 };
 
 const GLOB_TOOL = {
@@ -193,30 +197,155 @@ function flatMessageContents(messages: unknown[]): string[] {
   return out;
 }
 
-function emulatedOutboundMessages(): unknown[] {
-  const bodies = getCounts().outboundBodies;
-  // Second call is continuation emulated_json (first is native with tools).
-  const emulated = bodies.find((b) => !b.hasTools && b.messages.length > 0);
-  return emulated?.messages ?? [];
-}
-
 console.log("P1040 CURSOR RESUME TRANSCRIPT EMULATION\n");
 
-// ── A. Read → native text → Glob (novel continuation) ────────────────────
+// ── Unit: transformResumeTranscriptMessages sanitizes tool protocol ──────
+{
+  const readResultText = "UNIQUE_READ_RESULT_P1040_B";
+  const input = [
+    { role: "user", content: "b" },
+    assistantTools([tc("call_b_read", "Read", { path: "b.ts" })]),
+    toolMsg("call_b_read", readResultText),
+  ];
+  const inputBefore = JSON.stringify(input);
+  const transformed = transformResumeTranscriptMessages(input);
+  const contents = flatMessageContents(transformed);
+  const hasReadContext = contents.some(
+    (c) =>
+      c.includes("Previously requested tool: Read") ||
+      c.includes("Tool result for Read")
+  );
+  const hasResultText = contents.some((c) => c.includes(readResultText));
+  const hasToolCallIdLeak = contents.some((c) => c.includes("call_b_read"));
+  assert(
+    JSON.stringify(input) === inputBefore &&
+      !hasRawToolTranscriptFields(transformed) &&
+      hasReadContext &&
+      hasResultText &&
+      !hasToolCallIdLeak,
+    "unit.B transformResumeTranscriptMessages: no role=tool/tool_calls/tool_call_id; keeps Read result semantics",
+    {
+      providerCallCount: 0,
+      repairCallCount: 0,
+      arbitrationCallCount: 0,
+      fallbackCount: 0,
+      debitCallCount: 0,
+      hasReadContext,
+      hasResultText,
+      hasToolCallIdLeak,
+      transformedMsgCount: transformed.length,
+      level: "UNIT transformResumeTranscriptMessages",
+    }
+  );
+}
+
+// ── Unit: compileEmulatedResumeTranscript preserves multi-tool order ─────
+{
+  const markerRead = "ORDER_MARKER_READ_FIRST";
+  const markerGlob = "ORDER_MARKER_GLOB_SECOND";
+  const messages = [
+    { role: "user", content: "e" },
+    assistantTools([
+      tc("call_e_read", "Read", { path: "e.ts" }),
+      tc("call_e_glob", "Glob", { pattern: "e/**" }),
+    ]),
+    toolMsg("call_e_read", markerRead),
+    toolMsg("call_e_glob", markerGlob),
+  ];
+  const messagesBefore = JSON.stringify(messages);
+  const compiled = compileEmulatedResumeTranscript(
+    { model: "gpt-5.5", messages },
+    { model: "gpt-5.5", messages, tools: P1040_TOOLS, tool_choice: "auto" }
+  );
+  const compiledMsgs = Array.isArray(compiled.messages)
+    ? (compiled.messages as unknown[])
+    : [];
+  const contents = flatMessageContents(compiledMsgs);
+  const joined = contents.join("\n---\n");
+  const idxPrevRead = joined.indexOf("Previously requested tool: Read");
+  const idxPrevGlob = joined.indexOf("Previously requested tool: Glob");
+  const idxResRead = joined.indexOf(`Tool result for Read:\n${markerRead}`);
+  const idxResGlob = joined.indexOf(`Tool result for Glob:\n${markerGlob}`);
+  assert(
+    JSON.stringify(messages) === messagesBefore &&
+      compiled.tools === undefined &&
+      !hasRawToolTranscriptFields(compiledMsgs) &&
+      idxPrevRead >= 0 &&
+      idxPrevGlob > idxPrevRead &&
+      idxResRead > idxPrevGlob &&
+      idxResGlob > idxResRead,
+    "unit.E compileEmulatedResumeTranscript: multi tool results preserve order; no raw tool fields",
+    {
+      providerCallCount: 0,
+      repairCallCount: 0,
+      arbitrationCallCount: 0,
+      fallbackCount: 0,
+      debitCallCount: 0,
+      idxPrevRead,
+      idxPrevGlob,
+      idxResRead,
+      idxResGlob,
+      level: "UNIT compileEmulatedResumeTranscript",
+    }
+  );
+}
+
+// ── Unit: anti-replay drops duplicate Read same args ─────────────────────
+{
+  const history = [
+    { role: "user", content: "c" },
+    assistantTools([tc("call_c_read", "Read", { path: "a.ts" })]),
+    toolMsg("call_c_read", "a"),
+  ];
+  const completedSignatures = extractCompletedToolSignatures(history);
+  const historicalIds = extractHistoricalToolCallIds(history);
+  const filtered = filterNovelToolCallsOnCompletion(
+    {
+      choices: [
+        {
+          message: {
+            role: "assistant",
+            content: null,
+            tool_calls: [
+              {
+                id: "call_replay",
+                type: "function",
+                function: {
+                  name: "Read",
+                  arguments: JSON.stringify({ path: "a.ts" }),
+                },
+              },
+            ],
+          },
+          finish_reason: "tool_calls",
+        },
+      ],
+    },
+    { completedSignatures, historicalIds }
+  );
+  assert(
+    filtered === null,
+    "unit.C duplicate Read same args anti-replay — filterNovelToolCallsOnCompletion returns null",
+    {
+      providerCallCount: 0,
+      repairCallCount: 0,
+      arbitrationCallCount: 0,
+      fallbackCount: 0,
+      debitCallCount: 0,
+      completedSignatures: [...completedSignatures],
+      level: "UNIT filterNovelToolCallsOnCompletion",
+    }
+  );
+}
+
+// ── A. Read → native Glob (single-pass; P1047 no continuation arb) ───────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
       () => ({
-        kind: "completion",
-        content: "I should search next",
-        finish_reason: "stop",
+        ...nativeToolCompletion("Glob", { pattern: "**/*.ts" }, { id: "call_a_glob" }),
         usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("Glob", { pattern: "**/*.ts" }),
-        usage: ARB_USAGE,
       }),
     ],
   });
@@ -241,143 +370,24 @@ console.log("P1040 CURSOR RESUME TRANSCRIPT EMULATION\n");
       toolArgs(result)?.pattern === "**/*.ts" &&
       msg(result)?.content === null &&
       choice(result)?.finish_reason === "tool_calls" &&
-      meta.providerCallCount === 2 &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
-      tok.prompt_tokens === NATIVE_USAGE.prompt_tokens + ARB_USAGE.prompt_tokens &&
-      tok.completion_tokens ===
-        NATIVE_USAGE.completion_tokens + ARB_USAGE.completion_tokens,
-    "A. Round-2 Read→Glob novel; provider=2 arb=1 debit=1 credits=native+arb",
+      tok.prompt_tokens === NATIVE_USAGE.prompt_tokens &&
+      tok.completion_tokens === NATIVE_USAGE.completion_tokens,
+    "A. Round-2 Read→Glob novel; provider=1 arb=0 debit=1 credits=native",
     { ...meta, debitTokens: tok, toolName: toolName(result) }
   );
 }
 
-// ── B. Second emulated outbound has no raw tool transcript ───────────────
+// ── D. Read → Glob succeeds after completed Read (single-pass) ───────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
       () => ({
-        kind: "completion",
-        content: "continue",
+        ...nativeToolCompletion("Glob", { pattern: "*.md" }, { id: "call_d_glob" }),
         usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("Glob", { pattern: "src/**" }),
-        usage: ARB_USAGE,
-      }),
-    ],
-  });
-  const readResultText = "UNIQUE_READ_RESULT_P1040_B";
-  await exec(
-    {
-      model: "gpt-5.5",
-      messages: [
-        { role: "user", content: "b" },
-        assistantTools([tc("call_b_read", "Read", { path: "b.ts" })]),
-        toolMsg("call_b_read", readResultText),
-      ],
-      tools: P1040_TOOLS,
-      tool_choice: "auto",
-    },
-    "req_p1040_b"
-  );
-  const bodies = getCounts().outboundBodies;
-  const nativeBody = bodies[0];
-  const emulatedBody = bodies.find((b) => !b.hasTools);
-  const emulatedMsgs = emulatedBody?.messages ?? [];
-  const contents = flatMessageContents(emulatedMsgs);
-  const hasReadContext = contents.some(
-    (c) =>
-      c.includes("Previously requested tool: Read") ||
-      c.includes("Tool result for Read")
-  );
-  const hasResultText = contents.some((c) => c.includes(readResultText));
-  const hasToolCallIdLeak = contents.some((c) => c.includes("call_b_read"));
-  assert(
-    bodies.length >= 2 &&
-      nativeBody?.hasTools === true &&
-      emulatedBody != null &&
-      emulatedBody.hasTools === false &&
-      !hasRawToolTranscriptFields(emulatedMsgs) &&
-      hasReadContext &&
-      hasResultText &&
-      !hasToolCallIdLeak,
-    "B. emulated outbound: no role=tool/tool_calls/tool_call_id; keeps Read result semantics",
-    {
-      providerCallCount: bodies.length,
-      repairCallCount: 0,
-      arbitrationCallCount: getCounts().arbitrationCallCount,
-      fallbackCount: 0,
-      debitCallCount: getCounts().debitCallCount,
-      hasReadContext,
-      hasResultText,
-      hasToolCallIdLeak,
-      emulatedMsgCount: emulatedMsgs.length,
-    }
-  );
-}
-
-// ── C. Duplicate Read same args → anti-replay restore native ─────────────
-{
-  resetScenario({
-    providers: defaultProviders(["grsai-primary"]),
-    scripts: [
-      () => ({
-        kind: "completion",
-        content: "native stop text",
-        usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("Read", { path: "a.ts" }),
-        usage: ARB_USAGE,
-      }),
-    ],
-  });
-  const result = await exec(
-    {
-      model: "gpt-5.5",
-      messages: [
-        { role: "user", content: "c" },
-        assistantTools([tc("call_c_read", "Read", { path: "a.ts" })]),
-        toolMsg("call_c_read", "a"),
-      ],
-      tools: P1040_TOOLS,
-      tool_choice: "auto",
-    },
-    "req_p1040_c"
-  );
-  const meta = billingSnapshot(result);
-  const emulatedMsgs = emulatedOutboundMessages();
-  assert(
-    result.ok === true &&
-      msg(result)?.content === "native stop text" &&
-      !msg(result)?.tool_calls &&
-      toolId(result) == null &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
-      meta.debitCallCount === 1 &&
-      !hasRawToolTranscriptFields(emulatedMsgs),
-    "C. duplicate Read same args anti-replay — restore native; debit=1",
-    meta
-  );
-}
-
-// ── D. Read → Glob succeeds after completed Read ─────────────────────────
-{
-  resetScenario({
-    providers: defaultProviders(["grsai-primary"]),
-    scripts: [
-      () => ({
-        kind: "completion",
-        content: "next tool",
-        usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("Glob", { pattern: "*.md" }),
-        usage: ARB_USAGE,
       }),
     ],
   });
@@ -403,78 +413,15 @@ console.log("P1040 CURSOR RESUME TRANSCRIPT EMULATION\n");
       typeof id === "string" &&
       id !== "call_d_read" &&
       choice(result)?.finish_reason === "tool_calls" &&
-      meta.providerCallCount === 2 &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1,
-    "D. Read→Glob continuation succeeds with novel id",
+    "D. Read→Glob native single-pass succeeds with novel id",
     { ...meta, id }
   );
 }
 
-// ── E. Multiple tool results keep original order in emulated context ─────
-{
-  resetScenario({
-    providers: defaultProviders(["grsai-primary"]),
-    scripts: [
-      () => ({
-        kind: "completion",
-        content: "more",
-        usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeAssistantTextIntent("done after two tools"),
-        usage: ARB_USAGE,
-      }),
-    ],
-  });
-  const markerRead = "ORDER_MARKER_READ_FIRST";
-  const markerGlob = "ORDER_MARKER_GLOB_SECOND";
-  await exec(
-    {
-      model: "gpt-5.5",
-      messages: [
-        { role: "user", content: "e" },
-        assistantTools([
-          tc("call_e_read", "Read", { path: "e.ts" }),
-          tc("call_e_glob", "Glob", { pattern: "e/**" }),
-        ]),
-        toolMsg("call_e_read", markerRead),
-        toolMsg("call_e_glob", markerGlob),
-      ],
-      tools: P1040_TOOLS,
-      tool_choice: "auto",
-    },
-    "req_p1040_e"
-  );
-  const contents = flatMessageContents(emulatedOutboundMessages());
-  const joined = contents.join("\n---\n");
-  const idxPrevRead = joined.indexOf("Previously requested tool: Read");
-  const idxPrevGlob = joined.indexOf("Previously requested tool: Glob");
-  const idxResRead = joined.indexOf(`Tool result for Read:\n${markerRead}`);
-  const idxResGlob = joined.indexOf(`Tool result for Glob:\n${markerGlob}`);
-  assert(
-    !hasRawToolTranscriptFields(emulatedOutboundMessages()) &&
-      idxPrevRead >= 0 &&
-      idxPrevGlob > idxPrevRead &&
-      idxResRead > idxPrevGlob &&
-      idxResGlob > idxResRead,
-    "E. multi tool results preserve order in emulated text context",
-    {
-      providerCallCount: getCounts().providerCallCount,
-      repairCallCount: 0,
-      arbitrationCallCount: getCounts().arbitrationCallCount,
-      fallbackCount: 0,
-      debitCallCount: getCounts().debitCallCount,
-      idxPrevRead,
-      idxPrevGlob,
-      idxResRead,
-      idxResGlob,
-    }
-  );
-}
-
-// ── F. Invalid JSON arbitration → restore native; HTTP 200; debit=1 ──────
+// ── F. Native plain text is FINAL under auto (no arb second pass) ────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -484,10 +431,11 @@ console.log("P1040 CURSOR RESUME TRANSCRIPT EMULATION\n");
         content: "keep native F",
         usage: NATIVE_USAGE,
       }),
+      // Must never be consumed under P1047 auto resume.
       () => ({
         kind: "completion",
         content: "not-valid-json {{{",
-        usage: ARB_USAGE,
+        usage: NATIVE_USAGE,
       }),
     ],
   });
@@ -507,26 +455,22 @@ console.log("P1040 CURSOR RESUME TRANSCRIPT EMULATION\n");
   const meta = billingSnapshot(result);
   const body = JSON.stringify(result);
   const tok = debitTokens();
-  // Arb returned HTTP 200 with invalid JSON → both successful upstream
-  // components still aggregate; response body restores native text.
   assert(
     result.ok === true &&
       msg(result)?.content === "keep native F" &&
       !msg(result)?.tool_calls &&
       !body.includes("not-valid-json") &&
-      (meta.httpStatus === 200 || result.ok === true) &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
-      tok.prompt_tokens ===
-        NATIVE_USAGE.prompt_tokens + ARB_USAGE.prompt_tokens &&
-      tok.completion_tokens ===
-        NATIVE_USAGE.completion_tokens + ARB_USAGE.completion_tokens,
-    "F. invalid JSON → restore native; HTTP 200; debit=1; credits=native+arb HTTP200",
+      tok.prompt_tokens === NATIVE_USAGE.prompt_tokens &&
+      tok.completion_tokens === NATIVE_USAGE.completion_tokens,
+    "F. native plain text FINAL; provider=1 arb=0 debit=1; no second pass",
     { ...meta, debitTokens: tok }
   );
 }
 
-// ── G. Transport failure → restore native; debit=1 ───────────────────────
+// ── G. Native text FINAL — unused error script never runs ────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -563,15 +507,16 @@ console.log("P1040 CURSOR RESUME TRANSCRIPT EMULATION\n");
     result.ok === true &&
       msg(result)?.content === "keep native G" &&
       !msg(result)?.tool_calls &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
       tok.prompt_tokens === NATIVE_USAGE.prompt_tokens,
-    "G. continuation transport failure → restore native; debit=1",
+    "G. native text FINAL under auto; unused transport-error script; debit=1",
     { ...meta, debitTokens: tok }
   );
 }
 
-// ── H. Total timeout keeps upstream_timeout semantics ────────────────────
+// ── H. Total timeout — single native pass; arb never starts ──────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -613,31 +558,23 @@ console.log("P1040 CURSOR RESUME TRANSCRIPT EMULATION\n");
   const meta = billingSnapshot(result);
   const restored =
     result.ok === true && msg(result)?.content === "native before timeout";
-  const timedOut =
-    result.ok === false &&
-    (meta.errorCode === "upstream_timeout" ||
-      String(meta.errorCode ?? "").includes("timeout"));
   assert(
-    (restored || timedOut) && (meta.arbitrationCallCount ?? 0) <= 1,
-    "H. total/upstream timeout — restore native or upstream_timeout; no resurrection",
-    { ...meta, restored, timedOut }
+    restored &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0,
+    "H. native text FINAL under auto; arb never starts; no resurrection",
+    { ...meta, restored }
   );
 }
 
-// ── Billing red-line: success path aggregates; fail path no double debit ─
+// ── Billing red-line: single-pass native success; debit=1 ────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
       () => ({
-        kind: "completion",
-        content: "bill",
+        ...nativeToolCompletion("Glob", { pattern: "bill/**" }, { id: "call_bill_glob" }),
         usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("Glob", { pattern: "bill/**" }),
-        usage: ARB_USAGE,
       }),
     ],
   });
@@ -659,12 +596,12 @@ console.log("P1040 CURSOR RESUME TRANSCRIPT EMULATION\n");
   assert(
     okResult.ok === true &&
       toolName(okResult) === "Glob" &&
+      okMeta.providerCallCount === 1 &&
+      (okMeta.arbitrationCallCount ?? 0) === 0 &&
       okMeta.debitCallCount === 1 &&
-      okTok.prompt_tokens ===
-        NATIVE_USAGE.prompt_tokens + ARB_USAGE.prompt_tokens &&
-      okTok.completion_tokens ===
-        NATIVE_USAGE.completion_tokens + ARB_USAGE.completion_tokens,
-    "billing. success native+arb usage aggregated; recordSuccessfulUsageAndDebit=1",
+      okTok.prompt_tokens === NATIVE_USAGE.prompt_tokens &&
+      okTok.completion_tokens === NATIVE_USAGE.completion_tokens,
+    "billing. success native single-pass; recordSuccessfulUsageAndDebit=1",
     { ...okMeta, debitTokens: okTok }
   );
 }

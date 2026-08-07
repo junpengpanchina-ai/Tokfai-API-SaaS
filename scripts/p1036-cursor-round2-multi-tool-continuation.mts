@@ -1,9 +1,10 @@
 /**
- * P1036 — Cursor Round-2+ multi-tool continuation arbitration.
+ * P1036 — Cursor Round-2+ multi-tool continuation (P1047 single-pass).
  *
- * Proves legal role=tool resume can emit a *novel* next tool_call via one
- * controlled emulated_json continuation when native returns plain text, while
- * rejecting completed name+args replays and preserving P1033 anti-replay 400s.
+ * P1047 CLOSED resume continuation arbitration: on a legal role=tool resume,
+ * valid native text or next tool_calls are FINAL (provider=1, arbitration=0).
+ * Novel next-tool success paths use native tool_calls directly. Transcript-
+ * level anti-replay 400s (duplicate / unmatched / missing) remain.
  *
  * Authenticity:
  *   REAL executeChatCompletion ENTRY
@@ -31,9 +32,6 @@ import {
   installP1018Mocks,
   loadExecuteChatCompletion,
   loadRespondEarlySse,
-  makeAssistantTextIntent,
-  makeNativeToolCalls,
-  makeToolCallIntent,
   nativeToolCompletion,
   resetScenario,
   type AssertMeta,
@@ -50,7 +48,6 @@ const {
   shouldAttemptResumeToolContinuationArbitration,
 } = await import("../apps/dmit-api/src/lib/toolCallCapability.ts");
 const {
-  validateCursorToolTranscript,
   extractCompletedToolSignatures,
   toolCallSignature,
   DUPLICATE_TOOL_RESULT_CODE,
@@ -67,11 +64,6 @@ const NATIVE_USAGE = {
   prompt_tokens: 100,
   completion_tokens: 10,
   total_tokens: 110,
-};
-const ARB_USAGE = {
-  prompt_tokens: 40,
-  completion_tokens: 8,
-  total_tokens: 48,
 };
 
 let failed = 0;
@@ -200,7 +192,7 @@ function debitTokens() {
   };
 }
 
-console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
+console.log("P1036 CURSOR ROUND-2 MULTI-TOOL (P1047 SINGLE-PASS)\n");
 
 // ── Unit gates ───────────────────────────────────────────────────────────
 {
@@ -241,8 +233,8 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
       autoIntentArbitrationAttempted: false,
       freshRemainingTotalMs: 60_000,
       upstreamHttpOk: true,
-    }) === true,
-    "unit.P1036 continuation gate opens on legal resume + plain text",
+    }) === false,
+    "unit.P1036 continuation gate closed (P1047)",
     {
       providerCallCount: 0,
       repairCallCount: 0,
@@ -253,9 +245,10 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
   );
   const sigA = toolCallSignature("Read", { path: "a.ts" });
   const sigB = toolCallSignature("Read", { path: "b.ts" });
+  const sigAAgain = toolCallSignature("Read", { path: "a.ts" });
   assert(
-    sigA !== sigB,
-    "unit.same tool different args → distinct signatures",
+    sigA !== sigB && sigA === sigAAgain,
+    "unit.same tool different args → distinct signatures; same args equal",
     {
       providerCallCount: 0,
       repairCallCount: 0,
@@ -303,21 +296,14 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
   );
 }
 
-// ── B. Round-2: native text → continuation Read B ────────────────────────
+// ── B. Round-2: native directly returns Read B ───────────────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
       () => ({
-        kind: "completion",
-        content: "I should continue with the next file",
-        finish_reason: "stop",
+        ...nativeToolCompletion("Read", { path: "b.ts" }, { id: "call_r2_b" }),
         usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("Read", { path: "b.ts" }),
-        usage: ARB_USAGE,
       }),
     ],
   });
@@ -346,16 +332,16 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
       choice(result)?.finish_reason === "tool_calls" &&
       typeof idB === "string" &&
       idB !== "call_r1_a" &&
-      meta.providerCallCount === 2 &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
-      tok.prompt_tokens === NATIVE_USAGE.prompt_tokens + ARB_USAGE.prompt_tokens,
-    "B. Round-2 continuation → Read B; content=null; arb=1; debit=1; credits=native+arb",
+      tok.prompt_tokens === NATIVE_USAGE.prompt_tokens,
+    "B. Round-2 native Read B — provider=1 arb=0 debit=1 native-only",
     { ...meta, idB, debitTokens: tok }
   );
 }
 
-// ── C. Round-3: native final assistant_text ──────────────────────────────
+// ── C. Round-3: native final plain text ──────────────────────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -365,11 +351,6 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
         content: "both files summarized",
         finish_reason: "stop",
         usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeAssistantTextIntent("both files summarized (arb)"),
-        usage: ARB_USAGE,
       }),
     ],
   });
@@ -393,17 +374,16 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
   assert(
     result.ok === true &&
       !msg(result)?.tool_calls &&
-      typeof content === "string" &&
-      content.length > 0 &&
-      (meta.arbitrationCallCount ?? 0) <= 1 &&
-      meta.debitCallCount === 1 &&
-      (meta.httpStatus === 200 || result.ok === true),
-    "C. Round-3 final text — no more tools; arb≤1; debit=1",
+      content === "both files summarized" &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
+      meta.debitCallCount === 1,
+    "C. Round-3 native final text — arb=0 debit=1",
     { ...meta, content }
   );
 }
 
-// ── D. continuation tries to replay Read A ───────────────────────────────
+// ── D. resume native plain text FINAL (arb replay path closed) ───────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -412,11 +392,6 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
         kind: "completion",
         content: "native wants to stop",
         usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("Read", { path: "a.ts" }),
-        usage: ARB_USAGE,
       }),
     ],
   });
@@ -439,27 +414,26 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
       msg(result)?.content === "native wants to stop" &&
       !msg(result)?.tool_calls &&
       toolId(result) == null &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1,
-    "D. replay Read A same args rejected — restore native; no old id",
+    "D. resume native plain text FINAL — arb=0 (replay anti-replay is transcript-level)",
     meta
   );
 }
 
-// ── E. same Read tool, different path allowed ────────────────────────────
+// ── E. same Read tool, different path — native tool_calls ────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
       () => ({
-        kind: "completion",
-        content: "continue",
+        ...nativeToolCompletion(
+          "Read",
+          { path: "other.ts" },
+          { id: "call_e_other" }
+        ),
         usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("Read", { path: "other.ts" }),
-        usage: ARB_USAGE,
       }),
     ],
   });
@@ -481,8 +455,10 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
     result.ok === true &&
       toolName(result) === "Read" &&
       toolArgs(result)?.path === "other.ts" &&
-      toolId(result) !== "call_e1",
-    "E. same Read tool, different path allowed",
+      toolId(result) !== "call_e1" &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0,
+    "E. same Read tool, different path — native tool_calls; arb=0",
     meta
   );
 }
@@ -493,17 +469,12 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
       () => ({
-        kind: "completion",
-        content: "next write",
+        ...nativeToolCompletion(
+          "Write",
+          { path: "out.ts", contents: "x" },
+          { id: "call_f_write" }
+        ),
         usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("Write", {
-          path: "out.ts",
-          contents: "x",
-        }),
-        usage: ARB_USAGE,
       }),
     ],
   });
@@ -521,13 +492,16 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
     "req_p1036_f2"
   );
   const idWrite = toolId(r2);
+  const meta2 = billingSnapshot(r2);
   assert(
     r2.ok === true &&
       toolName(r2) === "Write" &&
       typeof idWrite === "string" &&
-      idWrite !== "call_f_read",
-    "F. Read → Write continuation — distinct ids",
-    { ...billingSnapshot(r2), idWrite }
+      idWrite !== "call_f_read" &&
+      (meta2.arbitrationCallCount ?? 0) === 0 &&
+      meta2.providerCallCount === 1,
+    "F. Read → Write native — distinct ids; arb=0",
+    { ...meta2, idWrite }
   );
 
   resetScenario({
@@ -535,26 +509,8 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
     scripts: [
       () => ({
         kind: "completion",
-        content: makeAssistantTextIntent("write complete"),
-        usage: NATIVE_USAGE,
-      }),
-    ],
-  });
-  // Native returns emulated-shaped JSON without going through continuation
-  // when content is already assistant_text intent? Native mode accepts text.
-  // Use plain final text:
-  resetScenario({
-    providers: defaultProviders(["grsai-primary"]),
-    scripts: [
-      () => ({
-        kind: "completion",
         content: "write complete",
         usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeAssistantTextIntent("write complete"),
-        usage: ARB_USAGE,
       }),
     ],
   });
@@ -575,12 +531,14 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
     },
     "req_p1036_f3"
   );
+  const meta3 = billingSnapshot(r3);
   assert(
     r3.ok === true &&
-      typeof msg(r3)?.content === "string" &&
-      !msg(r3)?.tool_calls,
-    "F. Write → final text",
-    billingSnapshot(r3)
+      msg(r3)?.content === "write complete" &&
+      !msg(r3)?.tool_calls &&
+      (meta3.arbitrationCallCount ?? 0) === 0,
+    "F. Write → final native text; arb=0",
+    meta3
   );
 }
 
@@ -681,7 +639,7 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
   );
 }
 
-// ── J. continuation returns assistant_text ───────────────────────────────
+// ── J. resume native plain text FINAL ────────────────────────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -690,11 +648,6 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
         kind: "completion",
         content: "native placeholder",
         usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeAssistantTextIntent("final from continuation"),
-        usage: ARB_USAGE,
       }),
     ],
   });
@@ -714,15 +667,16 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
   const meta = billingSnapshot(result);
   assert(
     result.ok === true &&
-      msg(result)?.content === "final from continuation" &&
+      msg(result)?.content === "native placeholder" &&
       !msg(result)?.tool_calls &&
-      (meta.arbitrationCallCount ?? 0) === 1,
-    "J. continuation assistant_text → final plain text; no forged tools",
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0,
+    "J. resume native plain text FINAL — no forged tools; arb=0",
     meta
   );
 }
 
-// ── K. continuation invalid JSON ─────────────────────────────────────────
+// ── K. resume native plain text FINAL (no arb invalid-JSON path) ─────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -731,11 +685,6 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
         kind: "completion",
         content: "keep this native text",
         usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: "not-json-at-all {{{",
-        usage: ARB_USAGE,
       }),
     ],
   });
@@ -753,26 +702,25 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
     "req_p1036_k"
   );
   const meta = billingSnapshot(result);
-  const body = JSON.stringify(result);
   assert(
     result.ok === true &&
       msg(result)?.content === "keep this native text" &&
-      !body.includes("not-json-at-all") &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1,
-    "K. invalid JSON → restore native; no JSON leak; no loop",
+    "K. resume native plain text FINAL — arb=0 debit=1",
     meta
   );
 }
 
-// ── L. continuation timeout ──────────────────────────────────────────────
+// ── L. resume native plain text FINAL (no arb timeout path) ──────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     timeoutPolicy: {
-      upstreamTimeoutMs: 50,
-      idleTimeoutMs: 50,
-      totalTimeoutMs: 80,
+      upstreamTimeoutMs: 5_000,
+      idleTimeoutMs: 5_000,
+      totalTimeoutMs: 30_000,
     },
     scripts: [
       () => ({
@@ -780,15 +728,6 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
         content: "native before timeout",
         usage: NATIVE_USAGE,
       }),
-      async () => {
-        await new Promise((r) => setTimeout(r, 120));
-        return {
-          kind: "error" as const,
-          code: "upstream_timeout",
-          message: "arbitration timed out",
-          status: 504,
-        };
-      },
     ],
   });
   const result = await exec(
@@ -805,31 +744,29 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
     "req_p1036_l"
   );
   const meta = billingSnapshot(result);
-  // Either restored native (partial budget) or total timeout — never infinite.
-  const restored =
-    result.ok === true && msg(result)?.content === "native before timeout";
-  const timedOut = result.ok === false;
   assert(
-    (restored || timedOut) && (meta.arbitrationCallCount ?? 0) <= 1,
-    "L. continuation timeout — restore native or fail; no budget resurrection",
-    { ...meta, restored, timedOut }
+    result.ok === true &&
+      msg(result)?.content === "native before timeout" &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
+      meta.debitCallCount === 1,
+    "L. resume native plain text FINAL — arb=0; no budget resurrection",
+    meta
   );
 }
 
-// ── M. SSE second tool call ──────────────────────────────────────────────
+// ── M. SSE second tool call — native ─────────────────────────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
       () => ({
-        kind: "completion",
-        content: "need next",
+        ...nativeToolCompletion(
+          "Read",
+          { path: "sse-b.ts" },
+          { id: "call_sse_b" }
+        ),
         usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("Read", { path: "sse-b.ts" }),
-        usage: ARB_USAGE,
       }),
     ],
   });
@@ -888,27 +825,26 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
       argsAreString &&
       !!finish &&
       doneEvents === 1 &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1,
-    "M. SSE second tool_call — delta.tool_calls + args string + [DONE]×1",
+    "M. SSE second tool_call native — delta.tool_calls + args string + [DONE]×1; arb=0",
     { ...meta, doneEvents, hasDeltaTool, argsAreString }
   );
 }
 
-// ── N. non-stream second tool call ───────────────────────────────────────
+// ── N. non-stream second tool call — native ──────────────────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
       () => ({
-        kind: "completion",
-        content: "next",
+        ...nativeToolCompletion(
+          "Read",
+          { path: "n-b.ts" },
+          { id: "call_n_b" }
+        ),
         usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("Read", { path: "n-b.ts" }),
-        usage: ARB_USAGE,
       }),
     ],
   });
@@ -933,26 +869,26 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
       Array.isArray(m?.tool_calls) &&
       m.tool_calls.length === 1 &&
       m.tool_calls[0]?.function?.name === "Read" &&
-      typeof m.tool_calls[0]?.function?.arguments === "string",
-    "N. non-stream second tool — content=null + legal tool_calls",
+      typeof m.tool_calls[0]?.function?.arguments === "string" &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0,
+    "N. non-stream second tool native — content=null + legal tool_calls; arb=0",
     meta
   );
 }
 
-// ── O. usage aggregation ─────────────────────────────────────────────────
+// ── O. usage single-pass native debit ────────────────────────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
       () => ({
-        kind: "completion",
-        content: "agg",
+        ...nativeToolCompletion(
+          "Read",
+          { path: "o-b.ts" },
+          { id: "call_o_b" }
+        ),
         usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("Read", { path: "o-b.ts" }),
-        usage: ARB_USAGE,
       }),
     ],
   });
@@ -974,32 +910,29 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
   assert(
     result.ok === true &&
       meta.debitCallCount === 1 &&
-      (meta.arbitrationCallCount ?? 0) === 1 &&
-      tok.prompt_tokens ===
-        NATIVE_USAGE.prompt_tokens + ARB_USAGE.prompt_tokens &&
-      tok.completion_tokens ===
-        NATIVE_USAGE.completion_tokens + ARB_USAGE.completion_tokens &&
+      meta.providerCallCount === 1 &&
+      (meta.arbitrationCallCount ?? 0) === 0 &&
+      tok.prompt_tokens === NATIVE_USAGE.prompt_tokens &&
+      tok.completion_tokens === NATIVE_USAGE.completion_tokens &&
       tok.credits_charged > 0,
-    "O. usage aggregation — native+arb tokens; debitCallCount=1",
+    "O. usage single-pass — native tokens; debitCallCount=1; arb=0",
     { ...meta, debitTokens: tok }
   );
 }
 
-// ── P. three continuous tools Read A→B→C→final ───────────────────────────
+// ── P. three continuous tools Read A→B→C→final (native each round) ───────
 {
   // Round-2: A done → B
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
       () => ({
-        kind: "completion",
-        content: "need b",
+        ...nativeToolCompletion(
+          "Read",
+          { path: "p-b.ts" },
+          { id: "call_p_b" }
+        ),
         usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("Read", { path: "p-b.ts" }),
-        usage: ARB_USAGE,
       }),
     ],
   });
@@ -1017,20 +950,19 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
     "req_p1036_p2"
   );
   const idB = toolId(r2);
+  const meta2 = billingSnapshot(r2);
 
   // Round-3: A+B done → C
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
       () => ({
-        kind: "completion",
-        content: "need c",
+        ...nativeToolCompletion(
+          "Read",
+          { path: "p-c.ts" },
+          { id: "call_p_c" }
+        ),
         usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("Read", { path: "p-c.ts" }),
-        usage: ARB_USAGE,
       }),
     ],
   });
@@ -1050,6 +982,7 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
     "req_p1036_p3"
   );
   const idC = toolId(r3);
+  const meta3 = billingSnapshot(r3);
 
   // Round-4: final
   resetScenario({
@@ -1059,11 +992,6 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
         kind: "completion",
         content: "all three done",
         usage: NATIVE_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeAssistantTextIntent("all three done"),
-        usage: ARB_USAGE,
       }),
     ],
   });
@@ -1084,6 +1012,7 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
     },
     "req_p1036_p4"
   );
+  const meta4 = billingSnapshot(r4);
 
   const completed = extractCompletedToolSignatures([
     { role: "user", content: "A B C" },
@@ -1098,23 +1027,31 @@ console.log("P1036 CURSOR ROUND-2 MULTI-TOOL CONTINUATION\n");
   assert(
     r2.ok === true &&
       toolArgs(r2)?.path === "p-b.ts" &&
+      (meta2.arbitrationCallCount ?? 0) === 0 &&
+      meta2.providerCallCount === 1 &&
       r3.ok === true &&
       toolArgs(r3)?.path === "p-c.ts" &&
+      (meta3.arbitrationCallCount ?? 0) === 0 &&
+      meta3.providerCallCount === 1 &&
       idB !== "call_p_a" &&
       idC !== idB &&
       idC !== "call_p_a" &&
       r4.ok === true &&
-      typeof msg(r4)?.content === "string" &&
+      msg(r4)?.content === "all three done" &&
       !msg(r4)?.tool_calls &&
+      (meta4.arbitrationCallCount ?? 0) === 0 &&
+      meta4.providerCallCount === 1 &&
       completed.size === 3,
-    "P. Read A→B→C→final — no replay; distinct ids; no infinite loop",
+    "P. Read A→B→C→final native each round — distinct ids; arb=0; no loop",
     {
-      ...billingSnapshot(r4),
+      ...meta4,
       idB,
       idC,
       completedCount: completed.size,
       r2ok: r2.ok,
       r3ok: r3.ok,
+      meta2,
+      meta3,
     }
   );
 }
@@ -1125,12 +1062,21 @@ console.log(
   JSON.stringify(
     {
       A_round1_native: { provider: 1, arbitration: 0, debit: 1 },
-      B_round2_cont_tool: { provider: 2, arbitration: 1, debit: 1 },
-      C_round3_final: { provider: "≤2", arbitration: "≤1", debit: 1 },
-      D_replay_reject: { provider: 2, arbitration: 1, debit: 1, fallback: true },
+      B_round2_native_tool: { provider: 1, arbitration: 0, debit: 1 },
+      C_round3_final: { provider: 1, arbitration: 0, debit: 1 },
+      D_resume_text: { provider: 1, arbitration: 0, debit: 1 },
+      E_native_other_path: { provider: 1, arbitration: 0 },
+      F_native_write: { provider: 1, arbitration: 0 },
       G_dup: { provider: 0, arbitration: 0, debit: 0 },
       H_unmatched: { provider: 0, arbitration: 0, debit: 0 },
       I_missing: { provider: 0, arbitration: 0, debit: 0 },
+      J_resume_text: { provider: 1, arbitration: 0 },
+      K_resume_text: { provider: 1, arbitration: 0, debit: 1 },
+      L_resume_text: { provider: 1, arbitration: 0, debit: 1 },
+      M_sse_native: { provider: 1, arbitration: 0, debit: 1 },
+      N_native_tool: { provider: 1, arbitration: 0 },
+      O_native_usage: { provider: 1, arbitration: 0, debit: 1 },
+      P_abc_native: { provider: 1, arbitration: 0 },
     },
     null,
     2

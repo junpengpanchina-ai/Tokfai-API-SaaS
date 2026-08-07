@@ -32,8 +32,7 @@ import {
   installP1018Mocks,
   loadExecuteChatCompletion,
   loadRespondEarlySse,
-  makeAssistantTextIntent,
-  makeParallelToolCallIntent,
+  makeNativeToolCalls,
   makeToolCallIntent,
   nativeToolCompletion,
   resetScenario,
@@ -310,25 +309,21 @@ console.log(`Authenticity: ${LEVEL}\n`);
   );
 }
 
-// ── C. stream=true multi tool ────────────────────────────────────────────
+// ── C. stream=true multi tool (native single-pass; P1047) ────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return {
-            kind: "completion",
-            content: "need tools",
-            usage: NATIVE_USAGE,
-          };
-        }
-        return {
-          kind: "completion",
-          content: makeParallelToolCallIntent(),
-          usage: ARB_USAGE,
-        };
-      },
+      () => ({
+        kind: "completion" as const,
+        content: null,
+        tool_calls: [
+          ...makeNativeToolCalls("get_weather", { city: "Shanghai" }, "call_w"),
+          ...makeNativeToolCalls("get_time", { tz: "Asia/Shanghai" }, "call_t"),
+        ],
+        finish_reason: "tool_calls",
+        usage: NATIVE_USAGE,
+      }),
     ],
   });
   const res = await respondChatCompletionEarlySse(mockContext(), {
@@ -369,11 +364,14 @@ console.log(`Authenticity: ${LEVEL}\n`);
       ids[0] !== ids[1] &&
       a0 &&
       a1 &&
-      events.includes("[DONE]"),
+      events.includes("[DONE]") &&
+      getCounts().providerCallCount === 1 &&
+      (getCounts().arbitrationCallCount ?? 0) === 0,
     "C. stream=true multi tool — indexes independent, args not crossed",
     {
       providerCallCount: getCounts().providerCallCount,
       repairCallCount: getCounts().repairCallCount,
+      arbitrationCallCount: getCounts().arbitrationCallCount,
       fallbackCount: 0,
       debitCallCount: getCounts().debitCallCount,
       ids,
@@ -381,25 +379,15 @@ console.log(`Authenticity: ${LEVEL}\n`);
   );
 }
 
-// ── D. emulated_json — no envelope leak, unified mappers ─────────────────
+// ── D. native tool_calls — no envelope leak, unified mappers (P1047) ─────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return {
-            kind: "completion",
-            content: "arbitrate me",
-            usage: NATIVE_USAGE,
-          };
-        }
-        return {
-          kind: "completion",
-          content: makeToolCallIntent("get_weather", { city: "Emu" }),
-          usage: ARB_USAGE,
-        };
-      },
+      () => ({
+        ...nativeToolCompletion("get_weather", { city: "Emu" }),
+        usage: NATIVE_USAGE,
+      }),
     ],
   });
   const result = await exec(
@@ -419,31 +407,25 @@ console.log(`Authenticity: ${LEVEL}\n`);
       !JSON.stringify(result.response).includes('"type":"tool_call"') &&
       !sse.includes("You are a strict JSON Tool Intent") &&
       sse.includes("tool_calls") &&
-      sse.includes("[DONE]"),
-    "D. emulated_json — unified nonstream + SSE mappers, no envelope leak",
+      sse.includes("[DONE]") &&
+      billingSnapshot(result).providerCallCount === 1 &&
+      (billingSnapshot(result).arbitrationCallCount ?? 0) === 0,
+    "D. native tool_calls — unified nonstream + SSE mappers, no envelope leak",
     { ...billingSnapshot(result) }
   );
 }
 
-// ── E. assistant_text ────────────────────────────────────────────────────
+// ── E. assistant_text (native auto plain text FINAL; P1047) ──────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return {
-            kind: "completion",
-            content: "plain first",
-            usage: NATIVE_USAGE,
-          };
-        }
-        return {
-          kind: "completion",
-          content: makeAssistantTextIntent("hello text"),
-          usage: ARB_USAGE,
-        };
-      },
+      () => ({
+        kind: "completion",
+        content: "hello text",
+        finish_reason: "stop",
+        usage: NATIVE_USAGE,
+      }),
     ],
   });
   const result = await exec(
@@ -459,7 +441,9 @@ console.log(`Authenticity: ${LEVEL}\n`);
     result.ok === true &&
       msg(result)?.content === "hello text" &&
       !Array.isArray(msg(result)?.tool_calls) &&
-      choice(result)?.finish_reason === "stop",
+      choice(result)?.finish_reason === "stop" &&
+      billingSnapshot(result).providerCallCount === 1 &&
+      (billingSnapshot(result).arbitrationCallCount ?? 0) === 0,
     "E. assistant_text — content, no tool_calls, finish=stop",
     { ...billingSnapshot(result) }
   );
@@ -794,25 +778,15 @@ console.log(`Authenticity: ${LEVEL}\n`);
   );
 }
 
-// ── N. P1030 dual usage aggregation still holds ──────────────────────────
+// ── N. P1041 exact-once debit (native single-pass; P1047 closed dual-arb) ─
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
-      (ctx) => {
-        if (!ctx.hasCompiler) {
-          return {
-            kind: "completion",
-            content: "arb",
-            usage: NATIVE_USAGE,
-          };
-        }
-        return {
-          kind: "completion",
-          content: makeToolCallIntent("get_weather", { city: "Bill" }),
-          usage: ARB_USAGE,
-        };
-      },
+      () => ({
+        ...nativeToolCompletion("get_weather", { city: "Bill" }),
+        usage: NATIVE_USAGE,
+      }),
     ],
   });
   const result = await exec(
@@ -828,10 +802,11 @@ console.log(`Authenticity: ${LEVEL}\n`);
   assert(
     result.ok === true &&
       getCounts().debitCallCount === 1 &&
-      Number(debit?.prompt_tokens) === 114 &&
-      Number(debit?.completion_tokens) === 10 &&
-      Number(debit?.total_tokens) === 124,
-    "N. P1030 dual usage aggregation preserved (114/10/124) debit=1",
+      (getCounts().arbitrationCallCount ?? 0) === 0 &&
+      Number(debit?.prompt_tokens) === NATIVE_USAGE.prompt_tokens &&
+      Number(debit?.completion_tokens) === NATIVE_USAGE.completion_tokens &&
+      Number(debit?.total_tokens) === NATIVE_USAGE.total_tokens,
+    "N. exact-once debit preserved (native-only; no auto arb merge) debit=1",
     {
       ...billingSnapshot(result),
       debit_tokens: {

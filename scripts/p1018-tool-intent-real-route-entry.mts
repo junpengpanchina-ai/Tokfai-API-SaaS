@@ -552,8 +552,8 @@ console.log("P1018 REAL ROUTE ENTRY — executeChatCompletion\n");
       r2.ok === true &&
       meta2.debitCallCount === 1 &&
       m2?.content === "Tokyo is sunny" &&
-      // P1036 — Round-N continuation may run once; first-turn AUTO still skipped.
-      (meta2.arbitrationCallCount ?? 0) <= 1,
+      // P1047 — Round-N continuation closed; first-turn AUTO still skipped.
+      (meta2.arbitrationCallCount ?? 0) === 0,
     "10. role=tool second round — each request debit×1",
     {
       ...meta2,
