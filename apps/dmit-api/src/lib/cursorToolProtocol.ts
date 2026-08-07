@@ -698,3 +698,48 @@ export function filterNovelToolCallsOnCompletion(
     droppedCount,
   };
 }
+
+/**
+ * P1043 — Short continuation nudge for native resumeToolRound only.
+ * Encourages immediate tool_calls when more tool work remains; still allows
+ * final assistant text when the task is already complete. Never forces
+ * tool_choice=required.
+ */
+export const NATIVE_RESUME_CONTINUATION_INSTRUCTION =
+  "Continue from the returned tool results.\n" +
+  "If additional tool work is required to complete the user's request, " +
+  "emit the required tool_calls now instead of describing the next action.\n" +
+  "If the task is already complete, return the final answer.";
+
+/** True when native resume fast-path instruction may be applied (request-scoped). */
+export function shouldApplyNativeResumeFastPath(args: {
+  resumeToolRound: boolean;
+  activeToolMode: string;
+  hasToolsClient: boolean;
+  toolChoice: unknown;
+}): boolean {
+  if (!args.resumeToolRound) return false;
+  if (args.activeToolMode !== "native") return false;
+  if (!args.hasToolsClient) return false;
+  const kind = toolChoiceKind(args.toolChoice);
+  return kind === "missing" || kind === "null" || kind === "auto";
+}
+
+/**
+ * P1043 — Append continuation instruction to an upstream body *copy*.
+ * Does not mutate clientBody, original messages arrays, or shared references.
+ */
+export function applyNativeResumeFastPathInstruction(
+  upstreamBody: Record<string, unknown>
+): { body: Record<string, unknown>; applied: boolean } {
+  const next: Record<string, unknown> = { ...upstreamBody };
+  const messages = Array.isArray(next.messages)
+    ? [...(next.messages as unknown[])]
+    : [];
+  messages.push({
+    role: "system",
+    content: NATIVE_RESUME_CONTINUATION_INSTRUCTION,
+  });
+  next.messages = messages;
+  return { body: next, applied: true };
+}

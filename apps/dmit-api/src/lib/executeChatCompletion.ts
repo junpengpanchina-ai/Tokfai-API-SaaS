@@ -110,12 +110,14 @@ import {
   type BillableUsageStage,
 } from "./billableUsageAggregation.js";
 import {
+  applyNativeResumeFastPathInstruction,
   countTools,
   ensureClientSafeToolCallIdsOnCompletion,
   extractCompletedToolSignatures,
   extractHistoricalToolCallIds,
   extractResponseToolCallMeta,
   filterNovelToolCallsOnCompletion,
+  shouldApplyNativeResumeFastPath,
   summarizeRoleCounts,
   toolChoiceKind,
   validateCursorToolTranscript,
@@ -1675,6 +1677,31 @@ async function runProviderAttempts(args: {
             });
           }
 
+          // P1043 — Native Resume Fast Path: request-scoped upstream copy only.
+          // Does not mutate clientBody / original transcript; does not force tools.
+          if (
+            shouldApplyNativeResumeFastPath({
+              resumeToolRound,
+              activeToolMode,
+              hasToolsClient,
+              toolChoice: (clientBody as { tool_choice?: unknown }).tool_choice,
+            })
+          ) {
+            const fastPath = applyNativeResumeFastPathInstruction(upstreamBody);
+            upstreamBody = fastPath.body;
+            log.info("native_resume_fastpath_instruction_applied", {
+              requestId,
+              route,
+              providerId: provider.id,
+              attemptModel,
+              activeToolMode,
+              resumeToolRound,
+              nativeResumeFastPathApplied: true,
+              billing_status: "not_billable",
+              credits_charged: 0,
+            });
+          }
+
           if (
             attemptIndex === 0 &&
             !repairAttempted &&
@@ -1720,6 +1747,61 @@ async function runProviderAttempts(args: {
             providerId: provider.id,
           };
 
+          // P1043 — stage timing for native / arbitration / repair fetches.
+          const resolveProviderFetchStage = ():
+            | "native"
+            | "first_turn_arbitration"
+            | "continuation_arbitration"
+            | "repair" => {
+            if (continuationArbitrationInFlight) {
+              return "continuation_arbitration";
+            }
+            if (autoIntentArbitrationInFlight) {
+              return "first_turn_arbitration";
+            }
+            if (repairAttempted && activeToolMode === "emulated_json") {
+              return "repair";
+            }
+            return "native";
+          };
+          const logProviderFetchStageTiming = (
+            stage:
+              | "native"
+              | "first_turn_arbitration"
+              | "continuation_arbitration"
+              | "repair",
+            stageStartedAt: number
+          ) => {
+            const elapsedMs = Date.now() - stageStartedAt;
+            const fields: Record<string, unknown> = {
+              requestId,
+              route,
+              providerId: provider.id,
+              attemptModel,
+              activeToolMode,
+              resumeToolRound,
+              stage,
+              elapsedMs,
+              freshRemainingTotalMs: Math.max(
+                0,
+                timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt)
+              ),
+              billing_status: "not_billable",
+              credits_charged: 0,
+            };
+            if (stage === "native") fields.native_elapsed_ms = elapsedMs;
+            if (stage === "continuation_arbitration") {
+              fields.continuation_arbitration_elapsed_ms = elapsedMs;
+            }
+            if (stage === "first_turn_arbitration") {
+              fields.first_turn_arbitration_elapsed_ms = elapsedMs;
+            }
+            if (stage === "repair") fields.repair_elapsed_ms = elapsedMs;
+            log.info("provider_fetch_stage_timing", fields);
+          };
+
+          const fetchStage = resolveProviderFetchStage();
+          const stageStartedAt = Date.now();
           try {
             if (useGemini25FlashStreamFallback) {
               // Never invent budget above the fresh remaining total.
@@ -1832,6 +1914,7 @@ async function runProviderAttempts(args: {
               upstreamId = fetched.upstreamId;
             }
           } catch (fetchErr) {
+            logProviderFetchStageTiming(fetchStage, stageStartedAt);
             // P1028/P1036 — arbitration transport/timeout must not upgrade a prior
             // native auto text success into provider fallback / 5xx.
             if (
@@ -1858,6 +1941,7 @@ async function runProviderAttempts(args: {
             }
             throw fetchErr;
           }
+          logProviderFetchStageTiming(fetchStage, stageStartedAt);
 
           normalizedData = normalizeToolCallsOnChatCompletion(
             data as unknown as Record<string, unknown>

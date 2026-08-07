@@ -160,6 +160,13 @@ const ALLOWED_FIELD_KEYS = new Set([
   "emittedFinishReason",
   "doneFrameEmitted",
   "clientDisconnected",
+  // P1043 native resume fast-path / provider stage timing
+  "elapsedMs",
+  "native_elapsed_ms",
+  "continuation_arbitration_elapsed_ms",
+  "first_turn_arbitration_elapsed_ms",
+  "repair_elapsed_ms",
+  "nativeResumeFastPathApplied",
 ]);
 
 const SENSITIVE_LOG_KEY_LITERAL =
