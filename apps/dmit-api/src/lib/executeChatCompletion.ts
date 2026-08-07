@@ -758,14 +758,17 @@ export async function executeChatCompletion(
     });
   }
 
-  // P1031/P1033 — Cursor protocol telemetry + role=tool transcript validation.
-  // Legal fully-matched tool results ⇒ resumeToolRound (not first-turn intent).
+  // P1031/P1033/P1046 — Cursor protocol telemetry + role=tool transcript
+  // validation. Historical toolMessageCount ≠ resumeToolRound; only a trailing
+  // contiguous role=tool block mapped to the nearest assistant.tool_calls
+  // sets resumeToolRound (waiting for assistant continuation).
   const toolTranscript = validateCursorToolTranscript(
     (body as { messages?: unknown }).messages
   );
   const roundTrip = toolTranscript.analysis;
   const resumeToolRound =
     toolTranscript.ok && toolTranscript.resumeToolRound === true;
+  const trailingToolMessageCount = toolTranscript.trailingToolMessageCount;
 
   if (supportsToolsRequested || roundTrip.toolMessageCount > 0) {
     const parallelRaw = (body as { parallel_tool_calls?: unknown })
@@ -787,6 +790,7 @@ export async function executeChatCompletion(
         (body as { messages?: unknown }).messages
       ),
       incomingToolMessageCount: roundTrip.toolMessageCount,
+      trailingToolMessageCount,
       incomingToolCallIdMaxLength: roundTrip.incomingToolCallIdMaxLength,
       hasTools,
       supportsToolsRequested,
@@ -798,6 +802,7 @@ export async function executeChatCompletion(
       requestId,
       route,
       toolMessageCount: roundTrip.toolMessageCount,
+      trailingToolMessageCount,
       toolCallIds: roundTrip.toolCallIds.slice(0, 32),
       mappedToolCallIds: roundTrip.mappedToolCallIds.slice(0, 32),
       unmatchedToolCallIdCount: roundTrip.unmatchedToolCallIdCount,

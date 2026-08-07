@@ -1,9 +1,10 @@
 /**
- * P1031 / P1033 / P1036 — Cursor Agent tool-protocol helpers.
+ * P1031 / P1033 / P1036 / P1046 — Cursor Agent tool-protocol helpers.
  *
  * - Safe telemetry (never logs prompts / arguments / secrets)
  * - role=tool round-trip analysis
- * - P1033 resumeToolRound detection + full transcript validation
+ * - P1033 full transcript validation (unmatched / duplicate / missing / order)
+ * - P1046 trailing-tail resumeToolRound (history tools ≠ active resume)
  * - P1036 completed tool signatures for Round-N continuation anti-replay
  */
 
@@ -80,10 +81,21 @@ export type ToolTranscriptRejectCode =
   | typeof MISSING_TOOL_RESULT_CODE
   | typeof INVALID_TOOL_MESSAGE_ORDER_CODE
   | typeof INVALID_TOOL_CALL_ID_CODE;
+export type TrailingToolResumeDetection = {
+  /**
+   * True only when the request *tail* is a contiguous role=tool block that
+   * maps to the nearest preceding assistant.tool_calls (waiting for
+   * continuation). Historical tool transcripts alone never set this.
+   */
+  resumeToolRound: boolean;
+  trailingToolMessageCount: number;
+};
+
 export type ToolTranscriptValidation =
   | {
       ok: true;
       resumeToolRound: boolean;
+      trailingToolMessageCount: number;
       analysis: ToolRoundTripAnalysis;
       duplicateToolResultCount: number;
       orderViolationCount: number;
@@ -91,12 +103,121 @@ export type ToolTranscriptValidation =
   | {
       ok: false;
       resumeToolRound: false;
+      trailingToolMessageCount: number;
       code: ToolTranscriptRejectCode;
       message: string;
       analysis: ToolRoundTripAnalysis;
       duplicateToolResultCount: number;
       orderViolationCount: number;
     };
+
+function isProtocolMessage(raw: unknown): raw is Record<string, unknown> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return false;
+  const role = (raw as Record<string, unknown>).role;
+  return typeof role === "string" && role.trim().length > 0;
+}
+
+function protocolRole(row: Record<string, unknown>): string {
+  return typeof row.role === "string" ? row.role.trim() : "";
+}
+
+/**
+ * P1046 — Detect whether *this HTTP request* is submitting trailing tool
+ * results for the nearest preceding assistant.tool_calls (resume continuation).
+ *
+ * Independent of global toolMessageCount: history with completed tool rounds
+ * followed by a new user/assistant message must return resumeToolRound=false.
+ */
+export function detectTrailingToolResume(
+  messages: unknown
+): TrailingToolResumeDetection {
+  const normalize = createUpstreamToolCallIdNormalizer();
+  const list = Array.isArray(messages) ? messages : [];
+
+  let lastIdx = -1;
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (!isProtocolMessage(list[i])) continue;
+    lastIdx = i;
+    break;
+  }
+  if (lastIdx < 0) {
+    return { resumeToolRound: false, trailingToolMessageCount: 0 };
+  }
+
+  const lastRole = protocolRole(list[lastIdx] as Record<string, unknown>);
+  if (lastRole !== "tool" && lastRole !== "function") {
+    return { resumeToolRound: false, trailingToolMessageCount: 0 };
+  }
+
+  // Collect contiguous trailing role=tool block (skip empty/invalid slots).
+  const trailingIds: string[] = [];
+  let i = lastIdx;
+  while (i >= 0) {
+    const raw = list[i];
+    if (!isProtocolMessage(raw)) {
+      i -= 1;
+      continue;
+    }
+    const role = protocolRole(raw);
+    if (role === "tool" || role === "function") {
+      const id =
+        typeof raw.tool_call_id === "string" ? raw.tool_call_id.trim() : "";
+      trailingIds.push(id);
+      i -= 1;
+      continue;
+    }
+    break;
+  }
+  trailingIds.reverse();
+  const trailingToolMessageCount = trailingIds.length;
+  if (trailingToolMessageCount === 0) {
+    return { resumeToolRound: false, trailingToolMessageCount: 0 };
+  }
+
+  // Nearest preceding non-empty message must be assistant.tool_calls.
+  let nearest: Record<string, unknown> | null = null;
+  while (i >= 0) {
+    const raw = list[i];
+    if (!isProtocolMessage(raw)) {
+      i -= 1;
+      continue;
+    }
+    nearest = raw;
+    break;
+  }
+  if (
+    !nearest ||
+    protocolRole(nearest) !== "assistant" ||
+    !Array.isArray(nearest.tool_calls) ||
+    nearest.tool_calls.length === 0
+  ) {
+    return { resumeToolRound: false, trailingToolMessageCount };
+  }
+
+  const nearestIds = new Set<string>();
+  for (const tc of nearest.tool_calls) {
+    if (!tc || typeof tc !== "object" || Array.isArray(tc)) continue;
+    const id = (tc as Record<string, unknown>).id;
+    if (typeof id !== "string" || id.length === 0) continue;
+    nearestIds.add(id);
+    nearestIds.add(normalize(id));
+  }
+  if (nearestIds.size === 0) {
+    return { resumeToolRound: false, trailingToolMessageCount };
+  }
+
+  for (const id of trailingIds) {
+    if (!id) {
+      return { resumeToolRound: false, trailingToolMessageCount };
+    }
+    const mapped = normalize(id);
+    if (!nearestIds.has(id) && !nearestIds.has(mapped)) {
+      return { resumeToolRound: false, trailingToolMessageCount };
+    }
+  }
+
+  return { resumeToolRound: true, trailingToolMessageCount };
+}
 
 function safeIdOut(mapped: string): string {
   return isUpstreamSafeToolCallId(mapped)
@@ -171,21 +292,21 @@ export function analyzeToolRoundTrip(messages: unknown): ToolRoundTripAnalysis {
 }
 
 /**
- * P1033 — Full Cursor tool transcript validation + resumeToolRound detection.
+ * P1033 / P1046 — Full Cursor tool transcript validation + resumeToolRound.
  *
- * resumeToolRound=true when:
- * - at least one role=tool / function message
- * - every tool result matches a prior assistant.tool_calls id
- * - no unmatched / duplicate / order violations
- * - historical assistant.tool_calls exist
+ * Validation (P1033) still rejects unmatched / duplicate / missing /
+ * illegal-order transcripts before provider fetch.
  *
- * Rejects (before provider fetch) on unmatched, duplicate, missing history,
- * or illegal assistant/tool order.
+ * resumeToolRound (P1046) is *not* "any legal historical tool transcript".
+ * It is true only when detectTrailingToolResume says the request tail is a
+ * contiguous role=tool block mapped to the nearest preceding
+ * assistant.tool_calls (waiting for assistant continuation).
  */
 export function validateCursorToolTranscript(
   messages: unknown
 ): ToolTranscriptValidation {
   const analysis = analyzeToolRoundTrip(messages);
+  const trailing = detectTrailingToolResume(messages);
   const normalize = createUpstreamToolCallIdNormalizer();
   const list = Array.isArray(messages) ? messages : [];
 
@@ -265,6 +386,7 @@ export function validateCursorToolTranscript(
     return {
       ok: true,
       resumeToolRound: false,
+      trailingToolMessageCount: trailing.trailingToolMessageCount,
       analysis,
       duplicateToolResultCount: 0,
       orderViolationCount: 0,
@@ -276,6 +398,7 @@ export function validateCursorToolTranscript(
     return {
       ok: false,
       resumeToolRound: false,
+      trailingToolMessageCount: trailing.trailingToolMessageCount,
       code: MISSING_ASSISTANT_TOOL_CALLS_CODE,
       message:
         "tool messages require a prior assistant message with tool_calls in messages.",
@@ -289,6 +412,7 @@ export function validateCursorToolTranscript(
     return {
       ok: false,
       resumeToolRound: false,
+      trailingToolMessageCount: trailing.trailingToolMessageCount,
       code: DUPLICATE_TOOL_RESULT_CODE,
       message:
         "duplicate tool result for the same tool_call_id is not allowed.",
@@ -302,6 +426,7 @@ export function validateCursorToolTranscript(
     return {
       ok: false,
       resumeToolRound: false,
+      trailingToolMessageCount: trailing.trailingToolMessageCount,
       code: INVALID_TOOL_CALL_ID_CODE,
       message:
         "tool message tool_call_id does not match any assistant tool_calls id in messages.",
@@ -315,6 +440,7 @@ export function validateCursorToolTranscript(
     return {
       ok: false,
       resumeToolRound: false,
+      trailingToolMessageCount: trailing.trailingToolMessageCount,
       code: INVALID_TOOL_MESSAGE_ORDER_CODE,
       message:
         "tool message appears before its assistant tool_calls or in an illegal order.",
@@ -335,6 +461,7 @@ export function validateCursorToolTranscript(
     return {
       ok: false,
       resumeToolRound: false,
+      trailingToolMessageCount: trailing.trailingToolMessageCount,
       code: MISSING_TOOL_RESULT_CODE,
       message:
         "assistant tool_calls require a matching tool result for every tool_call_id.",
@@ -344,17 +471,19 @@ export function validateCursorToolTranscript(
     };
   }
 
-  // Legal, fully matched tool transcript → resume round (not first-turn intent).
+  // Legal transcript. resumeToolRound only when the *tail* is submitting
+  // tool results for the nearest preceding assistant.tool_calls (P1046).
   return {
     ok: true,
-    resumeToolRound: true,
+    resumeToolRound: trailing.resumeToolRound,
+    trailingToolMessageCount: trailing.trailingToolMessageCount,
     analysis,
     duplicateToolResultCount: 0,
     orderViolationCount: 0,
   };
 }
 
-/** True when messages contain a legal role=tool resume transcript. */
+/** True when this request tail is a legal trailing tool-result continuation. */
 export function isResumeToolRound(messages: unknown): boolean {
   const v = validateCursorToolTranscript(messages);
   return v.ok && v.resumeToolRound;
