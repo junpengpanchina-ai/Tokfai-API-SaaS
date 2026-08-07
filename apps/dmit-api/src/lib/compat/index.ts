@@ -1,8 +1,9 @@
 /**
  * P1050 — Additive compatibility seam public surface.
+ * P1051 — Explicit Gemini provider adapter (providers/geminiAdapter).
  *
  * Not wired into executeChatCompletion / GPT Golden Path.
- * Import from here in tests and future provider adapters only.
+ * Import from here in tests and explicit Gemini provider paths only.
  */
 
 export type {
@@ -40,3 +41,23 @@ export {
   normalizeOpenAiFinishReasonToCanonical,
   toCanonicalFinishReason,
 } from "./finishReasonNormalization.js";
+
+export {
+  adaptGeminiResponseToOpenAI,
+  buildToolCallIdToNameMap,
+  canonicalGeminiResultToOpenAI,
+  convertOpenAIToolContinuationToGeminiContents,
+  convertOpenAIToolResultsToGeminiFunctionResponses,
+  convertOpenAIToolsToGemini,
+  convertOpenAIToolsToGeminiTools,
+  guardExplicitGeminiAdapter,
+  isExplicitGeminiProviderPath,
+  normalizeGeminiResponse,
+  normalizeGeminiUsage,
+  type GeminiContent,
+  type GeminiFunctionDeclaration,
+  type GeminiFunctionResponsePart,
+  type GeminiToolsEntry,
+  type NormalizeGeminiResponseOptions,
+  type OpenAiAssistantMessage,
+} from "./providers/geminiAdapter.js";
