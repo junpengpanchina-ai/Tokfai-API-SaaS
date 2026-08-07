@@ -31,7 +31,10 @@ import {
   toolChoiceSummary,
   type ToolCallingMode,
 } from "./toolCallCapability.js";
-import { compileEmulatedUpstreamBody } from "./toolIntentCompiler.js";
+import {
+  compileEmulatedResumeTranscript,
+  compileEmulatedUpstreamBody,
+} from "./toolIntentCompiler.js";
 import {
   applyToolIntentToChatCompletion,
   extractAssistantContentFromCompletion,
@@ -1485,8 +1488,9 @@ async function runProviderAttempts(args: {
           throw toolIntentApiError(TOOL_EMULATION_UNAVAILABLE_CODE);
         }
 
-        // P1033 — never forward raw role=tool transcript to emulated_json.
-        // (No complete transcript compiler exists; upstream Forced absorb 400.)
+        // P1033 — never start a request already in emulated_json with a raw
+        // role=tool transcript. P1040 continuation may switch native→emulated
+        // only after compileEmulatedResumeTranscript sanitizes history.
         if (resumeToolRound && toolMode === "emulated_json") {
           throw new ApiError({
             status: 400,
@@ -1628,11 +1632,25 @@ async function runProviderAttempts(args: {
 
           upstreamBody = buildUpstreamChatBody(body, attemptModel);
           if (activeToolMode === "emulated_json") {
-            upstreamBody = compileEmulatedUpstreamBody(
-              upstreamBody,
-              clientBody as Record<string, unknown>,
-              { repair: repairAttempted }
-            );
+            // P1040 — continuation arbitration only: sanitize Cursor tool
+            // transcript to plain-text context before emulated_json compile.
+            // First-turn P1028 / P1020 repair keep compileEmulatedUpstreamBody.
+            if (
+              resumeToolRound &&
+              continuationArbitrationInFlight
+            ) {
+              upstreamBody = compileEmulatedResumeTranscript(
+                upstreamBody,
+                clientBody as Record<string, unknown>,
+                { repair: repairAttempted }
+              );
+            } else {
+              upstreamBody = compileEmulatedUpstreamBody(
+                upstreamBody,
+                clientBody as Record<string, unknown>,
+                { repair: repairAttempted }
+              );
+            }
           } else if (
             shouldAdaptGrsaiNativeObjectToolChoice({
               providerId: provider.id,

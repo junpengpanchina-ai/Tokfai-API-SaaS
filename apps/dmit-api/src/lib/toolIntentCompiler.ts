@@ -102,6 +102,143 @@ function buildToolsDescription(tools: ToolFn[]): string {
     .join("\n");
 }
 
+function messageContentToText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (content == null) return "";
+  if (Array.isArray(content)) {
+    const parts: string[] = [];
+    for (const item of content) {
+      if (typeof item === "string") {
+        parts.push(item);
+        continue;
+      }
+      if (!item || typeof item !== "object") continue;
+      const part = item as Record<string, unknown>;
+      if (typeof part.text === "string") parts.push(part.text);
+      else if (typeof part.content === "string") parts.push(part.content);
+    }
+    return parts.join("");
+  }
+  if (typeof content === "object") {
+    const obj = content as Record<string, unknown>;
+    if (typeof obj.text === "string") return obj.text;
+    if (typeof obj.content === "string") return obj.content;
+    try {
+      return JSON.stringify(content);
+    } catch {
+      return "";
+    }
+  }
+  return "";
+}
+
+function toolNameFromCall(tc: unknown): string | null {
+  if (!tc || typeof tc !== "object" || Array.isArray(tc)) return null;
+  const row = tc as Record<string, unknown>;
+  const fn =
+    row.function && typeof row.function === "object" && !Array.isArray(row.function)
+      ? (row.function as Record<string, unknown>)
+      : null;
+  const name = typeof fn?.name === "string" ? fn.name.trim() : "";
+  return name || null;
+}
+
+function toolCallIdFromCall(tc: unknown): string | null {
+  if (!tc || typeof tc !== "object" || Array.isArray(tc)) return null;
+  const id = (tc as Record<string, unknown>).id;
+  return typeof id === "string" && id.trim() ? id.trim() : null;
+}
+
+/**
+ * P1040 — Convert a legal Cursor tool transcript into plain-text context for
+ * emulated_json continuation. Preserves tool names + results in original
+ * order. Never emits role=tool/function, assistant.tool_calls, tool_call_id,
+ * or function_call. Does not mutate the input array or message objects.
+ */
+export function transformResumeTranscriptMessages(
+  messages: unknown[]
+): Record<string, unknown>[] {
+  const idToName = new Map<string, string>();
+  const out: Record<string, unknown>[] = [];
+
+  for (const raw of messages) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const row = raw as Record<string, unknown>;
+    const role = typeof row.role === "string" ? row.role.trim() : "";
+
+    if (role === "system" || role === "user") {
+      out.push({
+        role,
+        content: messageContentToText(row.content),
+      });
+      continue;
+    }
+
+    if (role === "assistant") {
+      const text = messageContentToText(row.content);
+      if (text.length > 0) {
+        out.push({ role: "assistant", content: text });
+      }
+
+      if (Array.isArray(row.tool_calls)) {
+        for (const tc of row.tool_calls) {
+          const name = toolNameFromCall(tc);
+          const id = toolCallIdFromCall(tc);
+          if (name && id) idToName.set(id, name);
+          if (name) {
+            out.push({
+              role: "assistant",
+              content: `Previously requested tool: ${name}`,
+            });
+          }
+        }
+      }
+
+      // Legacy single function_call — convert, never forward raw field.
+      if (
+        row.function_call &&
+        typeof row.function_call === "object" &&
+        !Array.isArray(row.function_call)
+      ) {
+        const fc = row.function_call as Record<string, unknown>;
+        const name = typeof fc.name === "string" ? fc.name.trim() : "";
+        if (name) {
+          out.push({
+            role: "assistant",
+            content: `Previously requested tool: ${name}`,
+          });
+        }
+      }
+      continue;
+    }
+
+    if (role === "tool" || role === "function") {
+      const id =
+        typeof row.tool_call_id === "string" ? row.tool_call_id.trim() : "";
+      let name =
+        typeof row.name === "string" && row.name.trim()
+          ? row.name.trim()
+          : "";
+      if (!name && id) name = idToName.get(id) ?? "";
+      if (!name) name = "tool";
+      const resultText = messageContentToText(row.content);
+      out.push({
+        role: "user",
+        content: `Tool result for ${name}:\n${resultText}`,
+      });
+      continue;
+    }
+
+    // Unknown roles: keep as plain text context only (no tool fields).
+    out.push({
+      role: role || "user",
+      content: messageContentToText(row.content),
+    });
+  }
+
+  return out;
+}
+
 /**
  * Transform an upstream chat body for emulated_json mode:
  * - strip tools / tool_choice
@@ -160,4 +297,27 @@ export function compileEmulatedUpstreamBody(
     next.temperature = 0;
   }
   return next;
+}
+
+/**
+ * P1040 — Resume-safe emulated_json compiler for continuation arbitration only.
+ *
+ * Converts completed Cursor tool transcript history into plain-text context,
+ * then applies the same instruction injection as {@link compileEmulatedUpstreamBody}.
+ * First-turn P1028 must keep calling {@link compileEmulatedUpstreamBody} directly.
+ *
+ * Does not mutate clientBody or the original upstream messages array.
+ */
+export function compileEmulatedResumeTranscript(
+  upstreamBody: Record<string, unknown>,
+  clientBody: Record<string, unknown>,
+  opts?: { repair?: boolean }
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...upstreamBody };
+  if (Array.isArray(next.messages)) {
+    next.messages = transformResumeTranscriptMessages(
+      next.messages as unknown[]
+    );
+  }
+  return compileEmulatedUpstreamBody(next, clientBody, opts);
 }
