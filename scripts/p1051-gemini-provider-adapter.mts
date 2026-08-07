@@ -599,9 +599,15 @@ console.log("P1051 GEMINI PROVIDER ADAPTER\n");
     "apps/dmit-api/src/lib/toolCallingModeRegistry.ts",
     "emulated_json"
   );
-  const executeNotImportingAdapter = !fileContains(
+  const executeImportsAdapter = fileContains(
     "apps/dmit-api/src/lib/executeChatCompletion.ts",
     "geminiAdapter"
+  );
+  // P1053 — executeChatCompletion may import the Gemini adapter for explicit
+  // resume wiring only; GPT Golden Path must still refuse non-gemini gate.
+  const executeNotRewrittenToGeminiDefault = fileContains(
+    "apps/dmit-api/src/lib/executeChatCompletion.ts",
+    "resolveToolResumeAttempts"
   );
 
   assert(
@@ -615,7 +621,8 @@ console.log("P1051 GEMINI PROVIDER ADAPTER\n");
       autoPro[2] === "gemini-3-pro" &&
       gptProfile.providerFamily === "openai_compatible" &&
       geminiDefaultStillEmulated &&
-      executeNotImportingAdapter &&
+      executeImportsAdapter &&
+      executeNotRewrittenToGeminiDefault &&
       fileContains(adapterFile, "convertOpenAIToolsToGemini") &&
       // GPT body object identity / content untouched
       gptBody.choices[0]!.message.content === "golden" &&
@@ -625,7 +632,8 @@ console.log("P1051 GEMINI PROVIDER ADAPTER\n");
       gateOff,
       gateOn,
       autoPro,
-      executeNotImportingAdapter,
+      executeImportsAdapter,
+      executeNotRewrittenToGeminiDefault,
       geminiDefaultStillEmulated,
       registryUnchanged,
       digestHint: createHash("sha256")

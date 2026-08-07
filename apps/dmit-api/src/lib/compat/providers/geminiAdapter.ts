@@ -23,6 +23,47 @@ import {
   parseToolCallArguments,
 } from "../toolCallNormalization.js";
 
+/**
+ * P1053 — Explicit registry of upstream models that may resume canonical
+ * OpenAI tool transcripts via this Gemini adapter (not via native OpenAI
+ * role=tool ingest). Membership is controlled — not "name contains gemini".
+ */
+export const GEMINI_ADAPTER_TOOL_RESUME_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-3-flash",
+  "gemini-3-pro",
+] as const;
+
+const GEMINI_ADAPTER_TOOL_RESUME_MODEL_SET = new Set<string>(
+  GEMINI_ADAPTER_TOOL_RESUME_MODELS
+);
+
+/**
+ * True only when the upstream model is registered for P1051/P1053 Gemini
+ * adapter tool-resume. Does not inspect raw model-name substrings beyond the
+ * registered id set.
+ */
+export function isRegisteredGeminiAdapterToolResumeModel(
+  upstreamModelId: string
+): boolean {
+  const id =
+    typeof upstreamModelId === "string" ? upstreamModelId.trim().toLowerCase() : "";
+  if (!id) return false;
+  const normalized = id.replace(/[_\s]+/g, "-");
+  return (
+    GEMINI_ADAPTER_TOOL_RESUME_MODEL_SET.has(id) ||
+    GEMINI_ADAPTER_TOOL_RESUME_MODEL_SET.has(normalized)
+  );
+}
+
+/**
+ * Capability seam: registered Gemini adapter resume models only.
+ */
+export function modelSupportsCanonicalToolResumeViaGeminiAdapter(
+  upstreamModelId: string
+): boolean {
+  return isRegisteredGeminiAdapterToolResumeModel(upstreamModelId);
+}
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -406,6 +447,226 @@ export function convertOpenAIToolContinuationToGeminiContents(args: {
     contents.push({ role: "user", parts: responseParts });
   }
   return contents;
+}
+
+function messageContentToPlainText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    const chunks: string[] = [];
+    for (const part of content) {
+      if (typeof part === "string") chunks.push(part);
+      else if (isPlainObject(part) && typeof part.text === "string") {
+        chunks.push(part.text);
+      }
+    }
+    return chunks.join("");
+  }
+  if (content == null) return "";
+  return "";
+}
+
+function serializeGeminiPartsForChat(
+  role: "assistant" | "user",
+  parts: GeminiContentPart[] | undefined
+): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+  if (!parts?.length) return out;
+  const textChunks: string[] = [];
+  for (const part of parts) {
+    if (!isPlainObject(part)) continue;
+    const rec = part as Record<string, unknown>;
+    if (typeof rec.text === "string" && rec.text.length > 0) {
+      textChunks.push(rec.text);
+      continue;
+    }
+    if (isPlainObject(rec.functionCall)) {
+      if (textChunks.length > 0) {
+        out.push({ role, content: textChunks.join("") });
+        textChunks.length = 0;
+      }
+      out.push({
+        role: "assistant",
+        content: JSON.stringify({ functionCall: rec.functionCall }),
+      });
+      continue;
+    }
+    if (isPlainObject(rec.functionResponse)) {
+      if (textChunks.length > 0) {
+        out.push({ role, content: textChunks.join("") });
+        textChunks.length = 0;
+      }
+      out.push({
+        role: "user",
+        content: JSON.stringify({ functionResponse: rec.functionResponse }),
+      });
+    }
+  }
+  if (textChunks.length > 0) {
+    out.push({ role, content: textChunks.join("") });
+  }
+  return out;
+}
+
+/**
+ * P1053 — Convert a full OpenAI chat message list for Gemini adapter resume.
+ * Reuses P1051 convertOpenAIToolContinuationToGeminiContents for tool rounds.
+ * Output never contains role=tool / role=function / assistant.tool_calls.
+ */
+export function convertOpenAIMessagesForGeminiAdapterResume(
+  messages: unknown[]
+): { messages: Record<string, unknown>[]; converted: boolean } {
+  const list = Array.isArray(messages) ? messages : [];
+  const out: Record<string, unknown>[] = [];
+  let converted = false;
+  let i = 0;
+
+  while (i < list.length) {
+    const raw = list[i];
+    if (!isPlainObject(raw)) {
+      i += 1;
+      continue;
+    }
+    const role = typeof raw.role === "string" ? raw.role.trim() : "";
+
+    if (
+      role === "assistant" &&
+      Array.isArray(raw.tool_calls) &&
+      raw.tool_calls.length > 0
+    ) {
+      const toolMessages: Record<string, unknown>[] = [];
+      let j = i + 1;
+      while (j < list.length) {
+        const next = list[j];
+        if (!isPlainObject(next)) break;
+        const nextRole =
+          typeof next.role === "string" ? next.role.trim() : "";
+        if (nextRole !== "tool" && nextRole !== "function") break;
+        toolMessages.push(next);
+        j += 1;
+      }
+
+      if (toolMessages.length > 0) {
+        const text = messageContentToPlainText(raw.content);
+        if (text.length > 0) {
+          out.push({ role: "assistant", content: text });
+        }
+        const geminiContents = convertOpenAIToolContinuationToGeminiContents({
+          assistantMessage: raw,
+          toolMessages,
+        });
+        for (const content of geminiContents) {
+          const chatRole =
+            content.role === "model" ? ("assistant" as const) : ("user" as const);
+          out.push(
+            ...serializeGeminiPartsForChat(chatRole, content.parts)
+          );
+        }
+        converted = true;
+        i = j;
+        continue;
+      }
+
+      // assistant.tool_calls without trailing tool results — strip tool_calls.
+      const textOnly = messageContentToPlainText(raw.content);
+      if (textOnly.length > 0) {
+        out.push({ role: "assistant", content: textOnly });
+      }
+      for (const tc of raw.tool_calls) {
+        if (!isPlainObject(tc)) continue;
+        const fn = isPlainObject(tc.function) ? tc.function : null;
+        const name =
+          typeof fn?.name === "string"
+            ? fn.name.trim()
+            : typeof tc.name === "string"
+              ? tc.name.trim()
+              : "";
+        if (!name) continue;
+        let argsObj: Record<string, unknown> = {};
+        const rawArgs = fn?.arguments ?? tc.arguments;
+        if (isPlainObject(rawArgs)) argsObj = { ...rawArgs };
+        else if (typeof rawArgs === "string") {
+          const parsed = parseToolCallArguments(rawArgs);
+          if (parsed.ok) argsObj = parsed.arguments;
+        }
+        out.push({
+          role: "assistant",
+          content: JSON.stringify({ functionCall: { name, args: argsObj } }),
+        });
+        converted = true;
+      }
+      i += 1;
+      continue;
+    }
+
+    if (role === "tool" || role === "function") {
+      // Orphan tool row — convert via name if present; never forward role=tool.
+      const fr = convertOpenAIToolResultsToGeminiFunctionResponses({
+        toolMessages: [raw],
+        idToName: new Map(),
+      });
+      if (fr.length > 0) {
+        out.push(
+          ...serializeGeminiPartsForChat("user", fr)
+        );
+        converted = true;
+      } else {
+        const name =
+          typeof raw.name === "string" && raw.name.trim()
+            ? raw.name.trim()
+            : "tool";
+        out.push({
+          role: "user",
+          content: JSON.stringify({
+            functionResponse: {
+              name,
+              response: toolResultContentToResponseObject(raw.content),
+            },
+          }),
+        });
+        converted = true;
+      }
+      i += 1;
+      continue;
+    }
+
+    if (role === "system" || role === "user" || role === "assistant") {
+      out.push({
+        role,
+        content: messageContentToPlainText(raw.content),
+      });
+      i += 1;
+      continue;
+    }
+
+    out.push({
+      role: role || "user",
+      content: messageContentToPlainText(raw.content),
+    });
+    i += 1;
+  }
+
+  return { messages: out, converted };
+}
+
+/**
+ * P1053 — Apply Gemini adapter resume conversion to an upstream chat body copy.
+ * Does not mutate the input object. Strips raw OpenAI tool transcript fields.
+ */
+export function applyGeminiAdapterToolResumeToUpstreamChatBody(
+  upstreamBody: Record<string, unknown>
+): { body: Record<string, unknown>; converted: boolean } {
+  const next: Record<string, unknown> = { ...upstreamBody };
+  if (!Array.isArray(next.messages)) {
+    return { body: next, converted: false };
+  }
+  const { messages, converted } = convertOpenAIMessagesForGeminiAdapterResume(
+    next.messages as unknown[]
+  );
+  next.messages = messages;
+  // Never forward OpenAI tools/tool_choice unchanged as "native transcript" —
+  // emulated compile (caller) injects instructions; strip here as safety.
+  // Caller may re-inject via compileEmulatedUpstreamBody.
+  return { body: next, converted };
 }
 
 // ---------------------------------------------------------------------------

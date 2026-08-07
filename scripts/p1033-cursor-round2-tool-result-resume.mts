@@ -31,6 +31,7 @@ import {
   installP1018Mocks,
   loadExecuteChatCompletion,
   loadRespondEarlySse,
+  makeAssistantTextIntent,
   makeNativeToolCalls,
   nativeToolCompletion,
   resetScenario,
@@ -779,14 +780,16 @@ for (const [sceneId, choice, label] of [
   recordScene(13, "native fallback", result);
 }
 
-// ── 14. raw role=tool not sent to emulated provider ──────────────────────
+// ── 14. Gemini adapter resume converts role=tool (P1053) ─────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
     scripts: [
       () => ({
         kind: "completion",
-        content: "should not run on gemini emulated",
+        content: makeAssistantTextIntent(
+          "gemini resume ok after adapter conversion"
+        ),
         usage: NATIVE_USAGE,
       }),
     ],
@@ -797,7 +800,7 @@ for (const [sceneId, choice, label] of [
       messages: [
         { role: "user", content: "emu" },
         assistantTools([tc("call_emu", "Glob", { pattern: "*" })]),
-        toolMsg("call_emu", {}),
+        toolMsg("call_emu", { files: ["a.ts"] }),
       ],
       tools: WEATHER_TOOLS,
       tool_choice: "auto",
@@ -805,15 +808,30 @@ for (const [sceneId, choice, label] of [
     "req_p1033_14"
   );
   const meta = billingSnapshot(result);
+  const outbound = getCounts().outboundBodies[0];
+  const outboundRoles = Array.isArray(outbound?.messages)
+    ? outbound.messages.map((m) =>
+        m && typeof m === "object"
+          ? String((m as { role?: unknown }).role ?? "")
+          : ""
+      )
+    : [];
   assert(
-    result.ok === false &&
-      meta.errorCode === TOOL_ROUND_RESUME_UNAVAILABLE_CODE &&
-      meta.providerCallCount === 0 &&
-      meta.debitCallCount === 0,
-    "14. emulated provider does not receive raw role=tool",
-    meta
+    result.ok === true &&
+      meta.providerCallCount === 1 &&
+      meta.debitCallCount === 1 &&
+      meta.errorCode === null &&
+      !outboundRoles.includes("tool") &&
+      !outboundRoles.includes("function") &&
+      msg(result)?.content === "gemini resume ok after adapter conversion",
+    "14. gemini adapter resume converts role=tool (no raw tool transcript)",
+    {
+      ...meta,
+      outboundRoles,
+      content: msg(result)?.content ?? null,
+    }
   );
-  recordScene(14, "no emulated raw tool", result, { status: 400 });
+  recordScene(14, "gemini adapter resume", result, { status: 200 });
 }
 
 // ── 15. unmatched call_id ────────────────────────────────────────────────

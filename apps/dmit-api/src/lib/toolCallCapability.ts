@@ -9,6 +9,7 @@
 import { env } from "../env.js";
 import { normalizeClientModelId } from "../upstream/modelAliases.js";
 import { isImageModel } from "../capabilities/modelCapabilityPolicy.js";
+import { modelSupportsCanonicalToolResumeViaGeminiAdapter } from "./compat/providers/geminiAdapter.js";
 import {
   modelHasToolCallingSupport,
   resolveToolCallingAttempts,
@@ -385,9 +386,35 @@ export function modelSupportsNativeToolResume(upstreamModelId: string): boolean 
 }
 
 /**
+ * P1053 — True when a registered Gemini compatibility adapter can resume a
+ * canonical tool transcript for this upstream model (after adapter conversion).
+ * Does not mean native OpenAI role=tool ingest.
+ */
+export function modelSupportsAdapterToolResume(
+  upstreamModelId: string
+): boolean {
+  const model = normalizeClientModelId(upstreamModelId);
+  if (!model) return false;
+  return modelSupportsCanonicalToolResumeViaGeminiAdapter(model);
+}
+
+/**
+ * P1053 — Native OpenAI transcript resume OR registered Gemini adapter resume.
+ */
+export function modelSupportsToolResume(upstreamModelId: string): boolean {
+  return (
+    modelSupportsNativeToolResume(upstreamModelId) ||
+    modelSupportsAdapterToolResume(upstreamModelId)
+  );
+}
+
+/**
  * P1033 — Prefer models with live native tool-transcript support for resume.
  * Emulated_json models must not receive raw role=tool transcripts
  * (no transcript compiler). Returns empty when none remain.
+ *
+ * Kept for GPT Golden Path / P1033 unit proofs. Production resume routing
+ * uses {@link resolveToolResumeAttempts} (native + Gemini adapter).
  */
 export function resolveNativeToolResumeAttempts(args: {
   attempts: string[];
@@ -398,6 +425,26 @@ export function resolveNativeToolResumeAttempts(args: {
     const model = normalizeClientModelId(id);
     if (!model || seen.has(model)) continue;
     if (!modelSupportsNativeToolResume(model)) continue;
+    seen.add(model);
+    out.push(model);
+  }
+  return out;
+}
+
+/**
+ * P1053 — Resume attempts: native OpenAI transcript models OR models with a
+ * registered Gemini adapter resume path. Unsupported models remain excluded
+ * (caller still returns tool_round_resume_unavailable when empty).
+ */
+export function resolveToolResumeAttempts(args: {
+  attempts: string[];
+}): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const id of args.attempts) {
+    const model = normalizeClientModelId(id);
+    if (!model || seen.has(model)) continue;
+    if (!modelSupportsToolResume(model)) continue;
     seen.add(model);
     out.push(model);
   }

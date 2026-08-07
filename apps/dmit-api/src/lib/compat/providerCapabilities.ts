@@ -16,6 +16,12 @@ export type ProviderCapabilityFlags = {
   supportsNativeToolChoice: boolean;
   supportsReasoning: boolean;
   supportsVision: boolean;
+  /**
+   * P1053 — Canonical OpenAI tool-transcript resume via a registered provider
+   * adapter (e.g. Gemini P1051). Does not mean native OpenAI role=tool ingest.
+   * Native OpenAI resume semantics remain supportsNativeTools + live native mode.
+   */
+  supportsCanonicalToolResumeViaAdapter: boolean;
 };
 
 export type ProviderCapabilityProfile = ProviderCapabilityFlags & {
@@ -42,6 +48,7 @@ const PROFILES: ReadonlyMap<string, ProviderCapabilityProfile> = new Map([
       supportsNativeToolChoice: true,
       supportsReasoning: false,
       supportsVision: true,
+      supportsCanonicalToolResumeViaAdapter: false,
     },
   ],
   [
@@ -56,6 +63,7 @@ const PROFILES: ReadonlyMap<string, ProviderCapabilityProfile> = new Map([
       supportsNativeToolChoice: true,
       supportsReasoning: false,
       supportsVision: true,
+      supportsCanonicalToolResumeViaAdapter: false,
     },
   ],
   [
@@ -70,6 +78,7 @@ const PROFILES: ReadonlyMap<string, ProviderCapabilityProfile> = new Map([
       supportsNativeToolChoice: true,
       supportsReasoning: true,
       supportsVision: true,
+      supportsCanonicalToolResumeViaAdapter: false,
     },
   ],
   [
@@ -84,6 +93,7 @@ const PROFILES: ReadonlyMap<string, ProviderCapabilityProfile> = new Map([
       supportsNativeToolChoice: false,
       supportsReasoning: false,
       supportsVision: true,
+      supportsCanonicalToolResumeViaAdapter: true,
     },
   ],
   [
@@ -98,6 +108,7 @@ const PROFILES: ReadonlyMap<string, ProviderCapabilityProfile> = new Map([
       supportsNativeToolChoice: true,
       supportsReasoning: true,
       supportsVision: true,
+      supportsCanonicalToolResumeViaAdapter: false,
     },
   ],
 ]);
@@ -112,6 +123,7 @@ const UNKNOWN_PROFILE: ProviderCapabilityProfile = {
   supportsNativeToolChoice: false,
   supportsReasoning: false,
   supportsVision: false,
+  supportsCanonicalToolResumeViaAdapter: false,
 };
 
 /** Lookup by provider id. Unknown → safe all-false profile (no throw). */

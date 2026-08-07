@@ -21,6 +21,7 @@ import {
   requestHasTools,
   requestHasNonEmptyTools,
   resolveNativeToolResumeAttempts,
+  resolveToolResumeAttempts,
   resolveToolsCapableAttempts,
   resolveToolCallingMode,
   canNativeEmulatedRepair,
@@ -31,6 +32,10 @@ import {
   toolChoiceSummary,
   type ToolCallingMode,
 } from "./toolCallCapability.js";
+import {
+  applyGeminiAdapterToolResumeToUpstreamChatBody,
+  isRegisteredGeminiAdapterToolResumeModel,
+} from "./compat/providers/geminiAdapter.js";
 import {
   compileEmulatedResumeTranscript,
   compileEmulatedUpstreamBody,
@@ -856,15 +861,16 @@ export async function executeChatCompletion(
     return failureResult(err, requestId, requestedModel, routing);
   }
 
-  // P1033 — resume must route to native tool-transcript providers only.
-  // Emulated_json (e.g. gemini-3-pro) must not receive raw role=tool messages;
-  // that path historically surfaced upstream "Forced absorb routing could not
-  // be satisfied" as invalid_request_error after AUTO/alias fallthrough.
+  // P1033 / P1053 — resume routes to:
+  //   - native OpenAI tool-transcript models (GPT Golden Path, unchanged), OR
+  //   - registered Gemini adapter resume models (P1051 conversion required)
+  // Unsupported models still get tool_round_resume_unavailable (gate kept).
+  // Raw role=tool must never be forwarded to emulated Gemini without conversion.
   if (resumeToolRound) {
-    const nativeResumeAttempts = resolveNativeToolResumeAttempts({
+    const resumeAttempts = resolveToolResumeAttempts({
       attempts: attempts.length > 0 ? attempts : [requestedModel],
     });
-    if (nativeResumeAttempts.length === 0) {
+    if (resumeAttempts.length === 0) {
       const err = new ApiError({
         status: 400,
         message: TOOL_ROUND_RESUME_UNAVAILABLE_MESSAGE,
@@ -909,20 +915,24 @@ export async function executeChatCompletion(
       return failureResult(err, requestId, requestedModel, routing);
     }
     if (
-      nativeResumeAttempts.length !== attempts.length ||
-      nativeResumeAttempts[0] !== attempts[0]
+      resumeAttempts.length !== attempts.length ||
+      resumeAttempts[0] !== attempts[0]
     ) {
       log.info("cursor_tool_resume_native_routing", {
         requestId,
         route,
         requestedModel: requestedRaw,
         priorAttempts: attempts,
-        nativeResumeAttempts,
+        nativeResumeAttempts: resolveNativeToolResumeAttempts({
+          attempts: attempts.length > 0 ? attempts : [requestedModel],
+        }),
+        resumeAttempts,
         resumeToolRound: true,
       });
     }
-    attempts = nativeResumeAttempts;
+    attempts = resumeAttempts;
     // Resume must keep tools + role=tool transcript (never degrade-to-chat).
+    // Gemini adapter path converts the transcript before upstream fetch.
     if (toolsDegradedToChat) {
       toolsDegradedToChat = false;
       upstreamBodySource = body;
@@ -1500,7 +1510,13 @@ async function runProviderAttempts(args: {
         // P1033 — never start a request already in emulated_json with a raw
         // role=tool transcript. P1040 continuation may switch native→emulated
         // only after compileEmulatedResumeTranscript sanitizes history.
-        if (resumeToolRound && toolMode === "emulated_json") {
+        // P1053 — registered Gemini adapter models may resume after P1051
+        // conversion (applied at upstream body build below).
+        if (
+          resumeToolRound &&
+          toolMode === "emulated_json" &&
+          !isRegisteredGeminiAdapterToolResumeModel(attemptModel)
+        ) {
           throw new ApiError({
             status: 400,
             message: TOOL_ROUND_RESUME_UNAVAILABLE_MESSAGE,
@@ -1654,6 +1670,8 @@ async function runProviderAttempts(args: {
             // so the second provider pass must emit legal tool_calls.
             // P1049 — incomplete multi-step continuation also forces required
             // for exactly one resume repair (still capped at one per HTTP).
+            // P1053 — Gemini adapter resume: convert OpenAI tool transcript via
+            // P1051 before emulated compile (never send raw role=tool).
             const forceRequiredToolIntent =
               (autoIntentArbitrationInFlight && toolIntentDetected) ||
               continuationArbitrationInFlight;
@@ -1664,6 +1682,33 @@ async function runProviderAttempts(args: {
                 }
               : (clientBody as Record<string, unknown>);
             if (
+              resumeToolRound &&
+              isRegisteredGeminiAdapterToolResumeModel(attemptModel)
+            ) {
+              const adapted =
+                applyGeminiAdapterToolResumeToUpstreamChatBody(upstreamBody);
+              upstreamBody = adapted.body;
+              if (adapted.converted) {
+                log.info("gemini_adapter_tool_resume_converted", {
+                  requestId,
+                  route,
+                  providerId: provider.id,
+                  attemptModel,
+                  resumeToolRound: true,
+                  geminiAdapterResumeConverted: true,
+                  billing_status: "not_billable",
+                  credits_charged: 0,
+                });
+              }
+              upstreamBody = compileEmulatedUpstreamBody(
+                upstreamBody,
+                compileClientBody,
+                {
+                  repair:
+                    repairAttempted || forceRequiredToolIntent,
+                }
+              );
+            } else if (
               resumeToolRound &&
               continuationArbitrationInFlight
             ) {
