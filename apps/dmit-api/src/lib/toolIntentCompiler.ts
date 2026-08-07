@@ -201,6 +201,281 @@ export function detectExplicitToolExecutionIntent(args: {
   };
 }
 
+/**
+ * P1049 — Coarse agent tool capabilities for incomplete multi-step continuation.
+ * Not a planner: only conservative progress against explicit execution cues.
+ */
+export type AgentToolCapability =
+  | "search"
+  | "read"
+  | "write"
+  | "terminal"
+  | "delete";
+
+type AgentCapabilitySpec = {
+  id: AgentToolCapability;
+  /** User-task cue that this capability may be required. */
+  cue: RegExp;
+  /** Normalize a tool function name into this capability. */
+  matchesTool: (normalizedName: string) => boolean;
+};
+
+/**
+ * Central tool-name → capability mapping (Cursor + common aliases).
+ * Keep all normalization here — do not scatter hardcodes in gates.
+ */
+const AGENT_CAPABILITY_SPECS: readonly AgentCapabilitySpec[] = [
+  {
+    id: "search",
+    cue: /\b(search|grep|find(?:\s+(?:in\s+)?(?:code|files?|repo))?|ripgrep|codebase\s+search)\b|搜索|查找|检索/i,
+    matchesTool: (n) =>
+      /^(search|grep|glob|websearch|rg|codebasesearch)$/.test(n) ||
+      n.includes("search"),
+  },
+  {
+    id: "read",
+    cue: /\b(?:read|open)(?:\s+(?:the\s+)?(?:file|code|path))?\b|读取|打开文件|读一下|读文件/i,
+    matchesTool: (n) =>
+      /^(read|readfile|cat|get_file)$/.test(n) || n.endsWith("read"),
+  },
+  {
+    id: "write",
+    cue: /\b(write|edit|modify|patch|refactor|create(?:\s+file)?)\b|修改|编辑|写入|改一下|创建文件/i,
+    matchesTool: (n) =>
+      /^(write|edit|strreplace|applypatch|editnotebook|todowrite|createfile)$/.test(
+        n
+      ) ||
+      n.includes("write") ||
+      n.includes("edit"),
+  },
+  {
+    id: "terminal",
+    cue: /\b(run|execute|shell|terminal|bash|npm\s+run|npx|node)\b|运行|执行|跑一下|跑测试|终端/i,
+    matchesTool: (n) =>
+      /^(shell|terminal|awaitshell|bash|run_terminal_cmd|runcommand)$/.test(n) ||
+      n.includes("shell") ||
+      n.includes("terminal"),
+  },
+  {
+    id: "delete",
+    cue: /\b(delete|remove(?:\s+file)?|unlink|rm)\b|删除|移除文件/i,
+    matchesTool: (n) =>
+      /^(delete|removefile|unlink)$/.test(n) ||
+      n.includes("delete") ||
+      n.includes("removefile"),
+  },
+];
+
+/** Normalize a single tool function name to a coarse capability (or null). */
+export function normalizeToolNameToCapability(
+  toolName: string
+): AgentToolCapability | null {
+  const n = toolName.trim().toLowerCase().replace(/[\s_-]+/g, "");
+  if (!n) return null;
+  // Prefer exact family matches; scan specs in declaration order.
+  for (const spec of AGENT_CAPABILITY_SPECS) {
+    if (spec.matchesTool(n) || spec.matchesTool(toolName.trim().toLowerCase())) {
+      return spec.id;
+    }
+  }
+  return null;
+}
+
+/**
+ * Infer required capabilities from the original user execution request.
+ * Only includes capabilities for which the client exposed a matching tool.
+ */
+export function inferRequiredAgentCapabilities(args: {
+  messages: unknown;
+  tools: unknown;
+}): AgentToolCapability[] {
+  const tools = extractClientToolFunctions(args.tools);
+  if (tools.length === 0) return [];
+  const userText = collectLatestUserTexts(args.messages).join("\n").trim();
+  if (!userText) return [];
+
+  const available = new Set<AgentToolCapability>();
+  for (const t of tools) {
+    const cap = normalizeToolNameToCapability(t.name);
+    if (cap) available.add(cap);
+  }
+  if (available.size === 0) return [];
+
+  const required = new Set<AgentToolCapability>();
+  for (const spec of AGENT_CAPABILITY_SPECS) {
+    if (!available.has(spec.id)) continue;
+    if (spec.cue.test(userText)) required.add(spec.id);
+  }
+
+  // Direct tool-name mention also counts as requiring that tool's capability.
+  for (const t of tools) {
+    const norm = t.name.trim().toLowerCase();
+    if (norm.length < 2) continue;
+    const re = new RegExp(
+      `(?:^|[^a-z0-9_])${norm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:[^a-z0-9_]|$)`,
+      "i"
+    );
+    if (!re.test(userText)) continue;
+    const cap = normalizeToolNameToCapability(t.name);
+    if (cap && available.has(cap)) required.add(cap);
+  }
+
+  return AGENT_CAPABILITY_SPECS.map((s) => s.id).filter((id) =>
+    required.has(id)
+  );
+}
+
+/**
+ * Capabilities completed in the transcript: assistant.tool_calls that already
+ * have a matching role=tool result (answered round-trips only).
+ */
+export function extractCompletedAgentCapabilities(
+  messages: unknown
+): AgentToolCapability[] {
+  const completed = new Set<AgentToolCapability>();
+  const list = Array.isArray(messages) ? messages : [];
+  const byId = new Map<string, string>();
+  const answered = new Set<string>();
+
+  for (const raw of list) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const row = raw as Record<string, unknown>;
+    const role = typeof row.role === "string" ? row.role.trim() : "";
+    if (role === "assistant" && Array.isArray(row.tool_calls)) {
+      for (const tc of row.tool_calls) {
+        if (!tc || typeof tc !== "object" || Array.isArray(tc)) continue;
+        const t = tc as Record<string, unknown>;
+        const id = typeof t.id === "string" ? t.id.trim() : "";
+        if (!id) continue;
+        const fn =
+          t.function &&
+          typeof t.function === "object" &&
+          !Array.isArray(t.function)
+            ? (t.function as Record<string, unknown>)
+            : null;
+        const name = typeof fn?.name === "string" ? fn.name.trim() : "";
+        if (!name) continue;
+        byId.set(id, name);
+      }
+    }
+    if (role === "tool" || role === "function") {
+      const id =
+        typeof row.tool_call_id === "string" ? row.tool_call_id.trim() : "";
+      if (id) answered.add(id);
+    }
+  }
+
+  for (const [id, name] of byId) {
+    if (!answered.has(id)) continue;
+    const cap = normalizeToolNameToCapability(name);
+    if (cap) completed.add(cap);
+  }
+
+  return AGENT_CAPABILITY_SPECS.map((s) => s.id).filter((id) =>
+    completed.has(id)
+  );
+}
+
+export type IncompleteToolTaskContinuation = {
+  shouldContinue: boolean;
+  requiredCapabilities: AgentToolCapability[];
+  completedCapabilities: AgentToolCapability[];
+  remainingCapabilities: AgentToolCapability[];
+};
+
+/**
+ * P1049 — Conservative gate: resumeToolRound + explicit multi-step execution
+ * intent + native plain text, while required capabilities remain unmet.
+ *
+ * Does NOT reopen solely because tools[] are present or because the model
+ * wrote a "I'll continue" promise. Capability gap is primary; promise text is
+ * optional auxiliary reinforcement only.
+ */
+export function shouldContinueIncompleteToolTask(args: {
+  resumeToolRound: boolean;
+  explicitExecutionIntent: boolean;
+  upstreamReturnedToolCalls: boolean;
+  finishReason: string | null | undefined;
+  continuationAlreadyAttempted: boolean;
+  freshRemainingTotalMs: number;
+  unmatchedToolCallIdCount?: number;
+  duplicateToolResultCount?: number;
+  orderViolationCount?: number;
+  upstreamHttpOk?: boolean;
+  messages: unknown;
+  tools: unknown;
+  /** Optional native assistant text (promise cue is auxiliary only). */
+  nativeAssistantText?: string | null;
+}): IncompleteToolTaskContinuation {
+  const empty = (): IncompleteToolTaskContinuation => ({
+    shouldContinue: false,
+    requiredCapabilities: [],
+    completedCapabilities: [],
+    remainingCapabilities: [],
+  });
+
+  if (!args.resumeToolRound) return empty();
+  if (!args.explicitExecutionIntent) return empty();
+  if (args.upstreamReturnedToolCalls) return empty();
+  if (args.continuationAlreadyAttempted) return empty();
+  if (!(args.freshRemainingTotalMs > 0)) return empty();
+  if (args.upstreamHttpOk === false) return empty();
+  if ((args.unmatchedToolCallIdCount ?? 0) !== 0) return empty();
+  if ((args.duplicateToolResultCount ?? 0) !== 0) return empty();
+  if ((args.orderViolationCount ?? 0) !== 0) return empty();
+
+  const finish = (args.finishReason ?? "").trim().toLowerCase();
+  const plainFinish =
+    finish === "" ||
+    finish === "stop" ||
+    finish === "end_turn" ||
+    finish === "stop_sequence";
+  if (!plainFinish) return empty();
+
+  const requiredCapabilities = inferRequiredAgentCapabilities({
+    messages: args.messages,
+    tools: args.tools,
+  });
+  const completedCapabilities = extractCompletedAgentCapabilities(
+    args.messages
+  );
+  const completedSet = new Set(completedCapabilities);
+  const remainingCapabilities = requiredCapabilities.filter(
+    (c) => !completedSet.has(c)
+  );
+
+  if (remainingCapabilities.length === 0) {
+    return {
+      shouldContinue: false,
+      requiredCapabilities,
+      completedCapabilities,
+      remainingCapabilities,
+    };
+  }
+
+  // Require at least one answered tool round-trip in the transcript so we
+  // never invent continuation without real tool progress (resume integrity).
+  if (completedCapabilities.length === 0) {
+    return {
+      shouldContinue: false,
+      requiredCapabilities,
+      completedCapabilities,
+      remainingCapabilities,
+    };
+  }
+
+  // Auxiliary: promise/commitment wording may reinforce logs/tests but must
+  // never be the sole trigger — remaining capability gap is decisive.
+  void args.nativeAssistantText;
+
+  return {
+    shouldContinue: true,
+    requiredCapabilities,
+    completedCapabilities,
+    remainingCapabilities,
+  };
+}
+
 export function summarizeToolChoice(toolChoice: unknown): string {
   if (toolChoice == null || toolChoice === "auto") {
     return "auto: you may return tool_call or assistant_text.";

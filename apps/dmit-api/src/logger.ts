@@ -170,6 +170,10 @@ const ALLOWED_FIELD_KEYS = new Set([
   // P1048 auto tool-intent repair telemetry (no prompts / secrets)
   "toolIntentDetected",
   "nativeFinishReason",
+  // P1049 incomplete multi-step continuation (capability sets only)
+  "requiredCapabilities",
+  "completedCapabilities",
+  "remainingCapabilities",
 ]);
 
 const SENSITIVE_LOG_KEY_LITERAL =

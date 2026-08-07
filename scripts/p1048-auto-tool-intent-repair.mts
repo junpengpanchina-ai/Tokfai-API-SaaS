@@ -413,6 +413,8 @@ console.log(`Authenticity: ${LEVEL}\n`);
 }
 
 // ── CASE D: resumeToolRound + native final text — no first-turn repair ───
+// P1049: all required capabilities must already be complete so final text
+// stays single-pass (incomplete gap would open continuation repair).
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -432,8 +434,16 @@ console.log(`Authenticity: ${LEVEL}\n`);
   });
   const messages = [
     { role: "user", content: EXPLICIT_EXEC_PROMPT },
-    assistantTools([tc("call_r1_a", "Read", { path: "a.ts" })]),
+    assistantTools([
+      tc("call_r1_s", "Search", { query: "executeChatCompletion" }),
+      tc("call_r1_a", "Read", { path: "a.ts" }),
+      tc("call_r1_w", "Write", { path: "a.ts", contents: "x" }),
+      tc("call_r1_t", "Terminal", { command: "npm test" }),
+    ]),
+    toolMsg("call_r1_s", { hits: ["apps/.../executeChatCompletion.ts"] }),
     toolMsg("call_r1_a", { text: "contents of a" }),
+    toolMsg("call_r1_w", { ok: true }),
+    toolMsg("call_r1_t", { exit: 0 }),
   ];
   const v = validateCursorToolTranscript(messages);
   const result = await exec(

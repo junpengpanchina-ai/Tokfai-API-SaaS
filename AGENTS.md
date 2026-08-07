@@ -143,3 +143,27 @@ Hard limits:
 
 Completion report must include: git commit hash, changed files, the five PASS
 results, `pm2 status`, and grep of the last ~800 error-log lines.
+
+---
+
+# Tokfai Compatibility Prime Directive
+
+1. Compatibility is additive, not replacement.
+2. Existing production-success paths are Golden Paths.
+3. Do not change behavior of an existing successful provider merely to support a new provider.
+4. Provider-specific quirks belong in provider adapters / compatibility helpers.
+5. Unknown or unsupported compatibility states must fall back to existing proven behavior whenever safe.
+6. Existing streaming, tool_calls, resume, timeout, fallback and exact-once billing semantics must remain unchanged.
+7. Refactoring alone is not justification for modifying production behavior.
+8. Every compatibility change must prove:
+   - existing GPT path unchanged
+   - existing non-tool text unchanged
+   - existing tool path unchanged
+   - existing resume path unchanged
+   - billing exactly-once unchanged
+   - new provider behavior works independently
+9. Never migrate the whole gateway to a new abstraction in one step.
+10. Prefer incremental extraction + provider adapter + controlled adoption.
+
+DO NOT BREAK WHAT ALREADY WORKS.
+EXTEND TOKFAI TO UNDERSTAND MORE.

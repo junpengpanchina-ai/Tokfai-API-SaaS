@@ -319,11 +319,12 @@ export function shouldAttemptAutoToolIntentArbitration(args: {
 }
 
 /**
- * P1036 / P1047 — Round-2+ continuation arbitration gate.
+ * P1036 / P1047 / P1049 — Round-2+ continuation arbitration gate.
  *
- * Historically opened when native returned plain text on a legal resume.
- * P1047 closes that path: valid native final text or next tool_calls are final
- * under auto. P1048 must NOT reopen this via execution-intent (CASE D/E).
+ * P1047 closed blanket resume plain-text arbitration.
+ * P1048 must NOT reopen via first-turn execution-intent alone (CASE D/E).
+ * P1049 reopens ONLY when {@link shouldContinueIncompleteToolTask} reports an
+ * unmet multi-step capability gap (`incompleteToolTask=true`).
  */
 export function shouldAttemptResumeToolContinuationArbitration(args: {
   hasTools: boolean;
@@ -341,6 +342,11 @@ export function shouldAttemptResumeToolContinuationArbitration(args: {
   autoIntentArbitrationAttempted: boolean;
   freshRemainingTotalMs: number;
   upstreamHttpOk: boolean;
+  /**
+   * P1049 — from shouldContinueIncompleteToolTask().shouldContinue.
+   * Must stay unset/false unless capability gap is proven.
+   */
+  incompleteToolTask?: boolean;
 }): boolean {
   if (!args.resumeToolRound) return false;
   if (args.unmatchedToolCallIdCount !== 0) return false;
@@ -348,6 +354,8 @@ export function shouldAttemptResumeToolContinuationArbitration(args: {
   if (args.orderViolationCount !== 0) return false;
   if (!args.upstreamHttpOk) return false;
   if (args.autoIntentArbitrationAttempted) return false;
+  // P1049 — never reopen without proven incomplete capability gap.
+  if (args.incompleteToolTask !== true) return false;
   return shouldRunToolArbitrationAfterNativeResponse({
     hasTools: args.hasTools,
     supportsToolsRequested: args.supportsToolsRequested,
@@ -358,8 +366,8 @@ export function shouldAttemptResumeToolContinuationArbitration(args: {
     alreadyAttempted: args.continuationArbitrationAttempted,
     freshRemainingTotalMs: args.freshRemainingTotalMs,
     nativeResponseValid: true,
-    // P1048 — never reopen resume continuation via first-turn intent.
-    explicitToolExecutionIntent: false,
+    // Capability-gap continuation uses the same plain-text miss path.
+    explicitToolExecutionIntent: true,
   });
 }
 

@@ -35,6 +35,7 @@ import {
   compileEmulatedResumeTranscript,
   compileEmulatedUpstreamBody,
   detectExplicitToolExecutionIntent,
+  shouldContinueIncompleteToolTask,
 } from "./toolIntentCompiler.js";
 import {
   applyToolIntentToChatCompletion,
@@ -1651,8 +1652,11 @@ async function runProviderAttempts(args: {
             // First-turn P1028 / P1020 repair keep compileEmulatedUpstreamBody.
             // P1048 — explicit tool-intent repair forces required tool_choice
             // so the second provider pass must emit legal tool_calls.
+            // P1049 — incomplete multi-step continuation also forces required
+            // for exactly one resume repair (still capped at one per HTTP).
             const forceRequiredToolIntent =
-              autoIntentArbitrationInFlight && toolIntentDetected;
+              (autoIntentArbitrationInFlight && toolIntentDetected) ||
+              continuationArbitrationInFlight;
             const compileClientBody = forceRequiredToolIntent
               ? {
                   ...(clientBody as Record<string, unknown>),
@@ -1666,7 +1670,10 @@ async function runProviderAttempts(args: {
               upstreamBody = compileEmulatedResumeTranscript(
                 upstreamBody,
                 compileClientBody,
-                { repair: repairAttempted }
+                {
+                  repair:
+                    repairAttempted || forceRequiredToolIntent,
+                }
               );
             } else {
               upstreamBody = compileEmulatedUpstreamBody(
@@ -1994,7 +2001,8 @@ async function runProviderAttempts(args: {
                   content: extractAssistantContentFromCompletion(normalizedData),
                   clientTools: (clientBody as { tools?: unknown }).tools,
                   toolChoice:
-                    autoIntentArbitrationInFlight && toolIntentDetected
+                    (autoIntentArbitrationInFlight && toolIntentDetected) ||
+                    continuationArbitrationInFlight
                       ? "required"
                       : (clientBody as { tool_choice?: unknown })
                           .tool_choice,
@@ -2306,10 +2314,40 @@ async function runProviderAttempts(args: {
               continue;
             }
 
+            // P1049 — resume incomplete multi-step tool task (capability gap).
+            const nativeAssistantTextForGap = (() => {
+              const choices = normalizedData.choices;
+              if (!Array.isArray(choices) || !choices[0]) return null;
+              const first = choices[0] as Record<string, unknown>;
+              const message =
+                first.message &&
+                typeof first.message === "object" &&
+                !Array.isArray(first.message)
+                  ? (first.message as Record<string, unknown>)
+                  : null;
+              const content = message?.content;
+              return typeof content === "string" ? content : null;
+            })();
+            const incompleteTask = shouldContinueIncompleteToolTask({
+              resumeToolRound,
+              explicitExecutionIntent: toolIntentDetected,
+              upstreamReturnedToolCalls,
+              finishReason: finishForArbitration,
+              continuationAlreadyAttempted: continuationArbitrationAttempted,
+              freshRemainingTotalMs: freshMsForArb,
+              unmatchedToolCallIdCount,
+              duplicateToolResultCount,
+              orderViolationCount,
+              upstreamHttpOk: true,
+              messages: (clientBody as { messages?: unknown }).messages,
+              tools: (clientBody as { tools?: unknown }).tools,
+              nativeAssistantText: nativeAssistantTextForGap,
+            });
             if (
               !toolsDegradedToChat &&
               resumeToolRound &&
               canNativeEmulatedRepair(provider.id, attemptModel) &&
+              incompleteTask.shouldContinue &&
               shouldAttemptResumeToolContinuationArbitration({
                 hasTools: hasToolsClient,
                 supportsToolsRequested,
@@ -2325,6 +2363,7 @@ async function runProviderAttempts(args: {
                 autoIntentArbitrationAttempted,
                 freshRemainingTotalMs: freshMsForArb,
                 upstreamHttpOk: true,
+                incompleteToolTask: true,
               })
             ) {
               pushBillableUsageComponent("native", {
@@ -2338,6 +2377,18 @@ async function runProviderAttempts(args: {
               autoIntentArbitrationAttempted = true;
               savedNativeForArbitration = structuredClone(normalizedData);
               activeToolMode = "emulated_json";
+              log.info("incomplete_tool_task_continuation_triggered", {
+                requestId,
+                route,
+                resumeToolRound: true,
+                requiredCapabilities: incompleteTask.requiredCapabilities,
+                completedCapabilities: incompleteTask.completedCapabilities,
+                remainingCapabilities: incompleteTask.remainingCapabilities,
+                attemptedModel: attemptModel,
+                nativeFinishReason: finishForArbitration,
+                billing_status: "not_billable",
+                credits_charged: 0,
+              });
               continue;
             }
 
