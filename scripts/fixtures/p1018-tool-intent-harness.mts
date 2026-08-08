@@ -464,6 +464,7 @@ export async function installP1018Mocks(): Promise<void> {
           "model_not_available",
           "model_not_supported",
           "upstream_timeout",
+          "upstream_transport_error",
           "upstream_rate_limited",
           "tool_call_not_generated",
           "provider_tool_call_not_supported",

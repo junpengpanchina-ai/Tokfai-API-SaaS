@@ -85,6 +85,102 @@ function isTimeoutError(err: unknown): boolean {
   return err.name === "TimeoutError" || err.name === "AbortError";
 }
 
+function readErrorCode(err: unknown): string | null {
+  if (!err || typeof err !== "object") return null;
+  const code = (err as { code?: unknown }).code;
+  return typeof code === "string" && code.trim() ? code.trim() : null;
+}
+
+export type UpstreamTransportFailureInfo = {
+  errorName: string;
+  errorCode: string | null;
+  errorCauseCode: string | null;
+  diagnosticSnippet: string;
+};
+
+/**
+ * P1062 — inspect a non-HTTP fetch/transport exception without logging secrets.
+ * Numbers / codes / short names only; never Authorization, body, or messages.
+ */
+export function inspectUpstreamTransportFailure(
+  err: unknown
+): UpstreamTransportFailureInfo {
+  const errorName =
+    err instanceof Error && err.name
+      ? err.name
+      : typeof err === "string"
+        ? "Error"
+        : typeof err;
+  const errorCode = readErrorCode(err);
+  const cause =
+    err instanceof Error
+      ? (err as Error & { cause?: unknown }).cause
+      : undefined;
+  const errorCauseCode = readErrorCode(cause);
+  const msg =
+    err instanceof Error
+      ? err.message
+      : typeof err === "string"
+        ? err
+        : "transport_error";
+  const causeMsg = cause instanceof Error ? cause.message : "";
+  const parts = [
+    errorName,
+    msg.slice(0, 80),
+    errorCode,
+    errorCauseCode,
+    causeMsg.slice(0, 80),
+  ].filter((p): p is string => typeof p === "string" && p.length > 0);
+  return {
+    errorName,
+    errorCode,
+    errorCauseCode,
+    diagnosticSnippet: parts.join(": ").slice(0, 200),
+  };
+}
+
+/**
+ * P1062 — Node fetch / undici transport failures (not timeouts, not HTTP status).
+ * Timeout / AbortError stay on the existing upstream_timeout path.
+ */
+export function isUpstreamTransportFailure(err: unknown): boolean {
+  if (isTimeoutError(err)) return false;
+  const info = inspectUpstreamTransportFailure(err);
+  const cause =
+    err instanceof Error
+      ? (err as Error & { cause?: unknown }).cause
+      : undefined;
+  const causeName = cause instanceof Error ? cause.name : "";
+  const hay = [
+    info.errorName,
+    info.errorCode ?? "",
+    info.errorCauseCode ?? "",
+    info.diagnosticSnippet,
+    causeName,
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  if (hay.includes("fetch failed")) return true;
+  if (/\beconnreset\b/.test(hay)) return true;
+  if (/\beconnrefused\b/.test(hay)) return true;
+  if (/\bepipe\b/.test(hay)) return true;
+  if (/\benotfound\b/.test(hay)) return true;
+  if (/\beai_again\b/.test(hay)) return true;
+  if (hay.includes("und_err_socket")) return true;
+  if (hay.includes("und_err_connect_timeout")) return true;
+  if (hay.includes("und_err_headers_timeout")) return true;
+  if (hay.includes("und_err_body_timeout")) return true;
+  if (hay.includes("other side closed")) return true;
+  if (hay.includes("socket closed")) return true;
+  if (hay.includes("socket hang up")) return true;
+  if (/\btls\b/.test(hay) && (hay.includes("fail") || hay.includes("closed"))) {
+    return true;
+  }
+  if (hay.includes("cert") && hay.includes("fail")) return true;
+  return false;
+}
+
 /** Whether alias model chain or provider pool may try the next target. */
 export function isChatFallbackEligible(err: ApiError): boolean {
   const code = err.code;
@@ -105,6 +201,8 @@ export function isChatFallbackEligible(err: ApiError): boolean {
     "model_not_supported",
     "upstream_timeout",
     "upstream_rate_limited",
+    // P1062 — non-timeout transport failures may try next provider/model
+    "upstream_transport_error",
     // P971 — retry next alias/provider when strict tools got plain content
     "tool_call_not_generated",
     "provider_tool_call_not_supported",
@@ -322,6 +420,39 @@ export async function providerFetch<T = unknown>(
         publicMessage: "上游模型响应超时，请稍后重试或切换模型。",
         upstreamStatus: 504,
         upstreamErrorSnippet: "timeout",
+      });
+    }
+    // P1062 — non-timeout fetch/transport exceptions → structured 502
+    // (never raw throw → opaque Internal error / 500).
+    if (isUpstreamTransportFailure(err)) {
+      const info = inspectUpstreamTransportFailure(err);
+      log.warn("upstream_provider_transport_failed", {
+        requestId: logContext.requestId,
+        route: logContext.route,
+        model: logContext.model,
+        requestedModel: logContext.requestedModel,
+        resolvedModel: logContext.resolvedModel ?? logContext.model,
+        providerId: provider.id,
+        upstreamHost: host,
+        upstreamPath,
+        errorName: info.errorName,
+        errorCode: info.errorCode,
+        errorCauseCode: info.errorCauseCode,
+        causeCode: info.errorCauseCode,
+        latencyMs,
+        timeoutMs: effectiveTimeoutMs,
+        billing_status: "not_billable",
+        credits_charged: 0,
+        upstreamErrorCode: "upstream_transport_error",
+        message: "upstream_provider_transport_failed",
+      });
+      throw new ApiError({
+        status: 502,
+        message: `Upstream provider transport failed: ${info.diagnosticSnippet}`,
+        code: "upstream_transport_error",
+        type: "upstream_error",
+        publicMessage: "Upstream provider connection failed.",
+        upstreamErrorSnippet: info.diagnosticSnippet,
       });
     }
     throw err;

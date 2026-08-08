@@ -110,6 +110,7 @@ import {
 } from "../upstream/providerModelCircuitBreaker.js";
 import { providerFetchChatPreferNativeNonStream } from "../upstream/providerFetchChatStreamAssembled.js";
 import { buildUpstreamChatBody, droppedUpstreamChatKeysForAudit } from "./upstreamChatBody.js";
+import { measureChatCompletionBodyBytes } from "./chatBodyByteDiagnostics.js";
 import {
   CHAT_USAGE_ESTIMATION_ALGORITHM,
   coalesceUpstreamUsageTotal,
@@ -2011,6 +2012,32 @@ async function runProviderAttempts(args: {
           if (autoProTransparentCarrier) {
             autoProProviderAttemptCount += 1;
           }
+
+          // P1062 — numeric-only provider-boundary size diagnostics (no content).
+          {
+            const byteDiag = measureChatCompletionBodyBytes({
+              clientBody,
+              upstreamBody,
+            });
+            log.info("chat_body_byte_diagnostics", {
+              requestId,
+              route,
+              model: attemptModel,
+              requestedModel,
+              resolvedModel: attemptModel,
+              providerId: provider.id,
+              clientBodyByteLength: byteDiag.clientBodyByteLength,
+              upstreamBodyByteLength: byteDiag.upstreamBodyByteLength,
+              messagesByteLength: byteDiag.messagesByteLength,
+              toolsByteLength: byteDiag.toolsByteLength,
+              toolsCount: byteDiag.toolsCount,
+              largestToolSchemaBytes: byteDiag.largestToolSchemaBytes,
+              messageCount: byteDiag.messageCount,
+              billing_status: "not_billable",
+              credits_charged: 0,
+            });
+          }
+
           try {
             if (useGemini25FlashStreamFallback) {
               // Never invent budget above the fresh remaining total.

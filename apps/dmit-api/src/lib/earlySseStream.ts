@@ -8,6 +8,11 @@
  * Final client bytes leave via controller.enqueue — chat.completion.chunk
  * frames are sanitized here so finish_reason never reaches the client as
  * other|unknown|null (Cherry Studio AI_FinishReasonError).
+ *
+ * P1062 — request-scoped terminal state machine:
+ * closed / cancelled / errored stop heartbeat exactly once, make close/cancel
+ * idempotent, and never let write-after-close throw ERR_INVALID_STATE onto
+ * the main request chain (while still logging the skip / enqueue failure).
  */
 
 import {
@@ -15,6 +20,7 @@ import {
   sanitizeChatCompletionSseOutboundText,
   sseTextHasOpenAiWireFinish,
 } from "./chatCompletionSse.js";
+import { log } from "../logger.js";
 
 export const EARLY_SSE_HEADERS = {
   "Content-Type": "text/event-stream; charset=utf-8",
@@ -31,11 +37,24 @@ const DEFAULT_HEARTBEAT_MS = 10_000;
 
 export type EarlySseWrite = (chunk: string) => void;
 
+type EarlySseTerminal = "open" | "closed" | "cancelled" | "errored";
+
 function looksLikeChatCompletionSse(firstFrame: string): boolean {
   return (
     firstFrame.includes('"choices"') &&
     (firstFrame.includes('"delta"') || firstFrame.includes("chat.completion"))
   );
+}
+
+function errorNameOf(err: unknown): string {
+  if (err instanceof Error && err.name) return err.name;
+  return typeof err;
+}
+
+function errorCodeOf(err: unknown): string | null {
+  if (!err || typeof err !== "object") return null;
+  const code = (err as { code?: unknown }).code;
+  return typeof code === "string" && code.trim() ? code.trim() : null;
 }
 
 /**
@@ -52,15 +71,78 @@ export function createEarlySseResponse(args: {
   const heartbeatMs = args.heartbeatMs ?? DEFAULT_HEARTBEAT_MS;
   const chatSse = looksLikeChatCompletionSse(args.firstFrame);
 
+  let terminal: EarlySseTerminal = "open";
+  let heartbeat: ReturnType<typeof setInterval> | null = null;
+  let heartbeatCleared = false;
+
+  const clearHeartbeatExactlyOnce = () => {
+    if (heartbeatCleared) return;
+    heartbeatCleared = true;
+    if (heartbeat != null) {
+      clearInterval(heartbeat);
+      heartbeat = null;
+    }
+  };
+
+  const markTerminal = (reason: Exclude<EarlySseTerminal, "open">) => {
+    if (terminal !== "open") return;
+    terminal = reason;
+    clearHeartbeatExactlyOnce();
+    log.info("early_sse_terminal", {
+      requestId: args.requestId,
+      reason,
+      billing_status: "not_billable",
+      credits_charged: 0,
+    });
+  };
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      let closed = false;
       let lastActivityAt = Date.now();
       let sawWireFinish = false;
       let sawDone = false;
 
+      const safeEnqueue = (
+        bytes: Uint8Array,
+        source: "data" | "heartbeat"
+      ): boolean => {
+        if (terminal !== "open") {
+          if (source === "heartbeat") {
+            log.info("early_sse_heartbeat_skipped_terminal", {
+              requestId: args.requestId,
+              reason: terminal,
+              billing_status: "not_billable",
+              credits_charged: 0,
+            });
+          }
+          return false;
+        }
+        try {
+          controller.enqueue(bytes);
+          lastActivityAt = Date.now();
+          return true;
+        } catch (err) {
+          // Client cancel / double-close can make enqueue throw ERR_INVALID_STATE.
+          // Mark terminal + log; never rethrow into the timer or produceRest chain.
+          markTerminal("errored");
+          log.warn("early_sse_enqueue_failed", {
+            requestId: args.requestId,
+            reason: "errored",
+            errorName: errorNameOf(err),
+            code: errorCodeOf(err) ?? "ERR_INVALID_STATE",
+            message:
+              source === "heartbeat"
+                ? "heartbeat_enqueue_failed"
+                : "data_enqueue_failed",
+            billing_status: "not_billable",
+            credits_charged: 0,
+          });
+          return false;
+        }
+      };
+
       const write: EarlySseWrite = (chunk) => {
-        if (closed || !chunk) return;
+        if (terminal !== "open" || !chunk) return;
         // Ultimate SSE exit for /v1/chat/completions stream=true.
         const outbound = chatSse
           ? sanitizeChatCompletionSseOutboundText(chunk)
@@ -69,14 +151,22 @@ export function createEarlySseResponse(args: {
           if (sseTextHasOpenAiWireFinish(outbound)) sawWireFinish = true;
           if (/data:\s*\[DONE\]/i.test(outbound)) sawDone = true;
         }
-        controller.enqueue(encoder.encode(outbound));
-        lastActivityAt = Date.now();
+        safeEnqueue(encoder.encode(outbound), "data");
       };
 
-      const heartbeat = setInterval(() => {
-        if (closed) return;
+      heartbeat = setInterval(() => {
+        if (terminal !== "open") {
+          log.info("early_sse_heartbeat_skipped_terminal", {
+            requestId: args.requestId,
+            reason: terminal,
+            billing_status: "not_billable",
+            credits_charged: 0,
+          });
+          clearHeartbeatExactlyOnce();
+          return;
+        }
         if (Date.now() - lastActivityAt >= heartbeatMs) {
-          write(": ping\n\n");
+          safeEnqueue(encoder.encode(": ping\n\n"), "heartbeat");
         }
       }, Math.min(1_000, heartbeatMs));
 
@@ -86,27 +176,34 @@ export function createEarlySseResponse(args: {
         await args.produceRest(write);
       } catch {
         // Best-effort: never throw out of the stream start callback.
+        // Provider / execute failures must surface via writeFailure / result.ok.
       } finally {
-        clearInterval(heartbeat);
+        clearHeartbeatExactlyOnce();
         try {
           // AI SDK defaults finishReason to "other" when the stream closes
           // without a string finish_reason — always emit one for chat SSE.
-          if (!closed && chatSse && !sawWireFinish) {
+          if (terminal === "open" && chatSse && !sawWireFinish) {
             write(chatCompletionEmergencyStopSseFrame());
           }
-          if (!closed && chatSse && !sawDone) {
+          if (terminal === "open" && chatSse && !sawDone) {
             write("data: [DONE]\n\n");
           }
         } catch {
           // ignore ensure-finish failures
         }
-        closed = true;
+        if (terminal === "open") {
+          markTerminal("closed");
+        }
         try {
           controller.close();
         } catch {
-          // already closed / cancelled
+          // already closed / cancelled — idempotent
         }
       }
+    },
+    cancel() {
+      // Client disconnect: stop heartbeat before any further enqueue.
+      markTerminal("cancelled");
     },
   });
 

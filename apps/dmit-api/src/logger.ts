@@ -185,6 +185,15 @@ const ALLOWED_FIELD_KEYS = new Set([
   "autoProTransparentCarrier",
   "providerAttemptCount",
   "toolCallCount",
+  // P1062 early SSE lifecycle + transport / payload diagnostics (numbers only)
+  "errorCode",
+  "errorCauseCode",
+  "causeCode",
+  "clientBodyByteLength",
+  "upstreamBodyByteLength",
+  "messagesByteLength",
+  "toolsByteLength",
+  "largestToolSchemaBytes",
 ]);
 
 const SENSITIVE_LOG_KEY_LITERAL =

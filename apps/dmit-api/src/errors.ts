@@ -61,6 +61,7 @@ export const STATUS_BY_ERROR_CODE: Record<string, number> = {
   all_tool_upstreams_unavailable: 503,
   request_body_too_large: 413,
   upstream_timeout: 504,
+  upstream_transport_error: 502,
   image_generation_timeout: 504,
   image_task_timeout: 504,
   upstream_image_error: 502,
@@ -118,6 +119,7 @@ export function errorTypeForCode(
     code === "upstream_model_busy" ||
     code === "upstream_model_unavailable" ||
     code === "upstream_timeout" ||
+    code === "upstream_transport_error" ||
     code === "upstream_error" ||
     code === "upstream_auth_error" ||
     code === "all_upstreams_unavailable" ||
