@@ -309,6 +309,7 @@ console.log(`Authenticity: ${LEVEL}\n`);
 }
 
 // ── CASE B: explicit intent + native text → repair once ──────────────────
+// P1055: prefers native tool_choice repair; emulated_json remains fallback.
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -320,7 +321,24 @@ console.log(`Authenticity: ${LEVEL}\n`);
         usage: NATIVE_USAGE,
       }),
       (ctx) => {
-        const flat = (ctx.json.messages ?? [])
+        const json = ctx.json ?? {};
+        const tools = Array.isArray(json.tools) ? json.tools : [];
+        const choice = json.tool_choice;
+        const named =
+          choice &&
+          typeof choice === "object" &&
+          (choice as { function?: { name?: string } }).function?.name;
+        const forcedRequired = choice === "required" && tools.length > 0;
+        // P1055 native repair: tools retained + required/named tool_choice.
+        if (tools.length > 0 && (forcedRequired || named)) {
+          return {
+            ...nativeToolCompletion("Search", {
+              query: "executeChatCompletion",
+            }),
+            usage: REPAIR_USAGE,
+          };
+        }
+        const flat = (json.messages ?? [])
           .map((m: any) => String(m?.content ?? ""))
           .join("\n");
         if (!flat.includes("Available tools")) {
@@ -354,7 +372,7 @@ console.log(`Authenticity: ${LEVEL}\n`);
     result.ok === true &&
     Array.isArray(msg(result)?.tool_calls) &&
     msg(result).tool_calls[0]?.function?.name === "Search" &&
-    secondPassRepair(meta) &&
+    meta.providerCallCount === 2 &&
     meta.debitCallCount === 1;
   assert(
     ok,

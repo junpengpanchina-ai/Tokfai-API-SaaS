@@ -60,6 +60,12 @@ import {
   resolveForcedToolChoice,
   shouldAdaptGrsaiNativeObjectToolChoice,
 } from "./grsaiNativeToolChoiceAdapter.js";
+import {
+  applyNativeToolRepairToUpstreamBody,
+  selectNativeRepairTool,
+  shouldAttemptNativeToolRepair,
+  type NativeRepairToolSelection,
+} from "./nativeToolRepair.js";
 import { normalizeOpenAiFinishReasonOnChatCompletion } from "./openaiFinishReason.js";
 import { chatBodyKeysForLog } from "./chatCompletionDiagnostics.js";
 
@@ -1539,6 +1545,11 @@ async function runProviderAttempts(args: {
         let autoIntentArbitrationInFlight = false;
         let continuationArbitrationInFlight = false;
         let savedNativeForArbitration: Record<string, unknown> | null = null;
+        // P1055 — at most one native tool_choice repair before emulated_json.
+        let nativeToolRepairAttempted = false;
+        let nativeToolRepairInFlight = false;
+        let nativeToolRepairSucceeded = false;
+        let nativeRepairSelection: NativeRepairToolSelection | null = null;
         // P1048 — real toolIntentCompiler result (not hasTools alone).
         const toolIntentDetection = detectExplicitToolExecutionIntent({
           messages: (clientBody as { messages?: unknown }).messages,
@@ -1731,6 +1742,18 @@ async function runProviderAttempts(args: {
               );
             }
           } else if (
+            nativeToolRepairInFlight &&
+            nativeRepairSelection &&
+            activeToolMode === "native"
+          ) {
+            // P1055 — request-scoped native repair clone only (never clientBody).
+            const repaired = applyNativeToolRepairToUpstreamBody({
+              upstreamBody,
+              selection: nativeRepairSelection,
+              providerId: provider.id,
+            });
+            upstreamBody = repaired.body;
+          } else if (
             shouldAdaptGrsaiNativeObjectToolChoice({
               providerId: provider.id,
               toolCallingMode: activeToolMode,
@@ -1824,9 +1847,10 @@ async function runProviderAttempts(args: {
             providerId: provider.id,
           };
 
-          // P1043 — stage timing for native / arbitration / repair fetches.
+          // P1043 / P1055 — stage timing for native / native-repair / arbitration.
           const resolveProviderFetchStage = ():
             | "native"
+            | "native_repair"
             | "first_turn_arbitration"
             | "continuation_arbitration"
             | "repair" => {
@@ -1836,6 +1860,9 @@ async function runProviderAttempts(args: {
             if (autoIntentArbitrationInFlight) {
               return "first_turn_arbitration";
             }
+            if (nativeToolRepairInFlight && activeToolMode === "native") {
+              return "native_repair";
+            }
             if (repairAttempted && activeToolMode === "emulated_json") {
               return "repair";
             }
@@ -1844,6 +1871,7 @@ async function runProviderAttempts(args: {
           const logProviderFetchStageTiming = (
             stage:
               | "native"
+              | "native_repair"
               | "first_turn_arbitration"
               | "continuation_arbitration"
               | "repair",
@@ -1867,6 +1895,9 @@ async function runProviderAttempts(args: {
               credits_charged: 0,
             };
             if (stage === "native") fields.native_elapsed_ms = elapsedMs;
+            if (stage === "native_repair") {
+              fields.native_repair_elapsed_ms = elapsedMs;
+            }
             if (stage === "continuation_arbitration") {
               fields.continuation_arbitration_elapsed_ms = elapsedMs;
             }
@@ -1992,6 +2023,69 @@ async function runProviderAttempts(args: {
             }
           } catch (fetchErr) {
             logProviderFetchStageTiming(fetchStage, stageStartedAt);
+            // P1055 — native repair transport/timeout: one shot only, then
+            // fall through to existing emulated repair when budget remains.
+            if (
+              nativeToolRepairInFlight &&
+              savedNativeForArbitration &&
+              fetchErr instanceof ApiError
+            ) {
+              nativeToolRepairInFlight = false;
+              const remainingAfterFetch =
+                timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt);
+              const isTotalTimeout =
+                remainingAfterFetch <= 0 ||
+                fetchErr.upstreamErrorSnippet === "total_request_timeout";
+              log.info("auto_tool_native_repair_failed", {
+                requestId,
+                providerId: provider.id,
+                attemptedModel: attemptModel,
+                reason: isTotalTimeout
+                  ? "total_timeout"
+                  : fetchErr.code === "upstream_timeout"
+                    ? "upstream_timeout"
+                    : "transport_failure",
+                freshRemainingTotalMs: Math.max(0, remainingAfterFetch),
+                billing_status: "not_billable",
+                credits_charged: 0,
+              });
+              if (isTotalTimeout) {
+                throw fetchErr instanceof ApiError &&
+                  fetchErr.code === "upstream_timeout"
+                  ? fetchErr
+                  : ApiError.requestTimeout();
+              }
+              if (
+                canNativeEmulatedRepair(provider.id, attemptModel) &&
+                remainingAfterFetch > 0
+              ) {
+                autoIntentArbitrationAttempted = true;
+                autoIntentArbitrationInFlight = true;
+                activeToolMode = "emulated_json";
+                log.info("auto_tool_intent_repair_triggered", {
+                  requestId,
+                  route,
+                  requestedModel: requestedRaw,
+                  attemptedModel: attemptModel,
+                  resumeToolRound,
+                  toolChoiceKind: toolChoiceKind(
+                    (clientBody as { tool_choice?: unknown }).tool_choice
+                  ),
+                  toolIntentDetected: true,
+                  nativeFinishReason: "stop",
+                  reason: "native_repair_transport_fallback",
+                  billing_status: "not_billable",
+                  credits_charged: 0,
+                });
+                continue;
+              }
+              restoreNativeAfterArbitrationFailure(
+                fetchErr.code === "upstream_timeout"
+                  ? "timeout"
+                  : "transport_failure"
+              );
+              break;
+            }
             // P1028/P1036 — arbitration transport/timeout must not upgrade a prior
             // native auto text success into provider fallback / 5xx.
             if (
@@ -2024,6 +2118,176 @@ async function runProviderAttempts(args: {
             data as unknown as Record<string, unknown>
           );
           upstreamReturnedToolCalls = responseHasToolCalls(normalizedData);
+
+          // P1055 — native repair HTTP 200: accept tool_calls, else one emulated
+          // fallback. Do not open a second native repair.
+          if (nativeToolRepairInFlight) {
+            nativeToolRepairInFlight = false;
+            const finishAfterNativeRepair =
+              extractResponseFinishReason(normalizedData) ??
+              extractFinishReason(
+                normalizedData as unknown as ChatCompletionResponse
+              );
+            if (upstreamReturnedToolCalls) {
+              let nameMismatch = false;
+              if (nativeRepairSelection) {
+                try {
+                  assertNativeForcedToolCallsMatch({
+                    data: normalizedData,
+                    forcedToolName: nativeRepairSelection.selectedToolName,
+                    parallelToolCalls: (
+                      clientBody as { parallel_tool_calls?: unknown }
+                    ).parallel_tool_calls,
+                  });
+                } catch {
+                  nameMismatch = true;
+                }
+              }
+              if (!nameMismatch) {
+                pushBillableUsageComponent("auto_arbitration", {
+                  dataUsage: data.usage,
+                  requestBody: upstreamBody,
+                  responseBody: normalizedData,
+                });
+                nativeToolRepairSucceeded = true;
+                const toolCallCount =
+                  ((
+                    (
+                      (normalizedData.choices as unknown[])?.[0] as
+                        | Record<string, unknown>
+                        | undefined
+                    )?.message as Record<string, unknown> | undefined
+                  )?.tool_calls as unknown[] | undefined)?.length ?? 0;
+                log.info("auto_tool_native_repair_succeeded", {
+                  requestId,
+                  selectedToolName: nativeRepairSelection?.selectedToolName,
+                  toolCallCount,
+                  finishReason: finishAfterNativeRepair,
+                  billing_status: "not_billable",
+                  credits_charged: 0,
+                });
+                // Fall through to native tool_calls accept path below.
+              } else {
+                // Merge repair tokens into native cost; free auto_arbitration slot.
+                const repairUsage = resolveChatAttemptUsage({
+                  providerId: provider.id,
+                  dataUsage: data.usage,
+                  requestBody: upstreamBody,
+                  responseBody: normalizedData,
+                }).usage;
+                const nativeComp = billableUsageComponents.find(
+                  (c) => c.stage === "native"
+                );
+                if (nativeComp) {
+                  nativeComp.usage = mergeNormalizedUsages([
+                    nativeComp.usage,
+                    repairUsage,
+                  ]);
+                }
+                log.info("auto_tool_native_repair_failed", {
+                  requestId,
+                  providerId: provider.id,
+                  attemptedModel: attemptModel,
+                  reason: "forced_tool_name_mismatch",
+                  selectedToolName: nativeRepairSelection?.selectedToolName,
+                  freshRemainingTotalMs: Math.max(
+                    0,
+                    timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt)
+                  ),
+                  billing_status: "not_billable",
+                  credits_charged: 0,
+                });
+                if (
+                  canNativeEmulatedRepair(provider.id, attemptModel) &&
+                  timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt) > 0
+                ) {
+                  autoIntentArbitrationAttempted = true;
+                  autoIntentArbitrationInFlight = true;
+                  activeToolMode = "emulated_json";
+                  log.info("auto_tool_intent_repair_triggered", {
+                    requestId,
+                    route,
+                    requestedModel: requestedRaw,
+                    attemptedModel: attemptModel,
+                    resumeToolRound,
+                    toolChoiceKind: toolChoiceKind(
+                      (clientBody as { tool_choice?: unknown }).tool_choice
+                    ),
+                    toolIntentDetected: true,
+                    nativeFinishReason: finishAfterNativeRepair,
+                    reason: "native_repair_name_mismatch_fallback",
+                    billing_status: "not_billable",
+                    credits_charged: 0,
+                  });
+                  continue;
+                }
+                if (savedNativeForArbitration) {
+                  normalizedData = savedNativeForArbitration;
+                  upstreamReturnedToolCalls =
+                    responseHasToolCalls(normalizedData);
+                }
+              }
+            } else {
+              const repairUsage = resolveChatAttemptUsage({
+                providerId: provider.id,
+                dataUsage: data.usage,
+                requestBody: upstreamBody,
+                responseBody: normalizedData,
+              }).usage;
+              const nativeComp = billableUsageComponents.find(
+                (c) => c.stage === "native"
+              );
+              if (nativeComp) {
+                nativeComp.usage = mergeNormalizedUsages([
+                  nativeComp.usage,
+                  repairUsage,
+                ]);
+              }
+              log.info("auto_tool_native_repair_failed", {
+                requestId,
+                providerId: provider.id,
+                attemptedModel: attemptModel,
+                reason: "no_tool_calls",
+                selectedToolName: nativeRepairSelection?.selectedToolName,
+                finishReason: finishAfterNativeRepair,
+                freshRemainingTotalMs: Math.max(
+                  0,
+                  timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt)
+                ),
+                billing_status: "not_billable",
+                credits_charged: 0,
+              });
+              if (
+                canNativeEmulatedRepair(provider.id, attemptModel) &&
+                timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt) > 0
+              ) {
+                autoIntentArbitrationAttempted = true;
+                autoIntentArbitrationInFlight = true;
+                activeToolMode = "emulated_json";
+                log.info("auto_tool_intent_repair_triggered", {
+                  requestId,
+                  route,
+                  requestedModel: requestedRaw,
+                  attemptedModel: attemptModel,
+                  resumeToolRound,
+                  toolChoiceKind: toolChoiceKind(
+                    (clientBody as { tool_choice?: unknown }).tool_choice
+                  ),
+                  toolIntentDetected: true,
+                  nativeFinishReason: finishAfterNativeRepair,
+                  reason: "native_repair_no_tool_calls_fallback",
+                  billing_status: "not_billable",
+                  credits_charged: 0,
+                });
+                continue;
+              }
+              if (savedNativeForArbitration) {
+                normalizedData = savedNativeForArbitration;
+                upstreamReturnedToolCalls =
+                  responseHasToolCalls(normalizedData);
+              }
+            }
+          }
 
           // P1030 — capture arbitration HTTP 200 usage before parse/mutation.
           // Transport/timeout failures never reach here (no forged component).
@@ -2331,16 +2595,66 @@ async function runProviderAttempts(args: {
                 toolIntentDetected,
               })
             ) {
-              // P1030 — capture Native HTTP 200 usage before arbitration
-              // overwrites `data` (value-copied; later mutation safe).
+              // P1030 — capture Native HTTP 200 usage before repair overwrites.
               pushBillableUsageComponent("native", {
                 dataUsage: data.usage,
                 requestBody: upstreamBody,
                 responseBody: normalizedData,
               });
+              savedNativeForArbitration = structuredClone(normalizedData);
+
+              // P1055 — prefer one native tool_choice repair before emulated_json.
+              const clientChoiceRaw = (clientBody as { tool_choice?: unknown })
+                .tool_choice;
+              const clientToolChoiceIsAutoOrMissing =
+                clientChoiceRaw === undefined ||
+                clientChoiceRaw === null ||
+                clientChoiceRaw === "auto";
+              if (
+                shouldAttemptNativeToolRepair({
+                  hasTools: hasToolsClient,
+                  supportsToolsRequested,
+                  effectiveToolChoice: effectiveToolChoice(clientBody),
+                  activeToolMode,
+                  providerSupportsNativeTools: true,
+                  upstreamReturnedToolCalls,
+                  finishReason: finishForArbitration,
+                  explicitToolExecutionIntent: toolIntentDetected,
+                  nativeToolRepairAttempted,
+                  resumeToolRound,
+                  freshRemainingTotalMs: freshMsForArb,
+                  clientToolChoiceIsAutoOrMissing,
+                })
+              ) {
+                const selection = selectNativeRepairTool({
+                  messages: (clientBody as { messages?: unknown }).messages,
+                  tools: (clientBody as { tools?: unknown }).tools,
+                  matchedToolNames: toolIntentDetection.matchedToolNames,
+                  providerId: provider.id,
+                });
+                if (selection) {
+                  nativeToolRepairAttempted = true;
+                  nativeToolRepairInFlight = true;
+                  nativeRepairSelection = selection;
+                  log.info("auto_tool_native_repair_attempted", {
+                    requestId,
+                    providerId: provider.id,
+                    attemptedModel: attemptModel,
+                    requiredCapabilities: selection.requiredCapabilities,
+                    selectedCapability: selection.selectedCapability,
+                    selectedToolName: selection.selectedToolName,
+                    toolChoiceStrategy: selection.toolChoiceStrategy,
+                    freshRemainingTotalMs: freshMsForArb,
+                    billing_status: "not_billable",
+                    credits_charged: 0,
+                  });
+                  continue;
+                }
+              }
+
+              // Compatibility fallback: existing P1048 emulated_json repair.
               autoIntentArbitrationAttempted = true;
               autoIntentArbitrationInFlight = true;
-              savedNativeForArbitration = structuredClone(normalizedData);
               activeToolMode = "emulated_json";
               log.info("auto_tool_intent_repair_triggered", {
                 requestId,
@@ -2553,8 +2867,16 @@ async function runProviderAttempts(args: {
             billableUsageComponents.map((c) => c.usage)
           );
           // Public usage follows the accepted response body (native on restore,
-          // arbitration on accepted arb result) — not the internal cost sum.
-          if (activeToolMode === "native") {
+          // arbitration / P1055 native-repair on accepted second pass) — not
+          // the internal cost sum.
+          if (nativeToolRepairSucceeded) {
+            const repairComp = billableUsageComponents.find(
+              (c) => c.stage === "auto_arbitration"
+            );
+            clientFacingUsage = repairComp
+              ? cloneNormalizedUsage(repairComp.usage)
+              : finalUsageResolved.usage;
+          } else if (activeToolMode === "native") {
             const nativeComp = billableUsageComponents.find(
               (c) => c.stage === "native"
             );

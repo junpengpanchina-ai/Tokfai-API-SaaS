@@ -174,6 +174,11 @@ const ALLOWED_FIELD_KEYS = new Set([
   "requiredCapabilities",
   "completedCapabilities",
   "remainingCapabilities",
+  // P1055 native tool repair (no prompts / args / secrets)
+  "selectedCapability",
+  "selectedToolName",
+  "toolChoiceStrategy",
+  "native_repair_elapsed_ms",
 ]);
 
 const SENSITIVE_LOG_KEY_LITERAL =

@@ -287,7 +287,9 @@ export function shouldRunToolArbitrationAfterNativeResponse(args: {
  *
  * P1047: auto plain text is final when there is no explicit execution intent.
  * P1048: when toolIntentDetected (real toolIntentCompiler result) and native
- * returned plain text, allow exactly one emulated_json tool-intent repair.
+ * returned plain text, allow exactly one tool-intent repair.
+ * P1055: that repair prefers one native tool_choice force first; emulated_json
+ * remains the compatibility fallback (see nativeToolRepair.ts).
  * Never opens solely because hasTools=true.
  */
 export function shouldAttemptAutoToolIntentArbitration(args: {

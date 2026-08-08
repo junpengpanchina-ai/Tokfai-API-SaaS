@@ -22,6 +22,7 @@ export type ToolCallingMode = "native" | "emulated_json" | "unsupported";
  * tool_calls under strict/required (see executeChatCompletion).
  * P1047 — under tool_choice=auto/missing, valid native text OR tool_calls is
  * final unless P1048 detects explicit tool execution intent (one repair).
+ * P1055 — that repair prefers one native tool_choice force before emulated_json.
  */
 const GRSAI_NATIVE_MODELS = ["gpt-5.5", "gpt-5.4"] as const;
 
