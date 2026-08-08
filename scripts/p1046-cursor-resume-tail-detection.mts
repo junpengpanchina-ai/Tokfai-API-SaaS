@@ -465,7 +465,7 @@ console.log("P1046 CURSOR RESUME TAIL DETECTION\n");
   const v = validateCursorToolTranscript(messages);
   const result = await exec(
     {
-      // P1059 — resume continuation nudge retained on auto-pro only.
+      // P1061 — auto-pro carrier: resume works; task-completion nudge bypassed.
       model: "auto-pro",
       messages,
       tools: AGENT_FILE_TOOLS,
@@ -482,11 +482,11 @@ console.log("P1046 CURSOR RESUME TAIL DETECTION\n");
       meta.providerCallCount === 1 &&
       (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
-      outboundHasFastPathInstruction() === true &&
+      outboundHasFastPathInstruction() === false &&
       NATIVE_RESUME_CONTINUATION_INSTRUCTION.includes(
         "Continue from the returned tool results."
       ),
-    "I. true trailing resume — native fastpath; provider=1 arb=0 debit=1",
+    "I. true trailing resume — carrier no nudge; provider=1 arb=0 debit=1",
     {
       ...meta,
       resumeToolRound: v.resumeToolRound,

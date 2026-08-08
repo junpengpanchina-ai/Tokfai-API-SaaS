@@ -7,6 +7,10 @@
  *
  * Pure predicate only: no prompt text, no Search/Read/Write cues, no
  * task-completeness inference.
+ *
+ * P1061 — auto-pro transparent carrier is a separate gate
+ * ({@link isAutoProTransparentCarrier}); this module still returns false for
+ * auto-pro so explicit-model and carrier logging stay distinct.
  */
 
 import { normalizeClientModelId } from "../upstream/modelAliases.js";
@@ -16,7 +20,11 @@ import {
   listRegistryToolCapableModels,
 } from "./toolCallingModeRegistry.js";
 
-/** Smart routing aliases — keep historical P1048/P1049/P1055 behavior. */
+/**
+ * Smart routing aliases — not "explicit" gpt/gemini models.
+ * auto-pro is handled by P1061 carrier; auto-fast / auto-cheap keep
+ * historical P1048/P1049/P1055 Agent orchestration.
+ */
 const SMART_AUTO_ROUTING_ALIASES = new Set([
   "auto-pro",
   "auto-fast",

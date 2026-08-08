@@ -67,6 +67,7 @@ import {
   type NativeRepairToolSelection,
 } from "./nativeToolRepair.js";
 import { isTransparentExplicitModelRequest } from "./transparentExplicitModelGateway.js";
+import { isAutoProTransparentCarrier } from "./autoProTransparentCarrier.js";
 import { normalizeOpenAiFinishReasonOnChatCompletion } from "./openaiFinishReason.js";
 import { chatBodyKeysForLog } from "./chatCompletionDiagnostics.js";
 
@@ -1150,12 +1151,16 @@ export async function executeChatCompletion(
       if (input.onAfterPrecheck) {
         await input.onAfterPrecheck();
       }
-      // P1059 — explicit gpt/gemini → transparent gateway (auto-* unchanged).
+      // P1059 — explicit gpt/gemini → transparent gateway.
+      // P1061 — auto-pro → transparent carrier (routing only; no Agent rounds).
       const transparentExplicitModel = isTransparentExplicitModelRequest({
         requestedModel: requestedRaw,
         resolvedModel: requestedModel,
         canonicalId: requestedModel,
         isAlias,
+      });
+      const autoProTransparentCarrier = isAutoProTransparentCarrier({
+        requestedModel: requestedRaw,
       });
       return await runProviderAttempts({
         caller,
@@ -1182,6 +1187,7 @@ export async function executeChatCompletion(
         timeoutPolicy,
         clientStream,
         transparentExplicitModel,
+        autoProTransparentCarrier,
       });
     } finally {
       heavyPermit?.release();
@@ -1318,9 +1324,15 @@ async function runProviderAttempts(args: {
   /**
    * P1059 — explicit gpt / gemini request: bypass Agent orchestration
    * (intent arbitration / native repair / incomplete-task continuation /
-   * resume system nudge). Smart auto-* aliases stay false.
+   * resume system nudge).
    */
   transparentExplicitModel: boolean;
+  /**
+   * P1061 — auto-pro transparent carrier: same Agent-orchestration bypass as
+   * P1059 after one model-routing decision. Client required/named tool_choice
+   * remains protocol and is not bypassed.
+   */
+  autoProTransparentCarrier: boolean;
 }): Promise<ExecuteChatCompletionResult> {
   const {
     caller,
@@ -1347,12 +1359,21 @@ async function runProviderAttempts(args: {
     timeoutPolicy,
     clientStream,
     transparentExplicitModel,
+    autoProTransparentCarrier,
   } = args;
+
+  // P1059 + P1061 — Agent orchestration bypass (not client protocol).
+  const bypassAgentOrchestration =
+    transparentExplicitModel || autoProTransparentCarrier;
 
   let lastError: ApiError | null = null;
   // P1059 — at most one selected + one bypass log per HTTP request.
   let transparentGatewaySelectedLogged = false;
   let transparentOrchestrationBypassLogged = false;
+  // P1061 — at most one selected log per HTTP request; request-scoped
+  // provider fetch counter (includes transport/provider fallback attempts).
+  let autoProCarrierSelectedLogged = false;
+  let autoProProviderAttemptCount = 0;
 
   for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
     const attemptModel = attempts[attemptIndex]!;
@@ -1570,13 +1591,13 @@ async function runProviderAttempts(args: {
         let nativeToolRepairSucceeded = false;
         let nativeRepairSelection: NativeRepairToolSelection | null = null;
         // P1048 — real toolIntentCompiler result (not hasTools alone).
-        // P1059 — still compute for telemetry / bypass reason; orchestration
-        // gates below ignore it when transparentExplicitModel is true.
+        // P1059 / P1061 — still compute for telemetry / bypass reason;
+        // orchestration gates ignore it when bypassAgentOrchestration is true.
         const toolIntentDetection = detectExplicitToolExecutionIntent({
           messages: (clientBody as { messages?: unknown }).messages,
           tools: (clientBody as { tools?: unknown }).tools,
         });
-        const toolIntentDetected = transparentExplicitModel
+        const toolIntentDetected = bypassAgentOrchestration
           ? false
           : toolIntentDetection.detected;
         const noteTransparentOrchestrationBypass = (reason: string) => {
@@ -1606,6 +1627,23 @@ async function runProviderAttempts(args: {
             providerId: provider.id,
             transparentGateway: true,
             resumeToolRound,
+            billing_status: "not_billable",
+            credits_charged: 0,
+          });
+        }
+        if (autoProTransparentCarrier && !autoProCarrierSelectedLogged) {
+          autoProCarrierSelectedLogged = true;
+          log.info("auto_pro_transparent_carrier_selected", {
+            requestId,
+            route,
+            requestedModel: requestedRaw,
+            resolvedModel: requestedModel,
+            attemptedModel: attemptModel,
+            hasTools: hasToolsClient,
+            toolChoiceKind: toolChoiceKind(
+              (clientBody as { tool_choice?: unknown }).tool_choice
+            ),
+            autoProTransparentCarrier: true,
             billing_status: "not_billable",
             credits_charged: 0,
           });
@@ -1833,15 +1871,19 @@ async function runProviderAttempts(args: {
 
           // P1043 — Native Resume Fast Path: request-scoped upstream copy only.
           // Does not mutate clientBody / original transcript; does not force tools.
-          // P1059 — transparent explicit model: no task-completeness system nudge.
+          // P1059 / P1061 — transparent paths: no task-completeness system nudge.
           const resumeFastPathEligible = shouldApplyNativeResumeFastPath({
             resumeToolRound,
             activeToolMode,
             hasToolsClient,
             toolChoice: (clientBody as { tool_choice?: unknown }).tool_choice,
           });
-          if (transparentExplicitModel && resumeFastPathEligible) {
-            noteTransparentOrchestrationBypass("native_resume_continuation_nudge");
+          if (bypassAgentOrchestration && resumeFastPathEligible) {
+            if (transparentExplicitModel) {
+              noteTransparentOrchestrationBypass(
+                "native_resume_continuation_nudge"
+              );
+            }
           } else if (resumeFastPathEligible) {
             const fastPath = applyNativeResumeFastPathInstruction(upstreamBody);
             upstreamBody = fastPath.body;
@@ -1966,6 +2008,9 @@ async function runProviderAttempts(args: {
 
           const fetchStage = resolveProviderFetchStage();
           const stageStartedAt = Date.now();
+          if (autoProTransparentCarrier) {
+            autoProProviderAttemptCount += 1;
+          }
           try {
             if (useGemini25FlashStreamFallback) {
               // Never invent budget above the fresh remaining total.
@@ -2625,7 +2670,7 @@ async function runProviderAttempts(args: {
             // above) unless P1048 explicit tool execution intent requires
             // exactly one tool-intent repair. Never second-fetch solely
             // because tools[] were present. Strict repair remains above.
-            // P1059 — transparent explicit model: one semantic provider round;
+            // P1059 / P1061 — transparent paths: one semantic provider round;
             // do not open intent arbitration / native repair Agent rounds.
             const finishForArbitration =
               extractResponseFinishReason(normalizedData) ??
@@ -2653,10 +2698,12 @@ async function runProviderAttempts(args: {
                 // Use raw detection so transparent bypass can still be logged.
                 toolIntentDetected: toolIntentDetection.detected,
               });
-            if (transparentExplicitModel && wouldFirstTurnOrchestration) {
-              noteTransparentOrchestrationBypass(
-                "first_turn_auto_tool_arbitration"
-              );
+            if (bypassAgentOrchestration && wouldFirstTurnOrchestration) {
+              if (transparentExplicitModel) {
+                noteTransparentOrchestrationBypass(
+                  "first_turn_auto_tool_arbitration"
+                );
+              }
             } else if (wouldFirstTurnOrchestration) {
               // P1030 — capture Native HTTP 200 usage before repair overwrites.
               pushBillableUsageComponent("native", {
@@ -2750,8 +2797,8 @@ async function runProviderAttempts(args: {
               const content = message?.content;
               return typeof content === "string" ? content : null;
             })();
-            // P1059 — capability-gap probe uses raw intent for bypass logging;
-            // transparent explicit model never opens a continuation Agent round.
+            // P1059 / P1061 — capability-gap probe uses raw intent for bypass
+            // logging; transparent paths never open a continuation Agent round.
             const incompleteTask = shouldContinueIncompleteToolTask({
               resumeToolRound,
               explicitExecutionIntent: toolIntentDetection.detected,
@@ -2789,10 +2836,12 @@ async function runProviderAttempts(args: {
                 upstreamHttpOk: true,
                 incompleteToolTask: true,
               });
-            if (transparentExplicitModel && wouldResumeContinuation) {
-              noteTransparentOrchestrationBypass(
-                "incomplete_task_continuation_arbitration"
-              );
+            if (bypassAgentOrchestration && wouldResumeContinuation) {
+              if (transparentExplicitModel) {
+                noteTransparentOrchestrationBypass(
+                  "incomplete_task_continuation_arbitration"
+                );
+              }
             } else if (wouldResumeContinuation) {
               pushBillableUsageComponent("native", {
                 dataUsage: data.usage,
@@ -3176,6 +3225,24 @@ async function runProviderAttempts(args: {
           status: "succeeded",
           creditsCharged,
         });
+
+        if (autoProTransparentCarrier) {
+          const toolMeta = extractResponseToolCallMeta(responseData);
+          log.info("auto_pro_transparent_carrier_completed", {
+            requestId,
+            route,
+            requestedModel: requestedRaw,
+            resolvedModel: requestedModel,
+            attemptedModel: attemptModel,
+            providerAttemptCount: autoProProviderAttemptCount,
+            toolCallCount: toolMeta.toolCallCount,
+            finishReason,
+            autoProTransparentCarrier: true,
+            billing_status:
+              unlimited || creditsCharged <= 0 ? "not_billable" : "charged",
+            credits_charged: creditsCharged,
+          });
+        }
 
         return {
           ok: true,

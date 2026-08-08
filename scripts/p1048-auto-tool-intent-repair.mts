@@ -308,8 +308,9 @@ console.log(`Authenticity: ${LEVEL}\n`);
   caseResults.A = ok ? "PASS" : "FAIL";
 }
 
-// ── CASE B: explicit intent + native text → repair once ──────────────────
-// P1055: prefers native tool_choice repair; emulated_json remains fallback.
+// ── CASE B: P1061 auto-pro carrier — NO Tokfai-inferred intent repair ─────
+// shouldAttemptAutoToolIntentArbitration helper remains; execute bypasses
+// Agent orchestration for requestedModel=auto-pro (Cursor owns Agent).
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -320,47 +321,16 @@ console.log(`Authenticity: ${LEVEL}\n`);
         finish_reason: "stop",
         usage: NATIVE_USAGE,
       }),
-      (ctx) => {
-        const json = ctx.json ?? {};
-        const tools = Array.isArray(json.tools) ? json.tools : [];
-        const choice = json.tool_choice;
-        const named =
-          choice &&
-          typeof choice === "object" &&
-          (choice as { function?: { name?: string } }).function?.name;
-        const forcedRequired = choice === "required" && tools.length > 0;
-        // P1055 native repair: tools retained + required/named tool_choice.
-        if (tools.length > 0 && (forcedRequired || named)) {
-          return {
-            ...nativeToolCompletion("Search", {
-              query: "executeChatCompletion",
-            }),
-            usage: REPAIR_USAGE,
-          };
-        }
-        const flat = (json.messages ?? [])
-          .map((m: any) => String(m?.content ?? ""))
-          .join("\n");
-        if (!flat.includes("Available tools")) {
-          return {
-            kind: "completion",
-            content: "repair body missing compiler",
-            usage: REPAIR_USAGE,
-          };
-        }
-        return {
-          kind: "completion",
-          content: makeToolCallIntent("Search", {
-            query: "executeChatCompletion",
-          }),
-          usage: REPAIR_USAGE,
-        };
-      },
+      () => ({
+        ...nativeToolCompletion("Search", {
+          query: "SHOULD_NOT_RUN",
+        }),
+        usage: REPAIR_USAGE,
+      }),
     ],
   });
   const result = await exec(
     {
-      // P1059 — Agent orchestration retained on auto-pro only.
       model: "auto-pro",
       messages: [{ role: "user", content: EXPLICIT_EXEC_PROMPT }],
       tools: CURSOR_AGENT_TOOLS,
@@ -371,13 +341,15 @@ console.log(`Authenticity: ${LEVEL}\n`);
   const meta = billingSnapshot(result);
   const ok =
     result.ok === true &&
-    Array.isArray(msg(result)?.tool_calls) &&
-    msg(result).tool_calls[0]?.function?.name === "Search" &&
-    meta.providerCallCount === 2 &&
+    msg(result)?.content === "I will help without tools" &&
+    !msg(result)?.tool_calls &&
+    meta.providerCallCount === 1 &&
+    meta.repairCallCount === 0 &&
+    (meta.arbitrationCallCount ?? 0) === 0 &&
     meta.debitCallCount === 1;
   assert(
     ok,
-    "B. explicit intent + native text — provider=2 repair=1 debit=1",
+    "B. auto-pro carrier — NO intent repair; plain text provider=1 debit=1",
     {
       ...meta,
       provider: meta.providerCallCount,

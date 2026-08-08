@@ -302,11 +302,12 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
       (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
       tok.prompt_tokens === NATIVE_USAGE.prompt_tokens &&
-      outboundHasFastPathInstruction() &&
+      // P1061 — auto-pro carrier bypasses task-completion nudge (helper remains).
+      outboundHasFastPathInstruction() === false &&
       JSON.stringify(messages) === messagesBefore &&
       JSON.stringify(body.messages) === messagesBefore &&
       getCounts().outboundBodies[0]?.tool_choice === "auto",
-    "A. legal resume — native Read; provider=1 arb=0 debit=1; clientBody untouched",
+    "A. legal resume — native Read; provider=1 arb=0 debit=1; carrier no nudge",
     {
       ...meta,
       debitTokens: tok,
@@ -349,8 +350,8 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
       meta.providerCallCount === 1 &&
       (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1 &&
-      outboundHasFastPathInstruction(),
-    "B. native multi tool_calls — provider=1 arb=0 debit=1",
+      outboundHasFastPathInstruction() === false,
+    "B. native multi tool_calls — provider=1 arb=0; carrier no nudge",
     { ...meta, toolCallCount: toolCallCount(result) }
   );
 }
@@ -394,8 +395,8 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
       meta.debitCallCount === 1 &&
       tok.prompt_tokens === NATIVE_USAGE.prompt_tokens &&
       tok.completion_tokens === NATIVE_USAGE.completion_tokens &&
-      outboundHasFastPathInstruction(),
-    "C. native text FINAL under auto; provider=1 arb=0 debit=1; no continuation arb",
+      outboundHasFastPathInstruction() === false,
+    "C. native text FINAL under auto; provider=1 arb=0; carrier no nudge",
     { ...meta, debitTokens: tok }
   );
 }
@@ -670,11 +671,11 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
       !msg(result)?.tool_calls &&
       out0?.tool_choice === "auto" &&
       out0?.tool_choice !== "required" &&
-      outboundHasFastPathInstruction() &&
+      outboundHasFastPathInstruction() === false &&
       meta.providerCallCount === 1 &&
       (meta.arbitrationCallCount ?? 0) === 0 &&
       meta.debitCallCount === 1,
-    "H. completed task — final text allowed; provider=1 arb=0; tool_choice not forced required",
+    "H. completed task — final text; provider=1 arb=0; carrier no nudge",
     {
       ...meta,
       content: msg(result)?.content,
@@ -794,14 +795,15 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
       meta.providerCallCount === 1 &&
       (meta.arbitrationCallCount ?? 0) === 0 &&
       nativeHasRoleTool === true &&
-      outboundHasFastPathInstruction() &&
+      outboundHasFastPathInstruction() === false &&
       bodies.length === 1 &&
       meta.debitCallCount === 1,
-    "J. native resume keeps role=tool; Write single-pass; provider=1 arb=0 debit=1",
+    "J. native resume keeps role=tool; Write single-pass; carrier no nudge",
     {
       ...meta,
       nativeHasRoleTool,
       outboundCount: bodies.length,
+      fastPath: outboundHasFastPathInstruction(),
     }
   );
 }

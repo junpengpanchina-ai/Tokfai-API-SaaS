@@ -181,6 +181,10 @@ const ALLOWED_FIELD_KEYS = new Set([
   "native_repair_elapsed_ms",
   // P1059 explicit-model transparent gateway
   "transparentGateway",
+  // P1061 auto-pro transparent carrier
+  "autoProTransparentCarrier",
+  "providerAttemptCount",
+  "toolCallCount",
 ]);
 
 const SENSITIVE_LOG_KEY_LITERAL =

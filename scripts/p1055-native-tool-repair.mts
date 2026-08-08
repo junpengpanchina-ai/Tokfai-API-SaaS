@@ -160,21 +160,6 @@ function assistantTools(
   return { role: "assistant", content: null, tool_calls: toolCalls };
 }
 
-function isNativeRepairOutbound(json: Record<string, unknown>): boolean {
-  const tools = Array.isArray(json.tools) ? json.tools : [];
-  const choice = json.tool_choice;
-  if (tools.length === 0) return false;
-  if (choice === "required") return true;
-  if (
-    choice &&
-    typeof choice === "object" &&
-    (choice as { function?: { name?: string } }).function?.name
-  ) {
-    return true;
-  }
-  return false;
-}
-
 console.log("P1055 NATIVE TOOL REPAIR\n");
 console.log(`Authenticity: ${LEVEL}\n`);
 
@@ -346,7 +331,9 @@ console.log(`Authenticity: ${LEVEL}\n`);
   caseResults.C = ok ? "PASS" : "FAIL";
 }
 
-// ── D: explicit intent + plain text → native repair tool_calls ───────────
+// ── D: P1061 auto-pro carrier — NO Tokfai-inferred native repair ──────────
+// Helpers (shouldAttemptNativeToolRepair / selectNativeRepairTool) remain;
+// executeChatCompletion bypasses Agent orchestration for auto-pro.
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -357,24 +344,10 @@ console.log(`Authenticity: ${LEVEL}\n`);
         finish_reason: "stop",
         usage: NATIVE_USAGE,
       }),
-      (ctx) => {
-        if (!isNativeRepairOutbound(ctx.json ?? {})) {
-          return {
-            kind: "completion",
-            content: "expected native repair outbound",
-            usage: REPAIR_USAGE,
-          };
-        }
-        return {
-          ...nativeToolCompletion("Search", {
-            query: "executeChatCompletion",
-          }),
-          usage: REPAIR_USAGE,
-        };
-      },
       () => ({
-        kind: "completion",
-        content: makeToolCallIntent("Read", { path: "SHOULD_NOT_RUN.ts" }),
+        ...nativeToolCompletion("Search", {
+          query: "SHOULD_NOT_RUN",
+        }),
         usage: REPAIR_USAGE,
       }),
     ],
@@ -391,22 +364,24 @@ console.log(`Authenticity: ${LEVEL}\n`);
   const m = msg(result);
   const ok =
     result.ok === true &&
-    Array.isArray(m?.tool_calls) &&
-    m.tool_calls.length >= 1 &&
-    m.tool_calls[0]?.function?.name === "Search" &&
-    m.content == null &&
-    meta.providerCallCount === 2 &&
+    m?.content === "我先确认隔离目录里已有内容，再开始…" &&
+    !m?.tool_calls &&
+    meta.providerCallCount === 1 &&
     meta.debitCallCount === 1 &&
-    (meta.arbitrationCallCount ?? 0) === 0;
-  assert(ok, "D. native repair succeeds — provider=2 debit=1", {
-    ...meta,
-    toolName: m?.tool_calls?.[0]?.function?.name,
-    contentIsNull: m?.content == null,
-  });
+    (meta.arbitrationCallCount ?? 0) === 0 &&
+    meta.repairCallCount === 0;
+  assert(
+    ok,
+    "D. auto-pro carrier — NO native repair; plain text provider=1",
+    {
+      ...meta,
+      contentIsNull: m?.content == null,
+    }
+  );
   caseResults.D = ok ? "PASS" : "FAIL";
 }
 
-// ── E: native repair still plain text → one shot then emulated ───────────
+// ── E: P1061 auto-pro carrier — no native→emulated Agent cascade ─────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -417,43 +392,11 @@ console.log(`Authenticity: ${LEVEL}\n`);
         finish_reason: "stop",
         usage: NATIVE_USAGE,
       }),
-      (ctx) => {
-        if (!isNativeRepairOutbound(ctx.json ?? {})) {
-          return {
-            kind: "completion",
-            content: "not native repair",
-            usage: REPAIR_USAGE,
-          };
-        }
-        return {
-          kind: "completion",
-          content: "still plain after native repair",
-          finish_reason: "stop",
-          usage: REPAIR_USAGE,
-        };
-      },
-      (ctx) => {
-        const flat = (ctx.json.messages ?? [])
-          .map((m: any) => String(m?.content ?? ""))
-          .join("\n");
-        if (!flat.includes("Available tools")) {
-          return {
-            kind: "completion",
-            content: "emulated missing",
-            usage: REPAIR_USAGE,
-          };
-        }
-        return {
-          kind: "completion",
-          content: makeToolCallIntent("Search", {
-            query: "executeChatCompletion",
-          }),
-          usage: REPAIR_USAGE,
-        };
-      },
       () => ({
         kind: "completion",
-        content: "LOOP",
+        content: makeToolCallIntent("Search", {
+          query: "SHOULD_NOT_RUN",
+        }),
         usage: REPAIR_USAGE,
       }),
     ],
@@ -470,13 +413,17 @@ console.log(`Authenticity: ${LEVEL}\n`);
   const meta = billingSnapshot(result);
   const ok =
     result.ok === true &&
-    Array.isArray(msg(result)?.tool_calls) &&
-    msg(result).tool_calls[0]?.function?.name === "Search" &&
-    meta.providerCallCount === 3 &&
+    msg(result)?.content === "plain first" &&
+    !msg(result)?.tool_calls &&
+    meta.providerCallCount === 1 &&
     meta.debitCallCount === 1 &&
-    // P1048 force-required compile uses REPAIR_MARKER (counted as repair).
-    ((meta.arbitrationCallCount ?? 0) >= 1 || meta.repairCallCount >= 1);
-  assert(ok, "E. native repair once then emulated — provider=3", meta);
+    (meta.arbitrationCallCount ?? 0) === 0 &&
+    meta.repairCallCount === 0;
+  assert(
+    ok,
+    "E. auto-pro carrier — NO native/emulated cascade; provider=1",
+    meta
+  );
   caseResults.E = ok ? "PASS" : "FAIL";
 }
 

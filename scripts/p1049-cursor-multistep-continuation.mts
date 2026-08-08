@@ -480,7 +480,8 @@ console.log(`Authenticity: ${LEVEL}\n`);
   caseResults.B = ok ? "PASS" : "FAIL";
 }
 
-// ── CASE C: multistep incomplete + promise text → continuation ───────────
+// ── CASE C: P1061 auto-pro — NO incomplete-task continuation Agent round ─
+// shouldContinueIncompleteToolTask helper may still say true; execute bypasses.
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -512,22 +513,21 @@ console.log(`Authenticity: ${LEVEL}\n`);
     "req_p1049_c"
   );
   const meta = billingSnapshot(result);
-  const toolCalls = msg(result)?.tool_calls;
   const ok =
     result.ok === true &&
     v.resumeToolRound === true &&
-    Array.isArray(toolCalls) &&
-    toolCalls.length > 0 &&
-    meta.providerCallCount === 2 &&
-    meta.repairCallCount >= 1 &&
+    msg(result)?.content === "我接下来会读取文件并继续。" &&
+    !msg(result)?.tool_calls &&
+    meta.providerCallCount === 1 &&
+    meta.repairCallCount === 0 &&
+    (meta.arbitrationCallCount ?? 0) === 0 &&
     meta.debitCallCount === 1;
   assert(
     ok,
-    "C. incomplete multistep + promise → continuation repair=1 tool_calls>0",
+    "C. auto-pro carrier — NO continuation arb; plain provider=1 debit=1",
     {
       ...meta,
       resumeToolRound: v.resumeToolRound,
-      toolCallCount: Array.isArray(toolCalls) ? toolCalls.length : 0,
       provider: meta.providerCallCount,
       repair: meta.repairCallCount,
       debit: 1,
@@ -536,7 +536,7 @@ console.log(`Authenticity: ${LEVEL}\n`);
   caseResults.C = ok ? "PASS" : "FAIL";
 }
 
-// ── CASE D: continuation at most once (second still plain → return text) ─
+// ── CASE D: auto-pro carrier — plain stop final; no hidden second fetch ──
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -549,12 +549,7 @@ console.log(`Authenticity: ${LEVEL}\n`);
       }),
       () => ({
         kind: "completion",
-        content: makeAssistantTextIntent("仍是普通文本，不再继续 repair"),
-        usage: REPAIR_USAGE,
-      }),
-      () => ({
-        kind: "completion",
-        content: makeToolCallIntent("Read", { path: "loop.ts" }),
+        content: makeAssistantTextIntent("SHOULD_NOT_RUN"),
         usage: REPAIR_USAGE,
       }),
     ],
@@ -571,12 +566,13 @@ console.log(`Authenticity: ${LEVEL}\n`);
   const meta = billingSnapshot(result);
   const ok =
     result.ok === true &&
-    typeof msg(result)?.content === "string" &&
-    meta.providerCallCount === 2 &&
-    meta.debitCallCount === 1;
+    msg(result)?.content === "现在读取文件然后执行。" &&
+    meta.providerCallCount === 1 &&
+    meta.debitCallCount === 1 &&
+    (meta.arbitrationCallCount ?? 0) === 0;
   assert(
     ok,
-    "D. continuation repair max once; plain after repair → return text; no loop",
+    "D. auto-pro carrier — plain final provider=1; no continuation loop",
     {
       ...meta,
       provider: meta.providerCallCount,
@@ -810,15 +806,15 @@ console.log(`Authenticity: ${LEVEL}\n`);
   );
 }
 
-// ── CASE K: continuation repair → provider=2 debit=1 ─────────────────────
+// ── CASE K: auto-pro carrier continuation bypass → provider=1 debit=1 ────
 {
   caseResults.K = caseResults.C === "PASS" ? "PASS" : "FAIL";
   assert(
     caseResults.K === "PASS",
-    "K. continuation repair provider=2 debit=1 (shared with C)",
+    "K. auto-pro carrier — NO continuation; provider=1 debit=1 (shared with C)",
     {
-      providerCallCount: 2,
-      repairCallCount: 1,
+      providerCallCount: 1,
+      repairCallCount: 0,
       fallbackCount: 0,
       debitCallCount: 1,
       shared: "C",

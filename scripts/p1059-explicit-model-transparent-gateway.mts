@@ -3,7 +3,7 @@
  *
  * Explicit models: ONE client HTTP request → ONE semantic provider decision
  * round (transport/failover retries allowed; Agent orchestration bypassed).
- * auto-pro keeps P1048/P1049/P1055 historical behavior.
+ * auto-pro is not an "explicit" gpt/gemini model here (P1061 owns its carrier).
  *
  * Authenticity:
  *   REAL executeChatCompletion ENTRY
@@ -727,7 +727,7 @@ console.log(`Authenticity: ${LEVEL}\n`);
   }
 }
 
-// ── M: auto-pro keeps P1048/P1055 orchestration ──────────────────────────
+// ── M: auto-pro is NOT P1059 explicit (P1061 owns carrier) ────────────────
 {
   resetScenario({
     providers: defaultProviders(["grsai-primary"]),
@@ -738,41 +738,12 @@ console.log(`Authenticity: ${LEVEL}\n`);
         finish_reason: "stop",
         usage: NATIVE_USAGE,
       }),
-      (ctx) => {
-        const json = ctx.json ?? {};
-        const tools = Array.isArray(json.tools) ? json.tools : [];
-        const choice = json.tool_choice;
-        const named =
-          choice &&
-          typeof choice === "object" &&
-          (choice as { function?: { name?: string } }).function?.name;
-        const forcedRequired = choice === "required" && tools.length > 0;
-        if (tools.length > 0 && (forcedRequired || named)) {
-          return {
-            ...nativeToolCompletion("Search", {
-              query: "executeChatCompletion",
-            }),
-            usage: SECOND_USAGE,
-          };
-        }
-        const flat = (json.messages ?? [])
-          .map((m: any) => String(m?.content ?? ""))
-          .join("\n");
-        if (!flat.includes("Available tools")) {
-          return {
-            kind: "completion",
-            content: "repair body missing compiler",
-            usage: SECOND_USAGE,
-          };
-        }
-        return {
-          kind: "completion",
-          content: makeToolCallIntent("Search", {
-            query: "executeChatCompletion",
-          }),
-          usage: SECOND_USAGE,
-        };
-      },
+      () => ({
+        ...nativeToolCompletion("Search", {
+          query: "SHOULD_NOT_RUN",
+        }),
+        usage: SECOND_USAGE,
+      }),
     ],
   });
   const result = await exec(
@@ -793,11 +764,16 @@ console.log(`Authenticity: ${LEVEL}\n`);
       isAlias: true,
     }) === false &&
     result.ok === true &&
-    Array.isArray(msg(result)?.tool_calls) &&
-    msg(result).tool_calls[0]?.function?.name === "Search" &&
-    meta.providerCallCount === 2 &&
-    meta.debitCallCount === 1;
-  assert(ok, "M. auto-pro — P1048/P1055 orchestration unchanged", meta);
+    msg(result)?.content === "I will help without tools" &&
+    !msg(result)?.tool_calls &&
+    meta.providerCallCount === 1 &&
+    meta.debitCallCount === 1 &&
+    (meta.arbitrationCallCount ?? 0) === 0;
+  assert(
+    ok,
+    "M. auto-pro — not P1059 explicit; P1061 carrier returns plain (provider=1)",
+    meta
+  );
   caseResults.M = ok ? "PASS" : "FAIL";
 }
 
@@ -946,7 +922,7 @@ for (const [k, v] of Object.entries(caseResults)) {
 console.log("\n── BEHAVIOR MATRIX ──");
 console.log("GPT_EXPLICIT_TRANSPARENT=YES");
 console.log("GEMINI_EXPLICIT_TRANSPARENT=YES");
-console.log("AUTO_PRO_UNCHANGED=YES");
+console.log("AUTO_PRO_NOT_P1059_EXPLICIT=YES");
 console.log("FIRST_TURN_ARBITRATION_BYPASSED=YES");
 console.log("NATIVE_REPAIR_BYPASSED=YES");
 console.log("INCOMPLETE_TASK_CONTINUATION_BYPASSED=YES");
