@@ -179,6 +179,8 @@ const ALLOWED_FIELD_KEYS = new Set([
   "selectedToolName",
   "toolChoiceStrategy",
   "native_repair_elapsed_ms",
+  // P1059 explicit-model transparent gateway
+  "transparentGateway",
 ]);
 
 const SENSITIVE_LOG_KEY_LITERAL =

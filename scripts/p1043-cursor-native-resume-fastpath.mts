@@ -275,7 +275,7 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
   const messages = resumeMessages();
   const messagesBefore = JSON.stringify(messages);
   const body = {
-    model: "gpt-5.5",
+    model: "auto-pro",
     messages,
     tools: AGENT_FILE_TOOLS,
     tool_choice: "auto" as const,
@@ -335,7 +335,7 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
   });
   const result = await exec(
     {
-      model: "gpt-5.5",
+      model: "auto-pro",
       messages: resumeMessages(),
       tools: AGENT_FILE_TOOLS,
       tool_choice: "auto",
@@ -376,7 +376,7 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
   });
   const result = await exec(
     {
-      model: "gpt-5.5",
+      model: "auto-pro",
       messages: resumeMessages(),
       tools: AGENT_FILE_TOOLS,
       tool_choice: "auto",
@@ -648,7 +648,7 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
   });
   const result = await exec(
     {
-      model: "gpt-5.5",
+      model: "auto-pro",
       messages: [
         { role: "user", content: "read a then b then summarize" },
         assistantTools([tc("call_h_a", "Read", { path: "a.ts" })]),
@@ -770,7 +770,7 @@ console.log("P1043 CURSOR NATIVE RESUME FAST PATH\n");
   const uniqueResult = "UNIQUE_P1043_J_TOOL_RESULT";
   const result = await exec(
     {
-      model: "gpt-5.5",
+      model: "auto-pro",
       messages: [
         { role: "user", content: "j" },
         assistantTools([tc("call_j_read", "Read", { path: "in.ts" })]),

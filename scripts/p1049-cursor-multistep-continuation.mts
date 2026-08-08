@@ -504,7 +504,7 @@ console.log(`Authenticity: ${LEVEL}\n`);
   const v = validateCursorToolTranscript(messages);
   const result = await exec(
     {
-      model: "gpt-5.5",
+      model: "auto-pro",
       messages,
       tools: CURSOR_AGENT_TOOLS,
       tool_choice: "auto",
@@ -561,7 +561,7 @@ console.log(`Authenticity: ${LEVEL}\n`);
   });
   const result = await exec(
     {
-      model: "gpt-5.5",
+      model: "auto-pro",
       messages: multistepSearchOnlyRoundMessages(),
       tools: CURSOR_AGENT_TOOLS,
       tool_choice: "auto",

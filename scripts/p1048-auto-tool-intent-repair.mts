@@ -360,7 +360,8 @@ console.log(`Authenticity: ${LEVEL}\n`);
   });
   const result = await exec(
     {
-      model: "gpt-5.5",
+      // P1059 — Agent orchestration retained on auto-pro only.
+      model: "auto-pro",
       messages: [{ role: "user", content: EXPLICIT_EXEC_PROMPT }],
       tools: CURSOR_AGENT_TOOLS,
       tool_choice: "auto",

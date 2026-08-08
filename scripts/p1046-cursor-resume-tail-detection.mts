@@ -465,7 +465,8 @@ console.log("P1046 CURSOR RESUME TAIL DETECTION\n");
   const v = validateCursorToolTranscript(messages);
   const result = await exec(
     {
-      model: "gpt-5.5",
+      // P1059 — resume continuation nudge retained on auto-pro only.
+      model: "auto-pro",
       messages,
       tools: AGENT_FILE_TOOLS,
       tool_choice: "auto",

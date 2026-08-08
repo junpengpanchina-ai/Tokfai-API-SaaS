@@ -66,6 +66,7 @@ import {
   shouldAttemptNativeToolRepair,
   type NativeRepairToolSelection,
 } from "./nativeToolRepair.js";
+import { isTransparentExplicitModelRequest } from "./transparentExplicitModelGateway.js";
 import { normalizeOpenAiFinishReasonOnChatCompletion } from "./openaiFinishReason.js";
 import { chatBodyKeysForLog } from "./chatCompletionDiagnostics.js";
 
@@ -1149,6 +1150,13 @@ export async function executeChatCompletion(
       if (input.onAfterPrecheck) {
         await input.onAfterPrecheck();
       }
+      // P1059 — explicit gpt/gemini → transparent gateway (auto-* unchanged).
+      const transparentExplicitModel = isTransparentExplicitModelRequest({
+        requestedModel: requestedRaw,
+        resolvedModel: requestedModel,
+        canonicalId: requestedModel,
+        isAlias,
+      });
       return await runProviderAttempts({
         caller,
         requestId,
@@ -1173,6 +1181,7 @@ export async function executeChatCompletion(
         idempotencyKey: input.idempotencyKey ?? null,
         timeoutPolicy,
         clientStream,
+        transparentExplicitModel,
       });
     } finally {
       heavyPermit?.release();
@@ -1306,6 +1315,12 @@ async function runProviderAttempts(args: {
   idempotencyKey: string | null;
   timeoutPolicy: ReturnType<typeof resolveUpstreamTimeoutPolicy>;
   clientStream: boolean;
+  /**
+   * P1059 — explicit gpt / gemini request: bypass Agent orchestration
+   * (intent arbitration / native repair / incomplete-task continuation /
+   * resume system nudge). Smart auto-* aliases stay false.
+   */
+  transparentExplicitModel: boolean;
 }): Promise<ExecuteChatCompletionResult> {
   const {
     caller,
@@ -1331,9 +1346,13 @@ async function runProviderAttempts(args: {
     idempotencyKey,
     timeoutPolicy,
     clientStream,
+    transparentExplicitModel,
   } = args;
 
   let lastError: ApiError | null = null;
+  // P1059 — at most one selected + one bypass log per HTTP request.
+  let transparentGatewaySelectedLogged = false;
+  let transparentOrchestrationBypassLogged = false;
 
   for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
     const attemptModel = attempts[attemptIndex]!;
@@ -1551,11 +1570,46 @@ async function runProviderAttempts(args: {
         let nativeToolRepairSucceeded = false;
         let nativeRepairSelection: NativeRepairToolSelection | null = null;
         // P1048 — real toolIntentCompiler result (not hasTools alone).
+        // P1059 — still compute for telemetry / bypass reason; orchestration
+        // gates below ignore it when transparentExplicitModel is true.
         const toolIntentDetection = detectExplicitToolExecutionIntent({
           messages: (clientBody as { messages?: unknown }).messages,
           tools: (clientBody as { tools?: unknown }).tools,
         });
-        const toolIntentDetected = toolIntentDetection.detected;
+        const toolIntentDetected = transparentExplicitModel
+          ? false
+          : toolIntentDetection.detected;
+        const noteTransparentOrchestrationBypass = (reason: string) => {
+          if (!transparentExplicitModel || transparentOrchestrationBypassLogged) {
+            return;
+          }
+          transparentOrchestrationBypassLogged = true;
+          log.info("transparent_gateway_agent_orchestration_bypassed", {
+            requestId,
+            route,
+            requestedModel: requestedRaw,
+            resolvedModel: attemptModel,
+            providerId: provider.id,
+            transparentGateway: true,
+            reason,
+            billing_status: "not_billable",
+            credits_charged: 0,
+          });
+        };
+        if (transparentExplicitModel && !transparentGatewaySelectedLogged) {
+          transparentGatewaySelectedLogged = true;
+          log.info("transparent_gateway_selected", {
+            requestId,
+            route,
+            requestedModel: requestedRaw,
+            resolvedModel: attemptModel,
+            providerId: provider.id,
+            transparentGateway: true,
+            resumeToolRound,
+            billing_status: "not_billable",
+            credits_charged: 0,
+          });
+        }
         // P1030 — request-scoped billable usage components for this
         // provider/model attempt only (discarded on provider fallback throw).
         const billableUsageComponents: BillableUsageComponent[] = [];
@@ -1779,14 +1833,16 @@ async function runProviderAttempts(args: {
 
           // P1043 — Native Resume Fast Path: request-scoped upstream copy only.
           // Does not mutate clientBody / original transcript; does not force tools.
-          if (
-            shouldApplyNativeResumeFastPath({
-              resumeToolRound,
-              activeToolMode,
-              hasToolsClient,
-              toolChoice: (clientBody as { tool_choice?: unknown }).tool_choice,
-            })
-          ) {
+          // P1059 — transparent explicit model: no task-completeness system nudge.
+          const resumeFastPathEligible = shouldApplyNativeResumeFastPath({
+            resumeToolRound,
+            activeToolMode,
+            hasToolsClient,
+            toolChoice: (clientBody as { tool_choice?: unknown }).tool_choice,
+          });
+          if (transparentExplicitModel && resumeFastPathEligible) {
+            noteTransparentOrchestrationBypass("native_resume_continuation_nudge");
+          } else if (resumeFastPathEligible) {
             const fastPath = applyNativeResumeFastPathInstruction(upstreamBody);
             upstreamBody = fastPath.body;
             log.info("native_resume_fastpath_instruction_applied", {
@@ -2569,6 +2625,8 @@ async function runProviderAttempts(args: {
             // above) unless P1048 explicit tool execution intent requires
             // exactly one tool-intent repair. Never second-fetch solely
             // because tools[] were present. Strict repair remains above.
+            // P1059 — transparent explicit model: one semantic provider round;
+            // do not open intent arbitration / native repair Agent rounds.
             const finishForArbitration =
               extractResponseFinishReason(normalizedData) ??
               extractFinishReason(
@@ -2578,7 +2636,7 @@ async function runProviderAttempts(args: {
               0,
               timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt)
             );
-            if (
+            const wouldFirstTurnOrchestration =
               !toolsDegradedToChat &&
               !resumeToolRound &&
               canNativeEmulatedRepair(provider.id, attemptModel) &&
@@ -2592,9 +2650,14 @@ async function runProviderAttempts(args: {
                 autoIntentArbitrationAttempted,
                 freshRemainingTotalMs: freshMsForArb,
                 resumeToolRound,
-                toolIntentDetected,
-              })
-            ) {
+                // Use raw detection so transparent bypass can still be logged.
+                toolIntentDetected: toolIntentDetection.detected,
+              });
+            if (transparentExplicitModel && wouldFirstTurnOrchestration) {
+              noteTransparentOrchestrationBypass(
+                "first_turn_auto_tool_arbitration"
+              );
+            } else if (wouldFirstTurnOrchestration) {
               // P1030 — capture Native HTTP 200 usage before repair overwrites.
               pushBillableUsageComponent("native", {
                 dataUsage: data.usage,
@@ -2687,9 +2750,11 @@ async function runProviderAttempts(args: {
               const content = message?.content;
               return typeof content === "string" ? content : null;
             })();
+            // P1059 — capability-gap probe uses raw intent for bypass logging;
+            // transparent explicit model never opens a continuation Agent round.
             const incompleteTask = shouldContinueIncompleteToolTask({
               resumeToolRound,
-              explicitExecutionIntent: toolIntentDetected,
+              explicitExecutionIntent: toolIntentDetection.detected,
               upstreamReturnedToolCalls,
               finishReason: finishForArbitration,
               continuationAlreadyAttempted: continuationArbitrationAttempted,
@@ -2702,7 +2767,7 @@ async function runProviderAttempts(args: {
               tools: (clientBody as { tools?: unknown }).tools,
               nativeAssistantText: nativeAssistantTextForGap,
             });
-            if (
+            const wouldResumeContinuation =
               !toolsDegradedToChat &&
               resumeToolRound &&
               canNativeEmulatedRepair(provider.id, attemptModel) &&
@@ -2723,8 +2788,12 @@ async function runProviderAttempts(args: {
                 freshRemainingTotalMs: freshMsForArb,
                 upstreamHttpOk: true,
                 incompleteToolTask: true,
-              })
-            ) {
+              });
+            if (transparentExplicitModel && wouldResumeContinuation) {
+              noteTransparentOrchestrationBypass(
+                "incomplete_task_continuation_arbitration"
+              );
+            } else if (wouldResumeContinuation) {
               pushBillableUsageComponent("native", {
                 dataUsage: data.usage,
                 requestBody: upstreamBody,

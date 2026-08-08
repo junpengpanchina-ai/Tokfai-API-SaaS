@@ -381,7 +381,7 @@ console.log(`Authenticity: ${LEVEL}\n`);
   });
   const result = await exec(
     {
-      model: "gpt-5.5",
+      model: "auto-pro",
       messages: [{ role: "user", content: EXPLICIT_EXEC_PROMPT }],
       tools: CURSOR_AGENT_TOOLS,
     },
@@ -460,7 +460,7 @@ console.log(`Authenticity: ${LEVEL}\n`);
   });
   const result = await exec(
     {
-      model: "gpt-5.5",
+      model: "auto-pro",
       messages: [{ role: "user", content: EXPLICIT_EXEC_PROMPT }],
       tools: CURSOR_AGENT_TOOLS,
       tool_choice: "auto",
