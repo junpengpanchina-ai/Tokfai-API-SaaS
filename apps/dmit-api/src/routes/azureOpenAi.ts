@@ -5,6 +5,7 @@ import {
   applyAzureDeploymentModel,
   logAzureOpenAiIngress,
   parseAzureDeploymentParam,
+  passThroughSharedChatResponse,
 } from "../lib/azureOpenAiIngress.js";
 import { readJsonBodyWithLimit } from "../lib/readJsonBodyWithLimit.js";
 import { runChatCompletionsHttp } from "../lib/runChatCompletionsHttp.js";
@@ -19,7 +20,7 @@ import {
 import { logGatewayRejection } from "./chatGatewayLogs.js";
 
 /**
- * P1067 — Azure OpenAI compatibility ingress for Cursor Azure mode.
+ * P1067 / P1070 — Azure OpenAI compatibility ingress for Cursor Azure mode.
  *
  * POST /v1/openai/deployments/:deployment/chat/completions
  *   ?api-version=2024-12-01-preview
@@ -28,6 +29,7 @@ import { logGatewayRejection } from "./chatGatewayLogs.js";
  *   - api-key / Bearer auth compatibility
  *   - deployment → model normalization (deployment authoritative)
  *   - api-version accepted as metadata (no capability change)
+ *   - P1070: pass through shared Response status/headers/body (no JSON rewrap)
  *
  * Then reuses the production /v1/chat/completions pipeline
  * (runChatCompletionsHttp → executeChatCompletion / early SSE).
@@ -87,10 +89,13 @@ azureOpenAiRoutes.post(AZURE_CHAT_PATH, async (c) => {
     normalizedModel,
   });
 
-  return runChatCompletionsHttp(c, {
+  // P1070 — shared handler owns status/headers/body (incl. SSE).
+  // Never re-encode the shared Response as a default-200 JSON write.
+  const sharedResponse = await runChatCompletionsHttp(c, {
     caller,
     requestId,
     route: "/v1/openai/deployments/:deployment/chat/completions",
     rawBody: bodyWithModel,
   });
+  return passThroughSharedChatResponse(sharedResponse);
 });

@@ -53,8 +53,8 @@ export const requireAzureOpenAiAuth: MiddlewareHandler = async (c, next) => {
     const apiKey = await verifyApiKeyToken(token);
     c.set("apiKey" as never, apiKey satisfies VerifiedApiKey);
     c.set("tenantId" as never, apiKey.tenantId);
-    await next();
-    return;
+    // P1070 — propagate handler Response (status/headers/body) up the chain.
+    return await next();
   }
 
   // Bearer may still be a Supabase JWT (playground). api-key must be sk-tokfai_.
@@ -77,5 +77,6 @@ export const requireAzureOpenAiAuth: MiddlewareHandler = async (c, next) => {
   const { tenant } = await resolveTenantByHost(host);
   c.set("tenantId" as never, tenant?.id ?? null);
 
-  await next();
+  // P1070 — propagate handler Response (status/headers/body) up the chain.
+  return await next();
 };

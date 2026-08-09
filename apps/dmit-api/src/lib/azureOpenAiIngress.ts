@@ -85,3 +85,18 @@ export function logAzureOpenAiIngress(args: {
     apiVersionPresent: args.apiVersionPresent,
   });
 }
+
+/**
+ * P1070 — Preserve the shared chat handler Response at the Azure boundary.
+ *
+ * Must keep status / headers / body (including SSE streams) intact.
+ * Never buffer via response.json() and never rebuild with c.json(...)
+ * (that defaults to HTTP 200 and drops non-2xx status).
+ */
+export function passThroughSharedChatResponse(response: Response): Response {
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
