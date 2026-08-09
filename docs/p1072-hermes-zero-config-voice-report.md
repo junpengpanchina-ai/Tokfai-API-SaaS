@@ -1,6 +1,6 @@
 # P1072 — Hermes Zero-Config Voice + Real STT
 
-## Result: **PASS**
+## Result: **PASS** (STT route/adapter; voice three-input deferred to P1073)
 
 ```
 STT_CAN_INHERIT_CHAT_BASE_URL=false
@@ -10,30 +10,32 @@ CLIENT_PATCH_REQUIRED=true
 TOKFAI_REAL_STT_IMPLEMENTED=true
 AUDIO_PROVIDER_ADAPTER_IMPLEMENTED=true
 FAKE_TRANSCRIPTION_USED=NO
+PRODUCTION_STT_UPSTREAM_READY=false
 
 CORE_CHAT_THREE_INPUT_CONTRACT=true
-VOICE_THREE_INPUT_CONTRACT=true
+VOICE_THREE_INPUT_CONTRACT=false
 
 AUTOMATED_TEST_COUNT=29
 REAL_ENTRY_TEST_COUNT=20
-MANUAL_CONSUMER_STEPS=0
+MANUAL_CONSUMER_STEPS=1
 ```
 
 ### CLIENT_LIMITATION
 
-Stock Hermes Desktop (sourceMode=false) does not auto-inherit OPENAI_BASE_URL for STT; Desktop UI has no stt.openai.base_url field. Tokfai bootstrap writes STT_OPENAI_BASE_URL from Base URL so consumers never set a 4th field.
+Stock Hermes Desktop (sourceMode=false) does not auto-inherit OPENAI_BASE_URL for STT; Desktop UI has no stt.openai.base_url field. Terminal bootstrap is internal-only. Product path: Tokfai Hermes Connector (P1073).
 
 ### Evidence
 
 - STT base uses STT_OPENAI_BASE_URL/default api.openai.com; does not read OPENAI_BASE_URL
 - Desktop UI voiceProviderKeys(stt,openai) only exposes stt.openai.model — no base_url persistence seam
 - desktop-build-stamp sourceMode=false — bundled Desktop; Tokfai cannot inject inherit into binary
+- P1073: unmodified Hermes has no STT base inherit; consumer Terminal bootstrap is not product zero-config
 
 ### Cases
 
 | Case | OK | Real | Detail |
 |---|---|---|---|
-| phase1_stt_key_inherit | PASS | no | STT base uses STT_OPENAI_BASE_URL/default api.openai.com; does not read OPENAI_BASE_URL; Desktop UI voiceProviderKeys(stt,openai) only exposes stt.openai.model — no base_url persistence seam; desktop-build-stamp sourceMode=false — bundled Desktop; Tokfai cannot inject inherit into binary |
+| phase1_stt_key_inherit | PASS | no | STT base uses STT_OPENAI_BASE_URL/default api.openai.com; does not read OPENAI_BASE_URL; Desktop UI voiceProviderKeys(stt,openai) only exposes stt.openai.model — no base_url persistence seam; desktop-build-stamp sourceMode=false — bundled Desktop; Tokfai cannot inject inherit into binary; P1073: unmodified Hermes has no STT base inherit; consumer Terminal bootstrap is not product zero-config |
 | phase1_stt_base_inherit_stock | PASS | no | stock Hermes must NOT silently claim base inherit |
 | phase1_client_patch_required | PASS | no | Desktop bundled |
 | source_audio_route | PASS | no | /Users/p/Documents/GitHub/Tokfai-API-SaaS/apps/dmit-api/src/routes/audio.ts |

@@ -19,6 +19,7 @@ import {
   getChatCaller,
   requireApiKeyOrSupabaseJwt,
 } from "../middleware/chatAuth.js";
+import { chatGatewayMiddleware } from "../middleware/chatGateway.js";
 import { respondApiError } from "../middleware/error.js";
 import { resolveAudioSttConfig, resolveAudioSttProvider } from "../upstream/audio/resolveAudioProvider.js";
 
@@ -51,6 +52,8 @@ function basenameOnly(name: string): string {
 export const audioRoutes = new Hono();
 
 audioRoutes.use("/v1/audio/transcriptions", requireApiKeyOrSupabaseJwt);
+/** RPM / IP / tenant / concurrency — abuse guard when STT is not_billable. */
+audioRoutes.use("/v1/audio/transcriptions", chatGatewayMiddleware);
 
 audioRoutes.post("/v1/audio/transcriptions", async (c) => {
   const caller = getChatCaller(c);
@@ -179,6 +182,19 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
       ),
       requestId
     );
+  }
+
+  // Billing: flat TOKFAI_STT_PRICE_CREDITS only — never chat tokens.
+  // Unpriced → not_billable; chatGatewayMiddleware still enforces RPM/concurrency.
+  const priceProbe = cfg.priceCredits;
+  if (!(typeof priceProbe === "number" && priceProbe > 0)) {
+    log.info("audio_transcription_not_billable_guard", {
+      request_id: requestId,
+      route: AUDIO_TRANSCRIPTION_ENDPOINT,
+      provider: cfg.providerId,
+      billing_status: "not_billable",
+      guard: "chat_gateway_rpm_concurrency",
+    });
   }
 
   let upstream;

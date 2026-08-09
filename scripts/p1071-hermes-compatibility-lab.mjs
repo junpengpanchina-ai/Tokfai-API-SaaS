@@ -991,7 +991,7 @@ For **Chat / Responses / Tools / Streaming**, Hermes consumers only need:
 2. API Key (\`sk-tokfai_...\`)
 3. Model (e.g. \`gpt-5.5\`)
 
-**CLIENT_LIMITATION — STT / TTS:** Hermes STT defaults to \`https://api.openai.com/v1\` and does **not** inherit the chat Base URL (Desktop \`sourceMode=false\`). Use Tokfai bootstrap (\`scripts/hermes-tokfai-voice-bootstrap.mjs\`) so consumers still only enter Base URL + API Key + Model; bootstrap writes \`STT_OPENAI_BASE_URL\` internally. See P1072 for real \`/v1/audio/transcriptions\`.
+**CLIENT_LIMITATION — STT / TTS:** Hermes STT defaults to \`https://api.openai.com/v1\` and does **not** inherit the chat Base URL (Desktop \`sourceMode=false\`). Terminal bootstrap is internal-only. Product path: Tokfai Hermes Connector (\`scripts/hermes-tokfai-connector.mjs\`, P1073). See P1072 for real \`/v1/audio/transcriptions\`.
 
 ---
 

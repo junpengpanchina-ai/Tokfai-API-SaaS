@@ -152,9 +152,12 @@ function readHermesFacts() {
       );
     }
   }
-  // Zero extra fields feasible via Tokfai bootstrap (writes STT_OPENAI_BASE_URL from Base URL).
-  facts.ZERO_EXTRA_CONSUMER_FIELDS_FEASIBLE =
-    facts.STT_CAN_INHERIT_CHAT_API_KEY === true;
+  // P1072R2/P1073: terminal bootstrap is NOT zero-config product. Stock Hermes
+  // cannot inherit STT base URL; product path is Tokfai Hermes Connector (P1073).
+  facts.ZERO_EXTRA_CONSUMER_FIELDS_FEASIBLE = false;
+  facts.reasons.push(
+    "P1073: unmodified Hermes has no STT base inherit; consumer Terminal bootstrap is not product zero-config"
+  );
   return facts;
 }
 
@@ -561,10 +564,10 @@ async function main() {
 
   const failed = cases.filter((c) => !c.ok);
   const realEntry = cases.filter((c) => c.realEntry);
-  const voiceThreeInput =
-    facts.STT_CAN_INHERIT_CHAT_API_KEY &&
-    facts.ZERO_EXTRA_CONSUMER_FIELDS_FEASIBLE &&
-    cases.some((c) => c.id === "bootstrap_three_input_writes_stt" && c.ok);
+  // Honest product contract (P1072R2/P1073): stock Hermes + Terminal bootstrap ≠ YES.
+  // Voice three-input via Tokfai Hermes Connector is proven in P1073, not here.
+  const voiceThreeInput = false;
+  const manualConsumerSteps = 1; // would need Terminal bootstrap OR Connector install
 
   const summary = {
     git: gitHead(),
@@ -573,9 +576,8 @@ async function main() {
     STT_CAN_INHERIT_CHAT_API_KEY: facts.STT_CAN_INHERIT_CHAT_API_KEY,
     ZERO_EXTRA_CONSUMER_FIELDS_FEASIBLE: facts.ZERO_EXTRA_CONSUMER_FIELDS_FEASIBLE,
     CLIENT_PATCH_REQUIRED: facts.CLIENT_PATCH_REQUIRED,
-    CLIENT_LIMITATION: facts.STT_CAN_INHERIT_CHAT_BASE_URL
-      ? null
-      : "Stock Hermes Desktop (sourceMode=false) does not auto-inherit OPENAI_BASE_URL for STT; Desktop UI has no stt.openai.base_url field. Tokfai bootstrap writes STT_OPENAI_BASE_URL from Base URL so consumers never set a 4th field.",
+    CLIENT_LIMITATION:
+      "Stock Hermes Desktop (sourceMode=false) does not auto-inherit OPENAI_BASE_URL for STT; Desktop UI has no stt.openai.base_url field. Terminal bootstrap is internal-only. Product path: Tokfai Hermes Connector (P1073).",
     TOKFAI_REAL_STT_IMPLEMENTED: cases.some(
       (c) => c.id === "E_transcription_text_returned" && c.ok
     ),
@@ -583,11 +585,12 @@ async function main() {
       (c) => c.id === "D_provider_adapter_invoked" && c.ok
     ),
     FAKE_TRANSCRIPTION_USED: "NO",
+    PRODUCTION_STT_UPSTREAM_READY: false,
     CORE_CHAT_THREE_INPUT_CONTRACT: true,
     VOICE_THREE_INPUT_CONTRACT: voiceThreeInput,
     AUTOMATED_TEST_COUNT: cases.length,
     REAL_ENTRY_TEST_COUNT: realEntry.length,
-    MANUAL_CONSUMER_STEPS: 0,
+    MANUAL_CONSUMER_STEPS: manualConsumerSteps,
     reasons: facts.reasons,
     failed: failed.map((f) => f.id),
     cases,
@@ -595,9 +598,14 @@ async function main() {
 
   writeFileSync(SUMMARY_PATH, JSON.stringify(summary, null, 2) + "\n");
 
+  const sttPass =
+    failed.length === 0 &&
+    summary.TOKFAI_REAL_STT_IMPLEMENTED &&
+    summary.AUDIO_PROVIDER_ADAPTER_IMPLEMENTED;
+
   const report = `# P1072 — Hermes Zero-Config Voice + Real STT
 
-## Result: **${failed.length === 0 && voiceThreeInput ? "PASS" : "FAIL"}**
+## Result: **${sttPass ? "PASS" : "FAIL"}** (STT route/adapter; voice three-input deferred to P1073)
 
 \`\`\`
 STT_CAN_INHERIT_CHAT_BASE_URL=${summary.STT_CAN_INHERIT_CHAT_BASE_URL}
@@ -607,13 +615,14 @@ CLIENT_PATCH_REQUIRED=${summary.CLIENT_PATCH_REQUIRED}
 TOKFAI_REAL_STT_IMPLEMENTED=${summary.TOKFAI_REAL_STT_IMPLEMENTED}
 AUDIO_PROVIDER_ADAPTER_IMPLEMENTED=${summary.AUDIO_PROVIDER_ADAPTER_IMPLEMENTED}
 FAKE_TRANSCRIPTION_USED=NO
+PRODUCTION_STT_UPSTREAM_READY=false
 
 CORE_CHAT_THREE_INPUT_CONTRACT=${summary.CORE_CHAT_THREE_INPUT_CONTRACT}
 VOICE_THREE_INPUT_CONTRACT=${summary.VOICE_THREE_INPUT_CONTRACT}
 
 AUTOMATED_TEST_COUNT=${summary.AUTOMATED_TEST_COUNT}
 REAL_ENTRY_TEST_COUNT=${summary.REAL_ENTRY_TEST_COUNT}
-MANUAL_CONSUMER_STEPS=0
+MANUAL_CONSUMER_STEPS=${summary.MANUAL_CONSUMER_STEPS}
 \`\`\`
 
 ### CLIENT_LIMITATION
@@ -635,7 +644,7 @@ ${cases
   )
   .join("\n")}
 
-${failed.length === 0 && voiceThreeInput ? PASS_MARKER : FAIL_MARKER}
+${sttPass ? PASS_MARKER : FAIL_MARKER}
 `;
 
   writeFileSync(REPORT_PATH, report);
@@ -653,12 +662,13 @@ ${failed.length === 0 && voiceThreeInput ? PASS_MARKER : FAIL_MARKER}
     `CORE_CHAT_THREE_INPUT_CONTRACT=${summary.CORE_CHAT_THREE_INPUT_CONTRACT}`
   );
   console.log(`VOICE_THREE_INPUT_CONTRACT=${summary.VOICE_THREE_INPUT_CONTRACT}`);
+  console.log(`PRODUCTION_STT_UPSTREAM_READY=${summary.PRODUCTION_STT_UPSTREAM_READY}`);
   console.log(`AUTOMATED_TEST_COUNT=${summary.AUTOMATED_TEST_COUNT}`);
   console.log(`REAL_ENTRY_TEST_COUNT=${summary.REAL_ENTRY_TEST_COUNT}`);
-  console.log("MANUAL_CONSUMER_STEPS=0");
+  console.log(`MANUAL_CONSUMER_STEPS=${summary.MANUAL_CONSUMER_STEPS}`);
   console.log(`report: ${REPORT_PATH}`);
 
-  if (failed.length || !voiceThreeInput) {
+  if (!sttPass) {
     console.error(FAIL_MARKER);
     console.error("failed:", failed.map((f) => f.id).join(", "));
     process.exit(1);
