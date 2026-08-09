@@ -341,8 +341,103 @@ export type AdminChannelRow = {
   success_rate: number | null;
   last_error: string | null;
   enabled: boolean;
-  modalities: Array<"chat" | "image">;
+  modalities: Array<"chat" | "image" | "audio_transcription">;
+  capability?: "chat_image" | "audio_transcription";
+  provider?: "groq_whisper_compatible" | "openai_compatible" | null;
+  default_model?: string | null;
+  api_key_set?: boolean;
+  /** Masked hint only — never the full upstream secret. */
+  api_key_masked?: string | null;
+  updated_at?: string | null;
 };
+
+export type AdminSttChannelCreateBody = {
+  capability: "audio_transcription";
+  provider: "groq_whisper_compatible" | "openai_compatible";
+  name?: string;
+  base_url: string;
+  api_key: string;
+  default_model?: string;
+  enabled?: boolean;
+  priority?: number;
+  weight?: number;
+};
+
+export type AdminSttChannelUpdateBody = {
+  enabled?: boolean;
+  status?: "active" | "disabled";
+  priority?: number;
+  weight?: number;
+  base_url?: string;
+  /** Omit or empty to keep existing secret. */
+  api_key?: string;
+  default_model?: string;
+  provider?: "groq_whisper_compatible" | "openai_compatible";
+  name?: string;
+};
+
+export type AdminSttChannelTestResult = {
+  ok: boolean;
+  channel_id: string;
+  upstream_status: number | null;
+  latency_ms: number | null;
+  error_class: string | null;
+  message: string;
+  transcript_chars?: number;
+};
+
+export function createAdminChannelIdempotencyKey(): string {
+  const random = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+  return `admin-channel-${Date.now()}-${random}`;
+}
+
+export async function fetchAdminChannels(): Promise<AdminChannelRow[]> {
+  const res = await fetchAdminApi<{ data?: AdminChannelRow[] }>("/admin/channels");
+  return Array.isArray(res.data) ? res.data : [];
+}
+
+export async function createAdminSttChannel(
+  body: AdminSttChannelCreateBody,
+  idempotencyKey?: string
+): Promise<AdminChannelRow> {
+  const res = await fetchAdminApi<{ data: AdminChannelRow }>("/admin/channels", {
+    method: "POST",
+    json: body,
+    idempotencyKey: idempotencyKey ?? createAdminChannelIdempotencyKey(),
+  });
+  return res.data;
+}
+
+export async function updateAdminChannel(
+  id: string,
+  body: AdminSttChannelUpdateBody,
+  idempotencyKey?: string
+): Promise<AdminChannelRow> {
+  const res = await fetchAdminApi<{ data: AdminChannelRow }>(
+    `/admin/channels/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      json: body,
+      idempotencyKey: idempotencyKey ?? createAdminChannelIdempotencyKey(),
+    }
+  );
+  return res.data;
+}
+
+export async function testAdminSttChannel(
+  id: string,
+  idempotencyKey?: string
+): Promise<AdminSttChannelTestResult> {
+  const res = await fetchAdminApi<{ data: AdminSttChannelTestResult }>(
+    `/admin/channels/${encodeURIComponent(id)}/test`,
+    {
+      method: "POST",
+      json: {},
+      idempotencyKey: idempotencyKey ?? createAdminChannelIdempotencyKey(),
+    }
+  );
+  return res.data;
+}
 
 export type AdminPricingRow = {
   model_id: string;

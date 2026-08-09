@@ -1,0 +1,92 @@
+# P1077R3 — STT channel production migration gate
+
+- commit: `6044b56773283e68ee8c0d52d9b844dac98c22a0`
+- FINAL_VERDICT=A
+- GIT_CHANGED_FILE_COUNT=19
+- CURSOR_UI_VISIBLE_FILE_COUNT=14
+- COUNT_DIFFERENCE_EXPLAINED=YES
+- COUNT_DIFFERENCE_REASON=R2 reported GIT=17 vs Cursor UI=14 because UI typically omits .gitignore + markdown docs (3 artifacts → 17-3=14). Current git inventory=19 (modified=11 untracked=8); docs/gitignore in tree now=4 [.gitignore, docs/p1077-stt-upstream-channel-productionization-report.md, docs/p1077r2-stt-channel-persistence-precommit-audit-report.md, docs/p1077r3-stt-channel-production-migration-gate-report.md].
+
+## Files
+
+- 01 .gitignore
+- 02 apps/dmit-api/src/routes/admin.ts
+- 03 apps/dmit-api/src/routes/adminChannels.ts
+- 04 apps/dmit-api/src/routes/audio.ts
+- 05 apps/dmit-api/src/upstream/audio/resolveAudioProvider.ts
+- 06 apps/dmit-api/src/upstream/audio/types.ts
+- 07 apps/web/components/admin/admin-channels-panel.tsx
+- 08 apps/web/lib/admin/client.ts
+- 09 apps/web/lib/dashboard-safe/labels.generated.ts
+- 10 apps/web/lib/i18n/messages.ts
+- 11 scripts/p820-admin-docs-catalog-smoke.mjs
+- 12 apps/dmit-api/src/lib/adminUpstreamChannelsStore.ts
+- 13 docs/p1077-stt-upstream-channel-productionization-report.md
+- 14 docs/p1077r2-stt-channel-persistence-precommit-audit-report.md
+- 15 docs/p1077r3-stt-channel-production-migration-gate-report.md
+- 16 scripts/p1077-stt-upstream-channel-productionization.mjs
+- 17 scripts/p1077r2-stt-channel-persistence-precommit-audit.mjs
+- 18 scripts/p1077r3-stt-channel-production-migration-gate.mjs
+- 19 supabase/migrations/0040_admin_upstream_channels.sql
+
+## Cases
+
+- PASS `GIT_CHANGED_FILE_COUNT` — 19
+- PASS `COUNT_DIFFERENCE_EXPLAINED` — R2 reported GIT=17 vs Cursor UI=14 because UI typically omits .gitignore + markdown docs (3 artifacts → 17-3=14). Current git inventory=19 (modified=11 untracked=8); docs/gitignore in tree now=4 [.gitignore, docs/p1077-stt-upstream-channel-productionization-report.md, docs/p1077r2-stt-channel-persistence-precommit-audit-report.md, docs/p1077r3-stt-channel-production-migration-gate-report.md].
+- PASS `UNRELATED_DIFF_FOUND` — NO
+- PASS `all_files_classified` — classified=19
+- PASS `MIGRATION_IDEMPOTENT_OR_ORDER_SAFE` — if not exists
+- PASS `MIGRATION_DESTRUCTIVE` — NO
+- PASS `EXISTING_TABLE_DROPPED` — NO
+- PASS `EXISTING_COLUMN_DROPPED` — NO
+- PASS `EXISTING_DATA_REWRITTEN` — NO
+- PASS `DOWNSTREAM_EXISTING_SCHEMA_CHANGED` — NO
+- PASS `schema_has_encrypted_secret` — yes
+- PASS `BROWSER_CAN_READ_CHANNEL_SECRET_CIPHERTEXT` — NO — RLS on, no anon/auth policies, service_role grant only
+- PASS `ANON_CAN_WRITE_CHANNEL_TABLE` — NO
+- PASS `ADMIN_BACKEND_ONLY_WRITE` — YES
+- PASS `build` — status=0
+- PASS `typecheck` — status=0
+- PASS `PRODUCTION_SILENT_LOCAL_FILE_FALLBACK` — cls=UNAVAILABLE allow=false status=0
+- PASS `PRODUCTION_MEMORY_FALLBACK` — NO
+- PASS `DEV_OFFLINE_FILE_FALLBACK_ALLOWED` — DURABLE_FILE
+- PASS `PRODUCTION_STORE` — DATABASE
+- PASS `no_db_catch_file_fallback` — fail-closed
+- PASS `SUPABASE_URL_PRODUCTION_CONTRACT` — YES
+- PASS `SUPABASE_SERVICE_ROLE_KEY_PRODUCTION_CONTRACT` — YES
+- PASS `KEY_ENCRYPTION_SECRET_PRODUCTION_CONTRACT` — YES
+- PASS `PRODUCTION_ENV_VALUES_PRESENT` — NOT_VERIFIED_LOCALLY
+- PASS `TABLE_MISSING_DETECTED` — YES
+- PASS `DB_FAILURE_ERROR_SANITIZED` — YES
+- PASS `DB_FAILURE_SILENT_MEMORY_FALLBACK` — NO — consumer uses ENV fallback only; admin errors
+- PASS `DB_FAILURE_SECRET_LEAK` — NO
+- PASS `production_unavailable_fail_closed` — {"code":"admin_channels_store_unavailable","msg":"Admin upstream channel store is unavailable. Configure SUPABASE_SERVICE_ROLE_KEY for production."}
+- PASS `MIGRATION_BEFORE_APP_REQUIRED` — YES — app errors if table missing
+- PASS `APP_BEFORE_MIGRATION_SAFE` — NO — migration must precede app restart for STT admin channels (expected)
+- PASS `MIGRATION_DEPLOY_ORDER_READY` — 1 pull 2 migrate 0040 3 verify table 4 typecheck/build 5 pm2 restart 6 health 7 admin CRUD 8 test connection 9 consumer canary
+- PASS `CREATE_durable_store` — encrypted at rest
+- PASS `READ_after_cache_clear` — production store reload
+- PASS `UPDATE_durable_store` — whisper-large-v3
+- PASS `SECRET_ROTATE_DECRYPT` — rotated secret usable
+- PASS `DISABLE_resolver_fallback` — disabled → no admin channel
+- PASS `DELETE_not_found` — deleted from durable store
+- PASS `PRODUCTION_STORE_IMPLEMENTATION_EXERCISED` — YES — routes → adminUpstreamChannelsStore
+- PASS `COPIED_TEST_STORAGE_IMPLEMENTATION` — NO — uses dist/lib/adminUpstreamChannelsStore.js
+- PASS `CHAT_CHANGED` — NO
+- PASS `RESPONSES_CHANGED` — NO
+- PASS `CURSOR_CHANGED` — NO
+- PASS `AZURE_INGRESS_CHANGED` — NO
+- PASS `AUTOPRO_CHANGED` — NO
+- PASS `GPT_GEMINI_CHANGED` — NO
+- PASS `CONSUMER_AUTH_CHANGED` — NO
+- PASS `IMAGE_CHANGED` — NO
+- PASS `git_diff_check` — PASS
+- PASS `regression_P1077R2` — status=0
+- PASS `regression_P1077` — status=0
+- PASS `regression_P1072` — status=0
+- PASS `regression_P1074` — status=0
+- PASS `regression_P1059_absent` — not in scripts/ — isolation already covered
+- PASS `regression_P1061_absent` — not in scripts/ — isolation already covered
+- PASS `regression_P1062R4_absent` — not in scripts/ — isolation already covered
+- PASS `regression_P1067_absent` — not in scripts/ — isolation already covered
+- PASS `regression_P1070_absent` — not in scripts/ — isolation already covered

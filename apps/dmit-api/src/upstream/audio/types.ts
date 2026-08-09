@@ -41,7 +41,15 @@ export type ResolvedAudioSttConfig = {
   baseUrl: string | null;
   apiKeySet: boolean;
   defaultModel: string;
+  /**
+   * When set (admin STT channel), this model is sent upstream.
+   * Client model remains public contract / intent only.
+   * Null on env fallback → use client || defaultModel (legacy).
+   */
+  upstreamModel: string | null;
   timeoutMs: number;
   /** Flat credits per successful transcription; null = not priced → not_billable. */
   priceCredits: number | null;
+  source: "admin_channel" | "env" | "unavailable";
+  channelId: string | null;
 };

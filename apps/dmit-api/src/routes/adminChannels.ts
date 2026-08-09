@@ -1,11 +1,48 @@
+import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { isKeyEncryptionConfigured } from "../auth/keyEncryption.js";
 import { env } from "../env.js";
 import { recordAdminAuditLog } from "../lib/adminAuditLog.js";
+import {
+  AdminChannelStoreError,
+  decryptUpstreamSecretFromStore,
+  deleteDurableChannel,
+  encryptUpstreamSecretForStore,
+  getAdminChannelStorageClass,
+  getAdminChannelStoragePathOrTable,
+  loadDurableChannels,
+  persistDurableChannel,
+  __wipeDurableFileStoreForTests,
+  type DurableChannelRow,
+} from "../lib/adminUpstreamChannelsStore.js";
 import { log } from "../logger.js";
 import type { AdminUserContext } from "../middleware/requireAdminV1.js";
+import {
+  createOpenaiCompatSttAdapter,
+} from "../upstream/audio/openaiCompatSttAdapter.js";
+import type { AudioSttProviderId } from "../upstream/audio/types.js";
+
+export {
+  AdminChannelStoreError,
+  getAdminChannelStorageClass,
+  getAdminChannelStoragePathOrTable,
+};
+
+export type AdminChannelModality = "chat" | "image" | "audio_transcription";
+
+export type AdminChannelCapability = "chat_image" | "audio_transcription";
+
+export type AdminSttProvider =
+  | "groq_whisper_compatible"
+  | "openai_compatible";
 
 export type AdminChannelRow = {
   id: string;
   provider_name: string;
+  /** Always empty in list/get responses — use base_url_masked. */
   base_url: string;
   base_url_masked: string;
   status: "active" | "disabled";
@@ -15,8 +52,16 @@ export type AdminChannelRow = {
   success_rate: number | null;
   last_error: string | null;
   enabled: boolean;
-  modalities: Array<"chat" | "image">;
+  modalities: AdminChannelModality[];
   updated_at: string | null;
+  /** Extended fields — STT channels set these; primary chat/image may omit. */
+  capability?: AdminChannelCapability;
+  provider?: AdminSttProvider | null;
+  default_model?: string | null;
+  /** True when an upstream API key is stored — never returns the secret. */
+  api_key_set?: boolean;
+  /** Masked hint only (e.g. gsk_…abcd). Never full secret. */
+  api_key_masked?: string | null;
 };
 
 type AdminChannelWriteContext = {
@@ -37,11 +82,135 @@ type ChannelOverlay = {
   updated_at: string;
 };
 
+type SttChannelSecret = {
+  /** AES-GCM ciphertext when TOKFAI_KEY_ENCRYPTION_SECRET is configured. */
+  encrypted: string | null;
+  /** Process-memory fallback when encryption is not configured (tests/dev). */
+  memory: string | null;
+  last4: string;
+};
+
+type SttChannelRecord = {
+  id: string;
+  name: string;
+  provider: AdminSttProvider;
+  baseUrl: string;
+  defaultModel: string;
+  enabled: boolean;
+  priority: number;
+  weight: number;
+  timeoutMs: number | null;
+  secret: SttChannelSecret;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /**
- * Process-local channel overlays (no schema change).
- * Survives within a DMIT process; resets on restart.
+ * Process-local overlays for primary chat/image channel (operational tweaks).
+ * STT upstream channels are durable (DB / encrypted file) — memory is cache only.
  */
 const channelOverlays = new Map<string, ChannelOverlay>();
+
+/** In-memory cache of durable STT channels. Never the source of truth. */
+const sttChannels = new Map<string, SttChannelRecord>();
+let sttCacheLoaded = false;
+let sttCacheLoadPromise: Promise<void> | null = null;
+
+const PRIMARY_CHANNEL_ID = "primary-channel";
+
+const DEFAULT_GROQ_BASE = "https://api.groq.com/openai/v1";
+const DEFAULT_GROQ_MODEL = "whisper-large-v3-turbo";
+
+function durableToRecord(row: DurableChannelRow): SttChannelRecord | null {
+  if (row.capability !== "audio_transcription") return null;
+  const provider =
+    row.provider === "openai_compatible" ||
+    row.provider === "groq_whisper_compatible"
+      ? row.provider
+      : null;
+  if (!provider) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    provider,
+    baseUrl: row.base_url,
+    defaultModel: row.default_model || DEFAULT_GROQ_MODEL,
+    enabled: row.enabled,
+    priority: row.priority,
+    weight: row.weight,
+    timeoutMs: row.timeout_ms,
+    secret: {
+      encrypted: row.encrypted_api_key,
+      memory: null,
+      last4: row.api_key_last4 || "",
+    },
+    lastError: row.last_error,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function recordToDurable(rec: SttChannelRecord): DurableChannelRow {
+  return {
+    id: rec.id,
+    name: rec.name,
+    capability: "audio_transcription",
+    provider: rec.provider,
+    base_url: rec.baseUrl,
+    default_model: rec.defaultModel,
+    encrypted_api_key: rec.secret.encrypted,
+    api_key_last4: rec.secret.last4,
+    enabled: rec.enabled,
+    status: rec.enabled ? "active" : "disabled",
+    priority: rec.priority,
+    weight: rec.weight,
+    timeout_ms: rec.timeoutMs,
+    last_error: rec.lastError,
+    modalities: ["audio_transcription"],
+    created_at: rec.createdAt,
+    updated_at: rec.updatedAt,
+  };
+}
+
+async function ensureSttCacheLoaded(): Promise<void> {
+  if (sttCacheLoaded) return;
+  if (sttCacheLoadPromise) {
+    await sttCacheLoadPromise;
+    return;
+  }
+  sttCacheLoadPromise = (async () => {
+    const rows = await loadDurableChannels();
+    sttChannels.clear();
+    for (const row of rows) {
+      const rec = durableToRecord(row);
+      if (rec) sttChannels.set(rec.id, rec);
+    }
+    sttCacheLoaded = true;
+  })();
+  try {
+    await sttCacheLoadPromise;
+  } catch (err) {
+    sttCacheLoaded = false;
+    throw err instanceof AdminChannelStoreError
+      ? err
+      : new AdminChannelStoreError(
+          "admin_channels_store_unavailable",
+          "Admin upstream channel store is unavailable."
+        );
+  } finally {
+    sttCacheLoadPromise = null;
+  }
+}
+
+async function persistSttRecord(rec: SttChannelRecord): Promise<void> {
+  if (!rec.secret.encrypted) {
+    throw new Error("refusing to persist STT channel without encrypted secret");
+  }
+  await persistDurableChannel(recordToDurable(rec));
+  sttChannels.set(rec.id, rec);
+  sttCacheLoaded = true;
+}
 
 function maskBaseUrl(url: string): string {
   try {
@@ -55,11 +224,29 @@ function maskBaseUrl(url: string): string {
   }
 }
 
+function storeSecret(plaintext: string): SttChannelSecret {
+  if (!isKeyEncryptionConfigured()) {
+    throw new Error(
+      "TOKFAI_KEY_ENCRYPTION_SECRET is required to store upstream channel secrets"
+    );
+  }
+  const sealed = encryptUpstreamSecretForStore(plaintext);
+  return {
+    encrypted: sealed.encrypted_api_key,
+    memory: null,
+    last4: sealed.api_key_last4,
+  };
+}
+
+function readSecret(secret: SttChannelSecret): string | null {
+  return decryptUpstreamSecretFromStore(secret.encrypted);
+}
+
 function baseChannel(): AdminChannelRow {
   const baseUrl = env.GRSAI_BASE_URL;
   return {
     // Public admin label only — never expose real supplier brand/id to the UI.
-    id: "primary-channel",
+    id: PRIMARY_CHANNEL_ID,
     provider_name: "Tokfai private channel",
     base_url: baseUrl,
     base_url_masked: maskBaseUrl(baseUrl),
@@ -72,6 +259,11 @@ function baseChannel(): AdminChannelRow {
     enabled: true,
     modalities: ["chat", "image"],
     updated_at: null,
+    capability: "chat_image",
+    provider: null,
+    default_model: null,
+    api_key_set: Boolean(env.GRSAI_API_KEY?.trim()),
+    api_key_masked: null,
   };
 }
 
@@ -120,15 +312,109 @@ function applyOverlay(
   };
 }
 
-/** Read-only channel view derived from configured private channel + overlays. */
-export function listAdminChannels(): AdminChannelRow[] {
-  const channel = baseChannel();
-  return [applyOverlay(channel, channelOverlays.get(channel.id))];
+function sttRecordToRow(rec: SttChannelRecord): AdminChannelRow {
+  const secretPresent = Boolean(readSecret(rec.secret));
+  return {
+    id: rec.id,
+    provider_name: rec.name,
+    base_url: "",
+    base_url_masked: maskBaseUrl(rec.baseUrl),
+    status: rec.enabled ? "active" : "disabled",
+    priority: rec.priority,
+    weight: rec.weight,
+    timeout_ms: rec.timeoutMs,
+    success_rate: null,
+    last_error: rec.lastError,
+    enabled: rec.enabled,
+    modalities: ["audio_transcription"],
+    updated_at: rec.updatedAt,
+    capability: "audio_transcription",
+    provider: rec.provider,
+    default_model: rec.defaultModel,
+    api_key_set: secretPresent,
+    api_key_masked: secretPresent
+      ? `****…${rec.secret.last4} (set)`
+      : null,
+  };
 }
 
-export function getAdminChannel(id: string): AdminChannelRow | null {
-  const channel = listAdminChannels().find((row) => row.id === id);
+/** Read-only channel view: primary chat/image + durable STT channels. */
+export async function listAdminChannels(): Promise<AdminChannelRow[]> {
+  try {
+    await ensureSttCacheLoaded();
+  } catch (err) {
+    // Admin list must not silently invent an empty STT inventory on DB failure.
+    throw err instanceof AdminChannelStoreError
+      ? err
+      : new AdminChannelStoreError(
+          "admin_channels_store_unavailable",
+          "Admin upstream channel store is unavailable."
+        );
+  }
+  const channel = baseChannel();
+  const primary = applyOverlay(channel, channelOverlays.get(channel.id));
+  const stt = [...sttChannels.values()]
+    .sort((a, b) => a.priority - b.priority || a.createdAt.localeCompare(b.createdAt))
+    .map(sttRecordToRow);
+  return [primary, ...stt];
+}
+
+export async function getAdminChannel(
+  id: string
+): Promise<AdminChannelRow | null> {
+  const channel = (await listAdminChannels()).find((row) => row.id === id);
   return channel ?? null;
+}
+
+/**
+ * Runtime STT channel selection (internal — never expose secrets).
+ * Reloads from durable store so multi-process / restart see shared config.
+ */
+export async function resolveEnabledSttAdminChannel(): Promise<{
+  id: string;
+  providerId: AudioSttProviderId;
+  baseUrl: string;
+  apiKey: string;
+  defaultModel: string;
+  timeoutMs: number;
+} | null> {
+  try {
+    await ensureSttCacheLoaded();
+  } catch (err) {
+    // Designed consumer-safe degradation: durable store unavailable → ENV_FALLBACK.
+    // Never invent process-memory channels. Never leak store/DB details or secrets.
+    const code =
+      err instanceof AdminChannelStoreError
+        ? err.code
+        : "admin_channels_store_unavailable";
+    log.warn("admin_stt_channel_store_unavailable_env_fallback", {
+      code,
+      message: "Durable STT channel store unavailable; using env fallback.",
+    });
+    return null;
+  }
+  const candidates = [...sttChannels.values()]
+    .filter((r) => r.enabled)
+    .sort((a, b) => a.priority - b.priority || a.createdAt.localeCompare(b.createdAt));
+
+  for (const rec of candidates) {
+    const apiKey = readSecret(rec.secret);
+    const baseUrl = rec.baseUrl.trim();
+    if (!apiKey || !baseUrl) continue;
+    const providerId: AudioSttProviderId =
+      rec.provider === "groq_whisper_compatible"
+        ? "groq_whisper_compatible"
+        : "openai_compatible";
+    return {
+      id: rec.id,
+      providerId,
+      baseUrl,
+      apiKey,
+      defaultModel: rec.defaultModel || DEFAULT_GROQ_MODEL,
+      timeoutMs: rec.timeoutMs ?? env.TOKFAI_STT_TIMEOUT_MS ?? 60_000,
+    };
+  }
+  return null;
 }
 
 async function auditChannelWrite(
@@ -142,36 +428,53 @@ async function auditChannelWrite(
     channel?: AdminChannelRow | null;
   }
 ): Promise<void> {
-  await recordAdminAuditLog({
-    actorUserId: ctx.adminUser.userId,
-    actorEmail: ctx.adminUser.email,
-    action: args.action,
-    resourceType: "channel",
-    resourceId: args.resourceId,
-    requestPayload: args.requestPayload,
-    status: args.status,
-    resultPayload: {
-      ok: args.status === "succeeded",
-      channel_id: args.resourceId,
+  // Never put api_key / secrets into audit payloads.
+  const safeRequest = { ...args.requestPayload };
+  delete safeRequest.api_key;
+  delete safeRequest.apiKey;
+
+  try {
+    await recordAdminAuditLog({
+      actorUserId: ctx.adminUser.userId,
+      actorEmail: ctx.adminUser.email,
       action: args.action,
-      error: args.error ?? null,
-      channel: args.channel
-        ? {
-            id: args.channel.id,
-            enabled: args.channel.enabled,
-            status: args.channel.status,
-            priority: args.channel.priority,
-            base_url_masked: args.channel.base_url_masked,
-          }
-        : null,
-    },
-    ipAddress: ctx.ipAddress,
-    userAgent: ctx.userAgent,
-    idempotencyKey: ctx.idempotencyKey || undefined,
-  });
+      resourceType: "channel",
+      resourceId: args.resourceId,
+      requestPayload: safeRequest,
+      status: args.status,
+      resultPayload: {
+        ok: args.status === "succeeded",
+        channel_id: args.resourceId,
+        action: args.action,
+        error: args.error ?? null,
+        channel: args.channel
+          ? {
+              id: args.channel.id,
+              enabled: args.channel.enabled,
+              status: args.channel.status,
+              priority: args.channel.priority,
+              base_url_masked: args.channel.base_url_masked,
+              capability: args.channel.capability ?? null,
+              provider: args.channel.provider ?? null,
+              default_model: args.channel.default_model ?? null,
+              api_key_set: args.channel.api_key_set ?? false,
+            }
+          : null,
+      },
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+      idempotencyKey: ctx.idempotencyKey || undefined,
+    });
+  } catch {
+    // Soft-fail: channel ops must work in offline tests without service_role.
+    log.warn("admin_channel_audit_skipped", {
+      action: args.action,
+      resourceId: args.resourceId,
+    });
+  }
 }
 
-const ALLOWED_CHANNEL_PATCH = new Set([
+const ALLOWED_PRIMARY_PATCH = new Set([
   "enabled",
   "status",
   "priority",
@@ -179,9 +482,239 @@ const ALLOWED_CHANNEL_PATCH = new Set([
   "base_url",
 ]);
 
+const ALLOWED_STT_PATCH = new Set([
+  "enabled",
+  "status",
+  "priority",
+  "weight",
+  "base_url",
+  "api_key",
+  "default_model",
+  "provider",
+  "provider_name",
+  "name",
+  "timeout_ms",
+]);
+
+function parseBaseUrl(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return null;
+    }
+    return parsed.toString().replace(/\/+$/, "");
+  } catch {
+    return null;
+  }
+}
+
+function normalizeSttProvider(raw: unknown): AdminSttProvider | null {
+  if (typeof raw !== "string") return null;
+  const v = raw.trim().toLowerCase();
+  if (v === "groq_whisper_compatible" || v === "groq") {
+    return "groq_whisper_compatible";
+  }
+  if (
+    v === "openai_compatible" ||
+    v === "openai" ||
+    v === "openai-compatible"
+  ) {
+    return "openai_compatible";
+  }
+  return null;
+}
+
 /**
- * Patch channel operational fields (process-local overlay).
- * base_url is stored but always returned masked — never exposes upstream keys.
+ * Create an STT upstream channel (admin only).
+ * Consumer API keys are never used as upstream credentials.
+ */
+export async function createAdminSttChannel(
+  body: Record<string, unknown>,
+  ctx: AdminChannelWriteContext
+): Promise<
+  | { ok: true; channel: AdminChannelRow }
+  | { ok: false; status: 400; error: string; detail?: unknown }
+> {
+  const capability = String(body.capability ?? "audio_transcription").trim();
+  if (capability !== "audio_transcription" && capability !== "stt") {
+    await auditChannelWrite(ctx, {
+      action: "channels.create",
+      resourceId: "new",
+      requestPayload: { fields: Object.keys(body) },
+      status: "failed",
+      error: "invalid_capability",
+    });
+    return { ok: false, status: 400, error: "invalid_capability" };
+  }
+
+  const provider =
+    normalizeSttProvider(body.provider) ?? "groq_whisper_compatible";
+  const baseUrl =
+    parseBaseUrl(body.base_url) ??
+    (provider === "groq_whisper_compatible" ? DEFAULT_GROQ_BASE : null);
+  if (!baseUrl) {
+    await auditChannelWrite(ctx, {
+      action: "channels.create",
+      resourceId: "new",
+      requestPayload: { fields: Object.keys(body), provider },
+      status: "failed",
+      error: "invalid_base_url",
+    });
+    return { ok: false, status: 400, error: "invalid_base_url" };
+  }
+
+  const apiKeyRaw =
+    typeof body.api_key === "string" ? body.api_key.trim() : "";
+  if (!apiKeyRaw) {
+    await auditChannelWrite(ctx, {
+      action: "channels.create",
+      resourceId: "new",
+      requestPayload: { fields: Object.keys(body), provider },
+      status: "failed",
+      error: "missing_api_key",
+    });
+    return { ok: false, status: 400, error: "missing_api_key" };
+  }
+
+  // Never accept a consumer Tokfai key as upstream credential.
+  if (apiKeyRaw.startsWith("sk-tokfai_")) {
+    await auditChannelWrite(ctx, {
+      action: "channels.create",
+      resourceId: "new",
+      requestPayload: { fields: Object.keys(body), provider },
+      status: "failed",
+      error: "consumer_key_not_allowed_as_upstream",
+    });
+    return {
+      ok: false,
+      status: 400,
+      error: "consumer_key_not_allowed_as_upstream",
+    };
+  }
+
+  const defaultModel =
+    typeof body.default_model === "string" && body.default_model.trim()
+      ? body.default_model.trim()
+      : provider === "groq_whisper_compatible"
+        ? DEFAULT_GROQ_MODEL
+        : "whisper-1";
+
+  const name =
+    typeof body.name === "string" && body.name.trim()
+      ? body.name.trim().slice(0, 80)
+      : typeof body.provider_name === "string" && body.provider_name.trim()
+        ? body.provider_name.trim().slice(0, 80)
+        : "STT channel";
+
+  let priority = 10;
+  if (body.priority !== undefined) {
+    const n = Number(body.priority);
+    if (!Number.isInteger(n) || n < 0 || n > 10_000) {
+      return { ok: false, status: 400, error: "invalid_priority" };
+    }
+    priority = n;
+  }
+
+  let weight = 100;
+  if (body.weight !== undefined) {
+    const n = Number(body.weight);
+    if (!Number.isInteger(n) || n < 0 || n > 10_000) {
+      return { ok: false, status: 400, error: "invalid_weight" };
+    }
+    weight = n;
+  }
+
+  const enabled =
+    typeof body.enabled === "boolean"
+      ? body.enabled
+      : body.status === "disabled"
+        ? false
+        : true;
+
+  if (!isKeyEncryptionConfigured()) {
+    return {
+      ok: false,
+      status: 400,
+      error: "missing_key_encryption_secret",
+    };
+  }
+
+  const now = new Date().toISOString();
+  const id = `stt-${randomUUID().replace(/-/g, "").slice(0, 16)}`;
+  let rec: SttChannelRecord;
+  try {
+    rec = {
+      id,
+      name,
+      provider,
+      baseUrl,
+      defaultModel,
+      enabled,
+      priority,
+      weight,
+      timeoutMs: env.TOKFAI_STT_TIMEOUT_MS ?? 60_000,
+      secret: storeSecret(apiKeyRaw),
+      lastError: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await persistSttRecord(rec);
+  } catch (err) {
+    await auditChannelWrite(ctx, {
+      action: "channels.create",
+      resourceId: "new",
+      requestPayload: { fields: Object.keys(body), provider },
+      status: "failed",
+      error: "persist_failed",
+    });
+    return {
+      ok: false,
+      status: 400,
+      error: "persist_failed",
+      detail: {
+        message: err instanceof Error ? err.message : "persist_failed",
+      },
+    };
+  }
+  const channel = sttRecordToRow(rec);
+
+  await auditChannelWrite(ctx, {
+    action: "channels.create",
+    resourceId: id,
+    requestPayload: {
+      fields: Object.keys(body).filter((k) => k !== "api_key"),
+      provider,
+      capability: "audio_transcription",
+      base_url_masked: channel.base_url_masked,
+      default_model: defaultModel,
+      enabled,
+      api_key_set: true,
+    },
+    status: "succeeded",
+    channel,
+  });
+
+  log.info("admin_channel_create_ok", {
+    requestId: ctx.requestId,
+    route: ctx.route,
+    code: "admin_channel_create_ok",
+    message: "Admin STT channel created.",
+    channel_id: id,
+    provider,
+    capability: "audio_transcription",
+    adminUserId: ctx.adminUser.adminUserId ?? undefined,
+  });
+
+  return { ok: true, channel };
+}
+
+/**
+ * Patch channel operational fields.
+ * Primary chat/image: process-local overlay (existing).
+ * STT channels: update record; empty api_key does not overwrite.
  */
 export async function updateAdminChannel(
   id: string,
@@ -194,6 +727,12 @@ export async function updateAdminChannel(
   const channelId = id.trim();
   if (!channelId) {
     return { ok: false, status: 400, error: "missing_channel_id" };
+  }
+
+  await ensureSttCacheLoaded();
+  const stt = sttChannels.get(channelId);
+  if (stt) {
+    return updateSttChannel(stt, body, ctx);
   }
 
   const base = baseChannel();
@@ -209,7 +748,7 @@ export async function updateAdminChannel(
   }
 
   for (const key of Object.keys(body)) {
-    if (!ALLOWED_CHANNEL_PATCH.has(key)) {
+    if (!ALLOWED_PRIMARY_PATCH.has(key)) {
       await auditChannelWrite(ctx, {
         action: "channels.patch",
         resourceId: channelId,
@@ -281,15 +820,8 @@ export async function updateAdminChannel(
       patch.base_url_override = null;
       changed = true;
     } else if (typeof body.base_url === "string") {
-      const trimmed = body.base_url.trim();
-      try {
-        const parsed = new URL(trimmed);
-        if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-          throw new Error("invalid protocol");
-        }
-        patch.base_url_override = parsed.toString().replace(/\/+$/, "");
-        changed = true;
-      } catch {
+      const parsed = parseBaseUrl(body.base_url);
+      if (!parsed) {
         await auditChannelWrite(ctx, {
           action: "channels.patch",
           resourceId: channelId,
@@ -299,6 +831,8 @@ export async function updateAdminChannel(
         });
         return { ok: false, status: 400, error: "invalid_base_url" };
       }
+      patch.base_url_override = parsed;
+      changed = true;
     } else {
       await auditChannelWrite(ctx, {
         action: "channels.patch",
@@ -351,7 +885,533 @@ export async function updateAdminChannel(
   return { ok: true, channel };
 }
 
-/** Test helper — clear overlays (not exported via HTTP). */
+async function updateSttChannel(
+  rec: SttChannelRecord,
+  body: Record<string, unknown>,
+  ctx: AdminChannelWriteContext
+): Promise<
+  | { ok: true; channel: AdminChannelRow }
+  | { ok: false; status: 400 | 404; error: string; detail?: unknown }
+> {
+  for (const key of Object.keys(body)) {
+    if (!ALLOWED_STT_PATCH.has(key)) {
+      await auditChannelWrite(ctx, {
+        action: "channels.patch",
+        resourceId: rec.id,
+        requestPayload: { fields: Object.keys(body) },
+        status: "failed",
+        error: "unknown_field",
+      });
+      return {
+        ok: false,
+        status: 400,
+        error: "unknown_field",
+        detail: { field: key },
+      };
+    }
+  }
+
+  let changed = false;
+  const next: SttChannelRecord = { ...rec, secret: { ...rec.secret } };
+
+  if (typeof body.enabled === "boolean") {
+    next.enabled = body.enabled;
+    changed = true;
+  }
+  if (body.status === "active" || body.status === "disabled") {
+    next.enabled = body.status === "active";
+    changed = true;
+  }
+
+  if (body.priority !== undefined) {
+    const priority = Number(body.priority);
+    if (!Number.isInteger(priority) || priority < 0 || priority > 10_000) {
+      return { ok: false, status: 400, error: "invalid_priority" };
+    }
+    next.priority = priority;
+    changed = true;
+  }
+
+  if (body.weight !== undefined) {
+    const weight = Number(body.weight);
+    if (!Number.isInteger(weight) || weight < 0 || weight > 10_000) {
+      return { ok: false, status: 400, error: "invalid_weight" };
+    }
+    next.weight = weight;
+    changed = true;
+  }
+
+  if (body.base_url !== undefined) {
+    const parsed = parseBaseUrl(body.base_url);
+    if (!parsed) {
+      return { ok: false, status: 400, error: "invalid_base_url" };
+    }
+    next.baseUrl = parsed;
+    changed = true;
+  }
+
+  if (body.default_model !== undefined) {
+    if (typeof body.default_model !== "string" || !body.default_model.trim()) {
+      return { ok: false, status: 400, error: "invalid_default_model" };
+    }
+    next.defaultModel = body.default_model.trim();
+    changed = true;
+  }
+
+  if (body.provider !== undefined) {
+    const provider = normalizeSttProvider(body.provider);
+    if (!provider) {
+      return { ok: false, status: 400, error: "invalid_provider" };
+    }
+    next.provider = provider;
+    changed = true;
+  }
+
+  if (body.name !== undefined || body.provider_name !== undefined) {
+    const nameRaw = body.name ?? body.provider_name;
+    if (typeof nameRaw !== "string" || !nameRaw.trim()) {
+      return { ok: false, status: 400, error: "invalid_name" };
+    }
+    next.name = nameRaw.trim().slice(0, 80);
+    changed = true;
+  }
+
+  if (body.timeout_ms !== undefined) {
+    const n = Number(body.timeout_ms);
+    if (!Number.isInteger(n) || n < 1000 || n > 600_000) {
+      return { ok: false, status: 400, error: "invalid_timeout_ms" };
+    }
+    next.timeoutMs = n;
+    changed = true;
+  }
+
+  // Empty / missing api_key on edit must NOT overwrite existing secret.
+  if (body.api_key !== undefined) {
+    if (typeof body.api_key === "string" && body.api_key.trim()) {
+      const apiKeyRaw = body.api_key.trim();
+      if (apiKeyRaw.startsWith("sk-tokfai_")) {
+        return {
+          ok: false,
+          status: 400,
+          error: "consumer_key_not_allowed_as_upstream",
+        };
+      }
+      next.secret = storeSecret(apiKeyRaw);
+      changed = true;
+    }
+    // else: empty string → leave secret unchanged (not an error)
+  }
+
+  if (!changed) {
+    await auditChannelWrite(ctx, {
+      action: "channels.patch",
+      resourceId: rec.id,
+      requestPayload: { fields: Object.keys(body) },
+      status: "failed",
+      error: "empty_patch",
+    });
+    return { ok: false, status: 400, error: "empty_patch" };
+  }
+
+  next.updatedAt = new Date().toISOString();
+  try {
+    await persistSttRecord(next);
+  } catch (err) {
+    await auditChannelWrite(ctx, {
+      action: "channels.patch",
+      resourceId: rec.id,
+      requestPayload: { fields: Object.keys(body) },
+      status: "failed",
+      error: "persist_failed",
+    });
+    return {
+      ok: false,
+      status: 400,
+      error: "persist_failed",
+      detail: {
+        message: err instanceof Error ? err.message : "persist_failed",
+      },
+    };
+  }
+  const channel = sttRecordToRow(next);
+
+  await auditChannelWrite(ctx, {
+    action: "channels.patch",
+    resourceId: rec.id,
+    requestPayload: {
+      fields: Object.keys(body).filter((k) => k !== "api_key"),
+      enabled: next.enabled,
+      provider: next.provider,
+      default_model: next.defaultModel,
+      base_url_masked: channel.base_url_masked,
+      api_key_set: channel.api_key_set,
+      api_key_replaced: Boolean(
+        typeof body.api_key === "string" && body.api_key.trim()
+      ),
+    },
+    status: "succeeded",
+    channel,
+  });
+
+  log.info("admin_channel_patch_ok", {
+    requestId: ctx.requestId,
+    route: ctx.route,
+    code: "admin_channel_patch_ok",
+    message: "Admin STT channel updated.",
+    channel_id: rec.id,
+    provider: next.provider,
+    adminUserId: ctx.adminUser.adminUserId ?? undefined,
+  });
+
+  return { ok: true, channel };
+}
+
+/**
+ * Delete an STT upstream channel from durable store.
+ * Primary chat/image channel cannot be deleted.
+ */
+export async function deleteAdminChannel(
+  id: string,
+  ctx: AdminChannelWriteContext
+): Promise<
+  | { ok: true; deleted_id: string }
+  | { ok: false; status: 400 | 404; error: string }
+> {
+  const channelId = id.trim();
+  if (!channelId) {
+    return { ok: false, status: 400, error: "missing_channel_id" };
+  }
+  if (channelId === PRIMARY_CHANNEL_ID) {
+    return { ok: false, status: 400, error: "primary_channel_immutable" };
+  }
+  await ensureSttCacheLoaded();
+  if (!sttChannels.has(channelId)) {
+    await auditChannelWrite(ctx, {
+      action: "channels.delete",
+      resourceId: channelId,
+      requestPayload: {},
+      status: "failed",
+      error: "channel_not_found",
+    });
+    return { ok: false, status: 404, error: "channel_not_found" };
+  }
+  await deleteDurableChannel(channelId);
+  sttChannels.delete(channelId);
+  await auditChannelWrite(ctx, {
+    action: "channels.delete",
+    resourceId: channelId,
+    requestPayload: {},
+    status: "succeeded",
+  });
+  log.info("admin_channel_delete_ok", {
+    requestId: ctx.requestId,
+    channel_id: channelId,
+  });
+  return { ok: true, deleted_id: channelId };
+}
+
+export type AdminSttChannelTestResult = {
+  ok: boolean;
+  channel_id: string;
+  upstream_status: number | null;
+  latency_ms: number | null;
+  error_class: string | null;
+  message: string;
+  /** Transcript length only — never full upstream body dumps with secrets. */
+  transcript_chars?: number;
+};
+
+/**
+ * Real HTTP STT probe against the channel upstream (silence WAV).
+ * Never bills consumers. Never returns or logs upstream API keys.
+ */
+export async function testAdminSttChannel(
+  id: string,
+  ctx: AdminChannelWriteContext
+): Promise<
+  | { ok: true; result: AdminSttChannelTestResult }
+  | { ok: false; status: 400 | 404; error: string; result?: AdminSttChannelTestResult }
+> {
+  await ensureSttCacheLoaded();
+  const rec = sttChannels.get(id.trim());
+  if (!rec) {
+    return { ok: false, status: 404, error: "channel_not_found" };
+  }
+
+  const apiKey = readSecret(rec.secret);
+  if (!apiKey || !rec.baseUrl) {
+    const result: AdminSttChannelTestResult = {
+      ok: false,
+      channel_id: rec.id,
+      upstream_status: null,
+      latency_ms: null,
+      error_class: "missing_credentials",
+      message: "STT channel is missing base_url or api_key.",
+    };
+    await auditChannelWrite(ctx, {
+      action: "channels.test",
+      resourceId: rec.id,
+      requestPayload: { test: "stt_silence_wav" },
+      status: "failed",
+      error: "missing_credentials",
+      channel: sttRecordToRow(rec),
+    });
+    return { ok: false, status: 400, error: "missing_credentials", result };
+  }
+
+  let wavBytes: Uint8Array;
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    // dist/routes → repo root scripts/fixtures
+    const candidates = [
+      join(here, "../../../../scripts/fixtures/p1074/stt-canary-silence.wav"),
+      join(process.cwd(), "scripts/fixtures/p1074/stt-canary-silence.wav"),
+      join(process.cwd(), "../scripts/fixtures/p1074/stt-canary-silence.wav"),
+    ];
+    let found: Buffer | null = null;
+    for (const p of candidates) {
+      try {
+        found = readFileSync(p);
+        break;
+      } catch {
+        // try next
+      }
+    }
+    if (!found) {
+      throw new Error("silence_wav_missing");
+    }
+    wavBytes = new Uint8Array(found);
+  } catch {
+    return {
+      ok: false,
+      status: 400,
+      error: "test_fixture_missing",
+      result: {
+        ok: false,
+        channel_id: rec.id,
+        upstream_status: null,
+        latency_ms: null,
+        error_class: "test_fixture_missing",
+        message: "STT test fixture (silence WAV) is not available.",
+      },
+    };
+  }
+
+  const providerId: AudioSttProviderId =
+    rec.provider === "groq_whisper_compatible"
+      ? "groq_whisper_compatible"
+      : "openai_compatible";
+  const adapter = createOpenaiCompatSttAdapter({
+    providerId,
+    baseUrl: rec.baseUrl,
+    apiKey,
+  });
+
+  const started = Date.now();
+  try {
+    const out = await adapter.transcribeAudio({
+      requestId: ctx.requestId || `admin_stt_test_${rec.id}`,
+      model: rec.defaultModel || DEFAULT_GROQ_MODEL,
+      bytes: wavBytes,
+      mimeType: "audio/wav",
+      filename: "stt-canary-silence.wav",
+      timeoutMs: Math.min(rec.timeoutMs ?? 60_000, 60_000),
+    });
+    const latencyMs = Date.now() - started;
+    rec.lastError = null;
+    rec.updatedAt = new Date().toISOString();
+    await persistSttRecord(rec);
+
+    const result: AdminSttChannelTestResult = {
+      ok: true,
+      channel_id: rec.id,
+      upstream_status: out.upstreamStatus,
+      latency_ms: latencyMs,
+      error_class: null,
+      message: "STT upstream connection succeeded.",
+      transcript_chars: out.text.length,
+    };
+
+    await auditChannelWrite(ctx, {
+      action: "channels.test",
+      resourceId: rec.id,
+      requestPayload: { test: "stt_silence_wav" },
+      status: "succeeded",
+      channel: sttRecordToRow(rec),
+    });
+
+    log.info("admin_channel_stt_test_ok", {
+      requestId: ctx.requestId,
+      channel_id: rec.id,
+      provider: rec.provider,
+      upstream_status: out.upstreamStatus,
+      latency_ms: latencyMs,
+      transcript_chars: out.text.length,
+    });
+
+    return { ok: true, result };
+  } catch (err) {
+    const latencyMs = Date.now() - started;
+    const status =
+      err && typeof err === "object" && "upstreamStatus" in err
+        ? Number((err as { upstreamStatus?: number }).upstreamStatus) || null
+        : err && typeof err === "object" && "status" in err
+          ? Number((err as { status?: number }).status) || null
+          : null;
+    const code =
+      err && typeof err === "object" && "code" in err
+        ? String((err as { code?: string }).code ?? "upstream_error")
+        : "upstream_error";
+    const publicMessage =
+      err && typeof err === "object" && "publicMessage" in err
+        ? String((err as { publicMessage?: string }).publicMessage ?? "")
+        : "STT upstream connection failed.";
+
+    // Never include err.message if it might echo secrets — use public class only.
+    rec.lastError = `${code}${status != null ? ` status=${status}` : ""}`.slice(
+      0,
+      200
+    );
+    rec.updatedAt = new Date().toISOString();
+    await persistSttRecord(rec);
+
+    const result: AdminSttChannelTestResult = {
+      ok: false,
+      channel_id: rec.id,
+      upstream_status: status,
+      latency_ms: latencyMs,
+      error_class: code,
+      message: publicMessage || "STT upstream connection failed.",
+    };
+
+    await auditChannelWrite(ctx, {
+      action: "channels.test",
+      resourceId: rec.id,
+      requestPayload: { test: "stt_silence_wav" },
+      status: "failed",
+      error: code,
+      channel: sttRecordToRow(rec),
+    });
+
+    log.warn("admin_channel_stt_test_failed", {
+      requestId: ctx.requestId,
+      channel_id: rec.id,
+      provider: rec.provider,
+      upstream_status: status,
+      latency_ms: latencyMs,
+      error_class: code,
+    });
+
+    return { ok: false, status: 400, error: "stt_test_failed", result };
+  }
+}
+
+/** Test helper — clear memory cache only (durable store untouched). */
 export function __resetAdminChannelOverlaysForTests(): void {
   channelOverlays.clear();
+  sttChannels.clear();
+  sttCacheLoaded = false;
+  sttCacheLoadPromise = null;
+}
+
+/**
+ * Test helper — wipe durable file store + memory (isolation between smoke runs).
+ * Does not drop production DB rows unless the active backend is DURABLE_FILE.
+ */
+export async function __wipeAllSttChannelsForTests(): Promise<void> {
+  const cls = getAdminChannelStorageClass();
+  if (cls === "DURABLE_FILE") {
+    __wipeDurableFileStoreForTests();
+  } else if (cls === "DATABASE") {
+    const rows = await loadDurableChannels();
+    for (const row of rows) {
+      if (row.capability === "audio_transcription") {
+        await deleteDurableChannel(row.id);
+      }
+    }
+  }
+  channelOverlays.clear();
+  sttChannels.clear();
+  sttCacheLoaded = false;
+  sttCacheLoadPromise = null;
+}
+
+/**
+ * Simulate process restart: drop all in-memory channel state, then reload
+ * from durable store. Must not rely on uncleared Maps.
+ */
+export async function __simulateProcessRestartForTests(): Promise<{
+  storageClass: ReturnType<typeof getAdminChannelStorageClass>;
+  storagePathOrTable: string;
+  loadedCount: number;
+}> {
+  channelOverlays.clear();
+  sttChannels.clear();
+  sttCacheLoaded = false;
+  sttCacheLoadPromise = null;
+  await ensureSttCacheLoaded();
+  return {
+    storageClass: getAdminChannelStorageClass(),
+    storagePathOrTable: getAdminChannelStoragePathOrTable(),
+    loadedCount: sttChannels.size,
+  };
+}
+
+/** Test helper — insert STT channel into durable store (no admin JWT). */
+export async function __upsertSttChannelForTests(args: {
+  id?: string;
+  name?: string;
+  provider?: AdminSttProvider;
+  baseUrl: string;
+  apiKey: string;
+  defaultModel?: string;
+  enabled?: boolean;
+  priority?: number;
+}): Promise<AdminChannelRow> {
+  await ensureSttCacheLoaded();
+  const now = new Date().toISOString();
+  const id = args.id ?? `stt-test-${randomUUID().slice(0, 8)}`;
+  const provider = args.provider ?? "groq_whisper_compatible";
+  const rec: SttChannelRecord = {
+    id,
+    name: args.name ?? "STT test channel",
+    provider,
+    baseUrl: args.baseUrl.replace(/\/+$/, ""),
+    defaultModel:
+      args.defaultModel ??
+      (provider === "groq_whisper_compatible"
+        ? DEFAULT_GROQ_MODEL
+        : "whisper-1"),
+    enabled: args.enabled !== false,
+    priority: args.priority ?? 10,
+    weight: 100,
+    timeoutMs: 30_000,
+    secret: storeSecret(args.apiKey),
+    lastError: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await persistSttRecord(rec);
+  return sttRecordToRow(rec);
+}
+
+/** Test helper — hard-delete from durable store + cache. */
+export async function __deleteSttChannelForTests(id: string): Promise<void> {
+  await deleteDurableChannel(id);
+  sttChannels.delete(id);
+}
+
+/** @internal — assert a public row never contains plaintext secret. */
+export function __assertChannelRowSecretSafe(
+  row: AdminChannelRow,
+  plaintext?: string
+): boolean {
+  const blob = JSON.stringify(row);
+  if (plaintext && plaintext.length >= 8 && blob.includes(plaintext)) {
+    return false;
+  }
+  if (/"api_key"\s*:/.test(blob) && !/"api_key_set"/.test(blob)) {
+    return false;
+  }
+  return true;
 }

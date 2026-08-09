@@ -22,7 +22,14 @@ import {
   listAdminAnnouncements,
   updateAdminAnnouncement,
 } from "./adminAnnouncements.js";
-import { listAdminChannels, updateAdminChannel } from "./adminChannels.js";
+import {
+  AdminChannelStoreError,
+  createAdminSttChannel,
+  deleteAdminChannel,
+  listAdminChannels,
+  testAdminSttChannel,
+  updateAdminChannel,
+} from "./adminChannels.js";
 import { buildAdminDashboardSummary } from "./adminDashboardSummary.js";
 import { listAdminErrorLogs } from "./adminLogs.js";
 import {
@@ -144,7 +151,7 @@ function jsonError(
 
 function adminApiError(
   c: Context,
-  status: 400 | 401 | 403 | 404 | 409 | 500,
+  status: 400 | 401 | 403 | 404 | 409 | 500 | 503,
   message: string,
   code: string,
   type:
@@ -795,7 +802,118 @@ protectedAdminRoutes.post("/api-keys/:id/restore", async (c) => {
 });
 
 protectedAdminRoutes.get("/channels", async (c) => {
-  return c.json({ data: listAdminChannels() });
+  try {
+    return c.json({ data: await listAdminChannels() });
+  } catch (err) {
+    if (err instanceof AdminChannelStoreError) {
+      return adminApiError(
+        c,
+        503,
+        err.sanitized,
+        err.code,
+        "server_error"
+      );
+    }
+    return adminApiError(
+      c,
+      503,
+      "Admin upstream channel store is unavailable.",
+      "admin_channels_store_unavailable",
+      "server_error"
+    );
+  }
+});
+
+protectedAdminRoutes.post("/channels", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const result = await createAdminSttChannel(body, adminModelWriteContext(c));
+  if (!result.ok) {
+    const message =
+      result.error === "invalid_capability"
+        ? "Only capability=audio_transcription is supported for create."
+        : result.error === "invalid_base_url"
+          ? "Invalid base_url."
+          : result.error === "missing_api_key"
+            ? "Upstream api_key is required when creating an STT channel."
+            : result.error === "consumer_key_not_allowed_as_upstream"
+              ? "Consumer sk-tokfai_* keys cannot be used as upstream credentials."
+              : result.error === "invalid_priority"
+                ? "Invalid priority."
+                : result.error === "invalid_weight"
+                  ? "Invalid weight."
+                  : "Failed to create channel.";
+    return adminApiError(
+      c,
+      result.status,
+      message,
+      result.error,
+      "validation_error",
+      result.detail
+    );
+  }
+  return c.json({ data: result.channel }, 201);
+});
+
+protectedAdminRoutes.delete("/channels/:id", async (c) => {
+  const id = c.req.param("id").trim();
+  if (!id) {
+    return adminApiError(c, 400, "Channel ID is required.", "missing_channel_id");
+  }
+  const result = await deleteAdminChannel(id, adminModelWriteContext(c));
+  if (!result.ok) {
+    return adminApiError(
+      c,
+      result.status,
+      result.error === "channel_not_found"
+        ? "Channel not found."
+        : result.error === "primary_channel_immutable"
+          ? "Primary chat/image channel cannot be deleted."
+          : "Failed to delete channel.",
+      result.error,
+      result.status === 404 ? "not_found" : "validation_error"
+    );
+  }
+  return c.json({ data: { deleted_id: result.deleted_id } });
+});
+
+protectedAdminRoutes.post("/channels/:id/test", async (c) => {
+  const id = c.req.param("id").trim();
+  if (!id) {
+    return adminApiError(c, 400, "Channel ID is required.", "missing_channel_id");
+  }
+  const result = await testAdminSttChannel(id, adminModelWriteContext(c));
+  if (!result.ok) {
+    if (result.result) {
+      return c.json(
+        {
+          data: result.result,
+          error: {
+            message:
+              result.error === "channel_not_found"
+                ? "Channel not found."
+                : result.error === "missing_credentials"
+                  ? "STT channel is missing credentials."
+                  : result.error === "test_fixture_missing"
+                    ? "STT test fixture missing."
+                    : result.result.message,
+            code: result.error,
+            type: "validation_error",
+          },
+        },
+        result.status === 404 ? 404 : 400
+      );
+    }
+    return adminApiError(
+      c,
+      result.status,
+      result.error === "channel_not_found"
+        ? "Channel not found."
+        : "STT channel test failed.",
+      result.error,
+      result.status === 404 ? "not_found" : "validation_error"
+    );
+  }
+  return c.json({ data: result.result });
 });
 
 protectedAdminRoutes.patch("/channels/:id", async (c) => {
@@ -821,7 +939,13 @@ protectedAdminRoutes.patch("/channels/:id", async (c) => {
                 ? "Invalid base_url."
                 : result.error === "unknown_field"
                   ? "Unknown field in request body."
-                  : "Failed to update channel.";
+                  : result.error === "consumer_key_not_allowed_as_upstream"
+                    ? "Consumer sk-tokfai_* keys cannot be used as upstream credentials."
+                    : result.error === "invalid_default_model"
+                      ? "Invalid default_model."
+                      : result.error === "invalid_provider"
+                        ? "Invalid provider."
+                        : "Failed to update channel.";
     return adminApiError(
       c,
       result.status,

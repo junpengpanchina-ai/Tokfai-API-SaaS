@@ -22,6 +22,10 @@ apps/dmit-api/es
 # local audit / probe dumps
 tmp/
 
+# durable admin channel file fallback (ciphertext only; never commit)
+.tokfai-data/
+apps/dmit-api/.tokfai-data/
+
 # local acceptance / load-test artifacts (scripts write latest.json)
 batch-test-results/
 p776-smoke-results/

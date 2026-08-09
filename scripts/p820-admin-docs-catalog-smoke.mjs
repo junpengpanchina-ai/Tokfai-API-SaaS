@@ -71,13 +71,17 @@ function checkReadonlySurfaces() {
   if (channels.includes("AdminDisabledWriteActions")) {
     return fail("channels must not show fake disabled write buttons");
   }
+  // P1077 — chat/image stays read-only notice; STT upstreams are writable.
+  if (!channels.includes("createAdminSttChannel")) {
+    return fail("channels panel exposes STT channel create");
+  }
   if (!settings.includes("AdminReadonlyNotice")) {
     return fail("settings uses AdminReadonlyNotice");
   }
   if (settings.includes("AdminDisabledWriteActions")) {
     return fail("settings must not show fake Save button");
   }
-  return pass("channels/settings are explicit read-only");
+  return pass("channels chat/image read-only + STT writable; settings read-only");
 }
 
 function checkDocsRegistry() {

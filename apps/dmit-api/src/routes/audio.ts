@@ -21,7 +21,11 @@ import {
 } from "../middleware/chatAuth.js";
 import { chatGatewayMiddleware } from "../middleware/chatGateway.js";
 import { respondApiError } from "../middleware/error.js";
-import { resolveAudioSttConfig, resolveAudioSttProvider } from "../upstream/audio/resolveAudioProvider.js";
+import {
+  resolveAudioSttConfig,
+  resolveAudioSttProvider,
+  resolveSttUpstreamModel,
+} from "../upstream/audio/resolveAudioProvider.js";
 
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 const ALLOWED_EXT = new Set([
@@ -148,9 +152,12 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
     );
   }
 
-  const cfg = resolveAudioSttConfig();
-  const resolvedModel = model || cfg.defaultModel;
-  const provider = resolveAudioSttProvider();
+  const cfg = await resolveAudioSttConfig();
+  const { clientModel: resolvedModel, upstreamModel } = resolveSttUpstreamModel(
+    model,
+    cfg
+  );
+  const provider = await resolveAudioSttProvider();
 
   log.info("audio_transcriptions_request", {
     request_id: requestId,
@@ -158,7 +165,10 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
     user_id: caller.userId,
     route: AUDIO_TRANSCRIPTION_ENDPOINT,
     provider: cfg.providerId,
+    stt_source: cfg.source,
+    channel_id: cfg.channelId,
     model: resolvedModel,
+    upstream_model: upstreamModel,
     bytes: bytes.byteLength,
     mime_type: mimeType,
     // basename only — never full paths
@@ -201,7 +211,7 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
   try {
     upstream = await provider.transcribeAudio({
       requestId,
-      model: resolvedModel,
+      model: upstreamModel,
       bytes,
       mimeType,
       filename,
@@ -282,7 +292,10 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
     request_id: requestId,
     route: AUDIO_TRANSCRIPTION_ENDPOINT,
     provider: upstream.providerId,
+    stt_source: cfg.source,
+    channel_id: cfg.channelId,
     model: resolvedModel,
+    upstream_model: upstream.upstreamModel || upstreamModel,
     bytes: bytes.byteLength,
     mime_type: mimeType,
     latency_ms: latencyMs,
@@ -300,10 +313,12 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
       request_id: requestId,
       credits_charged: billable ? creditsCharged : 0,
       billing_status: billingStatus,
+      // Consumer-facing model only — never require Groq/upstream model names.
       requested_model: model || resolvedModel,
       resolved_model: resolvedModel,
       provider: upstream.providerId,
       usage_type: AUDIO_TRANSCRIPTION_USAGE_TYPE,
+      stt_source: cfg.source,
     },
   });
 });
