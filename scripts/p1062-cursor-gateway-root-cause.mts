@@ -594,7 +594,7 @@ await withFetch(async () => {
         err.code === "upstream_transport_error" &&
         err.status === 502 &&
         err.type === "upstream_error" &&
-        err.publicMessage === "Upstream provider connection failed." &&
+        err.publicMessage === "Provider connection failed." &&
         transportLog.length >= 1 &&
         transportLog[0]!.billing_status === "not_billable" &&
         transportLog[0]!.credits_charged === 0,
@@ -618,7 +618,7 @@ await withFetch(async () => {
     message: "transport",
     code: "upstream_transport_error",
     type: "upstream_error",
-    publicMessage: "Upstream provider connection failed.",
+    publicMessage: "Provider connection failed.",
   });
   assert(
     isChatFallbackEligible(mapped) === true,

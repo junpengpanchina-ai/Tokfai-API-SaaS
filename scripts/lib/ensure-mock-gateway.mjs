@@ -132,6 +132,29 @@ export async function isMockGatewayReady(baseUrl, apiKey) {
       return false;
     }
 
+    // P1072 — require real audio transcriptions envelope (not chat; not 501).
+    const boundary = "----tokfaiP1072MockProbe";
+    const audioRes = await fetch(`${root}/v1/audio/transcriptions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+      },
+      body:
+        `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="model"\r\n\r\nwhisper-1\r\n` +
+        `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="file"; filename="probe.wav"\r\n` +
+        `Content-Type: audio/wav\r\n\r\n` +
+        `RIFF....WAVEfmt \r\n` +
+        `--${boundary}--\r\n`,
+      signal: AbortSignal.timeout(8000),
+    });
+    if (audioRes.status !== 200) return false;
+    const audioBody = await audioRes.json().catch(() => null);
+    if (audioBody?.text !== "TOKFAI_P1072_STT_OK") return false;
+    if (audioBody?.tokfai?.billing_status !== "not_billable") return false;
+
     return true;
   } catch {
     return false;

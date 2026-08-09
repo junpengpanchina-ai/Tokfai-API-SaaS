@@ -247,7 +247,7 @@ export function mapUpstreamError(
       status: 502,
       code: "upstream_error",
       type: "upstream_error",
-      publicMessage: "Upstream provider failed.",
+      publicMessage: "Provider connection failed.",
     };
   }
 
@@ -263,7 +263,7 @@ export function mapUpstreamError(
       status: 502,
       code: "upstream_auth_error",
       type: "upstream_error",
-      publicMessage: "Upstream provider authentication failed.",
+      publicMessage: "Provider authentication failed.",
     };
   }
 
@@ -356,7 +356,7 @@ export function mapUpstreamError(
     status: 502,
     code: "upstream_error",
     type: "upstream_error",
-    publicMessage: "Upstream provider failed.",
+    publicMessage: "Provider connection failed.",
   };
 }
 
@@ -451,7 +451,7 @@ export async function providerFetch<T = unknown>(
         message: `Upstream provider transport failed: ${info.diagnosticSnippet}`,
         code: "upstream_transport_error",
         type: "upstream_error",
-        publicMessage: "Upstream provider connection failed.",
+        publicMessage: "Provider connection failed.",
         upstreamErrorSnippet: info.diagnosticSnippet,
       });
     }
@@ -516,7 +516,7 @@ export async function grsaiFetch<T = unknown>(
       message: "Primary upstream provider is not configured.",
       code: "upstream_error",
       type: "upstream_error",
-      publicMessage: "Upstream provider failed.",
+      publicMessage: "Provider connection failed.",
     });
   }
 

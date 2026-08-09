@@ -1,0 +1,1595 @@
+{
+  "model": "gpt-5.5",
+  "instructions": "[REDACTED_HERMES_SYSTEM_PROMPT]",
+  "input": [
+    {
+      "role": "user",
+      "content": "TOKFAI_HERMES_TOOL use read_file on README.md"
+    }
+  ],
+  "store": false,
+  "tools": [
+    {
+      "type": "function",
+      "name": "bfl_flux3_get_result",
+      "description": "Poll a FLUX 3 video job by the job id a generate tool return\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Job id from a previous bfl_flux3_* generate call."
+          },
+          "save_to": {
+            "type": "string",
+            "description": "Where to save the finished clip: a directory or a full file path. Set this only when the user asked for a particular location; the default is ~/Downloads. An existing file is never overwritten."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "function",
+      "name": "bfl_flux3_image_to_video",
+      "description": "Read bfl_flux3_prompting_guide before your first generation.\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Generation brief in plain prose (it is interpreted and expan\u2026[REDACTED]\u2026"
+          },
+          "aspect_ratio": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "21:9",
+              "16:9",
+              "4:3",
+              "1:1",
+              "3:4",
+              "9:16",
+              "9:21"
+            ],
+            "default": "auto",
+            "description": "Output aspect ratio. \"auto\" lets the model choose."
+          },
+          "duration": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 5,
+                "maximum": 20
+              },
+              {
+                "type": "string",
+                "const": "auto"
+              }
+            ],
+            "default": "auto",
+            "description": "Clip duration in whole seconds (5-20), or \"auto\"."
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "720p"
+            ],
+            "default": "720p",
+            "description": "Output resolution bin."
+          },
+          "generate_audio": {
+            "type": "boolean",
+            "default": true,
+            "description": "Generate synchronized audio."
+          },
+          "grounding": {
+            "type": "boolean",
+            "default": true,
+            "description": "Allow a short research pass before generation."
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295,
+            "description": "Optional reproducibility seed."
+          },
+          "version": {
+            "type": "string",
+            "description": "Model version pin. Defaults to \"latest\"."
+          },
+          "input_image": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Exactly one opening-frame image: a local file path or a URL (PNG/JPEG/WebP, up to 10MB)."
+          }
+        },
+        "required": [
+          "prompt",
+          "input_image"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "function",
+      "name": "bfl_flux3_keyframes_to_video",
+      "description": "Read bfl_flux3_prompting_guide before your first generation.\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Generation brief in plain prose (it is interpreted and expan\u2026[REDACTED]\u2026"
+          },
+          "aspect_ratio": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "21:9",
+              "16:9",
+              "4:3",
+              "1:1",
+              "3:4",
+              "9:16",
+              "9:21"
+            ],
+            "default": "auto",
+            "description": "Output aspect ratio. \"auto\" lets the model choose."
+          },
+          "duration": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 5,
+                "maximum": 20
+              },
+              {
+                "type": "string",
+                "const": "auto"
+              }
+            ],
+            "default": "auto",
+            "description": "Clip duration in whole seconds (5-20), or \"auto\"."
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "720p"
+            ],
+            "default": "720p",
+            "description": "Output resolution bin."
+          },
+          "generate_audio": {
+            "type": "boolean",
+            "default": true,
+            "description": "Generate synchronized audio."
+          },
+          "grounding": {
+            "type": "boolean",
+            "default": true,
+            "description": "Allow a short research pass before generation."
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295,
+            "description": "Optional reproducibility seed."
+          },
+          "version": {
+            "type": "string",
+            "description": "Model version pin. Defaults to \"latest\"."
+          },
+          "input_images": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "maxItems": 10,
+            "description": "1-10 keyframe images: local file paths or URLs (PNG/JPEG/WebP, up to 10MB each)."
+          },
+          "keyframe_indices": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 480
+            },
+            "minItems": 1,
+            "maxItems": 10,
+            "description": "One unique non-negative frame index per image (24fps). Each \u2026[REDACTED]\u2026"
+          }
+        },
+        "required": [
+          "prompt",
+          "input_images",
+          "keyframe_indices"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "function",
+      "name": "bfl_flux3_prompting_guide",
+      "description": "Read this before your first FLUX 3 generation. The prompting\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "function",
+      "name": "bfl_flux3_text_to_video",
+      "description": "Read bfl_flux3_prompting_guide before your first generation.\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Generation brief in plain prose (it is interpreted and expan\u2026[REDACTED]\u2026"
+          },
+          "aspect_ratio": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "21:9",
+              "16:9",
+              "4:3",
+              "1:1",
+              "3:4",
+              "9:16",
+              "9:21"
+            ],
+            "default": "auto",
+            "description": "Output aspect ratio. \"auto\" lets the model choose."
+          },
+          "duration": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 5,
+                "maximum": 20
+              },
+              {
+                "type": "string",
+                "const": "auto"
+              }
+            ],
+            "default": "auto",
+            "description": "Clip duration in whole seconds (5-20), or \"auto\"."
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "720p"
+            ],
+            "default": "720p",
+            "description": "Output resolution bin."
+          },
+          "generate_audio": {
+            "type": "boolean",
+            "default": true,
+            "description": "Generate synchronized audio."
+          },
+          "grounding": {
+            "type": "boolean",
+            "default": true,
+            "description": "Allow a short research pass before generation."
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295,
+            "description": "Optional reproducibility seed."
+          },
+          "version": {
+            "type": "string",
+            "description": "Model version pin. Defaults to \"latest\"."
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "function",
+      "name": "bfl_flux3_video_continuation",
+      "description": "Read bfl_flux3_prompting_guide before your first generation.\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Generation brief in plain prose (it is interpreted and expan\u2026[REDACTED]\u2026"
+          },
+          "aspect_ratio": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "21:9",
+              "16:9",
+              "4:3",
+              "1:1",
+              "3:4",
+              "9:16",
+              "9:21"
+            ],
+            "default": "auto",
+            "description": "Output aspect ratio. \"auto\" lets the model choose."
+          },
+          "duration": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 5,
+                "maximum": 20
+              },
+              {
+                "type": "string",
+                "const": "auto"
+              }
+            ],
+            "default": "auto",
+            "description": "Clip duration in whole seconds (5-20), or \"auto\"."
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "720p"
+            ],
+            "default": "720p",
+            "description": "Output resolution bin."
+          },
+          "generate_audio": {
+            "type": "boolean",
+            "default": true,
+            "description": "Generate synchronized audio."
+          },
+          "grounding": {
+            "type": "boolean",
+            "default": true,
+            "description": "Allow a short research pass before generation."
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295,
+            "description": "Optional reproducibility seed."
+          },
+          "version": {
+            "type": "string",
+            "description": "Model version pin. Defaults to \"latest\"."
+          },
+          "input_video": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The clip to continue: a local file path or a URL. mp4 only, at most 50MB and 15 seconds."
+          }
+        },
+        "required": [
+          "prompt",
+          "input_video"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "function",
+      "name": "browser_back",
+      "description": "Navigate back to the previous page in browser history. Requires browser_navigate to be called first.",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "type": "function",
+      "name": "browser_click",
+      "description": "Click on an element identified by its ref ID from the snapsh\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "description": "The element reference from the snapshot (e.g., '@e5', '@e12')"
+          }
+        },
+        "required": [
+          "ref"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "browser_console",
+      "description": "Get browser console output and JavaScript errors from the cu\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "clear": {
+            "type": "boolean",
+            "default": false,
+            "description": "If true, clear the message buffers after reading"
+          },
+          "expression": {
+            "type": "string",
+            "description": "JavaScript expression to evaluate in the page context. Runs \u2026[REDACTED]\u2026"
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "name": "browser_get_images",
+      "description": "Get a list of all images on the current page with their URLs and alt text. Useful for finding images to analyze with the vision tool. Requires browser_navigate to be called first.",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "type": "function",
+      "name": "browser_navigate",
+      "description": "Navigate to a URL in the browser. Initializes the session an\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL to navigate to (e.g., 'https://example.com')"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "browser_press",
+      "description": "Press a keyboard key. Useful for submitting forms (Enter), navigating (Tab), or keyboard shortcuts. Requires browser_navigate to be called first.",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Key to press (e.g., 'Enter', 'Tab', 'Escape', 'ArrowDown')"
+          }
+        },
+        "required": [
+          "key"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "browser_scroll",
+      "description": "Scroll the page in a direction. Use this to reveal more content that may be below or above the current viewport. Requires browser_navigate to be called first.",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "direction": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "description": "Direction to scroll"
+          }
+        },
+        "required": [
+          "direction"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "browser_snapshot",
+      "description": "Get a text-based snapshot of the current page's accessibilit\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "full": {
+            "type": "boolean",
+            "description": "If true, returns complete page content. If false (default), returns compact view with interactive elements only.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "name": "browser_type",
+      "description": "Type text into an input field identified by its ref ID. Clears the field first, then types the new text. Requires browser_navigate and browser_snapshot to be called first.",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "description": "The element reference from the snapshot (e.g., '@e3')"
+          },
+          "text": {
+            "type": "string",
+            "description": "The text to type into the field"
+          }
+        },
+        "required": [
+          "ref",
+          "text"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "browser_vision",
+      "description": "Take a screenshot of the current page so you can inspect it \u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "description": "What you want to know about the page visually. Be specific about what you're looking for."
+          },
+          "annotate": {
+            "type": "boolean",
+            "default": false,
+            "description": "If true, overlay numbered [N] labels on interactive elements. Each [N] maps to ref @eN for subsequent browser commands. Useful for QA and spatial reasoning about page layout."
+          }
+        },
+        "required": [
+          "question"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "clarify",
+      "description": "Ask the user a question when you need clarification, feedbac\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "description": "The question itself, and ONLY the question (e.g. 'Which deployment target?'). Do NOT embed the answer options here \u2014 pass them as separate elements in `choices`."
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4,
+            "description": "REQUIRED whenever you are presenting selectable options: eac\u2026[REDACTED]\u2026"
+          },
+          "multi_select": {
+            "type": "boolean",
+            "description": "When true, the user can select MULTIPLE options (like checkb\u2026[REDACTED]\u2026"
+          }
+        },
+        "required": [
+          "question"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "close_terminal",
+      "description": "Close the read-only terminal tab for one of your background \u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "process_id": {
+            "type": "string",
+            "description": "The background process's session id (from terminal(background=true) output or process(action='list')) whose tab should be closed."
+          }
+        },
+        "required": [
+          "process_id"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "cronjob",
+      "description": "Manage scheduled cron jobs with a single compressed tool.\n\nU\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "One of: create, list, update, pause, resume, remove, run. When action=create, the 'schedule' and 'prompt' fields are REQUIRED."
+          },
+          "job_id": {
+            "type": "string",
+            "description": "Required for update/pause/resume/remove/run"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "For create: the full self-contained prompt. If skills are also provided, this becomes the task instruction paired with those skills."
+          },
+          "schedule": {
+            "type": "string",
+            "description": "REQUIRED for action=create. For create/update: '30m', 'every\u2026[REDACTED]\u2026"
+          },
+          "name": {
+            "type": "string",
+            "description": "Optional human-friendly name"
+          },
+          "repeat": {
+            "type": "integer",
+            "description": "Optional repeat count. Omit for defaults (once for one-shot, forever for recurring)."
+          },
+          "deliver": {
+            "type": "string",
+            "description": "Omit this parameter to auto-deliver back to the current chat\u2026[REDACTED]\u2026"
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional ordered list of skill names to load before executing the cron prompt. On update, pass an empty array to clear attached skills."
+          },
+          "script": {
+            "type": "string",
+            "description": "Optional path to a script that runs each tick. In the defaul\u2026[REDACTED]\u2026"
+          },
+          "no_agent": {
+            "type": "boolean",
+            "default": false,
+            "description": "Default: False (LLM-driven job \u2014 the agent runs the prompt e\u2026[REDACTED]\u2026"
+          },
+          "context_from": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional job ID or list of job IDs whose most recent complet\u2026[REDACTED]\u2026"
+          },
+          "enabled_toolsets": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional list of toolset names to restrict the job's agent t\u2026[REDACTED]\u2026"
+          },
+          "workdir": {
+            "type": "string",
+            "description": "Optional absolute path to run the job from. When set, AGENTS\u2026[REDACTED]\u2026"
+          },
+          "attach_to_session": {
+            "type": "boolean",
+            "description": "When True, this job becomes CONTINUABLE: the user can reply \u2026[REDACTED]\u2026"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "delegate_task",
+      "description": "Spawn subagents in isolated contexts; each gets its own conv\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "goal": {
+            "type": "string",
+            "description": "What the subagent should accomplish. Be specific and self-contained -- the subagent knows nothing about your conversation history."
+          },
+          "context": {
+            "type": "string",
+            "description": "Background information the subagent needs: file paths, error messages, project structure, constraints. The more specific you are, the better the subagent performs."
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "goal": {
+                  "type": "string",
+                  "description": "Task goal"
+                },
+                "context": {
+                  "type": "string",
+                  "description": "Task-*** context"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "leaf",
+                    "orchestrator"
+                  ],
+                  "description": "Per-task role override. See top-level 'role' for semantics."
+                }
+              },
+              "required": [
+                "goal"
+              ]
+            },
+            "description": "Batch mode: tasks to run in parallel (up to 3 for this user,\u2026[REDACTED]\u2026"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "leaf",
+              "orchestrator"
+            ],
+            "description": "Role of the child agent. 'leaf' (default) = focused worker, \u2026[REDACTED]\u2026"
+          },
+          "background": {
+            "type": "boolean",
+            "description": "DEPRECATED / IGNORED. Top-level single and batch delegations\u2026[REDACTED]\u2026"
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "name": "execute_code",
+      "description": "Run a Python script that calls Hermes tools programmatically\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Python code to execute. Import tools with `from hermes_tools import web_search, terminal, ...` and print your final result to stdout."
+          }
+        },
+        "required": [
+          "code"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "focus_pane",
+      "description": "Reveal and focus a pane in the Hermes desktop app when the u\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pane": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "files",
+              "terminal",
+              "review",
+              "sessions"
+            ],
+            "description": "Which pane to reveal."
+          }
+        },
+        "required": [
+          "pane"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "image_generate",
+      "description": "Generate high-quality images from text prompts (text-to-imag\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "The text prompt describing the desired image (text-to-image) or the edit to apply (image-to-image). Be detailed and descriptive."
+          },
+          "aspect_ratio": {
+            "type": "string",
+            "enum": [
+              "landscape",
+              "square",
+              "portrait"
+            ],
+            "description": "The aspect ratio of the generated image. 'landscape' is 16:9 wide, 'portrait' is 16:9 tall, 'square' is 1:1.",
+            "default": "landscape"
+          },
+          "image_url": {
+            "type": "string",
+            "description": "Optional source image to edit/transform (image-to-image). Wh\u2026[REDACTED]\u2026"
+          },
+          "reference_image_urls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional list of additional reference image URLs / paths (st\u2026[REDACTED]\u2026"
+          }
+        },
+        "required": [
+          "prompt"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "memory",
+      "description": "Save durable facts to persistent memory that survive across \u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "add",
+              "replace",
+              "remove"
+            ],
+            "description": "The action to perform (single-op shape). Omit when using 'operations'."
+          },
+          "target": {
+            "type": "string",
+            "enum": [
+              "memory",
+              "user"
+            ],
+            "description": "Which memory store: 'memory' for personal notes, 'user' for user profile."
+          },
+          "content": {
+            "type": "string",
+            "description": "The entry content. Required for 'add' and 'replace' (single-op shape)."
+          },
+          "old_text": {
+            "type": "string",
+            "description": "REQUIRED for 'replace' and 'remove' (single-op shape): a short unique substring identifying the existing entry to modify. Omit only for 'add'."
+          },
+          "operations": {
+            "type": "array",
+            "description": "Batch shape: a list of operations applied atomically in one \u2026[REDACTED]\u2026",
+            "items": {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "add",
+                    "replace",
+                    "remove"
+                  ]
+                },
+                "content": {
+                  "type": "string",
+                  "description": "Entry content for add/replace."
+                },
+                "old_text": {
+                  "type": "string",
+                  "description": "Substring identifying the entry for replace/remove."
+                }
+              },
+              "required": [
+                "action"
+              ]
+            }
+          }
+        },
+        "required": [
+          "target"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "open_preview",
+      "description": "Open something in the preview pane beside the chat in the He\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "What to preview: a web URL (https://\u2026 or a bare domain), a localhost URL (localhost:3000), or a file path."
+          },
+          "label": {
+            "type": "string",
+            "description": "Optional tab label; defaults to the target's name."
+          }
+        },
+        "required": [
+          "url"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "patch",
+      "description": "Targeted find-and-replace edits in files. Use this instead o\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "replace",
+              "patch"
+            ],
+            "description": "Edit mode. 'replace' (default): requires path + old_string + new_string. 'patch': requires patch content only.",
+            "default": "replace"
+          },
+          "path": {
+            "type": "string",
+            "description": "REQUIRED when mode='replace'. File path to edit."
+          },
+          "old_string": {
+            "type": "string",
+            "description": "REQUIRED when mode='replace'. Exact text to find and replace. Must be unique in the file unless replace_all=true. Include surrounding context lines to ensure uniqueness."
+          },
+          "new_string": {
+            "type": "string",
+            "description": "REQUIRED when mode='replace'. Replacement text. Pass empty string '' to delete the matched text."
+          },
+          "replace_all": {
+            "type": "boolean",
+            "description": "Replace all occurrences instead of requiring a unique match (default: false)",
+            "default": false
+          },
+          "patch": {
+            "type": "string",
+            "description": "REQUIRED when mode='patch'. V4A format patch content. Format:\n*** Begin Patch\n*** Update File: path/to/file\n@@ context hint @@\n context line\n-removed line\n+added line\n*** End Patch"
+          },
+          "cross_profile": {
+            "type": "boolean",
+            "description": "Opt out of the cross-profile soft guard. Defaults to false. Set true ONLY after explicit user direction to edit another Hermes profile's skills/plugins/cron/memories.",
+            "default": false
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "process",
+      "description": "Manage background processes started with terminal(background\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "list",
+              "poll",
+              "log",
+              "wait",
+              "kill",
+              "write",
+              "submit",
+              "close"
+            ],
+            "description": "Action to perform on background processes"
+          },
+          "session_id": {
+            "type": "string",
+            "description": "Process session ID (from terminal background output). Required for all actions except 'list'."
+          },
+          "data": {
+            "type": "string",
+            "description": "Text to send to process stdin (for 'write' and 'submit' actions)"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "Max seconds to block for 'wait' action. Returns partial output on timeout.",
+            "minimum": 1
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Line offset for 'log' action (default: last 200 lines)"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max lines to return for 'log' action",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "read_file",
+      "description": "Read a text file with line numbers and pagination. Use this \u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to the file to read (absolute, relative, or ~/path)"
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Line number to start reading from (1-indexed, default: 1)",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of lines to read (default: 2000, max: 2000). Reads are additionally capped at a ~100K-character budget with a next_offset continuation.",
+            "default": 2000,
+            "maximum": 2000
+          }
+        },
+        "required": [
+          "path"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "read_terminal",
+      "description": "Read what's currently shown in the in-app terminal pane of t\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "start_line": {
+            "type": "integer",
+            "description": "0-indexed first line (0 = oldest). Omit for the visible screen."
+          },
+          "count": {
+            "type": "integer",
+            "description": "Lines to read from start_line. Defaults to the visible row count."
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "name": "search_files",
+      "description": "Search file contents or find files by name. Use this instead\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "Regex pattern for content search, or glob pattern (e.g., '*.py') for file search"
+          },
+          "target": {
+            "type": "string",
+            "enum": [
+              "content",
+              "files"
+            ],
+            "description": "'content' searches inside file contents, 'files' searches for files by name",
+            "default": "content"
+          },
+          "path": {
+            "type": "string",
+            "description": "Directory or file to search in (default: current working directory)",
+            "default": "."
+          },
+          "file_glob": {
+            "type": "string",
+            "description": "Filter files by pattern in grep mode (e.g., '*.py' to only search Python files)"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of results to return (default: 50)",
+            "default": 50
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Skip first N results for pagination (default: 0)",
+            "default": 0
+          },
+          "output_mode": {
+            "type": "string",
+            "enum": [
+              "content",
+              "files_only",
+              "count"
+            ],
+            "description": "Output format for grep mode: 'content' shows matching lines with line numbers, 'files_only' lists file paths, 'count' shows match counts per file",
+            "default": "content"
+          },
+          "context": {
+            "type": "integer",
+            "description": "Number of context lines before and after each match (grep mode only)",
+            "default": 0
+          }
+        },
+        "required": [
+          "pattern"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "session_search",
+      "description": "Search past sessions stored in the local session DB, or scro\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query (discovery shape). Keywords, phrases, or boolean expressions to find in past sessions. Omit to browse recent sessions. Ignored when session_id + around_message_id are set (scroll shape)."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Discovery shape only. Max sessions to return (default 3, max 10). Bump to 5\u201310 when the topic likely spans several sessions and you want to pick the right one to scroll into.",
+            "default": 3
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "newest",
+              "oldest"
+            ],
+            "description": "Discovery shape only. Temporal bias on top of FTS5 ranking. \u2026[REDACTED]\u2026"
+          },
+          "session_id": {
+            "type": "string",
+            "description": "Scroll shape. Session to read inside. Use the session_id returned from a prior discovery call. Must be paired with around_message_id."
+          },
+          "around_message_id": {
+            "type": "integer",
+            "description": "Scroll shape. Message id to center the window on. From a dis\u2026[REDACTED]\u2026"
+          },
+          "window": {
+            "type": "integer",
+            "description": "Scroll shape only. Messages to return on each side of the anchor (anchor itself always included). Clamped to [1, 20]. Default 5.",
+            "default": 5
+          },
+          "role_filter": {
+            "type": "string",
+            "description": "Optional. Comma-separated roles to include. Discovery defaul\u2026[REDACTED]\u2026"
+          },
+          "profile": {
+            "type": "string",
+            "description": "Optional. Read sessions from another Hermes profile's databa\u2026[REDACTED]\u2026"
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "name": "skill_manage",
+      "description": "Manage skills (create, update, delete). Skills are your proc\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "patch",
+              "edit",
+              "delete",
+              "write_file",
+              "remove_file"
+            ],
+            "description": "The action to perform."
+          },
+          "name": {
+            "type": "string",
+            "description": "Skill name (lowercase, hyphens/underscores, max 64 chars). Must match an existing skill for patch/edit/delete/write_file/remove_file."
+          },
+          "content": {
+            "type": "string",
+            "description": "Full SKILL.md content (YAML frontmatter + markdown body). Required for 'create' and 'edit'. For 'edit', read the skill first with skill_view() and provide the complete updated text."
+          },
+          "old_string": {
+            "type": "string",
+            "description": "Text to find in the file (required for 'patch'). Must be unique unless replace_all=true. Include enough surrounding context to ensure uniqueness."
+          },
+          "new_string": {
+            "type": "string",
+            "description": "Replacement text (required for 'patch'). Can be empty string to delete the matched text."
+          },
+          "replace_all": {
+            "type": "boolean",
+            "description": "For 'patch': replace all occurrences instead of requiring a unique match (default: false)."
+          },
+          "category": {
+            "type": "string",
+            "description": "Optional category/domain for organizing the skill (e.g., 'devops', 'data-science', 'mlops'). Creates a subdirectory grouping. Only used with 'create'."
+          },
+          "file_path": {
+            "type": "string",
+            "description": "Path to a supporting file within the skill directory. For 'w\u2026[REDACTED]\u2026"
+          },
+          "file_content": {
+            "type": "string",
+            "description": "Content for the file. Required for 'write_file'."
+          },
+          "absorbed_into": {
+            "type": "string",
+            "description": "For 'delete' only \u2014 declares intent so the curator can tell \u2026[REDACTED]\u2026"
+          }
+        },
+        "required": [
+          "action",
+          "name"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "skill_view",
+      "description": "Skills allow for loading information about specific tasks an\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The skill name (use skills_list to see available skills). For plugin-provided skills, use the qualified form 'plugin:skill' (e.g. 'superpowers:writing-plans')."
+          },
+          "file_path": {
+            "type": "string",
+            "description": "OPTIONAL: Path to a linked file within the skill (e.g., 'references/api.md', 'templates/config.yaml', 'scripts/validate.py'). Omit to get the main SKILL.md content."
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "skills_list",
+      "description": "List available skills (name + description). Use skill_view(name) to load full content.",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Optional category filter to narrow results"
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "name": "terminal",
+      "description": "Execute shell commands on a Linux environment. Filesystem, c\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "The command to execute on the VM"
+          },
+          "background": {
+            "type": "boolean",
+            "description": "Run in the background, returning a session_id. Pair with not\u2026[REDACTED]\u2026",
+            "default": false
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "Max seconds to wait (default: 180, foreground max: 600). Ret\u2026[REDACTED]\u2026",
+            "minimum": 1
+          },
+          "workdir": {
+            "type": "string",
+            "description": "Working directory for this command (absolute path). Defaults to the session working directory."
+          },
+          "pty": {
+            "type": "boolean",
+            "description": "Run in pseudo-terminal (PTY) mode for interactive CLI tools like Codex, Claude Code, or Python REPL. Only works with local and SSH backends. Default: false.",
+            "default": false
+          },
+          "notify_on_complete": {
+            "type": "boolean",
+            "description": "With background=true: get exactly one notification when the \u2026[REDACTED]\u2026",
+            "default": false
+          },
+          "watch_patterns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Strings to watch for in background output. ONLY for rare one\u2026[REDACTED]\u2026"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "text_to_speech",
+      "description": "Convert text to speech audio. Returns a MEDIA: path that the\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The text to convert to speech. Provider-specific character c\u2026[REDACTED]\u2026"
+          },
+          "output_path": {
+            "type": "string",
+            "description": "Optional custom file path to save the audio. Defaults to ~/.hermes/audio_cache/<timestamp>.mp3"
+          },
+          "speed": {
+            "type": "number",
+            "description": "Playback speed multiplier. 1.0 = normal, 0.5 = very slow (language learning), 2.0 = fast. Range: 0.25-4.0. Overrides the speed configured in config.yaml."
+          },
+          "instructions": {
+            "type": "string",
+            "description": "Optional voice-design guidance: tone, emotion, pacing, accen\u2026[REDACTED]\u2026"
+          },
+          "provider": {
+            "type": "string",
+            "description": "Optional TTS provider override. Accepts built-in names (edge\u2026[REDACTED]\u2026"
+          }
+        },
+        "required": [
+          "text"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "todo",
+      "description": "Manage your task list for the current session. Use for compl\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "todos": {
+            "type": "array",
+            "description": "Task items to write. Omit to read current list.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique item identifier"
+                },
+                "content": {
+                  "type": "string",
+                  "description": "Task description"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "in_progress",
+                    "completed",
+                    "cancelled"
+                  ],
+                  "description": "Current status"
+                }
+              },
+              "required": [
+                "id",
+                "content",
+                "status"
+              ]
+            }
+          },
+          "merge": {
+            "type": "boolean",
+            "description": "true: update existing items by id, add new ones. false (default): replace the entire list.",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "name": "vision_analyze",
+      "description": "Load an image into the conversation so you can see it. Accep\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "image_url": {
+            "type": "string",
+            "description": "Image URL (http/https), local file path, or data: URL to load."
+          },
+          "question": {
+            "type": "string",
+            "description": "Your specific question or request about the image. Optional context the model uses on the next turn after seeing the image."
+          }
+        },
+        "required": [
+          "image_url",
+          "question"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "web_extract",
+      "description": "Extract content from web page URLs. Returns clean page conte\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of URLs to extract content from (max 5 URLs per call)",
+            "maxItems": 5
+          },
+          "char_limit": {
+            "type": "integer",
+            "description": "Optional per-page character budget sent back (default 15000). Pages larger than this are head+tail truncated with the full text stored to disk. Raise it when you need more of a long page inline.",
+            "minimum": 2000
+          }
+        },
+        "required": [
+          "urls"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "web_search",
+      "description": "Search the web for information. Returns up to 5 results by d\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The search query to look up on the web. You may include backend-supported operators such as site:example.com, filetype:pdf, intitle:word, -term, or \"exact phrase\"."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of results to return. Defaults to 5.",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 5
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "write_file",
+      "description": "Write content to a file, completely replacing existing conte\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to the file to write (will be created if it doesn't exist, overwritten if it does)"
+          },
+          "content": {
+            "type": "string",
+            "description": "Complete content to write to the file"
+          },
+          "cross_profile": {
+            "type": "boolean",
+            "description": "Opt out of the cross-profile soft guard. Defaults to false. \u2026[REDACTED]\u2026",
+            "default": false
+          }
+        },
+        "required": [
+          "path",
+          "content"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "tool_search",
+      "description": "Search 3 additional tools that are loaded on demand. Returns\u2026[REDACTED]\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Keywords describing the capability you need (e.g. 'create github issue')."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of results to return. Default 5."
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "tool_describe",
+      "description": "Load the full JSON schema for one tool returned by `tool_search`. Required before `tool_call` if the tool's parameters are unknown.",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Exact tool name (as returned by tool_search)."
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "tool_call",
+      "description": "Invoke a deferred tool by name with the given arguments. Argument shape matches the tool's schema (see `tool_describe`). Policy, hooks, and approvals run exactly as for any directl\u2026",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Exact tool name to invoke."
+          },
+          "arguments": {
+            "type": "object",
+            "description": "Arguments for the tool, matching its schema."
+          }
+        },
+        "required": [
+          "name",
+          "arguments"
+        ]
+      }
+    }
+  ],
+  "tool_choice": "auto",
+  "parallel_tool_calls": true,
+  "reasoning": {
+    "effort": "max",
+    "summary": "auto"
+  },
+  "include": [
+    "reasoning.encrypted_content"
+  ]
+}

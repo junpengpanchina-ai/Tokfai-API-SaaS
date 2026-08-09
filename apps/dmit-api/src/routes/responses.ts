@@ -27,6 +27,7 @@ import { readJsonBodyWithLimit } from "../lib/readJsonBodyWithLimit.js";
 import { respondResponsesEarlySse } from "../lib/respondEarlySse.js";
 import {
   chatCompletionResponseToResponses,
+  chatMessagesAreEmpty,
   isResponsesFormatResponse,
   ResponsesRequestSchema,
   responsesBodyToChatBody,
@@ -159,9 +160,12 @@ responsesRoutes.post("/v1/responses", async (c) => {
   const chatBody = responsesBodyToChatBody(parsed.data);
   if (
     !chatBody.messages?.length ||
-    chatBody.messages.every(
-      (message) =>
-        typeof message.content !== "string" || message.content.trim() === ""
+    chatMessagesAreEmpty(
+      chatBody.messages as Array<{
+        role: string;
+        content?: unknown;
+        tool_calls?: unknown;
+      }>
     )
   ) {
     const rejectedReason =

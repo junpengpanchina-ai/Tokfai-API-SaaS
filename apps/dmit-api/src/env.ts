@@ -315,6 +315,33 @@ const Schema = z
   VERIFIED_TOOLS_CAPABLE_MODEL_IDS: z.string().default(""),
   BOT_MODEL: z.string().min(1).default("auto-fast"),
 
+  /**
+   * P1072 — Isolated OpenAI-compatible STT upstream (optional).
+   * When unset, /v1/audio/transcriptions returns audio_transcription_not_available.
+   * Never reuse chat executeChatCompletion for STT.
+   */
+  TOKFAI_STT_PROVIDER: z.string().optional().default("openai_compatible"),
+  TOKFAI_STT_BASE_URL: z.preprocess(
+    (v) => (typeof v === "string" && !v.trim() ? undefined : v),
+    z.string().url().optional()
+  ),
+  TOKFAI_STT_API_KEY: z.preprocess(
+    (v) => (typeof v === "string" && !v.trim() ? undefined : v),
+    z.string().min(1).optional()
+  ),
+  TOKFAI_STT_DEFAULT_MODEL: z.string().optional().default("whisper-1"),
+  TOKFAI_STT_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .default(60_000),
+  /** Flat credits per success; empty/unset → not_billable (never fake chat-token debit). */
+  TOKFAI_STT_PRICE_CREDITS: z.preprocess(
+    (v) => (typeof v === "string" && !v.trim() ? undefined : v),
+    z.string().optional()
+  ),
+
   STRIPE_SECRET_KEY: z.string().min(1).optional(),
   STRIPE_WEBHOOK_SECRET: z.string().min(1),
 

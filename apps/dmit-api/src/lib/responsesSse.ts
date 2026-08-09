@@ -84,6 +84,36 @@ function extractResponsesUsage(response: Record<string, unknown>): {
   };
 }
 
+function extractFunctionCallItems(
+  response: Record<string, unknown>
+): Array<Record<string, unknown>> {
+  const output = Array.isArray(response.output) ? response.output : [];
+  const calls: Array<Record<string, unknown>> = [];
+  for (const item of output) {
+    const row = asRecord(item);
+    if (!row || row.type !== "function_call") continue;
+    const name = typeof row.name === "string" ? row.name : "";
+    if (!name) continue;
+    const callId =
+      typeof row.call_id === "string" && row.call_id.trim()
+        ? row.call_id.trim()
+        : typeof row.id === "string" && row.id.trim()
+          ? row.id.trim()
+          : `call_${calls.length}_${name}`;
+    const args =
+      typeof row.arguments === "string" ? row.arguments : "{}";
+    calls.push({
+      type: "function_call",
+      id: callId.startsWith("fc_") ? callId : `fc_${callId}`,
+      call_id: callId,
+      name,
+      arguments: args || "{}",
+      status: "completed",
+    });
+  }
+  return calls;
+}
+
 function extractWireFinishReason(response: Record<string, unknown>): string {
   const normalized = normalizeOpenAiFinishReason(response.finish_reason, {
     allowNull: false,
@@ -92,7 +122,8 @@ function extractWireFinishReason(response: Record<string, unknown>): string {
   if (normalized === "length" || normalized === "content_filter") {
     return normalized;
   }
-  // tool_calls / function_call / stop / other → stop for text Responses wire
+  // Text Responses / Cherry: keep stop on the wire. Hermes reads function_call
+  // items from response.output (P1071); finish_reason may be sanitized to stop.
   return "stop";
 }
 
@@ -160,22 +191,30 @@ export function responsesSseBodyAfterCreated(
   opts?: { skipCreated?: boolean }
 ): string {
   const { responseId, model, messageId, createdAt } = responsesSseIds(response);
-  // Cherry requires a non-empty delta; fall back only if upstream text is blank.
+  const functionCalls = extractFunctionCallItems(response);
   const rawText = extractOutputText(response);
-  const outputText = rawText.length > 0 ? rawText : " ";
+  // Cherry text path needs a non-empty delta. Hermes tool-only turns must not
+  // invent a space message that looks like a final answer.
+  const emitTextMessage = rawText.length > 0 || functionCalls.length === 0;
+  const outputText =
+    rawText.length > 0 ? rawText : emitTextMessage ? " " : "";
   const usage = extractResponsesUsage(response);
   const finishReason = extractWireFinishReason(response);
   const incompleteDetails =
     chatFinishReasonToResponsesIncompleteDetails(finishReason);
   const status = incompleteDetails ? "incomplete" : "completed";
 
-  const completedItem = {
-    id: messageId,
-    type: "message",
-    status: "completed",
-    role: "assistant",
-    content: [{ type: "output_text", text: outputText }],
-  };
+  const outputItems: Array<Record<string, unknown>> = [];
+  if (emitTextMessage) {
+    outputItems.push({
+      type: "message",
+      role: "assistant",
+      content: [{ type: "output_text", text: outputText }],
+    });
+  }
+  for (const call of functionCalls) {
+    outputItems.push(call);
+  }
 
   // AI SDK requires `usage` on response.completed / response.incomplete or the
   // chunk is dropped and finishReason stays default "other".
@@ -185,13 +224,7 @@ export function responsesSseBodyAfterCreated(
     created_at: createdAt,
     status,
     model,
-    output: [
-      {
-        type: "message",
-        role: "assistant",
-        content: [{ type: "output_text", text: outputText }],
-      },
-    ],
+    output: outputItems,
     output_text: outputText,
     usage,
     incomplete_details: incompleteDetails,
@@ -206,67 +239,98 @@ export function responsesSseBodyAfterCreated(
     );
   }
 
-  chunks.push(
-    sseEvent("response.output_item.added", {
-      type: "response.output_item.added",
-      output_index: 0,
-      item: {
-        id: messageId,
-        type: "message",
-        status: "in_progress",
-        role: "assistant",
-        content: [],
-      },
-    })
-  );
+  let outputIndex = 0;
 
-  chunks.push(
-    sseEvent("response.content_part.added", {
-      type: "response.content_part.added",
-      item_id: messageId,
-      output_index: 0,
-      content_index: 0,
-      part: { type: "output_text", text: "" },
-    })
-  );
+  if (emitTextMessage) {
+    const completedItem = {
+      id: messageId,
+      type: "message",
+      status: "completed",
+      role: "assistant",
+      content: [{ type: "output_text", text: outputText }],
+    };
 
-  chunks.push(
-    sseEvent("response.output_text.delta", {
-      type: "response.output_text.delta",
-      item_id: messageId,
-      output_index: 0,
-      content_index: 0,
-      delta: outputText,
-    })
-  );
+    chunks.push(
+      sseEvent("response.output_item.added", {
+        type: "response.output_item.added",
+        output_index: outputIndex,
+        item: {
+          id: messageId,
+          type: "message",
+          status: "in_progress",
+          role: "assistant",
+          content: [],
+        },
+      })
+    );
 
-  chunks.push(
-    sseEvent("response.output_text.done", {
-      type: "response.output_text.done",
-      item_id: messageId,
-      output_index: 0,
-      content_index: 0,
-      text: outputText,
-    })
-  );
+    chunks.push(
+      sseEvent("response.content_part.added", {
+        type: "response.content_part.added",
+        item_id: messageId,
+        output_index: outputIndex,
+        content_index: 0,
+        part: { type: "output_text", text: "" },
+      })
+    );
 
-  chunks.push(
-    sseEvent("response.content_part.done", {
-      type: "response.content_part.done",
-      item_id: messageId,
-      output_index: 0,
-      content_index: 0,
-      part: { type: "output_text", text: outputText },
-    })
-  );
+    chunks.push(
+      sseEvent("response.output_text.delta", {
+        type: "response.output_text.delta",
+        item_id: messageId,
+        output_index: outputIndex,
+        content_index: 0,
+        delta: outputText,
+      })
+    );
 
-  chunks.push(
-    sseEvent("response.output_item.done", {
-      type: "response.output_item.done",
-      output_index: 0,
-      item: completedItem,
-    })
-  );
+    chunks.push(
+      sseEvent("response.output_text.done", {
+        type: "response.output_text.done",
+        item_id: messageId,
+        output_index: outputIndex,
+        content_index: 0,
+        text: outputText,
+      })
+    );
+
+    chunks.push(
+      sseEvent("response.content_part.done", {
+        type: "response.content_part.done",
+        item_id: messageId,
+        output_index: outputIndex,
+        content_index: 0,
+        part: { type: "output_text", text: outputText },
+      })
+    );
+
+    chunks.push(
+      sseEvent("response.output_item.done", {
+        type: "response.output_item.done",
+        output_index: outputIndex,
+        item: completedItem,
+      })
+    );
+    outputIndex += 1;
+  }
+
+  for (const call of functionCalls) {
+    chunks.push(
+      sseEvent("response.output_item.added", {
+        type: "response.output_item.added",
+        output_index: outputIndex,
+        item: { ...call, status: "in_progress" },
+      })
+    );
+    chunks.push(
+      sseEvent("response.output_item.done", {
+        type: "response.output_item.done",
+        output_index: outputIndex,
+        item: call,
+      })
+    );
+    outputIndex += 1;
+  }
 
   const finishedType =
     status === "incomplete" ? "response.incomplete" : "response.completed";

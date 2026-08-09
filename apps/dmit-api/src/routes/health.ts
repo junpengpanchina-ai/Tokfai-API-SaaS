@@ -95,6 +95,7 @@ healthRoutes.get("/__version", (c) =>
       "GET /v1/models",
       "POST /v1/chat/completions",
       "POST /v1/responses",
+      "POST /v1/audio/transcriptions",
       "GET /v1/billing/plans",
       "POST /v1/billing/checkout",
       "GET /api/system/health",

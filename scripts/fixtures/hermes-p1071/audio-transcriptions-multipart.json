@@ -1,0 +1,26 @@
+{
+  "method": "POST",
+  "path": "/v1/audio/transcriptions",
+  "content_type": "multipart/form-data",
+  "fields": {
+    "model": "whisper-1",
+    "file": "<binary audio; not stored>"
+  },
+  "auth_format": "Bearer <STT key \u2014 CLIENT_LIMITATION: not chat Base URL by default>",
+  "hermes_defaults": {
+    "stt_provider": "openai",
+    "stt_openai_model": "whisper-1",
+    "STT_OPENAI_BASE_URL": "https://api.openai.com/v1",
+    "config_keys": [
+      "stt.openai.base_url",
+      "stt.openai.api_key",
+      "STT_OPENAI_BASE_URL",
+      "VOICE_TOOLS_OPENAI_KEY"
+    ]
+  },
+  "notes": [
+    "Hermes STT does NOT automatically inherit chat OPENAI_BASE_URL",
+    "Consumer must set STT_OPENAI_BASE_URL / stt.openai.base_url to Tokfai for STT routing",
+    "Marked CLIENT_LIMITATION for three-input chat contract"
+  ]
+}

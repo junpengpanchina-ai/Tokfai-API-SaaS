@@ -1,0 +1,56 @@
+{
+  "CHAT": {
+    "touches_tokfai": true,
+    "path": "/v1/chat/completions",
+    "when": "api_mode=chat_completions (non openai-api GPT-5 path)"
+  },
+  "RESPONSES": {
+    "touches_tokfai": true,
+    "path": "/v1/responses",
+    "when": "openai-api / codex_responses (current production Hermes\u2192Tokfai)"
+  },
+  "STREAMING": {
+    "touches_tokfai": true,
+    "path": "/v1/responses?stream=true",
+    "sse": true
+  },
+  "TOOLS": {
+    "touches_tokfai": true,
+    "schema": "responses_flat_function",
+    "count_observed": 44
+  },
+  "TOOL_RESULTS": {
+    "touches_tokfai": true,
+    "schema": "function_call_output"
+  },
+  "IMAGES": {
+    "touches_tokfai": "partial",
+    "notes": "image_generate is Hermes-local tool; may call provider separately"
+  },
+  "VISION": {
+    "touches_tokfai": true,
+    "via": [
+      "responses input_image",
+      "Hermes vision_analyze tool / auxiliary.vision"
+    ]
+  },
+  "AUDIO_STT": {
+    "touches_tokfai": "optional",
+    "path": "/v1/audio/transcriptions",
+    "configurable": true,
+    "default_host": "api.openai.com",
+    "client_limitation": true
+  },
+  "TTS": {
+    "touches_tokfai": "optional",
+    "notes": "tts.openai.base_url configurable; separate from chat"
+  },
+  "WEB_FETCH": {
+    "touches_tokfai": false,
+    "notes": "Hermes-owned tools (web_search/web_extract); may use auxiliary models"
+  },
+  "CONTEXT_COMPRESSION": {
+    "touches_tokfai": "optional",
+    "notes": "auxiliary.compression.base_url can point at Tokfai"
+  }
+}

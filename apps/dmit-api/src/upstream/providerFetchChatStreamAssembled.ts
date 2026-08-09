@@ -380,7 +380,7 @@ export async function providerFetchChatStreamAssembled(
         message: "Upstream stream returned empty body.",
         code: "upstream_error",
         type: "upstream_error",
-        publicMessage: "Upstream provider failed.",
+        publicMessage: "Provider connection failed.",
         upstreamStatus: res.status,
         upstreamErrorSnippet: "empty_stream_body",
       });
@@ -440,7 +440,7 @@ export async function providerFetchChatStreamAssembled(
         message: "Upstream stream returned empty body.",
         code: "upstream_error",
         type: "upstream_error",
-        publicMessage: "Upstream provider failed.",
+        publicMessage: "Provider connection failed.",
         upstreamStatus: res.status,
         upstreamErrorSnippet: "empty_stream_body",
       });
@@ -473,7 +473,7 @@ export async function providerFetchChatStreamAssembled(
         message: "Upstream stream could not be assembled into chat.completion.",
         code: "upstream_error",
         type: "upstream_error",
-        publicMessage: "Upstream provider failed.",
+        publicMessage: "Provider connection failed.",
         upstreamStatus: res.status,
         upstreamErrorSnippet: "stream_assemble_failed",
       });

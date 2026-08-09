@@ -248,6 +248,38 @@ function mockErrorForModel(rawModel) {
       type: "invalid_request_error",
       message: "Invalid request.",
     },
+    "__tokfai_mock_provider_http_400": {
+      status: 400,
+      code: "invalid_request_error",
+      type: "invalid_request_error",
+      message:
+        "Invalid chat completion request. Please retry with a simpler request body.",
+    },
+    "__tokfai_mock_provider_http_401": {
+      status: 502,
+      code: "upstream_auth_error",
+      type: "upstream_error",
+      message: "Provider authentication failed.",
+    },
+    "__tokfai_mock_provider_http_429": {
+      status: 429,
+      code: "upstream_rate_limited",
+      type: "rate_limit_error",
+      message: "Provider is rate limiting requests. Please retry shortly.",
+    },
+    "__tokfai_mock_provider_outage": {
+      status: 503,
+      code: "all_upstreams_unavailable",
+      type: "upstream_error",
+      message:
+        "All providers are unavailable. Please retry shortly or choose another Tokfai model.",
+    },
+    "__tokfai_mock_provider_connection_failed": {
+      status: 502,
+      code: "upstream_transport_error",
+      type: "upstream_error",
+      message: "Provider connection failed.",
+    },
   };
   const hit = table[id];
   if (!hit) return null;
@@ -982,6 +1014,27 @@ function chatCompletionBody(body) {
   };
 }
 
+function hermesToolNames(tools) {
+  if (!Array.isArray(tools)) return [];
+  return tools
+    .map((t) => {
+      if (typeof t?.function?.name === "string") return t.function.name;
+      if (typeof t?.name === "string") return t.name;
+      return null;
+    })
+    .filter(Boolean);
+}
+
+function responsesInputHasToolResume(input) {
+  if (!Array.isArray(input)) return false;
+  return input.some(
+    (item) =>
+      item &&
+      typeof item === "object" &&
+      (item.type === "function_call_output" || item.type === "function_call")
+  );
+}
+
 function responsesBody(body) {
   const requestedModel = typeof body.model === "string" ? body.model : "auto-fast";
   const resolvedModel = resolveMockCanonicalModel(requestedModel);
@@ -992,6 +1045,87 @@ function responsesBody(body) {
       : Array.isArray(body.input)
         ? JSON.stringify(body.input)
         : "";
+  const toolNames = hermesToolNames(body.tools);
+  const hasTools = toolNames.length > 0;
+  const resume = responsesInputHasToolResume(body.input);
+  const forceTool =
+    hasTools &&
+    (/TOKFAI_HERMES_TOOL/i.test(inputText) ||
+      /call tool|use tool|read_file|web_search/i.test(inputText));
+
+  // Tool-result resume → final text answer (Hermes round-trip).
+  if (resume && !forceTool) {
+    const outputText = /TOKFAI_ALIAS_READY/i.test(inputText)
+      ? "TOKFAI_ALIAS_READY"
+      : "ok";
+    return {
+      id: `resp_${meta.request_id}`,
+      object: "response",
+      created_at: Math.floor(Date.now() / 1000),
+      status: "completed",
+      model: resolvedModel,
+      output_text: outputText,
+      output: [
+        {
+          type: "message",
+          role: "assistant",
+          content: [{ type: "output_text", text: outputText }],
+        },
+      ],
+      usage: { input_tokens: 8, output_tokens: 2, total_tokens: 10 },
+      finish_reason: "stop",
+      incomplete_details: null,
+      ...meta,
+      tokfai: {
+        ...meta.tokfai,
+        hermes_tool_resume: true,
+        hermes_tools_count: toolNames.length,
+      },
+    };
+  }
+
+  if (hasTools && (forceTool || toolNames.length >= 40)) {
+    const pick =
+      toolNames.find((n) => /read_file/i.test(n)) ||
+      toolNames.find((n) => /web_search/i.test(n)) ||
+      toolNames[0];
+    const callId = "call_mock_hermes_p1071";
+    return {
+      id: `resp_${meta.request_id}`,
+      object: "response",
+      created_at: Math.floor(Date.now() / 1000),
+      status: "completed",
+      model: resolvedModel,
+      output_text: "",
+      output: [
+        {
+          type: "function_call",
+          id: `fc_${callId}`,
+          call_id: callId,
+          name: pick,
+          arguments: JSON.stringify(
+            /read_file/i.test(pick)
+              ? { path: "README.md" }
+              : /web_search/i.test(pick)
+                ? { query: "tokfai" }
+                : {}
+          ),
+          status: "completed",
+        },
+      ],
+      usage: { input_tokens: 40, output_tokens: 12, total_tokens: 52 },
+      finish_reason: "tool_calls",
+      incomplete_details: null,
+      ...meta,
+      tokfai: {
+        ...meta.tokfai,
+        hermes_tools_count: toolNames.length,
+        hermes_function_calls: 1,
+        upstream_returned_tool_calls: true,
+      },
+    };
+  }
+
   const outputText = /TOKFAI_ALIAS_READY/i.test(inputText)
     ? "TOKFAI_ALIAS_READY"
     : "ok";
@@ -1010,7 +1144,13 @@ function responsesBody(body) {
       },
     ],
     usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
+    finish_reason: "stop",
+    incomplete_details: null,
     ...meta,
+    tokfai: {
+      ...meta.tokfai,
+      hermes_tools_count: toolNames.length,
+    },
   };
 }
 
@@ -1018,13 +1158,16 @@ function responsesToSse(response) {
   const responseId = response.id ?? `resp_mock`;
   const model = response.model ?? "gemini-3-flash";
   const messageId = `msg_${String(responseId).replace(/^resp_/, "")}`;
-  const outputText =
-    typeof response.output_text === "string" && response.output_text.length > 0
-      ? response.output_text
-      : "ok";
+  const functionCalls = Array.isArray(response.output)
+    ? response.output.filter((i) => i && i.type === "function_call")
+    : [];
+  const rawText =
+    typeof response.output_text === "string" ? response.output_text : "";
+  const emitText = rawText.length > 0 || functionCalls.length === 0;
+  const outputText = rawText.length > 0 ? rawText : emitText ? "ok" : "";
   const event = (name, payload) =>
     `event: ${name}\ndata: ${JSON.stringify(payload)}\n\n`;
-  return [
+  const chunks = [
     event("response.created", {
       type: "response.created",
       response: {
@@ -1034,56 +1177,86 @@ function responsesToSse(response) {
         model,
       },
     }),
-    event("response.output_item.added", {
-      type: "response.output_item.added",
-      output_index: 0,
-      item: {
-        id: messageId,
-        type: "message",
-        status: "in_progress",
-        role: "assistant",
-        content: [],
-      },
-    }),
-    event("response.content_part.added", {
-      type: "response.content_part.added",
-      item_id: messageId,
-      output_index: 0,
-      content_index: 0,
-      part: { type: "output_text", text: "" },
-    }),
-    event("response.output_text.delta", {
-      type: "response.output_text.delta",
-      item_id: messageId,
-      output_index: 0,
-      content_index: 0,
-      delta: outputText,
-    }),
-    event("response.output_text.done", {
-      type: "response.output_text.done",
-      item_id: messageId,
-      output_index: 0,
-      content_index: 0,
-      text: outputText,
-    }),
-    event("response.content_part.done", {
-      type: "response.content_part.done",
-      item_id: messageId,
-      output_index: 0,
-      content_index: 0,
-      part: { type: "output_text", text: outputText },
-    }),
-    event("response.output_item.done", {
-      type: "response.output_item.done",
-      output_index: 0,
-      item: {
-        id: messageId,
-        type: "message",
-        status: "completed",
-        role: "assistant",
-        content: [{ type: "output_text", text: outputText }],
-      },
-    }),
+  ];
+  let outputIndex = 0;
+  const completedOutput = [];
+  if (emitText) {
+    chunks.push(
+      event("response.output_item.added", {
+        type: "response.output_item.added",
+        output_index: outputIndex,
+        item: {
+          id: messageId,
+          type: "message",
+          status: "in_progress",
+          role: "assistant",
+          content: [],
+        },
+      }),
+      event("response.content_part.added", {
+        type: "response.content_part.added",
+        item_id: messageId,
+        output_index: outputIndex,
+        content_index: 0,
+        part: { type: "output_text", text: "" },
+      }),
+      event("response.output_text.delta", {
+        type: "response.output_text.delta",
+        item_id: messageId,
+        output_index: outputIndex,
+        content_index: 0,
+        delta: outputText,
+      }),
+      event("response.output_text.done", {
+        type: "response.output_text.done",
+        item_id: messageId,
+        output_index: outputIndex,
+        content_index: 0,
+        text: outputText,
+      }),
+      event("response.content_part.done", {
+        type: "response.content_part.done",
+        item_id: messageId,
+        output_index: outputIndex,
+        content_index: 0,
+        part: { type: "output_text", text: outputText },
+      }),
+      event("response.output_item.done", {
+        type: "response.output_item.done",
+        output_index: outputIndex,
+        item: {
+          id: messageId,
+          type: "message",
+          status: "completed",
+          role: "assistant",
+          content: [{ type: "output_text", text: outputText }],
+        },
+      })
+    );
+    completedOutput.push({
+      type: "message",
+      role: "assistant",
+      content: [{ type: "output_text", text: outputText }],
+    });
+    outputIndex += 1;
+  }
+  for (const call of functionCalls) {
+    chunks.push(
+      event("response.output_item.added", {
+        type: "response.output_item.added",
+        output_index: outputIndex,
+        item: { ...call, status: "in_progress" },
+      }),
+      event("response.output_item.done", {
+        type: "response.output_item.done",
+        output_index: outputIndex,
+        item: { ...call, status: "completed" },
+      })
+    );
+    completedOutput.push(call);
+    outputIndex += 1;
+  }
+  chunks.push(
     event("response.completed", {
       type: "response.completed",
       response: {
@@ -1091,18 +1264,20 @@ function responsesToSse(response) {
         object: "response",
         status: "completed",
         model,
-        output: [
-          {
-            type: "message",
-            role: "assistant",
-            content: [{ type: "output_text", text: outputText }],
-          },
-        ],
+        output: completedOutput,
         output_text: outputText,
+        finish_reason: functionCalls.length > 0 ? "stop" : "stop",
+        incomplete_details: null,
+        usage: response.usage ?? {
+          input_tokens: 1,
+          output_tokens: 1,
+          total_tokens: 2,
+        },
       },
     }),
-    "data: [DONE]\n\n",
-  ].join("");
+    "data: [DONE]\n\n"
+  );
+  return chunks.join("");
 }
 
 function geminiGenerateContentBody(body, modelId = "gemini-2.5-flash") {
@@ -1595,6 +1770,7 @@ export function startMockGateway(options = {}) {
             "GET /v1/models",
             "POST /v1/chat/completions",
             "POST /v1/responses",
+            "POST /v1/audio/transcriptions",
             "GET /v1beta/models",
             "POST /v1beta/models/:model:generateContent",
             "POST /v1beta/models/:model:streamGenerateContent",
@@ -1943,6 +2119,27 @@ export function startMockGateway(options = {}) {
               request_id: makeRequestId(),
             });
           }
+          const contentLength = Number(req.headers["content-length"] || 0);
+          const bodyBytes = Buffer.byteLength(JSON.stringify(body ?? {}), "utf8");
+          if (contentLength > 8 * 1024 * 1024 || bodyBytes > 8 * 1024 * 1024) {
+            const requestId = makeRequestId();
+            return sendJson(res, 413, {
+              error: {
+                message: "Request body too large.",
+                code: "request_body_too_large",
+                type: "invalid_request_error",
+                request_id: requestId,
+              },
+              request_id: requestId,
+              credits_charged: 0,
+              tokfai: {
+                billing_status: "not_billable",
+                credits_charged: 0,
+                request_id: requestId,
+                request_body_bytes: contentLength || bodyBytes,
+              },
+            });
+          }
           const model =
             typeof body?.model === "string" ? body.model : "auto-fast";
           const forced = mockErrorForModel(model);
@@ -1954,6 +2151,9 @@ export function startMockGateway(options = {}) {
             return sendJson(res, 400, modelNotAvailableBody(model));
           }
           const response = responsesBody(body);
+          if (response?.tokfai && typeof response.tokfai === "object") {
+            response.tokfai.request_body_bytes = bodyBytes;
+          }
           if (body?.stream === true) {
             return sendSse(res, responsesToSse(response), {
               requestId: response?.id ?? response?.request_id,
@@ -1963,6 +2163,148 @@ export function startMockGateway(options = {}) {
         } finally {
           slot.release?.();
         }
+      }
+
+      if (req.method === "POST" && path === "/v1/audio/transcriptions") {
+        const authErr = checkAuth(req, validKey);
+        if (authErr) return sendJson(res, authErr.status, authErr.body);
+        const requestId = makeRequestId();
+        const ct = String(req.headers["content-type"] || "");
+        if (!ct.toLowerCase().includes("multipart/form-data")) {
+          return sendJson(res, 400, {
+            error: {
+              message:
+                "Audio transcription requires multipart/form-data with a file field.",
+              code: "invalid_request_error",
+              type: "invalid_request_error",
+              request_id: requestId,
+            },
+            request_id: requestId,
+            credits_charged: 0,
+            tokfai: { billing_status: "not_billable", credits_charged: 0, request_id: requestId },
+          });
+        }
+        const raw = await new Promise((resolve, reject) => {
+          const chunks = [];
+          req.on("data", (c) => chunks.push(c));
+          req.on("end", () => resolve(Buffer.concat(chunks)));
+          req.on("error", reject);
+        });
+        const rawText = raw.toString("latin1");
+        const modelMatch = /name="model"\r\n\r\n([^\r\n]+)/i.exec(rawText);
+        const model = (modelMatch?.[1] || "whisper-1").trim();
+        const hasFile = /name="file"/i.test(rawText);
+        const filenameMatch =
+          /filename="([^"]+)"/i.exec(rawText) ||
+          /filename=([^\r\n;]+)/i.exec(rawText);
+        const filename = (filenameMatch?.[1] || "audio.wav").trim();
+        const bytes = raw.length;
+        if (!hasFile || bytes < 32) {
+          return sendJson(res, 400, {
+            error: {
+              message: "Audio file is required in multipart field `file`.",
+              code: "invalid_request_error",
+              type: "invalid_request_error",
+              request_id: requestId,
+            },
+            request_id: requestId,
+            credits_charged: 0,
+            tokfai: { billing_status: "not_billable", credits_charged: 0, request_id: requestId },
+          });
+        }
+        if (/\.(exe|bin|txt)$/i.test(filename)) {
+          return sendJson(res, 400, {
+            error: {
+              message: "Unsupported audio format.",
+              code: "invalid_request_error",
+              type: "invalid_request_error",
+              request_id: requestId,
+            },
+            request_id: requestId,
+            credits_charged: 0,
+            tokfai: { billing_status: "not_billable", credits_charged: 0, request_id: requestId },
+          });
+        }
+        if (bytes > 25 * 1024 * 1024) {
+          return sendJson(res, 400, {
+            error: {
+              message: "Audio file exceeds the 25MB size limit.",
+              code: "request_body_too_large",
+              type: "invalid_request_error",
+              request_id: requestId,
+            },
+            request_id: requestId,
+            credits_charged: 0,
+            tokfai: { billing_status: "not_billable", credits_charged: 0, request_id: requestId },
+          });
+        }
+        const sttForced = {
+          "__tokfai_mock_stt_provider_400": {
+            status: 400,
+            code: "invalid_request_error",
+            message: "Invalid audio transcription request.",
+          },
+          "__tokfai_mock_stt_provider_401": {
+            status: 502,
+            code: "upstream_auth_error",
+            message: "Provider authentication failed.",
+          },
+          "__tokfai_mock_stt_provider_429": {
+            status: 429,
+            code: "upstream_rate_limited",
+            message: "Provider is rate limiting requests. Please retry shortly.",
+          },
+          "__tokfai_mock_stt_timeout": {
+            status: 504,
+            code: "upstream_timeout",
+            message: "Upstream timed out. Please retry after a short wait.",
+          },
+          "__tokfai_mock_stt_unavailable": {
+            status: 503,
+            code: "all_upstreams_unavailable",
+            message:
+              "All providers are unavailable. Please retry shortly or choose another Tokfai model.",
+          },
+        }[model];
+        if (sttForced) {
+          return sendJson(res, sttForced.status, {
+            error: {
+              message: sttForced.message,
+              code: sttForced.code,
+              type:
+                sttForced.status === 429
+                  ? "rate_limit_error"
+                  : sttForced.status === 400
+                    ? "invalid_request_error"
+                    : "upstream_error",
+              request_id: requestId,
+            },
+            request_id: requestId,
+            credits_charged: 0,
+            tokfai: {
+              billing_status: "not_billable",
+              credits_charged: 0,
+              request_id: requestId,
+              provider: "openai_compatible",
+            },
+          });
+        }
+        // P1072 — real OpenAI-compatible transcription envelope (mock upstream).
+        return sendJson(res, 200, {
+          text: "TOKFAI_P1072_STT_OK",
+          request_id: requestId,
+          credits_charged: 0,
+          tokfai: {
+            request_id: requestId,
+            credits_charged: 0,
+            billing_status: "not_billable",
+            requested_model: model,
+            resolved_model: model,
+            provider: "openai_compatible",
+            usage_type: "audio_transcription",
+            request_body_bytes: bytes,
+          },
+        });
       }
 
       if (req.method === "POST" && path === "/v1/images/generations") {

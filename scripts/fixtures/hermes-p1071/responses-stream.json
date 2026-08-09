@@ -1,0 +1,11 @@
+{
+  "model": "gpt-5.5",
+  "input": [
+    {
+      "role": "user",
+      "content": "Say ok only."
+    }
+  ],
+  "store": false,
+  "stream": true
+}
