@@ -15,6 +15,7 @@ import {
 import { catalogRoutes } from "./routes/catalog.js";
 import { modelRoutes } from "./routes/models.js";
 import { chatRoutes } from "./routes/chat.js";
+import { azureOpenAiRoutes } from "./routes/azureOpenAi.js";
 import { responsesRoutes } from "./routes/responses.js";
 import { geminiRoutes } from "./routes/gemini.js";
 import { batchRoutes } from "./routes/batch.js";
@@ -44,6 +45,7 @@ export function buildApp() {
   app.route("/", modelRoutes);
   app.route("/", announcementRoutes);
   app.route("/", chatRoutes);
+  app.route("/", azureOpenAiRoutes);
   app.route("/", responsesRoutes);
   app.route("/", geminiRoutes);
   app.route("/", batchRoutes);

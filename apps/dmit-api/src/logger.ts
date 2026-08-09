@@ -194,6 +194,10 @@ const ALLOWED_FIELD_KEYS = new Set([
   "messagesByteLength",
   "toolsByteLength",
   "largestToolSchemaBytes",
+  // P1067 Azure OpenAI Cursor ingress (no prompts / tools / secrets)
+  "azureDeployment",
+  "normalizedModel",
+  "apiVersionPresent",
 ]);
 
 const SENSITIVE_LOG_KEY_LITERAL =

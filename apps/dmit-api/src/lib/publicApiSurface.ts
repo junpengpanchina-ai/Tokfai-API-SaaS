@@ -2,6 +2,7 @@
 export const PUBLIC_SUPPORTED_ENDPOINTS = [
   "GET /v1/models",
   "POST /v1/chat/completions",
+  "POST /v1/openai/deployments/:deployment/chat/completions",
   "POST /v1/responses",
   "GET /v1beta/models",
   "POST /v1beta/models/:model:generateContent",
