@@ -68,12 +68,16 @@ function isSttChannel(row: AdminChannelRow): boolean {
 
 type SttDraft = {
   name: string;
-  provider: "groq_whisper_compatible" | "openai_compatible";
+  provider:
+    | "groq_whisper_compatible"
+    | "openai_compatible"
+    | "self_hosted_whisper";
   base_url: string;
   api_key: string;
   default_model: string;
   enabled: boolean;
   priority: string;
+  timeout_ms: string;
 };
 
 function emptySttDraft(): SttDraft {
@@ -85,20 +89,30 @@ function emptySttDraft(): SttDraft {
     default_model: "whisper-large-v3-turbo",
     enabled: true,
     priority: "10",
+    timeout_ms: "60000",
   };
 }
 
 function rowToSttDraft(row: AdminChannelRow): SttDraft {
+  const provider =
+    row.provider === "openai_compatible"
+      ? "openai_compatible"
+      : row.provider === "self_hosted_whisper"
+        ? "self_hosted_whisper"
+        : "groq_whisper_compatible";
   return {
     name: row.provider_name || "STT channel",
-    provider: row.provider === "openai_compatible"
-      ? "openai_compatible"
-      : "groq_whisper_compatible",
+    provider,
     base_url: "",
     api_key: "",
-    default_model: row.default_model || "whisper-large-v3-turbo",
+    default_model:
+      row.default_model ||
+      (provider === "groq_whisper_compatible"
+        ? "whisper-large-v3-turbo"
+        : "whisper-1"),
     enabled: row.enabled,
     priority: String(row.priority ?? 10),
+    timeout_ms: String(row.timeout_ms ?? 60_000),
   };
 }
 
@@ -169,8 +183,16 @@ export function AdminChannelsPanel({
         throw new Error(t("admin.channels.invalidPriority"));
       }
 
+      const timeoutMs = Number(draft.timeout_ms);
+      if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 600_000) {
+        throw new Error(t("admin.channels.invalidTimeout"));
+      }
+
       if (mode === "create") {
-        if (!draft.api_key.trim()) {
+        if (
+          draft.provider !== "self_hosted_whisper" &&
+          !draft.api_key.trim()
+        ) {
           throw new Error(t("admin.channels.apiKeyRequired"));
         }
         if (!draft.base_url.trim()) {
@@ -181,10 +203,11 @@ export function AdminChannelsPanel({
           provider: draft.provider,
           name: draft.name.trim() || undefined,
           base_url: draft.base_url.trim(),
-          api_key: draft.api_key.trim(),
+          api_key: draft.api_key.trim() || undefined,
           default_model: draft.default_model.trim() || undefined,
           enabled: draft.enabled,
           priority,
+          timeout_ms: timeoutMs,
         });
         setMessage(t("admin.channels.created"));
       } else if (editingId) {
@@ -194,6 +217,7 @@ export function AdminChannelsPanel({
           default_model: draft.default_model.trim() || undefined,
           provider: draft.provider,
           name: draft.name.trim() || undefined,
+          timeout_ms: timeoutMs,
         };
         if (draft.base_url.trim()) {
           body.base_url = draft.base_url.trim();
@@ -441,32 +465,47 @@ export function AdminChannelsPanel({
                     id="stt-provider"
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     value={draft.provider}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const provider = e.target
+                        .value as SttDraft["provider"];
                       setDraft((d) => ({
                         ...d,
-                        provider: e.target.value as SttDraft["provider"],
+                        provider,
                         default_model:
-                          e.target.value === "groq_whisper_compatible"
+                          provider === "groq_whisper_compatible"
                             ? d.default_model || "whisper-large-v3-turbo"
                             : d.default_model || "whisper-1",
                         base_url:
-                          e.target.value === "groq_whisper_compatible" &&
-                          !d.base_url
+                          provider === "groq_whisper_compatible" && !d.base_url
                             ? "https://api.groq.com/openai/v1"
-                            : d.base_url,
-                      }))
-                    }
+                            : provider === "self_hosted_whisper" &&
+                                (!d.base_url ||
+                                  d.base_url.includes("api.groq.com"))
+                              ? "http://127.0.0.1:8080"
+                              : d.base_url,
+                        name:
+                          provider === "self_hosted_whisper" &&
+                          (!d.name || d.name === "STT channel")
+                            ? "Self-hosted STT worker"
+                            : d.name,
+                      }));
+                    }}
                     disabled={busy}
                   >
                     <option value="groq_whisper_compatible">
                       groq_whisper_compatible
                     </option>
                     <option value="openai_compatible">openai_compatible</option>
+                    <option value="self_hosted_whisper">
+                      self_hosted_whisper
+                    </option>
                   </select>
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="stt-base-url">
-                    {t("admin.channels.fieldBaseUrl")}
+                    {draft.provider === "self_hosted_whisper"
+                      ? t("admin.channels.fieldWorkerBaseUrl")
+                      : t("admin.channels.fieldBaseUrl")}
                   </Label>
                   <Input
                     id="stt-base-url"
@@ -474,7 +513,9 @@ export function AdminChannelsPanel({
                     placeholder={
                       mode === "edit"
                         ? t("admin.channels.baseUrlKeepPlaceholder")
-                        : "https://api.groq.com/openai/v1"
+                        : draft.provider === "self_hosted_whisper"
+                          ? "http://stt-worker:8080"
+                          : "https://api.groq.com/openai/v1"
                     }
                     onChange={(e) =>
                       setDraft((d) => ({ ...d, base_url: e.target.value }))
@@ -485,7 +526,9 @@ export function AdminChannelsPanel({
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="stt-api-key">
-                    {t("admin.channels.fieldApiKey")}
+                    {draft.provider === "self_hosted_whisper"
+                      ? t("admin.channels.fieldWorkerApiKey")
+                      : t("admin.channels.fieldApiKey")}
                   </Label>
                   <Input
                     id="stt-api-key"
@@ -495,16 +538,23 @@ export function AdminChannelsPanel({
                     placeholder={
                       mode === "edit"
                         ? t("admin.channels.apiKeyKeepPlaceholder")
-                        : t("admin.channels.apiKeyPlaceholder")
+                        : draft.provider === "self_hosted_whisper"
+                          ? t("admin.channels.workerApiKeyPlaceholder")
+                          : t("admin.channels.apiKeyPlaceholder")
                     }
                     onChange={(e) =>
                       setDraft((d) => ({ ...d, api_key: e.target.value }))
                     }
                     disabled={busy}
-                    required={mode === "create"}
+                    required={
+                      mode === "create" &&
+                      draft.provider !== "self_hosted_whisper"
+                    }
                   />
                   <p className="text-xs text-muted-foreground">
-                    {t("admin.channels.apiKeyHint")}
+                    {draft.provider === "self_hosted_whisper"
+                      ? t("admin.channels.workerApiKeyHint")
+                      : t("admin.channels.apiKeyHint")}
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -532,6 +582,19 @@ export function AdminChannelsPanel({
                     value={draft.priority}
                     onChange={(e) =>
                       setDraft((d) => ({ ...d, priority: e.target.value }))
+                    }
+                    disabled={busy}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="stt-timeout">
+                    {t("admin.channels.colTimeout")}
+                  </Label>
+                  <Input
+                    id="stt-timeout"
+                    value={draft.timeout_ms}
+                    onChange={(e) =>
+                      setDraft((d) => ({ ...d, timeout_ms: e.target.value }))
                     }
                     disabled={busy}
                   />

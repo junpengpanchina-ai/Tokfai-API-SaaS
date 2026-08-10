@@ -752,7 +752,7 @@ if (process.argv.includes("--tpm-disabled-case")) {
   assert(true, "10 stream=false covered by cases 1–9");
 }
 
-// ── 11) stream=true: timeout before response.created ───────────────────
+// ── 11) stream=true: P1080 SSE-while-queued; timeout still not_billable ─
 {
   resetAll();
   providerBehavior = "hang";
@@ -794,15 +794,18 @@ if (process.argv.includes("--tpm-disabled-case")) {
   });
   assert(
     !c.ok && c.errorCode === "heavy_queue_timeout",
-    "11a stream timeout JSON path",
+    "11a stream timeout failure result",
     c.ok ? "ok" : c.errorCode
   );
-  assert(cCreated === false, "11b no onAfterPrecheck / response.created for waiter");
+  assert(
+    cCreated === true,
+    "11b onAfterPrecheck while queued (P1080 SSE-while-queued)"
+  );
   assert(created === true, "11c A/B did flush precheck");
   while (hangResolvers.length) hangResolvers.shift()?.();
   await Promise.allSettled([a, b]);
 
-  // Also exercise respondResponsesEarlySse earlyDone JSON envelope
+  // P1080 — respondResponsesEarlySse returns response.failed+[DONE], not raw JSON 429
   resetAll();
   providerBehavior = "hang";
   const fakeC = {
@@ -834,15 +837,17 @@ if (process.argv.includes("--tpm-disabled-case")) {
   });
   const ct = resp.headers.get("content-type") || "";
   assert(
-    resp.status === 429 && ct.includes("application/json"),
-    "11d early SSE gate returns JSON envelope on queue timeout",
+    resp.status === 200 && ct.includes("text/event-stream"),
+    "11d early SSE returns event-stream on queue timeout (not raw JSON 429)",
     `status=${resp.status} ct=${ct}`
   );
-  const body = await resp.json();
+  const sseText = await resp.text();
   assert(
-    body?.error?.code === "heavy_queue_timeout",
-    "11e JSON error code heavy_queue_timeout",
-    JSON.stringify(body?.error ?? {})
+    sseText.includes("response.failed") &&
+      sseText.includes("heavy_queue_timeout") &&
+      /data:\s*\[DONE\]/i.test(sseText),
+    "11e response.failed + [DONE] on queue timeout",
+    sseText.slice(0, 240)
   );
   while (hangResolvers.length) hangResolvers.shift()?.();
   await Promise.allSettled([holdA, holdB]);

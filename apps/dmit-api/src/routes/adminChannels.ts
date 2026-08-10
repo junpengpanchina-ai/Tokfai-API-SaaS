@@ -23,6 +23,7 @@ import type { AdminUserContext } from "../middleware/requireAdminV1.js";
 import {
   createOpenaiCompatSttAdapter,
 } from "../upstream/audio/openaiCompatSttAdapter.js";
+import { createSelfHostedWhisperAdapter } from "../upstream/audio/selfHostedWhisperAdapter.js";
 import type { AudioSttProviderId } from "../upstream/audio/types.js";
 
 export {
@@ -37,7 +38,8 @@ export type AdminChannelCapability = "chat_image" | "audio_transcription";
 
 export type AdminSttProvider =
   | "groq_whisper_compatible"
-  | "openai_compatible";
+  | "openai_compatible"
+  | "self_hosted_whisper";
 
 export type AdminChannelRow = {
   id: string;
@@ -121,12 +123,24 @@ const PRIMARY_CHANNEL_ID = "primary-channel";
 
 const DEFAULT_GROQ_BASE = "https://api.groq.com/openai/v1";
 const DEFAULT_GROQ_MODEL = "whisper-large-v3-turbo";
+const DEFAULT_SELF_HOSTED_MODEL = "whisper-1";
+
+function emptySecret(): SttChannelSecret {
+  return { encrypted: null, memory: null, last4: "" };
+}
+
+function defaultModelForProvider(provider: AdminSttProvider): string {
+  if (provider === "groq_whisper_compatible") return DEFAULT_GROQ_MODEL;
+  if (provider === "self_hosted_whisper") return DEFAULT_SELF_HOSTED_MODEL;
+  return "whisper-1";
+}
 
 function durableToRecord(row: DurableChannelRow): SttChannelRecord | null {
   if (row.capability !== "audio_transcription") return null;
   const provider =
     row.provider === "openai_compatible" ||
-    row.provider === "groq_whisper_compatible"
+    row.provider === "groq_whisper_compatible" ||
+    row.provider === "self_hosted_whisper"
       ? row.provider
       : null;
   if (!provider) return null;
@@ -135,7 +149,7 @@ function durableToRecord(row: DurableChannelRow): SttChannelRecord | null {
     name: row.name,
     provider,
     baseUrl: row.base_url,
-    defaultModel: row.default_model || DEFAULT_GROQ_MODEL,
+    defaultModel: row.default_model || defaultModelForProvider(provider),
     enabled: row.enabled,
     priority: row.priority,
     weight: row.weight,
@@ -204,7 +218,8 @@ async function ensureSttCacheLoaded(): Promise<void> {
 }
 
 async function persistSttRecord(rec: SttChannelRecord): Promise<void> {
-  if (!rec.secret.encrypted) {
+  // Cloud STT requires encrypted secret; self-hosted worker secret is optional.
+  if (!rec.secret.encrypted && rec.provider !== "self_hosted_whisper") {
     throw new Error("refusing to persist STT channel without encrypted secret");
   }
   await persistDurableChannel(recordToDurable(rec));
@@ -313,7 +328,10 @@ function applyOverlay(
 }
 
 function sttRecordToRow(rec: SttChannelRecord): AdminChannelRow {
-  const secretPresent = Boolean(readSecret(rec.secret));
+  // Prefer last4 / ciphertext presence so list never decrypts for display.
+  const secretPresent = Boolean(
+    rec.secret.encrypted?.trim() || rec.secret.last4 || readSecret(rec.secret)
+  );
   return {
     id: rec.id,
     provider_name: rec.name,
@@ -333,7 +351,7 @@ function sttRecordToRow(rec: SttChannelRecord): AdminChannelRow {
     default_model: rec.defaultModel,
     api_key_set: secretPresent,
     api_key_masked: secretPresent
-      ? `****…${rec.secret.last4} (set)`
+      ? `****…${rec.secret.last4 || "****"} (set)`
       : null,
   };
 }
@@ -398,9 +416,21 @@ export async function resolveEnabledSttAdminChannel(): Promise<{
     .sort((a, b) => a.priority - b.priority || a.createdAt.localeCompare(b.createdAt));
 
   for (const rec of candidates) {
-    const apiKey = readSecret(rec.secret);
     const baseUrl = rec.baseUrl.trim();
-    if (!apiKey || !baseUrl) continue;
+    if (!baseUrl) continue;
+    const apiKey = readSecret(rec.secret) ?? "";
+    if (rec.provider === "self_hosted_whisper") {
+      return {
+        id: rec.id,
+        providerId: "self_hosted_whisper",
+        baseUrl,
+        apiKey,
+        defaultModel:
+          rec.defaultModel || defaultModelForProvider("self_hosted_whisper"),
+        timeoutMs: rec.timeoutMs ?? env.TOKFAI_STT_TIMEOUT_MS ?? 60_000,
+      };
+    }
+    if (!apiKey) continue;
     const providerId: AudioSttProviderId =
       rec.provider === "groq_whisper_compatible"
         ? "groq_whisper_compatible"
@@ -410,7 +440,8 @@ export async function resolveEnabledSttAdminChannel(): Promise<{
       providerId,
       baseUrl,
       apiKey,
-      defaultModel: rec.defaultModel || DEFAULT_GROQ_MODEL,
+      defaultModel:
+        rec.defaultModel || defaultModelForProvider(rec.provider),
       timeoutMs: rec.timeoutMs ?? env.TOKFAI_STT_TIMEOUT_MS ?? 60_000,
     };
   }
@@ -524,6 +555,14 @@ function normalizeSttProvider(raw: unknown): AdminSttProvider | null {
   ) {
     return "openai_compatible";
   }
+  if (
+    v === "self_hosted_whisper" ||
+    v === "self_hosted" ||
+    v === "self-hosted-whisper" ||
+    v === "self-hosted"
+  ) {
+    return "self_hosted_whisper";
+  }
   return null;
 }
 
@@ -568,7 +607,8 @@ export async function createAdminSttChannel(
 
   const apiKeyRaw =
     typeof body.api_key === "string" ? body.api_key.trim() : "";
-  if (!apiKeyRaw) {
+  // Self-hosted worker bearer is optional; cloud STT still requires a key.
+  if (!apiKeyRaw && provider !== "self_hosted_whisper") {
     await auditChannelWrite(ctx, {
       action: "channels.create",
       resourceId: "new",
@@ -598,16 +638,16 @@ export async function createAdminSttChannel(
   const defaultModel =
     typeof body.default_model === "string" && body.default_model.trim()
       ? body.default_model.trim()
-      : provider === "groq_whisper_compatible"
-        ? DEFAULT_GROQ_MODEL
-        : "whisper-1";
+      : defaultModelForProvider(provider);
 
   const name =
     typeof body.name === "string" && body.name.trim()
       ? body.name.trim().slice(0, 80)
       : typeof body.provider_name === "string" && body.provider_name.trim()
         ? body.provider_name.trim().slice(0, 80)
-        : "STT channel";
+        : provider === "self_hosted_whisper"
+          ? "Self-hosted STT worker"
+          : "STT channel";
 
   let priority = 10;
   if (body.priority !== undefined) {
@@ -627,6 +667,15 @@ export async function createAdminSttChannel(
     weight = n;
   }
 
+  let timeoutMs = env.TOKFAI_STT_TIMEOUT_MS ?? 60_000;
+  if (body.timeout_ms !== undefined) {
+    const n = Number(body.timeout_ms);
+    if (!Number.isInteger(n) || n < 1000 || n > 600_000) {
+      return { ok: false, status: 400, error: "invalid_timeout_ms" };
+    }
+    timeoutMs = n;
+  }
+
   const enabled =
     typeof body.enabled === "boolean"
       ? body.enabled
@@ -634,7 +683,17 @@ export async function createAdminSttChannel(
         ? false
         : true;
 
-  if (!isKeyEncryptionConfigured()) {
+  if (apiKeyRaw && !isKeyEncryptionConfigured()) {
+    return {
+      ok: false,
+      status: 400,
+      error: "missing_key_encryption_secret",
+    };
+  }
+  if (
+    provider !== "self_hosted_whisper" &&
+    !isKeyEncryptionConfigured()
+  ) {
     return {
       ok: false,
       status: 400,
@@ -655,8 +714,8 @@ export async function createAdminSttChannel(
       enabled,
       priority,
       weight,
-      timeoutMs: env.TOKFAI_STT_TIMEOUT_MS ?? 60_000,
-      secret: storeSecret(apiKeyRaw),
+      timeoutMs,
+      secret: apiKeyRaw ? storeSecret(apiKeyRaw) : emptySecret(),
       lastError: null,
       createdAt: now,
       updatedAt: now,
@@ -691,7 +750,8 @@ export async function createAdminSttChannel(
       base_url_masked: channel.base_url_masked,
       default_model: defaultModel,
       enabled,
-      api_key_set: true,
+      timeout_ms: timeoutMs,
+      api_key_set: Boolean(apiKeyRaw),
     },
     status: "succeeded",
     channel,
@@ -1138,15 +1198,19 @@ export async function testAdminSttChannel(
     return { ok: false, status: 404, error: "channel_not_found" };
   }
 
-  const apiKey = readSecret(rec.secret);
-  if (!apiKey || !rec.baseUrl) {
+  const apiKey = readSecret(rec.secret) ?? "";
+  const needsKey = rec.provider !== "self_hosted_whisper";
+  if (!rec.baseUrl || (needsKey && !apiKey)) {
     const result: AdminSttChannelTestResult = {
       ok: false,
       channel_id: rec.id,
       upstream_status: null,
       latency_ms: null,
       error_class: "missing_credentials",
-      message: "STT channel is missing base_url or api_key.",
+      message:
+        rec.provider === "self_hosted_whisper"
+          ? "STT channel is missing worker base_url."
+          : "STT channel is missing base_url or api_key.",
     };
     await auditChannelWrite(ctx, {
       action: "channels.test",
@@ -1197,21 +1261,26 @@ export async function testAdminSttChannel(
     };
   }
 
-  const providerId: AudioSttProviderId =
-    rec.provider === "groq_whisper_compatible"
-      ? "groq_whisper_compatible"
-      : "openai_compatible";
-  const adapter = createOpenaiCompatSttAdapter({
-    providerId,
-    baseUrl: rec.baseUrl,
-    apiKey,
-  });
+  const adapter =
+    rec.provider === "self_hosted_whisper"
+      ? createSelfHostedWhisperAdapter({
+          baseUrl: rec.baseUrl,
+          apiKey,
+        })
+      : createOpenaiCompatSttAdapter({
+          providerId:
+            rec.provider === "groq_whisper_compatible"
+              ? "groq_whisper_compatible"
+              : "openai_compatible",
+          baseUrl: rec.baseUrl,
+          apiKey,
+        });
 
   const started = Date.now();
   try {
     const out = await adapter.transcribeAudio({
       requestId: ctx.requestId || `admin_stt_test_${rec.id}`,
-      model: rec.defaultModel || DEFAULT_GROQ_MODEL,
+      model: rec.defaultModel || defaultModelForProvider(rec.provider),
       bytes: wavBytes,
       mimeType: "audio/wav",
       filename: "stt-canary-silence.wav",
@@ -1363,30 +1432,32 @@ export async function __upsertSttChannelForTests(args: {
   name?: string;
   provider?: AdminSttProvider;
   baseUrl: string;
-  apiKey: string;
+  /** Optional for self_hosted_whisper; required for cloud STT providers. */
+  apiKey?: string;
   defaultModel?: string;
   enabled?: boolean;
   priority?: number;
+  timeoutMs?: number;
 }): Promise<AdminChannelRow> {
   await ensureSttCacheLoaded();
   const now = new Date().toISOString();
   const id = args.id ?? `stt-test-${randomUUID().slice(0, 8)}`;
   const provider = args.provider ?? "groq_whisper_compatible";
+  const apiKey = (args.apiKey ?? "").trim();
+  if (!apiKey && provider !== "self_hosted_whisper") {
+    throw new Error("apiKey required for non-self-hosted STT test channels");
+  }
   const rec: SttChannelRecord = {
     id,
     name: args.name ?? "STT test channel",
     provider,
     baseUrl: args.baseUrl.replace(/\/+$/, ""),
-    defaultModel:
-      args.defaultModel ??
-      (provider === "groq_whisper_compatible"
-        ? DEFAULT_GROQ_MODEL
-        : "whisper-1"),
+    defaultModel: args.defaultModel ?? defaultModelForProvider(provider),
     enabled: args.enabled !== false,
     priority: args.priority ?? 10,
     weight: 100,
-    timeoutMs: 30_000,
-    secret: storeSecret(args.apiKey),
+    timeoutMs: args.timeoutMs ?? 30_000,
+    secret: apiKey ? storeSecret(apiKey) : emptySecret(),
     lastError: null,
     createdAt: now,
     updatedAt: now,

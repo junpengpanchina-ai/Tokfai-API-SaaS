@@ -126,14 +126,19 @@ async function main() {
         .filter(Boolean)
     : [];
   const allChanged = [...new Set([...modified, ...untracked])].sort();
+  // Lineage note (P1079R2): env.ts is related when TOKFAI_STT_* knobs change
+  // (TOKFAI_STT_MAX_UPLOAD_BYTES). errors.ts holds worker_* / body-limit codes.
+  // audio/* covers bounded multipart reader + self-hosted adapter.
   const p1077Related = allChanged.filter(
     (f) =>
-      /adminChannels|adminUpstreamChannels|audio\/|admin-channels|p1077|0040_admin_upstream|labels\.generated|messages\.ts|admin\/client|p820-admin|admin\.ts|\.gitignore/.test(
+      /adminChannels|adminUpstreamChannels|audio\/|admin-channels|p107\d|0040_admin_upstream|labels\.generated|messages\.ts|admin\/client|p820-admin|admin\.ts|\.gitignore|errors\.ts|env\.ts|selfHostedWhisper|readMultipartAudio|hermes-compatibility|hermes-live-stt|hermes-zero-config|hermes-voice|hermes-production-stt/.test(
         f
       ) ||
       f.includes("audio.ts") ||
       f.includes("resolveAudioProvider") ||
-      f.includes("adminUpstreamChannelsStore")
+      f.includes("adminUpstreamChannelsStore") ||
+      f.includes("selfHostedWhisperAdapter") ||
+      f.includes("readMultipartAudioWithLimit")
   );
   const unrelated = allChanged.filter((f) => !p1077Related.includes(f));
 
@@ -565,7 +570,11 @@ async function main() {
   );
   record(
     "CONSUMER_MODEL_ONLY",
-    /form\.model/.test(audioSrc) && /resolveSttUpstreamModel/.test(audioSrc),
+    (/form\.model/.test(audioSrc) ||
+      /form\.get\(\s*["']model["']\s*\)/.test(audioSrc) ||
+      /parsed\.model/.test(audioSrc) ||
+      /readMultipartAudioWithLimit/.test(audioSrc)) &&
+      /resolveSttUpstreamModel/.test(audioSrc),
     "STATIC_SOURCE_CHECK",
     "YES"
   );

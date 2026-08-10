@@ -56,7 +56,7 @@ Stock Hermes Desktop (sourceMode=false) does not auto-inherit OPENAI_BASE_URL fo
 | F_invalid_key_401 | PASS | yes | status=401 |
 | G_malformed_multipart_400 | PASS | yes | status=400 |
 | H_unsupported_format | PASS | yes | status=400 |
-| I_oversized_audio_limit | PASS | no | 25MB gate in route |
+| I_oversized_audio_limit | PASS | no | 25MB/configurable STT upload gate |
 | J_provider_http_400 | PASS | yes | status=400 code=invalid_request_error |
 | K_provider_401_403 | PASS | yes | status=502 code=upstream_auth_error |
 | L_provider_429 | PASS | yes | status=429 code=upstream_rate_limited |

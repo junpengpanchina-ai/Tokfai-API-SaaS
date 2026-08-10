@@ -9,6 +9,7 @@ import {
   createOpenaiCompatSttAdapter,
   createUnavailableSttAdapter,
 } from "./openaiCompatSttAdapter.js";
+import { createSelfHostedWhisperAdapter } from "./selfHostedWhisperAdapter.js";
 import type { AudioSttProvider, ResolvedAudioSttConfig } from "./types.js";
 
 function parsePrice(raw: string | undefined): number | null {
@@ -52,9 +53,18 @@ function resolveEnvSttConfig(): ResolvedAudioSttConfig {
     providerRaw === "openai-compatible"
   ) {
     providerId = "openai_compatible";
+  } else if (
+    providerRaw === "self_hosted_whisper" ||
+    providerRaw === "self_hosted" ||
+    providerRaw === "self-hosted-whisper"
+  ) {
+    providerId = "self_hosted_whisper";
   }
 
-  if (!baseUrl || !apiKeySet) {
+  // Self-hosted worker secret is optional; cloud STT still requires key + base.
+  if (providerId === "self_hosted_whisper") {
+    if (!baseUrl) providerId = "unavailable";
+  } else if (!baseUrl || !apiKeySet) {
     providerId = "unavailable";
   }
 
@@ -79,7 +89,10 @@ export async function resolveAudioSttConfig(): Promise<ResolvedAudioSttConfig> {
     return {
       providerId: admin.providerId,
       baseUrl: admin.baseUrl,
-      apiKeySet: true,
+      apiKeySet:
+        admin.providerId === "self_hosted_whisper"
+          ? Boolean(admin.apiKey?.trim())
+          : true,
       /** Public / fallback when client omits model. */
       defaultModel: admin.defaultModel,
       /**
@@ -126,6 +139,13 @@ export async function resolveAudioSttProvider(): Promise<AudioSttProvider> {
     apiKey = admin?.apiKey?.trim() ?? "";
   } else {
     apiKey = sttEnv("TOKFAI_STT_API_KEY") ?? "";
+  }
+
+  if (cfg.providerId === "self_hosted_whisper") {
+    return createSelfHostedWhisperAdapter({
+      baseUrl: cfg.baseUrl,
+      apiKey,
+    });
   }
 
   if (!apiKey) {

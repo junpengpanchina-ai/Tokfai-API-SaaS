@@ -1,12 +1,19 @@
 /**
- * POST /v1/audio/transcriptions — OpenAI-compatible STT ingress (P1072).
+ * POST /v1/audio/transcriptions — OpenAI-compatible STT ingress (P1072 / P1079R2).
  *
  * Hermes → Tokfai → isolated audio provider adapter → STT upstream.
  * Does NOT call executeChatCompletion. Never fakes a transcript.
+ *
+ * Memory boundary (P1079R2):
+ * - Configurable TOKFAI_STT_MAX_UPLOAD_BYTES (default 25MiB)
+ * - Content-Length early 413 before buffering when present
+ * - Streamed body hard-cap for chunked / missing Content-Length
+ * - Reject oversize before worker fetch
  */
 
 import { Hono } from "hono";
 
+import { env } from "../env.js";
 import { ApiError } from "../errors.js";
 import {
   AUDIO_TRANSCRIPTION_ENDPOINT,
@@ -22,12 +29,16 @@ import {
 import { chatGatewayMiddleware } from "../middleware/chatGateway.js";
 import { respondApiError } from "../middleware/error.js";
 import {
+  DEFAULT_STT_MAX_UPLOAD_BYTES,
+  readMultipartAudioWithLimit,
+  resolveSttMaxUploadBytes,
+} from "../upstream/audio/readMultipartAudioWithLimit.js";
+import {
   resolveAudioSttConfig,
   resolveAudioSttProvider,
   resolveSttUpstreamModel,
 } from "../upstream/audio/resolveAudioProvider.js";
 
-const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 const ALLOWED_EXT = new Set([
   ".mp3",
   ".mp4",
@@ -48,9 +59,12 @@ function extOf(name: string): string {
   return i >= 0 ? name.slice(i).toLowerCase() : "";
 }
 
-function basenameOnly(name: string): string {
-  const cleaned = name.replace(/\\/g, "/").split("/").pop() || "audio.wav";
-  return cleaned.slice(0, 128);
+function sttMaxUploadBytes(): number {
+  const live = process.env.TOKFAI_STT_MAX_UPLOAD_BYTES;
+  if (typeof live === "string" && live.trim()) {
+    return resolveSttMaxUploadBytes(live, DEFAULT_STT_MAX_UPLOAD_BYTES);
+  }
+  return env.TOKFAI_STT_MAX_UPLOAD_BYTES ?? DEFAULT_STT_MAX_UPLOAD_BYTES;
 }
 
 export const audioRoutes = new Hono();
@@ -64,6 +78,8 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
   const requestId = c.get("requestId" as never) as string;
   const startedAt = Date.now();
   const contentType = c.req.header("content-type") ?? "";
+  const maxUploadBytes = sttMaxUploadBytes();
+  const clientAbort = c.req.raw.signal;
 
   if (!contentType.toLowerCase().includes("multipart/form-data")) {
     return respondApiError(
@@ -78,31 +94,51 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
 
   let model = "";
   let language: string | undefined;
+  let prompt: string | undefined;
+  let responseFormat: string | undefined;
+  let temperature: number | undefined;
   let filename = "audio.wav";
   let mimeType = "application/octet-stream";
   let bytes: Uint8Array | null = null;
+  let rawBodyBytes = 0;
+  let contentLengthChecked = false;
 
   try {
-    const form = await c.req.parseBody({ all: true });
-    const modelField = form.model;
-    if (typeof modelField === "string" && modelField.trim()) {
-      model = modelField.trim();
-    }
-    const langField = form.language;
-    if (typeof langField === "string" && langField.trim()) {
-      language = langField.trim();
-    }
-    const fileField = form.file;
-    if (fileField instanceof File) {
-      filename = basenameOnly(fileField.name || "audio.wav");
-      mimeType = fileField.type || mimeType;
-      const ab = await fileField.arrayBuffer();
-      bytes = new Uint8Array(ab);
-    } else if (typeof fileField === "string" && fileField.length > 0) {
-      bytes = new Uint8Array(Buffer.from(fileField));
-      filename = "audio.wav";
-    }
+    const parsed = await readMultipartAudioWithLimit({
+      contentType,
+      contentLengthHeader: c.req.header("content-length"),
+      body: c.req.raw.body,
+      maxFileBytes: maxUploadBytes,
+      abortSignal: clientAbort,
+    });
+    model = parsed.model;
+    language = parsed.language;
+    prompt = parsed.prompt;
+    responseFormat = parsed.responseFormat;
+    temperature = parsed.temperature;
+    filename = parsed.filename;
+    mimeType = parsed.mimeType;
+    bytes = parsed.bytes;
+    rawBodyBytes = parsed.rawBodyBytes;
+    contentLengthChecked = parsed.contentLengthChecked;
   } catch (err) {
+    if (err instanceof ApiError) {
+      if (
+        err.code === "request_body_too_large" ||
+        err.code === "client_aborted"
+      ) {
+        // Oversize / abort: never call worker; failure usage is not_billable.
+        await safeFailUsage({
+          caller,
+          requestId,
+          resolvedModel: model || "whisper-1",
+          startedAt,
+          errorCode: err.code ?? "request_body_too_large",
+          errorMessage: err.message,
+        });
+      }
+      return respondApiError(c, err, requestId);
+    }
     log.warn("audio_transcriptions_multipart_parse_failed", {
       request_id: requestId,
       api_key_id: caller.apiKeyId,
@@ -124,17 +160,6 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
       ApiError.badRequest(
         "Audio file is required in multipart field `file`.",
         "invalid_request_error"
-      ),
-      requestId
-    );
-  }
-
-  if (bytes.byteLength > MAX_AUDIO_BYTES) {
-    return respondApiError(
-      c,
-      ApiError.badRequest(
-        "Audio file exceeds the 25MB size limit.",
-        "request_body_too_large"
       ),
       requestId
     );
@@ -170,6 +195,9 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
     model: resolvedModel,
     upstream_model: upstreamModel,
     bytes: bytes.byteLength,
+    raw_body_bytes: rawBodyBytes,
+    content_length_checked: contentLengthChecked,
+    max_upload_bytes: maxUploadBytes,
     mime_type: mimeType,
     // basename only — never full paths
     filename_ext: ext || null,
@@ -196,6 +224,8 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
 
   // Billing: flat TOKFAI_STT_PRICE_CREDITS only — never chat tokens.
   // Unpriced → not_billable; chatGatewayMiddleware still enforces RPM/concurrency.
+  // Future seam: self_hosted_stt_cost accounting (infra/GPU minutes) — do NOT
+  // double-debit here; still a single recordAudioTranscriptionSuccess path.
   const priceProbe = cfg.priceCredits;
   if (!(typeof priceProbe === "number" && priceProbe > 0)) {
     log.info("audio_transcription_not_billable_guard", {
@@ -204,6 +234,7 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
       provider: cfg.providerId,
       billing_status: "not_billable",
       guard: "chat_gateway_rpm_concurrency",
+      self_hosted_stt_cost_seam: "future_not_charged",
     });
   }
 
@@ -216,7 +247,11 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
       mimeType,
       filename,
       language,
+      prompt,
+      responseFormat,
+      temperature,
       timeoutMs: cfg.timeoutMs,
+      abortSignal: clientAbort,
     });
   } catch (err) {
     const apiErr =

@@ -113,7 +113,13 @@ export function createOpenaiCompatSttAdapter(args: {
             Authorization: `Bearer ${key}`,
           },
           body: form,
-          signal: AbortSignal.timeout(input.timeoutMs),
+          signal:
+            input.abortSignal && typeof AbortSignal.any === "function"
+              ? AbortSignal.any([
+                  AbortSignal.timeout(input.timeoutMs),
+                  input.abortSignal,
+                ])
+              : AbortSignal.timeout(input.timeoutMs),
         });
       } catch (err) {
         const name = err instanceof Error ? err.name : "";
@@ -125,6 +131,15 @@ export function createOpenaiCompatSttAdapter(args: {
           mime_type: input.mimeType,
           err_name: name,
         });
+        if (input.abortSignal?.aborted) {
+          throw new ApiError({
+            status: 499,
+            message: "stt_client_aborted",
+            code: "client_aborted",
+            type: "invalid_request_error",
+            publicMessage: "Client closed the request.",
+          });
+        }
         if (name === "TimeoutError" || name === "AbortError") {
           throw new ApiError({
             status: 504,

@@ -6,18 +6,27 @@
 export type AudioSttProviderId =
   | "openai_compatible"
   | "groq_whisper_compatible"
+  | "self_hosted_whisper"
   | "unavailable";
 
 export type TranscribeAudioInput = {
   requestId: string;
   model: string;
-  /** Raw audio bytes — never log. */
+  /**
+   * Raw audio bytes from gateway multipart parse — never log, never base64 JSON.
+   * Self-hosted adapter forwards these via FormData (no second app-level copy).
+   */
   bytes: Uint8Array;
   mimeType: string;
   /** Basename only for upstream multipart; never log full paths. */
   filename: string;
   language?: string;
+  prompt?: string;
+  responseFormat?: string;
+  temperature?: number;
   timeoutMs: number;
+  /** Consumer disconnect / gateway abort — must cancel worker fetch. */
+  abortSignal?: AbortSignal;
 };
 
 export type TranscribeAudioResult = {

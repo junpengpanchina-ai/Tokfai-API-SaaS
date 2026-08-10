@@ -343,7 +343,11 @@ export type AdminChannelRow = {
   enabled: boolean;
   modalities: Array<"chat" | "image" | "audio_transcription">;
   capability?: "chat_image" | "audio_transcription";
-  provider?: "groq_whisper_compatible" | "openai_compatible" | null;
+  provider?:
+    | "groq_whisper_compatible"
+    | "openai_compatible"
+    | "self_hosted_whisper"
+    | null;
   default_model?: string | null;
   api_key_set?: boolean;
   /** Masked hint only — never the full upstream secret. */
@@ -351,16 +355,23 @@ export type AdminChannelRow = {
   updated_at?: string | null;
 };
 
+export type AdminSttProvider =
+  | "groq_whisper_compatible"
+  | "openai_compatible"
+  | "self_hosted_whisper";
+
 export type AdminSttChannelCreateBody = {
   capability: "audio_transcription";
-  provider: "groq_whisper_compatible" | "openai_compatible";
+  provider: AdminSttProvider;
   name?: string;
   base_url: string;
-  api_key: string;
+  /** Required for cloud STT; optional for self_hosted_whisper. */
+  api_key?: string;
   default_model?: string;
   enabled?: boolean;
   priority?: number;
   weight?: number;
+  timeout_ms?: number;
 };
 
 export type AdminSttChannelUpdateBody = {
@@ -372,8 +383,9 @@ export type AdminSttChannelUpdateBody = {
   /** Omit or empty to keep existing secret. */
   api_key?: string;
   default_model?: string;
-  provider?: "groq_whisper_compatible" | "openai_compatible";
+  provider?: AdminSttProvider;
   name?: string;
+  timeout_ms?: number;
 };
 
 export type AdminSttChannelTestResult = {

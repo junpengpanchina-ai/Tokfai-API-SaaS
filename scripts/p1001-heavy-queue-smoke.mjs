@@ -98,23 +98,29 @@ assert(
 assert(
   exec.includes("acquireHeavyResponsesPermit") &&
     exec.includes("heavyPermit") &&
-    exec.includes("heavyPermit?.release()") &&
+    exec.includes("heavyPermit?.release(") &&
     exec.includes("heavyPermit?.queued") &&
     exec.includes("onAfterPrecheck") &&
     !exec.includes("releaseHeavyResponses(limitKey)"),
   "exec: unified permit release; no dual releaseHeavyResponses"
 );
 
-// Order: acquire before onAfterPrecheck
+// P1080 — onAfterPrecheck (SSE open) before Heavy queue wait for stream clients
 {
-  const acq = exec.indexOf("acquireHeavyResponsesPermit");
   const after = exec.indexOf("input.onAfterPrecheck");
+  const acq = exec.indexOf("heavyPermit = await acquireHeavyResponsesPermit");
   const secondary = exec.indexOf("heavyPermit?.queued");
   assert(
-    acq > 0 && after > acq && secondary > acq && secondary < after,
-    "exec: queue → secondary checks → onAfterPrecheck order"
+    after > 0 && acq > after && secondary > acq,
+    "exec: onAfterPrecheck → queue → secondary checks (P1080 SSE-while-queued)"
   );
 }
+
+assert(
+  exec.includes('clientStream && route === "/v1/responses"') &&
+    exec.includes("TOKFAI_HEAVY_QUEUE_ENABLED"),
+  "exec: responses stream auto-enables Heavy FIFO queue"
+);
 
 // P1001.1 — exactly one production await assertTokenBudget in main path
 {
@@ -141,7 +147,8 @@ assert(
 assert(
   responses.includes("c.req.raw.signal") &&
     responses.includes("abortSignal") &&
-    earlySse.includes("abortSignal: args.abortSignal"),
+    (earlySse.includes("abortSignal: args.abortSignal") ||
+      earlySse.includes("abortSignal: upstreamAbort.signal")),
   "responses/SSE: AbortSignal forwarded"
 );
 

@@ -1,6 +1,6 @@
 # P1077 — STT upstream channel productionization
 
-- commit: `6044b56773283e68ee8c0d52d9b844dac98c22a0`
+- commit: `c59496c8bbb2e2728ed3073ca40a86eeb6a10144`
 - STT_CHANNEL_PRODUCTION_READY=YES
 - REAL_ENTRY_TEST_COUNT=28
 - DB_MIGRATION_REQUIRED=YES (supabase/migrations/0040_admin_upstream_channels.sql; file fallback when no service_role)

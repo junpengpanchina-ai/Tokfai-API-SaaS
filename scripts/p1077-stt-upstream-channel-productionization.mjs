@@ -614,7 +614,11 @@ async function main() {
   );
   record(
     "CONSUMER_MODEL_ONLY",
-    /form\.model/.test(audioSrc) && /resolveSttUpstreamModel/.test(audioSrc),
+    (/form\.model/.test(audioSrc) ||
+      /form\.get\(\s*["']model["']\s*\)/.test(audioSrc) ||
+      /parsed\.model/.test(audioSrc) ||
+      /readMultipartAudioWithLimit/.test(audioSrc)) &&
+      /resolveSttUpstreamModel/.test(audioSrc),
     "client model + internal translation",
     false
   );

@@ -480,14 +480,29 @@ async function main() {
       );
     }
 
-    // I — oversized: skip real 25MB upload; assert source constant + mock path
+    // I — oversized: skip real 25MB upload; assert configurable gate (P1079R2).
+    // Default remains 25 * 1024 * 1024 via TOKFAI_STT_MAX_UPLOAD_BYTES /
+    // DEFAULT_STT_MAX_UPLOAD_BYTES; reject uses request_body_too_large (413).
     {
       const src = readFileSync(audioRoute, "utf8");
+      const limitSrcPath = join(
+        ROOT,
+        "apps/dmit-api/src/upstream/audio/readMultipartAudioWithLimit.ts"
+      );
+      const limitSrc = existsSync(limitSrcPath)
+        ? readFileSync(limitSrcPath, "utf8")
+        : "";
+      const hasDefault25 =
+        src.includes("25 * 1024 * 1024") ||
+        limitSrc.includes("25 * 1024 * 1024") ||
+        /TOKFAI_STT_MAX_UPLOAD_BYTES/.test(src);
+      const hasTooLarge =
+        src.includes("request_body_too_large") ||
+        /payloadTooLarge|readMultipartAudioWithLimit/.test(src);
       record(
         "I_oversized_audio_limit",
-        src.includes("25 * 1024 * 1024") &&
-          src.includes("request_body_too_large"),
-        "25MB gate in route",
+        hasDefault25 && hasTooLarge,
+        "25MB/configurable STT upload gate",
         false
       );
     }

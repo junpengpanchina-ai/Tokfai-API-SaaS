@@ -1,40 +1,48 @@
 # P1077R3 — STT channel production migration gate
 
-- commit: `6044b56773283e68ee8c0d52d9b844dac98c22a0`
+- commit: `c59496c8bbb2e2728ed3073ca40a86eeb6a10144`
 - FINAL_VERDICT=A
-- GIT_CHANGED_FILE_COUNT=19
+- GIT_CHANGED_FILE_COUNT=27
 - CURSOR_UI_VISIBLE_FILE_COUNT=14
 - COUNT_DIFFERENCE_EXPLAINED=YES
-- COUNT_DIFFERENCE_REASON=R2 reported GIT=17 vs Cursor UI=14 because UI typically omits .gitignore + markdown docs (3 artifacts → 17-3=14). Current git inventory=19 (modified=11 untracked=8); docs/gitignore in tree now=4 [.gitignore, docs/p1077-stt-upstream-channel-productionization-report.md, docs/p1077r2-stt-channel-persistence-precommit-audit-report.md, docs/p1077r3-stt-channel-production-migration-gate-report.md].
+- COUNT_DIFFERENCE_REASON=R2 reported GIT=17 vs Cursor UI=14 because UI typically omits .gitignore + markdown docs (3 artifacts → 17-3=14). Current git inventory=27 (modified=19 untracked=8); docs/gitignore in tree now=8 [docs/p1071-hermes-compatibility-lab-report.md, docs/p1072-hermes-zero-config-voice-report.md, docs/p1075-hermes-live-stt-firetest-report.md, docs/p1077-stt-upstream-channel-productionization-report.md, docs/p1077r2-stt-channel-persistence-precommit-audit-report.md, docs/p1077r3-stt-channel-production-migration-gate-report.md, docs/p1079-self-hosted-stt-worker-architecture-report.md, docs/p1079r2-self-hosted-stt-precommit-memory-boundary-report.md].
 
 ## Files
 
-- 01 .gitignore
-- 02 apps/dmit-api/src/routes/admin.ts
+- 01 apps/dmit-api/src/env.ts
+- 02 apps/dmit-api/src/errors.ts
 - 03 apps/dmit-api/src/routes/adminChannels.ts
 - 04 apps/dmit-api/src/routes/audio.ts
-- 05 apps/dmit-api/src/upstream/audio/resolveAudioProvider.ts
-- 06 apps/dmit-api/src/upstream/audio/types.ts
-- 07 apps/web/components/admin/admin-channels-panel.tsx
-- 08 apps/web/lib/admin/client.ts
-- 09 apps/web/lib/dashboard-safe/labels.generated.ts
-- 10 apps/web/lib/i18n/messages.ts
-- 11 scripts/p820-admin-docs-catalog-smoke.mjs
-- 12 apps/dmit-api/src/lib/adminUpstreamChannelsStore.ts
-- 13 docs/p1077-stt-upstream-channel-productionization-report.md
-- 14 docs/p1077r2-stt-channel-persistence-precommit-audit-report.md
-- 15 docs/p1077r3-stt-channel-production-migration-gate-report.md
-- 16 scripts/p1077-stt-upstream-channel-productionization.mjs
-- 17 scripts/p1077r2-stt-channel-persistence-precommit-audit.mjs
-- 18 scripts/p1077r3-stt-channel-production-migration-gate.mjs
-- 19 supabase/migrations/0040_admin_upstream_channels.sql
+- 05 apps/dmit-api/src/upstream/audio/openaiCompatSttAdapter.ts
+- 06 apps/dmit-api/src/upstream/audio/resolveAudioProvider.ts
+- 07 apps/dmit-api/src/upstream/audio/types.ts
+- 08 apps/web/components/admin/admin-channels-panel.tsx
+- 09 apps/web/lib/admin/client.ts
+- 10 apps/web/lib/dashboard-safe/labels.generated.ts
+- 11 docs/p1071-hermes-compatibility-lab-report.md
+- 12 docs/p1072-hermes-zero-config-voice-report.md
+- 13 docs/p1075-hermes-live-stt-firetest-report.md
+- 14 docs/p1077-stt-upstream-channel-productionization-report.md
+- 15 docs/p1077r2-stt-channel-persistence-precommit-audit-report.md
+- 16 docs/p1077r3-stt-channel-production-migration-gate-report.md
+- 17 scripts/p1072-hermes-zero-config-voice-smoke.mjs
+- 18 scripts/p1077-stt-upstream-channel-productionization.mjs
+- 19 scripts/p1077r2-stt-channel-persistence-precommit-audit.mjs
+- 20 apps/dmit-api/src/upstream/audio/readMultipartAudioWithLimit.ts
+- 21 apps/dmit-api/src/upstream/audio/selfHostedWhisperAdapter.ts
+- 22 docs/p1079-self-hosted-stt-worker-architecture-report.md
+- 23 docs/p1079r2-self-hosted-stt-precommit-memory-boundary-report.md
+- 24 scripts/lib/p1079-mock-stt-worker.mjs
+- 25 scripts/p1078-stt-stored-secret-fingerprint-proof.mjs
+- 26 scripts/p1079-self-hosted-stt-worker-architecture.mjs
+- 27 scripts/p1079r2-self-hosted-stt-precommit-memory-boundary.mts
 
 ## Cases
 
-- PASS `GIT_CHANGED_FILE_COUNT` — 19
-- PASS `COUNT_DIFFERENCE_EXPLAINED` — R2 reported GIT=17 vs Cursor UI=14 because UI typically omits .gitignore + markdown docs (3 artifacts → 17-3=14). Current git inventory=19 (modified=11 untracked=8); docs/gitignore in tree now=4 [.gitignore, docs/p1077-stt-upstream-channel-productionization-report.md, docs/p1077r2-stt-channel-persistence-precommit-audit-report.md, docs/p1077r3-stt-channel-production-migration-gate-report.md].
+- PASS `GIT_CHANGED_FILE_COUNT` — 27
+- PASS `COUNT_DIFFERENCE_EXPLAINED` — R2 reported GIT=17 vs Cursor UI=14 because UI typically omits .gitignore + markdown docs (3 artifacts → 17-3=14). Current git inventory=27 (modified=19 untracked=8); docs/gitignore in tree now=8 [docs/p1071-hermes-compatibility-lab-report.md, docs/p1072-hermes-zero-config-voice-report.md, docs/p1075-hermes-live-stt-firetest-report.md, docs/p1077-stt-upstream-channel-productionization-report.md, docs/p1077r2-stt-channel-persistence-precommit-audit-report.md, docs/p1077r3-stt-channel-production-mi
 - PASS `UNRELATED_DIFF_FOUND` — NO
-- PASS `all_files_classified` — classified=19
+- PASS `all_files_classified` — classified=27
 - PASS `MIGRATION_IDEMPOTENT_OR_ORDER_SAFE` — if not exists
 - PASS `MIGRATION_DESTRUCTIVE` — NO
 - PASS `EXISTING_TABLE_DROPPED` — NO

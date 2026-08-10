@@ -1,18 +1,18 @@
 # P1077R2 — STT channel persistence precommit audit
 
-- commit: `6044b56773283e68ee8c0d52d9b844dac98c22a0`
-- FINAL_VERDICT=A
+- commit: `c59496c8bbb2e2728ed3073ca40a86eeb6a10144`
+- FINAL_VERDICT=B
 - ADMIN_CHANNEL_STORAGE_CLASS=DURABLE_FILE
 - ADMIN_CHANNEL_STORAGE_PATH_OR_TABLE=/Users/p/Documents/GitHub/Tokfai-API-SaaS/tmp/p1077r2-admin-channels-store.json
 - DB_MIGRATION_REQUIRED=YES (supabase/migrations/0040_admin_upstream_channels.sql)
-- P1077_CHANGED_FILE_COUNT=19
-- UNRELATED_DIFF_FOUND=NO
+- P1077_CHANGED_FILE_COUNT=41
+- UNRELATED_DIFF_FOUND=YES
 - REAL_RESTART_TEST_COUNT=7
 
 ## Cases
 
-- PASS `phase1_git_scope` [STATIC_SOURCE_CHECK] — changed=19 related=19
-- PASS `UNRELATED_DIFF_FOUND` [STATIC_SOURCE_CHECK] — NO
+- PASS `phase1_git_scope` [STATIC_SOURCE_CHECK] — changed=41 related=27
+- FAIL `UNRELATED_DIFF_FOUND` [STATIC_SOURCE_CHECK] — apps/dmit-api/.env.example,apps/dmit-api/src/gateway/heavyResponsesQueue.ts,apps/dmit-api/src/lib/earlySseStream.ts,apps/dmit-api/src/lib/executeChatCompletion.ts,apps/dmit-api/src/lib/respondEarlySse.ts,apps/dmit-api/src/lib/responsesSse.ts,apps/dmit-api/src/lib/upstreamTimeoutPolicy.ts,apps/dmit-api/src/routes/responses.ts,apps/dmit-api/src/upstream/grsai.ts,scripts/p1001-heavy-queue-entry-test.mts,scripts/p1001-heavy-queue-smoke.mjs,scripts/p1080-provider-fetch-abort-unit.mts,scripts/p1080-re
 - PASS `build` [STATIC_SOURCE_CHECK] — status=0
 - PASS `typecheck` [STATIC_SOURCE_CHECK] — status=0
 - PASS `ADMIN_CHANNEL_STORAGE_CLASS` [REAL_STORAGE_TEST] — DURABLE_FILE
