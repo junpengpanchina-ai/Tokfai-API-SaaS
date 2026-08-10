@@ -184,6 +184,45 @@ export function responsesCreatedSseFrame(args?: {
 }
 
 /**
+ * P1080 — legal Responses SSE terminal for stream=true failures
+ * (queue full/timeout, upstream no-output, client-visible errors).
+ * Always ends with data: [DONE] so clients do not hang waiting for completed.
+ */
+export function responsesFailedSseBody(args: {
+  requestId?: string;
+  message: string;
+  code: string;
+  model?: string;
+}): string {
+  const rid =
+    typeof args.requestId === "string" && args.requestId.trim()
+      ? args.requestId.trim()
+      : `fail_${Date.now()}`;
+  const responseId = rid.startsWith("resp_") ? rid : `resp_${rid}`;
+  const model =
+    typeof args.model === "string" && args.model.trim()
+      ? args.model.trim()
+      : "unknown";
+  const createdAt = Math.floor(Date.now() / 1000);
+  return (
+    sseEvent("response.failed", {
+      type: "response.failed",
+      response: {
+        id: responseId,
+        object: "response",
+        created_at: createdAt,
+        status: "failed",
+        model,
+        error: {
+          code: args.code,
+          message: args.message,
+        },
+      },
+    }) + "data: [DONE]\n\n"
+  );
+}
+
+/**
  * Remaining Responses SSE events after the early response.created frame.
  */
 export function responsesSseBodyAfterCreated(

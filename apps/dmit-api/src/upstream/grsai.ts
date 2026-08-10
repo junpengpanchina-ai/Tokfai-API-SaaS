@@ -9,7 +9,7 @@ import { getProviderById } from "./providers.js";
  * Billing, model routing, and provider fallback live in executeChatCompletion.
  */
 
-export interface UpstreamFetchOptions extends Omit<RequestInit, "body"> {
+export interface UpstreamFetchOptions extends Omit<RequestInit, "body" | "signal"> {
   json?: unknown;
   timeoutMs?: number;
   /**
@@ -17,6 +17,11 @@ export interface UpstreamFetchOptions extends Omit<RequestInit, "body"> {
    * Non-stream JSON fetch treats this as the attempt timeout.
    */
   idleTimeoutMs?: number;
+  /**
+   * P1080 — client disconnect / gateway cancel. Combined with attempt timeout
+   * via AbortSignal.any so cancel aborts the in-flight upstream fetch.
+   */
+  abortSignal?: AbortSignal;
 }
 
 export interface UpstreamLogContext {
@@ -26,6 +31,29 @@ export interface UpstreamLogContext {
   requestedModel?: string;
   resolvedModel?: string;
   providerId?: string;
+}
+
+function combineAbortSignals(signals: AbortSignal[]): AbortSignal {
+  const active = signals.filter(Boolean);
+  if (active.length === 0) {
+    return new AbortController().signal;
+  }
+  if (active.length === 1) return active[0]!;
+  if (typeof AbortSignal.any === "function") {
+    return AbortSignal.any(active);
+  }
+  const merged = new AbortController();
+  const onAbort = () => {
+    if (!merged.signal.aborted) merged.abort();
+  };
+  for (const signal of active) {
+    if (signal.aborted) {
+      onAbort();
+      break;
+    }
+    signal.addEventListener("abort", onAbort, { once: true });
+  }
+  return merged.signal;
 }
 
 interface ParsedUpstreamError {
@@ -366,7 +394,14 @@ export async function providerFetch<T = unknown>(
   options: UpstreamFetchOptions = {},
   logContext: UpstreamLogContext = {}
 ): Promise<{ data: T; upstreamId: string | null }> {
-  const { json, headers, timeoutMs, idleTimeoutMs, ...init } = options;
+  const {
+    json,
+    headers,
+    timeoutMs,
+    idleTimeoutMs,
+    abortSignal: clientAbortSignal,
+    ...init
+  } = options;
   const upstreamUrl = buildProviderUrl(provider, path);
   const { host, path: upstreamPath } = providerUpstreamTarget(provider, path);
   const startedAt = Date.now();
@@ -383,6 +418,15 @@ export async function providerFetch<T = unknown>(
     finalHeaders.set("Content-Type", "application/json");
   }
 
+  if (clientAbortSignal?.aborted) {
+    throw ApiError.clientAborted();
+  }
+
+  const timeoutSignal = AbortSignal.timeout(effectiveTimeoutMs);
+  const fetchSignal = clientAbortSignal
+    ? combineAbortSignals([timeoutSignal, clientAbortSignal])
+    : timeoutSignal;
+
   let res: Response;
   try {
     res = await fetch(upstreamUrl, {
@@ -391,10 +435,29 @@ export async function providerFetch<T = unknown>(
       body: json !== undefined ? JSON.stringify(json) : undefined,
       // Idle semantics for today's non-stream upstream: same as attempt timeout.
       // When true upstream streaming is added, reset this timer on each chunk.
-      signal: AbortSignal.timeout(effectiveTimeoutMs),
+      // P1080 — client cancel shares this signal so disconnect aborts fetch.
+      signal: fetchSignal,
     });
   } catch (err) {
     const latencyMs = Date.now() - startedAt;
+    // Client cancel must not be classified as upstream_timeout.
+    if (clientAbortSignal?.aborted) {
+      log.info("responses_client_cancel_abort_upstream", {
+        requestId: logContext.requestId,
+        route: logContext.route,
+        model: logContext.model,
+        requestedModel: logContext.requestedModel,
+        resolvedModel: logContext.resolvedModel ?? logContext.model,
+        providerId: provider.id,
+        upstreamHost: host,
+        upstreamPath,
+        latencyMs,
+        timeoutMs: effectiveTimeoutMs,
+        billing_status: "not_billable",
+        credits_charged: 0,
+      });
+      throw ApiError.clientAborted();
+    }
     if (isTimeoutError(err)) {
       log.warn("upstream_provider_timeout", {
         requestId: logContext.requestId,

@@ -20,7 +20,8 @@ import {
 export type HeavyQueueAcquireResult = {
   queued: boolean;
   waitedMs: number;
-  release: () => void;
+  /** Exactly-once release. Optional reason for P1080 audit logs. */
+  release: (reason?: string) => void;
 };
 
 export type AcquireHeavyQueueOptions = {
@@ -109,23 +110,34 @@ function makePermit(
   return {
     queued,
     waitedMs,
-    release: () => {
+    release: (reason?: string) => {
       if (released) return;
       released = true;
-      releaseActiveSlot(limitKey, meta);
+      releaseActiveSlot(limitKey, meta, reason ?? "complete");
     },
   };
 }
 
 function releaseActiveSlot(
   limitKey: string,
-  meta: { requestId?: string; route?: string; model?: string }
+  meta: { requestId?: string; route?: string; model?: string },
+  reason: string
 ): void {
   const bucket = buckets.get(limitKey);
   if (!bucket) return;
 
   bucket.active = Math.max(0, bucket.active - 1);
 
+  log.info("heavy_slot_released", {
+    requestId: meta.requestId,
+    route: meta.route,
+    model: meta.model,
+    queued: false,
+    waitedMs: 0,
+    queueDepthForKey: bucket.waiters.length,
+    globalQueueDepth: globalWaiterCount,
+    reason,
+  });
   log.info("heavy_queue_released", {
     requestId: meta.requestId,
     route: meta.route,
@@ -134,7 +146,7 @@ function releaseActiveSlot(
     waitedMs: 0,
     queueDepthForKey: bucket.waiters.length,
     globalQueueDepth: globalWaiterCount,
-    reason: "release",
+    reason,
   });
 
   wakeNextWaiter(limitKey);
@@ -236,9 +248,17 @@ export async function acquireHeavyResponsesPermit(
     return {
       queued: false,
       waitedMs: 0,
-      release: () => {
+      release: (reason?: string) => {
         if (released) return;
         released = true;
+        log.info("heavy_slot_released", {
+          requestId,
+          route,
+          model,
+          queued: false,
+          waitedMs: 0,
+          reason: reason ?? "complete",
+        });
         void releaseHeavyResponses(limitKey);
       },
     };

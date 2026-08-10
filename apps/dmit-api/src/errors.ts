@@ -32,6 +32,7 @@ export const GATEWAY_GUARD_ERROR_CODES = new Set([
   "heavy_queue_full",
   "heavy_queue_timeout",
   "heavy_queue_aborted",
+  "client_aborted",
   "gateway_overloaded",
   "request_body_too_large",
   "upstream_timeout",
@@ -52,6 +53,7 @@ export const STATUS_BY_ERROR_CODE: Record<string, number> = {
   heavy_queue_full: 429,
   heavy_queue_timeout: 429,
   heavy_queue_aborted: 400,
+  client_aborted: 400,
   gateway_overloaded: 503,
   upstream_model_busy: 503,
   upstream_model_unavailable: 503,
@@ -62,6 +64,12 @@ export const STATUS_BY_ERROR_CODE: Record<string, number> = {
   request_body_too_large: 413,
   upstream_timeout: 504,
   upstream_transport_error: 502,
+  worker_auth_error: 502,
+  worker_unreachable: 502,
+  worker_timeout: 504,
+  worker_overloaded: 429,
+  worker_invalid_response: 502,
+  worker_model_unavailable: 400,
   image_generation_timeout: 504,
   image_task_timeout: 504,
   upstream_image_error: 502,
@@ -122,6 +130,10 @@ export function errorTypeForCode(
     code === "upstream_transport_error" ||
     code === "upstream_error" ||
     code === "upstream_auth_error" ||
+    code === "worker_auth_error" ||
+    code === "worker_unreachable" ||
+    code === "worker_timeout" ||
+    code === "worker_invalid_response" ||
     code === "all_upstreams_unavailable" ||
     code === "all_image_upstreams_unavailable" ||
     code === "all_tool_upstreams_unavailable" ||
@@ -136,6 +148,12 @@ export function errorTypeForCode(
     code === "missing_url"
   ) {
     return "upstream_error";
+  }
+  if (code === "worker_overloaded") {
+    return "rate_limit_error";
+  }
+  if (code === "worker_model_unavailable") {
+    return "invalid_request_error";
   }
   if (code === "upstream_image_error") {
     return "server_error";
@@ -467,6 +485,20 @@ export class ApiError extends Error {
       message,
       publicMessage,
       code: "heavy_queue_aborted",
+      type: "invalid_request_error",
+    });
+  }
+
+  /** Client disconnected mid-flight (P1080) — abort upstream, not billable. */
+  static clientAborted(
+    message = "Client aborted the request.",
+    publicMessage = "请求已取消。"
+  ) {
+    return new ApiError({
+      status: 400,
+      message,
+      publicMessage,
+      code: "client_aborted",
       type: "invalid_request_error",
     });
   }

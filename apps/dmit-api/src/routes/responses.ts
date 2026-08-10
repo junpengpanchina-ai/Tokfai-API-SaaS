@@ -228,7 +228,7 @@ responsesRoutes.post("/v1/responses", async (c) => {
     );
   }
 
-  // P1001 — client disconnect aborts Heavy queue wait (not Provider mid-flight).
+  // P1001/P1080 — client disconnect aborts Heavy queue wait + upstream fetch.
   const abortSignal = c.req.raw.signal;
 
   if (wantsStream) {

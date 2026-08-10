@@ -19,6 +19,7 @@ import {
 import { respondExecuteChatCompletionFailure } from "./handleExecuteChatCompletionResult.js";
 import {
   responsesCreatedSseFrame,
+  responsesFailedSseBody,
   responsesSseBodyAfterCreated,
   responsesToSseBody,
 } from "./responsesSse.js";
@@ -65,6 +66,24 @@ function failureToSseEnvelope(
     tokfai: { billing_status: "not_billable", credits_charged: 0 },
   };
   return `data: ${JSON.stringify(payload)}\n\ndata: [DONE]\n\n`;
+}
+
+/** P1080 — Responses stream failures must be response.failed + [DONE], never raw JSON 429. */
+function failureToResponsesSseEnvelope(
+  result: ExecuteChatCompletionResult & { ok: false }
+): string {
+  const message = safeInvalidRequestMessage(
+    result.errorMessage,
+    "Request failed."
+  );
+  const code =
+    (typeof result.errorCode === "string" && result.errorCode.trim()) ||
+    "invalid_request_error";
+  return responsesFailedSseBody({
+    requestId: result.requestId,
+    message,
+    code,
+  });
 }
 
 function writeChatRest(write: EarlySseWrite, result: ExecuteChatCompletionResult) {
@@ -274,16 +293,47 @@ export async function respondResponsesEarlySse(
     body: Parameters<typeof executeChatCompletion>[0]["body"];
     limitKey: string;
     idempotencyKey: string | null;
-    /** P1001 — forward client disconnect into Heavy queue wait. */
+    /** P1001/P1080 — client disconnect aborts Heavy queue wait + upstream fetch. */
     abortSignal?: AbortSignal;
     toResponsesPayload: (
       result: ExecuteChatCompletionResult & { ok: true }
     ) => Record<string, unknown>;
   }
 ): Promise<Response> {
+  // P1080 — single abort chain for request.signal + ReadableStream cancel.
+  const upstreamAbort = new AbortController();
+  let cancelLogged = false;
+  const abortUpstreamFromClient = () => {
+    if (upstreamAbort.signal.aborted) return;
+    if (!cancelLogged) {
+      cancelLogged = true;
+      log.info("responses_client_cancel_abort_upstream", {
+        requestId: args.requestId,
+        route: "/v1/responses",
+        billing_status: "not_billable",
+        credits_charged: 0,
+      });
+    }
+    try {
+      upstreamAbort.abort();
+    } catch {
+      // ignore
+    }
+  };
+  if (args.abortSignal) {
+    if (args.abortSignal.aborted) {
+      abortUpstreamFromClient();
+    } else {
+      args.abortSignal.addEventListener("abort", abortUpstreamFromClient, {
+        once: true,
+      });
+    }
+  }
+
   const gated = await runWithEarlySseGate<ExecuteChatCompletionResult>({
     requestId: args.requestId,
     firstFrame: responsesCreatedSseFrame(),
+    onClientCancel: abortUpstreamFromClient,
     execute: ({ onAfterPrecheck }) =>
       executeChatCompletion({
         caller: args.caller,
@@ -294,7 +344,7 @@ export async function respondResponsesEarlySse(
         route: "/v1/responses",
         clientStream: true,
         onAfterPrecheck,
-        abortSignal: args.abortSignal,
+        abortSignal: upstreamAbort.signal,
       }),
     isFailure: (result) => !result.ok,
     writeRest: (write, result) => {
@@ -303,7 +353,7 @@ export async function respondResponsesEarlySse(
       writeResponsesRest(write, response);
     },
     writeFailure: (write, result) => {
-      if (!result.ok) write(failureToSseEnvelope(result));
+      if (!result.ok) write(failureToResponsesSseEnvelope(result));
     },
   });
 
@@ -313,6 +363,38 @@ export async function respondResponsesEarlySse(
 
   const result = gated.earlyDone;
   if (!result.ok) {
+    // P1080 — stream=true capacity / queue / cancel errors: SSE terminal, not raw JSON 429.
+    const streamTerminalCodes = new Set([
+      "rate_limited",
+      "heavy_queue_full",
+      "heavy_queue_timeout",
+      "heavy_queue_aborted",
+      "client_aborted",
+      "upstream_timeout",
+      "gateway_overloaded",
+      "too_many_concurrent_requests",
+    ]);
+    if (streamTerminalCodes.has(result.errorCode)) {
+      const sseBody = failureToResponsesSseEnvelope(result);
+      return new Response(sseBody, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "close",
+          "X-Accel-Buffering": "no",
+          "X-Request-Id": result.requestId || args.requestId,
+          ...(typeof result.retryAfterSeconds === "number" &&
+          Number.isFinite(result.retryAfterSeconds)
+            ? {
+                "Retry-After": String(
+                  Math.max(1, Math.trunc(result.retryAfterSeconds))
+                ),
+              }
+            : {}),
+        },
+      });
+    }
     if (
       typeof result.retryAfterSeconds === "number" &&
       Number.isFinite(result.retryAfterSeconds)
@@ -351,6 +433,7 @@ export async function respondResponsesEarlySse(
           ? response.created_at
           : undefined,
     }),
+    onClientCancel: abortUpstreamFromClient,
     produceRest: async (write) => {
       writeResponsesRest(write, response);
     },

@@ -66,6 +66,11 @@ export function createEarlySseResponse(args: {
   firstFrame: string;
   produceRest: (write: EarlySseWrite) => Promise<void>;
   heartbeatMs?: number;
+  /**
+   * P1080 — invoked exactly once when the client cancels the ReadableStream
+   * (disconnect). Used to abort the in-flight upstream fetch / queue wait.
+   */
+  onClientCancel?: () => void;
 }): Response {
   const encoder = new TextEncoder();
   const heartbeatMs = args.heartbeatMs ?? DEFAULT_HEARTBEAT_MS;
@@ -74,6 +79,7 @@ export function createEarlySseResponse(args: {
   let terminal: EarlySseTerminal = "open";
   let heartbeat: ReturnType<typeof setInterval> | null = null;
   let heartbeatCleared = false;
+  let clientCancelNotified = false;
 
   const clearHeartbeatExactlyOnce = () => {
     if (heartbeatCleared) return;
@@ -81,6 +87,16 @@ export function createEarlySseResponse(args: {
     if (heartbeat != null) {
       clearInterval(heartbeat);
       heartbeat = null;
+    }
+  };
+
+  const notifyClientCancelExactlyOnce = () => {
+    if (clientCancelNotified) return;
+    clientCancelNotified = true;
+    try {
+      args.onClientCancel?.();
+    } catch {
+      // never throw out of cancel path
     }
   };
 
@@ -204,6 +220,8 @@ export function createEarlySseResponse(args: {
     cancel() {
       // Client disconnect: stop heartbeat before any further enqueue.
       markTerminal("cancelled");
+      // P1080 — abort upstream fetch / heavy queue wait.
+      notifyClientCancelExactlyOnce();
     },
   });
 
@@ -230,6 +248,8 @@ export async function runWithEarlySseGate<T>(args: {
   isFailure: (result: T) => boolean;
   writeRest: (write: EarlySseWrite, result: T) => void;
   writeFailure?: (write: EarlySseWrite, result: T) => void;
+  /** P1080 — forwarded to createEarlySseResponse.cancel → abort upstream. */
+  onClientCancel?: () => void;
 }): Promise<Response | { earlyDone: T }> {
   let signalReady!: () => void;
   const readySignal = new Promise<void>((resolve) => {
@@ -255,6 +275,7 @@ export async function runWithEarlySseGate<T>(args: {
   return createEarlySseResponse({
     requestId: args.requestId,
     firstFrame: args.firstFrame,
+    onClientCancel: args.onClientCancel,
     produceRest: async (write) => {
       const result = await resultPromise;
       if (args.isFailure(result)) {

@@ -326,10 +326,12 @@ export interface ExecuteChatCompletionInput {
    * Called after model/credit/budget prechecks succeed and immediately before
    * upstream provider attempts. Used by stream=true to flush the first SSE
    * frame without waiting on the model. Not invoked on precheck failures or
-   * idempotent replay. Heavy queue wait (P1001) completes before this hook.
+   * idempotent replay.
+   * P1080 — for /v1/responses stream=true, invoked BEFORE Heavy queue wait so
+   * the client keeps an SSE connection (response.created + ping) while queued.
    */
   onAfterPrecheck?: () => void | Promise<void>;
-  /** Client disconnect signal — Heavy queue wait aborts when aborted (P1001). */
+  /** Client disconnect — aborts Heavy queue wait and in-flight provider fetch (P1080). */
   abortSignal?: AbortSignal;
 }
 
@@ -1092,42 +1094,54 @@ export async function executeChatCompletion(
     await assertTokenBudget(limitKey, estimatedTokens);
 
     let heavyPermit: HeavyQueueAcquireResult | null = null;
-    if (timeoutPolicy.isHeavy) {
-      try {
-        heavyPermit = await acquireHeavyResponsesPermit({
-          limitKey,
-          concurrencyLimit: env.TOKFAI_HEAVY_RESPONSES_MAX_CONCURRENCY,
-          queueEnabled: env.TOKFAI_HEAVY_QUEUE_ENABLED,
-          maxWaitersPerKey: env.TOKFAI_HEAVY_QUEUE_MAX_WAITERS_PER_KEY,
-          maxWaitersGlobal: env.TOKFAI_HEAVY_QUEUE_MAX_WAITERS_GLOBAL,
-          waitTimeoutMs: env.TOKFAI_HEAVY_QUEUE_WAIT_TIMEOUT_MS,
-          signal: input.abortSignal,
-          requestId,
-          route,
-          model: requestedModel,
-        });
-      } catch (acquireErr) {
-        if (acquireErr instanceof ApiError) {
-          const routing = await logChatFailure({
-            caller,
-            requestId,
-            requestedModel,
-            requestedRaw,
-            isAlias,
-            attemptedModels: attempts,
-            startedAt,
-            err: acquireErr,
-            route,
-            timeoutMs: timeoutPolicy.upstreamTimeoutMs,
-          });
-          return failureResult(acquireErr, requestId, requestedModel, routing);
-        }
-        throw acquireErr;
-      }
-    }
-
     try {
-      // After a queue wait, re-check dynamic limits before SSE / Provider.
+      // P1080 — open early SSE before Heavy queue wait so stream clients are
+      // not stuck on a bare JSON 429 / silent wait without response.created.
+      if (input.onAfterPrecheck) {
+        await input.onAfterPrecheck();
+      }
+
+      if (timeoutPolicy.isHeavy) {
+        // P1080 — /v1/responses stream=true always uses bounded FIFO queue
+        // (even when TOKFAI_HEAVY_QUEUE_ENABLED=false) so saturated concurrency
+        // does not return a bare JSON 429 that disconnects stream clients.
+        const queueEnabled =
+          env.TOKFAI_HEAVY_QUEUE_ENABLED ||
+          (clientStream && route === "/v1/responses");
+        try {
+          heavyPermit = await acquireHeavyResponsesPermit({
+            limitKey,
+            concurrencyLimit: env.TOKFAI_HEAVY_RESPONSES_MAX_CONCURRENCY,
+            queueEnabled,
+            maxWaitersPerKey: env.TOKFAI_HEAVY_QUEUE_MAX_WAITERS_PER_KEY,
+            maxWaitersGlobal: env.TOKFAI_HEAVY_QUEUE_MAX_WAITERS_GLOBAL,
+            waitTimeoutMs: env.TOKFAI_HEAVY_QUEUE_WAIT_TIMEOUT_MS,
+            signal: input.abortSignal,
+            requestId,
+            route,
+            model: requestedModel,
+          });
+        } catch (acquireErr) {
+          if (acquireErr instanceof ApiError) {
+            const routing = await logChatFailure({
+              caller,
+              requestId,
+              requestedModel,
+              requestedRaw,
+              isAlias,
+              attemptedModels: attempts,
+              startedAt,
+              err: acquireErr,
+              route,
+              timeoutMs: timeoutPolicy.upstreamTimeoutMs,
+            });
+            return failureResult(acquireErr, requestId, requestedModel, routing);
+          }
+          throw acquireErr;
+        }
+      }
+
+      // After a queue wait, re-check dynamic limits before Provider.
       if (heavyPermit?.queued && !unlimited) {
         await assertHasCredits(caller.userId);
         await assertCreditPeriodLimits(caller.userId, {
@@ -1149,9 +1163,6 @@ export async function executeChatCompletion(
         // Re-reserving after wait would double-count the same request.
       }
 
-      if (input.onAfterPrecheck) {
-        await input.onAfterPrecheck();
-      }
       // P1059 — explicit gpt/gemini → transparent gateway.
       // P1061 — auto-pro → transparent carrier (routing only; no Agent rounds).
       const transparentExplicitModel = isTransparentExplicitModelRequest({
@@ -1189,9 +1200,13 @@ export async function executeChatCompletion(
         clientStream,
         transparentExplicitModel,
         autoProTransparentCarrier,
+        abortSignal: input.abortSignal,
       });
     } finally {
-      heavyPermit?.release();
+      const releaseReason = input.abortSignal?.aborted
+        ? "client_cancel"
+        : "complete";
+      heavyPermit?.release(releaseReason);
     }
   } catch (err) {
     if (err instanceof ApiError) {
@@ -1334,6 +1349,8 @@ async function runProviderAttempts(args: {
    * remains protocol and is not bypassed.
    */
   autoProTransparentCarrier: boolean;
+  /** P1080 — client disconnect aborts in-flight providerFetch. */
+  abortSignal?: AbortSignal;
 }): Promise<ExecuteChatCompletionResult> {
   const {
     caller,
@@ -1361,6 +1378,7 @@ async function runProviderAttempts(args: {
     clientStream,
     transparentExplicitModel,
     autoProTransparentCarrier,
+    abortSignal,
   } = args;
 
   // P1059 + P1061 — Agent orchestration bypass (not client protocol).
@@ -1375,6 +1393,8 @@ async function runProviderAttempts(args: {
   // provider fetch counter (includes transport/provider fallback attempts).
   let autoProCarrierSelectedLogged = false;
   let autoProProviderAttemptCount = 0;
+  // P1080 — at most one same-provider retry after responses stream no-output timeout.
+  let responsesStreamNoOutputRetried = false;
 
   for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
     const attemptModel = attempts[attemptIndex]!;
@@ -2135,17 +2155,79 @@ async function runProviderAttempts(args: {
                 idleTimeoutMs: idleTimeoutMs ?? null,
                 billing_status: "not_billable",
               });
-              const fetched = await providerFetch<ChatCompletionResponse>(
-                provider,
-                provider.chatPath,
-                {
-                  method: "POST",
-                  json: upstreamBody,
-                  timeoutMs: perAttemptTimeoutMs,
-                  ...(idleTimeoutMs != null ? { idleTimeoutMs } : {}),
-                },
-                logCtx
-              );
+              if (abortSignal?.aborted) {
+                throw ApiError.clientAborted();
+              }
+              const fetchOpts = {
+                method: "POST" as const,
+                json: upstreamBody,
+                timeoutMs: perAttemptTimeoutMs,
+                ...(idleTimeoutMs != null ? { idleTimeoutMs } : {}),
+                ...(abortSignal ? { abortSignal } : {}),
+              };
+              let fetched: {
+                data: ChatCompletionResponse;
+                upstreamId: string | null;
+              };
+              try {
+                fetched = await providerFetch<ChatCompletionResponse>(
+                  provider,
+                  provider.chatPath,
+                  fetchOpts,
+                  logCtx
+                );
+              } catch (firstFetchErr) {
+                // P1080 — one same-provider retry on responses stream no-output
+                // timeout when budget remains inside the ~120s client window.
+                const canRetryNoOutput =
+                  !responsesStreamNoOutputRetried &&
+                  route === "/v1/responses" &&
+                  clientStream &&
+                  bypassAgentOrchestration &&
+                  !requestHasTools(clientBody) &&
+                  timeoutPolicy.reason === "responses_stream_no_output_guard" &&
+                  firstFetchErr instanceof ApiError &&
+                  firstFetchErr.code === "upstream_timeout" &&
+                  !abortSignal?.aborted;
+                const remainingForRetry =
+                  timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt);
+                if (canRetryNoOutput && remainingForRetry > 15_000) {
+                  responsesStreamNoOutputRetried = true;
+                  const retryTimeoutMs = Math.min(
+                    perAttemptTimeoutMs,
+                    remainingForRetry - 5_000
+                  );
+                  log.info("responses_stream_no_output_retry", {
+                    requestId,
+                    route,
+                    providerId: provider.id,
+                    attemptModel,
+                    retryTimeoutMs,
+                    remainingForRetry,
+                    billing_status: "not_billable",
+                    credits_charged: 0,
+                  });
+                  fetched = await providerFetch<ChatCompletionResponse>(
+                    provider,
+                    provider.chatPath,
+                    {
+                      ...fetchOpts,
+                      timeoutMs: retryTimeoutMs,
+                      ...(idleTimeoutMs != null
+                        ? {
+                            idleTimeoutMs: Math.min(
+                              idleTimeoutMs,
+                              retryTimeoutMs
+                            ),
+                          }
+                        : {}),
+                    },
+                    logCtx
+                  );
+                } else {
+                  throw firstFetchErr;
+                }
+              }
               data = fetched.data;
               upstreamId = fetched.upstreamId;
             }
@@ -3171,6 +3253,38 @@ async function runProviderAttempts(args: {
         },
           { route }
         );
+
+        // P1080 — provider succeeded but client already cancelled: never debit.
+        if (abortSignal?.aborted) {
+          log.info("client_cancel_after_provider_pending", {
+            requestId,
+            route,
+            providerId: provider.id,
+            attemptModel,
+            billing_status: "not_billable",
+            credits_charged: 0,
+          });
+          const cancelErr = ApiError.clientAborted();
+          const cancelRouting = await logChatFailure({
+            caller,
+            requestId,
+            requestedModel,
+            requestedRaw,
+            isAlias,
+            attemptedModels: triedModels.length > 0 ? triedModels : [attemptModel],
+            startedAt,
+            err: cancelErr,
+            route,
+            providerId: provider.id,
+            timeoutMs: perAttemptTimeoutMs,
+          });
+          return failureResult(
+            cancelErr,
+            requestId,
+            requestedModel,
+            cancelRouting
+          );
+        }
 
         await recordSuccessfulUsageAndDebit(
           {

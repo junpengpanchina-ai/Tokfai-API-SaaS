@@ -155,7 +155,28 @@ export function resolveUpstreamTimeoutPolicy(args: {
   if (isHeavy) {
     const upstreamTimeoutMs = heavyUpstreamMs;
     // stream=true: idle timeout governs; do not cut solely on short total wall clock.
-    const idleTimeoutMs = args.clientStream ? heavyIdleMs : heavyUpstreamMs;
+    let idleTimeoutMs = args.clientStream ? heavyIdleMs : heavyUpstreamMs;
+    // P1080 — responses stream transparent (no tools): cap no-output wall so
+    // clients get a terminal SSE event inside the common ~120s window.
+    // Tool / long-agent bodies keep the full heavy budget.
+    const streamNoOutputGuard =
+      args.clientStream === true && !requestHasTools(args.body);
+    if (streamNoOutputGuard) {
+      const noOutputMs = env.TOKFAI_RESPONSES_STREAM_NO_OUTPUT_TIMEOUT_MS;
+      idleTimeoutMs = Math.min(idleTimeoutMs, noOutputMs);
+      const governingMs = idleTimeoutMs;
+      return {
+        tier: "heavy",
+        isHeavy: true,
+        upstreamTimeoutMs: Math.min(upstreamTimeoutMs, noOutputMs),
+        idleTimeoutMs,
+        totalTimeoutMs: Math.min(
+          Math.max(chatTotalMs, governingMs + 10_000),
+          noOutputMs + 15_000
+        ),
+        reason: "responses_stream_no_output_guard",
+      };
+    }
     const governingMs = args.clientStream ? idleTimeoutMs : upstreamTimeoutMs;
     return {
       tier: "heavy",
@@ -171,6 +192,21 @@ export function resolveUpstreamTimeoutPolicy(args: {
 
   if (isResponses) {
     const upstreamTimeoutMs = responsesUpstreamMs;
+    if (args.clientStream === true && !requestHasTools(args.body)) {
+      const noOutputMs = env.TOKFAI_RESPONSES_STREAM_NO_OUTPUT_TIMEOUT_MS;
+      const capped = Math.min(upstreamTimeoutMs, noOutputMs);
+      return {
+        tier: "responses",
+        isHeavy: false,
+        upstreamTimeoutMs: capped,
+        idleTimeoutMs: capped,
+        totalTimeoutMs: Math.min(
+          Math.max(chatTotalMs, capped + 10_000),
+          noOutputMs + 15_000
+        ),
+        reason: "responses_stream_no_output_guard",
+      };
+    }
     return {
       tier: "responses",
       isHeavy: false,

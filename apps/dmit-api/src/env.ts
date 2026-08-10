@@ -134,6 +134,17 @@ const Schema = z
     .min(1000)
     .max(120_000)
     .default(30_000),
+  /**
+   * P1080 — /v1/responses stream=true no-tools transparent gateway:
+   * wall budget for upstream no-output so clients get response.failed+[DONE]
+   * inside the common ~120s client timeout (not heavy 700s ping-only hang).
+   */
+  TOKFAI_RESPONSES_STREAM_NO_OUTPUT_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(5_000)
+    .max(120_000)
+    .default(100_000),
   /** Overall request wall clock (non-tool chat); keep moderate. */
   TOKFAI_TOTAL_REQUEST_TIMEOUT_MS: z.coerce
     .number()
@@ -336,6 +347,18 @@ const Schema = z
     .positive()
     .optional()
     .default(60_000),
+  /**
+   * P1079R2 — Max audio file upload bytes for /v1/audio/transcriptions.
+   * Enforced before worker call (Content-Length early + streamed body cap).
+   * Default 25MiB (OpenAI-compatible). Safe for ~1GB HKG gateway.
+   */
+  TOKFAI_STT_MAX_UPLOAD_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1024)
+    .max(100 * 1024 * 1024)
+    .optional()
+    .default(25 * 1024 * 1024),
   /** Flat credits per success; empty/unset → not_billable (never fake chat-token debit). */
   TOKFAI_STT_PRICE_CREDITS: z.preprocess(
     (v) => (typeof v === "string" && !v.trim() ? undefined : v),
