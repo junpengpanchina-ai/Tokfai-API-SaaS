@@ -229,6 +229,11 @@ export type AdminDashboardRecentRequest = {
   fallback_reason?: string | null;
   latency_ms?: number | null;
   route: string | null;
+  /** P1084 */
+  client_route?: string | null;
+  upstream_route?: string | null;
+  wire_api?: string | null;
+  billing_token_schema?: string | null;
   status: string | null;
   prompt_tokens: number | null;
   completion_tokens: number | null;

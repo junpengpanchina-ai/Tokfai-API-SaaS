@@ -1,6 +1,7 @@
 /** Dashboard display helpers — dashboard-safe contract layer. */
 
 import { formatIsoDateTimeUtc } from "./format-helpers";
+import { resolveDashboardUsageRouteAudit } from "./usage-route-audit";
 
 
 type DashboardSemanticTone = "success" | "destructive" | "warning" | "muted";
@@ -203,12 +204,11 @@ export function dashboardUsageStatusLabel(
 }
 
 export function dashboardResolveUsageRoute(
-  model: string | null | undefined
+  model: string | null | undefined,
+  endpoint?: string | null
 ): string {
-  if (model && dashboardIsUsageImageModel(model)) {
-    return "/v1/images/generations";
-  }
-  return "/v1/chat/completions";
+  const audit = resolveDashboardUsageRouteAudit({ endpoint, model });
+  return audit.client_route;
 }
 
 export function dashboardGetUsageKind(

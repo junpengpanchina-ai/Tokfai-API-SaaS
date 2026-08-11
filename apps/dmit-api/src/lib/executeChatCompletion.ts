@@ -176,6 +176,11 @@ import {
   routingEvidenceToLogFields,
   type TokfaiRoutingEvidence,
 } from "./routingEvidence.js";
+import {
+  resolveUsageRouteAudit,
+  usageRouteAuditLogFields,
+  usageRouteAuditSnapshotFields,
+} from "./usageRouteAudit.js";
 
 /**
  * Client fields that must NEVER influence billing or tenant resolution.
@@ -1230,17 +1235,22 @@ export async function executeChatCompletion(
           err,
           route,
         });
-        logCommercialRequestTrace({
-          phase: "guard",
-          requestId,
-          route,
-          userId: caller.userId,
-          apiKeyId: caller.apiKeyId,
-          model: requestedModel,
-          status: "failed",
-          creditsCharged: 0,
-          errorCode: err.code ?? null,
-        });
+        {
+          const routeAudit = resolveUsageRouteAudit({ clientRoute: route });
+          const routeLog = usageRouteAuditLogFields(routeAudit);
+          logCommercialRequestTrace({
+            phase: "guard",
+            requestId,
+            route,
+            ...routeLog,
+            userId: caller.userId,
+            apiKeyId: caller.apiKeyId,
+            model: requestedModel,
+            status: "failed",
+            creditsCharged: 0,
+            errorCode: err.code ?? null,
+          });
+        }
       }
       return failureResult(
         err,
@@ -1273,7 +1283,7 @@ export async function executeChatCompletion(
         credits_charged: 0,
       }),
       route,
-      routingEvidenceSnapshot(serverRouting)
+      routingEvidenceSnapshot(serverRouting, { clientRoute: route })
     );
 
     log.error("chat_completion_failed", {
@@ -3248,7 +3258,11 @@ async function runProviderAttempts(args: {
                   }
                 : {}),
             },
-            routing
+            routing,
+            {
+              clientRoute: route,
+              upstreamRoute: provider.chatPath ?? null,
+            }
           ),
         },
           { route }
@@ -3356,16 +3370,24 @@ async function runProviderAttempts(args: {
             : null,
         });
 
-        logCommercialRequestTrace({
-          phase: "success",
-          requestId,
-          route,
-          userId: caller.userId,
-          apiKeyId: caller.apiKeyId,
-          model: resolvedModel,
-          status: "succeeded",
-          creditsCharged,
-        });
+        {
+          const routeAudit = resolveUsageRouteAudit({
+            clientRoute: route,
+            upstreamRoute: provider.chatPath ?? null,
+          });
+          const routeLog = usageRouteAuditLogFields(routeAudit);
+          logCommercialRequestTrace({
+            phase: "success",
+            requestId,
+            route,
+            ...routeLog,
+            userId: caller.userId,
+            apiKeyId: caller.apiKeyId,
+            model: resolvedModel,
+            status: "succeeded",
+            creditsCharged,
+          });
+        }
 
         if (autoProTransparentCarrier) {
           const toolMeta = extractResponseToolCallMeta(responseData);
@@ -4055,18 +4077,40 @@ async function writeUsageLog(
   endpoint: string,
   responseSnapshot?: Record<string, unknown> | null
 ): Promise<void> {
+  const routeAudit = resolveUsageRouteAudit({ clientRoute: endpoint });
+  const auditFields = usageRouteAuditSnapshotFields(routeAudit);
+  let snapshot = responseSnapshot ?? null;
+  if (snapshot && typeof snapshot === "object" && !Array.isArray(snapshot)) {
+    const existingTokfai =
+      snapshot.tokfai &&
+      typeof snapshot.tokfai === "object" &&
+      !Array.isArray(snapshot.tokfai)
+        ? (snapshot.tokfai as Record<string, unknown>)
+        : {};
+    snapshot = {
+      ...snapshot,
+      tokfai: {
+        ...existingTokfai,
+        ...auditFields,
+      },
+    };
+  } else if (!snapshot) {
+    snapshot = { tokfai: auditFields };
+  }
+
   const { error } = await supabase().from("usage_logs").insert({
     ...entry,
     endpoint,
     billing_status: entry.billing_status ?? "not_billable",
     idempotency_key: entry.idempotency_key ?? null,
     billing_error: entry.billing_error ?? null,
-    ...(responseSnapshot ? { response_snapshot: responseSnapshot } : {}),
+    ...(snapshot ? { response_snapshot: snapshot } : {}),
   });
   if (error) {
     log.warn("usage_log_insert_failed", {
       requestId: entry.request_id,
-      route: "/v1/chat/completions",
+      route: endpoint,
+      clientRoute: endpoint,
       status: 500,
       code: "usage_log_insert_failed",
       message: "Failed to write usage log.",

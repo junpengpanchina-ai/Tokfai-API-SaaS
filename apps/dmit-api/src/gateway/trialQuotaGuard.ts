@@ -322,6 +322,14 @@ export function logCommercialRequestTrace(args: {
   phase: "success" | "failure" | "guard";
   requestId: string;
   route?: string;
+  /** P1084 — client inbound path (defaults from route). */
+  clientRoute?: string;
+  /** P1084 — upstream forward path (e.g. GRSai chat completions). */
+  upstreamRoute?: string;
+  /** P1084 — responses | chat_completions | … */
+  wireApi?: string;
+  /** P1084 — responses | chat_compat */
+  billingTokenSchema?: string;
   userId: string;
   apiKeyId?: string | null;
   apiKeyPrefix?: string | null;
@@ -330,10 +338,16 @@ export function logCommercialRequestTrace(args: {
   creditsCharged: number;
   errorCode?: string | null;
 }): void {
+  const route = args.route ?? "/v1/chat/completions";
   log.info("commercial_request_trace", {
     phase: args.phase,
     requestId: args.requestId,
-    route: args.route ?? "/v1/chat/completions",
+    route,
+    // P1084 — keep legacy `route` and add explicit client/upstream split.
+    clientRoute: args.clientRoute ?? route,
+    upstreamRoute: args.upstreamRoute ?? route,
+    wireApi: args.wireApi ?? null,
+    billingTokenSchema: args.billingTokenSchema ?? null,
     userId: args.userId,
     apiKeyIdMasked: args.apiKeyId ? maskApiKeyId(args.apiKeyId) : null,
     apiKeyPrefix: args.apiKeyPrefix ?? null,

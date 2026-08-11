@@ -1,4 +1,5 @@
 import { supabase } from "../supabase.js";
+import { resolveUsageRouteAudit } from "../lib/usageRouteAudit.js";
 import { listAdminCreditOrders } from "./adminCreditOrders.js";
 
 const PAGE_SIZE = 1000;
@@ -68,7 +69,15 @@ export type AdminDashboardRecentRequest = {
   routing_strategy: string | null;
   fallback_reason: string | null;
   latency_ms: number | null;
+  /** Preferred: client inbound route (usage_logs.endpoint). */
   route: string | null;
+  /** P1084 — explicit client inbound path. */
+  client_route: string | null;
+  /** P1084 — upstream forward path when different / known. */
+  upstream_route: string | null;
+  /** P1084 */
+  wire_api: string | null;
+  billing_token_schema: string | null;
   status: string | null;
   prompt_tokens: number | null;
   completion_tokens: number | null;
@@ -1043,6 +1052,37 @@ async function fetchRecentRequests(): Promise<{
             ? snapTokfai.latency_ms
             : null;
 
+        const clientFromSnap =
+          typeof snapTokfai?.client_route === "string"
+            ? snapTokfai.client_route
+            : null;
+        const upstreamFromSnap =
+          typeof snapTokfai?.upstream_route === "string"
+            ? snapTokfai.upstream_route
+            : null;
+        const wireFromSnap =
+          typeof snapTokfai?.wire_api === "string" ? snapTokfai.wire_api : null;
+        const billingSchemaFromSnap =
+          typeof snapTokfai?.billing_token_schema === "string"
+            ? snapTokfai.billing_token_schema
+            : null;
+
+        const routeAudit = resolveUsageRouteAudit({
+          clientRoute:
+            clientFromSnap ??
+            row.endpoint?.trim() ??
+            inferDashboardRoute(row.model),
+          upstreamRoute: upstreamFromSnap,
+        });
+        const clientRoute = routeAudit.client_route;
+        const upstreamRoute =
+          routeAudit.upstream_route !== routeAudit.client_route
+            ? routeAudit.upstream_route
+            : upstreamFromSnap &&
+                upstreamFromSnap !== clientRoute
+              ? upstreamFromSnap
+              : null;
+
         return {
           id: row.id,
           created_at: row.created_at,
@@ -1058,7 +1098,12 @@ async function fetchRecentRequests(): Promise<{
           routing_strategy: routingStrategy,
           fallback_reason: fallbackReason,
           latency_ms: latencyFromSnap ?? row.latency_ms,
-          route: row.endpoint?.trim() || inferDashboardRoute(row.model),
+          route: clientRoute,
+          client_route: clientRoute,
+          upstream_route: upstreamRoute,
+          wire_api: wireFromSnap ?? routeAudit.wire_api,
+          billing_token_schema:
+            billingSchemaFromSnap ?? routeAudit.billing_token_schema,
           status: row.status,
           prompt_tokens: row.prompt_tokens,
           completion_tokens: row.completion_tokens,
@@ -1086,7 +1131,9 @@ async function fetchRecentErrors(): Promise<{
   try {
     const { data, error } = await supabase()
       .from("usage_logs")
-      .select("id, request_id, model, status, error_code, error_message, created_at")
+      .select(
+        "id, request_id, model, status, error_code, error_message, created_at, endpoint"
+      )
       .order("created_at", { ascending: false })
       .limit(50);
 
@@ -1103,6 +1150,7 @@ async function fetchRecentErrors(): Promise<{
         error_code: string | null;
         error_message: string | null;
         created_at: string;
+        endpoint: string | null;
       }>
     ).filter(
       (row) =>
@@ -1115,7 +1163,7 @@ async function fetchRecentErrors(): Promise<{
       errors: rows.slice(0, 10).map((row) => ({
         id: row.id,
         request_id: row.request_id,
-        route: inferDashboardRoute(row.model),
+        route: row.endpoint?.trim() || inferDashboardRoute(row.model),
         model: row.model,
         status: row.status,
         error_code: row.error_code,

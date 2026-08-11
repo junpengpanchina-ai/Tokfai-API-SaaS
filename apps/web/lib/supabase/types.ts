@@ -27,6 +27,8 @@ export interface UsageLogRow {
   request_id: string | null;
   error_code?: string | null;
   billing_status?: string | null;
+  /** P1084 — client inbound route written by DMIT (may be null on legacy rows). */
+  endpoint?: string | null;
 }
 
 export interface ProfileRow {

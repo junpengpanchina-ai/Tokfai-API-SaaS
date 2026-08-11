@@ -9,6 +9,11 @@ import {
   MODEL_ALIAS_CHAINS,
   type ModelAliasId,
 } from "../upstream/modelAliases.js";
+import {
+  resolveUsageRouteAudit,
+  usageRouteAuditLogFields,
+  usageRouteAuditSnapshotFields,
+} from "./usageRouteAudit.js";
 
 export type TokfaiRoutingEvidence = {
   request_id: string;
@@ -34,6 +39,11 @@ export type RoutingLogFields = {
   providerId: string | null;
   providerLabel: string | null;
   route: string;
+  /** P1084 */
+  clientRoute: string;
+  upstreamRoute: string;
+  wireApi: string;
+  billingTokenSchema: string;
   status: number | string | null;
   upstreamStatus: number | null;
   upstreamErrorCode: string | null;
@@ -146,8 +156,16 @@ export function buildFailureRoutingEvidence(args: {
 /** Flatten for structured logs (camelCase keys used elsewhere in chat logs). */
 export function routingEvidenceToLogFields(
   evidence: TokfaiRoutingEvidence,
-  extras?: Partial<RoutingLogFields>
+  extras?: Partial<RoutingLogFields> & {
+    upstreamChatPath?: string | null;
+  }
 ): RoutingLogFields {
+  const route = extras?.route ?? "/v1/chat/completions";
+  const audit = resolveUsageRouteAudit({
+    clientRoute: extras?.clientRoute ?? route,
+    upstreamRoute: extras?.upstreamRoute ?? extras?.upstreamChatPath ?? null,
+  });
+  const routeLog = usageRouteAuditLogFields(audit);
   return {
     requestId: evidence.request_id,
     requestedModel: evidence.requested_model,
@@ -159,7 +177,12 @@ export function routingEvidenceToLogFields(
     attemptedModels: evidence.attempted_models,
     providerId: extras?.providerId ?? null,
     providerLabel: extras?.providerLabel ?? extras?.providerId ?? null,
-    route: extras?.route ?? "/v1/chat/completions",
+    route,
+    clientRoute: extras?.clientRoute ?? routeLog.clientRoute,
+    upstreamRoute: extras?.upstreamRoute ?? routeLog.upstreamRoute,
+    wireApi: extras?.wireApi ?? routeLog.wireApi,
+    billingTokenSchema:
+      extras?.billingTokenSchema ?? routeLog.billingTokenSchema,
     status: extras?.status ?? null,
     upstreamStatus: extras?.upstreamStatus ?? null,
     upstreamErrorCode: extras?.upstreamErrorCode ?? null,
@@ -174,9 +197,20 @@ export function routingEvidenceToLogFields(
 /** Merge routing into existing tokfai object without dropping billing fields. */
 export function mergeTokfaiRouting(
   existing: Record<string, unknown> | null | undefined,
-  evidence: TokfaiRoutingEvidence
+  evidence: TokfaiRoutingEvidence,
+  routeAudit?: {
+    clientRoute?: string | null;
+    upstreamRoute?: string | null;
+  }
 ): Record<string, unknown> {
   const base = existing && typeof existing === "object" ? { ...existing } : {};
+  const audit = resolveUsageRouteAudit({
+    clientRoute:
+      routeAudit?.clientRoute ??
+      (typeof base.client_route === "string" ? base.client_route : null) ??
+      "/v1/chat/completions",
+    upstreamRoute: routeAudit?.upstreamRoute ?? null,
+  });
   return {
     ...base,
     request_id: evidence.request_id,
@@ -188,6 +222,7 @@ export function mergeTokfaiRouting(
     latency_ms: evidence.latency_ms,
     billing_status: evidence.billing_status,
     credits_charged: evidence.credits_charged,
+    ...usageRouteAuditSnapshotFields(audit),
     ...(evidence.fallback_reason != null
       ? { fallback_reason: evidence.fallback_reason }
       : {}),
@@ -197,7 +232,11 @@ export function mergeTokfaiRouting(
 
 /** Snapshot stored on usage_logs.response_snapshot for Admin (no secrets). */
 export function routingEvidenceSnapshot(
-  evidence: TokfaiRoutingEvidence
+  evidence: TokfaiRoutingEvidence,
+  routeAudit?: {
+    clientRoute?: string | null;
+    upstreamRoute?: string | null;
+  }
 ): Record<string, unknown> {
-  return { tokfai: mergeTokfaiRouting({}, evidence) };
+  return { tokfai: mergeTokfaiRouting({}, evidence, routeAudit) };
 }

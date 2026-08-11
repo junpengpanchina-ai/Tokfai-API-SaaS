@@ -30,6 +30,7 @@ type UsageErrorRow = {
   error_message: string | null;
   upstream_status: number | null;
   latency_ms: number | null;
+  endpoint: string | null;
 };
 
 function parseLimit(raw: string | undefined): number {
@@ -83,7 +84,7 @@ export async function listAdminErrorLogs(query: {
   let builder = supabase()
     .from("usage_logs")
     .select(
-      "id, user_id, created_at, model, status, request_id, error_code, error_message, upstream_status, latency_ms"
+      "id, user_id, created_at, model, status, request_id, error_code, error_message, upstream_status, latency_ms, endpoint"
     )
     .order("created_at", { ascending: false })
     .limit(Math.min(limit * 5, MAX_LIMIT * 3));
@@ -119,7 +120,8 @@ export async function listAdminErrorLogs(query: {
 
   if (routeFilter) {
     rows = rows.filter((row) => {
-      const route = inferRoute(row.model)?.toLowerCase() ?? "";
+      const route =
+        (row.endpoint?.trim() || inferRoute(row.model))?.toLowerCase() ?? "";
       return route.includes(routeFilter);
     });
   }
@@ -145,7 +147,7 @@ export async function listAdminErrorLogs(query: {
   return limited.map((row) => ({
     id: row.id,
     request_id: row.request_id,
-    route: inferRoute(row.model),
+    route: row.endpoint?.trim() || inferRoute(row.model),
     user_id: row.user_id,
     email: emails.get(row.user_id) ?? null,
     model: row.model,

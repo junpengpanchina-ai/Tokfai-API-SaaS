@@ -211,6 +211,37 @@ function normalizeUsagePageLog(raw: unknown, index: number): UsagePageLog {
   const totalTokens = Number(row.total_tokens);
   const creditsCharged = Number(row.credits_charged);
 
+  const endpoint =
+    typeof row.endpoint === "string"
+      ? row.endpoint
+      : row.endpoint == null
+        ? null
+        : safeDashboardString(row.endpoint) || null;
+  const clientRoute =
+    typeof row.client_route === "string"
+      ? row.client_route
+      : row.client_route == null
+        ? null
+        : safeDashboardString(row.client_route) || null;
+  const upstreamRoute =
+    typeof row.upstream_route === "string"
+      ? row.upstream_route
+      : row.upstream_route == null
+        ? null
+        : safeDashboardString(row.upstream_route) || null;
+  const wireApi =
+    typeof row.wire_api === "string"
+      ? row.wire_api
+      : row.wire_api == null
+        ? null
+        : safeDashboardString(row.wire_api) || null;
+  const billingTokenSchema =
+    typeof row.billing_token_schema === "string"
+      ? row.billing_token_schema
+      : row.billing_token_schema == null
+        ? null
+        : safeDashboardString(row.billing_token_schema) || null;
+
   return {
     id: safeDashboardString(row.id) || `usage-log-${index}`,
     created_at: safeDashboardString(row.created_at),
@@ -245,6 +276,11 @@ function normalizeUsagePageLog(raw: unknown, index: number): UsagePageLog {
         : row.billing_status == null
           ? null
           : safeDashboardString(row.billing_status) || null,
+    endpoint,
+    client_route: clientRoute,
+    upstream_route: upstreamRoute,
+    wire_api: wireApi,
+    billing_token_schema: billingTokenSchema,
   };
 }
 

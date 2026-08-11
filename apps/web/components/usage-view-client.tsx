@@ -22,12 +22,16 @@ import {
   dashboardFormatUsageTokenCell,
   dashboardGetModelLabel,
   dashboardGetUsageKind,
-  dashboardResolveUsageRoute,
   dashboardShortRequestId,
   dashboardUsageStatusLabel,
   dashboardUsageStatusTone,
   type DashboardUsageKind,
 } from "@/lib/dashboard-safe/display-helpers";
+import {
+  dashboardIsResponsesUsageRoute,
+  dashboardShouldShowUpstreamRoute,
+  resolveDashboardUsageRouteAudit,
+} from "@/lib/dashboard-safe/usage-route-audit";
 import {
   DashboardCopyButton,
   useDashboardCopyToClipboard,
@@ -248,6 +252,19 @@ function UsageRow({
   locale: "en" | "zh";
 }) {
   const copyId = `usage-request-id-${row.id}`;
+  const routeAudit = resolveDashboardUsageRouteAudit({
+    endpoint: row.endpoint,
+    client_route: row.client_route,
+    upstream_route: row.upstream_route,
+    wire_api: row.wire_api,
+    billing_token_schema: row.billing_token_schema,
+    model: row.model,
+  });
+  const showUpstream = dashboardShouldShowUpstreamRoute(routeAudit);
+  const isResponses = dashboardIsResponsesUsageRoute(routeAudit);
+  const tokenHint = isResponses
+    ? t("dashboard.usage.tokenLabelResponsesHint")
+    : undefined;
 
   return (
     <tr className="border-b last:border-0 align-top">
@@ -264,22 +281,41 @@ function UsageRow({
             : t("dashboard.usage.kindChat")}
         </Badge>
       </td>
-      <td className="py-2.5 pr-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
-        {dashboardResolveUsageRoute(row.model)}
+      <td className="py-2.5 pr-3 font-mono text-xs whitespace-nowrap">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-foreground" title={routeAudit.client_route}>
+            {routeAudit.client_route}
+          </span>
+          {showUpstream ? (
+            <span
+              className="text-[10px] uppercase tracking-wide text-muted-foreground"
+              title={t("dashboard.usage.upstreamRouteHint")}
+            >
+              {t("dashboard.usage.colUpstream")}: {routeAudit.upstream_route}
+            </span>
+          ) : null}
+        </div>
       </td>
       <td className="py-2.5 pr-3 whitespace-nowrap">
         <StatusBadge status={row.status} t={t} />
       </td>
-      <td className="hidden py-2.5 pr-3 text-right font-mono text-xs md:table-cell">
+      <td
+        className="hidden py-2.5 pr-3 text-right font-mono text-xs md:table-cell"
+        title={tokenHint}
+      >
         {dashboardFormatUsageTokenCell(kind, row.prompt_tokens, "prompt")}
       </td>
-      <td className="hidden py-2.5 pr-3 text-right font-mono text-xs lg:table-cell">
+      <td
+        className="hidden py-2.5 pr-3 text-right font-mono text-xs lg:table-cell"
+        title={tokenHint}
+      >
         {dashboardFormatUsageTokenCell(kind, row.completion_tokens, "completion")}
       </td>
       <td
         className={`hidden py-2.5 pr-3 text-right text-xs sm:table-cell ${
           kind === "image" ? "text-muted-foreground" : "font-mono"
         }`}
+        title={tokenHint}
       >
         {kind === "image" && row.total_tokens == null
           ? t("dashboard.usage.imageGeneration")

@@ -1398,11 +1398,16 @@ export const messages = {
         colType: "Type",
         colModel: "Model",
         colRoute: "Route",
+        colUpstream: "Upstream",
+        upstreamRouteHint:
+          "Tokfai may forward Responses requests to the upstream chat completions path for provider compatibility. Billing still follows your inbound /v1/responses call.",
         colApiKeyPrefix: "API Key prefix",
         colStatus: "Status",
         colPrompt: "Prompt",
         colCompletion: "Completion",
         colTotal: "Total",
+        tokenLabelResponsesHint:
+          "For /v1/responses: Prompt = input_tokens, Completion = output_tokens, Total = total_tokens. Same usage amounts — ledger columns keep chat-compatible names.",
         colCredits: "Credits charged",
         colBilling: "Billing",
         billingNotBillableHint: "Not billable — credits_charged is 0",
@@ -6944,11 +6949,16 @@ export const messages = {
         colType: "类型",
         colModel: "Model",
         colRoute: "Route",
+        colUpstream: "上游",
+        upstreamRouteHint:
+          "Tokfai 可能将 Responses 请求转发到上游 chat completions 路径以兼容供应商。计费仍按你入站的 /v1/responses 请求。",
         colApiKeyPrefix: "API Key 前缀",
         colStatus: "状态",
         colPrompt: "Prompt",
         colCompletion: "Completion",
         colTotal: "Total",
+        tokenLabelResponsesHint:
+          "对 /v1/responses：Prompt = input_tokens，Completion = output_tokens，Total = total_tokens。计费数量不变 — 账本列名仍兼容 chat 的 prompt/completion。",
         colCredits: "扣除算力积分",
         colBilling: "计费",
         billingNotBillableHint: "不计费 — credits_charged 为 0",

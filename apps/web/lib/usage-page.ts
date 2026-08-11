@@ -9,13 +9,14 @@ import type {
   UsagePageState,
   UsagePageStats,
 } from "@/lib/dashboard-safe/dtos/usage";
+import { resolveDashboardUsageRouteAudit } from "@/lib/dashboard-safe/usage-route-audit";
 
 export type { UsagePageLog, UsagePageState, UsagePageStats } from "@/lib/dashboard-safe/dtos/usage";
 
 export const USAGE_RECENT_LIMIT = 50;
 
 const USAGE_LOG_SELECT =
-  "id, created_at, model, status, prompt_tokens, completion_tokens, total_tokens, credits_charged, request_id, error_code, billing_status";
+  "id, created_at, model, status, prompt_tokens, completion_tokens, total_tokens, credits_charged, request_id, error_code, billing_status, endpoint";
 
 function toNumber(value: number | string | null | undefined): number {
   if (value == null) return 0;
@@ -24,6 +25,10 @@ function toNumber(value: number | string | null | undefined): number {
 }
 
 function mapUsageLog(row: UsageLogRow): UsagePageLog {
+  const audit = resolveDashboardUsageRouteAudit({
+    endpoint: row.endpoint ?? null,
+    model: row.model,
+  });
   return {
     id: row.id,
     created_at: row.created_at,
@@ -37,6 +42,13 @@ function mapUsageLog(row: UsageLogRow): UsagePageLog {
     request_id: row.request_id,
     error_code: row.error_code ?? null,
     billing_status: row.billing_status ?? null,
+    endpoint: row.endpoint ?? null,
+    // Prefer stored endpoint as client_route; derived audit fills gaps for UI.
+    client_route: row.endpoint?.trim() ? row.endpoint.trim() : audit.client_route,
+    upstream_route:
+      audit.upstream_route !== audit.client_route ? audit.upstream_route : null,
+    wire_api: audit.wire_api,
+    billing_token_schema: audit.billing_token_schema,
   };
 }
 
