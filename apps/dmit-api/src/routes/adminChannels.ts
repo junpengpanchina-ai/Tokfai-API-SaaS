@@ -22,6 +22,7 @@ import { log } from "../logger.js";
 import type { AdminUserContext } from "../middleware/requireAdminV1.js";
 import {
   createOpenaiCompatSttAdapter,
+  detectSttProviderBaseMismatch,
 } from "../upstream/audio/openaiCompatSttAdapter.js";
 import { createSelfHostedWhisperAdapter } from "../upstream/audio/selfHostedWhisperAdapter.js";
 import type { AudioSttProviderId } from "../upstream/audio/types.js";
@@ -1206,7 +1207,7 @@ export async function testAdminSttChannel(
       channel_id: rec.id,
       upstream_status: null,
       latency_ms: null,
-      error_class: "missing_credentials",
+      error_class: "config_missing",
       message:
         rec.provider === "self_hosted_whisper"
           ? "STT channel is missing worker base_url."
@@ -1217,10 +1218,48 @@ export async function testAdminSttChannel(
       resourceId: rec.id,
       requestPayload: { test: "stt_silence_wav" },
       status: "failed",
-      error: "missing_credentials",
+      error: "config_missing",
       channel: sttRecordToRow(rec),
     });
-    return { ok: false, status: 400, error: "missing_credentials", result };
+    return { ok: false, status: 400, error: "config_missing", result };
+  }
+
+  // P1085R2 — refuse to probe when Groq provider is pointed at a non-Groq base
+  // (e.g. GRSai chat URL). Avoids confusing 404/auth failures.
+  const mismatch = detectSttProviderBaseMismatch(rec.provider, rec.baseUrl);
+  if (mismatch.mismatch) {
+    const result: AdminSttChannelTestResult = {
+      ok: false,
+      channel_id: rec.id,
+      upstream_status: null,
+      latency_ms: null,
+      error_class: "provider_base_mismatch",
+      message:
+        mismatch.hint ??
+        "provider_base_mismatch: baseUrl does not match groq_whisper_compatible.",
+    };
+    await auditChannelWrite(ctx, {
+      action: "channels.test",
+      resourceId: rec.id,
+      requestPayload: { test: "stt_silence_wav" },
+      status: "failed",
+      error: "provider_base_mismatch",
+      channel: sttRecordToRow(rec),
+    });
+    log.warn("admin_channel_stt_test_provider_base_mismatch", {
+      requestId: ctx.requestId,
+      channel_id: rec.id,
+      provider: rec.provider,
+      // Host only — never log secrets or full URLs with query tokens.
+      base_host: (() => {
+        try {
+          return new URL(rec.baseUrl).hostname;
+        } catch {
+          return "invalid";
+        }
+      })(),
+    });
+    return { ok: false, status: 400, error: "provider_base_mismatch", result };
   }
 
   let wavBytes: Uint8Array;

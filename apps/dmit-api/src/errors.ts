@@ -64,6 +64,8 @@ export const STATUS_BY_ERROR_CODE: Record<string, number> = {
   request_body_too_large: 413,
   upstream_timeout: 504,
   upstream_transport_error: 502,
+  upstream_not_found: 502,
+  endpoint_not_found: 502,
   worker_auth_error: 502,
   worker_unreachable: 502,
   worker_timeout: 504,

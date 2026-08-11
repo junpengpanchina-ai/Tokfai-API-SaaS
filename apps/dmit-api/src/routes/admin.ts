@@ -891,11 +891,14 @@ protectedAdminRoutes.post("/channels/:id/test", async (c) => {
             message:
               result.error === "channel_not_found"
                 ? "Channel not found."
-                : result.error === "missing_credentials"
+                : result.error === "config_missing" ||
+                    result.error === "missing_credentials"
                   ? "STT channel is missing credentials."
-                  : result.error === "test_fixture_missing"
-                    ? "STT test fixture missing."
-                    : result.result.message,
+                  : result.error === "provider_base_mismatch"
+                    ? result.result.message
+                    : result.error === "test_fixture_missing"
+                      ? "STT test fixture missing."
+                      : result.result.message,
             code: result.error,
             type: "validation_error",
           },

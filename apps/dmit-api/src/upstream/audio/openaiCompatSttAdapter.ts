@@ -11,11 +11,53 @@ import type {
   TranscribeAudioResult,
 } from "./types.js";
 
+const GROQ_STT_HOST = "api.groq.com";
+const GROQ_STT_PATH = "/openai/v1";
+
 function normalizeBase(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
 }
 
-function mapUpstreamSttError(
+/** True when baseUrl is Groq's OpenAI-compatible STT root. */
+export function isGroqOpenaiV1Base(baseUrl: string): boolean {
+  try {
+    const u = new URL(String(baseUrl || "").trim());
+    if (u.hostname.toLowerCase() !== GROQ_STT_HOST) return false;
+    const path = (u.pathname || "").replace(/\/+$/, "") || "";
+    return path === GROQ_STT_PATH || path.endsWith(GROQ_STT_PATH);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * P1085R2 — groq_whisper_compatible must point at api.groq.com/openai/v1.
+ * Never treat GRSai chat base/key as Groq STT.
+ */
+export function detectSttProviderBaseMismatch(
+  provider: string,
+  baseUrl: string
+): { mismatch: boolean; code: "provider_base_mismatch" | null; hint: string | null } {
+  const p = String(provider || "").trim().toLowerCase();
+  if (p !== "groq_whisper_compatible" && p !== "groq") {
+    return { mismatch: false, code: null, hint: null };
+  }
+  if (isGroqOpenaiV1Base(baseUrl)) {
+    return { mismatch: false, code: null, hint: null };
+  }
+  return {
+    mismatch: true,
+    code: "provider_base_mismatch",
+    hint:
+      "provider_base_mismatch: groq_whisper_compatible expects https://api.groq.com/openai/v1 (not a chat/GRSai base).",
+  };
+}
+
+/**
+ * Map upstream STT HTTP failures. 404 must not look like auth failure —
+ * GRSai (and others) often lack /audio/transcriptions.
+ */
+export function mapUpstreamSttError(
   status: number,
   bodyText: string
 ): ApiError {
@@ -27,6 +69,18 @@ function mapUpstreamSttError(
       code: "upstream_auth_error",
       type: "upstream_error",
       publicMessage: "Provider authentication failed.",
+      upstreamStatus: status,
+    });
+  }
+  // 404 before body keyword heuristics — never disguise as auth / invalid_request.
+  if (status === 404) {
+    return new ApiError({
+      status: 502,
+      message: `stt_upstream_not_found status=${status}`,
+      code: "upstream_not_found",
+      type: "upstream_error",
+      publicMessage:
+        "STT upstream endpoint was not found (endpoint_not_found).",
       upstreamStatus: status,
     });
   }
