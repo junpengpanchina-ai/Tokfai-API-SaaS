@@ -6,6 +6,10 @@ import {
   normalizeOpenAiFinishReason,
   normalizeOpenAiFinishReasonOnResponsesPayload,
 } from "./openaiFinishReason.js";
+import {
+  normalizeResponsesToolChoiceForChatCompletions,
+  normalizeResponsesToolsForChatCompletions,
+} from "./responsesToolAdapter.js";
 import { normalizeResponsesUsage } from "./responsesUsage.js";
 
 /**
@@ -166,46 +170,17 @@ function toolOutputToString(value: unknown): string {
 /**
  * Convert Hermes/OpenAI Responses flat tools → chat.completions tools.
  * Already-nested chat tools pass through unchanged.
+ * P1083 — delegates to responsesToolAdapter (unknown types passthrough).
  */
 export function responsesToolsToChatTools(tools: unknown): unknown {
-  if (!Array.isArray(tools)) return tools;
-  const out: Array<Record<string, unknown>> = [];
-  for (const item of tools) {
-    const row = asRecord(item);
-    if (!row) continue;
-    const nested = asRecord(row.function);
-    if (nested && typeof nested.name === "string" && nested.name.trim()) {
-      out.push({
-        type: "function",
-        function: {
-          name: nested.name.trim(),
-          ...(typeof nested.description === "string"
-            ? { description: nested.description }
-            : {}),
-          ...(nested.parameters !== undefined
-            ? { parameters: nested.parameters }
-            : { parameters: { type: "object", properties: {} } }),
-        },
-      });
-      continue;
-    }
-    if (typeof row.name === "string" && row.name.trim()) {
-      out.push({
-        type: "function",
-        function: {
-          name: row.name.trim(),
-          ...(typeof row.description === "string"
-            ? { description: row.description }
-            : {}),
-          ...(row.parameters !== undefined
-            ? { parameters: row.parameters }
-            : { parameters: { type: "object", properties: {} } }),
-          ...(typeof row.strict === "boolean" ? { strict: row.strict } : {}),
-        },
-      });
-    }
-  }
-  return out.length > 0 ? out : tools;
+  return normalizeResponsesToolsForChatCompletions(tools);
+}
+
+/** P1083 — Responses named tool_choice → chat.completions object shape. */
+export function responsesToolChoiceToChatToolChoice(
+  toolChoice: unknown
+): unknown {
+  return normalizeResponsesToolChoiceForChatCompletions(toolChoice);
 }
 
 function inputItemToMessages(item: unknown): ChatMessage[] {
@@ -348,8 +323,12 @@ export function responsesBodyToChatBody(
     stream: _stream,
     stream_options: _streamOptions,
     tools,
+    tool_choice: toolChoiceRaw,
     ...rest
-  } = body as ResponsesRequestBody & { tools?: unknown };
+  } = body as ResponsesRequestBody & {
+    tools?: unknown;
+    tool_choice?: unknown;
+  };
 
   const messages = responsesInputToMessages(input);
   if (typeof instructions === "string" && instructions.trim()) {
@@ -361,11 +340,16 @@ export function responsesBodyToChatBody(
 
   const chatTools =
     tools !== undefined ? responsesToolsToChatTools(tools) : undefined;
+  const chatToolChoice =
+    toolChoiceRaw !== undefined
+      ? responsesToolChoiceToChatToolChoice(toolChoiceRaw)
+      : undefined;
 
   return {
     ...rest,
     messages,
     ...(chatTools !== undefined ? { tools: chatTools } : {}),
+    ...(chatToolChoice !== undefined ? { tool_choice: chatToolChoice } : {}),
     ...(resolvedMaxTokens !== undefined
       ? { max_tokens: resolvedMaxTokens }
       : {}),
