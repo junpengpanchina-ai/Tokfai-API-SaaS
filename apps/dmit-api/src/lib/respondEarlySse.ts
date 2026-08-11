@@ -23,6 +23,7 @@ import {
   responsesSseBodyAfterCreated,
   responsesToSseBody,
 } from "./responsesSse.js";
+import { normalizeResponsesUsage } from "./responsesUsage.js";
 import { safeInvalidRequestMessage } from "./chatCompletionDiagnostics.js";
 import {
   forcedToolFailureSseResponse,
@@ -109,9 +110,10 @@ function asSseRecord(value: unknown): Record<string, unknown> | null {
 }
 
 /**
- * P991 last-mile SSE sanitizer for Cherry Studio /v1/responses.
+ * P991 / P1081 last-mile SSE sanitizer for Cherry Studio / Codex /v1/responses.
  * Only patches `response.completed` blocks when `response.status === "completed"`
- * so clients get an explicit stop signal (not inferred "other").
+ * so clients get an explicit stop signal (not inferred "other") and
+ * `response.usage.total_tokens` is always present (P1081).
  * Does not rewrite the business response object; does not touch chat/completions;
  * never upgrades failed / errored / incomplete into stop.
  */
@@ -195,6 +197,8 @@ function sanitizeOneResponsesCompletedBlock(block: string): string {
     nextResponse.incomplete_details = null;
   }
   nextResponse.finish_reason = "stop";
+  // P1081 — Codex ResponseCompleted requires usage.total_tokens.
+  nextResponse.usage = normalizeResponsesUsage(response.usage);
 
   const nextPayload: Record<string, unknown> = {
     ...payload,

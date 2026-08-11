@@ -6,6 +6,7 @@ import {
   normalizeOpenAiFinishReason,
   normalizeOpenAiFinishReasonOnResponsesPayload,
 } from "./openaiFinishReason.js";
+import { normalizeResponsesUsage } from "./responsesUsage.js";
 
 /**
  * OpenAI Responses API request → chat completions conversion.
@@ -537,11 +538,14 @@ export function chatCompletionResponseToResponses(
       model,
       output,
       output_text: outputText,
-      usage: {
+      usage: normalizeResponsesUsage({
         input_tokens: usageRaw?.prompt_tokens ?? 0,
         output_tokens: usageRaw?.completion_tokens ?? 0,
-        total_tokens: usageRaw?.total_tokens ?? 0,
-      },
+        ...(typeof usageRaw?.total_tokens === "number" &&
+        Number.isFinite(usageRaw.total_tokens)
+          ? { total_tokens: usageRaw.total_tokens }
+          : {}),
+      }),
       incomplete_details: incompleteDetails,
       finish_reason: finishReason,
       request_id: resolvedRequestId,

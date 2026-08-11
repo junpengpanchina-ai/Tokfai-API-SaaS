@@ -21,6 +21,7 @@ import {
   normalizeOpenAiFinishReason,
   normalizeOpenAiFinishReasonOnResponsesSsePayload,
 } from "./openaiFinishReason.js";
+import { normalizeResponsesUsage } from "./responsesUsage.js";
 
 const RESPONSES_ROUTE = "/v1/responses";
 
@@ -57,31 +58,9 @@ function extractOutputText(response: Record<string, unknown>): string {
   return parts.join("");
 }
 
-function extractResponsesUsage(response: Record<string, unknown>): {
-  input_tokens: number;
-  output_tokens: number;
-  input_tokens_details?: unknown;
-  output_tokens_details?: unknown;
-} {
-  const usage = asRecord(response.usage);
-  const inputTokens =
-    typeof usage?.input_tokens === "number" && Number.isFinite(usage.input_tokens)
-      ? usage.input_tokens
-      : 0;
-  const outputTokens =
-    typeof usage?.output_tokens === "number" && Number.isFinite(usage.output_tokens)
-      ? usage.output_tokens
-      : 0;
-  return {
-    input_tokens: inputTokens,
-    output_tokens: outputTokens,
-    ...(usage && "input_tokens_details" in usage
-      ? { input_tokens_details: usage.input_tokens_details }
-      : {}),
-    ...(usage && "output_tokens_details" in usage
-      ? { output_tokens_details: usage.output_tokens_details }
-      : {}),
-  };
+/** P1081 — wire usage always includes total_tokens for ResponseCompleted. */
+function extractResponsesUsage(response: Record<string, unknown>) {
+  return normalizeResponsesUsage(response.usage);
 }
 
 function extractFunctionCallItems(
