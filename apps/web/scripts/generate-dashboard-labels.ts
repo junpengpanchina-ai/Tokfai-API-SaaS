@@ -19,6 +19,7 @@ const EXTRA_FILES = [
   join(process.cwd(), "components", "credits-content-client.tsx"),
   join(process.cwd(), "components", "auth-success-toast.tsx"),
   join(process.cwd(), "lib", "dashboard-safe", "nav.ts"),
+  join(process.cwd(), "lib", "dashboard-safe", "display-helpers.ts"),
 ];
 
 /** Always include these trees so dynamic t(item.labelKey) never leaks raw keys. */
