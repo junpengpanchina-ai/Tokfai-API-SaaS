@@ -66,6 +66,10 @@ import {
   shouldAttemptNativeToolRepair,
   type NativeRepairToolSelection,
 } from "./nativeToolRepair.js";
+import {
+  applyCodexAutoToolRetryRequiredChoice,
+  shouldAttemptCodexAutoToolNoCallRetry,
+} from "./codexAutoToolRetry.js";
 import { isTransparentExplicitModelRequest } from "./transparentExplicitModelGateway.js";
 import { isAutoProTransparentCarrier } from "./autoProTransparentCarrier.js";
 import { normalizeOpenAiFinishReasonOnChatCompletion } from "./openaiFinishReason.js";
@@ -1190,6 +1194,7 @@ export async function executeChatCompletion(
         toolsFallbackApplied,
         supportsToolsRequested,
         resumeToolRound,
+        incomingToolMessageCount: roundTrip.toolMessageCount,
         unmatchedToolCallIdCount: roundTrip.unmatchedToolCallIdCount,
         duplicateToolResultCount: toolTranscript.duplicateToolResultCount,
         orderViolationCount: toolTranscript.orderViolationCount,
@@ -1332,6 +1337,8 @@ async function runProviderAttempts(args: {
    * P1036 — may still run ONE Round-N continuation arbitration.
    */
   resumeToolRound: boolean;
+  /** P1087 — total role=tool messages (Round-2 gate; 0 on first turn). */
+  incomingToolMessageCount: number;
   /** P1036 — transcript anti-replay counters (0 on legal resume). */
   unmatchedToolCallIdCount: number;
   duplicateToolResultCount: number;
@@ -1373,6 +1380,7 @@ async function runProviderAttempts(args: {
     toolsFallbackApplied,
     supportsToolsRequested,
     resumeToolRound,
+    incomingToolMessageCount,
     unmatchedToolCallIdCount,
     duplicateToolResultCount,
     orderViolationCount,
@@ -1621,6 +1629,14 @@ async function runProviderAttempts(args: {
         let nativeToolRepairInFlight = false;
         let nativeToolRepairSucceeded = false;
         let nativeRepairSelection: NativeRepairToolSelection | null = null;
+        // P1087 — at most one Responses auto→required compatibility retry.
+        // Protocol bridge only; never executes tools; never invents tool_calls.
+        let codexAutoToolRetryAttempted = false;
+        let codexAutoToolRetryInFlight = false;
+        let savedNativeForCodexAutoRetry: Record<string, unknown> | null = null;
+        let savedNativeDataForCodexAutoRetry: ChatCompletionResponse | null =
+          null;
+        let codexAutoRetryOriginalFinishReason: string | null = null;
         // P1048 — real toolIntentCompiler result (not hasTools alone).
         // P1059 / P1061 — still compute for telemetry / bypass reason;
         // orchestration gates ignore it when bypassAgentOrchestration is true.
@@ -1876,6 +1892,9 @@ async function runProviderAttempts(args: {
               providerId: provider.id,
             });
             upstreamBody = repaired.body;
+          } else if (codexAutoToolRetryInFlight && activeToolMode === "native") {
+            // P1087 — same tools/messages; only flip tool_choice → required.
+            upstreamBody = applyCodexAutoToolRetryRequiredChoice(upstreamBody);
           } else if (
             shouldAdaptGrsaiNativeObjectToolChoice({
               providerId: provider.id,
@@ -2243,6 +2262,56 @@ async function runProviderAttempts(args: {
             }
           } catch (fetchErr) {
             logProviderFetchStageTiming(fetchStage, stageStartedAt);
+            // P1087 — compatibility retry transport/timeout: restore original
+            // native text (never 500 solely because retry failed).
+            if (
+              codexAutoToolRetryInFlight &&
+              savedNativeForCodexAutoRetry &&
+              savedNativeDataForCodexAutoRetry
+            ) {
+              codexAutoToolRetryInFlight = false;
+              const remainingAfterFetch =
+                timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt);
+              const isTotalTimeout =
+                remainingAfterFetch <= 0 ||
+                (fetchErr instanceof ApiError &&
+                  fetchErr.upstreamErrorSnippet === "total_request_timeout");
+              if (isTotalTimeout && abortSignal?.aborted) {
+                throw ApiError.clientAborted();
+              }
+              if (isTotalTimeout) {
+                throw fetchErr instanceof ApiError &&
+                  fetchErr.code === "upstream_timeout"
+                  ? fetchErr
+                  : ApiError.requestTimeout();
+              }
+              data = savedNativeDataForCodexAutoRetry;
+              normalizedData = savedNativeForCodexAutoRetry;
+              upstreamReturnedToolCalls =
+                responseHasToolCalls(normalizedData);
+              log.info("codex_auto_tool_no_call_retry_selected", {
+                requestId,
+                route,
+                providerId: provider.id,
+                attemptedModel: attemptModel,
+                toolsCount: countTools(
+                  (clientBody as { tools?: unknown }).tools
+                ),
+                originalFinishReason: codexAutoRetryOriginalFinishReason,
+                originalHadToolCalls: false,
+                retryToolChoice: "required",
+                retryReturnedToolCalls: false,
+                retryFinishReason:
+                  fetchErr instanceof ApiError
+                    ? fetchErr.code === "upstream_timeout"
+                      ? "upstream_timeout"
+                      : "transport_failure"
+                    : "transport_failure",
+                billing_status: "not_billable",
+                credits_charged: 0,
+              });
+              break;
+            }
             // P1055 — native repair transport/timeout: one shot only, then
             // fall through to existing emulated repair when budget remains.
             if (
@@ -2338,6 +2407,62 @@ async function runProviderAttempts(args: {
             data as unknown as Record<string, unknown>
           );
           upstreamReturnedToolCalls = responseHasToolCalls(normalizedData);
+
+          // P1087 — compatibility retry HTTP 200: accept tool_calls if present;
+          // otherwise restore original text (never forge tool_calls, never 500).
+          if (codexAutoToolRetryInFlight) {
+            codexAutoToolRetryInFlight = false;
+            const retryFinish =
+              extractResponseFinishReason(normalizedData) ??
+              extractFinishReason(
+                normalizedData as unknown as ChatCompletionResponse
+              );
+            if (upstreamReturnedToolCalls) {
+              log.info("codex_auto_tool_no_call_retry_selected", {
+                requestId,
+                route,
+                providerId: provider.id,
+                attemptedModel: attemptModel,
+                toolsCount: countTools(
+                  (clientBody as { tools?: unknown }).tools
+                ),
+                originalFinishReason: codexAutoRetryOriginalFinishReason,
+                originalHadToolCalls: false,
+                retryToolChoice: "required",
+                retryReturnedToolCalls: true,
+                retryFinishReason: retryFinish,
+                billing_status: "not_billable",
+                credits_charged: 0,
+              });
+              break;
+            }
+            if (
+              savedNativeForCodexAutoRetry &&
+              savedNativeDataForCodexAutoRetry
+            ) {
+              data = savedNativeDataForCodexAutoRetry;
+              normalizedData = savedNativeForCodexAutoRetry;
+              upstreamReturnedToolCalls =
+                responseHasToolCalls(normalizedData);
+            }
+            log.info("codex_auto_tool_no_call_retry_selected", {
+              requestId,
+              route,
+              providerId: provider.id,
+              attemptedModel: attemptModel,
+              toolsCount: countTools(
+                (clientBody as { tools?: unknown }).tools
+              ),
+              originalFinishReason: codexAutoRetryOriginalFinishReason,
+              originalHadToolCalls: false,
+              retryToolChoice: "required",
+              retryReturnedToolCalls: false,
+              retryFinishReason: retryFinish,
+              billing_status: "not_billable",
+              credits_charged: 0,
+            });
+            break;
+          }
 
           // P1055 — native repair HTTP 200: accept tool_calls, else one emulated
           // fallback. Do not open a second native repair.
@@ -2985,6 +3110,37 @@ async function runProviderAttempts(args: {
                 billing_status: "not_billable",
                 credits_charged: 0,
               });
+              continue;
+            }
+
+            // P1087 — /v1/responses tools+auto, first turn stop/no tool_calls:
+            // one compatibility retry with Chat Completions tool_choice=required.
+            // Transparent gateway skips P1055 Agent repair; this bridge fills that gap
+            // without executing tools or inventing function_call.
+            if (
+              shouldAttemptCodexAutoToolNoCallRetry({
+                route,
+                hasTools: hasToolsClient,
+                toolsCount: countTools(
+                  (clientBody as { tools?: unknown }).tools
+                ),
+                toolChoice: (clientBody as { tool_choice?: unknown })
+                  .tool_choice,
+                incomingToolMessageCount,
+                upstreamHttpOk: true,
+                upstreamReturnedToolCalls,
+                finishReason: finishForArbitration,
+                alreadyAttempted: codexAutoToolRetryAttempted,
+                freshRemainingTotalMs: freshMsForArb,
+                activeToolMode,
+              })
+            ) {
+              codexAutoToolRetryAttempted = true;
+              codexAutoToolRetryInFlight = true;
+              savedNativeForCodexAutoRetry = structuredClone(normalizedData);
+              savedNativeDataForCodexAutoRetry = data;
+              codexAutoRetryOriginalFinishReason =
+                finishForArbitration ?? "stop";
               continue;
             }
 
