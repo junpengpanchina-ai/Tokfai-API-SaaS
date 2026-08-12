@@ -198,6 +198,18 @@ const ALLOWED_FIELD_KEYS = new Set([
   "azureDeployment",
   "normalizedModel",
   "apiVersionPresent",
+  // P1087 / P1088 Codex auto-tool no-call retry (enums / booleans / counts only)
+  "originalFinishReason",
+  "originalHadToolCalls",
+  "retryToolChoice",
+  "retryReturnedToolCalls",
+  "retryFinishReason",
+  "retryToolChoiceBefore",
+  "retryToolChoiceAfter",
+  "retryProviderFetchStarted",
+  "retryProviderReturnedToolCalls",
+  "retryResultSelectedForResponse",
+  "codexAutoToolRetryAttempted",
 ]);
 
 const SENSITIVE_LOG_KEY_LITERAL =

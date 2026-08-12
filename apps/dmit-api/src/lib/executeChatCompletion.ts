@@ -68,7 +68,10 @@ import {
 } from "./nativeToolRepair.js";
 import {
   applyCodexAutoToolRetryRequiredChoice,
+  codexAutoRetryHasMeaningfulAssistantText,
   shouldAttemptCodexAutoToolNoCallRetry,
+  shouldRejectCodexAutoToolRetryBlankSuccess,
+  summarizeCodexRetryToolChoice,
 } from "./codexAutoToolRetry.js";
 import { isTransparentExplicitModelRequest } from "./transparentExplicitModelGateway.js";
 import { isAutoProTransparentCarrier } from "./autoProTransparentCarrier.js";
@@ -1893,8 +1896,32 @@ async function runProviderAttempts(args: {
             });
             upstreamBody = repaired.body;
           } else if (codexAutoToolRetryInFlight && activeToolMode === "native") {
-            // P1087 — same tools/messages; only flip tool_choice → required.
+            // P1087 / P1088 — same tools/messages; only flip tool_choice → required.
+            const toolChoiceBefore = summarizeCodexRetryToolChoice(
+              upstreamBody.tool_choice
+            );
             upstreamBody = applyCodexAutoToolRetryRequiredChoice(upstreamBody);
+            const toolChoiceAfter = summarizeCodexRetryToolChoice(
+              upstreamBody.tool_choice
+            );
+            log.info("codex_auto_tool_retry_attempt_started", {
+              requestId,
+              route,
+              providerId: provider.id,
+              attemptedModel: attemptModel,
+              toolsCount: countTools(
+                (clientBody as { tools?: unknown }).tools
+              ),
+              retryToolChoiceBefore: toolChoiceBefore,
+              retryToolChoiceAfter: toolChoiceAfter,
+              retryProviderFetchStarted: true,
+              retryProviderReturnedToolCalls: false,
+              retryResultSelectedForResponse: false,
+              originalFinishReason: codexAutoRetryOriginalFinishReason,
+              originalHadToolCalls: false,
+              billing_status: "not_billable",
+              credits_charged: 0,
+            });
           } else if (
             shouldAdaptGrsaiNativeObjectToolChoice({
               providerId: provider.id,
@@ -2262,8 +2289,9 @@ async function runProviderAttempts(args: {
             }
           } catch (fetchErr) {
             logProviderFetchStageTiming(fetchStage, stageStartedAt);
-            // P1087 — compatibility retry transport/timeout: restore original
-            // native text (never 500 solely because retry failed).
+            // P1087 / P1088 — compatibility retry transport/timeout: restore
+            // original when it has meaningful text; never blank fake-success;
+            // never 500 solely because retry transport failed when text exists.
             if (
               codexAutoToolRetryInFlight &&
               savedNativeForCodexAutoRetry &&
@@ -2289,6 +2317,12 @@ async function runProviderAttempts(args: {
               normalizedData = savedNativeForCodexAutoRetry;
               upstreamReturnedToolCalls =
                 responseHasToolCalls(normalizedData);
+              const retryFinishReason =
+                fetchErr instanceof ApiError
+                  ? fetchErr.code === "upstream_timeout"
+                    ? "upstream_timeout"
+                    : "transport_failure"
+                  : "transport_failure";
               log.info("codex_auto_tool_no_call_retry_selected", {
                 requestId,
                 route,
@@ -2300,16 +2334,59 @@ async function runProviderAttempts(args: {
                 originalFinishReason: codexAutoRetryOriginalFinishReason,
                 originalHadToolCalls: false,
                 retryToolChoice: "required",
+                retryToolChoiceBefore: summarizeCodexRetryToolChoice(
+                  (clientBody as { tool_choice?: unknown }).tool_choice
+                ),
+                retryToolChoiceAfter: "required",
+                retryProviderFetchStarted: true,
+                retryProviderReturnedToolCalls: false,
+                retryResultSelectedForResponse: false,
                 retryReturnedToolCalls: false,
-                retryFinishReason:
-                  fetchErr instanceof ApiError
-                    ? fetchErr.code === "upstream_timeout"
-                      ? "upstream_timeout"
-                      : "transport_failure"
-                    : "transport_failure",
+                retryFinishReason,
                 billing_status: "not_billable",
                 credits_charged: 0,
               });
+              if (
+                shouldRejectCodexAutoToolRetryBlankSuccess({
+                  upstreamReturnedToolCalls,
+                  responseData: normalizedData,
+                })
+              ) {
+                const blankErr = new ApiError({
+                  status: 502,
+                  message:
+                    "Upstream did not return tool_calls after Responses auto→required compatibility retry.",
+                  code: TOOL_CALL_NOT_GENERATED_CODE,
+                  type: "upstream_error",
+                  publicMessage:
+                    "模型在 tool_choice=required 兼容重试后仍未返回 tool_calls（空白响应）。请改用已验证支持 tool calling 的模型，或显式指定 tool_choice。",
+                  upstreamStatus: 200,
+                });
+                log.warn("codex_auto_tool_retry_blank_rejected", {
+                  requestId,
+                  route,
+                  providerId: provider.id,
+                  attemptedModel: attemptModel,
+                  toolsCount: countTools(
+                    (clientBody as { tools?: unknown }).tools
+                  ),
+                  originalFinishReason: codexAutoRetryOriginalFinishReason,
+                  originalHadToolCalls: false,
+                  retryToolChoice: "required",
+                  retryReturnedToolCalls: false,
+                  retryFinishReason,
+                  retryProviderFetchStarted: true,
+                  retryProviderReturnedToolCalls: false,
+                  retryResultSelectedForResponse: false,
+                  upstreamReturnedToolCalls: false,
+                  fakeToolCallGuard: true,
+                  billing_status: "not_billable",
+                  credits_charged: 0,
+                  upstreamStatus: 200,
+                  upstreamErrorCode: TOOL_CALL_NOT_GENERATED_CODE,
+                });
+                throw blankErr;
+              }
               break;
             }
             // P1055 — native repair transport/timeout: one shot only, then
@@ -2408,8 +2485,8 @@ async function runProviderAttempts(args: {
           );
           upstreamReturnedToolCalls = responseHasToolCalls(normalizedData);
 
-          // P1087 — compatibility retry HTTP 200: accept tool_calls if present;
-          // otherwise restore original text (never forge tool_calls, never 500).
+          // P1087 / P1088 — compatibility retry HTTP 200: accept tool_calls if
+          // present; otherwise prefer meaningful text; never blank fake-success.
           if (codexAutoToolRetryInFlight) {
             codexAutoToolRetryInFlight = false;
             const retryFinish =
@@ -2417,6 +2494,8 @@ async function runProviderAttempts(args: {
               extractFinishReason(
                 normalizedData as unknown as ChatCompletionResponse
               );
+            const retryDataSnapshot = normalizedData;
+            const retryHadToolCalls = upstreamReturnedToolCalls;
             if (upstreamReturnedToolCalls) {
               log.info("codex_auto_tool_no_call_retry_selected", {
                 requestId,
@@ -2429,6 +2508,13 @@ async function runProviderAttempts(args: {
                 originalFinishReason: codexAutoRetryOriginalFinishReason,
                 originalHadToolCalls: false,
                 retryToolChoice: "required",
+                retryToolChoiceBefore: summarizeCodexRetryToolChoice(
+                  (clientBody as { tool_choice?: unknown }).tool_choice
+                ),
+                retryToolChoiceAfter: "required",
+                retryProviderFetchStarted: true,
+                retryProviderReturnedToolCalls: true,
+                retryResultSelectedForResponse: true,
                 retryReturnedToolCalls: true,
                 retryFinishReason: retryFinish,
                 billing_status: "not_billable",
@@ -2436,7 +2522,27 @@ async function runProviderAttempts(args: {
               });
               break;
             }
+
+            // Prefer original text when present; otherwise keep retry text if any.
+            let selectedRetryResult = false;
             if (
+              savedNativeForCodexAutoRetry &&
+              savedNativeDataForCodexAutoRetry &&
+              codexAutoRetryHasMeaningfulAssistantText(
+                savedNativeForCodexAutoRetry
+              )
+            ) {
+              data = savedNativeDataForCodexAutoRetry;
+              normalizedData = savedNativeForCodexAutoRetry;
+              upstreamReturnedToolCalls =
+                responseHasToolCalls(normalizedData);
+              selectedRetryResult = false;
+            } else if (
+              codexAutoRetryHasMeaningfulAssistantText(retryDataSnapshot)
+            ) {
+              // Keep retry text (already in data/normalizedData).
+              selectedRetryResult = true;
+            } else if (
               savedNativeForCodexAutoRetry &&
               savedNativeDataForCodexAutoRetry
             ) {
@@ -2444,7 +2550,9 @@ async function runProviderAttempts(args: {
               normalizedData = savedNativeForCodexAutoRetry;
               upstreamReturnedToolCalls =
                 responseHasToolCalls(normalizedData);
+              selectedRetryResult = false;
             }
+
             log.info("codex_auto_tool_no_call_retry_selected", {
               requestId,
               route,
@@ -2456,11 +2564,60 @@ async function runProviderAttempts(args: {
               originalFinishReason: codexAutoRetryOriginalFinishReason,
               originalHadToolCalls: false,
               retryToolChoice: "required",
+              retryToolChoiceBefore: summarizeCodexRetryToolChoice(
+                (clientBody as { tool_choice?: unknown }).tool_choice
+              ),
+              retryToolChoiceAfter: "required",
+              retryProviderFetchStarted: true,
+              retryProviderReturnedToolCalls: retryHadToolCalls,
+              retryResultSelectedForResponse: selectedRetryResult,
               retryReturnedToolCalls: false,
               retryFinishReason: retryFinish,
               billing_status: "not_billable",
               credits_charged: 0,
             });
+
+            if (
+              shouldRejectCodexAutoToolRetryBlankSuccess({
+                upstreamReturnedToolCalls,
+                responseData: normalizedData,
+              })
+            ) {
+              const blankErr = new ApiError({
+                status: 502,
+                message:
+                  "Upstream did not return tool_calls after Responses auto→required compatibility retry.",
+                code: TOOL_CALL_NOT_GENERATED_CODE,
+                type: "upstream_error",
+                publicMessage:
+                  "模型在 tool_choice=required 兼容重试后仍未返回 tool_calls（空白响应）。请改用已验证支持 tool calling 的模型，或显式指定 tool_choice。",
+                upstreamStatus: 200,
+              });
+              log.warn("codex_auto_tool_retry_blank_rejected", {
+                requestId,
+                route,
+                providerId: provider.id,
+                attemptedModel: attemptModel,
+                toolsCount: countTools(
+                  (clientBody as { tools?: unknown }).tools
+                ),
+                originalFinishReason: codexAutoRetryOriginalFinishReason,
+                originalHadToolCalls: false,
+                retryToolChoice: "required",
+                retryReturnedToolCalls: false,
+                retryFinishReason: retryFinish,
+                retryProviderFetchStarted: true,
+                retryProviderReturnedToolCalls: false,
+                retryResultSelectedForResponse: false,
+                upstreamReturnedToolCalls: false,
+                fakeToolCallGuard: true,
+                billing_status: "not_billable",
+                credits_charged: 0,
+                upstreamStatus: 200,
+                upstreamErrorCode: TOOL_CALL_NOT_GENERATED_CODE,
+              });
+              throw blankErr;
+            }
             break;
           }
 
@@ -3691,7 +3848,12 @@ async function runProviderAttempts(args: {
         }
 
         if (isAlias && isChatFallbackEligible(err)) {
-          const exhausted = allUpstreamsUnavailableError();
+          // P1088 — tools-path alias exhaustion must preserve locatable
+          // tool_call_not_generated (blank after auto→required retry), not
+          // collapse to a generic all_upstreams_unavailable.
+          const exhausted = requestHasTools(clientBody)
+            ? allToolUpstreamsUnavailableError(err)
+            : allUpstreamsUnavailableError();
           const routing = await logChatFailure({
             caller,
             requestId,
