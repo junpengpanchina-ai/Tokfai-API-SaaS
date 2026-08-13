@@ -380,6 +380,7 @@ console.log("P1088 CODEX AUTO-TOOL RETRY EFFECTIVENESS FIX\n");
 }
 
 // ── REAL: retry still blank → NOT blank success (clear error) ────────────
+// P1090: GRSAI runs a third compat-fallback fetch; invalid JSON still 502.
 {
   resetScenario({
     providers: defaultProviders(),
@@ -394,6 +395,11 @@ console.log("P1088 CODEX AUTO-TOOL RETRY EFFECTIVENESS FIX\n");
         content: "",
         finish_reason: "stop",
       }),
+      async () => ({
+        kind: "completion",
+        content: "not-json",
+        finish_reason: "stop",
+      }),
     ],
   });
   // Use concrete gpt-5.5 (production smoke model) — not an alias chain.
@@ -405,7 +411,7 @@ console.log("P1088 CODEX AUTO-TOOL RETRY EFFECTIVENESS FIX\n");
   const snap = billingSnapshot(result);
   const rejected =
     result.ok === false &&
-    c.providerCallCount === 2 &&
+    c.providerCallCount === 3 &&
     c.outboundBodies[1]?.tool_choice === "required" &&
     result.errorCode === "tool_call_not_generated" &&
     snap.debitCallCount === 0;
@@ -416,7 +422,7 @@ console.log("P1088 CODEX AUTO-TOOL RETRY EFFECTIVENESS FIX\n");
   );
 }
 
-// ── REAL: retry still text → legal auto text, no forge, no 500 ───────────
+// ── REAL: retry still text → P1090 compat fallback; invalid JSON → 502 ───
 {
   resetScenario({
     providers: defaultProviders(),
@@ -431,21 +437,27 @@ console.log("P1088 CODEX AUTO-TOOL RETRY EFFECTIVENESS FIX\n");
         content: "Still just text after required.",
         finish_reason: "stop",
       }),
+      async () => ({
+        kind: "completion",
+        content: "Still just text after required.",
+        finish_reason: "stop",
+      }),
     ],
   });
-  const result = await execResponses(baseBody(), "p1088-retry-still-text");
+  const result = await execResponses(
+    baseBody({ model: "gpt-5.5" }),
+    "p1088-retry-still-text"
+  );
   const c = getCounts();
-  const m = msg(result);
+  const snap = billingSnapshot(result);
   assert(
-    result.ok === true &&
-      c.providerCallCount === 2 &&
+    result.ok === false &&
+      c.providerCallCount === 3 &&
       c.outboundBodies[1]?.tool_choice === "required" &&
-      !hasToolCalls(result) &&
-      typeof m?.content === "string" &&
-      m.content.includes("read") &&
-      result.response?.choices?.[0]?.finish_reason !== "tool_calls",
-    "REAL: retry still text → keep text success, no forged tool_calls",
-    `calls=${c.providerCallCount}`
+      result.errorCode === "tool_call_not_generated" &&
+      snap.debitCallCount === 0,
+    "REAL: retry still text → compat fallback fail → clear error, no forged tool_calls",
+    `ok=${result.ok} calls=${c.providerCallCount} code=${result.errorCode}`
   );
 }
 

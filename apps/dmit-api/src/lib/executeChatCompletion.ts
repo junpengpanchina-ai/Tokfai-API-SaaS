@@ -73,6 +73,13 @@ import {
   shouldRejectCodexAutoToolRetryBlankSuccess,
   summarizeCodexRetryToolChoice,
 } from "./codexAutoToolRetry.js";
+import {
+  applyGrsaiToolCompatFallbackToCompletion,
+  buildGrsaiToolCompatFallbackUpstreamBody,
+  hashToolNameForLog,
+  parseGrsaiToolCompatFallbackCompletion,
+  shouldAttemptGrsaiToolCompatFallback,
+} from "./grsaiToolCompatFallback.js";
 import { isTransparentExplicitModelRequest } from "./transparentExplicitModelGateway.js";
 import { isAutoProTransparentCarrier } from "./autoProTransparentCarrier.js";
 import { normalizeOpenAiFinishReasonOnChatCompletion } from "./openaiFinishReason.js";
@@ -1640,6 +1647,13 @@ async function runProviderAttempts(args: {
         let savedNativeDataForCodexAutoRetry: ChatCompletionResponse | null =
           null;
         let codexAutoRetryOriginalFinishReason: string | null = null;
+        // P1090 — at most one GRSAI tool-call JSON compatibility fallback after
+        // native required retry still returns stop/no tool_calls.
+        let grsaiToolCompatFallbackAttempted = false;
+        let grsaiToolCompatFallbackInFlight = false;
+        let grsaiToolCompatFallbackSelectedName: string | null = null;
+        let grsaiToolCompatFallbackAllowedHashes: string[] = [];
+        let grsaiToolCompatFallbackToolsCount = 0;
         // P1048 — real toolIntentCompiler result (not hasTools alone).
         // P1059 / P1061 — still compute for telemetry / bypass reason;
         // orchestration gates ignore it when bypassAgentOrchestration is true.
@@ -1919,6 +1933,28 @@ async function runProviderAttempts(args: {
               retryResultSelectedForResponse: false,
               originalFinishReason: codexAutoRetryOriginalFinishReason,
               originalHadToolCalls: false,
+              billing_status: "not_billable",
+              credits_charged: 0,
+            });
+          } else if (grsaiToolCompatFallbackInFlight) {
+            // P1090 — provider-adapter JSON tool-call fetch (not Agent arbitration).
+            const built = buildGrsaiToolCompatFallbackUpstreamBody(
+              upstreamBody,
+              clientBody as Record<string, unknown>
+            );
+            upstreamBody = built.body;
+            grsaiToolCompatFallbackSelectedName = built.selectedToolName;
+            grsaiToolCompatFallbackAllowedHashes = built.allowedToolNameHashes;
+            grsaiToolCompatFallbackToolsCount = built.toolsCount;
+            log.info("grsai_tool_compat_fallback_provider_fetch_started", {
+              requestId,
+              route,
+              providerId: provider.id,
+              model: attemptModel,
+              toolsCount: built.toolsCount,
+              allowedToolNameHashes: built.allowedToolNameHashes,
+              fallbackSelected: true,
+              selectedToolHash: hashToolNameForLog(built.selectedToolName),
               billing_status: "not_billable",
               credits_charged: 0,
             });
@@ -2289,6 +2325,57 @@ async function runProviderAttempts(args: {
             }
           } catch (fetchErr) {
             logProviderFetchStageTiming(fetchStage, stageStartedAt);
+            // P1090 — compat fallback transport/timeout: never blank fake-success.
+            if (grsaiToolCompatFallbackInFlight) {
+              grsaiToolCompatFallbackInFlight = false;
+              const remainingAfterFetch =
+                timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt);
+              const isTotalTimeout =
+                remainingAfterFetch <= 0 ||
+                (fetchErr instanceof ApiError &&
+                  fetchErr.upstreamErrorSnippet === "total_request_timeout");
+              if (isTotalTimeout && abortSignal?.aborted) {
+                throw ApiError.clientAborted();
+              }
+              if (isTotalTimeout) {
+                throw fetchErr instanceof ApiError &&
+                  fetchErr.code === "upstream_timeout"
+                  ? fetchErr
+                  : ApiError.requestTimeout();
+              }
+              log.warn("grsai_tool_compat_fallback_parse_failed", {
+                requestId,
+                route,
+                providerId: provider.id,
+                model: attemptModel,
+                toolsCount: grsaiToolCompatFallbackToolsCount,
+                allowedToolNameHashes: grsaiToolCompatFallbackAllowedHashes,
+                fallbackSelected: true,
+                fallbackParseSucceeded: false,
+                selectedToolHash: grsaiToolCompatFallbackSelectedName
+                  ? hashToolNameForLog(grsaiToolCompatFallbackSelectedName)
+                  : undefined,
+                status: 502,
+                finishReason:
+                  fetchErr instanceof ApiError &&
+                  fetchErr.code === "upstream_timeout"
+                    ? "upstream_timeout"
+                    : "transport_failure",
+                billing_status: "not_billable",
+                credits_charged: 0,
+                upstreamErrorCode: TOOL_CALL_NOT_GENERATED_CODE,
+              });
+              throw new ApiError({
+                status: 502,
+                message:
+                  "GRSAI tool-call compatibility fallback failed to return a usable tool call.",
+                code: TOOL_CALL_NOT_GENERATED_CODE,
+                type: "upstream_error",
+                publicMessage:
+                  "模型在 tool_choice=required 兼容重试后仍未返回 tool_calls（空白响应）。请改用已验证支持 tool calling 的模型，或显式指定 tool_choice。",
+                upstreamStatus: 200,
+              });
+            }
             // P1087 / P1088 — compatibility retry transport/timeout: restore
             // original when it has meaningful text; never blank fake-success;
             // never 500 solely because retry transport failed when text exists.
@@ -2577,6 +2664,49 @@ async function runProviderAttempts(args: {
               credits_charged: 0,
             });
 
+            // P1090 — after native required retry still has no tool_calls, one
+            // GRSAI JSON tool-call compatibility fetch (protocol adapter only).
+            const freshMsForCompat =
+              timeoutPolicy.totalTimeoutMs - (Date.now() - startedAt);
+            if (
+              shouldAttemptGrsaiToolCompatFallback({
+                route,
+                providerId: provider.id,
+                hasTools: hasToolsClient,
+                toolsCount: countTools(
+                  (clientBody as { tools?: unknown }).tools
+                ),
+                toolChoice: (clientBody as { tool_choice?: unknown })
+                  .tool_choice,
+                incomingToolMessageCount,
+                codexAutoToolRetryAttempted: true,
+                nativeRetryReturnedToolCalls: false,
+                nativeRetryHttpOk: true,
+                nativeRetryFinishReason: retryFinish,
+                alreadyAttempted: grsaiToolCompatFallbackAttempted,
+                freshRemainingTotalMs: freshMsForCompat,
+              })
+            ) {
+              grsaiToolCompatFallbackAttempted = true;
+              grsaiToolCompatFallbackInFlight = true;
+              log.info("grsai_tool_compat_fallback_selected", {
+                requestId,
+                route,
+                providerId: provider.id,
+                model: attemptModel,
+                toolsCount: countTools(
+                  (clientBody as { tools?: unknown }).tools
+                ),
+                fallbackSelected: true,
+                fallbackParseSucceeded: false,
+                status: 200,
+                finishReason: retryFinish,
+                billing_status: "not_billable",
+                credits_charged: 0,
+              });
+              continue;
+            }
+
             if (
               shouldRejectCodexAutoToolRetryBlankSuccess({
                 upstreamReturnedToolCalls,
@@ -2619,6 +2749,133 @@ async function runProviderAttempts(args: {
               throw blankErr;
             }
             break;
+          }
+
+          // P1090 — GRSAI JSON tool-call compatibility fallback HTTP 200.
+          if (grsaiToolCompatFallbackInFlight) {
+            grsaiToolCompatFallbackInFlight = false;
+            const compatFinish =
+              extractResponseFinishReason(normalizedData) ??
+              extractFinishReason(
+                normalizedData as unknown as ChatCompletionResponse
+              );
+            if (upstreamReturnedToolCalls) {
+              log.info("grsai_tool_compat_fallback_parse_succeeded", {
+                requestId,
+                route,
+                providerId: provider.id,
+                model: attemptModel,
+                toolsCount: grsaiToolCompatFallbackToolsCount,
+                allowedToolNameHashes: grsaiToolCompatFallbackAllowedHashes,
+                fallbackSelected: true,
+                fallbackParseSucceeded: true,
+                selectedToolHash: grsaiToolCompatFallbackSelectedName
+                  ? hashToolNameForLog(grsaiToolCompatFallbackSelectedName)
+                  : undefined,
+                status: 200,
+                finishReason: compatFinish,
+                billing_status: "not_billable",
+                credits_charged: 0,
+              });
+              log.info("grsai_tool_compat_fallback_result_selected", {
+                requestId,
+                route,
+                providerId: provider.id,
+                model: attemptModel,
+                toolsCount: grsaiToolCompatFallbackToolsCount,
+                fallbackSelected: true,
+                fallbackParseSucceeded: true,
+                selectedToolHash: grsaiToolCompatFallbackSelectedName
+                  ? hashToolNameForLog(grsaiToolCompatFallbackSelectedName)
+                  : undefined,
+                status: 200,
+                finishReason: "tool_calls",
+                billing_status: "not_billable",
+                credits_charged: 0,
+              });
+              break;
+            }
+
+            try {
+              const parsed = parseGrsaiToolCompatFallbackCompletion({
+                data: normalizedData,
+                clientTools: (clientBody as { tools?: unknown }).tools,
+                toolChoice: (clientBody as { tool_choice?: unknown })
+                  .tool_choice,
+              });
+              normalizedData = applyGrsaiToolCompatFallbackToCompletion(
+                normalizedData,
+                parsed.intent
+              );
+              normalizedData =
+                normalizeToolCallsOnChatCompletion(normalizedData);
+              upstreamReturnedToolCalls = responseHasToolCalls(normalizedData);
+              if (!upstreamReturnedToolCalls) {
+                throw new Error("P1090: applied intent missing tool_calls");
+              }
+              log.info("grsai_tool_compat_fallback_parse_succeeded", {
+                requestId,
+                route,
+                providerId: provider.id,
+                model: attemptModel,
+                toolsCount: grsaiToolCompatFallbackToolsCount,
+                allowedToolNameHashes: grsaiToolCompatFallbackAllowedHashes,
+                fallbackSelected: true,
+                fallbackParseSucceeded: true,
+                selectedToolHash: hashToolNameForLog(parsed.selectedToolName),
+                argumentsByteLength: parsed.argumentsByteLength,
+                status: 200,
+                finishReason: compatFinish,
+                billing_status: "not_billable",
+                credits_charged: 0,
+              });
+              log.info("grsai_tool_compat_fallback_result_selected", {
+                requestId,
+                route,
+                providerId: provider.id,
+                model: attemptModel,
+                toolsCount: grsaiToolCompatFallbackToolsCount,
+                fallbackSelected: true,
+                fallbackParseSucceeded: true,
+                selectedToolHash: hashToolNameForLog(parsed.selectedToolName),
+                argumentsByteLength: parsed.argumentsByteLength,
+                status: 200,
+                finishReason: "tool_calls",
+                billing_status: "not_billable",
+                credits_charged: 0,
+              });
+              break;
+            } catch {
+              log.warn("grsai_tool_compat_fallback_parse_failed", {
+                requestId,
+                route,
+                providerId: provider.id,
+                model: attemptModel,
+                toolsCount: grsaiToolCompatFallbackToolsCount,
+                allowedToolNameHashes: grsaiToolCompatFallbackAllowedHashes,
+                fallbackSelected: true,
+                fallbackParseSucceeded: false,
+                selectedToolHash: grsaiToolCompatFallbackSelectedName
+                  ? hashToolNameForLog(grsaiToolCompatFallbackSelectedName)
+                  : undefined,
+                status: 502,
+                finishReason: compatFinish,
+                billing_status: "not_billable",
+                credits_charged: 0,
+                upstreamStatus: 200,
+                upstreamErrorCode: TOOL_CALL_NOT_GENERATED_CODE,
+              });
+              throw new ApiError({
+                status: 502,
+                message:
+                  "GRSAI tool-call compatibility fallback did not return a parseable tool call.",
+                code: TOOL_CALL_NOT_GENERATED_CODE,
+                type: "upstream_error",
+                publicMessage:
+                  "模型在 tool_choice=required 兼容重试后仍未返回 tool_calls（空白响应）。请改用已验证支持 tool calling 的模型，或显式指定 tool_choice。",
+                upstreamStatus: 200,
+              });
+            }
           }
 
           // P1055 — native repair HTTP 200: accept tool_calls, else one emulated

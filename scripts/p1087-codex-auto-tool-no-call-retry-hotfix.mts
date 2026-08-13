@@ -492,7 +492,7 @@ console.log("P1087 CODEX RESPONSES AUTO-TOOL NO-CALL RETRY HOTFIX\n");
   );
 }
 
-// ── REAL ENTRY: retry still no tool_calls → text, no 500, no forge ───────
+// ── REAL ENTRY: retry still no tool_calls → P1090 fail → clear 502 ───────
 {
   resetScenario({
     providers: defaultProviders(),
@@ -507,21 +507,27 @@ console.log("P1087 CODEX RESPONSES AUTO-TOOL NO-CALL RETRY HOTFIX\n");
         content: "Still just text after required.",
         finish_reason: "stop",
       }),
+      async () => ({
+        kind: "completion",
+        content: "Still just text after required.",
+        finish_reason: "stop",
+      }),
     ],
   });
-  const result = await execResponses(baseBody(), "p1087-retry-still-text");
+  const result = await execResponses(
+    baseBody({ model: "gpt-5.5" }),
+    "p1087-retry-still-text"
+  );
   const c = getCounts();
-  const m = msg(result);
+  const snap = billingSnapshot(result);
   assert(
-    result.ok === true &&
-      c.providerCallCount === 2 &&
+    result.ok === false &&
+      c.providerCallCount === 3 &&
       c.outboundBodies[1]?.tool_choice === "required" &&
-      !hasToolCalls(result) &&
-      typeof m?.content === "string" &&
-      m.content.includes("read") &&
-      result.response?.choices?.[0]?.finish_reason !== "tool_calls",
-    "REAL: retry still text → no 500, no forged tool_calls",
-    `calls=${c.providerCallCount} content=${String(m?.content || "").slice(0, 40)}`
+      result.errorCode === "tool_call_not_generated" &&
+      snap.debitCallCount === 0,
+    "REAL: retry still text → compat fallback fail → clear error, no forged tool_calls",
+    `ok=${result.ok} calls=${c.providerCallCount} code=${result.errorCode}`
   );
 }
 

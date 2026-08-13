@@ -210,6 +210,12 @@ const ALLOWED_FIELD_KEYS = new Set([
   "retryProviderReturnedToolCalls",
   "retryResultSelectedForResponse",
   "codexAutoToolRetryAttempted",
+  // P1090 GRSAI tool-call compatibility fallback (hashes / booleans / counts only)
+  "fallbackSelected",
+  "fallbackParseSucceeded",
+  "allowedToolNameHashes",
+  "selectedToolHash",
+  "argumentsByteLength",
 ]);
 
 const SENSITIVE_LOG_KEY_LITERAL =
