@@ -216,6 +216,13 @@ const ALLOWED_FIELD_KEYS = new Set([
   "allowedToolNameHashes",
   "selectedToolHash",
   "argumentsByteLength",
+  // P1093 previous_response_id state bridge (hashes / counts / lengths only)
+  "responseIdHash",
+  "callIdHash",
+  "toolNameHash",
+  "ttlMs",
+  "outputByteLength",
+  "messageCount",
 ]);
 
 const SENSITIVE_LOG_KEY_LITERAL =

@@ -33,6 +33,12 @@ import {
   responsesBodyToChatBody,
 } from "../lib/responsesTransform.js";
 import { normalizeOpenAiFinishReasonOnChatCompletion } from "../lib/openaiFinishReason.js";
+import {
+  applyRebuiltPreviousResponseBody,
+  detectPreviousResponseToolOutputBridge,
+  persistResponsesToolStateFromRound1,
+  resolvePreviousResponseToolOutputBridge,
+} from "../lib/responsesPreviousResponseBridge.js";
 import { logGatewayRejection } from "./chatGatewayLogs.js";
 
 /**
@@ -156,8 +162,62 @@ responsesRoutes.post("/v1/responses", async (c) => {
     );
   }
 
-  const wantsStream = parsed.data.stream === true;
-  const chatBody = responsesBodyToChatBody(parsed.data);
+  // P1093 — previous_response_id + function_call_output state bridge.
+  // Resolve before provider fetch / billing. On miss/mismatch: JSON error, no charge.
+  let responsesRequestBody: Record<string, unknown> = {
+    ...(parsed.data as Record<string, unknown>),
+  };
+  // Keep a copy of the pre-bridge body for round1 state persist (original input).
+  const round1PersistBody: Record<string, unknown> = {
+    ...responsesRequestBody,
+  };
+  try {
+    const bridge = detectPreviousResponseToolOutputBridge(responsesRequestBody);
+    if (bridge) {
+      const resolved = resolvePreviousResponseToolOutputBridge({
+        bridge,
+        userId: caller.userId,
+        route,
+      });
+      if (!resolved.ok) {
+        logChatCompletionInvalidRequest({
+          requestId,
+          route,
+          body,
+          rejectedReason: safeInvalidRequestMessage(
+            resolved.error.publicMessage,
+            "Invalid previous_response_id resume."
+          ),
+          validationErrors: [resolved.error.code || "previous_response_not_found"],
+        });
+        return respondApiError(c, resolved.error, requestId);
+      }
+      responsesRequestBody = applyRebuiltPreviousResponseBody(
+        responsesRequestBody,
+        resolved
+      );
+    }
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 400) {
+      logChatCompletionInvalidRequest({
+        requestId,
+        route,
+        body,
+        rejectedReason: safeInvalidRequestMessage(
+          err.publicMessage,
+          "Invalid function_call_output."
+        ),
+        validationErrors: [err.code || "invalid_function_call_output"],
+      });
+      return respondApiError(c, err, requestId);
+    }
+    throw err;
+  }
+
+  const wantsStream = responsesRequestBody.stream === true;
+  const chatBody = responsesBodyToChatBody(
+    responsesRequestBody as Parameters<typeof responsesBodyToChatBody>[0]
+  );
   if (
     !chatBody.messages?.length ||
     chatMessagesAreEmpty(
@@ -231,6 +291,36 @@ responsesRoutes.post("/v1/responses", async (c) => {
   // P1001/P1080 — client disconnect aborts Heavy queue wait + upstream fetch.
   const abortSignal = c.req.raw.signal;
 
+  const persistRound1ToolState = (response: Record<string, unknown>) => {
+    try {
+      const tokfai = asTokfaiMeta(response.tokfai);
+      persistResponsesToolStateFromRound1({
+        response,
+        requestBody: round1PersistBody,
+        userId: caller.userId,
+        route,
+        providerId:
+          typeof tokfai?.routing_strategy === "string"
+            ? tokfai.routing_strategy
+            : undefined,
+        requestedModel:
+          typeof tokfai?.requested_model === "string"
+            ? tokfai.requested_model
+            : typeof round1PersistBody.model === "string"
+              ? round1PersistBody.model
+              : undefined,
+        resolvedModel:
+          typeof tokfai?.resolved_model === "string"
+            ? tokfai.resolved_model
+            : typeof response.model === "string"
+              ? response.model
+              : undefined,
+      });
+    } catch {
+      // State persist must never break the client response path.
+    }
+  };
+
   if (wantsStream) {
     return respondResponsesEarlySse(c, {
       caller,
@@ -240,14 +330,14 @@ responsesRoutes.post("/v1/responses", async (c) => {
       idempotencyKey,
       abortSignal,
       toResponsesPayload: (result) => {
-        const chatBody = isResponsesFormatResponse(result.response)
+        const chatSnap = isResponsesFormatResponse(result.response)
           ? result.response
           : normalizeOpenAiFinishReasonOnChatCompletion(result.response, {
               route,
             });
-        const response = isResponsesFormatResponse(chatBody)
-          ? chatBody
-          : chatCompletionResponseToResponses(chatBody, result.requestId);
+        const response = isResponsesFormatResponse(chatSnap)
+          ? chatSnap
+          : chatCompletionResponseToResponses(chatSnap, result.requestId);
         if (
           !response ||
           typeof response !== "object" ||
@@ -258,6 +348,7 @@ responsesRoutes.post("/v1/responses", async (c) => {
             "server_error"
           );
         }
+        persistRound1ToolState(response);
         return response;
       },
     });
@@ -317,6 +408,14 @@ responsesRoutes.post("/v1/responses", async (c) => {
     );
   }
 
+  persistRound1ToolState(response);
+
   c.header("X-Request-Id", result.requestId);
   return c.json(response);
 });
+
+function asTokfaiMeta(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}

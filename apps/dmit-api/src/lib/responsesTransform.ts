@@ -324,10 +324,15 @@ export function responsesBodyToChatBody(
     stream_options: _streamOptions,
     tools,
     tool_choice: toolChoiceRaw,
+    // P1093 — strip Responses-only resume fields; never forward to chat upstream.
+    previous_response_id: _previousResponseId,
+    store: _store,
     ...rest
   } = body as ResponsesRequestBody & {
     tools?: unknown;
     tool_choice?: unknown;
+    previous_response_id?: unknown;
+    store?: unknown;
   };
 
   const messages = responsesInputToMessages(input);
