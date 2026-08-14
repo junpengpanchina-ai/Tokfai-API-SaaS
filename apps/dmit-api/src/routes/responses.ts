@@ -174,7 +174,7 @@ responsesRoutes.post("/v1/responses", async (c) => {
   try {
     const bridge = detectPreviousResponseToolOutputBridge(responsesRequestBody);
     if (bridge) {
-      const resolved = resolvePreviousResponseToolOutputBridge({
+      const resolved = await resolvePreviousResponseToolOutputBridge({
         bridge,
         userId: caller.userId,
         route,
@@ -291,10 +291,13 @@ responsesRoutes.post("/v1/responses", async (c) => {
   // P1001/P1080 — client disconnect aborts Heavy queue wait + upstream fetch.
   const abortSignal = c.req.raw.signal;
 
-  const persistRound1ToolState = (response: Record<string, unknown>) => {
+  const persistRound1ToolState = async (
+    response: Record<string, unknown>,
+    opts?: { awaitDurable?: boolean }
+  ) => {
     try {
       const tokfai = asTokfaiMeta(response.tokfai);
-      persistResponsesToolStateFromRound1({
+      await persistResponsesToolStateFromRound1({
         response,
         requestBody: round1PersistBody,
         userId: caller.userId,
@@ -315,6 +318,7 @@ responsesRoutes.post("/v1/responses", async (c) => {
             : typeof response.model === "string"
               ? response.model
               : undefined,
+        awaitDurable: opts?.awaitDurable !== false,
       });
     } catch {
       // State persist must never break the client response path.
@@ -348,7 +352,8 @@ responsesRoutes.post("/v1/responses", async (c) => {
             "server_error"
           );
         }
-        persistRound1ToolState(response);
+        // Memory sync inside; durable fire-and-forget (do not block SSE).
+        void persistRound1ToolState(response, { awaitDurable: false });
         return response;
       },
     });
@@ -408,7 +413,7 @@ responsesRoutes.post("/v1/responses", async (c) => {
     );
   }
 
-  persistRound1ToolState(response);
+  await persistRound1ToolState(response, { awaitDurable: true });
 
   c.header("X-Request-Id", result.requestId);
   return c.json(response);

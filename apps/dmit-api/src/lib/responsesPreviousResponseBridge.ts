@@ -12,12 +12,13 @@ import { ApiError } from "../errors.js";
 import { log } from "../logger.js";
 import { extractChatToolCalls } from "./responsesTransform.js";
 import {
-  getResponsesToolState,
+  getResponsesToolStateHybrid,
+  getStoreKind,
   hashForResponsesLog,
   hashToolsSchema,
   hashUserIdForStore,
   RESPONSES_TOOL_STATE_TTL_MS,
-  saveResponsesToolState,
+  saveResponsesToolStateHybrid,
   type ResponsesToolCallState,
   type ResponsesToolStateRecord,
 } from "./responsesToolStateStore.js";
@@ -201,7 +202,7 @@ export function extractToolCallsForStatePersist(
  * Persist round1 function_call state for later previous_response_id resume.
  * No-op when there are no tool calls.
  */
-export function persistResponsesToolStateFromRound1(args: {
+export async function persistResponsesToolStateFromRound1(args: {
   response: Record<string, unknown>;
   requestBody: Record<string, unknown>;
   userId: string;
@@ -209,7 +210,9 @@ export function persistResponsesToolStateFromRound1(args: {
   providerId?: string;
   requestedModel?: string;
   resolvedModel?: string;
-}): boolean {
+  /** When false, durable write is fire-and-forget (stream path). Default true. */
+  awaitDurable?: boolean;
+}): Promise<boolean> {
   const toolCalls = extractToolCallsForStatePersist(args.response);
   if (toolCalls.length === 0) return false;
 
@@ -236,44 +239,26 @@ export function persistResponsesToolStateFromRound1(args: {
   const toolsCount = countTools(tools);
   const ttlMs = RESPONSES_TOOL_STATE_TTL_MS;
 
-  saveResponsesToolState({
-    responseId,
-    userIdHash: hashUserIdForStore(args.userId),
-    model,
-    route: args.route ?? "/v1/responses",
-    providerId:
-      typeof args.providerId === "string" && args.providerId.trim()
-        ? args.providerId.trim()
-        : "unknown",
-    originalInput: normalizeOriginalInputForStore(args.requestBody.input),
-    toolCalls,
-    tools: tools !== undefined ? tools : null,
-    toolChoice: toolChoice !== undefined ? toolChoice : null,
-    toolsCount,
-    toolsSchemaHash: hashToolsSchema(tools),
-    ttlMs,
-  });
-
-  const first = toolCalls[0]!;
-  log.info("responses_tool_state_saved", {
-    route: args.route ?? "/v1/responses",
-    requestedModel:
-      typeof args.requestedModel === "string" && args.requestedModel.trim()
-        ? args.requestedModel.trim()
-        : typeof args.requestBody.model === "string"
-          ? args.requestBody.model
-          : model,
-    resolvedModel: model,
-    providerId:
-      typeof args.providerId === "string" && args.providerId.trim()
-        ? args.providerId.trim()
-        : "unknown",
-    responseIdHash: hashForResponsesLog(responseId),
-    callIdHash: hashForResponsesLog(first.callId),
-    toolNameHash: hashForResponsesLog(first.name),
-    toolsCount,
-    ttlMs,
-  });
+  await saveResponsesToolStateHybrid(
+    {
+      responseId,
+      userIdHash: hashUserIdForStore(args.userId),
+      model,
+      route: args.route ?? "/v1/responses",
+      providerId:
+        typeof args.providerId === "string" && args.providerId.trim()
+          ? args.providerId.trim()
+          : "unknown",
+      originalInput: normalizeOriginalInputForStore(args.requestBody.input),
+      toolCalls,
+      tools: tools !== undefined ? tools : null,
+      toolChoice: toolChoice !== undefined ? toolChoice : null,
+      toolsCount,
+      toolsSchemaHash: hashToolsSchema(tools),
+      ttlMs,
+    },
+    { awaitDurable: args.awaitDurable !== false }
+  );
 
   return true;
 }
@@ -324,17 +309,21 @@ function rebuildFullInputFromState(
  * Resolve previous_response_id state and rebuild full-input for existing
  * round2 path. Never fetches provider; never bills.
  */
-export function resolvePreviousResponseToolOutputBridge(args: {
+export async function resolvePreviousResponseToolOutputBridge(args: {
   bridge: PreviousResponseBridgeRequest;
   userId: string;
   route?: string;
-}): ResolvePreviousResponseResult {
-  const state = getResponsesToolState(args.bridge.previousResponseId);
+}): Promise<ResolvePreviousResponseResult> {
+  // Memory first, then optional durable (no provider fetch, no billing).
+  const state = await getResponsesToolStateHybrid(
+    args.bridge.previousResponseId
+  );
   if (!state) {
     log.warn("responses_previous_response_id_missing", {
       route: args.route ?? "/v1/responses",
       responseIdHash: hashForResponsesLog(args.bridge.previousResponseId),
       toolsCount: 0,
+      storeKind: getStoreKind(),
     });
     return {
       ok: false,

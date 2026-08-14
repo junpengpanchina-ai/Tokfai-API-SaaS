@@ -223,6 +223,9 @@ const ALLOWED_FIELD_KEYS = new Set([
   "ttlMs",
   "outputByteLength",
   "messageCount",
+  // P1095 durable responses tool state store
+  "storeKind",
+  "byteLength",
 ]);
 
 const SENSITIVE_LOG_KEY_LITERAL =

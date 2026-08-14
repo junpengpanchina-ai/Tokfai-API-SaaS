@@ -580,7 +580,7 @@ note("run", `run_id_hash=${shortHash(RUN_ID)} model=${MODEL} base=${BASE} live=$
         toolsCount: 1,
         toolsSchemaHash: "abc",
       });
-      const okResolve = bridge.resolvePreviousResponseToolOutputBridge({
+      const okResolve = await bridge.resolvePreviousResponseToolOutputBridge({
         bridge: {
           previousResponseId: respId,
           outputs: [
@@ -593,7 +593,7 @@ note("run", `run_id_hash=${shortHash(RUN_ID)} model=${MODEL} base=${BASE} live=$
         },
         userId: "user-p1092",
       });
-      const miss = bridge.resolvePreviousResponseToolOutputBridge({
+      const miss = await bridge.resolvePreviousResponseToolOutputBridge({
         bridge: {
           previousResponseId: "resp_missing",
           outputs: [
@@ -606,7 +606,7 @@ note("run", `run_id_hash=${shortHash(RUN_ID)} model=${MODEL} base=${BASE} live=$
         },
         userId: "user-p1092",
       });
-      const mismatch = bridge.resolvePreviousResponseToolOutputBridge({
+      const mismatch = await bridge.resolvePreviousResponseToolOutputBridge({
         bridge: {
           previousResponseId: respId,
           outputs: [

@@ -156,11 +156,14 @@ clearResponsesToolStateStoreForTests();
   assert(
     storeSrc.includes("RESPONSES_TOOL_STATE_TTL_MS") &&
       storeSrc.includes("saveResponsesToolState") &&
+      (storeSrc.includes("saveResponsesToolStateHybrid") ||
+        storeSrc.includes("getStoreKind")) &&
       /Does NOT execute tools/.test(storeSrc),
-    "state store is memory Map + TTL, protocol-only"
+    "state store is memory Map + TTL (+ optional hybrid), protocol-only"
   );
   assert(
-    bridgeSrc.includes("responses_tool_state_saved") &&
+    (bridgeSrc.includes("responses_tool_state_saved") ||
+      storeSrc.includes("responses_tool_state_saved")) &&
       bridgeSrc.includes("responses_previous_response_id_resolved") &&
       bridgeSrc.includes("responses_tool_output_round2_rebuilt") &&
       bridgeSrc.includes("tool_call_id_mismatch") &&
@@ -241,7 +244,7 @@ clearResponsesToolStateStoreForTests();
   // Force stable id for store key.
   responsesPayload.id = RESP_ID;
 
-  const saved = persistResponsesToolStateFromRound1({
+  const saved = await persistResponsesToolStateFromRound1({
     response: responsesPayload,
     requestBody: {
       model: "gpt-5.5",
@@ -288,7 +291,7 @@ clearResponsesToolStateStoreForTests();
     "no_tools"
   );
   textOnly.id = "resp_no_tools";
-  const noSave = persistResponsesToolStateFromRound1({
+  const noSave = await persistResponsesToolStateFromRound1({
     response: textOnly,
     requestBody: { model: "gpt-5.5", input: "hi" },
     userId: CALLER.userId,
@@ -316,7 +319,7 @@ clearResponsesToolStateStoreForTests();
     "detect previous_response_id + function_call_output"
   );
 
-  const resolved = resolvePreviousResponseToolOutputBridge({
+  const resolved = await resolvePreviousResponseToolOutputBridge({
     bridge: bridge!,
     userId: CALLER.userId,
     route: "/v1/responses",
@@ -397,7 +400,7 @@ clearResponsesToolStateStoreForTests();
 {
   const before = getCounts().providerCallCount;
 
-  const missing = resolvePreviousResponseToolOutputBridge({
+  const missing = await resolvePreviousResponseToolOutputBridge({
     bridge: {
       previousResponseId: "resp_missing_never_saved",
       outputs: [
@@ -424,7 +427,7 @@ clearResponsesToolStateStoreForTests();
       ? "YES"
       : "NO";
 
-  const mismatch = resolvePreviousResponseToolOutputBridge({
+  const mismatch = await resolvePreviousResponseToolOutputBridge({
     bridge: {
       previousResponseId: RESP_ID,
       outputs: [
@@ -492,7 +495,7 @@ clearResponsesToolStateStoreForTests();
       },
     ],
   })!;
-  const resolved = resolvePreviousResponseToolOutputBridge({
+  const resolved = await resolvePreviousResponseToolOutputBridge({
     bridge,
     userId: CALLER.userId,
   });

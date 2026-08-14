@@ -40,6 +40,24 @@ const Schema = z
   TOKEN_PEPPER: z.string().min(32, "TOKEN_PEPPER must be at least 32 chars"),
   TOKFAI_KEY_ENCRYPTION_SECRET: z.string().optional(),
 
+  /**
+   * P1095 — Optional AES-256-GCM key for Responses previous_response_id
+   * tool-state durable blobs. Missing/short → memory-only fallback (no boot fail).
+   */
+  RESPONSES_STATE_ENCRYPTION_KEY: z.preprocess(
+    (v) => (typeof v === "string" && !v.trim() ? undefined : v),
+    z.string().min(32).optional()
+  ),
+  /**
+   * P1095 — Opt-in durable store (Supabase responses_tool_states).
+   * Requires RESPONSES_STATE_ENCRYPTION_KEY. Default off → memory Map only.
+   */
+  TOKFAI_RESPONSES_TOOL_STATE_DURABLE: z
+    .string()
+    .optional()
+    .default("false")
+    .transform((raw) => raw === "true" || raw === "1" || raw === "yes"),
+
   GRSAI_BASE_URL: z.string().url().optional(),
   GRSAI_API_BASE: z.string().url().optional(),
   GRSAI_API_KEY: z.string().min(1),
