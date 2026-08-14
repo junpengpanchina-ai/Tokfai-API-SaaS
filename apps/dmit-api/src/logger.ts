@@ -226,6 +226,12 @@ const ALLOWED_FIELD_KEYS = new Set([
   // P1095 durable responses tool state store
   "storeKind",
   "byteLength",
+  // P1097 canonical response.id key alignment
+  "publicResponseIdHash",
+  "savedResponseIdHash",
+  "lookupResponseIdHash",
+  "aliasSaved",
+  "durableHit",
 ]);
 
 const SENSITIVE_LOG_KEY_LITERAL =

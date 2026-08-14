@@ -12,6 +12,10 @@ import { ApiError } from "../errors.js";
 import { log } from "../logger.js";
 import { extractChatToolCalls } from "./responsesTransform.js";
 import {
+  applyCanonicalResponsesPublicId,
+  responsesPublicIdHashes,
+} from "./responsesPublicId.js";
+import {
   getResponsesToolStateHybrid,
   getStoreKind,
   hashForResponsesLog,
@@ -210,17 +214,38 @@ export async function persistResponsesToolStateFromRound1(args: {
   providerId?: string;
   requestedModel?: string;
   resolvedModel?: string;
+  /** Tokfai request id — canonical public response.id = resp_<requestId>. */
+  requestId?: string;
   /** When false, durable write is fire-and-forget (stream path). Default true. */
   awaitDurable?: boolean;
 }): Promise<boolean> {
   const toolCalls = extractToolCallsForStatePersist(args.response);
   if (toolCalls.length === 0) return false;
 
-  const responseId =
-    typeof args.response.id === "string" && args.response.id.trim()
-      ? args.response.id.trim()
-      : "";
-  if (!responseId) return false;
+  const requestIdForCanon =
+    (typeof args.requestId === "string" && args.requestId.trim()
+      ? args.requestId.trim()
+      : null) ||
+    (typeof args.response.request_id === "string" &&
+    args.response.request_id.trim()
+      ? args.response.request_id.trim()
+      : null) ||
+    (typeof (args.response.tokfai as { request_id?: unknown } | undefined)
+      ?.request_id === "string"
+      ? String(
+          (args.response.tokfai as { request_id: string }).request_id
+        ).trim()
+      : null) ||
+    "";
+
+  if (!requestIdForCanon) {
+    // No request id → cannot form a stable public id; refuse to save under a
+    // random key that clients cannot previous_response_id against.
+    return false;
+  }
+
+  const { publicResponseId, previousResponseId, changed } =
+    applyCanonicalResponsesPublicId(args.response, requestIdForCanon);
 
   const model =
     (typeof args.resolvedModel === "string" && args.resolvedModel.trim()
@@ -238,27 +263,67 @@ export async function persistResponsesToolStateFromRound1(args: {
   const toolChoice = args.requestBody.tool_choice;
   const toolsCount = countTools(tools);
   const ttlMs = RESPONSES_TOOL_STATE_TTL_MS;
+  const first = toolCalls[0]!;
+  const route = args.route ?? "/v1/responses";
+  const providerId =
+    typeof args.providerId === "string" && args.providerId.trim()
+      ? args.providerId.trim()
+      : "unknown";
 
+  const baseRecord = {
+    userIdHash: hashUserIdForStore(args.userId),
+    model,
+    route,
+    providerId,
+    originalInput: normalizeOriginalInputForStore(args.requestBody.input),
+    toolCalls,
+    tools: tools !== undefined ? tools : null,
+    toolChoice: toolChoice !== undefined ? toolChoice : null,
+    toolsCount,
+    toolsSchemaHash: hashToolsSchema(tools),
+    ttlMs,
+  };
+
+  // Primary key = canonical public response.id (what clients send back).
   await saveResponsesToolStateHybrid(
     {
-      responseId,
-      userIdHash: hashUserIdForStore(args.userId),
-      model,
-      route: args.route ?? "/v1/responses",
-      providerId:
-        typeof args.providerId === "string" && args.providerId.trim()
-          ? args.providerId.trim()
-          : "unknown",
-      originalInput: normalizeOriginalInputForStore(args.requestBody.input),
-      toolCalls,
-      tools: tools !== undefined ? tools : null,
-      toolChoice: toolChoice !== undefined ? toolChoice : null,
-      toolsCount,
-      toolsSchemaHash: hashToolsSchema(tools),
-      ttlMs,
+      ...baseRecord,
+      responseId: publicResponseId,
     },
     { awaitDurable: args.awaitDurable !== false }
   );
+
+  let aliasSaved = false;
+  // Additive legacy alias only — never replaces primary public id.
+  if (
+    changed &&
+    previousResponseId &&
+    previousResponseId !== publicResponseId &&
+    previousResponseId.startsWith("resp_")
+  ) {
+    await saveResponsesToolStateHybrid(
+      {
+        ...baseRecord,
+        responseId: previousResponseId,
+      },
+      { awaitDurable: args.awaitDurable !== false }
+    );
+    aliasSaved = true;
+  }
+
+  log.info("responses_tool_state_key_canonicalized", {
+    route,
+    model,
+    providerId,
+    ...responsesPublicIdHashes({
+      publicResponseId,
+      savedResponseId: publicResponseId,
+    }),
+    aliasSaved,
+    toolsCount,
+    callIdHash: hashForResponsesLog(first.callId),
+    storeKind: getStoreKind(),
+  });
 
   return true;
 }
@@ -315,13 +380,17 @@ export async function resolvePreviousResponseToolOutputBridge(args: {
   route?: string;
 }): Promise<ResolvePreviousResponseResult> {
   // Memory first, then optional durable (no provider fetch, no billing).
-  const state = await getResponsesToolStateHybrid(
-    args.bridge.previousResponseId
-  );
+  const lookupId = args.bridge.previousResponseId;
+  const state = await getResponsesToolStateHybrid(lookupId);
   if (!state) {
     log.warn("responses_previous_response_id_missing", {
       route: args.route ?? "/v1/responses",
-      responseIdHash: hashForResponsesLog(args.bridge.previousResponseId),
+      responseIdHash: hashForResponsesLog(lookupId),
+      ...responsesPublicIdHashes({
+        publicResponseId: lookupId,
+        lookupResponseId: lookupId,
+      }),
+      durableHit: false,
       toolsCount: 0,
       storeKind: getStoreKind(),
     });
@@ -375,6 +444,11 @@ export async function resolvePreviousResponseToolOutputBridge(args: {
   log.info("responses_previous_response_id_resolved", {
     route: args.route ?? "/v1/responses",
     responseIdHash: hashForResponsesLog(args.bridge.previousResponseId),
+    ...responsesPublicIdHashes({
+      publicResponseId: state.responseId,
+      savedResponseId: state.responseId,
+      lookupResponseId: args.bridge.previousResponseId,
+    }),
     callIdHash: hashForResponsesLog(args.bridge.outputs[0]!.call_id),
     toolsCount: state.toolsCount,
     outputByteLength: (() => {

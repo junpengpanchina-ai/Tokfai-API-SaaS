@@ -10,6 +10,7 @@ import {
   normalizeResponsesToolChoiceForChatCompletions,
   normalizeResponsesToolsForChatCompletions,
 } from "./responsesToolAdapter.js";
+import { canonicalResponsesPublicId } from "./responsesPublicId.js";
 import { normalizeResponsesUsage } from "./responsesUsage.js";
 
 /**
@@ -520,7 +521,7 @@ export function chatCompletionResponseToResponses(
 
   return normalizeOpenAiFinishReasonOnResponsesPayload(
     {
-      id: `resp_${resolvedRequestId}`,
+      id: canonicalResponsesPublicId(resolvedRequestId),
       object: "response",
       created_at: createdAt,
       status,

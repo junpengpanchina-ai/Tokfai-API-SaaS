@@ -302,6 +302,7 @@ responsesRoutes.post("/v1/responses", async (c) => {
         requestBody: round1PersistBody,
         userId: caller.userId,
         route,
+        requestId,
         providerId:
           typeof tokfai?.routing_strategy === "string"
             ? tokfai.routing_strategy
@@ -353,6 +354,7 @@ responsesRoutes.post("/v1/responses", async (c) => {
           );
         }
         // Memory sync inside; durable fire-and-forget (do not block SSE).
+        // Persist mutates response.id to canonical public id (= early SSE frame).
         void persistRound1ToolState(response, { awaitDurable: false });
         return response;
       },
