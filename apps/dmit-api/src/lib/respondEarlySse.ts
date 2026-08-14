@@ -23,6 +23,7 @@ import {
   responsesSseBodyAfterCreated,
   responsesToSseBody,
 } from "./responsesSse.js";
+import { canonicalResponsesPublicId } from "./responsesPublicId.js";
 import { normalizeResponsesUsage } from "./responsesUsage.js";
 import { safeInvalidRequestMessage } from "./chatCompletionDiagnostics.js";
 import {
@@ -301,7 +302,9 @@ export async function respondResponsesEarlySse(
     abortSignal?: AbortSignal;
     toResponsesPayload: (
       result: ExecuteChatCompletionResult & { ok: true }
-    ) => Record<string, unknown>;
+    ) =>
+      | Record<string, unknown>
+      | Promise<Record<string, unknown>>;
   }
 ): Promise<Response> {
   // P1080 — single abort chain for request.signal + ReadableStream cancel.
@@ -334,9 +337,15 @@ export async function respondResponsesEarlySse(
     }
   }
 
+  // P1097 — early response.created id MUST equal final payload.id and
+  // previous_response_id save/lookup key (never resp_${Date.now()}).
+  const publicResponseId = canonicalResponsesPublicId(args.requestId);
+
   const gated = await runWithEarlySseGate<ExecuteChatCompletionResult>({
     requestId: args.requestId,
-    firstFrame: responsesCreatedSseFrame(),
+    firstFrame: responsesCreatedSseFrame({
+      responseId: publicResponseId,
+    }),
     onClientCancel: abortUpstreamFromClient,
     execute: ({ onAfterPrecheck }) =>
       executeChatCompletion({
@@ -351,9 +360,14 @@ export async function respondResponsesEarlySse(
         abortSignal: upstreamAbort.signal,
       }),
     isFailure: (result) => !result.ok,
-    writeRest: (write, result) => {
+    writeRest: async (write, result) => {
       if (!result.ok) return;
-      const response = args.toResponsesPayload(result);
+      // P1098 — await protocol state persist (memory+durable) BEFORE SSE rest
+      // so Round2 previous_response_id cannot race a multi-instance miss.
+      const response = await Promise.resolve(args.toResponsesPayload(result));
+      if (response && typeof response === "object") {
+        response.id = publicResponseId;
+      }
       writeResponsesRest(write, response);
     },
     writeFailure: (write, result) => {
@@ -426,11 +440,15 @@ export async function respondResponsesEarlySse(
     return respondExecuteChatCompletionFailure(c, result);
   }
 
-  const response = args.toResponsesPayload(result);
+  // P1098 — earlyDone path also awaits persist before first/rest frames.
+  const response = await Promise.resolve(args.toResponsesPayload(result));
+  if (response && typeof response === "object") {
+    response.id = publicResponseId;
+  }
   return createEarlySseResponse({
     requestId: result.requestId,
     firstFrame: responsesCreatedSseFrame({
-      responseId: typeof response.id === "string" ? response.id : undefined,
+      responseId: publicResponseId,
       model: typeof response.model === "string" ? response.model : undefined,
       createdAt:
         typeof response.created_at === "number"

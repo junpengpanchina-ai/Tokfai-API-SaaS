@@ -246,8 +246,8 @@ export async function runWithEarlySseGate<T>(args: {
     onAfterPrecheck: () => void | Promise<void>;
   }) => Promise<T>;
   isFailure: (result: T) => boolean;
-  writeRest: (write: EarlySseWrite, result: T) => void;
-  writeFailure?: (write: EarlySseWrite, result: T) => void;
+  writeRest: (write: EarlySseWrite, result: T) => void | Promise<void>;
+  writeFailure?: (write: EarlySseWrite, result: T) => void | Promise<void>;
   /** P1080 — forwarded to createEarlySseResponse.cancel → abort upstream. */
   onClientCancel?: () => void;
 }): Promise<Response | { earlyDone: T }> {
@@ -279,10 +279,11 @@ export async function runWithEarlySseGate<T>(args: {
     produceRest: async (write) => {
       const result = await resultPromise;
       if (args.isFailure(result)) {
-        args.writeFailure?.(write, result);
+        await Promise.resolve(args.writeFailure?.(write, result));
         return;
       }
-      args.writeRest(write, result);
+      // P1098 — allow awaiting protocol tool-state persist before SSE rest.
+      await Promise.resolve(args.writeRest(write, result));
     },
   });
 }

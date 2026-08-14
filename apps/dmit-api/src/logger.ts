@@ -232,6 +232,10 @@ const ALLOWED_FIELD_KEYS = new Set([
   "lookupResponseIdHash",
   "aliasSaved",
   "durableHit",
+  // P1098 stream protocol-state save (no prompts / args / secrets)
+  "storeFlag",
+  "toolCallCount",
+  "source",
 ]);
 
 const SENSITIVE_LOG_KEY_LITERAL =

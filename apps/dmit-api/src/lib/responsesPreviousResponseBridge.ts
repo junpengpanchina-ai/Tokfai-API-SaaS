@@ -205,6 +205,9 @@ export function extractToolCallsForStatePersist(
 /**
  * Persist round1 function_call state for later previous_response_id resume.
  * No-op when there are no tool calls.
+ *
+ * P1098: `store=false` (OpenAI conversation store) does NOT skip this —
+ * protocol resume state is independent of client conversation persistence.
  */
 export async function persistResponsesToolStateFromRound1(args: {
   response: Record<string, unknown>;
@@ -216,11 +219,37 @@ export async function persistResponsesToolStateFromRound1(args: {
   resolvedModel?: string;
   /** Tokfai request id — canonical public response.id = resp_<requestId>. */
   requestId?: string;
-  /** When false, durable write is fire-and-forget (stream path). Default true. */
+  /** When false, durable write is fire-and-forget. Default true (P1098 stream awaits). */
   awaitDurable?: boolean;
+  stream?: boolean;
+  /** Client `store` flag — logged only; never gates protocol state save. */
+  storeFlag?: boolean | null;
 }): Promise<boolean> {
+  const route = args.route ?? "/v1/responses";
+  const stream = args.stream === true;
+  const storeFlag =
+    typeof args.storeFlag === "boolean"
+      ? args.storeFlag
+      : args.requestBody.store === true
+        ? true
+        : args.requestBody.store === false
+          ? false
+          : null;
+  const ttlMs = RESPONSES_TOOL_STATE_TTL_MS;
+
   const toolCalls = extractToolCallsForStatePersist(args.response);
-  if (toolCalls.length === 0) return false;
+  if (toolCalls.length === 0) {
+    log.info("responses_tool_state_save_skipped_no_tool_call", {
+      route,
+      stream,
+      storeFlag,
+      toolCallCount: 0,
+      storeKind: getStoreKind(),
+      ttlMs,
+      source: "round1_function_call",
+    });
+    return false;
+  }
 
   const requestIdForCanon =
     (typeof args.requestId === "string" && args.requestId.trim()
@@ -241,11 +270,31 @@ export async function persistResponsesToolStateFromRound1(args: {
   if (!requestIdForCanon) {
     // No request id → cannot form a stable public id; refuse to save under a
     // random key that clients cannot previous_response_id against.
+    log.info("responses_tool_state_save_skipped_no_tool_call", {
+      route,
+      stream,
+      storeFlag,
+      toolCallCount: toolCalls.length,
+      storeKind: getStoreKind(),
+      ttlMs,
+      source: "round1_function_call",
+    });
     return false;
   }
 
   const { publicResponseId, previousResponseId, changed } =
     applyCanonicalResponsesPublicId(args.response, requestIdForCanon);
+
+  log.info("responses_tool_state_save_attempt", {
+    route,
+    stream,
+    storeFlag,
+    responseIdHash: hashForResponsesLog(publicResponseId),
+    toolCallCount: toolCalls.length,
+    storeKind: getStoreKind(),
+    ttlMs,
+    source: "round1_function_call",
+  });
 
   const model =
     (typeof args.resolvedModel === "string" && args.resolvedModel.trim()
@@ -262,9 +311,7 @@ export async function persistResponsesToolStateFromRound1(args: {
   const tools = args.requestBody.tools;
   const toolChoice = args.requestBody.tool_choice;
   const toolsCount = countTools(tools);
-  const ttlMs = RESPONSES_TOOL_STATE_TTL_MS;
   const first = toolCalls[0]!;
-  const route = args.route ?? "/v1/responses";
   const providerId =
     typeof args.providerId === "string" && args.providerId.trim()
       ? args.providerId.trim()
@@ -285,6 +332,8 @@ export async function persistResponsesToolStateFromRound1(args: {
   };
 
   // Primary key = canonical public response.id (what clients send back).
+  // P1098: always await durable on the default path so multi-instance Round2
+  // cannot race an in-flight durable write.
   await saveResponsesToolStateHybrid(
     {
       ...baseRecord,
@@ -310,6 +359,17 @@ export async function persistResponsesToolStateFromRound1(args: {
     );
     aliasSaved = true;
   }
+
+  log.info("responses_tool_state_saved", {
+    route,
+    stream,
+    storeFlag,
+    responseIdHash: hashForResponsesLog(publicResponseId),
+    toolCallCount: toolCalls.length,
+    storeKind: getStoreKind(),
+    ttlMs,
+    source: "round1_function_call",
+  });
 
   log.info("responses_tool_state_key_canonicalized", {
     route,
@@ -463,6 +523,17 @@ export async function resolvePreviousResponseToolOutputBridge(args: {
         return 0;
       }
     })(),
+  });
+
+  log.info("responses_previous_response_resolved", {
+    route: args.route ?? "/v1/responses",
+    stream: false,
+    storeFlag: null,
+    responseIdHash: hashForResponsesLog(args.bridge.previousResponseId),
+    toolCallCount: state.toolCalls.length,
+    storeKind: getStoreKind(),
+    ttlMs: Math.max(0, state.expiresAt - Date.now()),
+    source: "round1_function_call",
   });
 
   log.info("responses_tool_output_round2_rebuilt", {

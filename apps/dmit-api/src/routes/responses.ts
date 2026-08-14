@@ -215,6 +215,13 @@ responsesRoutes.post("/v1/responses", async (c) => {
   }
 
   const wantsStream = responsesRequestBody.stream === true;
+  // OpenAI `store` = conversation persistence — NOT protocol previous_response_id state.
+  const clientStoreFlag =
+    responsesRequestBody.store === true
+      ? true
+      : responsesRequestBody.store === false
+        ? false
+        : null;
   const chatBody = responsesBodyToChatBody(
     responsesRequestBody as Parameters<typeof responsesBodyToChatBody>[0]
   );
@@ -297,12 +304,17 @@ responsesRoutes.post("/v1/responses", async (c) => {
   ) => {
     try {
       const tokfai = asTokfaiMeta(response.tokfai);
+      // P1098: store=false must NOT skip protocol tool-state save.
+      // Stream path awaits durable (awaitDurable default true) so Round2
+      // cannot race multi-instance durable miss.
       await persistResponsesToolStateFromRound1({
         response,
         requestBody: round1PersistBody,
         userId: caller.userId,
         route,
         requestId,
+        stream: wantsStream,
+        storeFlag: clientStoreFlag,
         providerId:
           typeof tokfai?.routing_strategy === "string"
             ? tokfai.routing_strategy
@@ -334,7 +346,7 @@ responsesRoutes.post("/v1/responses", async (c) => {
       limitKey,
       idempotencyKey,
       abortSignal,
-      toResponsesPayload: (result) => {
+      toResponsesPayload: async (result) => {
         const chatSnap = isResponsesFormatResponse(result.response)
           ? result.response
           : normalizeOpenAiFinishReasonOnChatCompletion(result.response, {
@@ -353,9 +365,8 @@ responsesRoutes.post("/v1/responses", async (c) => {
             "server_error"
           );
         }
-        // Memory sync inside; durable fire-and-forget (do not block SSE).
-        // Persist mutates response.id to canonical public id (= early SSE frame).
-        void persistRound1ToolState(response, { awaitDurable: false });
+        // P1098 — await memory+durable BEFORE SSE function_call/completed frames.
+        await persistRound1ToolState(response, { awaitDurable: true });
         return response;
       },
     });
