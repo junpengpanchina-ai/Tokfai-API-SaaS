@@ -236,6 +236,15 @@ const ALLOWED_FIELD_KEYS = new Set([
   "storeFlag",
   "toolCallCount",
   "source",
+  // P1100 provider transport attempt / failover (codes / ms / booleans only)
+  "transportErrorClass",
+  "hasHttpResponse",
+  "retryable",
+  "billable",
+  "selectedForResponse",
+  "retryReason",
+  "sameProviderTransportRetry",
+  "transportAttemptIndex",
 ]);
 
 const SENSITIVE_LOG_KEY_LITERAL =

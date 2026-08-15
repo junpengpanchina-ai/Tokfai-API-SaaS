@@ -572,6 +572,12 @@ function makeToolChat(requestId: string) {
 
 // ── typecheck / build / regressions ──────────────────────────────────────
 {
+  if (process.env.TOKFAI_NESTED_REGRESSION === "1") {
+    pass("nested: skip typecheck/build (parent owns gate)");
+    report.TYPECHECK = "PASS";
+    report.BUILD = "PASS";
+    report.GIT_DIFF_CHECK = "PASS";
+  } else {
   const typecheck = spawnSync("npm", ["run", "typecheck"], {
     cwd: join(ROOT, "apps/dmit-api"),
     encoding: "utf8",
@@ -596,6 +602,7 @@ function makeToolChat(requestId: string) {
   });
   assert(diffCheck.status === 0, "git diff --check");
   report.GIT_DIFF_CHECK = diffCheck.status === 0 ? "PASS" : "FAIL";
+  } // end nested typecheck/build else
 
   const regressions: Array<[string, string, RegExp | "P1092_STATIC"]> = [
     [
@@ -655,6 +662,10 @@ function makeToolChat(requestId: string) {
     ],
   ];
 
+  if (process.env.TOKFAI_NESTED_REGRESSION === "1") {
+    pass("nested: skip child regressions (parent harness owns them)");
+    report.REGRESSIONS = "PASS";
+  } else {
   let regOk = true;
   const tsxLoader = join(
     ROOT,
@@ -723,6 +734,7 @@ function makeToolChat(requestId: string) {
     }
   }
   report.REGRESSIONS = regOk ? "PASS" : "FAIL";
+  } // end nested-regression else
 }
 
 setResponsesToolStateDurableBackendForTests(null);

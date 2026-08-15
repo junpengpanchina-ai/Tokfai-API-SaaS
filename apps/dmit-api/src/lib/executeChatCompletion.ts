@@ -107,6 +107,11 @@ import {
 import { isModelEnabledForTenant } from "../tenants/resolve.js";
 import { providerFetch, isChatFallbackEligible } from "../upstream/grsai.js";
 import {
+  isTransportRetryEligible,
+  TRANSPORT_RETRIES_EXHAUSTED_PUBLIC_MESSAGE,
+  transportRetryReason,
+} from "./providerTransportAttempt.js";
+import {
   formatModelNotRegisteredMessage,
   MODEL_NOT_AVAILABLE_CODE,
   resolveChatModel,
@@ -1423,6 +1428,9 @@ async function runProviderAttempts(args: {
   let autoProProviderAttemptCount = 0;
   // P1080 — at most one same-provider retry after responses stream no-output timeout.
   let responsesStreamNoOutputRetried = false;
+  // P1100 — at most one same-provider transport retry when no secondary provider.
+  let sameProviderTransportRetried = false;
+  let transportAttemptsObserved = 0;
 
   for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
     const attemptModel = attempts[attemptIndex]!;
@@ -3997,8 +4005,59 @@ async function runProviderAttempts(args: {
           ? Math.min(timeoutPolicy.idleTimeoutMs, remainingTotalMs)
           : Math.min(timeoutPolicy.upstreamTimeoutMs, remainingTotalMs);
 
+        // P1100 — structured transport attempt (safe fields only).
+        transportAttemptsObserved += 1;
+        const transportRetryable = isTransportRetryEligible(err);
+        log.info("provider_transport_attempt", {
+          requestId,
+          route,
+          providerId: provider.id,
+          attemptedModel: attemptModel,
+          transportAttemptIndex: transportAttemptsObserved - 1,
+          hasHttpResponse:
+            err.hasHttpResponse === true || err.upstreamStatus != null,
+          upstreamStatus: err.upstreamStatus ?? null,
+          errorCode: err.code ?? null,
+          transportErrorClass: err.transportErrorClass ?? null,
+          latencyMs: attemptLatencyMs,
+          retryable: transportRetryable,
+          billable: false,
+          selectedForResponse: false,
+          retryReason: transportRetryable ? transportRetryReason(err) : null,
+          billing_status: "not_billable",
+          credits_charged: 0,
+        });
+
         if (isTimeout) {
           await recordProviderModelTimeout(provider.id, attemptModel);
+        }
+
+        // Client abort must never be remapped to provider failure / fallback.
+        if (err.code === "client_aborted" || abortSignal?.aborted) {
+          const clientErr =
+            err.code === "client_aborted" ? err : ApiError.clientAborted();
+          const routing = await logChatFailure({
+            caller,
+            requestId,
+            requestedModel,
+            requestedRaw,
+            isAlias,
+            attemptedModels: attempts,
+            startedAt,
+            err: clientErr,
+            route,
+            providerId: provider.id,
+            timeoutMs: attemptTimeoutMs,
+          });
+          return failureResultWithSuggestions(
+            clientErr,
+            requestId,
+            requestedModel,
+            {
+              routing,
+              suggestSwitchModel: false,
+            }
+          );
         }
 
         const hasNextProvider =
@@ -4038,9 +4097,51 @@ async function runProviderAttempts(args: {
             upstreamStatus: err.upstreamStatus,
             upstreamErrorCode: err.code ?? null,
             upstreamErrorMessage: err.upstreamErrorSnippet,
+            transportErrorClass: err.transportErrorClass ?? null,
+            hasHttpResponse:
+              err.hasHttpResponse === true || err.upstreamStatus != null,
             latencyMs: attemptLatencyMs,
             timeoutMs: attemptTimeoutMs,
+            billing_status: "not_billable",
+            credits_charged: 0,
           });
+          continue;
+        }
+
+        // P1100 — no secondary provider: one same-provider transport retry.
+        const canSameProviderTransportRetry =
+          env.TOKFAI_UPSTREAM_TRANSPORT_SAME_PROVIDER_RETRY &&
+          !sameProviderTransportRetried &&
+          providerAttempts.length <= 1 &&
+          isTransportRetryEligible(err) &&
+          !abortSignal?.aborted;
+
+        if (canSameProviderTransportRetry) {
+          sameProviderTransportRetried = true;
+          log.warn("chat_provider_transport_same_provider_retry", {
+            requestId,
+            route,
+            requestedModel,
+            resolvedModel: requestedModel,
+            attemptModel,
+            attemptIndex,
+            providerId: provider.id,
+            providerIndex,
+            status: err.status,
+            code: err.code ?? "failed",
+            upstreamStatus: err.upstreamStatus,
+            upstreamErrorCode: err.code ?? null,
+            transportErrorClass: err.transportErrorClass ?? null,
+            hasHttpResponse: false,
+            retryReason: transportRetryReason(err),
+            sameProviderTransportRetry: true,
+            latencyMs: attemptLatencyMs,
+            timeoutMs: attemptTimeoutMs,
+            billing_status: "not_billable",
+            credits_charged: 0,
+          });
+          // for-loop will ++ then we -= so the same provider is retried once.
+          providerIndex -= 1;
           continue;
         }
 
@@ -4084,6 +4185,10 @@ async function runProviderAttempts(args: {
           upstreamStatus: err.upstreamStatus,
           upstreamErrorCode: err.code ?? null,
           upstreamErrorMessage: err.upstreamErrorSnippet,
+          transportErrorClass: err.transportErrorClass ?? null,
+          hasHttpResponse:
+            err.hasHttpResponse === true || err.upstreamStatus != null,
+          sameProviderTransportRetry: sameProviderTransportRetried,
           latencyMs: attemptLatencyMs,
           timeoutMs: attemptTimeoutMs,
           billing_status: "not_billable",
@@ -4104,6 +4209,25 @@ async function runProviderAttempts(args: {
           break;
         }
 
+        // P1100 — clarify public message after transport retries exhausted.
+        let finalErr = err;
+        if (
+          err.code === "upstream_transport_error" &&
+          (sameProviderTransportRetried || providerAttempts.length > 1)
+        ) {
+          finalErr = new ApiError({
+            status: err.status,
+            message: err.message,
+            code: err.code,
+            type: err.type,
+            publicMessage: TRANSPORT_RETRIES_EXHAUSTED_PUBLIC_MESSAGE,
+            upstreamStatus: err.upstreamStatus,
+            upstreamErrorSnippet: err.upstreamErrorSnippet,
+            transportErrorClass: err.transportErrorClass,
+            hasHttpResponse: err.hasHttpResponse,
+          });
+        }
+
         if (isAlias && isChatFallbackEligible(err)) {
           // P1088 — tools-path alias exhaustion must preserve locatable
           // tool_call_not_generated (blank after auto→required retry), not
@@ -4120,7 +4244,7 @@ async function runProviderAttempts(args: {
       attemptedModels: attempts,
             startedAt,
             err: exhausted,
-            lastAttempt: err,
+            lastAttempt: finalErr,
             route,
             providerId: provider.id,
             timeoutMs: attemptTimeoutMs,
@@ -4139,12 +4263,12 @@ async function runProviderAttempts(args: {
       isAlias,
       attemptedModels: attempts,
           startedAt,
-          err,
+          err: finalErr,
           route,
           providerId: provider.id,
           timeoutMs: attemptTimeoutMs,
         });
-        return failureResultWithSuggestions(err, requestId, requestedModel, {
+        return failureResultWithSuggestions(finalErr, requestId, requestedModel, {
             routing,
           suggestSwitchModel: isTimeout,
         });

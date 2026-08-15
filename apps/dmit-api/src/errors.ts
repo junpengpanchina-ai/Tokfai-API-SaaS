@@ -325,6 +325,13 @@ export class ApiError extends Error {
   readonly upstreamErrorSnippet?: string;
   /** Optional Retry-After hint (seconds) for 429 capacity errors. */
   readonly retryAfterSeconds?: number;
+  /**
+   * P1100 — transport classification (connect_timeout / headers timeout / …).
+   * Logs + failover only; never prompts or bodies.
+   */
+  readonly transportErrorClass?: string;
+  /** P1100 — false when fetch failed before any HTTP response. */
+  readonly hasHttpResponse?: boolean;
 
   constructor(args: {
     status: number;
@@ -336,6 +343,8 @@ export class ApiError extends Error {
     upstreamStatus?: number;
     upstreamErrorSnippet?: string;
     retryAfterSeconds?: number;
+    transportErrorClass?: string;
+    hasHttpResponse?: boolean;
   }) {
     super(args.message);
     this.name = "ApiError";
@@ -346,6 +355,8 @@ export class ApiError extends Error {
     this.upstreamStatus = args.upstreamStatus;
     this.upstreamErrorSnippet = args.upstreamErrorSnippet;
     this.retryAfterSeconds = args.retryAfterSeconds;
+    this.transportErrorClass = args.transportErrorClass;
+    this.hasHttpResponse = args.hasHttpResponse;
   }
 
   toJSON(): { error: ApiErrorPayload } {

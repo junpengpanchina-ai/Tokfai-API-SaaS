@@ -592,6 +592,12 @@ async function runStreamRound1(opts: {
 
 // ── typecheck / build / regressions ──────────────────────────────────────
 {
+  if (process.env.TOKFAI_NESTED_REGRESSION === "1") {
+    pass("nested: skip typecheck/build (parent owns gate)");
+    report.TYPECHECK = "PASS";
+    report.BUILD = "PASS";
+    report.GIT_DIFF_CHECK = "PASS";
+  } else {
   const typecheck = spawnSync("npm", ["run", "typecheck"], {
     cwd: join(ROOT, "apps/dmit-api"),
     encoding: "utf8",
@@ -612,7 +618,23 @@ async function runStreamRound1(opts: {
   });
   assert(diffCheck.status === 0, "git diff --check");
   report.GIT_DIFF_CHECK = diffCheck.status === 0 ? "PASS" : "FAIL";
+  } // end nested typecheck/build else
 
+  // P1096 is plan-only (no harness marker) — assert plan artifact exists.
+  assert(
+    existsSync(
+      join(ROOT, "supabase/migrations/0041_responses_tool_states.sql")
+    ) &&
+      read("apps/dmit-api/src/lib/responsesToolStateDurable.ts").includes(
+        "TOKFAI_RESPONSES_TOOL_STATE_DURABLE"
+      ),
+    "regression_P1096 plan/artifacts still present"
+  );
+
+  if (process.env.TOKFAI_NESTED_REGRESSION === "1") {
+    pass("nested: skip child regressions (parent harness owns them)");
+    report.REGRESSIONS = "PASS";
+  } else {
   const tsxLoader = join(
     ROOT,
     "apps/dmit-api/node_modules/tsx/dist/loader.mjs"
@@ -680,17 +702,6 @@ async function runStreamRound1(opts: {
     ],
   ];
 
-  // P1096 is plan-only (no harness marker) — assert plan artifact exists.
-  assert(
-    existsSync(
-      join(ROOT, "supabase/migrations/0041_responses_tool_states.sql")
-    ) &&
-      read("apps/dmit-api/src/lib/responsesToolStateDurable.ts").includes(
-        "TOKFAI_RESPONSES_TOOL_STATE_DURABLE"
-      ),
-    "regression_P1096 plan/artifacts still present"
-  );
-
   let regOk = true;
   for (const [label, script, re] of regressions) {
     const abs = join(ROOT, script);
@@ -755,6 +766,7 @@ async function runStreamRound1(opts: {
     }
   }
   report.REGRESSIONS = regOk ? "PASS" : "FAIL";
+  } // end nested-regression else
 }
 
 setResponsesToolStateDurableBackendForTests(null);

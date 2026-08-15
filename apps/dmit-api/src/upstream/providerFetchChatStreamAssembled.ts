@@ -22,11 +22,14 @@ import {
 } from "../lib/assembleChatCompletionFromUpstreamSse.js";
 import { log } from "../logger.js";
 import {
+  inspectUpstreamTransportFailure,
+  isUpstreamTransportFailure,
   mapUpstreamError,
   providerFetch,
   type UpstreamFetchOptions,
   type UpstreamLogContext,
 } from "./grsai.js";
+import { classifyTransportErrorClass } from "../lib/providerTransportAttempt.js";
 import type { UpstreamProvider } from "./providers.js";
 
 function buildProviderUrl(provider: UpstreamProvider, path: string): string {
@@ -326,6 +329,44 @@ export async function providerFetchChatStreamAssembled(
           publicMessage: "上游模型响应超时，请稍后重试或切换模型。",
           upstreamStatus: 504,
           upstreamErrorSnippet: "timeout",
+        });
+      }
+      if (isUpstreamTransportFailure(err)) {
+        const info = inspectUpstreamTransportFailure(err);
+        const transportErrorClass = classifyTransportErrorClass(info);
+        log.warn("upstream_provider_transport_failed", {
+          requestId: logContext.requestId,
+          route: logContext.route,
+          model: logContext.model,
+          requestedModel: logContext.requestedModel,
+          resolvedModel: logContext.resolvedModel ?? logContext.model,
+          providerId: provider.id,
+          upstreamHost: host,
+          upstreamPath,
+          errorName: info.errorName,
+          errorCode: info.errorCode,
+          errorCauseCode: info.errorCauseCode,
+          causeCode: info.errorCauseCode,
+          transportErrorClass,
+          hasHttpResponse: false,
+          latencyMs,
+          timeoutMs: wallMs,
+          idleTimeoutMs: idleMs,
+          billing_status: "not_billable",
+          credits_charged: 0,
+          upstreamErrorCode: "upstream_transport_error",
+          streamAssemble: true,
+          message: "upstream_provider_transport_failed",
+        });
+        throw new ApiError({
+          status: 502,
+          message: `Upstream provider transport failed: ${info.diagnosticSnippet}`,
+          code: "upstream_transport_error",
+          type: "upstream_error",
+          publicMessage: "Provider connection failed.",
+          upstreamErrorSnippet: info.diagnosticSnippet,
+          transportErrorClass,
+          hasHttpResponse: false,
         });
       }
       throw err;

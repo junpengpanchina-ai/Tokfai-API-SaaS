@@ -154,6 +154,11 @@ export type ProviderReply =
       code: string;
       message?: string;
       delayMs?: number;
+      /** P1100 — false = no HTTP response (transport). */
+      hasHttpResponse?: boolean;
+      transportErrorClass?: string;
+      /** Override; omit/null when hasHttpResponse=false. */
+      upstreamStatus?: number | null;
     };
 
 export type ProviderScript = (ctx: {
@@ -272,6 +277,7 @@ export function ensureDummyEnv(): void {
   set("STRIPE_WEBHOOK_SECRET", "whsec_p1018_test_only_secret");
   // Force single primary unless a test overrides providers via mock.
   process.env.TOKFAI_UPSTREAM_SECONDARY_ENABLED = "false";
+  process.env.TOKFAI_UPSTREAM_TRANSPORT_SAME_PROVIDER_RETRY = "true";
   process.env.TOKFAI_REDIS_ENABLED = "false";
   process.env.TOKFAI_UNLIMITED_BILLING_ENABLED = "false";
   process.env.VERIFIED_TOOLS_CAPABLE_MODEL_IDS = "";
@@ -307,13 +313,32 @@ function completionBody(reply: Extract<ProviderReply, { kind: "completion" }>) {
 
 function makeApiError(mod: any, reply: Extract<ProviderReply, { kind: "error" }>) {
   const ApiError = mod.ApiError;
+  const hasHttp =
+    reply.hasHttpResponse === true ||
+    (reply.hasHttpResponse !== false && reply.upstreamStatus != null) ||
+    (reply.hasHttpResponse !== false &&
+      reply.code !== "upstream_transport_error" &&
+      reply.code !== "client_aborted");
+  const upstreamStatus =
+    reply.upstreamStatus === null
+      ? undefined
+      : reply.upstreamStatus !== undefined
+        ? reply.upstreamStatus
+        : hasHttp
+          ? (reply.status ?? 502)
+          : undefined;
   return new ApiError({
-    status: reply.status ?? 502,
+    status: reply.status ?? (reply.code === "client_aborted" ? 400 : 502),
     message: reply.message ?? reply.code,
     publicMessage: reply.message ?? reply.code,
     code: reply.code,
-    type: "upstream_error",
-    upstreamStatus: reply.status ?? 502,
+    type:
+      reply.code === "client_aborted"
+        ? "invalid_request_error"
+        : "upstream_error",
+    upstreamStatus,
+    hasHttpResponse: hasHttp,
+    transportErrorClass: reply.transportErrorClass,
   });
 }
 
@@ -473,6 +498,34 @@ export async function installP1018Mocks(): Promise<void> {
           "tool_emulation_unavailable",
           "tool_intent_invalid_json",
         ].includes(code);
+      },
+      inspectUpstreamTransportFailure: (err: unknown) => {
+        const name =
+          err instanceof Error && err.name ? err.name : typeof err;
+        const msg =
+          err instanceof Error
+            ? err.message.slice(0, 80)
+            : typeof err === "string"
+              ? err.slice(0, 80)
+              : "transport_error";
+        return {
+          errorName: name,
+          errorCode: null,
+          errorCauseCode: null,
+          diagnosticSnippet: `${name}: ${msg}`.slice(0, 200),
+        };
+      },
+      isUpstreamTransportFailure: (err: unknown) => {
+        if (!(err instanceof Error)) return false;
+        if (err.name === "TimeoutError" || err.name === "AbortError") {
+          return false;
+        }
+        const hay = `${err.name} ${err.message}`.toLowerCase();
+        return (
+          hay.includes("fetch failed") ||
+          hay.includes("econnreset") ||
+          hay.includes("und_err_")
+        );
       },
       providerFetch: async (
         provider: { id: string },

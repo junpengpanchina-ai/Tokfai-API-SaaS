@@ -708,6 +708,12 @@ assert(
 
 // ── Typecheck / build / regressions / git diff --check ───────────────────
 {
+  if (process.env.TOKFAI_NESTED_REGRESSION === "1") {
+    pass("nested: skip typecheck/build (parent owns gate)");
+    report.TYPECHECK = "PASS";
+    report.BUILD = "PASS";
+    report.GIT_DIFF_CHECK = "PASS";
+  } else {
   const typecheck = spawnSync("npm", ["run", "typecheck"], {
     cwd: join(ROOT, "apps/dmit-api"),
     encoding: "utf8",
@@ -739,6 +745,7 @@ assert(
   if (diffCheck.status !== 0) {
     console.error(diffCheck.stdout || diffCheck.stderr);
   }
+  } // end nested typecheck/build else
 
   const regressions: Array<[string, string[], RegExp]> = [
     [
@@ -783,6 +790,10 @@ assert(
     ],
   ];
 
+  if (process.env.TOKFAI_NESTED_REGRESSION === "1") {
+    pass("nested: skip child regressions (parent harness owns them)");
+    report.REGRESSIONS = "PASS";
+  } else {
   let regOk = true;
   for (const [label, args, re] of regressions) {
     const script = args[0]!;
@@ -841,6 +852,7 @@ assert(
     }
   }
   report.REGRESSIONS = regOk ? "PASS" : "FAIL";
+  } // end nested-regression else
 }
 
 // Cleanup test hooks

@@ -301,6 +301,16 @@ const Schema = z
     .optional()
     .default("false")
     .transform((raw) => raw === "true" || raw === "1"),
+  /**
+   * P1100 — when no secondary provider is configured, allow one same-provider
+   * retry for no-HTTP-response transport errors (connect/headers/socket).
+   * Default on. Set "0"/"false" to disable. Success path unchanged.
+   */
+  TOKFAI_UPSTREAM_TRANSPORT_SAME_PROVIDER_RETRY: z
+    .string()
+    .optional()
+    .default("true")
+    .transform((raw) => raw !== "false" && raw !== "0"),
   TOKFAI_MODEL_PROVIDER_ORDER_GPT_5_4: z.string().optional(),
   TOKFAI_MODEL_PROVIDER_ORDER_GPT_5_5: z.string().optional(),
   TOKFAI_BATCH_MAX_ITEMS: z.coerce.number().int().positive().default(100),

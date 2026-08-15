@@ -389,6 +389,7 @@ export async function respondResponsesEarlySse(
       "heavy_queue_aborted",
       "client_aborted",
       "upstream_timeout",
+      "upstream_transport_error",
       "gateway_overloaded",
       "too_many_concurrent_requests",
     ]);

@@ -1,5 +1,6 @@
 import { env } from "../env.js";
 import { ApiError } from "../errors.js";
+import { classifyTransportErrorClass } from "../lib/providerTransportAttempt.js";
 import { log } from "../logger.js";
 import type { UpstreamProvider } from "./providers.js";
 import { getProviderById } from "./providers.js";
@@ -489,6 +490,7 @@ export async function providerFetch<T = unknown>(
     // (never raw throw → opaque Internal error / 500).
     if (isUpstreamTransportFailure(err)) {
       const info = inspectUpstreamTransportFailure(err);
+      const transportErrorClass = classifyTransportErrorClass(info);
       log.warn("upstream_provider_transport_failed", {
         requestId: logContext.requestId,
         route: logContext.route,
@@ -502,6 +504,8 @@ export async function providerFetch<T = unknown>(
         errorCode: info.errorCode,
         errorCauseCode: info.errorCauseCode,
         causeCode: info.errorCauseCode,
+        transportErrorClass,
+        hasHttpResponse: false,
         latencyMs,
         timeoutMs: effectiveTimeoutMs,
         billing_status: "not_billable",
@@ -516,6 +520,8 @@ export async function providerFetch<T = unknown>(
         type: "upstream_error",
         publicMessage: "Provider connection failed.",
         upstreamErrorSnippet: info.diagnosticSnippet,
+        transportErrorClass,
+        hasHttpResponse: false,
       });
     }
     throw err;
