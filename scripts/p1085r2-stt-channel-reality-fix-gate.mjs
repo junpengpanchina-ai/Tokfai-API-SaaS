@@ -360,19 +360,15 @@ async function main() {
     await channels.__wipeAllSttChannelsForTests();
   }
 
-  // Admin test: config_missing
+  // Admin test: missing credential classes (P1103 replaced config_missing)
   {
-    await channels.__wipeAllSttChannelsForTests();
-    // Self-hosted without base is blocked by upsert; use cloud with empty key via store wipe trick:
-    // create then clear secret is hard — call test on missing channel path and also
-    // exercise code path via record with empty secret through wipe + direct store if available.
-    // Prefer: upsert self_hosted with empty base rejected — use openai channel then
-    // patch is not needed: invoke error_class naming via source check + synthetic call.
     record(
       "UNIT_CONFIG_MISSING_CLASS",
-      /error_class:\s*"config_missing"/.test(adminSrc) ||
-        /error_class: "config_missing"/.test(adminSrc),
-      "admin test uses config_missing (not missing_credentials)"
+      /error_class:\s*"missing_api_key"/.test(adminSrc) &&
+        /error_class:\s*"missing_base_url"/.test(adminSrc) &&
+        (/error_class:\s*"missing_model"/.test(adminSrc) ||
+          /"missing_model"/.test(adminSrc)),
+      "admin test uses missing_api_key/missing_base_url/missing_model"
     );
   }
 

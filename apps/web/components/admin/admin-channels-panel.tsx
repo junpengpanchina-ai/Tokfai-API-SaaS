@@ -286,16 +286,20 @@ export function AdminChannelsPanel({
       await refresh();
     } catch (err) {
       // Failed test may still return structured body via AdminApiError.
-      const detail =
+      const body =
         err instanceof AdminApiError && err.body && typeof err.body === "object"
-          ? (err.body as { data?: AdminSttChannelTestResult }).data
+          ? (err.body as {
+              data?: AdminSttChannelTestResult;
+              error?: { message?: string; code?: string };
+            })
           : null;
+      const detail = body?.data ?? null;
       if (detail) setTestResult(detail);
-      setError(
-        err instanceof AdminApiError
-          ? err.message
-          : t("admin.channels.testFailed")
-      );
+      const backendMessage =
+        (detail && detail.message) ||
+        (typeof body?.error?.message === "string" ? body.error.message : null) ||
+        (err instanceof AdminApiError ? err.message : null);
+      setError(backendMessage || t("admin.channels.testFailed"));
     } finally {
       setBusy(false);
     }
@@ -433,10 +437,15 @@ export function AdminChannelsPanel({
             <div className="rounded-md border px-3 py-2 font-mono text-xs text-muted-foreground">
               <p>
                 test: {testResult.ok ? "ok" : "failed"} · status=
-                {testResult.upstream_status ?? "—"} · latency=
-                {testResult.latency_ms ?? "—"}ms
-                {testResult.error_class
-                  ? ` · class=${testResult.error_class}`
+                {testResult.upstream_status ??
+                  testResult.upstreamStatus ??
+                  "—"}{" "}
+                · latency=
+                {testResult.latency_ms ?? testResult.latencyMs ?? "—"}ms
+                {testResult.provider ? ` · provider=${testResult.provider}` : ""}
+                {testResult.model ? ` · model=${testResult.model}` : ""}
+                {testResult.error_class || testResult.code
+                  ? ` · class=${testResult.error_class ?? testResult.code}`
                   : ""}
               </p>
               <p>{testResult.message}</p>

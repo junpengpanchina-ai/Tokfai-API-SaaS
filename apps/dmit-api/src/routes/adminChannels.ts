@@ -1174,13 +1174,87 @@ export async function deleteAdminChannel(
 export type AdminSttChannelTestResult = {
   ok: boolean;
   channel_id: string;
+  provider?: string;
+  model?: string;
   upstream_status: number | null;
   latency_ms: number | null;
   error_class: string | null;
+  /** Alias of error_class for failure JSON contract. */
+  code?: string | null;
   message: string;
   /** Transcript length only — never full upstream body dumps with secrets. */
   transcript_chars?: number;
+  /** Short safe preview only (truncated); never audio / secrets. */
+  textPreview?: string;
+  /** CamelCase mirrors for Admin UI / smoke contracts. */
+  upstreamStatus?: number | null;
+  latencyMs?: number | null;
 };
+
+/**
+ * Minimal valid PCM WAV (8-bit mono 8 kHz, ~20 ms silence).
+ * Used for admin STT connection probes — never requires on-disk fixtures.
+ */
+export function buildMinimalSilentWav(): Uint8Array {
+  const sampleRate = 8000;
+  const numSamples = 160; // 20 ms
+  const dataSize = numSamples;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+  const writeStr = (offset: number, s: string) => {
+    for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
+  };
+  writeStr(0, "RIFF");
+  view.setUint32(4, 36 + dataSize, true);
+  writeStr(8, "WAVE");
+  writeStr(12, "fmt ");
+  view.setUint32(16, 16, true); // PCM fmt chunk size
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate, true); // byte rate (8-bit mono)
+  view.setUint16(32, 1, true); // block align
+  view.setUint16(34, 8, true); // bits
+  writeStr(36, "data");
+  view.setUint32(40, dataSize, true);
+  const bytes = new Uint8Array(buffer);
+  bytes.fill(0x80, 44); // mid-scale silence for unsigned 8-bit PCM
+  return bytes;
+}
+
+function loadSilenceWavBytes(): Uint8Array {
+  // Prefer in-process minimal WAV so production dist deploys never depend on
+  // scripts/fixtures being present next to the API binary.
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const candidates = [
+      join(here, "../../../../scripts/fixtures/p1074/stt-canary-silence.wav"),
+      join(process.cwd(), "scripts/fixtures/p1074/stt-canary-silence.wav"),
+      join(process.cwd(), "../scripts/fixtures/p1074/stt-canary-silence.wav"),
+    ];
+    for (const p of candidates) {
+      try {
+        return new Uint8Array(readFileSync(p));
+      } catch {
+        // try next / fall through to generated WAV
+      }
+    }
+  } catch {
+    // fall through
+  }
+  return buildMinimalSilentWav();
+}
+
+function withTestResultMirrors(
+  result: AdminSttChannelTestResult
+): AdminSttChannelTestResult {
+  return {
+    ...result,
+    code: result.code ?? result.error_class,
+    upstreamStatus: result.upstreamStatus ?? result.upstream_status,
+    latencyMs: result.latencyMs ?? result.latency_ms,
+  };
+}
 
 /**
  * Real HTTP STT probe against the channel upstream (silence WAV).
@@ -1201,43 +1275,95 @@ export async function testAdminSttChannel(
 
   const apiKey = readSecret(rec.secret) ?? "";
   const needsKey = rec.provider !== "self_hosted_whisper";
-  if (!rec.baseUrl || (needsKey && !apiKey)) {
-    const result: AdminSttChannelTestResult = {
+  const model =
+    (rec.defaultModel || defaultModelForProvider(rec.provider)).trim();
+  const baseUrl = (rec.baseUrl || "").trim();
+
+  if (!baseUrl) {
+    const result = withTestResultMirrors({
       ok: false,
       channel_id: rec.id,
+      provider: rec.provider,
+      model: model || undefined,
       upstream_status: null,
       latency_ms: null,
-      error_class: "config_missing",
-      message:
-        rec.provider === "self_hosted_whisper"
-          ? "STT channel is missing worker base_url."
-          : "STT channel is missing base_url or api_key.",
-    };
+      error_class: "missing_base_url",
+      code: "missing_base_url",
+      message: "missing_base_url: STT channel has no base_url configured.",
+    });
     await auditChannelWrite(ctx, {
       action: "channels.test",
       resourceId: rec.id,
       requestPayload: { test: "stt_silence_wav" },
       status: "failed",
-      error: "config_missing",
+      error: "missing_base_url",
       channel: sttRecordToRow(rec),
     });
-    return { ok: false, status: 400, error: "config_missing", result };
+    return { ok: false, status: 400, error: "missing_base_url", result };
+  }
+
+  if (needsKey && !apiKey) {
+    const result = withTestResultMirrors({
+      ok: false,
+      channel_id: rec.id,
+      provider: rec.provider,
+      model: model || undefined,
+      upstream_status: null,
+      latency_ms: null,
+      error_class: "missing_api_key",
+      code: "missing_api_key",
+      message: "missing_api_key: STT channel has no api_key configured.",
+    });
+    await auditChannelWrite(ctx, {
+      action: "channels.test",
+      resourceId: rec.id,
+      requestPayload: { test: "stt_silence_wav" },
+      status: "failed",
+      error: "missing_api_key",
+      channel: sttRecordToRow(rec),
+    });
+    return { ok: false, status: 400, error: "missing_api_key", result };
+  }
+
+  if (!model) {
+    const result = withTestResultMirrors({
+      ok: false,
+      channel_id: rec.id,
+      provider: rec.provider,
+      upstream_status: null,
+      latency_ms: null,
+      error_class: "missing_model",
+      code: "missing_model",
+      message: "missing_model: STT channel has no default_model configured.",
+    });
+    await auditChannelWrite(ctx, {
+      action: "channels.test",
+      resourceId: rec.id,
+      requestPayload: { test: "stt_silence_wav" },
+      status: "failed",
+      error: "missing_model",
+      channel: sttRecordToRow(rec),
+    });
+    return { ok: false, status: 400, error: "missing_model", result };
   }
 
   // P1085R2 — refuse to probe when Groq provider is pointed at a non-Groq base
   // (e.g. GRSai chat URL). Avoids confusing 404/auth failures.
-  const mismatch = detectSttProviderBaseMismatch(rec.provider, rec.baseUrl);
+  const mismatch = detectSttProviderBaseMismatch(rec.provider, baseUrl);
   if (mismatch.mismatch) {
-    const result: AdminSttChannelTestResult = {
+    const result = withTestResultMirrors({
       ok: false,
       channel_id: rec.id,
+      provider: rec.provider,
+      model,
       upstream_status: null,
       latency_ms: null,
       error_class: "provider_base_mismatch",
+      code: "provider_base_mismatch",
       message:
         mismatch.hint ??
         "provider_base_mismatch: baseUrl does not match groq_whisper_compatible.",
-    };
+    });
     await auditChannelWrite(ctx, {
       action: "channels.test",
       resourceId: rec.id,
@@ -1250,10 +1376,11 @@ export async function testAdminSttChannel(
       requestId: ctx.requestId,
       channel_id: rec.id,
       provider: rec.provider,
+      model,
       // Host only — never log secrets or full URLs with query tokens.
       base_host: (() => {
         try {
-          return new URL(rec.baseUrl).hostname;
+          return new URL(baseUrl).hostname;
         } catch {
           return "invalid";
         }
@@ -1262,48 +1389,12 @@ export async function testAdminSttChannel(
     return { ok: false, status: 400, error: "provider_base_mismatch", result };
   }
 
-  let wavBytes: Uint8Array;
-  try {
-    const here = dirname(fileURLToPath(import.meta.url));
-    // dist/routes → repo root scripts/fixtures
-    const candidates = [
-      join(here, "../../../../scripts/fixtures/p1074/stt-canary-silence.wav"),
-      join(process.cwd(), "scripts/fixtures/p1074/stt-canary-silence.wav"),
-      join(process.cwd(), "../scripts/fixtures/p1074/stt-canary-silence.wav"),
-    ];
-    let found: Buffer | null = null;
-    for (const p of candidates) {
-      try {
-        found = readFileSync(p);
-        break;
-      } catch {
-        // try next
-      }
-    }
-    if (!found) {
-      throw new Error("silence_wav_missing");
-    }
-    wavBytes = new Uint8Array(found);
-  } catch {
-    return {
-      ok: false,
-      status: 400,
-      error: "test_fixture_missing",
-      result: {
-        ok: false,
-        channel_id: rec.id,
-        upstream_status: null,
-        latency_ms: null,
-        error_class: "test_fixture_missing",
-        message: "STT test fixture (silence WAV) is not available.",
-      },
-    };
-  }
+  const wavBytes = loadSilenceWavBytes();
 
   const adapter =
     rec.provider === "self_hosted_whisper"
       ? createSelfHostedWhisperAdapter({
-          baseUrl: rec.baseUrl,
+          baseUrl,
           apiKey,
         })
       : createOpenaiCompatSttAdapter({
@@ -1311,7 +1402,7 @@ export async function testAdminSttChannel(
             rec.provider === "groq_whisper_compatible"
               ? "groq_whisper_compatible"
               : "openai_compatible",
-          baseUrl: rec.baseUrl,
+          baseUrl,
           apiKey,
         });
 
@@ -1319,26 +1410,37 @@ export async function testAdminSttChannel(
   try {
     const out = await adapter.transcribeAudio({
       requestId: ctx.requestId || `admin_stt_test_${rec.id}`,
-      model: rec.defaultModel || defaultModelForProvider(rec.provider),
+      model,
       bytes: wavBytes,
       mimeType: "audio/wav",
       filename: "stt-canary-silence.wav",
       timeoutMs: Math.min(rec.timeoutMs ?? 60_000, 60_000),
+      // Silence probes routinely return empty text — connection still succeeded.
+      allowEmptyTranscript: true,
     });
     const latencyMs = Date.now() - started;
     rec.lastError = null;
     rec.updatedAt = new Date().toISOString();
     await persistSttRecord(rec);
 
-    const result: AdminSttChannelTestResult = {
+    const preview =
+      typeof out.text === "string" && out.text.trim()
+        ? out.text.trim().slice(0, 80)
+        : undefined;
+
+    const result = withTestResultMirrors({
       ok: true,
       channel_id: rec.id,
+      provider: rec.provider,
+      model,
       upstream_status: out.upstreamStatus,
       latency_ms: latencyMs,
       error_class: null,
+      code: null,
       message: "STT upstream connection succeeded.",
       transcript_chars: out.text.length,
-    };
+      textPreview: preview,
+    });
 
     await auditChannelWrite(ctx, {
       action: "channels.test",
@@ -1352,6 +1454,7 @@ export async function testAdminSttChannel(
       requestId: ctx.requestId,
       channel_id: rec.id,
       provider: rec.provider,
+      model,
       upstream_status: out.upstreamStatus,
       latency_ms: latencyMs,
       transcript_chars: out.text.length,
@@ -1383,14 +1486,17 @@ export async function testAdminSttChannel(
     rec.updatedAt = new Date().toISOString();
     await persistSttRecord(rec);
 
-    const result: AdminSttChannelTestResult = {
+    const result = withTestResultMirrors({
       ok: false,
       channel_id: rec.id,
+      provider: rec.provider,
+      model,
       upstream_status: status,
       latency_ms: latencyMs,
       error_class: code,
+      code,
       message: publicMessage || "STT upstream connection failed.",
-    };
+    });
 
     await auditChannelWrite(ctx, {
       action: "channels.test",
@@ -1405,9 +1511,15 @@ export async function testAdminSttChannel(
       requestId: ctx.requestId,
       channel_id: rec.id,
       provider: rec.provider,
+      model,
       upstream_status: status,
       latency_ms: latencyMs,
       error_class: code,
+      errorCode: code,
+      errorMessage: (publicMessage || "STT upstream connection failed.").slice(
+        0,
+        200
+      ),
     });
 
     return { ok: false, status: 400, error: "stt_test_failed", result };
@@ -1477,21 +1589,30 @@ export async function __upsertSttChannelForTests(args: {
   enabled?: boolean;
   priority?: number;
   timeoutMs?: number;
+  /** P1103 — allow empty base/key to exercise missing_* admin test paths. */
+  allowMissingCredentials?: boolean;
 }): Promise<AdminChannelRow> {
   await ensureSttCacheLoaded();
   const now = new Date().toISOString();
   const id = args.id ?? `stt-test-${randomUUID().slice(0, 8)}`;
   const provider = args.provider ?? "groq_whisper_compatible";
   const apiKey = (args.apiKey ?? "").trim();
-  if (!apiKey && provider !== "self_hosted_whisper") {
+  if (
+    !apiKey &&
+    provider !== "self_hosted_whisper" &&
+    !args.allowMissingCredentials
+  ) {
     throw new Error("apiKey required for non-self-hosted STT test channels");
   }
   const rec: SttChannelRecord = {
     id,
     name: args.name ?? "STT test channel",
     provider,
-    baseUrl: args.baseUrl.replace(/\/+$/, ""),
-    defaultModel: args.defaultModel ?? defaultModelForProvider(provider),
+    baseUrl: (args.baseUrl || "").replace(/\/+$/, ""),
+    defaultModel:
+      args.defaultModel !== undefined
+        ? String(args.defaultModel).trim()
+        : defaultModelForProvider(provider),
     enabled: args.enabled !== false,
     priority: args.priority ?? 10,
     weight: 100,
@@ -1503,6 +1624,13 @@ export async function __upsertSttChannelForTests(args: {
   };
   await persistSttRecord(rec);
   return sttRecordToRow(rec);
+}
+
+/** Test helper — clear in-memory secret only (for missing_api_key probe tests). */
+export function __clearSttChannelSecretForTests(id: string): void {
+  const rec = sttChannels.get(id.trim());
+  if (!rec) throw new Error("channel_not_found");
+  rec.secret = emptySecret();
 }
 
 /** Test helper — hard-delete from durable store + cache. */

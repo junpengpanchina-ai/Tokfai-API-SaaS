@@ -396,11 +396,17 @@ export type AdminSttChannelUpdateBody = {
 export type AdminSttChannelTestResult = {
   ok: boolean;
   channel_id: string;
+  provider?: string;
+  model?: string;
   upstream_status: number | null;
   latency_ms: number | null;
   error_class: string | null;
+  code?: string | null;
   message: string;
   transcript_chars?: number;
+  textPreview?: string;
+  upstreamStatus?: number | null;
+  latencyMs?: number | null;
 };
 
 export function createAdminChannelIdempotencyKey(): string {

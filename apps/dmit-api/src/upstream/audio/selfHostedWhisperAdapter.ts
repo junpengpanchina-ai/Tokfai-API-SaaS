@@ -286,7 +286,7 @@ export function createSelfHostedWhisperAdapter(args: {
         });
       }
 
-      if (!text) {
+      if (!text && !input.allowEmptyTranscript) {
         throw new ApiError({
           status: 502,
           message: "stt_worker_empty_transcript",

@@ -235,7 +235,7 @@ export function createOpenaiCompatSttAdapter(args: {
       } catch {
         text = bodyText.trim();
       }
-      if (!text) {
+      if (!text && !input.allowEmptyTranscript) {
         throw new ApiError({
           status: 502,
           message: "stt_upstream_empty_transcript",

@@ -27,6 +27,11 @@ export type TranscribeAudioInput = {
   timeoutMs: number;
   /** Consumer disconnect / gateway abort — must cancel worker fetch. */
   abortSignal?: AbortSignal;
+  /**
+   * Admin channel "test connection" only: silence WAV often yields empty text.
+   * Consumer transcription must still reject empty transcripts.
+   */
+  allowEmptyTranscript?: boolean;
 };
 
 export type TranscribeAudioResult = {
