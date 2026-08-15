@@ -210,6 +210,9 @@ const ALLOWED_FIELD_KEYS = new Set([
   "retryProviderReturnedToolCalls",
   "retryResultSelectedForResponse",
   "codexAutoToolRetryAttempted",
+  // P1109 transparent Codex/Cursor no tool-force gate
+  "retrySkipped",
+  "compatFallbackSkipped",
   // P1090 GRSAI tool-call compatibility fallback (hashes / booleans / counts only)
   "fallbackSelected",
   "fallbackParseSucceeded",

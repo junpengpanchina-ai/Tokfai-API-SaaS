@@ -81,6 +81,10 @@ import {
   shouldAttemptGrsaiToolCompatFallback,
 } from "./grsaiToolCompatFallback.js";
 import { isTransparentExplicitModelRequest } from "./transparentExplicitModelGateway.js";
+import {
+  shouldBypassTokfaiToolForceForTransparentClient,
+  TRANSPARENT_TOOL_FORCE_BYPASS_REASON,
+} from "./transparentToolForceBypass.js";
 import { isAutoProTransparentCarrier } from "./autoProTransparentCarrier.js";
 import { normalizeOpenAiFinishReasonOnChatCompletion } from "./openaiFinishReason.js";
 import { chatBodyKeysForLog } from "./chatCompletionDiagnostics.js";
@@ -2693,6 +2697,13 @@ async function runProviderAttempts(args: {
                 nativeRetryFinishReason: retryFinish,
                 alreadyAttempted: grsaiToolCompatFallbackAttempted,
                 freshRemainingTotalMs: freshMsForCompat,
+                bypassTokfaiToolForce:
+                  shouldBypassTokfaiToolForceForTransparentClient({
+                    route,
+                    transparentGateway: bypassAgentOrchestration,
+                    toolChoice: (clientBody as { tool_choice?: unknown })
+                      .tool_choice,
+                  }),
               })
             ) {
               grsaiToolCompatFallbackAttempted = true;
@@ -3539,22 +3550,35 @@ async function runProviderAttempts(args: {
             // one compatibility retry with Chat Completions tool_choice=required.
             // Transparent gateway skips P1055 Agent repair; this bridge fills that gap
             // without executing tools or inventing function_call.
+            // P1109 — transparent Codex/Cursor auto: do NOT force a second fetch.
+            const clientToolChoiceForForce = (
+              clientBody as { tool_choice?: unknown }
+            ).tool_choice;
+            const transparentNoToolForce =
+              shouldBypassTokfaiToolForceForTransparentClient({
+                route,
+                transparentGateway: bypassAgentOrchestration,
+                toolChoice: clientToolChoiceForForce,
+              });
+            const codexRetryGateBase = {
+              route,
+              hasTools: hasToolsClient,
+              toolsCount: countTools(
+                (clientBody as { tools?: unknown }).tools
+              ),
+              toolChoice: clientToolChoiceForForce,
+              incomingToolMessageCount,
+              upstreamHttpOk: true as const,
+              upstreamReturnedToolCalls,
+              finishReason: finishForArbitration,
+              alreadyAttempted: codexAutoToolRetryAttempted,
+              freshRemainingTotalMs: freshMsForArb,
+              activeToolMode,
+            };
             if (
               shouldAttemptCodexAutoToolNoCallRetry({
-                route,
-                hasTools: hasToolsClient,
-                toolsCount: countTools(
-                  (clientBody as { tools?: unknown }).tools
-                ),
-                toolChoice: (clientBody as { tool_choice?: unknown })
-                  .tool_choice,
-                incomingToolMessageCount,
-                upstreamHttpOk: true,
-                upstreamReturnedToolCalls,
-                finishReason: finishForArbitration,
-                alreadyAttempted: codexAutoToolRetryAttempted,
-                freshRemainingTotalMs: freshMsForArb,
-                activeToolMode,
+                ...codexRetryGateBase,
+                bypassTokfaiToolForce: transparentNoToolForce,
               })
             ) {
               codexAutoToolRetryAttempted = true;
@@ -3564,6 +3588,31 @@ async function runProviderAttempts(args: {
               codexAutoRetryOriginalFinishReason =
                 finishForArbitration ?? "stop";
               continue;
+            }
+            if (
+              transparentNoToolForce &&
+              shouldAttemptCodexAutoToolNoCallRetry({
+                ...codexRetryGateBase,
+                bypassTokfaiToolForce: false,
+              })
+            ) {
+              log.info("transparent_tool_force_bypassed", {
+                requestId,
+                route,
+                reason: TRANSPARENT_TOOL_FORCE_BYPASS_REASON,
+                requestedModel: requestedRaw,
+                resolvedModel: attemptModel,
+                toolsCount: codexRetryGateBase.toolsCount,
+                toolChoice: summarizeCodexRetryToolChoice(
+                  clientToolChoiceForForce
+                ),
+                finishReason: finishForArbitration,
+                upstreamReturnedToolCalls,
+                retrySkipped: true,
+                compatFallbackSkipped: true,
+                billing_status: "not_billable",
+                credits_charged: 0,
+              });
             }
 
             // tool_choice=auto: plain text is allowed; preserve user semantics.

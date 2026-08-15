@@ -106,7 +106,10 @@ export function shouldAttemptGrsaiToolCompatFallback(args: {
   nativeRetryFinishReason: string | null | undefined;
   alreadyAttempted: boolean;
   freshRemainingTotalMs: number;
+  /** P1109 — transparent auto path: never force text→tool_calls compat. */
+  bypassTokfaiToolForce?: boolean;
 }): boolean {
+  if (args.bypassTokfaiToolForce === true) return false;
   if (args.route !== "/v1/responses") return false;
   if (!isGrsaiToolCompatProvider(args.providerId)) return false;
   if (!args.hasTools) return false;

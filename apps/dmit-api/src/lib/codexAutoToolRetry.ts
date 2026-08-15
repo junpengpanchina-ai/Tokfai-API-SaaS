@@ -70,7 +70,13 @@ export function shouldAttemptCodexAutoToolNoCallRetry(args: {
   freshRemainingTotalMs: number;
   /** Only native Chat Completions tool path (not emulated_json). */
   activeToolMode?: string;
+  /**
+   * P1109 — transparent Codex/Cursor auto path: never force a second fetch.
+   * Legacy non-transparent callers omit this (or pass false).
+   */
+  bypassTokfaiToolForce?: boolean;
 }): boolean {
+  if (args.bypassTokfaiToolForce === true) return false;
   if (args.route !== "/v1/responses") return false;
   if (!args.hasTools) return false;
   if (!(args.toolsCount > 0)) return false;
