@@ -18,6 +18,14 @@ function normalizeBase(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
 }
 
+/**
+ * Build Whisper-compatible transcription URL.
+ * base already includes /v1 (or /openai/v1); never inserts a second /v1.
+ */
+export function buildSttTranscriptionUrl(baseUrl: string): string {
+  return `${normalizeBase(baseUrl)}/audio/transcriptions`;
+}
+
 /** True when baseUrl is Groq's OpenAI-compatible STT root. */
 export function isGroqOpenaiV1Base(baseUrl: string): boolean {
   try {
@@ -31,7 +39,23 @@ export function isGroqOpenaiV1Base(baseUrl: string): boolean {
 }
 
 /**
+ * True when base looks like an OpenAI-compatible root ending in /v1
+ * (e.g. https://grsaiapi.com/v1). Used by grsai_whisper_compatible.
+ */
+export function isOpenaiCompatV1Base(baseUrl: string): boolean {
+  try {
+    const u = new URL(String(baseUrl || "").trim());
+    if (u.protocol !== "https:" && u.protocol !== "http:") return false;
+    const path = (u.pathname || "").replace(/\/+$/, "") || "";
+    return path === "/v1" || path.endsWith("/v1");
+  } catch {
+    return false;
+  }
+}
+
+/**
  * P1085R2 — groq_whisper_compatible must point at api.groq.com/openai/v1.
+ * P1104 — grsai_whisper_compatible must NOT use Groq base; expects /v1 root.
  * Never treat GRSai chat base/key as Groq STT.
  */
 export function detectSttProviderBaseMismatch(
@@ -39,18 +63,38 @@ export function detectSttProviderBaseMismatch(
   baseUrl: string
 ): { mismatch: boolean; code: "provider_base_mismatch" | null; hint: string | null } {
   const p = String(provider || "").trim().toLowerCase();
-  if (p !== "groq_whisper_compatible" && p !== "groq") {
+  if (p === "groq_whisper_compatible" || p === "groq") {
+    if (isGroqOpenaiV1Base(baseUrl)) {
+      return { mismatch: false, code: null, hint: null };
+    }
+    return {
+      mismatch: true,
+      code: "provider_base_mismatch",
+      hint:
+        "provider_base_mismatch: groq_whisper_compatible expects https://api.groq.com/openai/v1 (not a chat/GRSai base).",
+    };
+  }
+  if (p === "grsai_whisper_compatible" || p === "grsai") {
+    // Never allow Groq host under the GrsAI provider label.
+    if (isGroqOpenaiV1Base(baseUrl)) {
+      return {
+        mismatch: true,
+        code: "provider_base_mismatch",
+        hint:
+          "provider_base_mismatch: grsai_whisper_compatible expects a GrsAI OpenAI-compatible /v1 base (e.g. https://grsaiapi.com/v1), not api.groq.com.",
+      };
+    }
+    if (!isOpenaiCompatV1Base(baseUrl)) {
+      return {
+        mismatch: true,
+        code: "provider_base_mismatch",
+        hint:
+          "provider_base_mismatch: grsai_whisper_compatible expects base_url ending with /v1 (e.g. https://grsaiapi.com/v1).",
+      };
+    }
     return { mismatch: false, code: null, hint: null };
   }
-  if (isGroqOpenaiV1Base(baseUrl)) {
-    return { mismatch: false, code: null, hint: null };
-  }
-  return {
-    mismatch: true,
-    code: "provider_base_mismatch",
-    hint:
-      "provider_base_mismatch: groq_whisper_compatible expects https://api.groq.com/openai/v1 (not a chat/GRSai base).",
-  };
+  return { mismatch: false, code: null, hint: null };
 }
 
 /**
@@ -130,7 +174,10 @@ export function mapUpstreamSttError(
 }
 
 export function createOpenaiCompatSttAdapter(args: {
-  providerId: "openai_compatible" | "groq_whisper_compatible";
+  providerId:
+    | "openai_compatible"
+    | "groq_whisper_compatible"
+    | "grsai_whisper_compatible";
   baseUrl: string;
   apiKey: string;
 }): AudioSttProvider {
@@ -157,7 +204,7 @@ export function createOpenaiCompatSttAdapter(args: {
       form.append("model", input.model);
       if (input.language) form.append("language", input.language);
 
-      const url = `${base}/audio/transcriptions`;
+      const url = buildSttTranscriptionUrl(base);
       const started = Date.now();
       let res: Response;
       try {

@@ -48,6 +48,12 @@ function resolveEnvSttConfig(): ResolvedAudioSttConfig {
   if (providerRaw === "groq_whisper_compatible" || providerRaw === "groq") {
     providerId = "groq_whisper_compatible";
   } else if (
+    providerRaw === "grsai_whisper_compatible" ||
+    providerRaw === "grsai" ||
+    providerRaw === "grsai_whisper"
+  ) {
+    providerId = "grsai_whisper_compatible";
+  } else if (
     providerRaw === "openai_compatible" ||
     providerRaw === "openai" ||
     providerRaw === "openai-compatible"
@@ -154,7 +160,8 @@ export async function resolveAudioSttProvider(): Promise<AudioSttProvider> {
 
   if (
     cfg.providerId === "openai_compatible" ||
-    cfg.providerId === "groq_whisper_compatible"
+    cfg.providerId === "groq_whisper_compatible" ||
+    cfg.providerId === "grsai_whisper_compatible"
   ) {
     return createOpenaiCompatSttAdapter({
       providerId: cfg.providerId,

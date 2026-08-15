@@ -70,6 +70,7 @@ type SttDraft = {
   name: string;
   provider:
     | "groq_whisper_compatible"
+    | "grsai_whisper_compatible"
     | "openai_compatible"
     | "self_hosted_whisper";
   base_url: string;
@@ -83,10 +84,10 @@ type SttDraft = {
 function emptySttDraft(): SttDraft {
   return {
     name: "STT channel",
-    provider: "groq_whisper_compatible",
-    base_url: "https://api.groq.com/openai/v1",
+    provider: "grsai_whisper_compatible",
+    base_url: "https://grsaiapi.com/v1",
     api_key: "",
-    default_model: "whisper-large-v3-turbo",
+    default_model: "whisper-1",
     enabled: true,
     priority: "10",
     timeout_ms: "60000",
@@ -99,7 +100,9 @@ function rowToSttDraft(row: AdminChannelRow): SttDraft {
       ? "openai_compatible"
       : row.provider === "self_hosted_whisper"
         ? "self_hosted_whisper"
-        : "groq_whisper_compatible";
+        : row.provider === "grsai_whisper_compatible"
+          ? "grsai_whisper_compatible"
+          : "groq_whisper_compatible";
   return {
     name: row.provider_name || "STT channel",
     provider,
@@ -444,6 +447,9 @@ export function AdminChannelsPanel({
                 {testResult.latency_ms ?? testResult.latencyMs ?? "—"}ms
                 {testResult.provider ? ` · provider=${testResult.provider}` : ""}
                 {testResult.model ? ` · model=${testResult.model}` : ""}
+                {testResult.base_host || testResult.baseHost
+                  ? ` · base=${testResult.base_host ?? testResult.baseHost}`
+                  : ""}
                 {testResult.error_class || testResult.code
                   ? ` · class=${testResult.error_class ?? testResult.code}`
                   : ""}
@@ -485,22 +491,39 @@ export function AdminChannelsPanel({
                             ? d.default_model || "whisper-large-v3-turbo"
                             : d.default_model || "whisper-1",
                         base_url:
-                          provider === "groq_whisper_compatible" && !d.base_url
+                          provider === "groq_whisper_compatible" &&
+                          (!d.base_url ||
+                            d.base_url.includes("grsaiapi.com") ||
+                            d.base_url.includes("127.0.0.1"))
                             ? "https://api.groq.com/openai/v1"
-                            : provider === "self_hosted_whisper" &&
+                            : provider === "grsai_whisper_compatible" &&
                                 (!d.base_url ||
-                                  d.base_url.includes("api.groq.com"))
-                              ? "http://127.0.0.1:8080"
-                              : d.base_url,
+                                  d.base_url.includes("api.groq.com") ||
+                                  d.base_url.includes("127.0.0.1"))
+                              ? "https://grsaiapi.com/v1"
+                              : provider === "self_hosted_whisper" &&
+                                  (!d.base_url ||
+                                    d.base_url.includes("api.groq.com") ||
+                                    d.base_url.includes("grsaiapi.com"))
+                                ? "http://127.0.0.1:8080"
+                                : d.base_url,
                         name:
                           provider === "self_hosted_whisper" &&
                           (!d.name || d.name === "STT channel")
                             ? "Self-hosted STT worker"
-                            : d.name,
+                            : provider === "grsai_whisper_compatible" &&
+                                (!d.name ||
+                                  d.name === "STT channel" ||
+                                  d.name === "Self-hosted STT worker")
+                              ? "GrsAI STT channel"
+                              : d.name,
                       }));
                     }}
                     disabled={busy}
                   >
+                    <option value="grsai_whisper_compatible">
+                      grsai_whisper_compatible
+                    </option>
                     <option value="groq_whisper_compatible">
                       groq_whisper_compatible
                     </option>
@@ -524,7 +547,9 @@ export function AdminChannelsPanel({
                         ? t("admin.channels.baseUrlKeepPlaceholder")
                         : draft.provider === "self_hosted_whisper"
                           ? "http://stt-worker:8080"
-                          : "https://api.groq.com/openai/v1"
+                          : draft.provider === "grsai_whisper_compatible"
+                            ? "https://grsaiapi.com/v1"
+                            : "https://api.groq.com/openai/v1"
                     }
                     onChange={(e) =>
                       setDraft((d) => ({ ...d, base_url: e.target.value }))

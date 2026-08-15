@@ -350,6 +350,7 @@ export type AdminChannelRow = {
   capability?: "chat_image" | "audio_transcription";
   provider?:
     | "groq_whisper_compatible"
+    | "grsai_whisper_compatible"
     | "openai_compatible"
     | "self_hosted_whisper"
     | null;
@@ -362,6 +363,7 @@ export type AdminChannelRow = {
 
 export type AdminSttProvider =
   | "groq_whisper_compatible"
+  | "grsai_whisper_compatible"
   | "openai_compatible"
   | "self_hosted_whisper";
 
@@ -398,6 +400,7 @@ export type AdminSttChannelTestResult = {
   channel_id: string;
   provider?: string;
   model?: string;
+  base_host?: string | null;
   upstream_status: number | null;
   latency_ms: number | null;
   error_class: string | null;
@@ -407,6 +410,7 @@ export type AdminSttChannelTestResult = {
   textPreview?: string;
   upstreamStatus?: number | null;
   latencyMs?: number | null;
+  baseHost?: string | null;
 };
 
 export function createAdminChannelIdempotencyKey(): string {

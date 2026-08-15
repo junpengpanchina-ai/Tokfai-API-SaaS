@@ -6,6 +6,7 @@
 export type AudioSttProviderId =
   | "openai_compatible"
   | "groq_whisper_compatible"
+  | "grsai_whisper_compatible"
   | "self_hosted_whisper"
   | "unavailable";
 

@@ -39,6 +39,7 @@ export type AdminChannelCapability = "chat_image" | "audio_transcription";
 
 export type AdminSttProvider =
   | "groq_whisper_compatible"
+  | "grsai_whisper_compatible"
   | "openai_compatible"
   | "self_hosted_whisper";
 
@@ -124,6 +125,8 @@ const PRIMARY_CHANNEL_ID = "primary-channel";
 
 const DEFAULT_GROQ_BASE = "https://api.groq.com/openai/v1";
 const DEFAULT_GROQ_MODEL = "whisper-large-v3-turbo";
+const DEFAULT_GRSAI_STT_BASE = "https://grsaiapi.com/v1";
+const DEFAULT_GRSAI_STT_MODEL = "whisper-1";
 const DEFAULT_SELF_HOSTED_MODEL = "whisper-1";
 
 function emptySecret(): SttChannelSecret {
@@ -132,8 +135,15 @@ function emptySecret(): SttChannelSecret {
 
 function defaultModelForProvider(provider: AdminSttProvider): string {
   if (provider === "groq_whisper_compatible") return DEFAULT_GROQ_MODEL;
+  if (provider === "grsai_whisper_compatible") return DEFAULT_GRSAI_STT_MODEL;
   if (provider === "self_hosted_whisper") return DEFAULT_SELF_HOSTED_MODEL;
   return "whisper-1";
+}
+
+function defaultBaseForProvider(provider: AdminSttProvider): string | null {
+  if (provider === "groq_whisper_compatible") return DEFAULT_GROQ_BASE;
+  if (provider === "grsai_whisper_compatible") return DEFAULT_GRSAI_STT_BASE;
+  return null;
 }
 
 function durableToRecord(row: DurableChannelRow): SttChannelRecord | null {
@@ -141,6 +151,7 @@ function durableToRecord(row: DurableChannelRow): SttChannelRecord | null {
   const provider =
     row.provider === "openai_compatible" ||
     row.provider === "groq_whisper_compatible" ||
+    row.provider === "grsai_whisper_compatible" ||
     row.provider === "self_hosted_whisper"
       ? row.provider
       : null;
@@ -435,7 +446,9 @@ export async function resolveEnabledSttAdminChannel(): Promise<{
     const providerId: AudioSttProviderId =
       rec.provider === "groq_whisper_compatible"
         ? "groq_whisper_compatible"
-        : "openai_compatible";
+        : rec.provider === "grsai_whisper_compatible"
+          ? "grsai_whisper_compatible"
+          : "openai_compatible";
     return {
       id: rec.id,
       providerId,
@@ -550,6 +563,13 @@ function normalizeSttProvider(raw: unknown): AdminSttProvider | null {
     return "groq_whisper_compatible";
   }
   if (
+    v === "grsai_whisper_compatible" ||
+    v === "grsai" ||
+    v === "grsai_whisper"
+  ) {
+    return "grsai_whisper_compatible";
+  }
+  if (
     v === "openai_compatible" ||
     v === "openai" ||
     v === "openai-compatible"
@@ -593,8 +613,7 @@ export async function createAdminSttChannel(
   const provider =
     normalizeSttProvider(body.provider) ?? "groq_whisper_compatible";
   const baseUrl =
-    parseBaseUrl(body.base_url) ??
-    (provider === "groq_whisper_compatible" ? DEFAULT_GROQ_BASE : null);
+    parseBaseUrl(body.base_url) ?? defaultBaseForProvider(provider);
   if (!baseUrl) {
     await auditChannelWrite(ctx, {
       action: "channels.create",
@@ -648,7 +667,9 @@ export async function createAdminSttChannel(
         ? body.provider_name.trim().slice(0, 80)
         : provider === "self_hosted_whisper"
           ? "Self-hosted STT worker"
-          : "STT channel";
+          : provider === "grsai_whisper_compatible"
+            ? "GrsAI STT channel"
+            : "STT channel";
 
   let priority = 10;
   if (body.priority !== undefined) {
@@ -1176,6 +1197,8 @@ export type AdminSttChannelTestResult = {
   channel_id: string;
   provider?: string;
   model?: string;
+  /** Hostname only — never full base_url with query tokens. */
+  base_host?: string | null;
   upstream_status: number | null;
   latency_ms: number | null;
   error_class: string | null;
@@ -1189,7 +1212,16 @@ export type AdminSttChannelTestResult = {
   /** CamelCase mirrors for Admin UI / smoke contracts. */
   upstreamStatus?: number | null;
   latencyMs?: number | null;
+  baseHost?: string | null;
 };
+
+function safeBaseHost(baseUrl: string): string | null {
+  try {
+    return new URL(baseUrl).hostname;
+  } catch {
+    return baseUrl ? "invalid" : null;
+  }
+}
 
 /**
  * Minimal valid PCM WAV (8-bit mono 8 kHz, ~20 ms silence).
@@ -1253,6 +1285,7 @@ function withTestResultMirrors(
     code: result.code ?? result.error_class,
     upstreamStatus: result.upstreamStatus ?? result.upstream_status,
     latencyMs: result.latencyMs ?? result.latency_ms,
+    baseHost: result.baseHost ?? result.base_host ?? null,
   };
 }
 
@@ -1285,6 +1318,7 @@ export async function testAdminSttChannel(
       channel_id: rec.id,
       provider: rec.provider,
       model: model || undefined,
+      base_host: null,
       upstream_status: null,
       latency_ms: null,
       error_class: "missing_base_url",
@@ -1308,6 +1342,7 @@ export async function testAdminSttChannel(
       channel_id: rec.id,
       provider: rec.provider,
       model: model || undefined,
+      base_host: safeBaseHost(baseUrl),
       upstream_status: null,
       latency_ms: null,
       error_class: "missing_api_key",
@@ -1330,6 +1365,7 @@ export async function testAdminSttChannel(
       ok: false,
       channel_id: rec.id,
       provider: rec.provider,
+      base_host: safeBaseHost(baseUrl),
       upstream_status: null,
       latency_ms: null,
       error_class: "missing_model",
@@ -1347,8 +1383,8 @@ export async function testAdminSttChannel(
     return { ok: false, status: 400, error: "missing_model", result };
   }
 
-  // P1085R2 — refuse to probe when Groq provider is pointed at a non-Groq base
-  // (e.g. GRSai chat URL). Avoids confusing 404/auth failures.
+  // P1085R2 / P1104 — refuse to probe when provider/base pair is mismatched
+  // (e.g. Groq provider + GRSai base, or GrsAI provider + Groq base).
   const mismatch = detectSttProviderBaseMismatch(rec.provider, baseUrl);
   if (mismatch.mismatch) {
     const result = withTestResultMirrors({
@@ -1356,13 +1392,14 @@ export async function testAdminSttChannel(
       channel_id: rec.id,
       provider: rec.provider,
       model,
+      base_host: safeBaseHost(baseUrl),
       upstream_status: null,
       latency_ms: null,
       error_class: "provider_base_mismatch",
       code: "provider_base_mismatch",
       message:
         mismatch.hint ??
-        "provider_base_mismatch: baseUrl does not match groq_whisper_compatible.",
+        "provider_base_mismatch: baseUrl does not match the selected STT provider.",
     });
     await auditChannelWrite(ctx, {
       action: "channels.test",
@@ -1378,13 +1415,7 @@ export async function testAdminSttChannel(
       provider: rec.provider,
       model,
       // Host only — never log secrets or full URLs with query tokens.
-      base_host: (() => {
-        try {
-          return new URL(baseUrl).hostname;
-        } catch {
-          return "invalid";
-        }
-      })(),
+      base_host: safeBaseHost(baseUrl),
     });
     return { ok: false, status: 400, error: "provider_base_mismatch", result };
   }
@@ -1401,7 +1432,9 @@ export async function testAdminSttChannel(
           providerId:
             rec.provider === "groq_whisper_compatible"
               ? "groq_whisper_compatible"
-              : "openai_compatible",
+              : rec.provider === "grsai_whisper_compatible"
+                ? "grsai_whisper_compatible"
+                : "openai_compatible",
           baseUrl,
           apiKey,
         });
@@ -1433,6 +1466,7 @@ export async function testAdminSttChannel(
       channel_id: rec.id,
       provider: rec.provider,
       model,
+      base_host: safeBaseHost(baseUrl),
       upstream_status: out.upstreamStatus,
       latency_ms: latencyMs,
       error_class: null,
@@ -1455,6 +1489,7 @@ export async function testAdminSttChannel(
       channel_id: rec.id,
       provider: rec.provider,
       model,
+      base_host: safeBaseHost(baseUrl),
       upstream_status: out.upstreamStatus,
       latency_ms: latencyMs,
       transcript_chars: out.text.length,
@@ -1491,6 +1526,7 @@ export async function testAdminSttChannel(
       channel_id: rec.id,
       provider: rec.provider,
       model,
+      base_host: safeBaseHost(baseUrl),
       upstream_status: status,
       latency_ms: latencyMs,
       error_class: code,
@@ -1512,6 +1548,7 @@ export async function testAdminSttChannel(
       channel_id: rec.id,
       provider: rec.provider,
       model,
+      base_host: safeBaseHost(baseUrl),
       upstream_status: status,
       latency_ms: latencyMs,
       error_class: code,
