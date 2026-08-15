@@ -5195,6 +5195,9 @@ export const messages = {
         disabledOk: "STT channel disabled.",
         testOk: "STT upstream test succeeded.",
         testFailed: "STT upstream test failed.",
+        grsaiSttCapabilityHint:
+          "GrsAI docs currently prove chat/image only — not STT. A confirmed upstream STT endpoint is required before connection tests can succeed. Chat completions Base URL cannot be used for audio transcription.",
+        grsaiSttExperimentalBadge: "STT endpoint unconfirmed",
         fieldName: "Display name",
         fieldProvider: "Provider",
         fieldBaseUrl: "Upstream Base URL",
@@ -10577,6 +10580,9 @@ export const messages = {
         disabledOk: "STT 渠道已禁用。",
         testOk: "STT 上游测试成功。",
         testFailed: "STT 上游测试失败。",
+        grsaiSttCapabilityHint:
+          "GrsAI 文档当前只证明 chat/image，不证明 STT。需要上游提供真实已确认的 STT endpoint 后才能成功测试。Chat completions 的 Base URL 不能用于音频转写。",
+        grsaiSttExperimentalBadge: "STT endpoint 未确认",
         fieldName: "显示名称",
         fieldProvider: "Provider",
         fieldBaseUrl: "上游 Base URL",

@@ -25,7 +25,17 @@ import {
   detectSttProviderBaseMismatch,
 } from "../upstream/audio/openaiCompatSttAdapter.js";
 import { createSelfHostedWhisperAdapter } from "../upstream/audio/selfHostedWhisperAdapter.js";
+import {
+  getSttProviderCapability,
+  GRSAI_STT_ENDPOINT_UNKNOWN_MESSAGE,
+} from "../upstream/audio/sttProviderCapability.js";
 import type { AudioSttProviderId } from "../upstream/audio/types.js";
+
+export {
+  getSttProviderCapability,
+  GRSAI_STT_ENDPOINT_UNKNOWN_MESSAGE,
+  isGrsaiSttEndpointConfirmed,
+} from "../upstream/audio/sttProviderCapability.js";
 
 export {
   AdminChannelStoreError,
@@ -66,6 +76,10 @@ export type AdminChannelRow = {
   api_key_set?: boolean;
   /** Masked hint only (e.g. gsk_…abcd). Never full secret. */
   api_key_masked?: string | null;
+  /** P1107 — whether Whisper STT endpoint shape is known/confirmed for this provider. */
+  stt_endpoint_known?: boolean | null;
+  /** P1107 — experimental / unverified STT (e.g. GrsAI without confirmed endpoint). */
+  stt_experimental?: boolean | null;
 };
 
 type AdminChannelWriteContext = {
@@ -344,6 +358,7 @@ function sttRecordToRow(rec: SttChannelRecord): AdminChannelRow {
   const secretPresent = Boolean(
     rec.secret.encrypted?.trim() || rec.secret.last4 || readSecret(rec.secret)
   );
+  const cap = getSttProviderCapability(rec.provider, { baseUrl: rec.baseUrl });
   return {
     id: rec.id,
     provider_name: rec.name,
@@ -365,6 +380,8 @@ function sttRecordToRow(rec: SttChannelRecord): AdminChannelRow {
     api_key_masked: secretPresent
       ? `****…${rec.secret.last4 || "****"} (set)`
       : null,
+    stt_endpoint_known: cap.sttEndpointKnown,
+    stt_experimental: cap.experimental,
   };
 }
 
@@ -1418,6 +1435,44 @@ export async function testAdminSttChannel(
       base_host: safeBaseHost(baseUrl),
     });
     return { ok: false, status: 400, error: "provider_base_mismatch", result };
+  }
+
+  // P1107 — GrsAI docs prove chat/image only; do not blind-probe STT paths
+  // unless ops explicitly confirms a real STT base via env override.
+  if (rec.provider === "grsai_whisper_compatible") {
+    const cap = getSttProviderCapability(rec.provider, { baseUrl });
+    if (!cap.sttEndpointKnown) {
+      const result = withTestResultMirrors({
+        ok: false,
+        channel_id: rec.id,
+        provider: rec.provider,
+        model,
+        base_host: safeBaseHost(baseUrl),
+        upstream_status: null,
+        latency_ms: null,
+        error_class: "stt_endpoint_unknown",
+        code: "stt_endpoint_unknown",
+        message: GRSAI_STT_ENDPOINT_UNKNOWN_MESSAGE,
+      });
+      await auditChannelWrite(ctx, {
+        action: "channels.test",
+        resourceId: rec.id,
+        requestPayload: { test: "stt_capability_gate" },
+        status: "failed",
+        error: "stt_endpoint_unknown",
+        channel: sttRecordToRow(rec),
+      });
+      log.warn("admin_channel_stt_test_endpoint_unknown", {
+        requestId: ctx.requestId,
+        channel_id: rec.id,
+        provider: rec.provider,
+        model,
+        base_host: safeBaseHost(baseUrl),
+        stt_endpoint_known: false,
+        experimental: true,
+      });
+      return { ok: false, status: 400, error: "stt_endpoint_unknown", result };
+    }
   }
 
   const wavBytes = loadSilenceWavBytes();

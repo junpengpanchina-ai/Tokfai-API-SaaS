@@ -532,6 +532,11 @@ export function AdminChannelsPanel({
                       self_hosted_whisper
                     </option>
                   </select>
+                  {draft.provider === "grsai_whisper_compatible" ? (
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      {t("admin.channels.grsaiSttCapabilityHint")}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="stt-base-url">
@@ -702,6 +707,17 @@ export function AdminChannelsPanel({
                               ? ` · ${row.api_key_masked || "key set"}`
                               : ""}
                           </div>
+                          {row.provider === "grsai_whisper_compatible" &&
+                          row.stt_endpoint_known !== true ? (
+                            <div className="mt-2 space-y-1">
+                              <Badge variant="outline" className="text-xs">
+                                {t("admin.channels.grsaiSttExperimentalBadge")}
+                              </Badge>
+                              <p className="text-xs text-muted-foreground">
+                                {t("admin.channels.grsaiSttCapabilityHint")}
+                              </p>
+                            </div>
+                          ) : null}
                         </td>
                         <td className="py-2 pr-4 font-mono text-xs">
                           {row.provider || "—"}

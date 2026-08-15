@@ -358,6 +358,10 @@ export type AdminChannelRow = {
   api_key_set?: boolean;
   /** Masked hint only — never the full upstream secret. */
   api_key_masked?: string | null;
+  /** Whether Whisper STT endpoint is known/confirmed for this provider. */
+  stt_endpoint_known?: boolean | null;
+  /** Experimental / unverified STT capability (e.g. GrsAI without confirmed endpoint). */
+  stt_experimental?: boolean | null;
   updated_at?: string | null;
 };
 

@@ -318,11 +318,42 @@ async function main() {
     await channels.__wipeAllSttChannelsForTests();
   }
 
-  // Admin grsai + mock /v1 upstream empty text success
+  // P1107 — grsai without confirmed STT endpoint must not probe
+  {
+    delete process.env.TOKFAI_GRSAI_STT_ENDPOINT_CONFIRMED;
+    delete process.env.TOKFAI_GRSAI_STT_CONFIRMED_BASE_URL;
+    await channels.__wipeAllSttChannelsForTests();
+    const row = await channels.__upsertSttChannelForTests({
+      id: "stt-p1104-grsai-unknown",
+      provider: "grsai_whisper_compatible",
+      baseUrl: "https://grsaiapi.com/v1",
+      apiKey: "sk-grsai-p1104-unconfirmed",
+      defaultModel: "whisper-1",
+    });
+    const out = await channels.testAdminSttChannel(
+      row.id,
+      adminCtx("grsai-unknown")
+    );
+    const r = out.result;
+    record(
+      "ADMIN_GRSAI_STT_ENDPOINT_UNKNOWN",
+      out.ok === false &&
+        out.error === "stt_endpoint_unknown" &&
+        r?.error_class === "stt_endpoint_unknown" &&
+        /Chat completions base URL cannot be used for audio transcription/i.test(
+          String(r?.message || "")
+        ),
+      `error=${out.error} class=${r?.error_class}`
+    );
+    await channels.__wipeAllSttChannelsForTests();
+  }
+
+  // Admin grsai + mock /v1 upstream empty text success (confirmed override)
   await withMockWhisperUpstream(
     () => ({ status: 200, body: { text: "" } }),
     async (baseUrl, paths) => {
-      // Bypass host-shape gate: mock is 127.0.0.1/v1 which passes isOpenaiCompatV1Base
+      process.env.TOKFAI_GRSAI_STT_ENDPOINT_CONFIRMED = "1";
+      process.env.TOKFAI_GRSAI_STT_CONFIRMED_BASE_URL = baseUrl;
       await channels.__wipeAllSttChannelsForTests();
       const row = await channels.__upsertSttChannelForTests({
         id: "stt-p1104-grsai-ok",
@@ -348,6 +379,8 @@ async function main() {
           !paths.some((p) => /\/v1\/v1\//.test(p)),
         paths.join(",") || "no paths"
       );
+      delete process.env.TOKFAI_GRSAI_STT_ENDPOINT_CONFIRMED;
+      delete process.env.TOKFAI_GRSAI_STT_CONFIRMED_BASE_URL;
       await channels.__wipeAllSttChannelsForTests();
     }
   );
