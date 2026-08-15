@@ -884,6 +884,13 @@ protectedAdminRoutes.post("/channels/:id/test", async (c) => {
   const result = await testAdminSttChannel(id, adminModelWriteContext(c));
   if (!result.ok) {
     if (result.result) {
+      const configCodes = new Set([
+        "config_missing",
+        "missing_credentials",
+        "missing_api_key",
+        "missing_base_url",
+        "missing_model",
+      ]);
       return c.json(
         {
           data: result.result,
@@ -891,9 +898,8 @@ protectedAdminRoutes.post("/channels/:id/test", async (c) => {
             message:
               result.error === "channel_not_found"
                 ? "Channel not found."
-                : result.error === "config_missing" ||
-                    result.error === "missing_credentials"
-                  ? "STT channel is missing credentials."
+                : configCodes.has(result.error)
+                  ? result.result.message
                   : result.error === "provider_base_mismatch"
                     ? result.result.message
                     : result.error === "test_fixture_missing"
