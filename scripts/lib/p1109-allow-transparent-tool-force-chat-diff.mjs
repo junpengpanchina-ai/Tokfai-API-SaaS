@@ -1,24 +1,50 @@
 /**
- * P1109 — allow executeChatCompletion.ts diffs that only add the transparent
- * Codex/Cursor no-tool-force gate (so STT golden-path harnesses can still PASS
- * while Responses tooling semantics change intentionally).
+ * Allow executeChatCompletion.ts diffs that only add Responses tool-choice
+ * transparency / opt-in policy / privacy-safe wire diagnostics (so STT
+ * golden-path harnesses can still PASS while Responses tooling semantics
+ * change intentionally).
+ *
+ * Rejects accidental STT / whisper / audio edits inside the same file.
  */
 
 import { spawnSync } from "node:child_process";
 
-const EXEC =
-  "apps/dmit-api/src/lib/executeChatCompletion.ts";
+const EXEC = "apps/dmit-api/src/lib/executeChatCompletion.ts";
 
-const P1109_MARKERS = [
+const ALLOWED_MARKERS = [
+  // P1109
   "shouldBypassTokfaiToolForceForTransparentClient",
   "transparent_tool_force_bypassed",
   "bypassTokfaiToolForce",
   "TRANSPARENT_TOOL_FORCE_BYPASS_REASON",
   "P1109",
+  // P1115
+  "applyCodexExplicitToolChoicePolicy",
+  "resolveCodexExplicitToolChoicePolicy",
+  "codex_explicit_tool_choice_policy",
+  "codexExplicitToolChoicePolicy",
+  "TOKFAI_CODEX_TOOL_CHOICE_POLICY",
+  "P1115",
+  // P1116R2 / P1119
+  "summarizeOutboundToolChoiceWire",
+  "summarizeUpstreamToolsSchemaFingerprint",
+  "summarizeToolChoiceWireShape",
+  "upstream_tool_choice_wire",
+  "upstreamToolChoiceWireDiag",
+  "inboundToolChoiceKind",
+  "outboundToolChoiceKind",
+  "toolTypesSummary",
+  "toolNameHashes",
+  "parametersByteLengths",
+  "inputSchemaPresentCount",
+  "P1116R2",
+  "P1116",
+  "P1119",
 ];
 
 /**
- * True when HEAD→workdir executeChatCompletion diff is empty or P1109-only.
+ * True when HEAD→workdir executeChatCompletion diff is empty or
+ * P1109/P1115/P1116R2 Responses tool-choice-only.
  */
 export function isP1109OnlyExecuteChatCompletionDiff(root) {
   const r = spawnSync("git", ["diff", "HEAD", "--", EXEC], {
@@ -27,7 +53,7 @@ export function isP1109OnlyExecuteChatCompletionDiff(root) {
   });
   const d = `${r.stdout || ""}`;
   if (!d.trim()) return true;
-  if (!P1109_MARKERS.some((m) => d.includes(m))) return false;
+  if (!ALLOWED_MARKERS.some((m) => d.includes(m))) return false;
   // Reject accidental STT / whisper edits inside the same file.
   if (/\bstt\b|whisper|audio\/transcription/i.test(d)) return false;
   return true;
@@ -35,7 +61,7 @@ export function isP1109OnlyExecuteChatCompletionDiff(root) {
 
 /**
  * Drop executeChatCompletion.ts from a dirty-forbidden list when the only
- * change is the P1109 transparent no-tool-force gate.
+ * change is Responses tool-choice transparency / opt-in / wire diagnostics.
  */
 export function filterForbiddenDirtyAllowingP1109Chat(dirtyPaths, root) {
   const allowChat = isP1109OnlyExecuteChatCompletionDiff(root);

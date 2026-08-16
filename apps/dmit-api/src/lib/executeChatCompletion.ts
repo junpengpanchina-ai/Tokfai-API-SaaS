@@ -89,6 +89,7 @@ import {
   applyCodexExplicitToolChoicePolicy,
   resolveCodexExplicitToolChoicePolicy,
 } from "./codexExplicitToolChoicePolicy.js";
+import { summarizeOutboundToolChoiceWire } from "./upstreamToolChoiceWireDiag.js";
 import { isAutoProTransparentCarrier } from "./autoProTransparentCarrier.js";
 import { normalizeOpenAiFinishReasonOnChatCompletion } from "./openaiFinishReason.js";
 import { chatBodyKeysForLog } from "./chatCompletionDiagnostics.js";
@@ -2223,6 +2224,51 @@ async function runProviderAttempts(args: {
               toolsCount: byteDiag.toolsCount,
               largestToolSchemaBytes: byteDiag.largestToolSchemaBytes,
               messageCount: byteDiag.messageCount,
+              billing_status: "not_billable",
+              credits_charged: 0,
+            });
+          }
+
+          // P1116R2 / P1119 — privacy-safe wire proof at provider boundary
+          // (enums / counts / name hashes / schema byte lengths only).
+          {
+            const wire = summarizeOutboundToolChoiceWire({
+              inboundToolChoice: (clientBody as { tool_choice?: unknown })
+                .tool_choice,
+              outboundToolChoice: (upstreamBody as { tool_choice?: unknown })
+                .tool_choice,
+              outboundTools: (upstreamBody as { tools?: unknown }).tools,
+              route,
+            });
+            log.info("upstream_tool_choice_wire", {
+              requestId,
+              route,
+              providerId: provider.id,
+              requestedModel: requestedRaw,
+              resolvedModel: attemptModel,
+              toolsCount: wire.tools.toolsCount,
+              inboundToolChoiceKind: wire.inboundToolChoiceKind,
+              outboundToolChoiceKind: wire.outboundToolChoiceKind,
+              toolChoiceBefore: wire.inboundToolChoiceKind,
+              toolChoiceAfter: wire.outboundToolChoiceKind,
+              outboundToolChoiceShape: wire.outboundToolChoiceShape.shape,
+              outboundToolChoiceTypeToken:
+                wire.outboundToolChoiceShape.typeToken,
+              toolTypesSummary: wire.tools.toolTypesSummary,
+              hasFunctionTools: wire.tools.hasFunctionTools,
+              hasUnsupportedToolTypes: wire.tools.hasUnsupportedToolTypes,
+              unsupportedToolTypeCount: wire.tools.unsupportedToolTypeCount,
+              bodyShape: wire.tools.bodyShape,
+              toolNameHashes: wire.schema.toolNameHashes,
+              parametersByteLengths: wire.schema.parametersByteLengths,
+              largestParametersBytes: wire.schema.largestParametersBytes,
+              totalParametersBytes: wire.schema.totalParametersBytes,
+              missingNameCount: wire.schema.missingNameCount,
+              missingParametersCount: wire.schema.missingParametersCount,
+              inputSchemaPresentCount: wire.schema.inputSchemaPresentCount,
+              emptyParametersStubCount: wire.schema.emptyParametersStubCount,
+              nonFunctionPassthroughCount:
+                wire.schema.nonFunctionPassthroughCount,
               billing_status: "not_billable",
               credits_charged: 0,
             });
