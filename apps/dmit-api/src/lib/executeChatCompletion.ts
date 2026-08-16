@@ -85,6 +85,10 @@ import {
   shouldBypassTokfaiToolForceForTransparentClient,
   TRANSPARENT_TOOL_FORCE_BYPASS_REASON,
 } from "./transparentToolForceBypass.js";
+import {
+  applyCodexExplicitToolChoicePolicy,
+  resolveCodexExplicitToolChoicePolicy,
+} from "./codexExplicitToolChoicePolicy.js";
 import { isAutoProTransparentCarrier } from "./autoProTransparentCarrier.js";
 import { normalizeOpenAiFinishReasonOnChatCompletion } from "./openaiFinishReason.js";
 import { chatBodyKeysForLog } from "./chatCompletionDiagnostics.js";
@@ -1659,6 +1663,8 @@ async function runProviderAttempts(args: {
         let savedNativeDataForCodexAutoRetry: ChatCompletionResponse | null =
           null;
         let codexAutoRetryOriginalFinishReason: string | null = null;
+        // P1115 — log explicit opt-in tool_choice rewrite at most once / attempt.
+        let codexExplicitToolChoicePolicyLogged = false;
         // P1090 — at most one GRSAI tool-call JSON compatibility fallback after
         // native required retry still returns stop/no tool_calls.
         let grsaiToolCompatFallbackAttempted = false;
@@ -1841,6 +1847,66 @@ async function runProviderAttempts(args: {
           }
 
           upstreamBody = buildUpstreamChatBody(body, attemptModel);
+
+          // P1115 — explicit opt-in: transparent /v1/responses auto|missing +
+          // tools → outbound tool_choice=required on the first provider fetch.
+          // Does not open a second fetch; does not inspect prompts/paths.
+          // Skip while any in-flight repair/retry already owns tool_choice.
+          if (
+            !codexAutoToolRetryInFlight &&
+            !grsaiToolCompatFallbackInFlight &&
+            !nativeToolRepairInFlight &&
+            !autoIntentArbitrationInFlight &&
+            !continuationArbitrationInFlight &&
+            !repairAttempted
+          ) {
+            const policyName = resolveCodexExplicitToolChoicePolicy(
+              process.env.TOKFAI_CODEX_TOOL_CHOICE_POLICY ??
+                env.TOKFAI_CODEX_TOOL_CHOICE_POLICY
+            );
+            const policyResult = applyCodexExplicitToolChoicePolicy({
+              route,
+              transparentGateway: bypassAgentOrchestration,
+              toolsCount: countTools(
+                (clientBody as { tools?: unknown }).tools
+              ),
+              toolChoice: (upstreamBody as { tool_choice?: unknown })
+                .tool_choice,
+              policy: policyName,
+            });
+            if (policyResult.applied) {
+              upstreamBody = {
+                ...upstreamBody,
+                tool_choice: policyResult.toolChoice,
+              };
+            }
+            if (
+              !codexExplicitToolChoicePolicyLogged &&
+              (policyResult.applied ||
+                (policyName === "required_when_tools_present" &&
+                  policyResult.reason !== "policy_preserve_auto"))
+            ) {
+              codexExplicitToolChoicePolicyLogged = true;
+              log.info("codex_explicit_tool_choice_policy", {
+                requestId,
+                route,
+                policy: policyResult.policy,
+                applied: policyResult.applied,
+                reason: policyResult.reason,
+                toolsCount: countTools(
+                  (clientBody as { tools?: unknown }).tools
+                ),
+                toolChoiceBefore: policyResult.beforeKind,
+                toolChoiceAfter: policyResult.afterKind,
+                clientType: bypassAgentOrchestration
+                  ? "transparent_codex_like"
+                  : "other",
+                billing_status: "not_billable",
+                credits_charged: 0,
+              });
+            }
+          }
+
           if (activeToolMode === "emulated_json") {
             // P1040 — continuation arbitration only: sanitize Cursor tool
             // transcript to plain-text context before emulated_json compile.

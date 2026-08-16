@@ -58,6 +58,16 @@ const Schema = z
     .default("false")
     .transform((raw) => raw === "true" || raw === "1" || raw === "yes"),
 
+  /**
+   * P1115 — Explicit opt-in Codex /v1/responses tool_choice policy.
+   * - preserve_auto (default): never rewrite auto/missing
+   * - required_when_tools_present: transparent /v1/responses + tools → required
+   * Does not inspect prompts/paths; does not open a second provider fetch.
+   */
+  TOKFAI_CODEX_TOOL_CHOICE_POLICY: z
+    .enum(["preserve_auto", "required_when_tools_present"])
+    .default("preserve_auto"),
+
   GRSAI_BASE_URL: z.string().url().optional(),
   GRSAI_API_BASE: z.string().url().optional(),
   GRSAI_API_KEY: z.string().min(1),
