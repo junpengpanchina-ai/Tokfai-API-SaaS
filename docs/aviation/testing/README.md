@@ -24,8 +24,9 @@ No production load without human authorization.
 | [15-p1232-controlled-mock-provider-load-plan.md](./15-p1232-controlled-mock-provider-load-plan.md) | P1232-R0 controlled mock provider load plan (not executed) |
 | [16-p1240-aviation-workspace-reality-test-plan.md](./16-p1240-aviation-workspace-reality-test-plan.md) | P1240-R0 aviation workspace reality test plan (depth, not concurrency) |
 | [17-p1240-r1-workspace-reality-execution-checklist.md](./17-p1240-r1-workspace-reality-execution-checklist.md) | P1240-R1 execution checklist + customer-safe prompts |
+| [18-p1240-r2-synthetic-workspace-execution.md](./18-p1240-r2-synthetic-workspace-execution.md) | P1240-R2 synthetic FCU fixture + execution prompts |
 
-Fixtures: `test-fixtures/aviation/customer-001/`  
+Fixtures: `test-fixtures/aviation/customer-001/`, `test-fixtures/aviation/p1240-r2-synthetic-fcu/`  
 Harness: `scripts/aviation-sim/`  
 Canary: `.tokfai-canary/p1230-r15/input.txt`
 
