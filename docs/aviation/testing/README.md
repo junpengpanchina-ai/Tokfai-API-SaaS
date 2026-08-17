@@ -23,6 +23,7 @@ No production load without human authorization.
 | [14-p1231-real-codex-gemini-capacity-closure.md](./14-p1231-real-codex-gemini-capacity-closure.md) | P1231 real Codex/Gemini capacity gate closure → P1232/P1240 |
 | [15-p1232-controlled-mock-provider-load-plan.md](./15-p1232-controlled-mock-provider-load-plan.md) | P1232-R0 controlled mock provider load plan (not executed) |
 | [16-p1240-aviation-workspace-reality-test-plan.md](./16-p1240-aviation-workspace-reality-test-plan.md) | P1240-R0 aviation workspace reality test plan (depth, not concurrency) |
+| [17-p1240-r1-workspace-reality-execution-checklist.md](./17-p1240-r1-workspace-reality-execution-checklist.md) | P1240-R1 execution checklist + customer-safe prompts |
 
 Fixtures: `test-fixtures/aviation/customer-001/`  
 Harness: `scripts/aviation-sim/`  
