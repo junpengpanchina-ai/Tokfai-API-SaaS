@@ -20,6 +20,9 @@ No production load without human authorization.
 | [11-mac-real-dmit-verification.md](./11-mac-real-dmit-verification.md) | Mac copy-paste runbook |
 | [12-dmit-real-http-observation.md](./12-dmit-real-http-observation.md) | DMIT SSH read-only observation |
 | [13-p1230-r15-local-full-http-status.md](./13-p1230-r15-local-full-http-status.md) | L1 Full HTTP blocked-by-env status |
+| [14-p1231-real-codex-gemini-capacity-closure.md](./14-p1231-real-codex-gemini-capacity-closure.md) | P1231 real Codex/Gemini capacity gate closure → P1232/P1240 |
+| [15-p1232-controlled-mock-provider-load-plan.md](./15-p1232-controlled-mock-provider-load-plan.md) | P1232-R0 controlled mock provider load plan (not executed) |
+| [16-p1240-aviation-workspace-reality-test-plan.md](./16-p1240-aviation-workspace-reality-test-plan.md) | P1240-R0 aviation workspace reality test plan (depth, not concurrency) |
 
 Fixtures: `test-fixtures/aviation/customer-001/`  
 Harness: `scripts/aviation-sim/`  
