@@ -1,0 +1,150 @@
+{
+  "TOKFAI_P1230_R1_RUNTIME_CLOSURE_COMPLETE": true,
+  "CURRENT_HEAD": "see_git",
+  "TOOL_ROUNDTRIP_PASS": "YES",
+  "TOOL_ROUNDTRIP_ROOT_CLASS": "NONE",
+  "RESUME_PASS": "YES",
+  "MAX_VERIFIED_TOOL_ROUNDS": 20,
+  "SESSION_ISOLATION_PASS": "YES",
+  "MAX_VERIFIED_CONCURRENT_SESSIONS": 100,
+  "CROSS_TENANT_LEAKS": 0,
+  "BILLING_INVARIANT_PASS": "YES",
+  "BILLING_CASES_TESTED": 6,
+  "UNEXPLAINED_DOUBLE_CHARGES": 0,
+  "CROSS_TENANT_BILLING_LEAKS": 0,
+  "APPLICATION_CODE_CHANGE_REQUIRED": "NO",
+  "LOCAL_DMIT_MODE": "PROTOCOL_GATEWAY_WITH_REAL_DIST_LIBS",
+  "FULL_HTTP_DMIT": "NO_ENV",
+  "PRODUCTION_LOAD_TEST_READY": "YES",
+  "PRODUCTION_LOAD_TEST_EXECUTED": "NO",
+  "matrix": [
+    {
+      "name": "TR1_round1_tool_call",
+      "pass": true,
+      "responseId": "resp_b7c8d3ff860c7df9"
+    },
+    {
+      "name": "TR1_resume_final",
+      "pass": true
+    },
+    {
+      "name": "RESUME_R1",
+      "pass": true,
+      "rounds": 1
+    },
+    {
+      "name": "RESUME_R2",
+      "pass": true,
+      "rounds": 2
+    },
+    {
+      "name": "RESUME_R5",
+      "pass": true,
+      "rounds": 5
+    },
+    {
+      "name": "RESUME_R10",
+      "pass": true,
+      "rounds": 10
+    },
+    {
+      "name": "RESUME_R20",
+      "pass": true,
+      "rounds": 20
+    },
+    {
+      "name": "RESUME_ERR_UNKNOWN_PREVIOUS_RESPONSE_ID",
+      "pass": true
+    },
+    {
+      "name": "RESUME_ERR_WRONG_TOOL_CALL_ID",
+      "pass": true
+    },
+    {
+      "name": "RESUME_ERR_DUPLICATE_TOOL_RESULT",
+      "pass": true
+    },
+    {
+      "name": "ISO_SERIAL",
+      "pass": true
+    },
+    {
+      "name": "ISO_X1_cross_previous_response_id",
+      "pass": true
+    },
+    {
+      "name": "ISO_X2_foreign_tool_call_id",
+      "pass": true
+    },
+    {
+      "name": "ISO_CONCURRENT_3",
+      "pass": true,
+      "fails": 0,
+      "leaks": 0
+    },
+    {
+      "name": "ISO_CONCURRENT_10",
+      "pass": true,
+      "fails": 0,
+      "leaks": 0
+    },
+    {
+      "name": "ISO_CONCURRENT_25",
+      "pass": true,
+      "fails": 0,
+      "leaks": 0
+    },
+    {
+      "name": "ISO_CONCURRENT_50",
+      "pass": true,
+      "fails": 0,
+      "leaks": 0
+    },
+    {
+      "name": "ISO_CONCURRENT_100",
+      "pass": true,
+      "fails": 0,
+      "leaks": 0
+    },
+    {
+      "name": "BILL_B1_normal_text",
+      "pass": true,
+      "note": "success→billable"
+    },
+    {
+      "name": "BILL_B3_first_tool_round",
+      "pass": true
+    },
+    {
+      "name": "BILL_B4_tool_resume",
+      "pass": true,
+      "note": "billable_events>=2 actual=4"
+    },
+    {
+      "name": "BILL_B7_429",
+      "pass": true
+    },
+    {
+      "name": "BILL_B8_500",
+      "pass": true
+    },
+    {
+      "name": "BILL_B11_duplicate_resume",
+      "pass": true,
+      "note": "second resume not silently double-charged as success"
+    },
+    {
+      "name": "BILL_TENANT_ISOLATION_SUMS",
+      "pass": true,
+      "sa": 5,
+      "sb": 5,
+      "sc": 5
+    },
+    {
+      "name": "BILL_PROVIDER_USAGE_ATTRIBUTION",
+      "pass": true,
+      "billable": 15,
+      "providerOk": 15
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 
 面向用户 / 运维：如何用 **old Codex CLI** 连接 Tokfai，并跑通工具流（读文件 / 写文件 / Shell）。
 
-依据：P1120 / P1123R2 已验证事实。Tokfai **不执行**本地工具；Codex CLI 在本机执行 Read / Write / Shell。
+依据：P1120 真实 Codex 模型 canary（会话已验证矩阵）；P1123R2 被本手册引用为 CLI 操作依据，但**仓库内无独立脚本/commit/PASS**（历史库标 PARTIAL，见 `docs/codex-history/`）。Tokfai **不执行**本地工具；Codex CLI 在本机执行 Read / Write / Shell。
 
 ---
 
@@ -170,6 +170,7 @@ diff -u .tokfai-canary/p1124/input.txt .tokfai-canary/p1124/output.txt && echo P
 
 ## 9. 相关材料
 
-- 内部配置辅助（可选）：`scripts/p1102-real-codex-client-config-helper.mjs`
-- 模型候选 canary（内部）：`scripts/p1120-real-codex-model-candidate-canary.mjs`
+- 工程历史知识库（时间线 / 台账 / 调查 / leftovers）：[`docs/codex-history/README.md`](./codex-history/README.md)
+- 内部配置辅助（可选；**当前仓库可能缺失**）：`scripts/p1102-real-codex-client-config-helper.mjs`
+- 模型候选 canary（内部；**当前仓库可能缺失**）：`scripts/p1120-real-codex-model-candidate-canary.mjs`
 - 本手册检查脚本：`scripts/p1124-codex-cli-tokfai-runbook-check.mjs`
