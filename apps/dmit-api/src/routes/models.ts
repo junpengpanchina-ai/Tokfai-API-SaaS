@@ -1,20 +1,21 @@
 import { Hono } from "hono";
 
 import { listCatalogModels } from "../catalog/modelCatalog.js";
+import { buildModelsListPayload } from "./modelsListCompat.js";
 
 /**
  * /v1/models — OpenAI-compatible public model listing (no auth).
  *
  * Catalog is read from public.models (enabled + visible) when available;
  * falls back to pricing.ts.
+ *
+ * `data[]` is the OpenAI list. `models[]` is the same catalog for Codex CLI
+ * (decode error: missing field `models`). Chat/completions and responses
+ * are unchanged.
  */
 export const modelRoutes = new Hono();
 
 modelRoutes.get("/v1/models", async (c) => {
   const data = await listCatalogModels();
-
-  return c.json({
-    object: "list",
-    data,
-  });
+  return c.json(buildModelsListPayload(data));
 });
