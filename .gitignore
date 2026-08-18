@@ -53,3 +53,6 @@ p788-recovery-gate-results/
 model-health-results/
 load-test-results/
 p780-live-walkthrough-results/
+
+# Tokfai local canary artifacts
+.tokfai-canary/
