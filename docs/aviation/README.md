@@ -97,6 +97,9 @@ REGULATORY GATE MODEL
 | [27-customer-attack-map.md](./27-customer-attack-map.md) | P1252-R0 客户攻坚地图（七类画像×白嫖/成交信号） |
 | [28-first-call-question-bank.md](./28-first-call-question-bank.md) | P1252-R0 首访题库（90 问） |
 | [29-demo-to-close-playbook.md](./29-demo-to-close-playbook.md) | P1252-R0 演示到付费试点话术 |
+| [30-first-10-calls-battlecard.md](./30-first-10-calls-battlecard.md) | P1253-R0 前 10 类客户电话作战卡 |
+| [31-aviation-sales-scripts.md](./31-aviation-sales-scripts.md) | P1253-R0 可复制话术（微信/电话/异议） |
+| [32-paid-pilot-offer.md](./32-paid-pilot-offer.md) | P1253-R0 三档付费试点与人民币报价带 |
 | [engineering/](./engineering/) | R2 工程知识库 |
 | [testing/](./testing/) | P1230–P1234 测试设计 |
 | `test-fixtures/aviation/customer-001/` | 合成客户 + 30 缺陷金标 |
