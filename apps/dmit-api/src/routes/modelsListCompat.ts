@@ -20,7 +20,7 @@ export type ModelsListPayload = {
 };
 
 const DEFAULT_SHELL_TYPE = "default";
-const DEFAULT_VISIBILITY = "public";
+const DEFAULT_VISIBILITY = "list";
 
 export function toCodexModelsList(data: OpenAiModelListItem[]): CodexModelListItem[] {
   return data.map((item) => ({
