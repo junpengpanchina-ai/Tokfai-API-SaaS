@@ -2,11 +2,13 @@ import type { OpenAiModelListItem } from "../catalog/modelPricing.js";
 
 /**
  * OpenAI clients read `data[]` (unchanged catalog objects).
- * Codex CLI also needs `models[]` with a `slug` field (decode error: missing `slug`).
+ * Codex CLI also needs `models[]` with `slug` and `supported_reasoning_levels`
+ * (decode errors: missing `slug` / missing `supported_reasoning_levels`).
  * `models[]` is a Codex-shaped copy; `data[]` is not mutated.
  */
 export type CodexModelListItem = OpenAiModelListItem & {
   slug: string;
+  supported_reasoning_levels: string[];
 };
 
 export type ModelsListPayload = {
@@ -21,6 +23,7 @@ export function toCodexModelsList(data: OpenAiModelListItem[]): CodexModelListIt
     id: item.id,
     name: item.name,
     slug: item.id,
+    supported_reasoning_levels: [],
   }));
 }
 
@@ -37,8 +40,9 @@ export type ModelsListCompatCheck = {
   objectIsList: boolean;
   dataIsArray: boolean;
   modelsIsArray: boolean;
-  models0HasSlug: boolean;
-  data0HasNoSlug: boolean;
+  modelsAllHaveSlug: boolean;
+  modelsAllHaveSupportedReasoningLevels: boolean;
+  dataHasNoSupportedReasoningLevels: boolean;
   requiredIdInData: boolean;
   requiredIdInModels: boolean;
 };
@@ -56,6 +60,18 @@ function modelsRowHasIdNameOrSlug(row: unknown, requiredId: string): boolean {
   return row["id"] === requiredId || row["name"] === requiredId || row["slug"] === requiredId;
 }
 
+function hasNonEmptySlug(row: unknown): boolean {
+  return isRecord(row) && typeof row["slug"] === "string" && row["slug"].length > 0;
+}
+
+function hasSupportedReasoningLevelsArray(row: unknown): boolean {
+  return isRecord(row) && Array.isArray(row["supported_reasoning_levels"]);
+}
+
+function dataRowHasSupportedReasoningLevels(row: unknown): boolean {
+  return isRecord(row) && Object.prototype.hasOwnProperty.call(row, "supported_reasoning_levels");
+}
+
 export function checkModelsListCompat(
   raw: string,
   requiredId = "gemini-3-pro"
@@ -65,8 +81,9 @@ export function checkModelsListCompat(
     objectIsList: false,
     dataIsArray: false,
     modelsIsArray: false,
-    models0HasSlug: false,
-    data0HasNoSlug: false,
+    modelsAllHaveSlug: false,
+    modelsAllHaveSupportedReasoningLevels: false,
+    dataHasNoSupportedReasoningLevels: false,
     requiredIdInData: false,
     requiredIdInModels: false,
   };
@@ -83,16 +100,16 @@ export function checkModelsListCompat(
   const models = rec["models"];
   const dataArr = Array.isArray(data) ? data : [];
   const modelsArr = Array.isArray(models) ? models : [];
-  const models0 = modelsArr[0];
-  const data0 = dataArr[0];
 
   return {
     jsonParseOk: true,
     objectIsList: rec["object"] === "list",
     dataIsArray: Array.isArray(data),
     modelsIsArray: Array.isArray(models),
-    models0HasSlug: isRecord(models0) && typeof models0["slug"] === "string" && models0["slug"].length > 0,
-    data0HasNoSlug: !isRecord(data0) || !Object.prototype.hasOwnProperty.call(data0, "slug"),
+    modelsAllHaveSlug: modelsArr.length > 0 && modelsArr.every(hasNonEmptySlug),
+    modelsAllHaveSupportedReasoningLevels:
+      modelsArr.length > 0 && modelsArr.every(hasSupportedReasoningLevelsArray),
+    dataHasNoSupportedReasoningLevels: dataArr.every((row) => !dataRowHasSupportedReasoningLevels(row)),
     requiredIdInData: dataArr.some((row) => dataRowHasId(row, requiredId)),
     requiredIdInModels: modelsArr.some((row) => modelsRowHasIdNameOrSlug(row, requiredId)),
   };
@@ -104,8 +121,9 @@ export function modelsListCompatPassed(check: ModelsListCompatCheck): boolean {
     check.objectIsList &&
     check.dataIsArray &&
     check.modelsIsArray &&
-    check.models0HasSlug &&
-    check.data0HasNoSlug &&
+    check.modelsAllHaveSlug &&
+    check.modelsAllHaveSupportedReasoningLevels &&
+    check.dataHasNoSupportedReasoningLevels &&
     check.requiredIdInData &&
     check.requiredIdInModels
   );
@@ -134,8 +152,8 @@ if (isDirectRun()) {
   const check = checkModelsListCompat(raw, "gemini-3-pro");
   const ok = modelsListCompatPassed(check);
   if (!ok) {
-    console.error("TOKFAI_P1261_MODELS_SLUG_COMPAT_PASS=NO", check);
+    console.error("TOKFAI_P1262_SUPPORTED_REASONING_LEVELS_COMPAT_PASS=NO", check);
     process.exit(1);
   }
-  console.log("TOKFAI_P1261_MODELS_SLUG_COMPAT_PASS=YES");
+  console.log("TOKFAI_P1262_SUPPORTED_REASONING_LEVELS_COMPAT_PASS=YES");
 }
