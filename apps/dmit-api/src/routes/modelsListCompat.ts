@@ -3,13 +3,14 @@ import type { OpenAiModelListItem } from "../catalog/modelPricing.js";
 /**
  * OpenAI clients read `data[]` (unchanged catalog objects).
  * Codex CLI also needs `models[]` with `slug`, `supported_reasoning_levels`,
- * and `shell_type` (decode error: missing `shell_type`).
+ * `shell_type`, and `visibility` (decode error: missing `visibility`).
  * `models[]` is a Codex-shaped copy; `data[]` is not mutated.
  */
 export type CodexModelListItem = OpenAiModelListItem & {
   slug: string;
   supported_reasoning_levels: string[];
   shell_type: string;
+  visibility: string;
 };
 
 export type ModelsListPayload = {
@@ -19,6 +20,7 @@ export type ModelsListPayload = {
 };
 
 const DEFAULT_SHELL_TYPE = "default";
+const DEFAULT_VISIBILITY = "public";
 
 export function toCodexModelsList(data: OpenAiModelListItem[]): CodexModelListItem[] {
   return data.map((item) => ({
@@ -28,6 +30,7 @@ export function toCodexModelsList(data: OpenAiModelListItem[]): CodexModelListIt
     slug: item.id,
     supported_reasoning_levels: [],
     shell_type: DEFAULT_SHELL_TYPE,
+    visibility: DEFAULT_VISIBILITY,
   }));
 }
 
@@ -47,9 +50,11 @@ export type ModelsListCompatCheck = {
   modelsAllHaveSlug: boolean;
   modelsAllHaveSupportedReasoningLevels: boolean;
   modelsAllHaveShellType: boolean;
+  modelsAllHaveVisibility: boolean;
   dataHasNoSlug: boolean;
   dataHasNoSupportedReasoningLevels: boolean;
   dataHasNoShellType: boolean;
+  dataHasNoVisibility: boolean;
   requiredIdInData: boolean;
   requiredIdInModels: boolean;
 };
@@ -79,6 +84,10 @@ function hasShellType(row: unknown): boolean {
   return isRecord(row) && typeof row["shell_type"] === "string" && row["shell_type"].length > 0;
 }
 
+function hasVisibility(row: unknown): boolean {
+  return isRecord(row) && typeof row["visibility"] === "string" && row["visibility"].length > 0;
+}
+
 function dataRowHasKey(row: unknown, key: string): boolean {
   return isRecord(row) && Object.prototype.hasOwnProperty.call(row, key);
 }
@@ -95,9 +104,11 @@ export function checkModelsListCompat(
     modelsAllHaveSlug: false,
     modelsAllHaveSupportedReasoningLevels: false,
     modelsAllHaveShellType: false,
+    modelsAllHaveVisibility: false,
     dataHasNoSlug: false,
     dataHasNoSupportedReasoningLevels: false,
     dataHasNoShellType: false,
+    dataHasNoVisibility: false,
     requiredIdInData: false,
     requiredIdInModels: false,
   };
@@ -124,11 +135,13 @@ export function checkModelsListCompat(
     modelsAllHaveSupportedReasoningLevels:
       modelsArr.length > 0 && modelsArr.every(hasSupportedReasoningLevelsArray),
     modelsAllHaveShellType: modelsArr.length > 0 && modelsArr.every(hasShellType),
+    modelsAllHaveVisibility: modelsArr.length > 0 && modelsArr.every(hasVisibility),
     dataHasNoSlug: dataArr.every((row) => !dataRowHasKey(row, "slug")),
     dataHasNoSupportedReasoningLevels: dataArr.every(
       (row) => !dataRowHasKey(row, "supported_reasoning_levels")
     ),
     dataHasNoShellType: dataArr.every((row) => !dataRowHasKey(row, "shell_type")),
+    dataHasNoVisibility: dataArr.every((row) => !dataRowHasKey(row, "visibility")),
     requiredIdInData: dataArr.some((row) => dataRowHasId(row, requiredId)),
     requiredIdInModels: modelsArr.some((row) => modelsRowHasIdNameOrSlug(row, requiredId)),
   };
@@ -143,9 +156,11 @@ export function modelsListCompatPassed(check: ModelsListCompatCheck): boolean {
     check.modelsAllHaveSlug &&
     check.modelsAllHaveSupportedReasoningLevels &&
     check.modelsAllHaveShellType &&
+    check.modelsAllHaveVisibility &&
     check.dataHasNoSlug &&
     check.dataHasNoSupportedReasoningLevels &&
     check.dataHasNoShellType &&
+    check.dataHasNoVisibility &&
     check.requiredIdInData &&
     check.requiredIdInModels
   );
@@ -174,8 +189,8 @@ if (isDirectRun()) {
   const check = checkModelsListCompat(raw, "gemini-3-pro");
   const ok = modelsListCompatPassed(check);
   if (!ok) {
-    console.error("TOKFAI_P1263_MODELS_SHELL_TYPE_COMPAT_PASS=NO", check);
+    console.error("TOKFAI_P1264_MODELS_VISIBILITY_COMPAT_PASS=NO", check);
     process.exit(1);
   }
-  console.log("TOKFAI_P1263_MODELS_SHELL_TYPE_COMPAT_PASS=YES");
+  console.log("TOKFAI_P1264_MODELS_VISIBILITY_COMPAT_PASS=YES");
 }

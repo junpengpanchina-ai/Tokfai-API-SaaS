@@ -10,8 +10,8 @@ import { buildModelsListPayload } from "./modelsListCompat.js";
  * falls back to pricing.ts.
  *
  * `data[]` is the OpenAI list (no Codex-only fields). `models[]` is a copy
- * with `slug` (= id), `supported_reasoning_levels` (= []), and
- * `shell_type` (= "default") for Codex CLI.
+ * with `slug` (= id), `supported_reasoning_levels` (= []),
+ * `shell_type` (= "default"), and `visibility` (= "public") for Codex CLI.
  * Chat/completions and responses are unchanged.
  */
 export const modelRoutes = new Hono();
