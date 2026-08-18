@@ -94,6 +94,9 @@ REGULATORY GATE MODEL
 | [24-industry-depth-map.md](./24-industry-depth-map.md) | P1251-R0 行业分层、客户画像与演示底座 |
 | [25-certification-and-operation-chain.md](./25-certification-and-operation-chain.md) | P1251-R0 政策与准入链（证、UOM、2026、运行类） |
 | [26-ai-workflow-for-aviation-customers.md](./26-ai-workflow-for-aviation-customers.md) | P1251-R0 本机 AI 工作流（文件链→申请辅助） |
+| [27-customer-attack-map.md](./27-customer-attack-map.md) | P1252-R0 客户攻坚地图（七类画像×白嫖/成交信号） |
+| [28-first-call-question-bank.md](./28-first-call-question-bank.md) | P1252-R0 首访题库（90 问） |
+| [29-demo-to-close-playbook.md](./29-demo-to-close-playbook.md) | P1252-R0 演示到付费试点话术 |
 | [engineering/](./engineering/) | R2 工程知识库 |
 | [testing/](./testing/) | P1230–P1234 测试设计 |
 | `test-fixtures/aviation/customer-001/` | 合成客户 + 30 缺陷金标 |
