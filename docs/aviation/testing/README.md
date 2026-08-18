@@ -25,6 +25,7 @@ No production load without human authorization.
 | [16-p1240-aviation-workspace-reality-test-plan.md](./16-p1240-aviation-workspace-reality-test-plan.md) | P1240-R0 aviation workspace reality test plan (depth, not concurrency) |
 | [17-p1240-r1-workspace-reality-execution-checklist.md](./17-p1240-r1-workspace-reality-execution-checklist.md) | P1240-R1 execution checklist + customer-safe prompts |
 | [18-p1240-r2-synthetic-workspace-execution.md](./18-p1240-r2-synthetic-workspace-execution.md) | P1240-R2 synthetic FCU fixture + execution prompts |
+| [19-p1240-r3-strict-chain-execution.md](./19-p1240-r3-strict-chain-execution.md) | P1240-R3 strict-r3 fixed-file-scope chain PASS archive |
 
 Fixtures: `test-fixtures/aviation/customer-001/`, `test-fixtures/aviation/p1240-r2-synthetic-fcu/`  
 Harness: `scripts/aviation-sim/`  
