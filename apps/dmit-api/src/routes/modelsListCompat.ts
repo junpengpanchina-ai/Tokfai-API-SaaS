@@ -15,7 +15,7 @@ export type CodexModelListItem = OpenAiModelListItem & {
 
 export type ModelsListPayload = {
   object: "list";
-  data: OpenAiModelListItem[];
+  data: CodexModelListItem[];
   models: CodexModelListItem[];
 };
 
@@ -35,10 +35,11 @@ export function toCodexModelsList(data: OpenAiModelListItem[]): CodexModelListIt
 }
 
 export function buildModelsListPayload(data: OpenAiModelListItem[]): ModelsListPayload {
+  const codexModels = toCodexModelsList(data);
   return {
     object: "list",
-    data,
-    models: toCodexModelsList(data),
+    data: codexModels,
+    models: codexModels,
   };
 }
 
