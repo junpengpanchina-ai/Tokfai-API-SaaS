@@ -1,20 +1,34 @@
 import type { OpenAiModelListItem } from "../catalog/modelPricing.js";
 
 /**
- * OpenAI clients read `data[]`. Codex CLI (wire_api=responses) expects `models[]`.
- * Both arrays are the same catalog objects — additive, not a replacement.
+ * OpenAI clients read `data[]` (unchanged catalog objects).
+ * Codex CLI also needs `models[]` with a `slug` field (decode error: missing `slug`).
+ * `models[]` is a Codex-shaped copy; `data[]` is not mutated.
  */
+export type CodexModelListItem = OpenAiModelListItem & {
+  slug: string;
+};
+
 export type ModelsListPayload = {
   object: "list";
   data: OpenAiModelListItem[];
-  models: OpenAiModelListItem[];
+  models: CodexModelListItem[];
 };
+
+export function toCodexModelsList(data: OpenAiModelListItem[]): CodexModelListItem[] {
+  return data.map((item) => ({
+    ...item,
+    id: item.id,
+    name: item.name,
+    slug: item.id,
+  }));
+}
 
 export function buildModelsListPayload(data: OpenAiModelListItem[]): ModelsListPayload {
   return {
     object: "list",
     data,
-    models: data,
+    models: toCodexModelsList(data),
   };
 }
 
@@ -23,32 +37,45 @@ export type ModelsListCompatCheck = {
   objectIsList: boolean;
   dataIsArray: boolean;
   modelsIsArray: boolean;
+  models0HasSlug: boolean;
+  data0HasNoSlug: boolean;
   requiredIdInData: boolean;
   requiredIdInModels: boolean;
 };
 
-function hasModelIdOrName(row: unknown, requiredId: string): boolean {
-  if (!row || typeof row !== "object") return false;
-  const rec = row as { id?: unknown; name?: unknown };
-  return rec.id === requiredId || rec.name === requiredId;
+function isRecord(row: unknown): row is Record<string, unknown> {
+  return Boolean(row) && typeof row === "object";
+}
+
+function dataRowHasId(row: unknown, requiredId: string): boolean {
+  return isRecord(row) && row["id"] === requiredId;
+}
+
+function modelsRowHasIdNameOrSlug(row: unknown, requiredId: string): boolean {
+  if (!isRecord(row)) return false;
+  return row["id"] === requiredId || row["name"] === requiredId || row["slug"] === requiredId;
 }
 
 export function checkModelsListCompat(
   raw: string,
   requiredId = "gemini-3-pro"
 ): ModelsListCompatCheck {
+  const failed: ModelsListCompatCheck = {
+    jsonParseOk: false,
+    objectIsList: false,
+    dataIsArray: false,
+    modelsIsArray: false,
+    models0HasSlug: false,
+    data0HasNoSlug: false,
+    requiredIdInData: false,
+    requiredIdInModels: false,
+  };
+
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw) as unknown;
   } catch {
-    return {
-      jsonParseOk: false,
-      objectIsList: false,
-      dataIsArray: false,
-      modelsIsArray: false,
-      requiredIdInData: false,
-      requiredIdInModels: false,
-    };
+    return failed;
   }
 
   const rec = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
@@ -56,14 +83,18 @@ export function checkModelsListCompat(
   const models = rec["models"];
   const dataArr = Array.isArray(data) ? data : [];
   const modelsArr = Array.isArray(models) ? models : [];
+  const models0 = modelsArr[0];
+  const data0 = dataArr[0];
 
   return {
     jsonParseOk: true,
     objectIsList: rec["object"] === "list",
     dataIsArray: Array.isArray(data),
     modelsIsArray: Array.isArray(models),
-    requiredIdInData: dataArr.some((row) => hasModelIdOrName(row, requiredId)),
-    requiredIdInModels: modelsArr.some((row) => hasModelIdOrName(row, requiredId)),
+    models0HasSlug: isRecord(models0) && typeof models0["slug"] === "string" && models0["slug"].length > 0,
+    data0HasNoSlug: !isRecord(data0) || !Object.prototype.hasOwnProperty.call(data0, "slug"),
+    requiredIdInData: dataArr.some((row) => dataRowHasId(row, requiredId)),
+    requiredIdInModels: modelsArr.some((row) => modelsRowHasIdNameOrSlug(row, requiredId)),
   };
 }
 
@@ -73,6 +104,8 @@ export function modelsListCompatPassed(check: ModelsListCompatCheck): boolean {
     check.objectIsList &&
     check.dataIsArray &&
     check.modelsIsArray &&
+    check.models0HasSlug &&
+    check.data0HasNoSlug &&
     check.requiredIdInData &&
     check.requiredIdInModels
   );
@@ -101,8 +134,8 @@ if (isDirectRun()) {
   const check = checkModelsListCompat(raw, "gemini-3-pro");
   const ok = modelsListCompatPassed(check);
   if (!ok) {
-    console.error("TOKFAI_P1260_MODELS_LIST_COMPAT_PASS=NO", check);
+    console.error("TOKFAI_P1261_MODELS_SLUG_COMPAT_PASS=NO", check);
     process.exit(1);
   }
-  console.log("TOKFAI_P1260_MODELS_LIST_COMPAT_PASS=YES");
+  console.log("TOKFAI_P1261_MODELS_SLUG_COMPAT_PASS=YES");
 }

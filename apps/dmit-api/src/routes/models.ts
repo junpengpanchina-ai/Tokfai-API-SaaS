@@ -9,9 +9,9 @@ import { buildModelsListPayload } from "./modelsListCompat.js";
  * Catalog is read from public.models (enabled + visible) when available;
  * falls back to pricing.ts.
  *
- * `data[]` is the OpenAI list. `models[]` is the same catalog for Codex CLI
- * (decode error: missing field `models`). Chat/completions and responses
- * are unchanged.
+ * `data[]` is the OpenAI list (no Codex-only fields). `models[]` is a copy
+ * with `slug` (= id) for Codex CLI (decode error: missing field `slug`).
+ * Chat/completions and responses are unchanged.
  */
 export const modelRoutes = new Hono();
 
