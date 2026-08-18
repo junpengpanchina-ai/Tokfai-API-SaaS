@@ -90,6 +90,10 @@ REGULATORY GATE MODEL
 | [20-computer-based-operation-control-system.md](./20-computer-based-operation-control-system.md) | AC-92-FS-002 运行控制系统 |
 | [21-evtol-certification-landscape.md](./21-evtol-certification-landscape.md) | eVTOL 取证矩阵 |
 | [22-decision-critical-unknowns.md](./22-decision-critical-unknowns.md) | P0 UNKNOWN 硬化 |
+| [23-customer-demo-sop.md](./23-customer-demo-sop.md) | P1250-R0 无人机/eVTOL 客户演示 SOP |
+| [24-industry-depth-map.md](./24-industry-depth-map.md) | P1251-R0 行业分层、客户画像与演示底座 |
+| [25-certification-and-operation-chain.md](./25-certification-and-operation-chain.md) | P1251-R0 政策与准入链（证、UOM、2026、运行类） |
+| [26-ai-workflow-for-aviation-customers.md](./26-ai-workflow-for-aviation-customers.md) | P1251-R0 本机 AI 工作流（文件链→申请辅助） |
 | [engineering/](./engineering/) | R2 工程知识库 |
 | [testing/](./testing/) | P1230–P1234 测试设计 |
 | `test-fixtures/aviation/customer-001/` | 合成客户 + 30 缺陷金标 |
