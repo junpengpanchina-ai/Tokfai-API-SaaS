@@ -109,6 +109,12 @@ REGULATORY GATE MODEL
 | [39-composite-delivery-standard.md](./39-composite-delivery-standard.md) | P1272-R0 航飞复合交付标准 L1–L5 |
 | [40-evidence-row-schema.md](./40-evidence-row-schema.md) | P1272-R0 EVIDENCE_ROW canonical schema |
 | [41-customer-deliverable-template.md](./41-customer-deliverable-template.md) | P1272-R0 客户可读交付报告模板 |
+| [42-uav-war-to-commercial-system-map.md](./42-uav-war-to-commercial-system-map.md) | P1273-R0 战争→商业精密 UAV 能力映射（非武器） |
+| [43-commercial-uav-precision-stack.md](./43-commercial-uav-precision-stack.md) | P1273-R0 商业高精密无人机八层技术栈清单 |
+| [44-tokfai-uav-operating-system-entrypoints.md](./44-tokfai-uav-operating-system-entrypoints.md) | P1273-R0 飞前/飞中日志/飞后/商务介入 SOP |
+| [45-uav-mission-function-map.md](./45-uav-mission-function-map.md) | P1274-R0 八函数任务反推地图（商业精密） |
+| [46-uav-extreme-environment-commercialization.md](./46-uav-extreme-environment-commercialization.md) | P1274-R0 极端环境商用诊断（销售+工程） |
+| [47-uav-function-to-tokfai-deliverable-chain.md](./47-uav-function-to-tokfai-deliverable-chain.md) | P1274-R0 函数→证据→报告→四档商业链 |
 | [engineering/](./engineering/) | R2 工程知识库 |
 | [testing/](./testing/) | P1230–P1234 测试设计 |
 | `test-fixtures/aviation/customer-001/` | 合成客户 + 30 缺陷金标 |
