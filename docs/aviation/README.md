@@ -100,6 +100,12 @@ REGULATORY GATE MODEL
 | [30-first-10-calls-battlecard.md](./30-first-10-calls-battlecard.md) | P1253-R0 前 10 类客户电话作战卡 |
 | [31-aviation-sales-scripts.md](./31-aviation-sales-scripts.md) | P1253-R0 可复制话术（微信/电话/异议） |
 | [32-paid-pilot-offer.md](./32-paid-pilot-offer.md) | P1253-R0 三档付费试点与人民币报价带 |
+| [33-pdf-precision-composite-map.md](./33-pdf-precision-composite-map.md) | P1270-R0 航飞 PDF/Word/Excel/代码精密复合分层 |
+| [34-pdf-to-evidence-chain.md](./34-pdf-to-evidence-chain.md) | P1270-R0 回答必须带文件证据链 |
+| [35-aviation-file-intake-checklist.md](./35-aviation-file-intake-checklist.md) | P1270-R0 首次文件清单与资料体检包装 |
+| [36-approval-rejection-diagnosis-map.md](./36-approval-rejection-diagnosis-map.md) | P1271-R0 审批/起飞申请驳回分型与诊断输出 |
+| [37-rejection-to-evidence-remediation-chain.md](./37-rejection-to-evidence-remediation-chain.md) | P1271-R0 驳回→证据→补件 REMEDIATION_ROW |
+| [38-rejection-diagnosis-intake-playbook.md](./38-rejection-diagnosis-intake-playbook.md) | P1271-R0 驳回客户首访、演示与交付 playbook |
 | [engineering/](./engineering/) | R2 工程知识库 |
 | [testing/](./testing/) | P1230–P1234 测试设计 |
 | `test-fixtures/aviation/customer-001/` | 合成客户 + 30 缺陷金标 |
