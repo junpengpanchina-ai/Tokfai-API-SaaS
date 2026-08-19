@@ -11,6 +11,7 @@ export type CodexModelListItem = OpenAiModelListItem & {
   supported_reasoning_levels: string[];
   shell_type: string;
   visibility: string;
+  supported_in_api: boolean;
 };
 
 export type ModelsListPayload = {
@@ -32,6 +33,7 @@ export function toCodexModelsList(data: OpenAiModelListItem[]): CodexModelListIt
     supported_reasoning_levels: [],
     shell_type: DEFAULT_SHELL_TYPE,
     visibility: DEFAULT_VISIBILITY,
+      supported_in_api: DEFAULT_SUPPORTED_IN_API,
   }));
 }
 
