@@ -106,6 +106,9 @@ REGULATORY GATE MODEL
 | [36-approval-rejection-diagnosis-map.md](./36-approval-rejection-diagnosis-map.md) | P1271-R0 审批/起飞申请驳回分型与诊断输出 |
 | [37-rejection-to-evidence-remediation-chain.md](./37-rejection-to-evidence-remediation-chain.md) | P1271-R0 驳回→证据→补件 REMEDIATION_ROW |
 | [38-rejection-diagnosis-intake-playbook.md](./38-rejection-diagnosis-intake-playbook.md) | P1271-R0 驳回客户首访、演示与交付 playbook |
+| [39-composite-delivery-standard.md](./39-composite-delivery-standard.md) | P1272-R0 航飞复合交付标准 L1–L5 |
+| [40-evidence-row-schema.md](./40-evidence-row-schema.md) | P1272-R0 EVIDENCE_ROW canonical schema |
+| [41-customer-deliverable-template.md](./41-customer-deliverable-template.md) | P1272-R0 客户可读交付报告模板 |
 | [engineering/](./engineering/) | R2 工程知识库 |
 | [testing/](./testing/) | P1230–P1234 测试设计 |
 | `test-fixtures/aviation/customer-001/` | 合成客户 + 30 缺陷金标 |
