@@ -115,6 +115,9 @@ REGULATORY GATE MODEL
 | [45-uav-mission-function-map.md](./45-uav-mission-function-map.md) | P1274-R0 八函数任务反推地图（商业精密） |
 | [46-uav-extreme-environment-commercialization.md](./46-uav-extreme-environment-commercialization.md) | P1274-R0 极端环境商用诊断（销售+工程） |
 | [47-uav-function-to-tokfai-deliverable-chain.md](./47-uav-function-to-tokfai-deliverable-chain.md) | P1274-R0 函数→证据→报告→四档商业链 |
+| [48-real-customer-file-to-evidence-demo.md](./48-real-customer-file-to-evidence-demo.md) | P1275-R0 真实/模拟文件→证据链 Demo |
+| [49-uav-customer-demo-script.md](./49-uav-customer-demo-script.md) | P1275-R0 电话/文件/30 分钟演示脚本 |
+| [50-uav-paid-pilot-pricing-and-scope.md](./50-uav-paid-pilot-pricing-and-scope.md) | P1275-R0 UAV 试点 A/B/C 报价与范围 |
 | [engineering/](./engineering/) | R2 工程知识库 |
 | [testing/](./testing/) | P1230–P1234 测试设计 |
 | `test-fixtures/aviation/customer-001/` | 合成客户 + 30 缺陷金标 |
