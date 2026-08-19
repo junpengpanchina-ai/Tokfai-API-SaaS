@@ -149,3 +149,4 @@ REGULATORY GATE MODEL
 - Codex 历史：[`../codex-history/README.md`](../codex-history/README.md)
 - Codex 操作基座：[`../codex-cli-tokfai.md`](../codex-cli-tokfai.md)
 - [demo/p1277-l2-uav-evidence-chain-result.md](./demo/p1277-l2-uav-evidence-chain-result.md) | P1277-R1 无人机客户材料证据链 L2 验证 |
+| [demo/p1278-l3-uav-evidence-pressure-result.md](./demo/p1278-l3-uav-evidence-pressure-result.md) | P1278-R1 UAV L3 证据链压测结果 |
