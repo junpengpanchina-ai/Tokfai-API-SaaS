@@ -21,6 +21,7 @@ export type ModelsListPayload = {
 
 const DEFAULT_SHELL_TYPE = "default";
 const DEFAULT_VISIBILITY = "list";
+const DEFAULT_SUPPORTED_IN_API = true;
 
 export function toCodexModelsList(data: OpenAiModelListItem[]): CodexModelListItem[] {
   return data.map((item) => ({
@@ -52,6 +53,7 @@ export type ModelsListCompatCheck = {
   modelsAllHaveSupportedReasoningLevels: boolean;
   modelsAllHaveShellType: boolean;
   modelsAllHaveVisibility: boolean;
+  modelsAllHaveSupportedInApi: boolean;
   dataHasNoSlug: boolean;
   dataHasNoSupportedReasoningLevels: boolean;
   dataHasNoShellType: boolean;
@@ -89,6 +91,10 @@ function hasVisibility(row: unknown): boolean {
   return isRecord(row) && typeof row["visibility"] === "string" && row["visibility"].length > 0;
 }
 
+function hasSupportedInApi(row: unknown): boolean {
+  return isRecord(row) && typeof row["supported_in_api"] === "boolean";
+}
+
 function dataRowHasKey(row: unknown, key: string): boolean {
   return isRecord(row) && Object.prototype.hasOwnProperty.call(row, key);
 }
@@ -106,6 +112,7 @@ export function checkModelsListCompat(
     modelsAllHaveSupportedReasoningLevels: false,
     modelsAllHaveShellType: false,
     modelsAllHaveVisibility: false,
+    modelsAllHaveSupportedInApi: false,
     dataHasNoSlug: false,
     dataHasNoSupportedReasoningLevels: false,
     dataHasNoShellType: false,
@@ -137,6 +144,7 @@ export function checkModelsListCompat(
       modelsArr.length > 0 && modelsArr.every(hasSupportedReasoningLevelsArray),
     modelsAllHaveShellType: modelsArr.length > 0 && modelsArr.every(hasShellType),
     modelsAllHaveVisibility: modelsArr.length > 0 && modelsArr.every(hasVisibility),
+    modelsAllHaveSupportedInApi: modelsArr.length > 0 && modelsArr.every(hasSupportedInApi),
     dataHasNoSlug: dataArr.every((row) => !dataRowHasKey(row, "slug")),
     dataHasNoSupportedReasoningLevels: dataArr.every(
       (row) => !dataRowHasKey(row, "supported_reasoning_levels")
@@ -158,6 +166,7 @@ export function modelsListCompatPassed(check: ModelsListCompatCheck): boolean {
     check.modelsAllHaveSupportedReasoningLevels &&
     check.modelsAllHaveShellType &&
     check.modelsAllHaveVisibility &&
+    check.modelsAllHaveSupportedInApi &&
     check.dataHasNoSlug &&
     check.dataHasNoSupportedReasoningLevels &&
     check.dataHasNoShellType &&
@@ -190,8 +199,8 @@ if (isDirectRun()) {
   const check = checkModelsListCompat(raw, "gemini-3-pro");
   const ok = modelsListCompatPassed(check);
   if (!ok) {
-    console.error("TOKFAI_P1264_MODELS_VISIBILITY_COMPAT_PASS=NO", check);
+    console.error("TOKFAI_P1267_MODELS_SUPPORTED_IN_API_COMPAT_PASS=NO", check);
     process.exit(1);
   }
-  console.log("TOKFAI_P1264_MODELS_VISIBILITY_COMPAT_PASS=YES");
+  console.log("TOKFAI_P1267_MODELS_SUPPORTED_IN_API_COMPAT_PASS=YES");
 }
