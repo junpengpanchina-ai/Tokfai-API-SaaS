@@ -12,6 +12,7 @@ export type CodexModelListItem = OpenAiModelListItem & {
   shell_type: string;
   visibility: string;
   supported_in_api: boolean;
+  priority: number;
 };
 
 export type ModelsListPayload = {
@@ -23,6 +24,7 @@ export type ModelsListPayload = {
 const DEFAULT_SHELL_TYPE = "default";
 const DEFAULT_VISIBILITY = "list";
 const DEFAULT_SUPPORTED_IN_API = true;
+const DEFAULT_PRIORITY = 0;
 
 export function toCodexModelsList(data: OpenAiModelListItem[]): CodexModelListItem[] {
   return data.map((item) => ({
@@ -34,6 +36,7 @@ export function toCodexModelsList(data: OpenAiModelListItem[]): CodexModelListIt
     shell_type: DEFAULT_SHELL_TYPE,
     visibility: DEFAULT_VISIBILITY,
       supported_in_api: DEFAULT_SUPPORTED_IN_API,
+      priority: DEFAULT_PRIORITY,
   }));
 }
 
