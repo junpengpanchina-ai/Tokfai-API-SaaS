@@ -119,6 +119,7 @@ REGULATORY GATE MODEL
 | [49-uav-customer-demo-script.md](./49-uav-customer-demo-script.md) | P1275-R0 电话/文件/30 分钟演示脚本 |
 | [50-uav-paid-pilot-pricing-and-scope.md](./50-uav-paid-pilot-pricing-and-scope.md) | P1275-R0 UAV 试点 A/B/C 报价与范围 |
 | [demo/](./demo/) | P1276-R0 证据链 Demo 合成样例与运行时验证输出 |
+| [demo/p1280-tool-call-compatibility-probe.md](./demo/p1280-tool-call-compatibility-probe.md) | P1280-R0 Upstream tool-call 兼容性探针（Responses↔Chat，无改码） |
 | [engineering/](./engineering/) | R2 工程知识库 |
 | [testing/](./testing/) | P1230–P1234 测试设计 |
 | `test-fixtures/aviation/customer-001/` | 合成客户 + 30 缺陷金标 |

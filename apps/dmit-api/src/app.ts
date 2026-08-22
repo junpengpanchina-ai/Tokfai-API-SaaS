@@ -54,8 +54,8 @@ export function buildApp() {
   app.route("/", imageRoutes);
   app.route("/", visionRoutes);
   app.route("/", audioRoutes);
+  app.route("/admin/aviation", adminAviationRoutes);
   app.route("/admin", adminRoutes);
-app.route("/admin/aviation", adminAviationRoutes);
 
   registerDebugRoutes(app);
 
