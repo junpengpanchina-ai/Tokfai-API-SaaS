@@ -27,6 +27,7 @@ import { announcementRoutes } from "./routes/announcements.js";
 import { meRoutes } from "./routes/me.js";
 import { tenantRoutes } from "./routes/tenant.js";
 import { registerDebugRoutes } from "./routes/debug.js";
+import { adminAviationRoutes } from "./routes/adminAviation.js";
 
 export function buildApp() {
   const app = new Hono();
@@ -54,6 +55,7 @@ export function buildApp() {
   app.route("/", visionRoutes);
   app.route("/", audioRoutes);
   app.route("/admin", adminRoutes);
+app.route("/admin/aviation", adminAviationRoutes);
 
   registerDebugRoutes(app);
 
