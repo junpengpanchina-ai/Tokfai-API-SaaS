@@ -120,6 +120,7 @@ REGULATORY GATE MODEL
 | [50-uav-paid-pilot-pricing-and-scope.md](./50-uav-paid-pilot-pricing-and-scope.md) | P1275-R0 UAV 试点 A/B/C 报价与范围 |
 | [demo/](./demo/) | P1276-R0 证据链 Demo 合成样例与运行时验证输出 |
 | [demo/p1280-tool-call-compatibility-probe.md](./demo/p1280-tool-call-compatibility-probe.md) | P1280-R0 Upstream tool-call 兼容性探针（Responses↔Chat，无改码） |
+| [demo/p1284-customer-intake-script.md](./demo/p1284-customer-intake-script.md) | P1284-R0 客户本地一键上传分析（`--path` 拖文件/文件夹，`scripts/aviation/tokfai-uav-intake.py`） |
 | [engineering/](./engineering/) | R2 工程知识库 |
 | [testing/](./testing/) | P1230–P1234 测试设计 |
 | `test-fixtures/aviation/customer-001/` | 合成客户 + 30 缺陷金标 |
@@ -144,6 +145,15 @@ REGULATORY GATE MODEL
 13. 客户说“审批被退”时第一轮该索取什么事实
 
 无法官方支撑处一律标 `UNKNOWN`。
+
+## P1284 客户本地 intake 脚本
+
+客户无需在本机安装 poppler 或自行抽取 PDF；材料上传到 `https://api.tokfai.com/admin/aviation` 后，**Tokfai 服务端**负责 PDF/文本抽取与模型分析。
+
+- 脚本：`scripts/aviation/tokfai-uav-intake.py`
+- 文档：[demo/p1284-customer-intake-script.md](./demo/p1284-customer-intake-script.md)
+- 用法：把文件或文件夹 **拖到终端** 作为 `--path`（支持中文路径与空格）；`--question` 填写客户问题
+- 若材料为扫描件 PDF / 图片 PDF / 空文件导致读不出文本，服务端返回 `NO_EXTRACTED_TEXT`（422），**不会继续扣模型费**
 
 ## Related
 
