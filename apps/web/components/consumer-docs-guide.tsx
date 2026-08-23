@@ -18,6 +18,7 @@ import {
   SUPPORTED_MATERIALS,
   UPSTREAM_CLIENT_CONFIGS,
   UPSTREAM_CONFIG_SUBTITLE,
+  PATH_WARNING,
   UAV_ANALYZE_CODE,
   UAV_API_KEY_CODE,
   UAV_OUTPUT_FILE,
@@ -143,6 +144,8 @@ export function ConsumerDocsGuide({
             </div>
           </CardContent>
         </Card>
+
+        <PathWarningCard zh={zh} />
 
         <Card id="supported-materials" className="scroll-mt-24">
           <CardHeader className="pb-3">
@@ -307,6 +310,68 @@ function UpstreamConfigBlockView({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function PathWarningCard({ zh }: { zh: boolean }) {
+  return (
+    <Card
+      id="path-warning"
+      className="scroll-mt-24 border-amber-500/40 bg-amber-500/5 shadow-sm"
+    >
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base text-amber-900 dark:text-amber-100">
+          {pick(PATH_WARNING.title, zh)}
+        </CardTitle>
+        <CardDescription className="text-sm leading-relaxed text-foreground/80">
+          {pick(PATH_WARNING.body, zh)}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 text-sm">
+        <div>
+          <p className="mb-2 font-medium text-foreground">
+            {zh ? "正确做法" : "What to do instead"}
+          </p>
+          <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
+            {PATH_WARNING.correctSteps.map((step) => (
+              <li key={step.zh}>{pick(step, zh)}</li>
+            ))}
+          </ol>
+        </div>
+
+        <CodeBlock code={PATH_WARNING.exampleCode} />
+
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">
+            {zh ? "成功标志" : "Success output"}
+          </p>
+          <CodeBlock code={PATH_WARNING.successOutput} />
+        </div>
+
+        <div className="grid gap-3 rounded-lg border border-amber-500/30 bg-background/60 p-4 sm:grid-cols-2">
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-destructive">
+              {pick(PATH_WARNING.wrongExample.label, zh)}：
+            </p>
+            <code className="block text-xs text-muted-foreground">
+              {PATH_WARNING.wrongExample.text}
+            </code>
+            <p className="text-xs text-muted-foreground">
+              {zh ? "原因：" : "Reason: "}
+              {pick(PATH_WARNING.wrongExample.reason, zh)}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-foreground">
+              {zh ? "正确" : "Correct"}：
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {pick(PATH_WARNING.correctNote, zh)}
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

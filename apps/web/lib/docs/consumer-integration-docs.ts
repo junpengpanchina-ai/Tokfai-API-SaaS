@@ -212,6 +212,53 @@ export const UAV_SUCCESS_FLAG = "TOKFAI_P1284_CLIENT_INTAKE_DONE";
 
 export const UAV_OUTPUT_FILE = "tokfai-uav-diagnosis-YYYYMMDD-HHMMSS.md";
 
+export const PATH_WARNING = {
+  title: {
+    zh: "为什么只输入路径读不了文件？",
+    en: "Why can't Tokfai read a path you type?",
+  },
+  body: {
+    zh: "Tokfai 云端不会隔空读取客户电脑本地路径。如果你只输入 Flight/FlightControl/ControlLaw/txg_control_task.c，Tokfai 实际收到的只是这一行路径文本，不是 txg_control_task.c 的源码内容。",
+    en: "Tokfai in the cloud cannot read local paths on your computer. If you only send Flight/FlightControl/ControlLaw/txg_control_task.c, Tokfai receives that path string — not the source code inside txg_control_task.c.",
+  },
+  correctSteps: [
+    {
+      zh: "推荐：使用 tokfai-uav-intake.py 脚本上传本地文件；",
+      en: "Recommended: use the tokfai-uav-intake.py script to upload local files;",
+    },
+    {
+      zh: "或使用 /admin/aviation/jobs 文件上传接口；",
+      en: "Or use the /admin/aviation/jobs file upload API;",
+    },
+    {
+      zh: "或在 Cursor / Codex 中打开项目文件夹，并确保目标文件内容已经加入上下文后再提问。",
+      en: "Or open the project folder in Cursor / Codex and ensure file content is in context before asking.",
+    },
+  ],
+  exampleCode: `export TOKFAI_API_KEY="sk-tokfai_xxx"
+
+python3 scripts/aviation/tokfai-uav-intake.py \\
+  --path "把文件拖到这里" \\
+  --question "详细解读这个飞控文件，重点看控制分配、姿态环、油门/电机输出和安全边界"`,
+  successOutput: `TOKFAI_UAV_INTAKE_START
+UPLOADED_COUNT=1
+ANALYZE_STATUS=analyzed
+WROTE=tokfai-uav-diagnosis-YYYYMMDD-HHMMSS.md
+TOKFAI_P1284_CLIENT_INTAKE_DONE`,
+  wrongExample: {
+    label: { zh: "错误", en: "Wrong" },
+    text: "详细解读 Flight/FlightControl/ControlLaw/txg_control_task.c",
+    reason: {
+      zh: "这只是本地路径，Tokfai 无法读取客户电脑文件。",
+      en: "This is only a local path — Tokfai cannot read files on your computer.",
+    },
+  },
+  correctNote: {
+    zh: "把文件通过脚本或上传接口传给 Tokfai。",
+    en: "Send files to Tokfai via the script or upload API.",
+  },
+};
+
 export const SUPPORTED_MATERIALS: Array<{ zh: string; en: string }> = [
   { zh: "飞行审批 PDF", en: "Flight approval PDFs" },
   { zh: "空域/航线限制材料", en: "Airspace / route restriction documents" },
