@@ -7,6 +7,7 @@ import json
 import os
 import urllib.error
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -210,6 +211,11 @@ def collect_files(root: Path, max_files: int) -> list[Path]:
     return sorted(out)
 
 
+def default_output_path() -> str:
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    return f"tokfai-uav-diagnosis-{stamp}.md"
+
+
 def join_url(base: str, suffix: str) -> str:
     return base.rstrip("/") + "/" + suffix.lstrip("/")
 
@@ -226,7 +232,11 @@ def main() -> int:
         default=DEFAULT_BASE_URL,
         help=f"Aviation intake API base (default: {DEFAULT_BASE_URL})",
     )
-    parser.add_argument("--out", default="tokfai-uav-diagnosis.md", help="Output report path")
+    parser.add_argument(
+        "--out",
+        default=None,
+        help="Output report path (default: tokfai-uav-diagnosis-YYYYMMDD-HHMMSS.md)",
+    )
     parser.add_argument("--max-files", type=int, default=80, help="Max files from folder scan")
     args = parser.parse_args()
 
@@ -240,6 +250,7 @@ def main() -> int:
         )
 
     base_url = args.base_url.strip().rstrip("/")
+    out_path = Path(args.out) if args.out is not None else Path(default_output_path())
     target = Path(args.path).expanduser()
     files = collect_files(target, args.max_files)
     file_count = len(files)
@@ -247,6 +258,7 @@ def main() -> int:
     print("TOKFAI_UAV_INTAKE_START")
     print(f"API_KEY={mask_api_key(api_key)}")
     print(f"BASE_URL={base_url}")
+    print(f"OUT_PATH={out_path}")
     print(f"FILE_COUNT={file_count}")
 
     if file_count == 0:
@@ -360,7 +372,6 @@ def main() -> int:
             content_type = v.lower()
             break
 
-    out_path = Path(args.out)
     raw_path = Path(str(out_path) + ".raw.json")
 
     if "application/json" in content_type:
