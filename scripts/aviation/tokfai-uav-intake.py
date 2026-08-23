@@ -55,6 +55,17 @@ def mask_api_key(key: str) -> str:
     return key[:8] + "..." + key[-4:]
 
 
+def normalize_api_key(key: str) -> str:
+    key = key.strip()
+    if key.lower().startswith("bearer "):
+        return key[7:].strip()
+    return key
+
+
+def authorization_header(api_key: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {api_key}"}
+
+
 def parse_json_body(raw: str) -> Any:
     if not raw.strip():
         return {}
@@ -101,6 +112,10 @@ def handle_http_error(status: int, body: str) -> None:
             print(json.dumps(payload, ensure_ascii=False, indent=2))
         die("NO_EXTRACTED_TEXT", "", 1)
 
+    if code == "MODEL_AUTH_ERROR":
+        print("MODEL_AUTH_ERROR")
+        die("MODEL_AUTH_ERROR", body[:2000], 1)
+
     if status == 429:
         print("RATE_LIMIT_OR_BUSY")
         die("RATE_LIMIT_OR_BUSY", body[:2000], 1)
@@ -120,7 +135,7 @@ def http_request_raw(
     headers: dict[str, str] | None = None,
     timeout: int = 300,
 ) -> tuple[int, str, dict[str, str]]:
-    hdrs = {"Authorization": f"Bearer {api_key}"}
+    hdrs = authorization_header(api_key)
     if headers:
         hdrs.update(headers)
     req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
@@ -215,7 +230,9 @@ def main() -> int:
     parser.add_argument("--max-files", type=int, default=80, help="Max files from folder scan")
     args = parser.parse_args()
 
-    api_key = (args.api_key or "").strip() or os.environ.get("TOKFAI_API_KEY", "").strip()
+    api_key = normalize_api_key(
+        (args.api_key or "").strip() or os.environ.get("TOKFAI_API_KEY", "").strip()
+    )
     if not api_key:
         die(
             "ERROR_MISSING_TOKFAI_API_KEY",
@@ -316,7 +333,19 @@ def main() -> int:
         analyze_status = str(analyze_result.get("status", analyze_status))
     print(f"ANALYZE_STATUS={analyze_status}")
 
-    # 4. Fetch result
+    # 4. Fetch status
+    status_url = join_url(base_url, f"jobs/{job_id}/status")
+    _, status_body, _ = http_request(
+        status_url,
+        api_key,
+        method="GET",
+        timeout=300,
+    )
+    status_payload = parse_json_body(status_body)
+    if isinstance(status_payload, dict):
+        print(f"JOB_STATUS={status_payload.get('status', 'unknown')}")
+
+    # 5. Fetch result
     result_url = join_url(base_url, f"jobs/{job_id}/result")
     status, result_body, resp_headers = http_request(
         result_url,

@@ -3,7 +3,7 @@ import { constants as fsConstants, promises as fs } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 
 import { env } from "../env.js";
 
@@ -73,6 +73,37 @@ type FileExtractResult = {
 };
 
 export const adminAviationRoutes = new Hono();
+
+type AuthResult =
+  | { ok: true; authorization: string }
+  | { ok: false; response: Response };
+
+function requireAuthorization(c: Context): AuthResult {
+  const authorization =
+    c.req.header("authorization") || c.req.header("Authorization");
+  if (!authorization) {
+    return {
+      ok: false,
+      response: c.json(
+        { error: "missing_authorization", message: "Missing Bearer token." },
+        401
+      ),
+    };
+  }
+  if (!authorization.startsWith("Bearer ")) {
+    return {
+      ok: false,
+      response: c.json(
+        {
+          error: "invalid_authorization_format",
+          message: "Authorization must be Bearer token.",
+        },
+        401
+      ),
+    };
+  }
+  return { ok: true, authorization };
+}
 
 async function resolveWritableDataRoot(): Promise<string> {
   try {
@@ -525,6 +556,9 @@ async function extractInboxFiles(
 }
 
 adminAviationRoutes.post("/jobs", async (c) => {
+  const authResult = requireAuthorization(c);
+  if (!authResult.ok) return authResult.response;
+
   const jobId = `av_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
   const dataRoot = await resolveWritableDataRoot();
   const base = jobBaseDir(dataRoot, jobId);
@@ -545,6 +579,13 @@ adminAviationRoutes.post("/jobs", async (c) => {
 });
 
 adminAviationRoutes.post("/jobs/:jobId/files", async (c) => {
+  const authResult = requireAuthorization(c);
+  if (!authResult.ok) return authResult.response;
+  const { authorization } = authResult;
+  console.log("admin_aviation_file_upload", {
+    authPrefix: authorization.slice(0, 18),
+  });
+
   const jobId = c.req.param("jobId");
   if (!isValidJobId(jobId)) {
     return c.json({ error: "job_not_found", message: "Invalid job ID." }, 404);
@@ -609,6 +650,10 @@ adminAviationRoutes.post("/jobs/:jobId/files", async (c) => {
 });
 
 adminAviationRoutes.post("/jobs/:jobId/analyze", async (c) => {
+  const authResult = requireAuthorization(c);
+  if (!authResult.ok) return authResult.response;
+  const { authorization } = authResult;
+
   const jobId = c.req.param("jobId");
   if (!isValidJobId(jobId)) {
     return c.json({ error: "job_not_found", message: "Invalid job ID." }, 404);
@@ -667,13 +712,12 @@ adminAviationRoutes.post("/jobs/:jobId/analyze", async (c) => {
     "TOKFAI_P1285_SERVER_FILE_INTAKE_DONE",
   ].join("\n");
 
-  const auth = c.req.header("authorization");
   const responsesUrl = `${localApiBaseUrl()}/v1/responses`;
   const upstreamRes = await fetch(responsesUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(auth ? { Authorization: auth } : {}),
+      Authorization: authorization,
     },
     body: JSON.stringify({
       model: "gpt-5.5",
@@ -688,6 +732,18 @@ adminAviationRoutes.post("/jobs/:jobId/analyze", async (c) => {
     rawJson = JSON.parse(rawText);
   } catch {
     rawJson = { raw: rawText };
+  }
+
+  if (upstreamRes.status === 401 || upstreamRes.status === 403) {
+    return c.json(
+      {
+        error: "MODEL_AUTH_ERROR",
+        message: "Aviation analyze could not authenticate against /v1/responses.",
+        status: 401,
+        upstreamBody: rawText,
+      },
+      401
+    );
   }
 
   const resultsPath = resultsDir(dataRoot, jobId);
@@ -737,6 +793,9 @@ adminAviationRoutes.post("/jobs/:jobId/analyze", async (c) => {
 });
 
 adminAviationRoutes.get("/jobs/:jobId/status", async (c) => {
+  const authResult = requireAuthorization(c);
+  if (!authResult.ok) return authResult.response;
+
   const jobId = c.req.param("jobId");
   if (!isValidJobId(jobId)) {
     return c.json({ error: "job_not_found", message: "Invalid job ID." }, 404);
@@ -789,6 +848,9 @@ adminAviationRoutes.get("/jobs/:jobId/status", async (c) => {
 });
 
 adminAviationRoutes.get("/jobs/:jobId/result", async (c) => {
+  const authResult = requireAuthorization(c);
+  if (!authResult.ok) return authResult.response;
+
   const jobId = c.req.param("jobId");
   if (!isValidJobId(jobId)) {
     return c.json({ error: "job_not_found", message: "Invalid job ID." }, 404);
