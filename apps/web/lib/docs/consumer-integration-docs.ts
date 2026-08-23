@@ -41,7 +41,157 @@ export const SOLUTION_HERO_CARDS: HeroCard[] = [
       en: "For Cherry Studio, Cursor, scripts, and other clients calling Tokfai.",
     },
     cta: { zh: "查看客户端配置", en: "View client setup" },
-    href: "#client-access",
+    href: "#upstream-config",
+  },
+];
+
+export const UPSTREAM_CONFIG_SUBTITLE = {
+  zh: "适合需要在 Codex、Cursor、Cherry Studio 等工具中调用 Tokfai 的工程师客户。普通材料分析客户优先使用上方「工程材料分析」。",
+  en: "For engineers using Codex, Cursor, Cherry Studio, and similar tools with Tokfai. For material analysis, use Engineering material analysis above first.",
+};
+
+export const CODEX_CONFIG_TOML = `model = "gpt-5.5"
+model_provider = "openai"
+openai_base_url = "https://api.tokfai.com/v1"`;
+
+export const CODEX_AUTH_JSON = `{
+  "OPENAI_API_KEY": "sk-tokfai_xxx"
+}`;
+
+export const CODEX_TEST_CURL = `curl -sS https://api.tokfai.com/v1/models
+
+curl -sS https://api.tokfai.com/v1/responses \\
+  -H "Authorization: Bearer sk-tokfai_xxx" \\
+  -H "Content-Type: application/json" \\
+  -d '{"model":"gpt-5.5","input":"回复 TOKFAI_AUTH_OK","stream":false}'`;
+
+export const CODEX_COMMON_ERRORS: Array<{
+  code: string;
+  meaning: { zh: string; en: string };
+}> = [
+  {
+    code: "Missing Bearer token",
+    meaning: { zh: "没有传 Authorization", en: "No Authorization header was sent" },
+  },
+  {
+    code: "invalid_token",
+    meaning: { zh: "API Key 错误或过期", en: "API key is wrong or expired" },
+  },
+  {
+    code: "404",
+    meaning: {
+      zh: "base_url 配错，注意要使用 https://api.tokfai.com/v1",
+      en: "Wrong base_url — use https://api.tokfai.com/v1",
+    },
+  },
+  {
+    code: "stream disconnected",
+    meaning: {
+      zh: "客户端或本地代理中断，先关闭代理/重启客户端后再测",
+      en: "Client or local proxy interrupted — disable proxy and restart the client",
+    },
+  },
+  {
+    code: "model_not_available",
+    meaning: {
+      zh: "模型名不在 Tokfai 模型列表",
+      en: "Model id is not in the Tokfai model list",
+    },
+  },
+];
+
+export type UpstreamConfigBlock = {
+  heading: { zh: string; en: string };
+  body?: { zh: string; en: string };
+  code?: string;
+  bullets?: Array<{ zh: string; en: string }>;
+  errors?: Array<{ code: string; meaning: { zh: string; en: string } }>;
+};
+
+export type UpstreamClientConfig = {
+  id: string;
+  title: { zh: string; en: string };
+  blocks: UpstreamConfigBlock[];
+};
+
+export const UPSTREAM_CLIENT_CONFIGS: UpstreamClientConfig[] = [
+  {
+    id: "codex",
+    title: { zh: "Codex 配置 Tokfai", en: "Codex with Tokfai" },
+    blocks: [
+      {
+        heading: { zh: "配置 config.toml", en: "config.toml" },
+        code: CODEX_CONFIG_TOML,
+      },
+      {
+        heading: { zh: "配置 auth.json", en: "auth.json" },
+        body: {
+          zh: "在本机 ~/.codex/auth.json 中填入 API Key。",
+          en: "Put your API key in ~/.codex/auth.json on your machine.",
+        },
+        code: CODEX_AUTH_JSON,
+      },
+      {
+        heading: { zh: "测试方式", en: "Test" },
+        code: CODEX_TEST_CURL,
+      },
+      {
+        heading: { zh: "常见报错", en: "Common errors" },
+        errors: CODEX_COMMON_ERRORS,
+      },
+    ],
+  },
+  {
+    id: "cursor",
+    title: { zh: "Cursor 配置 Tokfai", en: "Cursor with Tokfai" },
+    blocks: [
+      {
+        heading: { zh: "连接参数", en: "Connection" },
+        bullets: [
+          { zh: "Base URL: https://api.tokfai.com/v1", en: "Base URL: https://api.tokfai.com/v1" },
+          { zh: "API Key: sk-tokfai_xxx", en: "API Key: sk-tokfai_xxx" },
+          {
+            zh: "Model: gpt-5.5 或模型页中展示的模型 id",
+            en: "Model: gpt-5.5 or a model id from the Models page",
+          },
+        ],
+      },
+      {
+        heading: { zh: "文件读取说明", en: "About local files" },
+        body: {
+          zh: "Cursor 只是客户端，真正能否读取本地文件，取决于 Cursor 是否把文件内容放进请求；Tokfai 只能分析已经传到 API 的内容。",
+          en: "Cursor is only the client. Whether local files are analyzed depends on Cursor sending file content in the request. Tokfai can only analyze what reaches the API.",
+        },
+      },
+    ],
+  },
+  {
+    id: "cherry-studio",
+    title: { zh: "Cherry Studio 配置 Tokfai", en: "Cherry Studio with Tokfai" },
+    blocks: [
+      {
+        heading: { zh: "连接参数", en: "Connection" },
+        bullets: [
+          {
+            zh: "Provider 类型选择 OpenAI Compatible",
+            en: "Provider type: OpenAI Compatible",
+          },
+          {
+            zh: "API Host / Base URL: https://api.tokfai.com/v1",
+            en: "API Host / Base URL: https://api.tokfai.com/v1",
+          },
+          { zh: "API Key: sk-tokfai_xxx", en: "API Key: sk-tokfai_xxx" },
+          {
+            zh: "模型从 /v1/models 获取",
+            en: "Fetch models from /v1/models",
+          },
+          {
+            zh: "先用一句话测试，再测试长文本",
+            en: "Test with one short sentence first, then longer text",
+          },
+        ],
+      },
+    ],
   },
 ];
 
@@ -168,42 +318,3 @@ export const API_ENDPOINTS: Array<{ method: string; path: string; note: { zh: st
   },
 ];
 
-export const CLIENT_CONFIG_BULLETS: Array<{
-  title: { zh: string; en: string };
-  items: Array<{ zh: string; en: string }>;
-}> = [
-  {
-    title: { zh: "Cherry Studio", en: "Cherry Studio" },
-    items: [
-      {
-        zh: "只配置 Tokfai 自定义供应商（OpenAI Compatible）",
-        en: "Configure only a custom Tokfai provider (OpenAI Compatible)",
-      },
-      {
-        zh: "Base URL：https://api.tokfai.com/v1",
-        en: "Base URL: https://api.tokfai.com/v1",
-      },
-      {
-        zh: "模型必须从 Tokfai 供应商下选择（顶部显示 | Tokfai）",
-        en: "Pick models under the Tokfai provider (header shows | Tokfai)",
-      },
-    ],
-  },
-  {
-    title: { zh: "Cursor", en: "Cursor" },
-    items: [
-      {
-        zh: "添加 OpenAI Compatible 供应商",
-        en: "Add an OpenAI Compatible provider",
-      },
-      {
-        zh: "Base URL：https://api.tokfai.com/v1",
-        en: "Base URL: https://api.tokfai.com/v1",
-      },
-      {
-        zh: "API Key：控制台 sk-tokfai_…",
-        en: "API Key: sk-tokfai_… from the dashboard",
-      },
-    ],
-  },
-];

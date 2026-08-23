@@ -13,15 +13,18 @@ import {
 } from "@/components/ui/card";
 import {
   API_ENDPOINTS,
-  CLIENT_CONFIG_BULLETS,
   CONSUMER_DOC_COMMON_ERRORS,
   SOLUTION_HERO_CARDS,
   SUPPORTED_MATERIALS,
+  UPSTREAM_CLIENT_CONFIGS,
+  UPSTREAM_CONFIG_SUBTITLE,
   UAV_ANALYZE_CODE,
   UAV_API_KEY_CODE,
   UAV_OUTPUT_FILE,
   UAV_SUCCESS_FLAG,
   UAV_WORKFLOW_STEPS,
+  type UpstreamClientConfig,
+  type UpstreamConfigBlock,
 } from "@/lib/docs/consumer-integration-docs";
 import { useI18n } from "@/lib/i18n/i18n-provider";
 
@@ -222,31 +225,87 @@ export function ConsumerDocsGuide({
         </Card>
       </section>
 
-      {/* Client access — deferred */}
-      <section id="client-access" className="scroll-mt-24 space-y-4">
-        <h2 className="text-xl font-semibold tracking-tight">
-          {zh ? "客户端接入" : "Client integration"}
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {CLIENT_CONFIG_BULLETS.map((group) => (
-            <Card key={group.title.zh}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">{pick(group.title, zh)}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-1.5 text-sm text-muted-foreground">
-                  {group.items.map((item) => (
-                    <li key={item.zh} className="flex items-start gap-2">
-                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-muted-foreground" />
-                      {pick(item, zh)}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
+      {/* Client / upstream config — after API */}
+      <section id="upstream-config" className="scroll-mt-24 space-y-4">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight">
+            {zh ? "客户端 / 上游配置" : "Client / upstream configuration"}
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+            {pick(UPSTREAM_CONFIG_SUBTITLE, zh)}
+          </p>
+        </div>
+        <div className="space-y-4">
+          {UPSTREAM_CLIENT_CONFIGS.map((config) => (
+            <UpstreamClientCard key={config.id} config={config} zh={zh} />
           ))}
         </div>
       </section>
+    </div>
+  );
+}
+
+function UpstreamClientCard({
+  config,
+  zh,
+}: {
+  config: UpstreamClientConfig;
+  zh: boolean;
+}) {
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">{pick(config.title, zh)}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5 text-sm">
+        {config.blocks.map((block) => (
+          <UpstreamConfigBlockView key={pick(block.heading, zh)} block={block} zh={zh} />
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function UpstreamConfigBlockView({
+  block,
+  zh,
+}: {
+  block: UpstreamConfigBlock;
+  zh: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="font-medium text-foreground">{pick(block.heading, zh)}</p>
+      {block.body ? (
+        <p className="text-muted-foreground">{pick(block.body, zh)}</p>
+      ) : null}
+      {block.code ? <CodeBlock code={block.code} /> : null}
+      {block.bullets && block.bullets.length > 0 ? (
+        <ul className="space-y-1.5 text-muted-foreground">
+          {block.bullets.map((item) => (
+            <li key={item.zh} className="flex items-start gap-2">
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-muted-foreground" />
+              {pick(item, zh)}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {block.errors && block.errors.length > 0 ? (
+        <div className="overflow-x-auto rounded-md border">
+          <table className="w-full text-sm">
+            <tbody className="text-muted-foreground">
+              {block.errors.map((row) => (
+                <tr key={row.code} className="border-b last:border-0">
+                  <td className="px-3 py-2 pr-4 align-top">
+                    <code className="text-foreground">{row.code}</code>
+                  </td>
+                  <td className="px-3 py-2 align-top">{pick(row.meaning, zh)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
     </div>
   );
 }
