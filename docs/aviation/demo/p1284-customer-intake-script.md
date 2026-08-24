@@ -14,7 +14,9 @@
 
 `.pdf` `.txt` `.md` `.log` `.json` `.csv` `.c` `.h` `.cpp` `.hpp` `.cc` `.hh` `.py` `.m`
 
-扫描文件夹时会跳过：`node_modules` `.git` `dist` `build` `.next` `vendor` `target` `__pycache__` `.DS_Store`
+也可传入 `.zip` 工程包：脚本会在本地安全解压，再收集其中符合白名单的文件上传（不解压 xlsx/docx/pptx 等未支持格式）。
+
+扫描文件夹或 zip 时会跳过：`node_modules` `.git` `dist` `build` `.next` `vendor` `target` `__pycache__` `.idea` `.vscode` `__MACOSX` `.DS_Store`
 
 ---
 
@@ -48,7 +50,19 @@ python3 scripts/aviation/tokfai-uav-intake.py \
 
 脚本会递归收集支持的文件类型（默认最多 80 个），逐个上传后分析。
 
-### C. 使用环境变量保存 API Key
+### C. 上传 zip 工程包
+
+`--path` 指向 `.zip` 时，脚本在本地临时目录安全解压，再收集白名单内文件上传：
+
+```bash
+python3 scripts/aviation/tokfai-uav-intake.py \
+  --path /path/to/project.zip \
+  --question "请分析这个无人机工程包，重点看控制链路、姿态环、任务调度、电机输出和安全边界"
+```
+
+zip 限制：单成员 ≤ 50MB，总解压 ≤ 300MB，文件数 ≤ `--max-files`。不支持的成员跳过，不中断整个流程。
+
+### D. 使用环境变量保存 API Key
 
 避免在命令行重复输入密钥：
 
@@ -70,7 +84,7 @@ API Key 优先级：`--api-key` 参数 > 环境变量 `TOKFAI_API_KEY`。若都�
 
 | 参数 | 必填 | 默认 | 说明 |
 |------|------|------|------|
-| `--path` | 是 | — | 文件或文件夹路径 |
+| `--path` | 是 | — | 文件、文件夹或 `.zip` 路径 |
 | `--question` | 是 | — | 客户问题（写入本地报告头） |
 | `--api-key` | 否 | 环境变量 | `sk-tokfai_...` |
 | `--base-url` | 否 | `https://api.tokfai.com/admin/aviation` | Intake API 根路径 |
@@ -95,12 +109,22 @@ API Key 优先级：`--api-key` 参数 > 环境变量 `TOKFAI_API_KEY`。若都�
 TOKFAI_UAV_INTAKE_START
 API_KEY=sk-tokfa...xxxx
 BASE_URL=https://api.tokfai.com/admin/aviation
+ZIP_MODE=false
 FILE_COUNT=12
 JOB_ID=av_...
 UPLOADED_COUNT=12
 ANALYZE_STATUS=analyzed
 WROTE=tokfai-uav-diagnosis.md
 TOKFAI_P1284_CLIENT_INTAKE_DONE
+```
+
+zip 模式额外输出：
+
+```text
+ZIP_MODE=true
+ZIP_TOTAL_MEMBERS=42
+ZIP_EXTRACTED_FILES=12
+ZIP_SKIPPED_FILES=30
 ```
 
 ---
@@ -110,6 +134,8 @@ TOKFAI_P1284_CLIENT_INTAKE_DONE
 | 输出 | 含义 |
 |------|------|
 | `AUTH_ERROR` | 401 — Token 缺失或无效 |
+| `ERROR_ZIP_NO_SUPPORTED_FILES` | zip 内无白名单可上传文件 |
+| `ERROR_ZIP_INVALID` | zip 文件损坏或无法读取 |
 | `FILE_TOO_LARGE` | 413 — 单文件超过 50MB |
 | `UNSUPPORTED_FILE_TYPE` | 415 — 扩展名不在支持列表 |
 | `NO_EXTRACTED_TEXT` | 422 — 无可读文本（扫描 PDF、图片 PDF、空文件、不支持格式）；**不会继续扣模型费** |
