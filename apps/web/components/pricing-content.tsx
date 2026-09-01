@@ -35,14 +35,8 @@ import {
   TOKFAI_BILLING_POLICY,
 } from "@/lib/tokfai-api";
 
-const CREDIT_PLAN_IDS = new Set([
-  "credit_10",
-  "credit_20",
-  "credit_49",
-  "credit_99",
-  "credit_499",
-  "credit_999",
-]);
+const FEATURED_PLAN_IDS = ["credit_99", "credit_499", "credit_999"] as const;
+const STARTER_PLAN_IDS = ["credit_10", "credit_20", "credit_49"] as const;
 
 const PLAN_DESCRIPTION_KEYS: Record<string, string> = {
   credit_10: "pricing.planDescCredit10",
@@ -62,6 +56,16 @@ const PLAN_AUDIENCE_KEYS: Record<string, string> = {
   credit_999: "pricing.planAudienceCredit999",
 };
 
+function sortByIdOrder(
+  plans: BillingRechargePlan[],
+  order: readonly string[]
+): BillingRechargePlan[] {
+  const index = new Map(order.map((id, i) => [id, i]));
+  return [...plans].sort(
+    (a, b) => (index.get(a.plan_id) ?? 99) - (index.get(b.plan_id) ?? 99)
+  );
+}
+
 export function PricingContent({
   plans,
   purchaseDisabled = false,
@@ -74,7 +78,19 @@ export function PricingContent({
   const { t, locale } = useI18n();
   const zh = locale === "zh";
   const dashHref = (path: string) => dashboardCtaHref(path, isLoggedIn);
-  const visiblePlans = plans.filter((plan) => CREDIT_PLAN_IDS.has(plan.plan_id));
+
+  const featuredPlans = sortByIdOrder(
+    plans.filter((plan) =>
+      (FEATURED_PLAN_IDS as readonly string[]).includes(plan.plan_id)
+    ),
+    FEATURED_PLAN_IDS
+  );
+  const starterPlans = sortByIdOrder(
+    plans.filter((plan) =>
+      (STARTER_PLAN_IDS as readonly string[]).includes(plan.plan_id)
+    ),
+    STARTER_PLAN_IDS
+  );
 
   const usagePoints = [
     { id: "starter-plan", icon: Wallet, text: t("pricing.starterPlanLine") },
@@ -149,10 +165,102 @@ export function PricingContent({
       href: isLoggedIn ? "/dashboard/docs" : "/docs",
       title: zh ? "接入文档" : "Integration docs",
       desc: zh
-        ? "Quickstart、Chat、Responses、Image、Cherry Studio 示例"
-        : "Quickstart, Chat, Responses, Image, and Cherry Studio examples",
+        ? "3 分钟接入、curl、Cherry Studio / Cursor 示例"
+        : "3-minute setup, curl, Cherry Studio / Cursor examples",
     },
   ];
+
+  function renderPlanCard(
+    plan: BillingRechargePlan,
+    opts: { highlight?: boolean; compact?: boolean }
+  ) {
+    const descriptionKey = PLAN_DESCRIPTION_KEYS[plan.plan_id];
+    const audienceKey = PLAN_AUDIENCE_KEYS[plan.plan_id];
+    const canPurchase = plan.enabled && !purchaseDisabled;
+    const highlight = Boolean(opts.highlight);
+    const compact = Boolean(opts.compact);
+
+    return (
+      <Card
+        key={plan.plan_id}
+        id={`plan-${plan.plan_id}`}
+        className={
+          highlight
+            ? "flex scroll-mt-24 flex-col border-primary shadow-md ring-1 ring-primary/20"
+            : compact
+              ? "flex scroll-mt-24 flex-col border-muted bg-muted/20"
+              : "flex scroll-mt-24 flex-col"
+        }
+      >
+        <CardHeader className="flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className={compact ? "text-base" : undefined}>
+              {plan.name}
+            </CardTitle>
+            {plan.badge || highlight ? (
+              <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                {highlight
+                  ? zh
+                    ? "推荐"
+                    : "Recommended"
+                  : plan.badge}
+              </span>
+            ) : null}
+          </div>
+          {audienceKey ? (
+            <p className="text-xs font-medium text-primary">{t(audienceKey)}</p>
+          ) : null}
+          <CardDescription className="text-sm leading-relaxed">
+            {plan.description ?? (descriptionKey ? t(descriptionKey) : null)}
+          </CardDescription>
+          <p className="text-sm text-muted-foreground">
+            {t("pricing.planCreditsUse")}
+          </p>
+          <div className={compact ? "pt-3" : "pt-4"}>
+            <div
+              className={
+                compact
+                  ? "text-2xl font-semibold tracking-tight"
+                  : "text-3xl font-semibold tracking-tight"
+              }
+            >
+              {formatCny(plan.amount_cents)}
+            </div>
+            <div className="mt-1 text-sm text-muted-foreground">
+              {formatMessage(t("pricing.baseCreditsLine"), {
+                credits: formatPlanCredits(plan.base_credits),
+              })}
+            </div>
+            {plan.bonus_credits > 0 ? (
+              <div className="mt-1 text-xs font-medium text-primary">
+                {formatMessage(t("pricing.bonusCreditsLine"), {
+                  bonus: formatPlanCredits(plan.bonus_credits),
+                })}
+              </div>
+            ) : null}
+            <div className="mt-1 text-sm font-medium text-foreground">
+              {formatMessage(t("pricing.finalCreditsLine"), {
+                credits: formatPlanCredits(plan.credits),
+              })}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {canPurchase ? (
+            <PricingBuyButton
+              planId={plan.plan_id}
+              planName={plan.name}
+              isLoggedIn={isLoggedIn}
+            />
+          ) : (
+            <Button className="w-full" disabled variant="outline">
+              {t("pricing.comingSoon")}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <>
@@ -166,8 +274,8 @@ export function PricingContent({
           </p>
           <p className="mx-auto mt-3 max-w-2xl text-balance text-sm text-muted-foreground">
             {zh
-              ? "本页只讲价格与扣费。模型能力请看模型页，接入示例请看文档页。"
-              : "This page covers pricing only. Capabilities live on Models; curl examples live on Docs."}
+              ? "本页只讲价格与扣费。模型能力请看模型页，接入示例请看文档页。适合 Cherry Studio / Cursor / OpenAI SDK / API 项目。"
+              : "This page covers pricing only. Capabilities live on Models; curl examples live on Docs. Fits Cherry Studio / Cursor / OpenAI SDK / API projects."}
           </p>
           <p className="mx-auto mt-3 max-w-2xl text-balance text-sm text-muted-foreground">
             {t("pricing.budgetNote")}
@@ -180,82 +288,39 @@ export function PricingContent({
           </p>
         ) : null}
 
-        <div className="mx-auto mt-10 grid max-w-5xl min-w-0 grid-cols-1 gap-6 overflow-x-hidden sm:mt-16 md:grid-cols-3">
-          {visiblePlans.map((plan) => {
-            const descriptionKey = PLAN_DESCRIPTION_KEYS[plan.plan_id];
-            const audienceKey = PLAN_AUDIENCE_KEYS[plan.plan_id];
-            const canPurchase = plan.enabled && !purchaseDisabled;
-            const isHighlight = plan.plan_id === "credit_20";
-
-            return (
-              <Card
-                key={plan.plan_id}
-                className={
-                  isHighlight
-                    ? "flex flex-col border-primary shadow-md ring-1 ring-primary/20"
-                    : "flex flex-col"
-                }
-              >
-                <CardHeader className="flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <CardTitle>{plan.name}</CardTitle>
-                    {plan.badge ? (
-                      <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                        {plan.badge}
-                      </span>
-                    ) : null}
-                  </div>
-                  {audienceKey ? (
-                    <p className="text-xs font-medium text-primary">
-                      {t(audienceKey)}
-                    </p>
-                  ) : null}
-                  <CardDescription className="text-sm leading-relaxed">
-                    {plan.description ?? (descriptionKey ? t(descriptionKey) : null)}
-                  </CardDescription>
-                  <p className="text-sm text-muted-foreground">
-                    {t("pricing.planCreditsUse")}
-                  </p>
-                  <div className="pt-4">
-                    <div className="text-3xl font-semibold tracking-tight">
-                      {formatCny(plan.amount_cents)}
-                    </div>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                      {formatMessage(t("pricing.baseCreditsLine"), {
-                        credits: formatPlanCredits(plan.base_credits),
-                      })}
-                    </div>
-                    {plan.bonus_credits > 0 ? (
-                      <div className="mt-1 text-xs font-medium text-primary">
-                        {formatMessage(t("pricing.bonusCreditsLine"), {
-                          bonus: formatPlanCredits(plan.bonus_credits),
-                        })}
-                      </div>
-                    ) : null}
-                    <div className="mt-1 text-sm font-medium text-foreground">
-                      {formatMessage(t("pricing.finalCreditsLine"), {
-                        credits: formatPlanCredits(plan.credits),
-                      })}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {canPurchase ? (
-                    <PricingBuyButton
-                      planId={plan.plan_id}
-                      planName={plan.name}
-                      isLoggedIn={isLoggedIn}
-                    />
-                  ) : (
-                    <Button className="w-full" disabled variant="outline">
-                      {t("pricing.comingSoon")}
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+        <div className="mx-auto mt-10 max-w-5xl sm:mt-16">
+          <div className="mb-6 text-center">
+            <h2 className="text-xl font-semibold tracking-tight">
+              {t("pricing.featuredTitle")}
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {t("pricing.featuredDesc")}
+            </p>
+          </div>
+          <div className="grid min-w-0 grid-cols-1 gap-6 overflow-x-hidden md:grid-cols-3">
+            {featuredPlans.map((plan) =>
+              renderPlanCard(plan, { highlight: plan.plan_id === "credit_99" })
+            )}
+          </div>
         </div>
+
+        {starterPlans.length > 0 ? (
+          <div className="mx-auto mt-14 max-w-5xl">
+            <div className="mb-6 text-center">
+              <h2 className="text-lg font-semibold tracking-tight text-muted-foreground">
+                {t("pricing.starterTitle")}
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {t("pricing.starterDesc")}
+              </p>
+            </div>
+            <div className="grid min-w-0 grid-cols-1 gap-4 overflow-x-hidden sm:grid-cols-3">
+              {starterPlans.map((plan) =>
+                renderPlanCard(plan, { compact: true })
+              )}
+            </div>
+          </div>
+        ) : null}
 
         <p className="mx-auto mt-6 max-w-2xl text-center text-sm text-muted-foreground">
           {t("pricing.paymentMethods")}
@@ -336,6 +401,42 @@ export function PricingContent({
       </section>
 
       <section className="border-t bg-muted/30">
+        <div className="container py-16 md:py-20">
+          <div className="mx-auto max-w-2xl">
+            <h2 className="text-2xl font-semibold tracking-tight">
+              {t("pricing.faqTitle")}
+            </h2>
+            <dl className="mt-8 space-y-6 text-sm">
+              <div>
+                <dt className="font-medium text-foreground">
+                  {t("pricing.faq99Q")}
+                </dt>
+                <dd className="mt-2 text-muted-foreground">
+                  {t("pricing.faq99A")}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium text-foreground">
+                  {t("pricing.faqFitQ")}
+                </dt>
+                <dd className="mt-2 text-muted-foreground">
+                  {t("pricing.faqFitA")}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium text-foreground">
+                  {t("pricing.faqNotFitQ")}
+                </dt>
+                <dd className="mt-2 text-muted-foreground">
+                  {t("pricing.faqNotFitA")}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t">
         <div className="container py-16 md:py-20">
           <div className="mx-auto max-w-3xl">
             <h2 className="text-2xl font-semibold tracking-tight">

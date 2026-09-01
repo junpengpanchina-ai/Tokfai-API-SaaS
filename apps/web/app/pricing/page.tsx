@@ -9,7 +9,7 @@ import { TOKFAI_PRODUCT_TAGLINE } from "@/lib/tokfai-api";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Pricing",
+  title: "Pricing — ¥99 API trial pack",
   description: TOKFAI_PRODUCT_TAGLINE,
 };
 

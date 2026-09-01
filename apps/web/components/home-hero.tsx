@@ -4,20 +4,25 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { dashboardCtaHref } from "@/lib/auth/public-cta";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { loginPathWithNext } from "@/lib/auth/login-redirect";
 import { useI18n } from "@/lib/i18n/i18n-provider";
-import { creditsPurchaseHref } from "@/lib/billing/recharge-plans";
 import { TOKFAI_API_ORIGIN } from "@/lib/tokfai-api";
+
+const PRICING_99_HREF = "/pricing#plan-credit_99";
 
 export function HomeHero() {
   const { t } = useI18n();
   const { user, loading } = useAuth();
   const isLoggedIn = Boolean(user);
 
-  const rechargeHref = creditsPurchaseHref(isLoggedIn);
+  const experienceHref = isLoggedIn
+    ? PRICING_99_HREF
+    : loginPathWithNext(PRICING_99_HREF);
   const docsHref = isLoggedIn ? "/dashboard/docs" : "/docs";
-  const dashboardHref = dashboardCtaHref("/dashboard", isLoggedIn);
+  const cherryHref = isLoggedIn
+    ? "/dashboard/docs#client-config"
+    : "/docs#client-config";
 
   return (
     <section className="container min-w-0 overflow-x-hidden py-20 md:py-28">
@@ -44,8 +49,8 @@ export function HomeHero() {
             className="w-full sm:w-auto"
             disabled={loading}
           >
-            <Link href={rechargeHref}>
-              {t("home.startWithCredits")}
+            <Link href={experienceHref}>
+              {t("home.ctaExperience99")}
               <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
@@ -58,16 +63,15 @@ export function HomeHero() {
           >
             <Link href={docsHref}>{t("home.readDocs")}</Link>
           </Button>
-          {isLoggedIn ? (
-            <Button
-              asChild
-              size="lg"
-              variant="outline"
-              className="w-full sm:w-auto"
-            >
-              <Link href={dashboardHref}>{t("nav.dashboard")}</Link>
-            </Button>
-          ) : null}
+          <Button
+            asChild
+            size="lg"
+            variant="outline"
+            className="w-full sm:w-auto"
+            disabled={loading}
+          >
+            <Link href={cherryHref}>{t("home.ctaCherryStudio")}</Link>
+          </Button>
         </div>
       </div>
     </section>

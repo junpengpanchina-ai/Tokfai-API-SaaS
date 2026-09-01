@@ -25,21 +25,21 @@ const SCENARIOS = [
     icon: MessageSquare,
     endpoint: TOKFAI_CHAT_COMPLETIONS_ENDPOINT,
     model: TOKFAI_RECOMMENDED_MODEL,
-    docsHref: "/docs#chat-completions",
+    docsHref: "/docs#api-access",
   },
   {
     key: "image" as const,
     icon: ImageIcon,
     endpoint: TOKFAI_IMAGES_GENERATIONS_FULL_PATH,
     model: "nano-banana",
-    docsHref: "/docs#image-api",
+    docsHref: "/docs#api-access",
   },
   {
     key: "devtools" as const,
     icon: Plug,
     endpoint: TOKFAI_API_BASE_URL,
     model: TOKFAI_RECOMMENDED_MODEL,
-    docsHref: "/docs#client-integrations",
+    docsHref: "/docs#client-config",
   },
 ];
 

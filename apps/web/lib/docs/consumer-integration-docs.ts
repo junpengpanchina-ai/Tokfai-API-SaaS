@@ -8,14 +8,14 @@ export type HeroCard = {
 
 export const SOLUTION_HERO_CARDS: HeroCard[] = [
   {
-    id: "engineering",
-    title: { zh: "工程材料分析", en: "Engineering material analysis" },
+    id: "quickstart",
+    title: { zh: "3 分钟接入", en: "3-minute setup" },
     description: {
-      zh: "上传工程包、PDF、日志、代码等材料，Tokfai 读取文件内容后生成诊断报告。",
-      en: "Upload project archives, PDFs, logs, and code. Tokfai reads file content and produces a diagnosis report.",
+      zh: "Base URL、API Key、/v1/models 与 /v1/chat/completions curl。先跑通再接客户端。",
+      en: "Base URL, API key, /v1/models and /v1/chat/completions curl. Verify first, then wire clients.",
     },
-    cta: { zh: "查看工程分析", en: "View engineering analysis" },
-    href: "#engineering-analysis",
+    cta: { zh: "开始接入", en: "Start setup" },
+    href: "#quickstart",
   },
   {
     id: "api",
@@ -38,6 +38,72 @@ export const SOLUTION_HERO_CARDS: HeroCard[] = [
     href: "#client-config",
   },
 ];
+
+export const QUICKSTART_STEPS: Array<{ zh: string; en: string }> = [
+  {
+    zh: "注册并创建 sk-tokfai_… API Key",
+    en: "Sign up and create a sk-tokfai_… API key",
+  },
+  {
+    zh: "Base URL 设为 https://api.tokfai.com/v1",
+    en: "Set Base URL to https://api.tokfai.com/v1",
+  },
+  {
+    zh: "用 curl 调 /v1/models 与 /v1/chat/completions 验证",
+    en: "Verify with curl against /v1/models and /v1/chat/completions",
+  },
+  {
+    zh: "再接入 Cherry Studio / Cursor / OpenAI SDK",
+    en: "Then connect Cherry Studio / Cursor / OpenAI SDK",
+  },
+];
+
+export const MODELS_LIST_CURL = `curl -sS https://api.tokfai.com/v1/models \\
+  -H "Authorization: Bearer sk-tokfai_xxx"`;
+
+export const CHAT_COMPLETIONS_CURL = `curl -sS https://api.tokfai.com/v1/chat/completions \\
+  -H "Authorization: Bearer sk-tokfai_xxx" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "auto-fast",
+    "messages": [{"role":"user","content":"Reply with TOKFAI_OK"}],
+    "stream": false
+  }'`;
+
+export const CHAT_COMPLETIONS_STREAM_CURL = `curl -sS https://api.tokfai.com/v1/chat/completions \\
+  -H "Authorization: Bearer sk-tokfai_xxx" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "auto-fast",
+    "messages": [{"role":"user","content":"Reply with TOKFAI_OK"}],
+    "stream": true
+  }'`;
+
+export const PYTHON_OPENAI_SNIPPET = `from openai import OpenAI
+
+client = OpenAI(
+    api_key="sk-tokfai_xxx",
+    base_url="https://api.tokfai.com/v1",
+)
+
+resp = client.chat.completions.create(
+    model="auto-fast",
+    messages=[{"role": "user", "content": "Reply with TOKFAI_OK"}],
+)
+print(resp.choices[0].message.content)`;
+
+export const NODE_OPENAI_SNIPPET = `import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: "sk-tokfai_xxx",
+  baseURL: "https://api.tokfai.com/v1",
+});
+
+const resp = await client.chat.completions.create({
+  model: "auto-fast",
+  messages: [{ role: "user", content: "Reply with TOKFAI_OK" }],
+});
+console.log(resp.choices[0].message.content);`;
 
 export const ENGINEERING_INTRO = {
   zh: "Tokfai 不能直接读取用户电脑上的本地路径，必须上传真实文件或工程包。",

@@ -34,13 +34,14 @@ export const messages = {
       pricing: "Pricing",
       dashboard: "Dashboard",
       language: "Language",
+      useCases: "Use cases",
     },
     home: {
-      headline: "Tokfai — KA AI aggregation platform",
+      headline: "Tokfai: OpenAI-compatible AI gateway",
       tagline:
-        "Not a single chat tool. One API key for text & code (GPT / Gemini), image generation (Nano Banana), and reserved video capacity.",
+        "One API key for GPT, Gemini, and image generation — OpenAI-compatible format, independent API keys, credit ledger, usage logs, and online top-up with automatic credit.",
       description:
-        "Built for enterprise workloads: ecommerce batch product shots, training remixes, GEO outbound content, and drone flight analytics. Text bills by usage; images bill only on success after async task completion.",
+        "Built for API projects first. Industry scenarios (ecommerce, UAV engineering) live on dedicated use-case pages. Text bills by usage; images usually bill only on successful async completion — ledger is authoritative.",
       compatLabel: "Works with",
       compatCursor: "Cursor",
       compatCherryStudio: "Cherry Studio",
@@ -55,7 +56,7 @@ export const messages = {
       scenarioChatCta: "Chat API docs",
       scenarioImageTitle: "Image generation",
       scenarioImageBody:
-        "Nano Banana via POST /v1/images/generations — submit returns task_id; poll for results. Success billed; failure/timeout not charged.",
+        "Nano Banana via POST /v1/images/generations — submit returns task_id; poll for results. Success billed; failure/timeout usually not charged.",
       scenarioImageCta: "Image API docs",
       scenarioDevToolsTitle: "Developer tools integration",
       scenarioDevToolsBody:
@@ -64,9 +65,17 @@ export const messages = {
       scenarioEndpointLabel: "Endpoint",
       scenarioModelLabel: "Recommended model",
       startWithCredits: "Top up now",
+      ctaExperience99: "¥99 API trial pack",
+      ctaCherryStudio: "Connect Cherry Studio",
       tryImagePlayground: "Try Image Workbench",
       viewPricing: "View pricing",
       readDocs: "View integration docs",
+      useCasesTitle: "Use-case pages",
+      useCasesDesc:
+        "OpenAI-compatible API, ecommerce AI credits, and UAV engineering AI — dedicated landing pages.",
+      useCaseOpenAi: "OpenAI-compatible API",
+      useCaseEcommerce: "Ecommerce AI credits",
+      useCaseUav: "UAV engineering AI",
       howItWorksTitle: "How it works",
       howItWorksDesc: "From sign-up to your first API call in five steps.",
       step1Title: "Sign in",
@@ -97,8 +106,16 @@ export const messages = {
       devLabelImageApiDocs: "Image API docs",
       fullApiReference: "Full API reference",
     },
+    useCases: {
+      cta99: "¥99 API trial pack",
+      ctaDocs: "View docs",
+      ctaPricing: "View pricing",
+    },
     common: {
       signOut: "Sign out",
+      footerUseCases: "Use cases",
+      footerTerms: "Terms",
+      footerPrivacy: "Privacy",
       signingOut: "Signing out…",
       signedInAs: "Signed in as",
       logIn: "Log in",
@@ -1459,7 +1476,28 @@ export const messages = {
     pricing: {
       heroTitle: "Compute credit packs",
       heroDesc:
-        "Top up compute credits (¥1 = 10,000). Text models bill by usage; image models bill per generation. Failed requests are not charged.",
+        "Start with the ¥99 API trial pack. Text models bill by usage; image models bill per successful generation. Failed requests are usually not charged — Usage and Credits ledger are authoritative.",
+      featuredTitle: "Recommended packs",
+      featuredDesc:
+        "¥99 for builders getting started; ¥499 for teams; ¥999 for high-volume production. Credits work for Chat API and Image API.",
+      starterTitle: "Smaller top-ups",
+      starterDesc:
+        "¥10 / ¥20 / ¥49 remain available for light tests. Most projects should start at ¥99.",
+      planAudienceCredit99: "Recommended — API trial pack",
+      planAudienceCredit499: "Teams & steady daily use",
+      planAudienceCredit999: "High-volume production",
+      billingFailedCalls:
+        "Failed calls are usually not charged — ledger is authoritative.",
+      faqTitle: "Pricing FAQ",
+      faq99Q: "What is the ¥99 pack?",
+      faq99A:
+        "¥99 API trial pack credits about 1,188,000 compute credits (+20% bonus). Same balance for Chat and Image.",
+      faqFitQ: "Who is Tokfai for?",
+      faqFitA:
+        "Developers and teams using Cherry Studio, Cursor, OpenAI SDK, or custom apps. Not for illegal or abusive use.",
+      faqNotFitQ: "Who should not self-serve first?",
+      faqNotFitA:
+        "Projects that need contracts/invoices before any spend should contact support first. Early public beta.",
       budgetNote:
         "Reference prices help planning — actual charges follow Usage and the compute-credits ledger (admin model pricing is authoritative).",
       usageTitle: "Usage-based billing",
@@ -1469,7 +1507,7 @@ export const messages = {
       modelRatesDesc:
         "10,000 compute credits ≈ ¥1 base. Chat API bills by input/output tokens. Image API bills per generation. Usage and Credits are the source of truth for actual charges.",
       disclaimer:
-        "Current reference prices are shown for planning. Usage and Credits are the source of truth for actual charges. Failed requests are not charged.",
+        "Current reference prices are shown for planning. Usage and Credits are the source of truth for actual charges. Failed requests are usually not charged.",
       chatModelsTitle: "Chat Models",
       imageModelsTitle: "Image Models",
       colModel: "Model",
@@ -1483,11 +1521,11 @@ export const messages = {
       colUseCase: "Best for",
       colTags: "Tags",
       imageModelsIntro:
-        "Image generation is billed per successful generation in credits, with a current reference price in ¥. Each model uses a different amount; failed requests are not charged.",
+        "Image generation is billed per successful generation in credits, with a current reference price in ¥. Each model uses a different amount; failed requests are usually not charged.",
       chatBillingSummary: "Chat models: billed by input/output tokens.",
       imageBillingSummary: "Image models: billed per generation in credits.",
       starterPlanLine:
-        "¥10 / ¥20 / ¥49 / ¥99 / ¥499 / ¥999 — prepaid compute credits (¥1 = 10,000) for Chat and Image API.",
+        "Recommended: ¥99 / ¥499 / ¥999. Smaller ¥10 / ¥20 / ¥49 packs remain for light tests (¥1 = 10,000 credits).",
       starterUse: "Compute credits work for Chat API and Image API.",
       planDescCredit10: "¥10 → 100,000 compute credits",
       planDescCredit20: "¥20 → 220,000 compute credits (+10%)",
@@ -1498,9 +1536,6 @@ export const messages = {
       planAudienceCredit10: "Best for first top-up / smoke tests",
       planAudienceCredit20: "Best for light usage",
       planAudienceCredit49: "Best for regular usage",
-      planAudienceCredit99: "Best for builders",
-      planAudienceCredit499: "Best for teams",
-      planAudienceCredit999: "Best for high-volume production",
       planDescStarter: "For testing and personal projects",
       planDescPro: "For builders and growing side projects",
       planDescBusiness: "For teams and high-volume production",
@@ -1522,7 +1557,6 @@ export const messages = {
       forDevelopersDesc:
         "Point any OpenAI-compatible client at Tokfai and start calling models with your API key.",
       billingSuccessCalls: "Successful calls debit credits.",
-      billingFailedCalls: "Failed calls are not charged.",
       monitorUsagePrefix: "Monitor usage in",
       monitorUsageSuffix: ".",
       ledgerInPrefix: "Ledger in",
@@ -5662,13 +5696,14 @@ export const messages = {
       pricing: "定价",
       dashboard: "控制台",
       language: "语言",
+      useCases: "场景用例",
     },
     home: {
-      headline: "Tokfai — KA 大客户 AI 聚合平台",
+      headline: "Tokfai：OpenAI 兼容 AI 网关",
       tagline:
-        "不是单一聊天工具。一个 API Key 覆盖文本与代码（GPT / Gemini）、图片生成（Nano Banana），视频能力预留 / coming soon。",
+        "一个 API Key 接入 GPT、Gemini 与图片生成，支持 OpenAI 兼容格式、独立 API Key、余额账本、调用记录和在线充值自动到账。",
       description:
-        "面向行业场景：电商批量实拍图/换图、培训二创、GEO 出海内容、无人机仿飞精控与批量飞行数据分析。文本按用量扣费；图片异步任务成功才扣费，失败/超时不扣费。",
+        "首页先讲 API。电商与无人机场景见独立用例页。文本按用量扣费；图片异步任务通常成功才扣费——以 Usage / Credits 账本为准。早期公测，面向稳定调用优化。",
       compatLabel: "兼容",
       compatCursor: "Cursor",
       compatCherryStudio: "Cherry Studio",
@@ -5683,7 +5718,7 @@ export const messages = {
       scenarioChatCta: "Chat API 文档",
       scenarioImageTitle: "图片生成",
       scenarioImageBody:
-        "Nano Banana 走 POST /v1/images/generations — 提交返回 task_id，轮询取结果。成功才扣费；失败/超时不扣费。",
+        "Nano Banana 走 POST /v1/images/generations — 提交返回 task_id，轮询取结果。成功才扣费；失败/超时通常不扣费。",
       scenarioImageCta: "Image API 文档",
       scenarioDevToolsTitle: "桌面客户端接入",
       scenarioDevToolsBody:
@@ -5692,9 +5727,17 @@ export const messages = {
       scenarioEndpointLabel: "接口",
       scenarioModelLabel: "推荐 model",
       startWithCredits: "立即充值",
+      ctaExperience99: "99 元体验 API",
+      ctaCherryStudio: "接入 Cherry Studio",
       tryImagePlayground: "体验图片工作台",
       viewPricing: "查看定价",
       readDocs: "查看接入文档",
+      useCasesTitle: "场景用例",
+      useCasesDesc:
+        "OpenAI 兼容 API、电商 AI 积分、无人机工程 AI — 独立落地页。",
+      useCaseOpenAi: "OpenAI 兼容 API",
+      useCaseEcommerce: "电商 AI 积分",
+      useCaseUav: "无人机工程 AI",
       howItWorksTitle: "如何开始",
       howItWorksDesc: "从注册到第一次 API 调用，共五个步骤。",
       step1Title: "登录",
@@ -5721,6 +5764,11 @@ export const messages = {
       devLabelImageApiDocs: "Image API docs",
       fullApiReference: "完整 API 参考",
     },
+    useCases: {
+      cta99: "99 元体验 API",
+      ctaDocs: "查看接入文档",
+      ctaPricing: "查看定价",
+    },
     common: {
       signOut: "退出登录",
       signingOut: "正在退出…",
@@ -5735,6 +5783,9 @@ export const messages = {
       footerTagline: "Tokfai · GPT / Gemini / 图片模型 API 网关",
       apiReference: "API 参考 →",
       copyright: "© {year} Tokfai",
+      footerUseCases: "场景用例",
+      footerTerms: "服务条款",
+      footerPrivacy: "隐私政策",
     },
     auth: {
       login: {
@@ -7011,7 +7062,26 @@ export const messages = {
     pricing: {
       heroTitle: "算力积分充值套餐",
       heroDesc:
-        "充值算力积分（¥1 = 10,000）即可调用。文本模型按用量扣费，图片模型按次扣费。失败请求不扣费。",
+        "建议从 99 元 API 体验包开始。文本按用量扣费，图片按成功生成扣费。失败请求通常不扣费——以 Usage / Credits 账本为准。",
+      featuredTitle: "主推套餐",
+      featuredDesc:
+        "¥99 适合接入试跑；¥499 适合团队日常；¥999 适合高频生产。积分可用于 Chat 与 Image。",
+      starterTitle: "小额档",
+      starterDesc: "¥10 / ¥20 / ¥49 仍可用于轻量测试。多数项目建议从 ¥99 起步。",
+      planAudienceCredit99: "推荐 — 99 元 API 体验包",
+      planAudienceCredit499: "团队与稳定日活",
+      planAudienceCredit999: "高频生产",
+      billingFailedCalls: "失败调用通常不扣费——以账本为准。",
+      faqTitle: "定价常见问题",
+      faq99Q: "99 元套餐是什么？",
+      faq99A:
+        "99 元 API 体验包到账约 1,188,000 算力积分（含 +20%）。Chat 与 Image 共用余额。",
+      faqFitQ: "适合谁？",
+      faqFitA:
+        "使用 Cherry Studio、Cursor、OpenAI SDK 或自研应用的开发者与团队。不支持违法与滥用用途。",
+      faqNotFitQ: "谁不该先自助下单？",
+      faqNotFitA:
+        "需要合同/发票才能启动的大型采购，请先联系支持。当前为早期公测。",
       budgetNote:
         "参考价格便于预算规划，实际扣费以 Usage 与算力积分账本为准（以后台模型定价为准）。",
       usageTitle: "按量计费",
@@ -7020,7 +7090,7 @@ export const messages = {
       modelRatesDesc:
         "10000 算力积分约等于 ¥1 基础额度。Chat API 按输入 / 输出 tokens 扣费。Image API 按生成次数扣费。实际扣费以 Usage 与算力积分账本为准。",
       disclaimer:
-        "展示当前参考价格供规划使用，实际扣费以 Usage 与算力积分账本为准。失败请求不扣费。",
+        "展示当前参考价格供规划使用，实际扣费以 Usage 与算力积分账本为准。失败请求通常不扣费。",
       chatModelsTitle: "对话模型",
       imageModelsTitle: "图像模型",
       colModel: "模型",
@@ -7034,11 +7104,11 @@ export const messages = {
       colUseCase: "适合场景",
       colTags: "Tags",
       imageModelsIntro:
-        "图片生成按次扣除算力积分，并展示当前参考价格（¥）。不同模型消耗不同；失败请求不扣费。",
+        "图片生成按次扣除算力积分，并展示当前参考价格（¥）。不同模型消耗不同；失败请求通常不扣费。",
       chatBillingSummary: "对话模型：按 input/output tokens 计费。",
       imageBillingSummary: "图片模型：按每次成功生成扣除算力积分。",
       starterPlanLine:
-        "¥10 / ¥20 / ¥49 / ¥99 / ¥499 / ¥999 — 预付费算力积分（¥1 = 10,000）用于 Chat 与 Image API。",
+        "主推 ¥99 / ¥499 / ¥999。小额 ¥10 / ¥20 / ¥49 仍可用于轻量测试（¥1 = 10,000 积分）。",
       starterUse: "算力积分可用于 Chat API 与 Image API。",
       planDescCredit10: "¥10 到账 100,000 算力积分",
       planDescCredit20: "¥20 到账 220,000 算力积分，送10%",
@@ -7049,9 +7119,6 @@ export const messages = {
       planAudienceCredit10: "适合首次充值 / 冒烟测试",
       planAudienceCredit20: "适合轻度使用",
       planAudienceCredit49: "适合日常使用",
-      planAudienceCredit99: "适合开发者",
-      planAudienceCredit499: "适合团队",
-      planAudienceCredit999: "适合高频生产",
       planDescStarter: "适合测试与个人项目",
       planDescPro: "适合开发者与成长型小项目",
       planDescBusiness: "适合团队与高频生产环境",
@@ -7072,7 +7139,6 @@ export const messages = {
       forDevelopersDesc:
         "将任意 OpenAI 兼容客户端指向 Tokfai，使用 API 密钥即可调用模型。",
       billingSuccessCalls: "成功调用会扣除算力积分。",
-      billingFailedCalls: "失败调用不扣费。",
       monitorUsagePrefix: "在",
       monitorUsageSuffix: "查看用量。",
       ledgerInPrefix: "账本见",

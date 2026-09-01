@@ -48,9 +48,9 @@ export function resolveTokfaiApiBaseUrl(
 }
 
 export const TOKFAI_PRODUCT_TAGLINE =
-  "Tokfai — KA enterprise AI aggregation platform. One API key for text/code (GPT / Gemini) and image generation (Nano Banana).";
+  "Tokfai — OpenAI-compatible AI gateway. One API key for GPT, Gemini, and image generation.";
 export const TOKFAI_BILLING_POLICY =
-  "Successful calls debit compute credits. Failed calls and image timeouts are not charged.";
+  "Successful calls debit compute credits. Failed calls and image timeouts are usually not charged; Usage and Credits ledger are authoritative.";
 export const TOKFAI_PRICING_DISCLAIMER =
   "Reference prices help planning. Actual charges follow Usage and the compute-credits ledger.";
 export const TOKFAI_PLAYGROUND_POLICY =

@@ -8,8 +8,10 @@ import { formatMessage } from "@/lib/i18n/messages";
 const FOOTER_LINKS = [
   { href: "/pricing", labelKey: "nav.pricing" },
   { href: "/docs", labelKey: "nav.docs" },
+  { href: "/use-cases/openai-compatible-api", labelKey: "common.footerUseCases" },
+  { href: "/terms", labelKey: "common.footerTerms" },
+  { href: "/privacy", labelKey: "common.footerPrivacy" },
   { href: "/dashboard", labelKey: "nav.dashboard" },
-  { href: "/dashboard/docs", labelKey: "common.apiReference" },
 ] as const;
 
 export function PublicFooter() {
@@ -17,7 +19,7 @@ export function PublicFooter() {
 
   return (
     <footer className="border-t">
-      <div className="container flex flex-col gap-4 py-6 text-xs text-muted-foreground sm:h-16 sm:flex-row sm:items-center sm:justify-between sm:py-0">
+      <div className="container flex flex-col gap-4 py-6 text-xs text-muted-foreground sm:h-auto sm:flex-row sm:items-center sm:justify-between sm:py-4">
         <span>
           {formatMessage(t("common.copyright"), {
             year: String(new Date().getFullYear()),

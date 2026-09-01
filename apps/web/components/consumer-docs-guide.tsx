@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -12,8 +13,14 @@ import {
 } from "@/components/ui/card";
 import {
   API_ENDPOINTS,
+  CHAT_COMPLETIONS_CURL,
+  CHAT_COMPLETIONS_STREAM_CURL,
   ENGINEERING_INTRO,
+  MODELS_LIST_CURL,
+  NODE_OPENAI_SNIPPET,
   PATH_WARNING,
+  PYTHON_OPENAI_SNIPPET,
+  QUICKSTART_STEPS,
   SOLUTION_HERO_CARDS,
   UAV_ANALYSIS_SCOPE,
   UAV_OUTPUT_FILE,
@@ -48,9 +55,20 @@ export function ConsumerDocsGuide({
         </h1>
         <p className="text-base leading-relaxed text-muted-foreground">
           {zh
-            ? "工程材料分析、API 接入、客户端配置三个入口。按场景选择。"
-            : "Three entry points: engineering analysis, API integration, and client configuration."}
+            ? "3 分钟跑通 API，再接 Cherry Studio / Cursor / OpenAI SDK。Base URL：https://api.tokfai.com/v1"
+            : "Run the API in 3 minutes, then connect Cherry Studio / Cursor / OpenAI SDK. Base URL: https://api.tokfai.com/v1"}
         </p>
+        <div className="flex flex-wrap gap-3 pt-1">
+          <Button asChild size="sm">
+            <Link href="/pricing#plan-credit_99">
+              {zh ? "99 元体验 API" : "¥99 API trial pack"}
+              <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <a href="#quickstart">{zh ? "3 分钟接入" : "3-minute setup"}</a>
+          </Button>
+        </div>
       </header>
 
       <section className="grid gap-4 md:grid-cols-3">
@@ -58,7 +76,7 @@ export function ConsumerDocsGuide({
           <Card
             key={card.id}
             className={
-              card.id === "engineering"
+              card.id === "quickstart"
                 ? "border-primary/30 bg-primary/5 shadow-sm"
                 : undefined
             }
@@ -72,7 +90,7 @@ export function ConsumerDocsGuide({
             <CardContent>
               <Button
                 asChild
-                variant={card.id === "engineering" ? "default" : "outline"}
+                variant={card.id === "quickstart" ? "default" : "outline"}
                 size="sm"
               >
                 <a href={card.href}>
@@ -83,6 +101,81 @@ export function ConsumerDocsGuide({
             </CardContent>
           </Card>
         ))}
+      </section>
+
+      {/* 0. 3-minute quickstart */}
+      <section id="quickstart" className="scroll-mt-24 space-y-5">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">
+            {zh ? "3 分钟接入" : "3-minute setup"}
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+            {zh
+              ? "Authorization: Bearer sk-tokfai_xxx。先验证 models 与 chat/completions，再接客户端。"
+              : "Authorization: Bearer sk-tokfai_xxx. Verify models and chat/completions before wiring clients."}
+          </p>
+        </div>
+
+        <WorkflowSteps steps={QUICKSTART_STEPS} zh={zh} />
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Base URL</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CodeBlock code="https://api.tokfai.com/v1" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">GET /v1/models</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CodeBlock code={MODELS_LIST_CURL} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">
+              POST /v1/chat/completions · stream=false
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CodeBlock code={CHAT_COMPLETIONS_CURL} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">
+              POST /v1/chat/completions · stream=true
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CodeBlock code={CHAT_COMPLETIONS_STREAM_CURL} />
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Python · OpenAI SDK</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CodeBlock code={PYTHON_OPENAI_SNIPPET} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Node.js · OpenAI SDK</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CodeBlock code={NODE_OPENAI_SNIPPET} />
+            </CardContent>
+          </Card>
+        </div>
       </section>
 
       {/* 1. Engineering material analysis */}
@@ -115,7 +208,9 @@ export function ConsumerDocsGuide({
                 <p className="mb-2 font-medium text-foreground">
                   {zh ? "支持材料" : "Supported formats"}
                 </p>
-                <p className="text-muted-foreground">{pick(UAV_SUPPORTED_FORMATS, zh)}</p>
+                <p className="text-muted-foreground">
+                  {pick(UAV_SUPPORTED_FORMATS, zh)}
+                </p>
               </div>
               <div>
                 <p className="mb-2 font-medium text-foreground">
@@ -230,7 +325,7 @@ function UpstreamClientCard({
   zh: boolean;
 }) {
   return (
-    <Card>
+    <Card id={config.id === "cherry-studio" ? "cherry-studio" : undefined}>
       <CardHeader className="pb-3">
         <CardTitle className="text-base">{pick(config.title, zh)}</CardTitle>
       </CardHeader>

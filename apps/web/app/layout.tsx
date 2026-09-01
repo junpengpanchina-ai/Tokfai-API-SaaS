@@ -17,11 +17,11 @@ export async function generateMetadata(): Promise<Metadata> {
   const brand = tenant.name || "Tokfai";
   return {
     title: {
-      default: `${brand} — OpenAI-compatible image & chat API`,
+      default: `${brand}：OpenAI 兼容 AI 网关`,
       template: `%s · ${brand}`,
     },
     description:
-      "OpenAI-compatible image & chat API — one API for chat, image, and AI apps.",
+      "OpenAI-compatible AI gateway — one API key for GPT, Gemini, and image generation.",
   };
 }
 

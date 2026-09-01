@@ -155,6 +155,36 @@ export function HomeExtraSections() {
           </div>
         </div>
       </section>
+
+      <section className="border-t bg-muted/30">
+        <div className="container py-16 md:py-20">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-2xl font-semibold tracking-tight">
+              {t("home.useCasesTitle")}
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {t("home.useCasesDesc")}
+            </p>
+          </div>
+          <div className="mx-auto mt-8 grid max-w-3xl gap-3 sm:grid-cols-3">
+            <Button asChild variant="outline" className="h-auto whitespace-normal py-3">
+              <Link href="/use-cases/openai-compatible-api">
+                {t("home.useCaseOpenAi")}
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="h-auto whitespace-normal py-3">
+              <Link href="/use-cases/ecommerce-ai-credits">
+                {t("home.useCaseEcommerce")}
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="h-auto whitespace-normal py-3">
+              <Link href="/use-cases/uav-engineering-ai">
+                {t("home.useCaseUav")}
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </section>
     </>
   );
 }

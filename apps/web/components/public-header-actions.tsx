@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { href: "/", labelKey: "nav.home" },
   { href: "/pricing", labelKey: "nav.pricing" },
   { href: "/docs", labelKey: "nav.docs" },
+  { href: "/use-cases/openai-compatible-api", labelKey: "nav.useCases" },
 ] as const;
 
 function AuthToolbarPlaceholder() {

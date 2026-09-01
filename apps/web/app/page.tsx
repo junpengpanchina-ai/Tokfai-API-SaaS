@@ -8,7 +8,7 @@ import { PublicHeader } from "@/components/public-header";
 import { TOKFAI_PRODUCT_TAGLINE } from "@/lib/tokfai-api";
 
 export const metadata: Metadata = {
-  title: "Tokfai — OpenAI-compatible image & chat API",
+  title: "Tokfai：OpenAI 兼容 AI 网关",
   description: TOKFAI_PRODUCT_TAGLINE,
 };
 
