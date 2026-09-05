@@ -16,6 +16,7 @@ import {
   CHAT_COMPLETIONS_CURL,
   CHAT_COMPLETIONS_STREAM_CURL,
   ENGINEERING_INTRO,
+  HIGH_VOLUME_SECTION,
   MODELS_LIST_CURL,
   NODE_OPENAI_SNIPPET,
   PATH_WARNING,
@@ -295,7 +296,7 @@ export function ConsumerDocsGuide({
         </Card>
       </section>
 
-      {/* 3. Client configuration */}
+      {/* Client configuration */}
       <section id="client-config" className="scroll-mt-24 space-y-4">
         <div>
           <h2 className="text-xl font-semibold tracking-tight">
@@ -312,6 +313,30 @@ export function ConsumerDocsGuide({
             <UpstreamClientCard key={config.id} config={config} zh={zh} />
           ))}
         </div>
+      </section>
+
+      {/* High-frequency / production boundary */}
+      <section id="high-volume" className="scroll-mt-24 space-y-4">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight">
+            {pick(HIGH_VOLUME_SECTION.title, zh)}
+          </h2>
+        </div>
+        <Card>
+          <CardContent className="space-y-3 pt-6 text-sm leading-relaxed text-muted-foreground">
+            {HIGH_VOLUME_SECTION.body.map((line) => (
+              <p key={line.en}>{pick(line, zh)}</p>
+            ))}
+            <p>
+              <Link
+                href="/pricing"
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                {zh ? "查看定价与量级说明" : "View pricing & scale notes"}
+              </Link>
+            </p>
+          </CardContent>
+        </Card>
       </section>
     </div>
   );

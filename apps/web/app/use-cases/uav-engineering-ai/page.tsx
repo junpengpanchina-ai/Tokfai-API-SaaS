@@ -83,7 +83,13 @@ export default function UavEngineeringAiPage() {
               <div>
                 <dt className="font-medium">这是官方适航认证吗？</dt>
                 <dd className="mt-1 text-muted-foreground">
-                  不是。输出仅供工程辅助，最终责任在人工审核与合规流程。
+                  不是。Tokfai 只做工程材料分析辅助，不做官方认证，不替代人工审核。最终责任在人工审核与合规流程。
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium">大规模或敏感数据能直接自助吗？</dt>
+                <dd className="mt-1 text-muted-foreground">
+                  如果涉及大规模数据处理、涉密材料、个人隐私或监管审批结论，需要走人工评估或不承接。
                 </dd>
               </div>
               <div>

@@ -5,12 +5,12 @@ import { PricingContent } from "@/components/pricing-content";
 import { PublicFooter } from "@/components/public-footer";
 import { PublicHeader } from "@/components/public-header";
 import { fetchBillingPlansForPricing } from "@/lib/billing/recharge-plans";
-import { TOKFAI_PRODUCT_TAGLINE } from "@/lib/tokfai-api";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Pricing — ¥99 API trial pack",
-  description: TOKFAI_PRODUCT_TAGLINE,
+  description:
+    "Tokfai prepaid credits for API onboarding and mid-scale use. Self-serve packs do not promise high-concurrency production capacity — contact us for project review.",
 };
 
 export const dynamic = "force-dynamic";

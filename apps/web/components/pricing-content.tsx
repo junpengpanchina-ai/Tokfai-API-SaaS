@@ -404,6 +404,47 @@ export function PricingContent({
         <div className="container py-16 md:py-20">
           <div className="mx-auto max-w-2xl">
             <h2 className="text-2xl font-semibold tracking-tight">
+              {t("pricing.scaleTitle")}
+            </h2>
+            <div className="mt-6 space-y-4 text-sm leading-relaxed text-muted-foreground">
+              <p>{t("pricing.scaleBody1")}</p>
+              <p>{t("pricing.scaleBody2")}</p>
+              <p>{t("pricing.scaleBody3")}</p>
+              <p>{t("pricing.scaleBody4")}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t">
+        <div className="container py-16 md:py-20">
+          <div className="mx-auto max-w-2xl">
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("pricing.enterpriseTitle")}</CardTitle>
+                <CardDescription className="text-sm leading-relaxed">
+                  {t("pricing.enterpriseBody1")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  {t("pricing.enterpriseBody2")}
+                </p>
+                <Button asChild>
+                  <a href="mailto:junpengpanchina@gmail.com?subject=Tokfai%20project%20plan">
+                    {t("pricing.enterpriseCta")}
+                  </a>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t bg-muted/30">
+        <div className="container py-16 md:py-20">
+          <div className="mx-auto max-w-2xl">
+            <h2 className="text-2xl font-semibold tracking-tight">
               {t("pricing.faqTitle")}
             </h2>
             <dl className="mt-8 space-y-6 text-sm">
@@ -429,6 +470,14 @@ export function PricingContent({
                 </dt>
                 <dd className="mt-2 text-muted-foreground">
                   {t("pricing.faqNotFitA")}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium text-foreground">
+                  {t("pricing.faqScaleQ")}
+                </dt>
+                <dd className="mt-2 text-muted-foreground">
+                  {t("pricing.faqScaleA")}
                 </dd>
               </div>
             </dl>

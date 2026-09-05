@@ -1479,15 +1479,30 @@ export const messages = {
         "Start with the ¥99 API trial pack. Text models bill by usage; image models bill per successful generation. Failed requests are usually not charged — Usage and Credits ledger are authoritative.",
       featuredTitle: "Recommended packs",
       featuredDesc:
-        "¥99 for builders getting started; ¥499 for teams; ¥999 for high-volume production. Credits work for Chat API and Image API.",
+        "¥99 for API trial; ¥499 for small teams; ¥999 for higher prepaid balance. Self-serve packs are for integration and mid-scale use — not a production high-concurrency SLA.",
       starterTitle: "Smaller top-ups",
       starterDesc:
         "¥10 / ¥20 / ¥49 remain available for light tests. Most projects should start at ¥99.",
       planAudienceCredit99: "Recommended — API trial pack",
       planAudienceCredit499: "Teams & steady daily use",
-      planAudienceCredit999: "High-volume production",
+      planAudienceCredit999: "Higher prepaid balance — contact us for heavy production",
       billingFailedCalls:
         "Failed calls are usually not charged — ledger is authoritative.",
+      scaleTitle: "What scale is Tokfai for?",
+      scaleBody1:
+        "Self-serve packs fit individual developers, small teams, Cherry Studio / Cursor setup, ecommerce asset tests, image generation, and early engineering validation.",
+      scaleBody2:
+        "¥99 / ¥499 / ¥999 are mainly for API onboarding, cost checks, and small-to-mid call volume. They do not promise a high-concurrency production SLA.",
+      scaleBody3:
+        "If you need frequent calls, batch jobs, production integration, or engineering project work, contact us first to review RPM, QPS, tokens, models, use case, and budget.",
+      scaleBody4:
+        "Tokfai does not currently take million-RPM workloads, model distillation, training-data supply, large-scale scraping, illegal collection, or mainland-China personal privacy data processing as self-serve offers.",
+      enterpriseTitle: "Enterprise / project cooperation",
+      enterpriseBody1:
+        "High-frequency calling needs a human review — do not rely on self-serve packs alone.",
+      enterpriseBody2:
+        "Review items include expected RPM, peak concurrency, daily requests, average tokens, model types, whether image jobs are involved, whether it is production, and whether contract / invoice / written SLA terms are required.",
+      enterpriseCta: "Contact project plan",
       faqTitle: "Pricing FAQ",
       faq99Q: "What is the ¥99 pack?",
       faq99A:
@@ -1497,7 +1512,10 @@ export const messages = {
         "Developers and teams using Cherry Studio, Cursor, OpenAI SDK, or custom apps. Not for illegal or abusive use.",
       faqNotFitQ: "Who should not self-serve first?",
       faqNotFitA:
-        "Projects that need contracts/invoices before any spend should contact support first. Early public beta.",
+        "Projects that need contracts/invoices before any spend, or high-frequency / production capacity, should contact support first. Early public beta.",
+      faqScaleQ: "Can I buy ¥999 and run production at high concurrency?",
+      faqScaleA:
+        "No automatic promise. Self-serve packs credit your balance; high-frequency or production use needs a capacity review. Limits and Usage / Credits ledger are authoritative.",
       budgetNote:
         "Reference prices help planning — actual charges follow Usage and the compute-credits ledger (admin model pricing is authoritative).",
       usageTitle: "Usage-based billing",
@@ -7065,13 +7083,27 @@ export const messages = {
         "建议从 99 元 API 体验包开始。文本按用量扣费，图片按成功生成扣费。失败请求通常不扣费——以 Usage / Credits 账本为准。",
       featuredTitle: "主推套餐",
       featuredDesc:
-        "¥99 适合接入试跑；¥499 适合团队日常；¥999 适合高频生产。积分可用于 Chat 与 Image。",
+        "¥99 适合接入试跑；¥499 适合小团队；¥999 适合更高预付余额。自助套餐用于接入与中小规模调用，不承诺高并发生产 SLA。",
       starterTitle: "小额档",
       starterDesc: "¥10 / ¥20 / ¥49 仍可用于轻量测试。多数项目建议从 ¥99 起步。",
       planAudienceCredit99: "推荐 — 99 元 API 体验包",
       planAudienceCredit499: "团队与稳定日活",
-      planAudienceCredit999: "高频生产",
+      planAudienceCredit999: "更高预付余额 — 高频生产请先评估",
       billingFailedCalls: "失败调用通常不扣费——以账本为准。",
+      scaleTitle: "Tokfai 适合什么量级？",
+      scaleBody1:
+        "自助套餐适合个人开发者、小团队、Cherry Studio / Cursor 接入、电商素材测试、图片生成和工程项目早期验证。",
+      scaleBody2:
+        "99 / 499 / 999 套餐主要用于接口接入、成本验证和中小规模调用，不承诺高并发生产 SLA。",
+      scaleBody3:
+        "如果你需要高频调用、批量任务、生产环境接入或工程项目合作，请先联系评估 RPM、QPS、token、模型、用途和预算。",
+      scaleBody4:
+        "Tokfai 暂不承接百万 RPM、模型蒸馏、训练数据供应、大规模抓取、违法采集或个人隐私数据处理等高风险需求。",
+      enterpriseTitle: "企业 / 工程项目合作",
+      enterpriseBody1: "高频调用需人工评估，不走自助套餐。",
+      enterpriseBody2:
+        "评估项包括：预计 RPM、峰值并发、日请求量、平均 token、模型类型、是否图片任务、是否生产环境、是否需要合同/发票/书面 SLA 条款。",
+      enterpriseCta: "联系项目方案",
       faqTitle: "定价常见问题",
       faq99Q: "99 元套餐是什么？",
       faq99A:
@@ -7081,7 +7113,10 @@ export const messages = {
         "使用 Cherry Studio、Cursor、OpenAI SDK 或自研应用的开发者与团队。不支持违法与滥用用途。",
       faqNotFitQ: "谁不该先自助下单？",
       faqNotFitA:
-        "需要合同/发票才能启动的大型采购，请先联系支持。当前为早期公测。",
+        "需要合同/发票才能启动的大型采购，或高频/生产容量需求，请先联系支持。当前为早期公测。",
+      faqScaleQ: "买了 ¥999 就能高并发生产吗？",
+      faqScaleA:
+        "不会自动承诺。自助套餐只充值余额；高频或生产环境需先做容量评估。限流与 Usage / Credits 账本为准。",
       budgetNote:
         "参考价格便于预算规划，实际扣费以 Usage 与算力积分账本为准（以后台模型定价为准）。",
       usageTitle: "按量计费",

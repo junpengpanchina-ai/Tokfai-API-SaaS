@@ -55,6 +55,9 @@ export default function EcommerceAiCreditsPage() {
                 ：主图 / 场景图 prompt → Nano Banana 异步任务
               </li>
             </ul>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              适合商品文案、图片 prompt、批量素材测试和中小规模生成。如果要做大规模自动化铺货或高频批量生成，需要单独评估，不建议直接用自助套餐硬跑。
+            </p>
           </section>
 
           <section className="space-y-3">

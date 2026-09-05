@@ -105,6 +105,28 @@ const resp = await client.chat.completions.create({
 });
 console.log(resp.choices[0].message.content);`;
 
+export const HIGH_VOLUME_SECTION = {
+  title: { zh: "高频调用与生产环境", en: "High-frequency calls & production" },
+  body: [
+    {
+      zh: "自助套餐默认适合测试、开发和中小规模调用。",
+      en: "Self-serve packs are for testing, development, and small-to-mid call volume by default.",
+    },
+    {
+      zh: "如需生产环境、高频调用、批量生成或工程项目接入，请先评估 RPM、QPS、并发、token、模型和预算。",
+      en: "For production, high-frequency calls, batch generation, or engineering projects, review RPM, QPS, concurrency, tokens, models, and budget first.",
+    },
+    {
+      zh: "不要直接用自助套餐压测百万级请求。",
+      en: "Do not use self-serve packs to load-test million-scale request volumes.",
+    },
+    {
+      zh: "所有调用以 API Key 限流、Usage / Credits 账本和系统实际返回为准。",
+      en: "All calls follow API key rate limits, the Usage / Credits ledger, and actual system responses.",
+    },
+  ],
+};
+
 export const ENGINEERING_INTRO = {
   zh: "Tokfai 不能直接读取用户电脑上的本地路径，必须上传真实文件或工程包。",
   en: "Tokfai cannot read local paths on your computer. Upload real files or a project archive.",

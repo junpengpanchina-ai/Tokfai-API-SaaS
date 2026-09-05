@@ -83,6 +83,13 @@ export default function OpenAiCompatibleApiPage() {
                   注册 → 创建 Key → 充值 99 元体验包 → 跑通 docs 里的 curl。
                 </dd>
               </div>
+              <div>
+                <dt className="font-medium">Tokfai 可以承接百万 RPM 吗？</dt>
+                <dd className="mt-1 text-muted-foreground">
+                  百万 RPM 属于超大规模推理或训练数据链路，不属于自助 API
+                  套餐范围。高频调用需要单独评估模型、token、预算和上游通道。
+                </dd>
+              </div>
             </dl>
           </section>
         </article>
