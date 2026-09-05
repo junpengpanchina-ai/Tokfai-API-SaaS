@@ -1,4 +1,4 @@
-import { filterPublicModelsList } from "../catalog/publicModelsListFilter.js";
+import { filterPublicModelsList, scrubModelsListPayload } from "../catalog/publicModelsListFilter.js";
 import type { OpenAiModelListItem } from "../catalog/modelPricing.js";
 
 /**
@@ -42,14 +42,14 @@ export function toCodexModelsList(data: OpenAiModelListItem[]): CodexModelListIt
 }
 
 export function buildModelsListPayload(data: OpenAiModelListItem[]): ModelsListPayload {
-  // Final denylist: never advertise alias / smart-route / Tokfai GPT* rows.
+  // Final denylist inside payload builder (also scrubbed again in routes/models.ts).
   const publicData = filterPublicModelsList(data);
   const codexModels = toCodexModelsList(publicData);
-  return {
+  return scrubModelsListPayload({
     object: "list",
     data: codexModels,
     models: codexModels,
-  };
+  });
 }
 
 export type ModelsListCompatCheck = {

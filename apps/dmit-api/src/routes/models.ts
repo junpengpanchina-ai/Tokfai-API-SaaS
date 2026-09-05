@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 
 import { listCatalogModels } from "../catalog/modelCatalog.js";
-import { filterPublicModelsList } from "../catalog/publicModelsListFilter.js";
+import { scrubModelsListPayload } from "../catalog/publicModelsListFilter.js";
 import { buildModelsListPayload } from "./modelsListCompat.js";
 
 /**
@@ -9,16 +9,18 @@ import { buildModelsListPayload } from "./modelsListCompat.js";
  *
  * Catalog is read from public.models (enabled + visible) when available;
  * falls back to pricing.ts. Compatibility aliases are callable on chat
- * routes but are not advertised in this list (route + payload denylist).
+ * routes but are not advertised here. Payload is hard-scrubbed immediately
+ * before JSON leaves this handler.
  *
  * `data[]` is the OpenAI list (no Codex-only fields). `models[]` is a copy
  * with `slug` (= id), `supported_reasoning_levels` (= []),
- * `shell_type` (= "default"), and `visibility` (= "public") for Codex CLI.
+ * `shell_type` (= "default"), and `visibility` for Codex CLI.
  * Chat/completions and responses are unchanged.
  */
 export const modelRoutes = new Hono();
 
 modelRoutes.get("/v1/models", async (c) => {
-  const data = filterPublicModelsList(await listCatalogModels());
-  return c.json(buildModelsListPayload(data));
+  const payload = buildModelsListPayload(await listCatalogModels());
+  // Final hard filter — last step before the response body is sent.
+  return c.json(scrubModelsListPayload(payload));
 });
