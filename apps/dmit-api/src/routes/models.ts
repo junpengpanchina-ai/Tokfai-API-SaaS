@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import { listCatalogModels } from "../catalog/modelCatalog.js";
+import { filterPublicModelsList } from "../catalog/publicModelsListFilter.js";
 import { buildModelsListPayload } from "./modelsListCompat.js";
 
 /**
@@ -8,7 +9,7 @@ import { buildModelsListPayload } from "./modelsListCompat.js";
  *
  * Catalog is read from public.models (enabled + visible) when available;
  * falls back to pricing.ts. Compatibility aliases are callable on chat
- * routes but are not advertised in this list.
+ * routes but are not advertised in this list (route + payload denylist).
  *
  * `data[]` is the OpenAI list (no Codex-only fields). `models[]` is a copy
  * with `slug` (= id), `supported_reasoning_levels` (= []),
@@ -18,6 +19,6 @@ import { buildModelsListPayload } from "./modelsListCompat.js";
 export const modelRoutes = new Hono();
 
 modelRoutes.get("/v1/models", async (c) => {
-  const data = await listCatalogModels();
+  const data = filterPublicModelsList(await listCatalogModels());
   return c.json(buildModelsListPayload(data));
 });

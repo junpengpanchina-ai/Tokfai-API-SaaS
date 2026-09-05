@@ -3,13 +3,16 @@ import { supabase } from "../supabase.js";
 import { getModelConfig } from "../upstream/modelCatalog.js";
 import {
   listAliasModelsForCatalog,
-  listPublicModelsHiddenAliasIds,
   resolveChatModel,
 } from "../upstream/modelAliases.js";
 import { isUnavailableImageModel } from "../upstream/imageModelAliases.js";
 import { priceFor } from "../upstream/pricing.js";
 import { tokfaiClientDisplayName } from "./clientModelDisplayName.js";
 import { resolveModelCapabilityFlags } from "../lib/toolCallCapability.js";
+import {
+  filterPublicModelsList,
+  isDeniedPublicModelId,
+} from "./publicModelsListFilter.js";
 import {
   DEFAULT_IMAGE_MODEL_ID,
   isHiddenInternalModel,
@@ -597,7 +600,6 @@ function withClientDisplayFields(
  * POST /v1/images/generations — not this list.
  */
 export async function listCatalogModels(): Promise<OpenAiModelListItem[]> {
-  const hiddenAliasIds = new Set(listPublicModelsHiddenAliasIds());
   const now = Math.floor(Date.now() / 1000);
 
   const [chatIds, fromDb] = await Promise.all([
@@ -606,19 +608,19 @@ export async function listCatalogModels(): Promise<OpenAiModelListItem[]> {
   ]);
 
   const callableIds = new Set<string>(
-    chatIds.filter((id) => !hiddenAliasIds.has(id))
+    chatIds.filter((id) => !isDeniedPublicModelId(id))
   );
 
   const dbById = new Map(
     (fromDb ?? [])
-      .filter((row) => !hiddenAliasIds.has(row.id))
+      .filter((row) => !isDeniedPublicModelId(row.id))
       .map((row) => [row.id, row])
   );
 
   const concrete: OpenAiModelListItem[] = [];
   for (const id of callableIds) {
     if (isHiddenInternalModel(id)) continue;
-    if (hiddenAliasIds.has(id)) continue;
+    if (isDeniedPublicModelId(id)) continue;
     const fromRow = dbById.get(id);
     if (fromRow) {
       concrete.push(fromRow);
@@ -638,7 +640,7 @@ export async function listCatalogModels(): Promise<OpenAiModelListItem[]> {
   if (fromDb?.length) {
     const order = new Map(
       fromDb
-        .filter((row) => !hiddenAliasIds.has(row.id))
+        .filter((row) => !isDeniedPublicModelId(row.id))
         .map((row, index) => [row.id, index])
     );
     concrete.sort((a, b) => {
@@ -651,7 +653,7 @@ export async function listCatalogModels(): Promise<OpenAiModelListItem[]> {
     });
   }
 
-  return concrete;
+  return filterPublicModelsList(concrete);
 }
 
 async function listCatalogModelsFromDb(): Promise<OpenAiModelListItem[] | null> {

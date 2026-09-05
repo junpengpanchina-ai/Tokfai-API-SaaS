@@ -1,3 +1,4 @@
+import { filterPublicModelsList } from "../catalog/publicModelsListFilter.js";
 import type { OpenAiModelListItem } from "../catalog/modelPricing.js";
 
 /**
@@ -41,7 +42,9 @@ export function toCodexModelsList(data: OpenAiModelListItem[]): CodexModelListIt
 }
 
 export function buildModelsListPayload(data: OpenAiModelListItem[]): ModelsListPayload {
-  const codexModels = toCodexModelsList(data);
+  // Final denylist: never advertise alias / smart-route / Tokfai GPT* rows.
+  const publicData = filterPublicModelsList(data);
+  const codexModels = toCodexModelsList(publicData);
   return {
     object: "list",
     data: codexModels,
