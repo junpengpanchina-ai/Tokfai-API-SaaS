@@ -57,6 +57,17 @@ export const CATALOG_SEED_ENTRIES: CatalogSeedEntry[] = [
     image_credits_per_generation: 0,
   },
   {
+    id: "gemini-3.1-flash-lite",
+    display_name: "Gemini 3.1 Flash Lite",
+    model_type: "chat",
+    status: "coming_soon",
+    sort_order: 125,
+    billing_type: "chat",
+    input_credits_per_million_tokens: 35,
+    output_credits_per_million_tokens: 300,
+    image_credits_per_generation: 0,
+  },
+  {
     id: "gemini-3.5-flash",
     display_name: "Gemini 3.5 Flash",
     model_type: "chat",
