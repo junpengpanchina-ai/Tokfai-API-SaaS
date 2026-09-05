@@ -7,7 +7,8 @@ import { buildModelsListPayload } from "./modelsListCompat.js";
  * /v1/models — OpenAI-compatible public model listing (no auth).
  *
  * Catalog is read from public.models (enabled + visible) when available;
- * falls back to pricing.ts.
+ * falls back to pricing.ts. Compatibility aliases are callable on chat
+ * routes but are not advertised in this list.
  *
  * `data[]` is the OpenAI list (no Codex-only fields). `models[]` is a copy
  * with `slug` (= id), `supported_reasoning_levels` (= []),

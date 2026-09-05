@@ -50,21 +50,29 @@ function humanizeModelId(modelId: string): string {
 }
 
 /**
- * Build Cherry-friendly display name. Always prefixes Tokfai.
- * Prefer known catalog labels so clients see "Tokfai GPT-5.5" consistently.
+ * Build Cherry-friendly display name.
+ * Non-GPT families keep a Tokfai prefix for provider disambiguation.
+ * GPT ids never use a "Tokfai GPT*" label — those read as fake branded aliases.
  */
 export function tokfaiClientDisplayName(
   modelId: string,
   dbDisplayName?: string | null
 ): string {
   const known = KNOWN_LABELS[modelId];
-  if (known) return `Tokfai ${known}`;
-
   const raw =
-    typeof dbDisplayName === "string" && dbDisplayName.trim().length > 0
+    known ??
+    (typeof dbDisplayName === "string" && dbDisplayName.trim().length > 0
       ? dbDisplayName.trim()
-      : humanizeModelId(modelId);
+      : humanizeModelId(modelId));
   const withoutPrefix =
     raw.replace(/^Tokfai\s+/i, "").trim() || humanizeModelId(modelId);
+
+  if (
+    /^gpt([\d._-]|$)/i.test(modelId) ||
+    /^GPT([\d.\s-]|$)/i.test(withoutPrefix)
+  ) {
+    return withoutPrefix;
+  }
+
   return `Tokfai ${withoutPrefix}`;
 }

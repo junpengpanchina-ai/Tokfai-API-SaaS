@@ -3,6 +3,7 @@ import { supabase } from "../supabase.js";
 import { getModelConfig } from "../upstream/modelCatalog.js";
 import {
   listAliasModelsForCatalog,
+  listPublicModelsHiddenAliasIds,
   resolveChatModel,
 } from "../upstream/modelAliases.js";
 import { isUnavailableImageModel } from "../upstream/imageModelAliases.js";
@@ -589,16 +590,14 @@ function withClientDisplayFields(
 /**
  * Visible catalog for GET /v1/models.
  *
- * OpenAI-compatible chat clients (Cherry Studio, Chatbox, etc.) only see
- * general text/chat models and catalog aliases. Image-only models stay on
- * Tokfai Image Workbench / POST /v1/images/generations docs — not this list.
- *
- * `id` stays the callable model id; `name` / `display_name` / `title` carry a
- * Tokfai-prefixed label so clients do not confuse Tokfai with OpenAI/Gemini.
+ * OpenAI-compatible chat clients only see concrete text/chat models that are
+ * enabled+visible in DB (or static fallback). Compatibility aliases
+ * (auto-*, gpt-5-pro, gpt-5.4-pro, …) stay callable via chat routing but are
+ * not advertised here. Image-only models stay on Image Workbench /
+ * POST /v1/images/generations — not this list.
  */
 export async function listCatalogModels(): Promise<OpenAiModelListItem[]> {
-  const aliases = listAliasModelsForCatalog();
-  const aliasIds = new Set(aliases.map((row) => row.id));
+  const hiddenAliasIds = new Set(listPublicModelsHiddenAliasIds());
   const now = Math.floor(Date.now() / 1000);
 
   const [chatIds, fromDb] = await Promise.all([
@@ -606,15 +605,20 @@ export async function listCatalogModels(): Promise<OpenAiModelListItem[]> {
     listCatalogModelsFromDb(),
   ]);
 
-  const callableIds = new Set<string>([
-    ...chatIds.filter((id) => !aliasIds.has(id)),
-  ]);
+  const callableIds = new Set<string>(
+    chatIds.filter((id) => !hiddenAliasIds.has(id))
+  );
 
-  const dbById = new Map((fromDb ?? []).map((row) => [row.id, row]));
+  const dbById = new Map(
+    (fromDb ?? [])
+      .filter((row) => !hiddenAliasIds.has(row.id))
+      .map((row) => [row.id, row])
+  );
 
   const concrete: OpenAiModelListItem[] = [];
   for (const id of callableIds) {
     if (isHiddenInternalModel(id)) continue;
+    if (hiddenAliasIds.has(id)) continue;
     const fromRow = dbById.get(id);
     if (fromRow) {
       concrete.push(fromRow);
@@ -632,7 +636,11 @@ export async function listCatalogModels(): Promise<OpenAiModelListItem[]> {
 
   // Preserve DB sort_order when available; otherwise keep stable id order.
   if (fromDb?.length) {
-    const order = new Map(fromDb.map((row, index) => [row.id, index]));
+    const order = new Map(
+      fromDb
+        .filter((row) => !hiddenAliasIds.has(row.id))
+        .map((row, index) => [row.id, index])
+    );
     concrete.sort((a, b) => {
       const ai = order.get(a.id);
       const bi = order.get(b.id);
@@ -643,19 +651,7 @@ export async function listCatalogModels(): Promise<OpenAiModelListItem[]> {
     });
   }
 
-  return [
-    ...aliases.map((row) =>
-      withClientDisplayFields({
-        id: row.id,
-        object: "model",
-        created: row.created,
-        owned_by: row.owned_by,
-        display_name: row.display_name,
-        ...(row.alias_of ? { alias_of: row.alias_of } : {}),
-      })
-    ),
-    ...concrete,
-  ];
+  return concrete;
 }
 
 async function listCatalogModelsFromDb(): Promise<OpenAiModelListItem[] | null> {

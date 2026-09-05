@@ -48,7 +48,7 @@ export const MODEL_ALIAS_IDS = Object.keys(
  * 1:1 consumer compatibility rewrites after normalizeClientModelId().
  * Targets are Tokfai catalog / alias ids (not upstream vendor names).
  *
- * Listed on GET /v1/models when included in CATALOG_COMPAT_ALIAS_ENTRIES.
+ * Chat routing only — these ids are not advertised on GET /v1/models.
  */
 export const CLIENT_MODEL_REWRITES: Record<string, string> = {
   // Cherry / Chatbox / Codex GPT display-name variants → Tokfai aliases
@@ -81,7 +81,7 @@ export const CLIENT_MODEL_REWRITES: Record<string, string> = {
 };
 
 /**
- * Compatibility aliases advertised on GET /v1/models for third-party clients.
+ * Compatibility aliases for chat routing / allowlist (not listed on GET /v1/models).
  * Request still resolves via CLIENT_MODEL_REWRITES → alias_of.
  */
 export const CATALOG_COMPAT_ALIAS_ENTRIES = [
@@ -195,7 +195,7 @@ export function resolveModelAttempts(
 }
 
 /**
- * Alias ids advertised on GET /v1/models (callable smart routes only).
+ * Smart-route alias ids (callable via chat; hidden from GET /v1/models).
  */
 export const CATALOG_ALIAS_IDS: ModelAliasId[] = [
   "auto-fast",
@@ -219,6 +219,20 @@ export type CatalogAliasListItem = {
   title: string;
   alias_of?: string;
 };
+
+/**
+ * Alias ids that must not appear on GET /v1/models.
+ * Chat/completions still resolve these via MODEL_ALIAS_CHAINS / CLIENT_MODEL_REWRITES.
+ */
+export function listPublicModelsHiddenAliasIds(): string[] {
+  return [
+    ...CATALOG_ALIAS_IDS,
+    ...CATALOG_COMPAT_ALIAS_ENTRIES.map((entry) => entry.id),
+    // Dashed client spellings (normalizeClientModelId may rewrite these first)
+    "gpt-5-4",
+    "gpt-5-4-pro",
+  ];
+}
 
 export function listAliasModelsForCatalog(): CatalogAliasListItem[] {
   const now = Math.floor(Date.now() / 1000);
