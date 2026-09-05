@@ -1,139 +1,164 @@
 /**
- * Hard denylist for GET /v1/models only.
- * Chat/completions may still resolve these ids via MODEL_ALIAS_CHAINS /
- * CLIENT_MODEL_REWRITES — this module must never be used to block chat routing.
+ * Last-mile scrub for GET /v1/models only.
+ * Must not be used to block /v1/chat/completions alias routing.
  */
 
-/** Exact ids that must never appear in /v1/models `data` / `models`. */
-export const PUBLIC_MODELS_HARD_DENIED_IDS: readonly string[] = [
+/** Alias / pseudo-model ids that must never appear in the public list. */
+export const DENY_PUBLIC_MODEL_IDS = new Set([
   "auto-fast",
   "auto-pro",
   "auto-cheap",
-  "gpt-5",
   "gpt-5-chat",
   "gpt-5-pro",
-  "gpt-5.1",
-  "gpt-5.2",
   "gpt-5-4",
-  "gpt-5.4",
   "gpt-5-4-pro",
+  // Dotted compat spellings of the same aliases
+  "gpt-5.4",
   "gpt-5.4-pro",
-  "deepseek-chat",
-  "deepseek-v3",
+]);
+
+/** @deprecated Prefer DENY_PUBLIC_MODEL_IDS — kept for existing smoke imports. */
+export const PUBLIC_MODELS_HARD_DENIED_IDS = [
+  ...DENY_PUBLIC_MODEL_IDS,
 ] as const;
 
-const HARD_DENIED = new Set(
-  PUBLIC_MODELS_HARD_DENIED_IDS.map((id) => id.toLowerCase())
-);
+type PublicModelLike = {
+  id?: unknown;
+  name?: unknown;
+  display_name?: unknown;
+  displayName?: unknown;
+  title?: unknown;
+  slug?: unknown;
+  [key: string]: unknown;
+};
 
-/** Extra pattern coverage for dashed / odd spellings. */
-const DENIED_PUBLIC_MODEL_ID_RE =
-  /^(auto-(fast|pro|cheap)|gpt-5(-chat|-pro)?|gpt-5\.(1|2)|gpt-5-4(-pro)?|gpt-5\.4(-pro)?|deepseek-chat|deepseek-v3)$/i;
-
-const TOKFAI_GPT_LABEL_RE = /Tokfai\s+GPT/i;
-
-export function isDeniedPublicModelId(modelId: string): boolean {
-  const id = modelId.trim().toLowerCase();
-  if (!id) return true;
-  if (HARD_DENIED.has(id)) return true;
-  return DENIED_PUBLIC_MODEL_ID_RE.test(id);
+function lower(value: unknown): string {
+  return String(value ?? "").toLowerCase();
 }
 
-/** Strip Tokfai GPT* branding from labels; keep plain GPT-* text. */
+/**
+ * Deny by hard id set, or by any name/display_name/title containing "tokfai gpt".
+ * Call after label sanitize when keeping concrete GPT models (e.g. gpt-5.6-*).
+ */
+export function isDeniedPublicModel(model: PublicModelLike): boolean {
+  const id = lower(model?.id);
+  const name = lower(model?.name);
+  const displayName = lower(model?.display_name ?? model?.displayName);
+  const title = lower(model?.title);
+  const slug = lower(model?.slug);
+
+  if (DENY_PUBLIC_MODEL_IDS.has(id) || DENY_PUBLIC_MODEL_IDS.has(slug)) {
+    return true;
+  }
+  if (displayName.includes("tokfai gpt")) return true;
+  if (title.includes("tokfai gpt")) return true;
+  if (name.includes("tokfai gpt")) return true;
+  return false;
+}
+
+export function isDeniedPublicModelId(modelId: string): boolean {
+  return isDeniedPublicModel({ id: modelId });
+}
+
+/** Strip "Tokfai GPT" branding so concrete GPT ids can remain listed. */
 export function sanitizePublicModelLabel(
-  modelId: string,
+  _modelId: string,
   label: string | null | undefined
 ): string | undefined {
   if (typeof label !== "string") return undefined;
   let trimmed = label.trim();
   if (!trimmed) return undefined;
-
-  // Remove every "Tokfai GPT" occurrence (not only a leading prefix).
-  while (TOKFAI_GPT_LABEL_RE.test(trimmed)) {
-    trimmed = trimmed.replace(TOKFAI_GPT_LABEL_RE, "GPT").replace(/\s+/g, " ").trim();
+  while (/Tokfai\s+GPT/i.test(trimmed)) {
+    trimmed = trimmed.replace(/Tokfai\s+GPT/gi, "GPT").replace(/\s+/g, " ").trim();
   }
-
-  if (/^gpt([\d._-]|$)/i.test(modelId) && /^Tokfai\s+/i.test(trimmed)) {
+  if (/^Tokfai\s+/i.test(trimmed) && /^gpt([\d._-]|$)/i.test(_modelId)) {
     trimmed = trimmed.replace(/^Tokfai\s+/i, "").trim();
   }
-
   return trimmed || undefined;
 }
 
-type PublicModelListFields = {
-  id: string;
-  name?: string;
-  display_name?: string;
-  title?: string;
-  slug?: string;
-};
+function sanitizeModelRow<T extends PublicModelLike>(model: T): T {
+  const id = String(model?.id ?? "");
+  const name = sanitizePublicModelLabel(id, model.name as string | undefined);
+  const displayName = sanitizePublicModelLabel(
+    id,
+    (model.display_name ?? model.displayName) as string | undefined
+  );
+  const title = sanitizePublicModelLabel(id, model.title as string | undefined);
 
-function rowHasTokfaiGptLabel(item: PublicModelListFields): boolean {
-  for (const key of ["name", "display_name", "title", "slug"] as const) {
-    const value = item[key];
-    if (typeof value === "string" && TOKFAI_GPT_LABEL_RE.test(value)) {
-      return true;
-    }
-  }
-  return false;
+  return {
+    ...model,
+    ...(model.name !== undefined ? { name: name ?? model.name } : {}),
+    ...(model.display_name !== undefined
+      ? { display_name: displayName ?? model.display_name }
+      : {}),
+    ...(model.displayName !== undefined
+      ? { displayName: displayName ?? model.displayName }
+      : {}),
+    ...(model.title !== undefined ? { title: title ?? model.title } : {}),
+  };
 }
 
-/**
- * Last-line filter before /v1/models JSON leaves the process.
- * Drops alias/smart-route ids and strips Tokfai GPT* display fields.
- */
-export function filterPublicModelsList<T extends PublicModelListFields>(
+export function filterPublicModelsList<T extends PublicModelLike>(
   items: readonly T[]
 ): T[] {
+  const seen = new Set<string>();
   const out: T[] = [];
-  for (const item of items) {
-    if (isDeniedPublicModelId(item.id)) continue;
-    if (typeof item.slug === "string" && isDeniedPublicModelId(item.slug)) {
-      continue;
-    }
-
-    const name = sanitizePublicModelLabel(item.id, item.name);
-    const displayName = sanitizePublicModelLabel(item.id, item.display_name);
-    const title = sanitizePublicModelLabel(item.id, item.title);
-
-    const next: T = {
-      ...item,
-      ...(item.name !== undefined ? { name: name ?? item.name } : {}),
-      ...(item.display_name !== undefined
-        ? { display_name: displayName ?? item.display_name }
-        : {}),
-      ...(item.title !== undefined ? { title: title ?? item.title } : {}),
-    };
-
-    // Absolute rule: never emit rows that still contain "Tokfai GPT".
-    if (rowHasTokfaiGptLabel(next)) continue;
-
-    out.push(next);
+  for (const raw of items) {
+    const model = sanitizeModelRow(raw);
+    if (isDeniedPublicModel(model)) continue;
+    const id = String(model?.id ?? "").trim();
+    if (!id) continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(model);
   }
   return out;
 }
 
 export type ModelsListPayloadLike = {
-  object: "list";
-  data: PublicModelListFields[];
-  models?: PublicModelListFields[];
+  object?: string;
+  data?: PublicModelLike[];
+  models?: PublicModelLike[];
+  [key: string]: unknown;
 };
 
 /**
- * Scrub a finished /v1/models payload (both `data` and Codex `models`).
- * Call this immediately before res.json / c.json.
+ * Last-mile scrub immediately before /v1/models JSON response.
+ * Scrubs both `data` and `models`, drops denied rows, dedupes ids per list.
  */
-export function scrubModelsListPayload<T extends ModelsListPayloadLike>(
+export function scrubPublicModelsPayload<T extends ModelsListPayloadLike>(
   payload: T
 ): T {
-  const data = filterPublicModelsList(payload.data ?? []);
-  const models = filterPublicModelsList(
-    Array.isArray(payload.models) ? payload.models : data
-  );
-  return {
-    ...payload,
-    object: "list",
-    data,
-    models,
+  const next: T = { ...payload };
+
+  const scrubList = (list: PublicModelLike[]): PublicModelLike[] => {
+    const seen = new Set<string>();
+    const out: PublicModelLike[] = [];
+    for (const raw of list) {
+      const model = sanitizeModelRow(raw);
+      if (isDeniedPublicModel(model)) continue;
+      const id = String(model?.id ?? "").trim();
+      if (!id) continue;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      out.push(model);
+    }
+    return out;
   };
+
+  if (Array.isArray(next.data)) {
+    next.data = scrubList(next.data);
+  }
+
+  if (Array.isArray(next.models)) {
+    // Independent seen set so Codex `models[]` stays populated as a scrubbed
+    // mirror of `data[]` (shared seen would empty the second array).
+    next.models = scrubList(next.models);
+  }
+
+  return next;
 }
+
+/** Alias used by existing call sites. */
+export const scrubModelsListPayload = scrubPublicModelsPayload;
