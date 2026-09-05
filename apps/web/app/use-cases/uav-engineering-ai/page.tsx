@@ -25,9 +25,8 @@ export default function UavEngineeringAiPage() {
               无人机工程材料 AI 分析
             </h1>
             <p className="text-base leading-relaxed text-muted-foreground">
-              Upload flight / control project materials and ask Tokfai for
-              structured diagnosis — 航飞审批、空域限制、适航材料、日志诊断、飞控
-              与姿态环风险梳理。OpenAI-compatible API；本地路径无法直读，需上传内容。
+              用 OpenAI 兼容 API 整理航飞审批、空域限制、适航材料、日志诊断与飞控风险草稿。本地路径无法直读，需上传内容。早期公测，建议先用
+              99 元验证。
             </p>
             <div className="flex flex-wrap gap-3">
               <Button asChild>
@@ -89,13 +88,16 @@ export default function UavEngineeringAiPage() {
               <div>
                 <dt className="font-medium">大规模或敏感数据能直接自助吗？</dt>
                 <dd className="mt-1 text-muted-foreground">
-                  如果涉及大规模数据处理、涉密材料、个人隐私或监管审批结论，需要走人工评估或不承接。
+                  不适合。大规模数据处理、涉密材料、个人隐私或监管审批结论，需要人工评估或不承接；也不承接百万
+                  RPM、蒸馏与训练数据供应类需求。
                 </dd>
               </div>
               <div>
                 <dt className="font-medium">下一步？</dt>
                 <dd className="mt-1 text-muted-foreground">
-                  注册并创建 Key → 充值 99 → 按 Docs 无人机章节跑通上传脚本。
+                  注册 → 充值 99 → 创建 Key → 配 Base URL → 按 Docs
+                  无人机章节跑通上传与 chat，并看 Usage / Credits。异常可邮件
+                  junpengpanchina@gmail.com。
                 </dd>
               </div>
             </dl>

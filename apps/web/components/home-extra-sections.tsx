@@ -77,6 +77,30 @@ export function HomeExtraSections() {
       </section>
 
       <section className="container py-16 md:py-20">
+        <div className="mx-auto grid max-w-3xl gap-8 md:grid-cols-2">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight">
+              {t("home.fitTitle")}
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              {t("home.fitBody")}
+            </p>
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight">
+              {t("home.notFitTitle")}
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              {t("home.notFitBody")}
+            </p>
+          </div>
+        </div>
+        <p className="mx-auto mt-8 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+          {t("home.earlyBetaNote")}
+        </p>
+      </section>
+
+      <section className="container py-16 md:py-20">
         <div className="mx-auto max-w-3xl">
           <h2 className="text-2xl font-semibold tracking-tight">
             {t("home.devQuickRefTitle")}

@@ -9,10 +9,10 @@ export type HeroCard = {
 export const SOLUTION_HERO_CARDS: HeroCard[] = [
   {
     id: "quickstart",
-    title: { zh: "3 分钟接入", en: "3-minute setup" },
+    title: { zh: "真实接入路径", en: "Real integration path" },
     description: {
-      zh: "Base URL、API Key、/v1/models 与 /v1/chat/completions curl。先跑通再接客户端。",
-      en: "Base URL, API key, /v1/models and /v1/chat/completions curl. Verify first, then wire clients.",
+      zh: "注册 → 充值 99 → 创建 Key → 配 Base URL → 跑 /v1/models → 跑 chat → 看 Usage / Credits。",
+      en: "Sign up → top up ¥99 → create a key → set Base URL → call /v1/models → run chat → check Usage / Credits.",
     },
     cta: { zh: "开始接入", en: "Start setup" },
     href: "#quickstart",
@@ -41,20 +41,20 @@ export const SOLUTION_HERO_CARDS: HeroCard[] = [
 
 export const QUICKSTART_STEPS: Array<{ zh: string; en: string }> = [
   {
-    zh: "注册并创建 sk-tokfai_… API Key",
-    en: "Sign up and create a sk-tokfai_… API key",
+    zh: "注册登录，并充值 99 元体验包",
+    en: "Sign up / sign in, then top up the ¥99 trial pack",
   },
   {
-    zh: "Base URL 设为 https://api.tokfai.com/v1",
-    en: "Set Base URL to https://api.tokfai.com/v1",
+    zh: "创建 sk-tokfai_… API Key，Base URL 设为 https://api.tokfai.com/v1",
+    en: "Create a sk-tokfai_… API key; set Base URL to https://api.tokfai.com/v1",
   },
   {
-    zh: "用 curl 调 /v1/models 与 /v1/chat/completions 验证",
-    en: "Verify with curl against /v1/models and /v1/chat/completions",
+    zh: "用 curl 跑 /v1/models，再跑 /v1/chat/completions",
+    en: "Call /v1/models with curl, then /v1/chat/completions",
   },
   {
-    zh: "再接入 Cherry Studio / Cursor / OpenAI SDK",
-    en: "Then connect Cherry Studio / Cursor / OpenAI SDK",
+    zh: "在 Usage / Credits 核对扣费与失败请求，再接 Cherry Studio / Cursor",
+    en: "Check Usage / Credits for charges and failed requests, then wire Cherry Studio / Cursor",
   },
 ];
 
@@ -109,20 +109,20 @@ export const HIGH_VOLUME_SECTION = {
   title: { zh: "高频调用与生产环境", en: "High-frequency calls & production" },
   body: [
     {
-      zh: "自助套餐默认适合测试、开发和中小规模调用。",
-      en: "Self-serve packs are for testing, development, and small-to-mid call volume by default.",
+      zh: "Tokfai 处于早期公测：建议先用 99 元验证接口、速度和成本，再决定是否放大。",
+      en: "Tokfai is in early public beta: start with ¥99 to verify the API, latency, and cost before you scale.",
     },
     {
-      zh: "如需生产环境、高频调用、批量生成或工程项目接入，请先评估 RPM、QPS、并发、token、模型和预算。",
-      en: "For production, high-frequency calls, batch generation, or engineering projects, review RPM, QPS, concurrency, tokens, models, and budget first.",
+      zh: "自助套餐适合开发者、小团队、Cherry Studio / Cursor 与中小规模调用；不是大客户正式 SLA 采购。",
+      en: "Self-serve packs fit developers, small teams, Cherry Studio / Cursor, and mid-scale use — not formal large-buyer SLA procurement.",
     },
     {
-      zh: "不要直接用自助套餐压测百万级请求。",
-      en: "Do not use self-serve packs to load-test million-scale request volumes.",
+      zh: "百万 RPM、模型蒸馏、训练数据供应、大规模爬取、灰产违法、个人隐私和敏感数据处理，不作为自助承接。",
+      en: "Million-RPM, distillation, training-data supply, large-scale scraping, grey-market / illegal use, and personal privacy / sensitive data are not self-serve offers.",
     },
     {
-      zh: "所有调用以 API Key 限流、Usage / Credits 账本和系统实际返回为准。",
-      en: "All calls follow API key rate limits, the Usage / Credits ledger, and actual system responses.",
+      zh: "接入、扣费或调用记录异常，可邮件 junpengpanchina@gmail.com 人工核查。所有调用以限流、Usage / Credits 账本和实际返回为准。",
+      en: "If integration, billing, or usage logs look wrong, email junpengpanchina@gmail.com for a human review. Calls follow rate limits, Usage / Credits, and actual responses.",
     },
   ],
 };

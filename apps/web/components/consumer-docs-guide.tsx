@@ -56,8 +56,13 @@ export function ConsumerDocsGuide({
         </h1>
         <p className="text-base leading-relaxed text-muted-foreground">
           {zh
-            ? "3 分钟跑通 API，再接 Cherry Studio / Cursor / OpenAI SDK。Base URL：https://api.tokfai.com/v1"
-            : "Run the API in 3 minutes, then connect Cherry Studio / Cursor / OpenAI SDK. Base URL: https://api.tokfai.com/v1"}
+            ? "给开发者和小团队用的 AI API 中转。真实路径：注册 → 充值 99 → 创建 Key → 配 Base URL → 跑 /v1/models → 跑 chat → 看 Usage / Credits。Base URL：https://api.tokfai.com/v1"
+            : "AI API relay for developers and small teams. Path: sign up → top up ¥99 → create a key → set Base URL → call /v1/models → run chat → check Usage / Credits. Base URL: https://api.tokfai.com/v1"}
+        </p>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          {zh
+            ? "早期公测，适合先小额验证。接入、扣费、图片任务或调用记录异常，可邮件 junpengpanchina@gmail.com 人工核查。"
+            : "Early public beta — start small. Email junpengpanchina@gmail.com for a human review if integration, billing, image jobs, or usage logs look wrong."}
         </p>
         <div className="flex flex-wrap gap-3 pt-1">
           <Button asChild size="sm">
@@ -67,7 +72,7 @@ export function ConsumerDocsGuide({
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
-            <a href="#quickstart">{zh ? "3 分钟接入" : "3-minute setup"}</a>
+            <a href="#quickstart">{zh ? "真实接入路径" : "Integration path"}</a>
           </Button>
         </div>
       </header>
@@ -108,12 +113,12 @@ export function ConsumerDocsGuide({
       <section id="quickstart" className="scroll-mt-24 space-y-5">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">
-            {zh ? "3 分钟接入" : "3-minute setup"}
+            {zh ? "真实接入路径" : "Real integration path"}
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             {zh
-              ? "Authorization: Bearer sk-tokfai_xxx。先验证 models 与 chat/completions，再接客户端。"
-              : "Authorization: Bearer sk-tokfai_xxx. Verify models and chat/completions before wiring clients."}
+              ? "Authorization: Bearer sk-tokfai_xxx。先充 99、验证 models 与 chat，再核对 Usage / Credits，最后接客户端。"
+              : "Authorization: Bearer sk-tokfai_xxx. Top up ¥99, verify models and chat, check Usage / Credits, then wire clients."}
           </p>
         </div>
 

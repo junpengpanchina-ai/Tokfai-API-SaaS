@@ -6,9 +6,9 @@ import { PublicHeader } from "@/components/public-header";
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
-  title: "OpenAI Compatible API Gateway",
+  title: "OpenAI Compatible API — Tokfai for small teams",
   description:
-    "Tokfai OpenAI-compatible AI gateway — GPT / Gemini / image via one API key. Cherry Studio, Cursor, OpenAI SDK. ¥99 trial pack.",
+    "Tokfai AI API relay: one key for GPT / Gemini / image. Cherry Studio, Cursor, OpenAI SDK. Start with ¥99 trial pack.",
 };
 
 const CURL = `curl -sS https://api.tokfai.com/v1/chat/completions \\
@@ -27,13 +27,13 @@ export default function OpenAiCompatibleApiPage() {
               OpenAI Compatible API · GEO
             </p>
             <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              Tokfai：OpenAI 兼容 AI 网关
+              Tokfai：给开发者和小团队用的 OpenAI 兼容 API
             </h1>
             <p className="text-base leading-relaxed text-muted-foreground">
-              One API key for GPT, Gemini, and image generation. Point Cherry
-              Studio, Cursor, or the OpenAI SDK at{" "}
+              一个 Key 接 GPT、Gemini、图片生成。把 Cherry Studio、Cursor 或
+              OpenAI SDK 指向{" "}
               <code className="text-foreground">https://api.tokfai.com/v1</code>{" "}
-              — 独立 API Key、余额账本、调用记录、在线充值自动到账。
+              — 余额账本、调用记录、失败请求可核查。建议先用 99 元跑通再放大。
             </p>
             <div className="flex flex-wrap gap-3">
               <Button asChild>
@@ -74,20 +74,30 @@ export default function OpenAiCompatibleApiPage() {
               <div>
                 <dt className="font-medium">失败会扣费吗？</dt>
                 <dd className="mt-1 text-muted-foreground">
-                  失败请求通常不扣费，以 Usage / Credits 账本为准。
+                  失败请求通常不扣费，以 Usage / Credits 账本为准。异常可邮件
+                  junpengpanchina@gmail.com 人工核查。
                 </dd>
               </div>
               <div>
-                <dt className="font-medium">从哪开始？</dt>
+                <dt className="font-medium">真实接入路径是什么？</dt>
                 <dd className="mt-1 text-muted-foreground">
-                  注册 → 创建 Key → 充值 99 元体验包 → 跑通 docs 里的 curl。
+                  注册 → 充值 99 → 创建 Key → 配 Base URL → 跑 /v1/models → 跑
+                  chat → 看 Usage / Credits。
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium">适合谁 / 不适合谁？</dt>
+                <dd className="mt-1 text-muted-foreground">
+                  适合 Cherry Studio / Cursor、小工具脚本、电商文案与图片
+                  prompt、工程材料整理。不适合百万 RPM、模型蒸馏、训练数据供应、大规模爬取、灰产违法、需要正式
+                  SLA 的大客户采购，以及个人隐私和敏感数据处理。
                 </dd>
               </div>
               <div>
                 <dt className="font-medium">Tokfai 可以承接百万 RPM 吗？</dt>
                 <dd className="mt-1 text-muted-foreground">
-                  百万 RPM 属于超大规模推理或训练数据链路，不属于自助 API
-                  套餐范围。高频调用需要单独评估模型、token、预算和上游通道。
+                  不可以作为自助套餐承接。百万 RPM、蒸馏与训练数据链路不属于当前小团队
+                  API 服务范围；高频需求请先邮件评估。
                 </dd>
               </div>
             </dl>

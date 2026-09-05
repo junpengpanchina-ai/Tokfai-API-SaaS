@@ -48,14 +48,14 @@ export function resolveTokfaiApiBaseUrl(
 }
 
 export const TOKFAI_PRODUCT_TAGLINE =
-  "Tokfai — OpenAI-compatible AI gateway. One API key for GPT, Gemini, and image generation.";
+  "Tokfai — AI API relay for developers and small teams. One key for GPT, Gemini, and image generation.";
 export const TOKFAI_BILLING_POLICY =
   "Successful calls debit compute credits. Failed calls and image timeouts are usually not charged; Usage and Credits ledger are authoritative.";
 export const TOKFAI_PRICING_DISCLAIMER =
   "Reference prices help planning. Actual charges follow Usage and the compute-credits ledger.";
 export const TOKFAI_PLAYGROUND_POLICY =
   "Chat Playground is for text models only. Image Workbench is for Nano Banana image models via async tasks.";
-export const TOKFAI_STARTER_PLAN = "¥10 = 100,000 compute credits (¥1 = 10,000)";
+export const TOKFAI_STARTER_PLAN = "¥99 trial pack recommended (¥1 = 10,000 credits)";
 export const TOKFAI_PAYMENT_METHODS =
   "WeChat Pay, Visa / international cards";
 

@@ -5,9 +5,9 @@ import { PublicFooter } from "@/components/public-footer";
 import { PublicHeader } from "@/components/public-header";
 
 export const metadata: Metadata = {
-  title: "Docs — 3-minute OpenAI-compatible API setup",
+  title: "Docs — Tokfai integration path",
   description:
-    "Tokfai integration docs: Base URL, API key, curl examples, Cherry Studio / Cursor. Self-serve packs for test and mid-scale use; high-frequency production needs a capacity review.",
+    "Sign up → top up ¥99 → create a key → set Base URL → call /v1/models → run chat → check Usage / Credits. Cherry Studio / Cursor / OpenAI SDK. Early public beta.",
 };
 
 export default function DocsPage() {

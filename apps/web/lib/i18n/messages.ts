@@ -37,28 +37,28 @@ export const messages = {
       useCases: "Use cases",
     },
     home: {
-      headline: "Tokfai: OpenAI-compatible AI gateway",
+      headline: "AI API relay for developers and small teams",
       tagline:
-        "One API key for GPT, Gemini, and image generation — OpenAI-compatible format, independent API keys, credit ledger, usage logs, and online top-up with automatic credit.",
+        "One key for GPT, Gemini, and image generation — OpenAI-compatible Base URL, credit ledger, usage logs, and failed-request checks.",
       description:
-        "Built for API projects first. Industry scenarios (ecommerce, UAV engineering) live on dedicated use-case pages. Text bills by usage; images usually bill only on successful async completion — ledger is authoritative.",
+        "Tokfai is a small-team API service you can actually buy and run. Start with the ¥99 trial pack to verify Base URL, API key, model calls, and billing — then scale if it fits. Ecommerce and UAV scenarios live on dedicated use-case pages.",
       compatLabel: "Works with",
       compatCursor: "Cursor",
       compatCherryStudio: "Cherry Studio",
       compatOpenAiSdk: "OpenAI SDK",
       compatCustomApp: "Custom App",
-      scenariosTitle: "Core capabilities",
+      scenariosTitle: "What you get",
       scenariosDesc:
-        "Text/code, image generation (async task_id), and client integration — same Tokfai base URL. Video is reserved / coming soon.",
+        "Text/code, image generation (async task_id), and client wiring — same Tokfai Base URL. Video is reserved / coming soon.",
       scenarioChatTitle: "Text & code",
       scenarioChatBody:
-        "GPT / Gemini via POST /v1/chat/completions or /v1/responses — assistants, agents, code, GEO copy.",
+        "GPT / Gemini via POST /v1/chat/completions or /v1/responses — scripts, tools, assistants, and copy drafts.",
       scenarioChatCta: "Chat API docs",
       scenarioImageTitle: "Image generation",
       scenarioImageBody:
         "Nano Banana via POST /v1/images/generations — submit returns task_id; poll for results. Success billed; failure/timeout usually not charged.",
       scenarioImageCta: "Image API docs",
-      scenarioDevToolsTitle: "Developer tools integration",
+      scenarioDevToolsTitle: "Desktop client wiring",
       scenarioDevToolsBody:
         "Point Cursor or Cherry Studio at api.tokfai.com/v1 with your sk-tokfai_… key — use Tokfai text models only in chat clients.",
       scenarioDevToolsCta: "Integration guide",
@@ -70,6 +70,14 @@ export const messages = {
       tryImagePlayground: "Try Image Workbench",
       viewPricing: "View pricing",
       readDocs: "View integration docs",
+      fitTitle: "Who it's for",
+      fitBody:
+        "Cherry Studio / Cursor setup · small tools, scripts, and side projects · ecommerce titles, detail copy, and image prompts · engineering materials, logs, and document tidy-up · start with ¥99 to verify the API, latency, and cost before you scale.",
+      notFitTitle: "Who it's not for",
+      notFitBody:
+        "Million-RPM workloads · model distillation · training-data supply · large-scale scraping · grey-market or illegal use · large buyers that need a formal SLA first · personal privacy / sensitive data processing as a self-serve offer.",
+      earlyBetaNote:
+        "Tokfai is in early public beta — start with a small top-up. If integration, billing, image tasks, or usage logs look wrong, email junpengpanchina@gmail.com for a human review.",
       useCasesTitle: "Use-case pages",
       useCasesDesc:
         "OpenAI-compatible API, ecommerce AI credits, and UAV engineering AI — dedicated landing pages.",
@@ -77,25 +85,26 @@ export const messages = {
       useCaseEcommerce: "Ecommerce AI credits",
       useCaseUav: "UAV engineering AI",
       howItWorksTitle: "How it works",
-      howItWorksDesc: "From sign-up to your first API call in five steps.",
-      step1Title: "Sign in",
+      howItWorksDesc:
+        "Sign up → top up ¥99 → create a key → set Base URL → call /v1/models and chat → check Usage / Credits.",
+      step1Title: "Sign up",
       step1Body:
         "Create a Tokfai account or log in with your existing credentials.",
-      step2Title: "Buy compute credits",
+      step2Title: "Top up ¥99",
       step2Body:
-        "¥10 = 100,000 compute credits — prepaid balance powers every API call.",
-      step3Title: "Create API key",
+        "Buy the ¥99 trial pack first — enough to verify the API without a large prepaid balance.",
+      step3Title: "Create an API key",
       step3Body:
         "Issue a sk-tokfai_… key from the dashboard and store it securely.",
-      step4Title: "Call the API",
+      step4Title: "Wire Base URL and smoke-test",
       step4Body:
-        "Point OpenAI SDK, Cursor, Cherry Studio, or your app at api.tokfai.com/v1. Use Chat for text models; Image Workbench for Nano Banana async image tasks.",
-      step5Title: "Monitor usage",
+        "Point your client at https://api.tokfai.com/v1, call GET /v1/models, then run a short chat (or Image Workbench for Nano Banana).",
+      step5Title: "Check Usage / Credits",
       step5Body:
-        "Watch requests, credits charged, and ledger entries update in real time.",
+        "Confirm charged requests, failed-request behavior, and ledger entries before you scale spend.",
       devQuickRefTitle: "Developer quick reference",
       devQuickRefDesc:
-        "Swap your base URL and Authorization header — keep the rest of your OpenAI-compatible code unchanged.",
+        "Swap Base URL and Authorization — keep the rest of your OpenAI-compatible code.",
       devLabelBaseUrl: "Base URL",
       devLabelApiKeyFormat: "API key format",
       devLabelStarter: "Starter",
@@ -125,7 +134,8 @@ export const messages = {
       unavailable: "Unavailable",
       chatPlayground: "Chat Playground",
       imagePlayground: "Image Playground",
-      footerTagline: "Tokfai · API gateway for GPT, Gemini, and image models",
+      footerTagline:
+        "Tokfai · AI API relay for developers and small teams",
       apiReference: "API reference →",
       copyright: "© {year} Tokfai",
     },
@@ -1476,13 +1486,13 @@ export const messages = {
     pricing: {
       heroTitle: "Compute credit packs",
       heroDesc:
-        "Start with the ¥99 API trial pack. Text models bill by usage; image models bill per successful generation. Failed requests are usually not charged — Usage and Credits ledger are authoritative.",
+        "Start with ¥99. You are not asked to prepay a large amount up front — first verify Base URL, API key, model calls, and the credit ledger. After that works, move to ¥499 / ¥999 or a project plan. Text bills by usage; images bill per successful generation. Failed requests are usually not charged — Usage and Credits are authoritative.",
       featuredTitle: "Recommended packs",
       featuredDesc:
-        "¥99 for API trial; ¥499 for small teams; ¥999 for higher prepaid balance. Self-serve packs are for integration and mid-scale use — not a production high-concurrency SLA.",
+        "¥99 to prove the integration; ¥499 for small teams; ¥999 for higher prepaid balance. Self-serve packs are for onboarding and mid-scale use — not a formal large-buyer SLA.",
       starterTitle: "Smaller top-ups",
       starterDesc:
-        "¥10 / ¥20 / ¥49 remain available for light tests. Most projects should start at ¥99.",
+        "¥10 / ¥20 / ¥49 remain for light smoke tests. Most projects should start at ¥99.",
       planAudienceCredit99: "Recommended — API trial pack",
       planAudienceCredit499: "Teams & steady daily use",
       planAudienceCredit999: "Higher prepaid balance — contact us for heavy production",
@@ -1490,34 +1500,34 @@ export const messages = {
         "Failed calls are usually not charged — ledger is authoritative.",
       scaleTitle: "What scale is Tokfai for?",
       scaleBody1:
-        "Self-serve packs fit individual developers, small teams, Cherry Studio / Cursor setup, ecommerce asset tests, image generation, and early engineering validation.",
+        "Self-serve packs fit developers and small teams: Cherry Studio / Cursor, small tools and scripts, ecommerce titles / details / image prompts, engineering materials and log tidy-up, and a ¥99 first pass on API speed and cost.",
       scaleBody2:
-        "¥99 / ¥499 / ¥999 are mainly for API onboarding, cost checks, and small-to-mid call volume. They do not promise a high-concurrency production SLA.",
+        "¥99 / ¥499 / ¥999 are for proving the path and running small-to-mid volume. They are not a high-concurrency production contract.",
       scaleBody3:
-        "If you need frequent calls, batch jobs, production integration, or engineering project work, contact us first to review RPM, QPS, tokens, models, use case, and budget.",
+        "If you need frequent calls, batch jobs, production wiring, or engineering project work, email junpengpanchina@gmail.com first to review RPM, QPS, tokens, models, use case, and budget.",
       scaleBody4:
-        "Tokfai does not currently take million-RPM workloads, model distillation, training-data supply, large-scale scraping, illegal collection, or mainland-China personal privacy data processing as self-serve offers.",
-      enterpriseTitle: "Enterprise / project cooperation",
+        "Tokfai does not currently take million-RPM workloads, model distillation, training-data supply, large-scale scraping, grey-market / illegal use, formal large-buyer SLA procurement, or personal privacy / sensitive data processing as self-serve offers.",
+      enterpriseTitle: "Project / larger cooperation",
       enterpriseBody1:
         "High-frequency calling needs a human review — do not rely on self-serve packs alone.",
       enterpriseBody2:
-        "Review items include expected RPM, peak concurrency, daily requests, average tokens, model types, whether image jobs are involved, whether it is production, and whether contract / invoice / written SLA terms are required.",
+        "Review items include expected RPM, peak concurrency, daily requests, average tokens, model types, whether image jobs are involved, whether it is production, and whether contract / invoice / written commercial terms are required.",
       enterpriseCta: "Contact project plan",
       faqTitle: "Pricing FAQ",
       faq99Q: "What is the ¥99 pack?",
       faq99A:
-        "¥99 API trial pack credits about 1,188,000 compute credits (+20% bonus). Same balance for Chat and Image.",
+        "¥99 API trial pack credits about 1,188,000 compute credits (+20% bonus). Same balance for Chat and Image — use it to prove Base URL, key, models, and the ledger before larger top-ups.",
       faqFitQ: "Who is Tokfai for?",
       faqFitA:
-        "Developers and teams using Cherry Studio, Cursor, OpenAI SDK, or custom apps. Not for illegal or abusive use.",
+        "Developers and small teams using Cherry Studio, Cursor, OpenAI SDK, or custom apps; ecommerce copy/image prompts; engineering notes and logs. Start with ¥99 to verify API, speed, and cost.",
       faqNotFitQ: "Who should not self-serve first?",
       faqNotFitA:
-        "Projects that need contracts/invoices before any spend, or high-frequency / production capacity, should contact support first. Early public beta.",
+        "Million-RPM, distillation, training-data supply, large-scale scraping, grey-market / illegal use, formal SLA procurement, or personal privacy / sensitive data workloads. Early public beta — email junpengpanchina@gmail.com if you need a human review.",
       faqScaleQ: "Can I buy ¥999 and run production at high concurrency?",
       faqScaleA:
-        "No automatic promise. Self-serve packs credit your balance; high-frequency or production use needs a capacity review. Limits and Usage / Credits ledger are authoritative.",
+        "No automatic promise. Self-serve packs only credit your balance; high-frequency or production use needs a capacity review. Limits and Usage / Credits ledger are authoritative.",
       budgetNote:
-        "Reference prices help planning — actual charges follow Usage and the compute-credits ledger (admin model pricing is authoritative).",
+        "Start with ¥99 to run the path end-to-end. Reference prices help planning — actual charges follow Usage and the compute-credits ledger.",
       usageTitle: "Usage-based billing",
       usageDesc:
         "Prepaid credits power every API call. You only pay for what you use.",
@@ -1649,38 +1659,39 @@ export const messages = {
     docs: {
       pageTitle: "API Documentation",
       pageSubtitle:
-        "Tokfai KA AI aggregation platform — text/code, image generation, reserved video. Point clients at https://api.tokfai.com/v1 with sk-tokfai_….",
+        "Small-team AI API relay — text/code, image generation, reserved video. Point clients at https://api.tokfai.com/v1 with sk-tokfai_…. Early public beta: start with ¥99, then check Usage / Credits.",
       createApiKey: "Create API key",
       copy: "Copy",
       copied: "Copied",
-      threeMinuteSetupTitle: "3-minute setup",
+      threeMinuteSetupTitle: "Real integration path",
       threeMinuteSetupDesc:
-        "Four steps to go from sign-up to your first API call — works with Cursor, Cherry Studio, OpenAI SDK, or a custom app.",
+        "Sign up → top up ¥99 → create a key → set Base URL → call GET /v1/models → run chat → check Usage / Credits. Works with Cursor, Cherry Studio, OpenAI SDK, or a custom app.",
       setupStep1:
-        "Sign in and create an API key under API Keys. Copy the full sk-tokfai_… secret — it is shown once.",
+        "Sign up / sign in, then create an API key under API Keys. Copy the full sk-tokfai_… secret — it is shown once.",
       setupStep2:
-        "Top up prepaid credits under Credits. Balance updates after payment is confirmed.",
+        "Top up the ¥99 trial pack under Credits. Balance updates after payment is confirmed.",
       setupStep3:
         "Set base URL to https://api.tokfai.com/v1 and send Authorization: Bearer sk-tokfai_… on every request.",
       setupStep4:
-        "Send a test request with model auto-fast, or try Chat Playground and Image Playground first.",
+        "Call GET /v1/models, then POST /v1/chat/completions (start with auto-fast). Confirm Usage / Credits before wiring production traffic.",
       setupPlaygroundHint:
-        "Recommended flow: create your key in API Keys, then validate chat and image calls in Playground before wiring your app.",
+        "Recommended: create your key, top up ¥99, smoke-test /v1/models and chat (or Playground), then wire your app. Email junpengpanchina@gmail.com if billing or logs look wrong.",
       worksWithLabel: "Works with",
       compatCursor: "Cursor",
       compatCherryStudio: "Cherry Studio",
       compatOpenAiSdk: "OpenAI SDK",
       compatCustomApp: "Custom App",
       quickstartTitle: "Quickstart",
-      quickstartDesc: "Get your first Tokfai API response in a few minutes.",
+      quickstartDesc:
+        "Prove Tokfai end-to-end with a small top-up before you scale spend.",
       quickstartStep1:
-        "Create an API key in Dashboard → API Keys. Copy the full secret — it is shown once at creation.",
+        "Sign up, then create an API key in Dashboard → API Keys. Copy the full secret — it is shown once at creation.",
       quickstartStep2:
-        "Top up credits in Dashboard → Credits. Credits are added after payment is confirmed.",
+        "Top up ¥99 in Dashboard → Credits — enough to verify calls and the ledger.",
       quickstartStep3:
         "Set your client base URL to https://api.tokfai.com/v1 and send Authorization: Bearer sk-tokfai_… on every request.",
       quickstartStep4:
-        "Make your first call — POST /v1/chat/completions for chat (start with auto-fast) or POST /v1/images/generations for images.",
+        "Call GET /v1/models, then chat (auto-fast) or images. Check Usage / Credits for charges and failed-request behavior.",
       quickstartFirstCallTitle: "First call example",
       quickstartLinksApiKeys: "API Keys",
       quickstartLinksCredits: "Credits",
@@ -5717,22 +5728,22 @@ export const messages = {
       useCases: "场景用例",
     },
     home: {
-      headline: "Tokfai：OpenAI 兼容 AI 网关",
+      headline: "给开发者和小团队用的 AI API 中转",
       tagline:
-        "一个 API Key 接入 GPT、Gemini 与图片生成，支持 OpenAI 兼容格式、独立 API Key、余额账本、调用记录和在线充值自动到账。",
+        "一个 Key 接 GPT、Gemini、图片生成 — OpenAI 兼容 Base URL、余额账本、调用记录、失败请求可核查。",
       description:
-        "首页先讲 API。电商与无人机场景见独立用例页。文本按用量扣费；图片异步任务通常成功才扣费——以 Usage / Credits 账本为准。早期公测，面向稳定调用优化。",
+        "Tokfai 是可交易的小团队 API 服务：先用 99 元体验包跑通 Base URL、API Key、模型调用和扣费账本，再决定是否放大。电商与无人机场景见独立用例页。",
       compatLabel: "兼容",
       compatCursor: "Cursor",
       compatCherryStudio: "Cherry Studio",
       compatOpenAiSdk: "OpenAI SDK",
       compatCustomApp: "自研 App",
-      scenariosTitle: "核心能力",
+      scenariosTitle: "你能用到什么",
       scenariosDesc:
         "文本与代码、图片生成（异步 task_id）、桌面客户端接入 — 共用 Tokfai Base URL。视频能力预留 / reserved。",
       scenarioChatTitle: "文本与代码",
       scenarioChatBody:
-        "GPT / Gemini 走 POST /v1/chat/completions 或 /v1/responses — 对话、Agent、代码、GEO 文案。",
+        "GPT / Gemini 走 POST /v1/chat/completions 或 /v1/responses — 小工具、脚本、助手与文案草稿。",
       scenarioChatCta: "Chat API 文档",
       scenarioImageTitle: "图片生成",
       scenarioImageBody:
@@ -5750,6 +5761,14 @@ export const messages = {
       tryImagePlayground: "体验图片工作台",
       viewPricing: "查看定价",
       readDocs: "查看接入文档",
+      fitTitle: "适合谁",
+      fitBody:
+        "Cherry Studio / Cursor 接入 · 小工具、小脚本、小项目 · 电商标题、详情页、图片 prompt · 工程材料、日志、文档整理 · 先用 99 元验证接口、速度和成本，再决定是否放大。",
+      notFitTitle: "不适合谁",
+      notFitBody:
+        "百万 RPM · 模型蒸馏 · 训练数据供应 · 大规模爬取 · 灰产违法用途 · 需要正式 SLA 的大客户采购 · 个人隐私和敏感数据处理（不作为自助套餐承接）。",
+      earlyBetaNote:
+        "Tokfai 目前处于早期公测阶段，适合先小额验证。如果接入、扣费、图片任务或调用记录异常，可通过邮箱 junpengpanchina@gmail.com 联系人工核查。",
       useCasesTitle: "场景用例",
       useCasesDesc:
         "OpenAI 兼容 API、电商 AI 积分、无人机工程 AI — 独立落地页。",
@@ -5757,18 +5776,19 @@ export const messages = {
       useCaseEcommerce: "电商 AI 积分",
       useCaseUav: "无人机工程 AI",
       howItWorksTitle: "如何开始",
-      howItWorksDesc: "从注册到第一次 API 调用，共五个步骤。",
-      step1Title: "登录",
+      howItWorksDesc:
+        "注册 → 充值 99 → 创建 Key → 配 Base URL → 跑 /v1/models → 跑 chat → 看 Usage / Credits。",
+      step1Title: "注册登录",
       step1Body: "注册 Tokfai 账户或使用已有账号登录。",
-      step2Title: "购买算力积分",
-      step2Body: "¥10 = 100,000 算力积分 — 预付费余额驱动每次 API 调用。",
+      step2Title: "充值 99 元",
+      step2Body: "先买 99 元体验包 — 用小额把接口和账本跑通，不必一上来充大额。",
       step3Title: "创建 API Key",
       step3Body: "在控制台签发 sk-tokfai_… 密钥并妥善保存。",
-      step4Title: "调用 API",
+      step4Title: "配 Base URL 并冒烟",
       step4Body:
-        "将 OpenAI SDK、Cursor、Cherry Studio 或自研应用指向 api.tokfai.com/v1。文本用 Chat；Nano Banana 图片走图片工作台异步任务。",
-      step5Title: "查看用量",
-      step5Body: "实时查看请求、扣费算力积分与账本流水。",
+        "客户端指向 https://api.tokfai.com/v1，先 GET /v1/models，再跑短 chat（图片用图片工作台 / Nano Banana）。",
+      step5Title: "看 Usage / Credits",
+      step5Body: "核对成功扣费、失败是否扣费与账本流水，再决定是否放大调用。",
       devQuickRefTitle: "开发者速查",
       devQuickRefDesc:
         "替换 Base URL 与 Authorization 头即可 — 其余 OpenAI 兼容代码无需改动。",
@@ -5798,7 +5818,7 @@ export const messages = {
       unavailable: "不可用",
       chatPlayground: "Chat Playground",
       imagePlayground: "Image Playground",
-      footerTagline: "Tokfai · GPT / Gemini / 图片模型 API 网关",
+      footerTagline: "Tokfai · 给开发者和小团队用的 AI API 中转",
       apiReference: "API 参考 →",
       copyright: "© {year} Tokfai",
       footerUseCases: "场景用例",
@@ -7080,45 +7100,45 @@ export const messages = {
     pricing: {
       heroTitle: "算力积分充值套餐",
       heroDesc:
-        "建议从 99 元 API 体验包开始。文本按用量扣费，图片按成功生成扣费。失败请求通常不扣费——以 Usage / Credits 账本为准。",
+        "建议先从 99 元开始。不是让你一上来充值大额，而是先把 Base URL、API Key、模型调用和扣费账本跑通。跑通后，再升级 499 / 999 或项目方案。文本按用量扣费，图片按成功生成扣费。失败请求通常不扣费——以 Usage / Credits 账本为准。",
       featuredTitle: "主推套餐",
       featuredDesc:
-        "¥99 适合接入试跑；¥499 适合小团队；¥999 适合更高预付余额。自助套餐用于接入与中小规模调用，不承诺高并发生产 SLA。",
+        "¥99 用来验证接入；¥499 适合小团队；¥999 适合更高预付余额。自助套餐面向接入与中小规模调用，不是大客户正式 SLA 采购。",
       starterTitle: "小额档",
-      starterDesc: "¥10 / ¥20 / ¥49 仍可用于轻量测试。多数项目建议从 ¥99 起步。",
+      starterDesc: "¥10 / ¥20 / ¥49 仍可用于轻量冒烟。多数项目建议从 ¥99 起步。",
       planAudienceCredit99: "推荐 — 99 元 API 体验包",
       planAudienceCredit499: "团队与稳定日活",
       planAudienceCredit999: "更高预付余额 — 高频生产请先评估",
       billingFailedCalls: "失败调用通常不扣费——以账本为准。",
       scaleTitle: "Tokfai 适合什么量级？",
       scaleBody1:
-        "自助套餐适合个人开发者、小团队、Cherry Studio / Cursor 接入、电商素材测试、图片生成和工程项目早期验证。",
+        "自助套餐适合开发者和小团队：Cherry Studio / Cursor、小工具与脚本、电商标题/详情/图片 prompt、工程材料与日志整理，以及用 99 元先验证接口、速度和成本。",
       scaleBody2:
-        "99 / 499 / 999 套餐主要用于接口接入、成本验证和中小规模调用，不承诺高并发生产 SLA。",
+        "99 / 499 / 999 套餐用于把路径跑通和中小规模调用，不是高并发生产合同。",
       scaleBody3:
-        "如果你需要高频调用、批量任务、生产环境接入或工程项目合作，请先联系评估 RPM、QPS、token、模型、用途和预算。",
+        "如果你需要高频调用、批量任务、生产环境接入或工程项目合作，请先发邮件 junpengpanchina@gmail.com 评估 RPM、QPS、token、模型、用途和预算。",
       scaleBody4:
-        "Tokfai 暂不承接百万 RPM、模型蒸馏、训练数据供应、大规模抓取、违法采集或个人隐私数据处理等高风险需求。",
-      enterpriseTitle: "企业 / 工程项目合作",
+        "Tokfai 暂不承接百万 RPM、模型蒸馏、训练数据供应、大规模爬取、灰产违法用途、需要正式 SLA 的大客户采购，以及个人隐私和敏感数据处理等自助需求。",
+      enterpriseTitle: "项目 / 更大合作",
       enterpriseBody1: "高频调用需人工评估，不走自助套餐。",
       enterpriseBody2:
-        "评估项包括：预计 RPM、峰值并发、日请求量、平均 token、模型类型、是否图片任务、是否生产环境、是否需要合同/发票/书面 SLA 条款。",
+        "评估项包括：预计 RPM、峰值并发、日请求量、平均 token、模型类型、是否图片任务、是否生产环境、是否需要合同/发票/书面商务条款。",
       enterpriseCta: "联系项目方案",
       faqTitle: "定价常见问题",
       faq99Q: "99 元套餐是什么？",
       faq99A:
-        "99 元 API 体验包到账约 1,188,000 算力积分（含 +20%）。Chat 与 Image 共用余额。",
+        "99 元 API 体验包到账约 1,188,000 算力积分（含 +20%）。Chat 与 Image 共用余额——用来先跑通 Base URL、Key、模型和账本，再决定是否放大。",
       faqFitQ: "适合谁？",
       faqFitA:
-        "使用 Cherry Studio、Cursor、OpenAI SDK 或自研应用的开发者与团队。不支持违法与滥用用途。",
+        "用 Cherry Studio、Cursor、OpenAI SDK 或自研应用的开发者与小团队；电商标题/详情/图片 prompt；工程材料与日志整理。建议先用 99 元验证接口、速度和成本。",
       faqNotFitQ: "谁不该先自助下单？",
       faqNotFitA:
-        "需要合同/发票才能启动的大型采购，或高频/生产容量需求，请先联系支持。当前为早期公测。",
+        "百万 RPM、模型蒸馏、训练数据供应、大规模爬取、灰产违法、需要正式 SLA 的大客户采购、个人隐私和敏感数据处理。当前为早期公测——异常可邮件 junpengpanchina@gmail.com 人工核查。",
       faqScaleQ: "买了 ¥999 就能高并发生产吗？",
       faqScaleA:
         "不会自动承诺。自助套餐只充值余额；高频或生产环境需先做容量评估。限流与 Usage / Credits 账本为准。",
       budgetNote:
-        "参考价格便于预算规划，实际扣费以 Usage 与算力积分账本为准（以后台模型定价为准）。",
+        "建议先从 99 元把路径跑通。参考价格便于预算规划，实际扣费以 Usage 与算力积分账本为准。",
       usageTitle: "按量计费",
       usageDesc: "预付费算力积分驱动每次 API 调用，按实际使用扣费。",
       modelRatesTitle: "模型价格",
@@ -7240,38 +7260,38 @@ export const messages = {
     docs: {
       pageTitle: "API 文档",
       pageSubtitle:
-        "Tokfai KA 大客户 AI 聚合平台 — 文本与代码、图片生成、视频预留。客户端指向 https://api.tokfai.com/v1，使用 sk-tokfai_…。",
+        "给开发者和小团队用的 AI API 中转 — 文本与代码、图片生成、视频预留。客户端指向 https://api.tokfai.com/v1，使用 sk-tokfai_…。早期公测：建议先充 99，再核对 Usage / Credits。",
       createApiKey: "创建 API Key",
       copy: "复制",
       copied: "已复制",
-      threeMinuteSetupTitle: "3 分钟接入",
+      threeMinuteSetupTitle: "真实接入路径",
       threeMinuteSetupDesc:
-        "四步完成从注册到第一次 API 调用 — 适用于 Cursor、Cherry Studio、OpenAI SDK 或自研 App。",
+        "注册 → 充值 99 → 创建 Key → 配 Base URL → 跑 /v1/models → 跑 chat → 看 Usage / Credits。适用于 Cursor、Cherry Studio、OpenAI SDK 或自研 App。",
       setupStep1:
-        "登录后在 API Keys 创建密钥，复制完整 sk-tokfai_… secret（创建时仅展示一次）。",
+        "注册/登录后在 API Keys 创建密钥，复制完整 sk-tokfai_… secret（创建时仅展示一次）。",
       setupStep2:
-        "在 Credits 充值预付费算力积分，支付确认后余额自动入账。",
+        "在 Credits 充值 99 元体验包，支付确认后余额自动入账。",
       setupStep3:
         "将 base URL 设为 https://api.tokfai.com/v1，每次请求携带 Authorization: Bearer sk-tokfai_…。",
       setupStep4:
-        "使用 model auto-fast 发送测试请求，或先在 Chat Playground 与 Image Playground 验证。",
+        "先 GET /v1/models，再 POST /v1/chat/completions（建议 auto-fast）。确认 Usage / Credits 后再接正式流量。",
       setupPlaygroundHint:
-        "推荐流程：先在 API Keys 创建密钥，再在 Playground 验证对话与图像调用，最后接入你的应用。",
+        "推荐：先创建 Key、充 99、冒烟 /v1/models 与 chat（或 Playground），再接入应用。若扣费或调用记录异常，邮件 junpengpanchina@gmail.com 人工核查。",
       worksWithLabel: "兼容",
       compatCursor: "Cursor",
       compatCherryStudio: "Cherry Studio",
       compatOpenAiSdk: "OpenAI SDK",
       compatCustomApp: "Custom App",
       quickstartTitle: "快速开始",
-      quickstartDesc: "几分钟内完成第一次 Tokfai API 调用。",
+      quickstartDesc: "先用小额把 Tokfai 端到端跑通，再决定是否放大。",
       quickstartStep1:
-        "在 Dashboard → API Keys 创建 API Key，并复制完整 secret（创建时仅展示一次）。",
+        "注册后在 Dashboard → API Keys 创建 API Key，并复制完整 secret（创建时仅展示一次）。",
       quickstartStep2:
-        "在 Dashboard → Credits 充值 credits，支付确认后自动入账。",
+        "在 Dashboard → Credits 充值 99 元体验包，用于验证调用与账本。",
       quickstartStep3:
         "将客户端 base URL 设为 https://api.tokfai.com/v1，每次请求携带 Authorization: Bearer sk-tokfai_…。",
       quickstartStep4:
-        "发起第一次调用 — POST /v1/chat/completions（对话，建议从 auto-fast 开始）或 POST /v1/images/generations（图像）。",
+        "先跑 GET /v1/models，再跑 chat（auto-fast）或图片。核对 Usage / Credits 的扣费与失败请求表现。",
       quickstartFirstCallTitle: "第一次调用示例",
       quickstartLinksApiKeys: "API Keys",
       quickstartLinksCredits: "Credits",

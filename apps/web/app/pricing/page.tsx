@@ -8,9 +8,9 @@ import { fetchBillingPlansForPricing } from "@/lib/billing/recharge-plans";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Pricing — ¥99 API trial pack",
+  title: "Pricing — start with ¥99",
   description:
-    "Tokfai prepaid credits for API onboarding and mid-scale use. Self-serve packs do not promise high-concurrency production capacity — contact us for project review.",
+    "Start with ¥99 to verify Base URL, API key, model calls, and the credit ledger. Then move to ¥499 / ¥999 or a project plan. Early public beta for developers and small teams.",
 };
 
 export const dynamic = "force-dynamic";

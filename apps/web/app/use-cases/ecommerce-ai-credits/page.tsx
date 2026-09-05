@@ -25,9 +25,8 @@ export default function EcommerceAiCreditsPage() {
               电商 AI：商品文案与图片生成 API
             </h1>
             <p className="text-base leading-relaxed text-muted-foreground">
-              Use Tokfai compute credits for ecommerce SKU copy, listing
-              details, and product image prompts — via OpenAI-compatible Chat /
-              Image APIs. 一个 Key，按账本扣费。
+              用电商标题、详情页、图片 prompt 走 Tokfai Chat / Image API — 一个
+              Key，按账本扣费。建议先用 99 元跑通，再放大素材量。
             </p>
             <div className="flex flex-wrap gap-3">
               <Button asChild>
@@ -74,19 +73,28 @@ export default function EcommerceAiCreditsPage() {
               <div>
                 <dt className="font-medium">这是成品电商后台吗？</dt>
                 <dd className="mt-1 text-muted-foreground">
-                  不是。Tokfai 是 API 网关；可用 Cherry Studio 或自研系统调用。
+                  不是。Tokfai 是小团队可用的 API 中转；可用 Cherry Studio 或自研系统调用。
                 </dd>
               </div>
               <div>
                 <dt className="font-medium">图片会不会一次烧完积分？</dt>
                 <dd className="mt-1 text-muted-foreground">
-                  图片按次扣费，建议控制并发；失败/超时通常不扣费，以账本为准。
+                  图片按次扣费，建议控制并发；失败/超时通常不扣费，以账本为准。异常可邮件
+                  junpengpanchina@gmail.com 人工核查。
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium">适合谁 / 不适合谁？</dt>
+                <dd className="mt-1 text-muted-foreground">
+                  适合标题、详情、图片 prompt 与中小规模素材测试。不适合百万级铺货爬取、灰产违法，以及需要正式
+                  SLA 的大客户采购。
                 </dd>
               </div>
               <div>
                 <dt className="font-medium">下一步做什么？</dt>
                 <dd className="mt-1 text-muted-foreground">
-                  充值 99 元体验包 → 创建 Key → 先跑通文本，再试图片工作台。
+                  注册 → 充值 99 → 创建 Key → 配 Base URL → 跑 /v1/models 与
+                  chat → 再试图片工作台，并看 Usage / Credits。
                 </dd>
               </div>
             </dl>
