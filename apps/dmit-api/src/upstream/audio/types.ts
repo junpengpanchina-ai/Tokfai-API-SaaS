@@ -104,6 +104,7 @@ export type ResolvedAudioTtsConfig = {
   baseUrl: string | null;
   apiKeySet: boolean;
   defaultModel: string;
+  defaultVoice: string;
   timeoutMs: number;
   source: "env" | "unavailable";
 };

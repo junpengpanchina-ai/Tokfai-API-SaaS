@@ -23,6 +23,11 @@ import {
   recordAudioTranscriptionFailure,
   recordAudioTranscriptionSuccess,
 } from "../lib/audioTranscriptionUsage.js";
+import {
+  audioClientHint,
+  classifySttFailure,
+  hermesAudioCompatFields,
+} from "../lib/hermesAudioCompat.js";
 import { log } from "../logger.js";
 import {
   getChatCaller,
@@ -89,6 +94,16 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
   const contentType = c.req.header("content-type") ?? "";
   const maxUploadBytes = sttMaxUploadBytes();
   const clientAbort = c.req.raw.signal;
+  const client = audioClientHint(c);
+
+  log.info("hermes_audio_compat", {
+    ...hermesAudioCompatFields({
+      requestId,
+      route: "/v1/audio/transcriptions",
+      outcome: "ingress",
+      client,
+    }),
+  });
 
   if (!contentType.toLowerCase().includes("multipart/form-data")) {
     return respondApiError(
@@ -221,6 +236,19 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
       errorCode: "audio_transcription_not_available",
       errorMessage: "STT upstream not configured",
     });
+    log.warn(
+      "hermes_audio_compat",
+      hermesAudioCompatFields({
+        requestId,
+        route: "/v1/audio/transcriptions",
+        outcome: "stt_upstream_unavailable",
+        client,
+        provider: cfg.providerId,
+        stt_source: cfg.source,
+        error_code: "audio_transcription_not_available",
+        status: 501,
+      })
+    );
     return respondApiError(
       c,
       ApiError.audioCapabilityUnavailable(
@@ -282,6 +310,25 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
       errorMessage: apiErr.message,
       upstreamStatus: apiErr.upstreamStatus ?? apiErr.status,
     });
+    const outcome = classifySttFailure({
+      code: apiErr.code,
+      providerId: cfg.providerId,
+      baseUrl: cfg.baseUrl,
+      source: cfg.source,
+    });
+    log.warn(
+      "hermes_audio_compat",
+      hermesAudioCompatFields({
+        requestId,
+        route: "/v1/audio/transcriptions",
+        outcome,
+        client,
+        provider: cfg.providerId,
+        stt_source: cfg.source,
+        error_code: apiErr.code ?? "upstream_error",
+        status: apiErr.status,
+      })
+    );
     return respondApiError(c, apiErr, requestId);
   }
 
@@ -347,6 +394,18 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
     billing_status: billingStatus,
     transcript_chars: upstream.text.length,
   });
+  log.info(
+    "hermes_audio_compat",
+    hermesAudioCompatFields({
+      requestId,
+      route: "/v1/audio/transcriptions",
+      outcome: "stt_ok",
+      client,
+      provider: upstream.providerId,
+      stt_source: cfg.source,
+      status: 200,
+    })
+  );
 
   c.header("X-Request-Id", requestId);
   return c.json({
@@ -368,14 +427,25 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
 });
 
 /**
- * POST /v1/audio/speech — OpenAI-compatible TTS ingress (Audio P1 placeholder).
+ * POST /v1/audio/speech — OpenAI-compatible TTS ingress (Audio P1/P3).
  * Decoupled from chat. When TOKFAI_TTS_* unset → audio_speech_not_available JSON
- * (never route_not_found / nginx 502).
+ * (never route_not_found / nginx 502). Ready for openai_compatible worker at :8792.
  */
 audioRoutes.post("/v1/audio/speech", async (c) => {
   const caller = getChatCaller(c);
   const requestId = c.get("requestId" as never) as string;
   const clientAbort = c.req.raw.signal;
+  const client = audioClientHint(c);
+
+  log.info(
+    "hermes_audio_compat",
+    hermesAudioCompatFields({
+      requestId,
+      route: "/v1/audio/speech",
+      outcome: "ingress",
+      client,
+    })
+  );
 
   let body: Record<string, unknown>;
   try {
@@ -410,7 +480,9 @@ audioRoutes.post("/v1/audio/speech", async (c) => {
     cfg.defaultModel ||
     "tts-1";
   const voice =
-    (typeof body.voice === "string" && body.voice.trim()) || "alloy";
+    (typeof body.voice === "string" && body.voice.trim()) ||
+    cfg.defaultVoice ||
+    "alloy";
   const responseFormat =
     typeof body.response_format === "string"
       ? body.response_format.trim()
@@ -435,6 +507,18 @@ audioRoutes.post("/v1/audio/speech", async (c) => {
   });
 
   if (!provider.available || cfg.providerId === "unavailable") {
+    log.warn(
+      "hermes_audio_compat",
+      hermesAudioCompatFields({
+        requestId,
+        route: "/v1/audio/speech",
+        outcome: "tts_unavailable",
+        client,
+        provider: cfg.providerId,
+        error_code: "audio_speech_not_available",
+        status: 501,
+      })
+    );
     return respondApiError(
       c,
       ApiError.audioCapabilityUnavailable(
@@ -456,6 +540,17 @@ audioRoutes.post("/v1/audio/speech", async (c) => {
       timeoutMs: cfg.timeoutMs,
       abortSignal: clientAbort,
     });
+    log.info(
+      "hermes_audio_compat",
+      hermesAudioCompatFields({
+        requestId,
+        route: "/v1/audio/speech",
+        outcome: "tts_ok",
+        client,
+        provider: out.providerId,
+        status: 200,
+      })
+    );
     c.header("X-Request-Id", requestId);
     return new Response(Buffer.from(out.audio), {
       status: 200,
@@ -475,6 +570,22 @@ audioRoutes.post("/v1/audio/speech", async (c) => {
             type: "upstream_error",
             publicMessage: "Provider connection failed.",
           });
+    const outcome =
+      apiErr.code === "audio_speech_not_available"
+        ? "tts_unavailable"
+        : "tts_upstream_failed";
+    log.warn(
+      "hermes_audio_compat",
+      hermesAudioCompatFields({
+        requestId,
+        route: "/v1/audio/speech",
+        outcome,
+        client,
+        provider: cfg.providerId,
+        error_code: apiErr.code ?? "upstream_error",
+        status: apiErr.status,
+      })
+    );
     return respondApiError(c, apiErr, requestId);
   }
 });

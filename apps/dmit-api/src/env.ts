@@ -418,6 +418,7 @@ const Schema = z
     z.string().min(1).optional()
   ),
   TOKFAI_TTS_DEFAULT_MODEL: z.string().optional().default("tts-1"),
+  TOKFAI_TTS_DEFAULT_VOICE: z.string().optional().default("alloy"),
   TOKFAI_TTS_TIMEOUT_MS: z.coerce
     .number()
     .int()

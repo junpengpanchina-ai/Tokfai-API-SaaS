@@ -26,6 +26,7 @@ export function resolveAudioTtsConfig(): ResolvedAudioTtsConfig {
   const apiKeyLive = ttsEnv("TOKFAI_TTS_API_KEY");
   const apiKeySet = Boolean(apiKeyLive);
   const defaultModel = ttsEnv("TOKFAI_TTS_DEFAULT_MODEL") || "tts-1";
+  const defaultVoice = ttsEnv("TOKFAI_TTS_DEFAULT_VOICE") || "alloy";
   const timeoutRaw = ttsEnv("TOKFAI_TTS_TIMEOUT_MS");
   const timeoutMs = timeoutRaw
     ? Number(timeoutRaw) || 60_000
@@ -49,6 +50,7 @@ export function resolveAudioTtsConfig(): ResolvedAudioTtsConfig {
     baseUrl,
     apiKeySet,
     defaultModel,
+    defaultVoice,
     timeoutMs,
     source: providerId === "unavailable" ? "unavailable" : "env",
   };
@@ -61,6 +63,11 @@ export function resolveAudioTtsProvider(): AudioTtsProvider {
   }
   const apiKey = ttsEnv("TOKFAI_TTS_API_KEY") ?? "";
   if (!apiKey) {
+    return createUnavailableTtsAdapter();
+  }
+  // Never allow chat GRSAI / OpenAI official keys to masquerade as TTS upstream.
+  const grsaiChatKey = ttsEnv("GRSAI_API_KEY") ?? env.GRSAI_API_KEY ?? "";
+  if (grsaiChatKey && apiKey === grsaiChatKey) {
     return createUnavailableTtsAdapter();
   }
   if (cfg.providerId === "openai_compatible") {
