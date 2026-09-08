@@ -14,6 +14,7 @@ export type ErrorType =
   | "billing_error"
   | "not_found"
   | "upstream_error"
+  | "upstream_capability_error"
   | "server_error"
   | "not_implemented";
 
@@ -66,6 +67,9 @@ export const STATUS_BY_ERROR_CODE: Record<string, number> = {
   upstream_transport_error: 502,
   upstream_not_found: 502,
   endpoint_not_found: 502,
+  GRSAI_STT_ENDPOINT_NOT_FOUND: 502,
+  audio_transcription_not_available: 501,
+  audio_speech_not_available: 501,
   worker_auth_error: 502,
   worker_unreachable: 502,
   worker_timeout: 504,
@@ -150,6 +154,13 @@ export function errorTypeForCode(
     code === "missing_url"
   ) {
     return "upstream_error";
+  }
+  if (
+    code === "audio_transcription_not_available" ||
+    code === "audio_speech_not_available" ||
+    code === "GRSAI_STT_ENDPOINT_NOT_FOUND"
+  ) {
+    return "upstream_capability_error";
   }
   if (code === "worker_overloaded") {
     return "rate_limit_error";
@@ -250,6 +261,7 @@ function isErrorType(value: unknown): value is ErrorType {
     value === "billing_error" ||
     value === "not_found" ||
     value === "upstream_error" ||
+    value === "upstream_capability_error" ||
     value === "server_error" ||
     value === "not_implemented"
   );
@@ -398,6 +410,29 @@ export class ApiError extends Error {
       message,
       code,
       type: "not_implemented",
+    });
+  }
+
+  /**
+   * Audio STT/TTS capability gaps (Hermes-compatible JSON, never nginx 502 /
+   * route_not_found). Isolated from chat upstream errors.
+   */
+  static audioCapabilityUnavailable(
+    message: string,
+    code: "audio_transcription_not_available" | "audio_speech_not_available"
+  ) {
+    const safe = sanitizePublicErrorMessage(
+      message,
+      code === "audio_speech_not_available"
+        ? "Text-to-speech is not available on Tokfai yet."
+        : "Audio transcription is not available for the configured provider."
+    );
+    return new ApiError({
+      status: 501,
+      message: safe,
+      publicMessage: safe,
+      code,
+      type: "upstream_capability_error",
     });
   }
 

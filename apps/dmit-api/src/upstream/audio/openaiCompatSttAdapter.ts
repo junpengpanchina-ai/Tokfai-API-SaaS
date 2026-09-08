@@ -97,34 +97,41 @@ export function detectSttProviderBaseMismatch(
   return { mismatch: false, code: null, hint: null };
 }
 
+function isGrsaiSttProvider(providerId: string | undefined): boolean {
+  const p = String(providerId || "")
+    .trim()
+    .toLowerCase();
+  return (
+    p === "grsai_whisper_compatible" || p === "grsai" || p === "grsai_whisper"
+  );
+}
+
 /**
- * Map upstream STT HTTP failures. 404 must not look like auth failure —
- * GRSai (and others) often lack /audio/transcriptions.
+ * Map upstream STT HTTP failures to a stable Hermes-compatible envelope.
+ * Capability / upstream gaps → audio_transcription_not_available
+ * (never nginx-looking bare 502 / generic upstream_not_found).
  */
 export function mapUpstreamSttError(
   status: number,
-  bodyText: string
+  bodyText: string,
+  opts?: { providerId?: string }
 ): ApiError {
   const lower = bodyText.toLowerCase();
-  if (status === 401 || status === 403) {
+  // Client-invalid audio / params stay 400.
+  if (
+    status === 400 ||
+    ((lower.includes("invalid") || lower.includes("unsupported")) &&
+      status < 500 &&
+      status !== 401 &&
+      status !== 403 &&
+      status !== 404)
+  ) {
     return new ApiError({
-      status: 502,
-      message: `stt_upstream_auth status=${status}`,
-      code: "upstream_auth_error",
-      type: "upstream_error",
-      publicMessage: "Provider authentication failed.",
-      upstreamStatus: status,
-    });
-  }
-  // 404 before body keyword heuristics — never disguise as auth / invalid_request.
-  if (status === 404) {
-    return new ApiError({
-      status: 502,
-      message: `stt_upstream_not_found status=${status}`,
-      code: "upstream_not_found",
-      type: "upstream_error",
-      publicMessage:
-        "STT upstream endpoint was not found (endpoint_not_found).",
+      status: 400,
+      message: `stt_upstream_invalid status=${status}`,
+      code: "invalid_request_error",
+      type: "invalid_request_error",
+      publicMessage: "Invalid audio transcription request.",
       upstreamStatus: status,
     });
   }
@@ -138,37 +145,19 @@ export function mapUpstreamSttError(
       upstreamStatus: status,
     });
   }
-  if (
-    status === 400 ||
-    lower.includes("invalid") ||
-    lower.includes("unsupported")
-  ) {
-    return new ApiError({
-      status: 400,
-      message: `stt_upstream_invalid status=${status}`,
-      code: "invalid_request_error",
-      type: "invalid_request_error",
-      publicMessage: "Invalid audio transcription request.",
-      upstreamStatus: status,
-    });
-  }
-  if (status === 503 || status === 502) {
-    return new ApiError({
-      status: 503,
-      message: `stt_upstream_unavailable status=${status}`,
-      code: "all_upstreams_unavailable",
-      type: "upstream_error",
-      publicMessage:
-        "All providers are unavailable. Please retry shortly or choose another Tokfai model.",
-      upstreamStatus: status,
-    });
-  }
+
+  const err = ApiError.audioCapabilityUnavailable(
+    "Audio transcription is not available for the configured provider.",
+    "audio_transcription_not_available"
+  );
   return new ApiError({
-    status: 502,
-    message: `stt_upstream_error status=${status}`,
-    code: "upstream_error",
-    type: "upstream_error",
-    publicMessage: "Provider connection failed.",
+    status: err.status,
+    message: isGrsaiSttProvider(opts?.providerId)
+      ? `stt_grsai_capability_gap status=${status}`
+      : `stt_upstream_capability status=${status}`,
+    publicMessage: err.publicMessage,
+    code: err.code,
+    type: err.type,
     upstreamStatus: status,
   });
 }
@@ -190,8 +179,8 @@ export function createOpenaiCompatSttAdapter(args: {
       input: TranscribeAudioInput
     ): Promise<TranscribeAudioResult> {
       if (!base || !key) {
-        throw ApiError.notImplemented(
-          "Audio transcription upstream is not configured.",
+        throw ApiError.audioCapabilityUnavailable(
+          "Audio transcription is not available for the configured provider.",
           "audio_transcription_not_available"
         );
       }
@@ -272,24 +261,29 @@ export function createOpenaiCompatSttAdapter(args: {
           mime_type: input.mimeType,
           latency_ms: latencyMs,
         });
-        throw mapUpstreamSttError(res.status, bodyText);
+        throw mapUpstreamSttError(res.status, bodyText, {
+          providerId: args.providerId,
+        });
       }
 
       let text = "";
+      let hasTextField = false;
       try {
         const parsed = JSON.parse(bodyText) as { text?: unknown };
-        if (typeof parsed.text === "string") text = parsed.text.trim();
+        if (typeof parsed.text === "string") {
+          hasTextField = true;
+          text = parsed.text.trim();
+        }
       } catch {
         text = bodyText.trim();
+        hasTextField = text.length > 0;
       }
-      if (!text && !input.allowEmptyTranscript) {
-        throw new ApiError({
-          status: 502,
-          message: "stt_upstream_empty_transcript",
-          code: "upstream_error",
-          type: "upstream_error",
-          publicMessage: "Provider connection failed.",
-        });
+      // OpenAI returns {"text":""} for silence — still a successful transcription.
+      if (!hasTextField && !text && !input.allowEmptyTranscript) {
+        throw ApiError.audioCapabilityUnavailable(
+          "Audio transcription is not available for the configured provider.",
+          "audio_transcription_not_available"
+        );
       }
 
       log.info("audio_stt_upstream_ok", {
@@ -319,8 +313,8 @@ export function createUnavailableSttAdapter(): AudioSttProvider {
     id: "unavailable",
     available: false,
     async transcribeAudio() {
-      throw ApiError.notImplemented(
-        "Audio transcription is not available on Tokfai yet.",
+      throw ApiError.audioCapabilityUnavailable(
+        "Audio transcription is not available for the configured provider.",
         "audio_transcription_not_available"
       );
     },

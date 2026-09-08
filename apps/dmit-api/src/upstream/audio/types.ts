@@ -1,5 +1,5 @@
 /**
- * Isolated STT provider types (P1072).
+ * Isolated STT / TTS provider types (P1072 / Audio P1).
  * Never shared with executeChatCompletion.
  */
 
@@ -9,6 +9,8 @@ export type AudioSttProviderId =
   | "grsai_whisper_compatible"
   | "self_hosted_whisper"
   | "unavailable";
+
+export type AudioTtsProviderId = "openai_compatible" | "unavailable";
 
 export type TranscribeAudioInput = {
   requestId: string;
@@ -67,4 +69,41 @@ export type ResolvedAudioSttConfig = {
   priceCredits: number | null;
   source: "admin_channel" | "env" | "unavailable";
   channelId: string | null;
+};
+
+export type SynthesizeSpeechInput = {
+  requestId: string;
+  model: string;
+  input: string;
+  voice: string;
+  responseFormat?: string;
+  speed?: number;
+  timeoutMs: number;
+  abortSignal?: AbortSignal;
+};
+
+export type SynthesizeSpeechResult = {
+  audio: Uint8Array;
+  contentType: string;
+  providerId: AudioTtsProviderId;
+  upstreamModel: string;
+  upstreamStatus: number;
+  latencyMs: number;
+};
+
+export type AudioTtsProvider = {
+  id: AudioTtsProviderId;
+  available: boolean;
+  synthesizeSpeech(
+    input: SynthesizeSpeechInput
+  ): Promise<SynthesizeSpeechResult>;
+};
+
+export type ResolvedAudioTtsConfig = {
+  providerId: AudioTtsProviderId;
+  baseUrl: string | null;
+  apiKeySet: boolean;
+  defaultModel: string;
+  timeoutMs: number;
+  source: "env" | "unavailable";
 };

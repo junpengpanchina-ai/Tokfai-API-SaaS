@@ -1,8 +1,10 @@
 /**
  * POST /v1/audio/transcriptions — OpenAI-compatible STT ingress (P1072 / P1079R2).
+ * POST /v1/audio/speech — OpenAI-compatible TTS ingress (Audio P1 placeholder).
  *
- * Hermes → Tokfai → isolated audio provider adapter → STT upstream.
- * Does NOT call executeChatCompletion. Never fakes a transcript.
+ * Hermes → Tokfai → isolated audio provider adapter → STT/TTS upstream.
+ * Does NOT call executeChatCompletion. Never fakes a transcript or audio.
+ * Capability gaps return upstream_capability_error JSON (not route_not_found).
  *
  * Memory boundary (P1079R2):
  * - Configurable TOKFAI_STT_MAX_UPLOAD_BYTES (default 25MiB)
@@ -38,6 +40,10 @@ import {
   resolveAudioSttProvider,
   resolveSttUpstreamModel,
 } from "../upstream/audio/resolveAudioProvider.js";
+import {
+  resolveAudioTtsConfig,
+  resolveAudioTtsProvider,
+} from "../upstream/audio/resolveTtsProvider.js";
 
 const ALLOWED_EXT = new Set([
   ".mp3",
@@ -72,6 +78,9 @@ export const audioRoutes = new Hono();
 audioRoutes.use("/v1/audio/transcriptions", requireApiKeyOrSupabaseJwt);
 /** RPM / IP / tenant / concurrency — abuse guard when STT is not_billable. */
 audioRoutes.use("/v1/audio/transcriptions", chatGatewayMiddleware);
+
+audioRoutes.use("/v1/audio/speech", requireApiKeyOrSupabaseJwt);
+audioRoutes.use("/v1/audio/speech", chatGatewayMiddleware);
 
 audioRoutes.post("/v1/audio/transcriptions", async (c) => {
   const caller = getChatCaller(c);
@@ -214,8 +223,8 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
     });
     return respondApiError(
       c,
-      ApiError.notImplemented(
-        "Audio transcription is not available on Tokfai yet. Chat/Responses continue to use Base URL + API Key + Model only.",
+      ApiError.audioCapabilityUnavailable(
+        "Audio transcription is not available for the configured provider.",
         "audio_transcription_not_available"
       ),
       requestId
@@ -356,6 +365,118 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
       stt_source: cfg.source,
     },
   });
+});
+
+/**
+ * POST /v1/audio/speech — OpenAI-compatible TTS ingress (Audio P1 placeholder).
+ * Decoupled from chat. When TOKFAI_TTS_* unset → audio_speech_not_available JSON
+ * (never route_not_found / nginx 502).
+ */
+audioRoutes.post("/v1/audio/speech", async (c) => {
+  const caller = getChatCaller(c);
+  const requestId = c.get("requestId" as never) as string;
+  const clientAbort = c.req.raw.signal;
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await c.req.json()) as Record<string, unknown>;
+  } catch {
+    return respondApiError(
+      c,
+      ApiError.badRequest(
+        "Text-to-speech requires a JSON body with input, model, and voice.",
+        "invalid_request_error"
+      ),
+      requestId
+    );
+  }
+
+  const inputText =
+    typeof body.input === "string" ? body.input.trim() : "";
+  if (!inputText) {
+    return respondApiError(
+      c,
+      ApiError.badRequest(
+        "Field `input` (non-empty string) is required.",
+        "invalid_request_error"
+      ),
+      requestId
+    );
+  }
+
+  const cfg = resolveAudioTtsConfig();
+  const model =
+    (typeof body.model === "string" && body.model.trim()) ||
+    cfg.defaultModel ||
+    "tts-1";
+  const voice =
+    (typeof body.voice === "string" && body.voice.trim()) || "alloy";
+  const responseFormat =
+    typeof body.response_format === "string"
+      ? body.response_format.trim()
+      : undefined;
+  const speed =
+    typeof body.speed === "number" && Number.isFinite(body.speed)
+      ? body.speed
+      : undefined;
+
+  const provider = resolveAudioTtsProvider();
+
+  log.info("audio_speech_request", {
+    request_id: requestId,
+    api_key_id: caller.apiKeyId,
+    user_id: caller.userId,
+    route: "/v1/audio/speech",
+    provider: cfg.providerId,
+    tts_source: cfg.source,
+    model,
+    voice,
+    input_chars: inputText.length,
+  });
+
+  if (!provider.available || cfg.providerId === "unavailable") {
+    return respondApiError(
+      c,
+      ApiError.audioCapabilityUnavailable(
+        "Text-to-speech is not available on Tokfai yet.",
+        "audio_speech_not_available"
+      ),
+      requestId
+    );
+  }
+
+  try {
+    const out = await provider.synthesizeSpeech({
+      requestId,
+      model,
+      input: inputText,
+      voice,
+      responseFormat,
+      speed,
+      timeoutMs: cfg.timeoutMs,
+      abortSignal: clientAbort,
+    });
+    c.header("X-Request-Id", requestId);
+    return new Response(Buffer.from(out.audio), {
+      status: 200,
+      headers: {
+        "Content-Type": out.contentType,
+        "X-Request-Id": requestId,
+      },
+    });
+  } catch (err) {
+    const apiErr =
+      err instanceof ApiError
+        ? err
+        : new ApiError({
+            status: 502,
+            message: "tts_provider_failed",
+            code: "upstream_error",
+            type: "upstream_error",
+            publicMessage: "Provider connection failed.",
+          });
+    return respondApiError(c, apiErr, requestId);
+  }
 });
 
 async function safeFailUsage(args: {

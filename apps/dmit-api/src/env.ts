@@ -403,6 +403,28 @@ const Schema = z
     z.string().optional()
   ),
 
+  /**
+   * Audio P1 — Isolated OpenAI-compatible TTS upstream (optional).
+   * When unset, POST /v1/audio/speech returns audio_speech_not_available.
+   * Never reuse chat credentials or OpenAI official keys by default.
+   */
+  TOKFAI_TTS_PROVIDER: z.string().optional().default(""),
+  TOKFAI_TTS_BASE_URL: z.preprocess(
+    (v) => (typeof v === "string" && !v.trim() ? undefined : v),
+    z.string().url().optional()
+  ),
+  TOKFAI_TTS_API_KEY: z.preprocess(
+    (v) => (typeof v === "string" && !v.trim() ? undefined : v),
+    z.string().min(1).optional()
+  ),
+  TOKFAI_TTS_DEFAULT_MODEL: z.string().optional().default("tts-1"),
+  TOKFAI_TTS_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .default(60_000),
+
   STRIPE_SECRET_KEY: z.string().min(1).optional(),
   STRIPE_WEBHOOK_SECRET: z.string().min(1),
 

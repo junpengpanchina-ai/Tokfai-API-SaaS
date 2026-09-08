@@ -1,6 +1,8 @@
 /**
  * Resolve STT provider: ADMIN_CHANNEL > ENV_FALLBACK > UNAVAILABLE.
  * Never hard-code a vendor into the route. Never use consumer keys as upstream.
+ * Env path uses TOKFAI_STT_* only — never GRSAI_API_KEY / chat secrets.
+ * Default provider id is openai_compatible (not Groq).
  */
 
 import { env } from "../../env.js";
@@ -145,6 +147,12 @@ export async function resolveAudioSttProvider(): Promise<AudioSttProvider> {
     apiKey = admin?.apiKey?.trim() ?? "";
   } else {
     apiKey = sttEnv("TOKFAI_STT_API_KEY") ?? "";
+  }
+
+  // Never allow chat GRSAI key to masquerade as an STT upstream credential.
+  const grsaiChatKey = sttEnv("GRSAI_API_KEY") ?? env.GRSAI_API_KEY ?? "";
+  if (apiKey && grsaiChatKey && apiKey === grsaiChatKey) {
+    return createUnavailableSttAdapter();
   }
 
   if (cfg.providerId === "self_hosted_whisper") {

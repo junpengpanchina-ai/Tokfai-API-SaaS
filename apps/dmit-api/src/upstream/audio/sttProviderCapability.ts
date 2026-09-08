@@ -11,6 +11,9 @@ import type { AudioSttProviderId } from "./types.js";
 export const GRSAI_STT_ENDPOINT_UNKNOWN_MESSAGE =
   "GrsAI STT endpoint is not documented/confirmed. Chat completions base URL cannot be used for audio transcription.";
 
+/** Stable client error.code when GRSAI STT upstream returns HTTP 404. */
+export const GRSAI_STT_ENDPOINT_NOT_FOUND = "GRSAI_STT_ENDPOINT_NOT_FOUND" as const;
+
 export type SttProviderCapabilityMeta = {
   providerId: AudioSttProviderId | string;
   /** True when the Whisper-compatible STT URL shape is known/confirmed. */

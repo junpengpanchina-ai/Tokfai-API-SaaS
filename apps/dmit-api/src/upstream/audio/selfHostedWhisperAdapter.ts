@@ -176,8 +176,8 @@ export function createSelfHostedWhisperAdapter(args: {
       input: TranscribeAudioInput
     ): Promise<TranscribeAudioResult> {
       if (!base) {
-        throw ApiError.notImplemented(
-          "Self-hosted speech worker is not configured.",
+        throw ApiError.audioCapabilityUnavailable(
+          "Audio transcription is not available for the configured provider.",
           "audio_transcription_not_available"
         );
       }

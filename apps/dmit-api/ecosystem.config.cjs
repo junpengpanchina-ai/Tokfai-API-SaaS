@@ -25,5 +25,22 @@ module.exports = {
       min_uptime: "10s",
       restart_delay: 2000,
     },
+    {
+      // Audio P2 — OpenAI-compatible local whisper.cpp STT (not Groq / not GRSAI chat).
+      name: "tokfai-stt-worker",
+      cwd: __dirname + "/../../workers/openai-compat-stt",
+      script: "../../scripts/tokfai-openai-compat-stt-worker.mjs",
+      node_args: "--env-file=../../apps/dmit-api/.env",
+      env: {
+        NODE_ENV: "production",
+        TOKFAI_STT_WORKER_HOST: "127.0.0.1",
+        TOKFAI_STT_WORKER_PORT: "8791",
+      },
+      autorestart: true,
+      max_restarts: 20,
+      min_uptime: "10s",
+      restart_delay: 2000,
+      max_memory_restart: "200M",
+    },
   ],
 };
