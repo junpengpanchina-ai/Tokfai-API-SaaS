@@ -35,6 +35,7 @@ import {
 } from "../middleware/chatAuth.js";
 import { chatGatewayMiddleware } from "../middleware/chatGateway.js";
 import { respondApiError } from "../middleware/error.js";
+import { normalizeSttAudioForUpstream } from "../upstream/audio/normalizeSttAudio.js";
 import {
   DEFAULT_STT_MAX_UPLOAD_BYTES,
   readMultipartAudioWithLimit,
@@ -275,14 +276,54 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
     });
   }
 
+  // Hermes / browser mic often sends video/webm or opus — normalize to 16 kHz
+  // mono WAV before the STT upstream (isolated; never touches chat routing).
+  let upstreamBytes = bytes;
+  let upstreamMime = mimeType;
+  let upstreamFilename = filename;
+  let originalMime = mimeType;
+  let originalByteLength = bytes.byteLength;
+  let normalizedByteLength = bytes.byteLength;
+  let audioDurationSec = 0;
+  try {
+    const normalized = await normalizeSttAudioForUpstream({
+      requestId,
+      bytes,
+      mimeType,
+      filename,
+      abortSignal: clientAbort,
+      timeoutMs: Math.min(30_000, cfg.timeoutMs),
+    });
+    upstreamBytes = normalized.bytes;
+    upstreamMime = normalized.mimeType;
+    upstreamFilename = normalized.filename;
+    originalMime = normalized.originalMime;
+    originalByteLength = normalized.originalBytes;
+    normalizedByteLength = normalized.normalizedBytes;
+    audioDurationSec = normalized.duration;
+  } catch (err) {
+    if (err instanceof ApiError) {
+      await safeFailUsage({
+        caller,
+        requestId,
+        resolvedModel,
+        startedAt,
+        errorCode: err.code ?? "invalid_request_error",
+        errorMessage: err.message,
+      });
+      return respondApiError(c, err, requestId);
+    }
+    throw err;
+  }
+
   let upstream;
   try {
     upstream = await provider.transcribeAudio({
       requestId,
       model: upstreamModel,
-      bytes,
-      mimeType,
-      filename,
+      bytes: upstreamBytes,
+      mimeType: upstreamMime,
+      filename: upstreamFilename,
       language,
       prompt,
       responseFormat,
@@ -387,13 +428,28 @@ audioRoutes.post("/v1/audio/transcriptions", async (c) => {
     channel_id: cfg.channelId,
     model: resolvedModel,
     upstream_model: upstream.upstreamModel || upstreamModel,
-    bytes: bytes.byteLength,
-    mime_type: mimeType,
+    bytes: upstreamBytes.byteLength,
+    mime_type: upstreamMime,
+    original_mime: originalMime,
+    original_bytes: originalByteLength,
+    normalized_bytes: normalizedByteLength,
+    duration: audioDurationSec,
     latency_ms: latencyMs,
     status: 200,
     billing_status: billingStatus,
     transcript_chars: upstream.text.length,
   });
+
+  if (!String(upstream.text || "").trim()) {
+    log.warn("audio_transcription_empty_result", {
+      request_id: requestId,
+      original_mime: originalMime,
+      original_bytes: originalByteLength,
+      normalized_bytes: normalizedByteLength,
+      duration: audioDurationSec,
+    });
+  }
+
   log.info(
     "hermes_audio_compat",
     hermesAudioCompatFields({

@@ -297,6 +297,11 @@ const ALLOWED_FIELD_KEYS = new Set([
   "tts_source",
   "voice",
   "input_chars",
+  // STT ffmpeg normalize (webm/opus → 16 kHz mono wav)
+  "original_mime",
+  "original_bytes",
+  "normalized_bytes",
+  "duration",
 ]);
 
 const SENSITIVE_LOG_KEY_LITERAL =
