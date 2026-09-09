@@ -19,6 +19,44 @@ export function buildTtsSpeechUrl(baseUrl: string): string {
   return `${normalizeBase(baseUrl)}/audio/speech`;
 }
 
+/** Best-effort Content-Type when upstream omits it. */
+export function contentTypeForSpeechFormat(
+  responseFormat: string | undefined,
+  upstreamContentType: string | null
+): string {
+  const upstream = String(upstreamContentType || "")
+    .split(";")[0]
+    ?.trim()
+    .toLowerCase();
+  if (
+    upstream === "audio/mpeg" ||
+    upstream === "audio/mp3" ||
+    upstream === "audio/wav" ||
+    upstream === "audio/x-wav" ||
+    upstream === "audio/wave" ||
+    upstream === "audio/opus" ||
+    upstream === "audio/ogg" ||
+    upstream === "audio/aac" ||
+    upstream === "audio/flac" ||
+    upstream === "audio/pcm"
+  ) {
+    if (upstream === "audio/mp3") return "audio/mpeg";
+    if (upstream === "audio/x-wav" || upstream === "audio/wave") {
+      return "audio/wav";
+    }
+    return upstream;
+  }
+  const fmt = String(responseFormat || "mp3")
+    .trim()
+    .toLowerCase();
+  if (fmt === "wav") return "audio/wav";
+  if (fmt === "opus") return "audio/opus";
+  if (fmt === "aac") return "audio/aac";
+  if (fmt === "flac") return "audio/flac";
+  if (fmt === "pcm") return "audio/pcm";
+  return "audio/mpeg";
+}
+
 /**
  * Map upstream TTS HTTP failures to Hermes-compatible capability / upstream codes.
  */
@@ -130,10 +168,15 @@ export function createOpenaiCompatTtsAdapter(args: {
         });
       } catch (err) {
         const name = err instanceof Error ? err.name : "";
-        log.warn("audio_tts_transport_failed", {
+        const latencyMs = Date.now() - started;
+        log.warn("audio_speech_upstream_failed", {
           request_id: input.requestId,
           provider: "openai_compatible",
           model: input.model,
+          voice: input.voice,
+          input_chars: input.input.length,
+          latency_ms: latencyMs,
+          status: 502,
           err_name: name,
         });
         if (input.abortSignal?.aborted) {
@@ -166,26 +209,53 @@ export function createOpenaiCompatTtsAdapter(args: {
       const latencyMs = Date.now() - started;
       if (!res.ok) {
         const bodyText = await res.text().catch(() => "");
-        log.warn("audio_tts_upstream_http_error", {
+        log.warn("audio_speech_upstream_failed", {
           request_id: input.requestId,
           provider: "openai_compatible",
           model: input.model,
-          upstream_status: res.status,
+          voice: input.voice,
+          input_chars: input.input.length,
           latency_ms: latencyMs,
+          status: res.status,
+          upstream_status: res.status,
         });
         throw mapUpstreamTtsError(res.status, bodyText);
       }
 
       const buf = new Uint8Array(await res.arrayBuffer());
-      const contentType =
-        res.headers.get("content-type") || "audio/mpeg";
+      if (buf.byteLength === 0) {
+        log.warn("audio_speech_upstream_failed", {
+          request_id: input.requestId,
+          provider: "openai_compatible",
+          model: input.model,
+          voice: input.voice,
+          input_chars: input.input.length,
+          latency_ms: latencyMs,
+          status: 502,
+        });
+        throw new ApiError({
+          status: 502,
+          message: "tts_upstream_empty_audio",
+          code: "upstream_error",
+          type: "upstream_error",
+          publicMessage: "Provider returned empty audio.",
+          upstreamStatus: res.status,
+        });
+      }
 
-      log.info("audio_tts_upstream_ok", {
+      const contentType = contentTypeForSpeechFormat(
+        input.responseFormat,
+        res.headers.get("content-type")
+      );
+
+      log.info("audio_speech_upstream_ok", {
         request_id: input.requestId,
         provider: "openai_compatible",
         model: input.model,
-        upstream_status: res.status,
+        voice: input.voice,
+        input_chars: input.input.length,
         latency_ms: latencyMs,
+        status: res.status,
         bytes: buf.byteLength,
       });
 

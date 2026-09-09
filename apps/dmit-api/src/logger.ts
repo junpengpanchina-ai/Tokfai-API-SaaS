@@ -297,6 +297,8 @@ const ALLOWED_FIELD_KEYS = new Set([
   "tts_source",
   "voice",
   "input_chars",
+  "latency_ms",
+  "err_name",
   // STT ffmpeg normalize (webm/opus → 16 kHz mono wav)
   "original_mime",
   "original_bytes",

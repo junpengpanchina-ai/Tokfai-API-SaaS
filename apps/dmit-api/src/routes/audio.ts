@@ -549,6 +549,7 @@ audioRoutes.post("/v1/audio/speech", async (c) => {
       : undefined;
 
   const provider = resolveAudioTtsProvider();
+  const speechStartedAt = Date.now();
 
   log.info("audio_speech_request", {
     request_id: requestId,
@@ -563,6 +564,16 @@ audioRoutes.post("/v1/audio/speech", async (c) => {
   });
 
   if (!provider.available || cfg.providerId === "unavailable") {
+    const latencyMs = Date.now() - speechStartedAt;
+    log.warn("audio_speech_not_available", {
+      request_id: requestId,
+      provider: cfg.providerId,
+      model,
+      voice,
+      input_chars: inputText.length,
+      latency_ms: latencyMs,
+      status: 501,
+    });
     log.warn(
       "hermes_audio_compat",
       hermesAudioCompatFields({
@@ -585,6 +596,15 @@ audioRoutes.post("/v1/audio/speech", async (c) => {
     );
   }
 
+  log.info("audio_speech_provider_selected", {
+    request_id: requestId,
+    provider: provider.id,
+    model,
+    voice,
+    input_chars: inputText.length,
+    tts_source: cfg.source,
+  });
+
   try {
     const out = await provider.synthesizeSpeech({
       requestId,
@@ -595,6 +615,17 @@ audioRoutes.post("/v1/audio/speech", async (c) => {
       speed,
       timeoutMs: cfg.timeoutMs,
       abortSignal: clientAbort,
+    });
+    const latencyMs = Date.now() - speechStartedAt;
+    log.info("audio_speech_upstream_ok", {
+      request_id: requestId,
+      provider: out.providerId,
+      model,
+      voice,
+      input_chars: inputText.length,
+      latency_ms: latencyMs,
+      status: 200,
+      bytes: out.audio.byteLength,
     });
     log.info(
       "hermes_audio_compat",
@@ -613,6 +644,7 @@ audioRoutes.post("/v1/audio/speech", async (c) => {
       headers: {
         "Content-Type": out.contentType,
         "X-Request-Id": requestId,
+        "Content-Length": String(out.audio.byteLength),
       },
     });
   } catch (err) {
@@ -626,6 +658,29 @@ audioRoutes.post("/v1/audio/speech", async (c) => {
             type: "upstream_error",
             publicMessage: "Provider connection failed.",
           });
+    const latencyMs = Date.now() - speechStartedAt;
+    if (apiErr.code === "audio_speech_not_available") {
+      log.warn("audio_speech_not_available", {
+        request_id: requestId,
+        provider: cfg.providerId,
+        model,
+        voice,
+        input_chars: inputText.length,
+        latency_ms: latencyMs,
+        status: apiErr.status,
+      });
+    } else {
+      log.warn("audio_speech_upstream_failed", {
+        request_id: requestId,
+        provider: cfg.providerId,
+        model,
+        voice,
+        input_chars: inputText.length,
+        latency_ms: latencyMs,
+        status: apiErr.status,
+        error_code: apiErr.code ?? "upstream_error",
+      });
+    }
     const outcome =
       apiErr.code === "audio_speech_not_available"
         ? "tts_unavailable"

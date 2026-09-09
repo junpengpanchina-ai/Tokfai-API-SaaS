@@ -42,5 +42,22 @@ module.exports = {
       restart_delay: 2000,
       max_memory_restart: "200M",
     },
+    {
+      // Audio P6 — OpenAI-compatible local TTS (espeak-ng + ffmpeg; not GRSAI chat).
+      name: "tokfai-tts-worker",
+      cwd: __dirname + "/../../",
+      script: "scripts/tokfai-openai-compat-tts-worker.mjs",
+      node_args: "--env-file=apps/dmit-api/.env",
+      env: {
+        NODE_ENV: "production",
+        TOKFAI_TTS_WORKER_HOST: "127.0.0.1",
+        TOKFAI_TTS_WORKER_PORT: "8792",
+      },
+      autorestart: true,
+      max_restarts: 20,
+      min_uptime: "10s",
+      restart_delay: 2000,
+      max_memory_restart: "150M",
+    },
   ],
 };

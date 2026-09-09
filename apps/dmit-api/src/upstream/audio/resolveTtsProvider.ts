@@ -3,6 +3,9 @@
  * Never uses GRSAI chat key, OpenAI official key, or consumer Tokfai keys.
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { env } from "../../env.js";
 import {
   createOpenaiCompatTtsAdapter,
@@ -10,11 +13,44 @@ import {
 } from "./openaiCompatTtsAdapter.js";
 import type { AudioTtsProvider, ResolvedAudioTtsConfig } from "./types.js";
 
+/** Cached .env fallback — PM2 dump may inject empty TOKFAI_TTS_* and block --env-file. */
+let dotEnvCache: Map<string, string> | null = null;
+
+function loadDotEnvFallback(): Map<string, string> {
+  if (dotEnvCache) return dotEnvCache;
+  const map = new Map<string, string>();
+  try {
+    const text = readFileSync(join(process.cwd(), ".env"), "utf8");
+    for (const line of text.split(/\r?\n/)) {
+      if (!line || line.trim().startsWith("#") || !line.includes("=")) continue;
+      const i = line.indexOf("=");
+      const k = line.slice(0, i).trim();
+      let v = line.slice(i + 1).trim();
+      if (
+        (v.startsWith('"') && v.endsWith('"')) ||
+        (v.startsWith("'") && v.endsWith("'"))
+      ) {
+        v = v.slice(1, -1);
+      }
+      if (k.startsWith("TOKFAI_TTS_") && v) map.set(k, v);
+    }
+  } catch {
+    // no .env / unreadable — ignore
+  }
+  dotEnvCache = map;
+  return map;
+}
+
 function ttsEnv(name: string): string | undefined {
   const live = process.env[name];
+  // Treat whitespace-only as unset (PM2 dump empty strings block --env-file).
   if (typeof live === "string" && live.trim()) return live.trim();
   const frozen = (env as Record<string, unknown>)[name];
   if (typeof frozen === "string" && frozen.trim()) return frozen.trim();
+  if (name.startsWith("TOKFAI_TTS_")) {
+    const fromFile = loadDotEnvFallback().get(name);
+    if (fromFile) return fromFile;
+  }
   return undefined;
 }
 
@@ -66,7 +102,13 @@ export function resolveAudioTtsProvider(): AudioTtsProvider {
     return createUnavailableTtsAdapter();
   }
   // Never allow chat GRSAI / OpenAI official keys to masquerade as TTS upstream.
-  const grsaiChatKey = ttsEnv("GRSAI_API_KEY") ?? env.GRSAI_API_KEY ?? "";
+  const grsaiChatKey =
+    (typeof process.env.GRSAI_API_KEY === "string" &&
+    process.env.GRSAI_API_KEY.trim()
+      ? process.env.GRSAI_API_KEY.trim()
+      : undefined) ??
+    env.GRSAI_API_KEY ??
+    "";
   if (grsaiChatKey && apiKey === grsaiChatKey) {
     return createUnavailableTtsAdapter();
   }
