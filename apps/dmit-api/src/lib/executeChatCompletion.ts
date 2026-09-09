@@ -116,6 +116,7 @@ import {
 import { isModelEnabledForTenant } from "../tenants/resolve.js";
 import { providerFetch, isChatFallbackEligible } from "../upstream/grsai.js";
 import {
+  isSameProviderUpstreamRetryEligible,
   isTransportRetryEligible,
   TRANSPORT_RETRIES_EXHAUSTED_PUBLIC_MESSAGE,
   transportRetryReason,
@@ -403,7 +404,15 @@ export async function executeChatCompletion(
   const body = stripClientBillingOverrides(input.body);
 
   const requestedRaw = (body.model || env.BOT_MODEL).trim();
-  const resolvedRequest = resolveChatModel(requestedRaw);
+  const allowFallbackRaw = (body as Record<string, unknown>).allow_fallback;
+  const allowFallback =
+    allowFallbackRaw === true ||
+    allowFallbackRaw === 1 ||
+    allowFallbackRaw === "true" ||
+    allowFallbackRaw === "1";
+  const resolvedRequest = resolveChatModel(requestedRaw, new Set(), {
+    allowFallback,
+  });
   /** Internal catalog / alias id after consumer compatibility rewrite. */
   const requestedModel = resolvedRequest.canonicalId;
 
@@ -456,8 +465,10 @@ export async function executeChatCompletion(
     timeoutMs: timeoutPolicy.upstreamTimeoutMs,
     idleTimeoutMs: timeoutPolicy.idleTimeoutMs,
     totalTimeoutMs: timeoutPolicy.totalTimeoutMs,
+    streamFirstTokenTimeoutMs: timeoutPolicy.streamFirstTokenTimeoutMs,
     reason: timeoutPolicy.reason,
     clientStream,
+    allowFallback,
     // Policy log is pre-attempt; not a billing event.
     billing_status: "not_billable",
     credits_charged: 0,
@@ -4146,6 +4157,36 @@ async function runProviderAttempts(args: {
           });
         }
 
+        if (sameProviderTransportRetried) {
+          log.info("upstream_retry_success", {
+            requestId,
+            route,
+            requestedModel,
+            resolvedModel: resolvedModel,
+            attemptModel,
+            providerId: provider.id,
+            latencyMs: Date.now() - attemptStartedAt,
+            billing_status:
+              unlimited || creditsCharged <= 0 ? "not_billable" : "charged",
+            credits_charged: creditsCharged,
+          });
+        }
+
+        if (isAlias && attemptIndex > 0) {
+          log.info("fallback_model_succeeded", {
+            requestId,
+            route,
+            requestedModel,
+            resolvedModel: resolvedModel,
+            attemptModel,
+            attemptIndex,
+            providerId: provider.id,
+            billing_status:
+              unlimited || creditsCharged <= 0 ? "not_billable" : "charged",
+            credits_charged: creditsCharged,
+          });
+        }
+
         return {
           ok: true,
           response,
@@ -4197,6 +4238,19 @@ async function runProviderAttempts(args: {
         if (err.code === "client_aborted" || abortSignal?.aborted) {
           const clientErr =
             err.code === "client_aborted" ? err : ApiError.clientAborted();
+          log.info("client_aborted_no_retry", {
+            requestId,
+            route,
+            requestedModel,
+            resolvedModel: requestedModel,
+            attemptModel,
+            providerId: provider.id,
+            code: clientErr.code,
+            status: clientErr.status,
+            latencyMs: attemptLatencyMs,
+            billing_status: "not_billable",
+            credits_charged: 0,
+          });
           const routing = await logChatFailure({
             caller,
             requestId,
@@ -4269,17 +4323,38 @@ async function runProviderAttempts(args: {
           continue;
         }
 
-        // P1100 — no secondary provider: one same-provider transport retry.
+        // P7 / P1100 — one same-provider retry for timeout / network / 502/503/504.
         const canSameProviderTransportRetry =
           env.TOKFAI_UPSTREAM_TRANSPORT_SAME_PROVIDER_RETRY &&
           !sameProviderTransportRetried &&
-          providerAttempts.length <= 1 &&
-          isTransportRetryEligible(err) &&
+          isSameProviderUpstreamRetryEligible(err) &&
           !abortSignal?.aborted;
 
         if (canSameProviderTransportRetry) {
           sameProviderTransportRetried = true;
-          log.warn("chat_provider_transport_same_provider_retry", {
+          if (
+            err.code === "upstream_timeout" &&
+            (clientStream ||
+              timeoutPolicy.reason.includes("first_token") ||
+              timeoutPolicy.reason.includes("stream"))
+          ) {
+            log.warn("stream_first_token_timeout", {
+              requestId,
+              route,
+              requestedModel,
+              resolvedModel: requestedModel,
+              attemptModel,
+              providerId: provider.id,
+              latencyMs: attemptLatencyMs,
+              timeoutMs: attemptTimeoutMs,
+              streamFirstTokenTimeoutMs:
+                timeoutPolicy.streamFirstTokenTimeoutMs,
+              status: err.status,
+              code: err.code,
+              billing_status: "not_billable",
+            });
+          }
+          log.warn("upstream_retry_start", {
             requestId,
             route,
             requestedModel,
@@ -4293,7 +4368,8 @@ async function runProviderAttempts(args: {
             upstreamStatus: err.upstreamStatus,
             upstreamErrorCode: err.code ?? null,
             transportErrorClass: err.transportErrorClass ?? null,
-            hasHttpResponse: false,
+            hasHttpResponse:
+              err.hasHttpResponse === true || err.upstreamStatus != null,
             retryReason: transportRetryReason(err),
             sameProviderTransportRetry: true,
             latencyMs: attemptLatencyMs,
@@ -4367,7 +4443,61 @@ async function runProviderAttempts(args: {
           isChatFallbackEligible(err);
 
         if (hasNextModel) {
+          const nextModel = attempts[attemptIndex + 1]!;
+          if (sameProviderTransportRetried) {
+            log.warn("upstream_retry_failed", {
+              requestId,
+              route,
+              requestedModel,
+              attemptModel,
+              providerId: provider.id,
+              status: err.status,
+              code: err.code ?? "failed",
+              latencyMs: attemptLatencyMs,
+              billing_status: "not_billable",
+            });
+          }
+          log.info("fallback_model_selected", {
+            requestId,
+            route,
+            requestedModel,
+            fromModel: attemptModel,
+            toModel: nextModel,
+            attemptIndex,
+            providerId: provider.id,
+            status: err.status,
+            code: err.code ?? "failed",
+            billing_status: "not_billable",
+          });
           break;
+        }
+
+        if (sameProviderTransportRetried) {
+          log.warn("upstream_retry_failed", {
+            requestId,
+            route,
+            requestedModel,
+            attemptModel,
+            providerId: provider.id,
+            status: err.status,
+            code: err.code ?? "failed",
+            latencyMs: attemptLatencyMs,
+            billing_status: "not_billable",
+          });
+        }
+
+        if (isAlias && attemptIndex > 0) {
+          log.warn("fallback_model_failed", {
+            requestId,
+            route,
+            requestedModel,
+            attemptModel,
+            attemptIndex,
+            providerId: provider.id,
+            status: err.status,
+            code: err.code ?? "failed",
+            billing_status: "not_billable",
+          });
         }
 
         // P1100 — clarify public message after transport retries exhausted.

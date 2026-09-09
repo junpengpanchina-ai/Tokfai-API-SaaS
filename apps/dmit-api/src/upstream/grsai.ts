@@ -270,8 +270,23 @@ export function mapUpstreamError(
   if (
     combined.includes("<html") ||
     combined.includes("bad gateway") ||
+    combined.includes("gateway timeout") ||
     combined.includes("cloudflare")
   ) {
+    if (
+      status === 504 ||
+      status === 408 ||
+      combined.includes("gateway timeout") ||
+      combined.includes("504")
+    ) {
+      return {
+        status: 504,
+        code: "upstream_timeout",
+        type: "upstream_error",
+        publicMessage:
+          "Upstream model timed out. Please retry or switch model.",
+      };
+    }
     return {
       status: 502,
       code: "upstream_error",
@@ -377,7 +392,8 @@ export function mapUpstreamError(
       status: 504,
       code: "upstream_timeout",
       type: "upstream_error",
-      publicMessage: "上游模型响应超时，请稍后重试或切换模型。",
+      publicMessage:
+        "Upstream model timed out. Please retry or switch model.",
     };
   }
 
@@ -481,7 +497,8 @@ export async function providerFetch<T = unknown>(
         message: "Upstream provider timed out.",
         code: "upstream_timeout",
         type: "upstream_error",
-        publicMessage: "上游模型响应超时，请稍后重试或切换模型。",
+        publicMessage:
+          "Upstream model timed out. Please retry or switch model.",
         upstreamStatus: 504,
         upstreamErrorSnippet: "timeout",
       });

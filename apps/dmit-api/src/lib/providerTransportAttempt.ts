@@ -36,6 +36,8 @@ export type TransportErrorClass =
 
 const NO_RETRY_CODES = new Set([
   "invalid_request_error",
+  "invalid_token",
+  "missing_token",
   "upstream_auth_error",
   "insufficient_credits",
   "client_aborted",
@@ -44,6 +46,11 @@ const NO_RETRY_CODES = new Set([
   "tool_call_not_generated",
   "provider_tool_call_not_supported",
 ]);
+
+const STABLE_UPSTREAM_TIMEOUT_PUBLIC_MESSAGE =
+  "Upstream model timed out. Please retry or switch model.";
+
+export { STABLE_UPSTREAM_TIMEOUT_PUBLIC_MESSAGE };
 
 /**
  * Classify undici / Node fetch transport cause codes into stable enums.
@@ -109,6 +116,46 @@ export function isTransportRetryEligible(err: ApiError): boolean {
   if (err.code === "client_aborted") return false;
   if (err.code && NO_RETRY_CODES.has(err.code)) return false;
   return isNoHttpResponseTransportError(err);
+}
+
+/**
+ * P7 — one same-provider retry for timeout / network / 502 / 503 / 504.
+ * Never retry auth, client abort, or 4xx validation.
+ */
+export function isSameProviderUpstreamRetryEligible(err: ApiError): boolean {
+  if (err.code === "client_aborted") return false;
+  if (err.code && NO_RETRY_CODES.has(err.code)) return false;
+  if (err.status === 400 || err.status === 401 || err.status === 403) {
+    return false;
+  }
+  const upstreamStatus = err.upstreamStatus ?? null;
+  if (
+    upstreamStatus === 400 ||
+    upstreamStatus === 401 ||
+    upstreamStatus === 403
+  ) {
+    return false;
+  }
+  if (err.code === "upstream_timeout") return true;
+  if (isTransportRetryEligible(err)) return true;
+  if (
+    upstreamStatus === 502 ||
+    upstreamStatus === 503 ||
+    upstreamStatus === 504
+  ) {
+    return true;
+  }
+  if (err.status === 502 || err.status === 503 || err.status === 504) {
+    // Only when classified as upstream (not client gateway mistakes).
+    return (
+      err.type === "upstream_error" ||
+      err.code === "upstream_error" ||
+      err.code === "upstream_model_busy" ||
+      err.code === "upstream_model_unavailable" ||
+      err.code === "upstream_rate_limited"
+    );
+  }
+  return false;
 }
 
 export function transportRetryReason(err: ApiError): string {

@@ -1,16 +1,13 @@
 /**
- * Layered upstream timeout policy.
+ * Layered upstream timeout policy (P7).
  *
- * Chat stays moderate (env default). Ordinary /v1/responses gets a medium budget.
- * Codex / coding / heavy responses get 700s — never apply that globally.
+ * Chat / ordinary responses:
+ * - stream first-token / idle: 30s (TOKFAI_STREAM_FIRST_TOKEN_TIMEOUT_MS)
+ * - non-stream attempt: 90s (TOKFAI_CHAT_TIMEOUT_MS / UPSTREAM)
+ * - hard wall: 180s (TOKFAI_TOTAL_REQUEST_TIMEOUT_MS)
  *
- * P970: tools / tool_choice on /v1/chat/completions use TOOL_CALL_TIMEOUT_MS
- * (default 420s) — not the heavy 700s responses tier.
- *
- * Exception: Gemini 3 chat models often exceed the short chat budget on
- * /v1/chat/completions while finishing within the ordinary responses budget.
- * Give those models the responses attempt timeout on chat — never the heavy
- * 700s tier.
+ * Users must not wait a full 180s on a single hung attempt.
+ * Tool / heavy paths still use dedicated budgets but are hard-capped at 180s.
  */
 
 import { env } from "../env.js";
@@ -25,14 +22,15 @@ export type UpstreamTimeoutTier =
 
 /** Documented defaults (env may override). */
 export const UPSTREAM_TIMEOUT_DEFAULTS = {
-  /** Per-attempt upstream fetch budget. */
   attemptMs: 90_000,
-  chatMs: 180_000,
-  streamMs: 300_000,
-  toolCallMs: 420_000,
-  responsesMs: 300_000,
-  heavyMs: 700_000,
-  heavyIdleMs: 700_000,
+  chatMs: 90_000,
+  streamFirstTokenMs: 30_000,
+  streamMs: 180_000,
+  toolCallMs: 180_000,
+  responsesMs: 90_000,
+  heavyMs: 180_000,
+  heavyIdleMs: 180_000,
+  hardMs: 180_000,
 } as const;
 
 export interface UpstreamTimeoutPolicy {
@@ -41,12 +39,14 @@ export interface UpstreamTimeoutPolicy {
   /** Wall-clock budget for one upstream attempt (non-stream). */
   upstreamTimeoutMs: number;
   /**
-   * Idle budget for stream=true: abort only when no bytes arrive for this long.
-   * For today's non-stream upstream fetch, equals the attempt timeout.
+   * Idle / first-token budget for stream=true: abort when no bytes arrive.
+   * For non-stream upstream fetch used to satisfy client stream, equals attempt.
    */
   idleTimeoutMs: number;
-  /** Overall request budget (covers local work + upstream attempt). */
+  /** Overall request budget (covers local work + retries/fallback). */
   totalTimeoutMs: number;
+  /** Stream first-token budget (for logs / stream_first_token_timeout). */
+  streamFirstTokenTimeoutMs: number;
   reason: string;
 }
 
@@ -69,7 +69,7 @@ const HEAVY_MODEL_IDS = new Set([
 
 /**
  * Gemini 3 chat models that share the same GRSAI path as /v1/responses but
- * need the longer responses attempt budget on /v1/chat/completions.
+ * need a longer responses attempt budget on /v1/chat/completions.
  * Keep this narrow — do not widen the default chat timeout.
  */
 const SLOW_CHAT_GEMINI3_MODEL_IDS = new Set([
@@ -113,7 +113,6 @@ export function hasHeavyBodySignals(body: unknown): boolean {
     if (HEAVY_BODY_SIGNAL_RE.test(blob)) return true;
   }
 
-  // Cheap scan of message / input text for Codex-style prompts.
   const messages = record.messages;
   if (Array.isArray(messages)) {
     for (const msg of messages.slice(0, 8)) {
@@ -126,6 +125,17 @@ export function hasHeavyBodySignals(body: unknown): boolean {
   }
 
   return false;
+}
+
+function hardCapMs(): number {
+  return Math.max(
+    5_000,
+    env.TOKFAI_TOTAL_REQUEST_TIMEOUT_MS || UPSTREAM_TIMEOUT_DEFAULTS.hardMs
+  );
+}
+
+function clampHard(ms: number): number {
+  return Math.min(Math.max(1_000, ms), hardCapMs());
 }
 
 export function resolveUpstreamTimeoutPolicy(args: {
@@ -146,152 +156,162 @@ export function resolveUpstreamTimeoutPolicy(args: {
   const attemptMs = env.TOKFAI_UPSTREAM_TIMEOUT_MS;
   const chatMs = env.TOKFAI_CHAT_TIMEOUT_MS;
   const streamMs = env.TOKFAI_STREAM_TIMEOUT_MS;
+  const firstTokenMs =
+    env.TOKFAI_STREAM_FIRST_TOKEN_TIMEOUT_MS ??
+    UPSTREAM_TIMEOUT_DEFAULTS.streamFirstTokenMs;
   const toolCallMs = env.TOKFAI_TOOL_CALL_TIMEOUT_MS;
   const responsesUpstreamMs = env.TOKFAI_RESPONSES_UPSTREAM_TIMEOUT_MS;
   const heavyUpstreamMs = env.TOKFAI_HEAVY_RESPONSES_UPSTREAM_TIMEOUT_MS;
   const heavyIdleMs = env.TOKFAI_HEAVY_RESPONSES_IDLE_TIMEOUT_MS;
-  const chatTotalMs = env.TOKFAI_TOTAL_REQUEST_TIMEOUT_MS;
+  const hardMs = hardCapMs();
+
+  const base = (
+    partial: Omit<UpstreamTimeoutPolicy, "streamFirstTokenTimeoutMs">
+  ): UpstreamTimeoutPolicy => ({
+    ...partial,
+    upstreamTimeoutMs: clampHard(partial.upstreamTimeoutMs),
+    idleTimeoutMs: clampHard(partial.idleTimeoutMs),
+    totalTimeoutMs: clampHard(partial.totalTimeoutMs),
+    streamFirstTokenTimeoutMs: clampHard(firstTokenMs),
+  });
 
   if (isHeavy) {
-    const upstreamTimeoutMs = heavyUpstreamMs;
-    // stream=true: idle timeout governs; do not cut solely on short total wall clock.
-    let idleTimeoutMs = args.clientStream ? heavyIdleMs : heavyUpstreamMs;
-    // P1080 — responses stream transparent (no tools): cap no-output wall so
-    // clients get a terminal SSE event inside the common ~120s window.
-    // Tool / long-agent bodies keep the full heavy budget.
+    const upstreamTimeoutMs = clampHard(heavyUpstreamMs);
+    let idleTimeoutMs = args.clientStream
+      ? clampHard(Math.min(heavyIdleMs, firstTokenMs))
+      : upstreamTimeoutMs;
     const streamNoOutputGuard =
       args.clientStream === true && !requestHasTools(args.body);
     if (streamNoOutputGuard) {
-      const noOutputMs = env.TOKFAI_RESPONSES_STREAM_NO_OUTPUT_TIMEOUT_MS;
+      const noOutputMs = Math.min(
+        env.TOKFAI_RESPONSES_STREAM_NO_OUTPUT_TIMEOUT_MS,
+        firstTokenMs
+      );
       idleTimeoutMs = Math.min(idleTimeoutMs, noOutputMs);
-      const governingMs = idleTimeoutMs;
-      return {
+      return base({
         tier: "heavy",
         isHeavy: true,
-        upstreamTimeoutMs: Math.min(upstreamTimeoutMs, noOutputMs),
+        upstreamTimeoutMs: Math.min(upstreamTimeoutMs, idleTimeoutMs),
         idleTimeoutMs,
-        totalTimeoutMs: Math.min(
-          Math.max(chatTotalMs, governingMs + 10_000),
-          noOutputMs + 15_000
-        ),
-        reason: "responses_stream_no_output_guard",
-      };
+        totalTimeoutMs: hardMs,
+        reason: "responses_stream_first_token_guard",
+      });
     }
-    const governingMs = args.clientStream ? idleTimeoutMs : upstreamTimeoutMs;
-    return {
+    return base({
       tier: "heavy",
       isHeavy: true,
       upstreamTimeoutMs,
-      idleTimeoutMs,
-      totalTimeoutMs: Math.max(chatTotalMs, governingMs + 10_000),
+      idleTimeoutMs: args.clientStream
+        ? clampHard(Math.min(heavyIdleMs, Math.max(firstTokenMs, chatMs)))
+        : upstreamTimeoutMs,
+      totalTimeoutMs: hardMs,
       reason: modelHeavy
         ? "responses_heavy_model"
         : "responses_heavy_body_signals",
-    };
+    });
   }
 
   if (isResponses) {
-    const upstreamTimeoutMs = responsesUpstreamMs;
+    const upstreamTimeoutMs = clampHard(
+      Math.max(attemptMs, responsesUpstreamMs, chatMs)
+    );
     if (args.clientStream === true && !requestHasTools(args.body)) {
-      const noOutputMs = env.TOKFAI_RESPONSES_STREAM_NO_OUTPUT_TIMEOUT_MS;
-      const capped = Math.min(upstreamTimeoutMs, noOutputMs);
-      return {
+      const idle = clampHard(
+        Math.min(
+          upstreamTimeoutMs,
+          firstTokenMs,
+          env.TOKFAI_RESPONSES_STREAM_NO_OUTPUT_TIMEOUT_MS
+        )
+      );
+      return base({
         tier: "responses",
         isHeavy: false,
-        upstreamTimeoutMs: capped,
-        idleTimeoutMs: capped,
-        totalTimeoutMs: Math.min(
-          Math.max(chatTotalMs, capped + 10_000),
-          noOutputMs + 15_000
-        ),
-        reason: "responses_stream_no_output_guard",
-      };
+        upstreamTimeoutMs: idle,
+        idleTimeoutMs: idle,
+        totalTimeoutMs: hardMs,
+        reason: "responses_stream_first_token_guard",
+      });
     }
-    return {
+    return base({
       tier: "responses",
       isHeavy: false,
       upstreamTimeoutMs,
       idleTimeoutMs: upstreamTimeoutMs,
-      totalTimeoutMs: Math.max(chatTotalMs, upstreamTimeoutMs + 10_000),
+      totalTimeoutMs: hardMs,
       reason: "responses_default",
-    };
+    });
   }
 
-  // /v1/chat/completions — P970 tool_call tier (not heavy 700s).
+  // /v1/chat/completions — tool_call tier (hard-capped).
   const hasTools = requestHasTools(args.body);
   if (hasTools) {
-    const upstreamTimeoutMs = Math.max(attemptMs, toolCallMs);
-    return {
+    const upstreamTimeoutMs = clampHard(Math.max(attemptMs, toolCallMs));
+    return base({
       tier: "tool_call",
       isHeavy: false,
       upstreamTimeoutMs,
-      idleTimeoutMs: upstreamTimeoutMs,
-      totalTimeoutMs: Math.max(chatTotalMs, upstreamTimeoutMs + 10_000),
+      idleTimeoutMs: args.clientStream
+        ? clampHard(Math.min(upstreamTimeoutMs, Math.max(firstTokenMs, chatMs)))
+        : upstreamTimeoutMs,
+      totalTimeoutMs: hardMs,
       reason: "chat_tool_call",
-    };
+    });
   }
 
-  // Client stream=true without tools — STREAM_TIMEOUT_MS.
+  // Client stream=true without tools — first-token 30s (do not wait 180s).
   if (args.clientStream) {
-    const upstreamTimeoutMs = Math.max(attemptMs, streamMs);
-    return {
+    const idle = clampHard(Math.min(Math.max(attemptMs, streamMs), firstTokenMs));
+    return base({
       tier: "stream",
       isHeavy: false,
-      upstreamTimeoutMs,
-      idleTimeoutMs: upstreamTimeoutMs,
-      totalTimeoutMs: Math.max(chatTotalMs, upstreamTimeoutMs + 10_000),
-      reason: "chat_stream",
-    };
+      upstreamTimeoutMs: idle,
+      idleTimeoutMs: idle,
+      totalTimeoutMs: hardMs,
+      reason: "chat_stream_first_token",
+    });
   }
 
-  // Gemini 3 is the known exception: same upstream as responses, but often
-  // slower than the short chat default while finishing within 300s.
   const slowGemini3 =
     isSlowChatGemini3Model(args.requestedModel) ||
     isSlowChatGemini3Model(args.resolvedModel ?? "");
   if (slowGemini3) {
-    const upstreamTimeoutMs = Math.max(attemptMs, chatMs, responsesUpstreamMs);
-    return {
+    const upstreamTimeoutMs = clampHard(
+      Math.max(attemptMs, chatMs, responsesUpstreamMs)
+    );
+    return base({
       tier: "chat",
       isHeavy: false,
       upstreamTimeoutMs,
       idleTimeoutMs: upstreamTimeoutMs,
-      totalTimeoutMs: Math.max(chatTotalMs, upstreamTimeoutMs + 10_000),
+      totalTimeoutMs: hardMs,
       reason: "chat_slow_gemini3",
-    };
+    });
   }
 
-  // gemini-2.5-flash /v1/chat/completions (stream true|false) may need a short
-  // non-stream probe + internal upstream stream=true drain, then synthesize
-  // client SSE when stream=true. Never apply this budget to /v1/responses.
   const gemini25FlashChat =
     route === "/v1/chat/completions" &&
     (args.requestedModel.trim().toLowerCase() === "gemini-2.5-flash" ||
       (args.resolvedModel ?? "").trim().toLowerCase() === "gemini-2.5-flash");
   if (gemini25FlashChat) {
-    const upstreamTimeoutMs = Math.max(attemptMs, chatMs);
-    const streamFallbackBudgetMs = Math.max(upstreamTimeoutMs, streamMs);
-    return {
+    const upstreamTimeoutMs = clampHard(Math.max(attemptMs, chatMs));
+    return base({
       tier: "chat",
       isHeavy: false,
       upstreamTimeoutMs,
-      idleTimeoutMs: streamFallbackBudgetMs,
-      totalTimeoutMs: Math.max(
-        chatTotalMs,
-        Math.min(upstreamTimeoutMs, 20_000) + streamFallbackBudgetMs * 2 + 20_000
-      ),
+      idleTimeoutMs: upstreamTimeoutMs,
+      totalTimeoutMs: hardMs,
       reason: "chat_gemini25_flash_nonstream_stream_fallback",
-    };
+    });
   }
 
-  // Default non-stream chat: CHAT_TIMEOUT_MS wall, attempt capped by UPSTREAM_ATTEMPT.
-  const chatWallMs = Math.max(attemptMs, chatMs);
-  return {
+  // Default non-stream chat: 90s attempt, 180s hard wall for retries/fallback.
+  const chatWallMs = clampHard(Math.max(attemptMs, chatMs));
+  return base({
     tier: "chat",
     isHeavy: false,
     upstreamTimeoutMs: chatWallMs,
     idleTimeoutMs: chatWallMs,
-    totalTimeoutMs: Math.max(chatTotalMs, chatWallMs + 10_000),
+    totalTimeoutMs: hardMs,
     reason: "chat_default",
-  };
+  });
 }

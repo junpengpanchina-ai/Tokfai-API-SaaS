@@ -274,6 +274,10 @@ const ALLOWED_FIELD_KEYS = new Set([
   "retryReason",
   "sameProviderTransportRetry",
   "transportAttemptIndex",
+  "streamFirstTokenTimeoutMs",
+  "allowFallback",
+  "fromModel",
+  "toModel",
   // Audio P3 — Hermes OpenAI audio compatibility markers (no secrets / no audio bytes)
   "hermes_audio_compat",
   "hits_tokfai_audio",

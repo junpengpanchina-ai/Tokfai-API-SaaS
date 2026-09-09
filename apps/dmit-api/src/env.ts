@@ -105,27 +105,28 @@ const Schema = z
     .int()
     .positive()
     .default(90_000),
-  /** Ordinary /v1/responses upstream timeout (not Codex/heavy). */
+  /** Ordinary /v1/responses upstream timeout (not Codex/heavy). P7: 90s default. */
   TOKFAI_RESPONSES_UPSTREAM_TIMEOUT_MS: z.coerce
     .number()
     .int()
     .positive()
-    .default(300_000),
-  /** Codex / coding / heavy /v1/responses upstream timeout. */
+    .default(90_000),
+  /** Codex / coding / heavy /v1/responses upstream timeout. P7: hard-capped 180s. */
   TOKFAI_HEAVY_RESPONSES_UPSTREAM_TIMEOUT_MS: z.coerce
     .number()
     .int()
     .positive()
-    .default(700_000),
+    .default(180_000),
   /**
    * Idle timeout for stream=true heavy responses — abort only when upstream
    * sends no data for this long (not a short total wall-clock cut).
+   * P7 — first-token / idle default 30s via STREAM_FIRST_TOKEN when no tools.
    */
   TOKFAI_HEAVY_RESPONSES_IDLE_TIMEOUT_MS: z.coerce
     .number()
     .int()
     .positive()
-    .default(700_000),
+    .default(180_000),
   /** Per API key concurrent heavy /v1/responses cap (avoids infinite hang). */
   TOKFAI_HEAVY_RESPONSES_MAX_CONCURRENCY: z.coerce
     .number()
@@ -181,20 +182,30 @@ const Schema = z
     .default(180_000),
   /**
    * P970 — Non-stream chat wall / idle budget (not heavy 700s).
-   * Alias of total chat budget when tools are absent.
+   * P7 — user-visible non-stream attempt default 90s (hard cap via TOTAL).
    */
-  TOKFAI_CHAT_TIMEOUT_MS: z.coerce.number().int().positive().default(180_000),
-  /** P970 — Client stream=true chat idle/wall budget. */
-  TOKFAI_STREAM_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
+  TOKFAI_CHAT_TIMEOUT_MS: z.coerce.number().int().positive().default(90_000),
+  /**
+   * P7 — Client stream=true first-token / no-output idle budget.
+   * Abort if upstream sends nothing within this window (do not wait 180s).
+   */
+  TOKFAI_STREAM_FIRST_TOKEN_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(30_000),
+  /** P970 — Client stream=true chat overall idle/wall budget (hard-capped by TOTAL). */
+  TOKFAI_STREAM_TIMEOUT_MS: z.coerce.number().int().positive().default(180_000),
   /**
    * P970 — Only when request includes tools / tool_choice.
    * Never apply global 700s; tool path uses this dedicated budget.
+   * P7 — still hard-capped by TOKFAI_TOTAL_REQUEST_TIMEOUT_MS (180s).
    */
   TOKFAI_TOOL_CALL_TIMEOUT_MS: z.coerce
     .number()
     .int()
     .positive()
-    .default(420_000),
+    .default(180_000),
   /**
    * P970 — Per-upstream-attempt budget (alias of TOKFAI_UPSTREAM_TIMEOUT_MS).
    * Kept as a named knob for ops; defaults match UPSTREAM_ATTEMPT_TIMEOUT_MS=90s.

@@ -19,41 +19,42 @@ export function buildTtsSpeechUrl(baseUrl: string): string {
   return `${normalizeBase(baseUrl)}/audio/speech`;
 }
 
-/** Best-effort Content-Type when upstream omits it. */
+/** Content-Type for the resolved speech format (default mp3 → audio/mpeg). */
 export function contentTypeForSpeechFormat(
   responseFormat: string | undefined,
   upstreamContentType: string | null
 ): string {
+  const fmt = String(responseFormat || "mp3")
+    .trim()
+    .toLowerCase();
+  if (fmt === "wav") return "audio/wav";
+  if (fmt === "mp3" || fmt === "mpeg") return "audio/mpeg";
+  if (fmt === "opus") return "audio/opus";
+  if (fmt === "aac") return "audio/aac";
+  if (fmt === "flac") return "audio/flac";
+  if (fmt === "pcm") return "audio/pcm";
+
   const upstream = String(upstreamContentType || "")
     .split(";")[0]
     ?.trim()
     .toLowerCase();
+  if (upstream === "audio/mpeg" || upstream === "audio/mp3") return "audio/mpeg";
   if (
-    upstream === "audio/mpeg" ||
-    upstream === "audio/mp3" ||
     upstream === "audio/wav" ||
     upstream === "audio/x-wav" ||
-    upstream === "audio/wave" ||
+    upstream === "audio/wave"
+  ) {
+    return "audio/wav";
+  }
+  if (
     upstream === "audio/opus" ||
     upstream === "audio/ogg" ||
     upstream === "audio/aac" ||
     upstream === "audio/flac" ||
     upstream === "audio/pcm"
   ) {
-    if (upstream === "audio/mp3") return "audio/mpeg";
-    if (upstream === "audio/x-wav" || upstream === "audio/wave") {
-      return "audio/wav";
-    }
     return upstream;
   }
-  const fmt = String(responseFormat || "mp3")
-    .trim()
-    .toLowerCase();
-  if (fmt === "wav") return "audio/wav";
-  if (fmt === "opus") return "audio/opus";
-  if (fmt === "aac") return "audio/aac";
-  if (fmt === "flac") return "audio/flac";
-  if (fmt === "pcm") return "audio/pcm";
   return "audio/mpeg";
 }
 
@@ -140,12 +141,16 @@ export function createOpenaiCompatTtsAdapter(args: {
       }
 
       const url = buildTtsSpeechUrl(base);
+      const responseFormat =
+        String(input.responseFormat || "mp3")
+          .trim()
+          .toLowerCase() || "mp3";
       const body: Record<string, unknown> = {
         model: input.model,
         input: input.input,
         voice: input.voice,
+        response_format: responseFormat,
       };
-      if (input.responseFormat) body.response_format = input.responseFormat;
       if (typeof input.speed === "number") body.speed = input.speed;
 
       const started = Date.now();
@@ -244,7 +249,7 @@ export function createOpenaiCompatTtsAdapter(args: {
       }
 
       const contentType = contentTypeForSpeechFormat(
-        input.responseFormat,
+        responseFormat,
         res.headers.get("content-type")
       );
 

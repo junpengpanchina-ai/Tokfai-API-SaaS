@@ -579,7 +579,7 @@ export class ApiError extends Error {
 
   static requestTimeout(
     message = "Total request timeout exceeded.",
-    publicMessage = "上游模型响应超时，请稍后重试或切换模型。"
+    publicMessage = "Upstream model timed out. Please retry or switch model."
   ) {
     return new ApiError({
       status: 504,

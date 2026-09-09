@@ -8,10 +8,10 @@
 
 import { tokfaiClientDisplayName } from "../catalog/clientModelDisplayName.js";
 
-/** Smart routing aliases — resolved server-side with ordered fallback. */
+/** Smart routing aliases — resolved server-side with ordered fallback (P7). */
 export const MODEL_ALIAS_CHAINS = {
-  "auto-fast": ["gemini-3-flash", "gemini-2.5-flash", "gemini-3-pro"],
-  "auto-pro": ["gpt-5.5", "gpt-5.4", "gemini-3-pro"],
+  "auto-fast": ["gpt-5.6-sol", "gpt-5.5", "gemini-3-flash", "gemini-2.5-flash"],
+  "auto-pro": ["gpt-5.6-terra", "gpt-5.6-sol", "gpt-5.5"],
   "auto-cheap": ["gemini-2.5-flash", "gemini-3-flash"],
   /**
    * Client-facing GPT-5 family names that may not exist upstream.
@@ -37,6 +37,15 @@ export const MODEL_ALIAS_CHAINS = {
    */
   "deepseek-chat": ["gemini-2.5-flash", "gemini-3-flash"],
 } as const;
+
+/**
+ * Explicit model fallback chains — only used when body.allow_fallback=true.
+ * Without that flag, gpt-5.6-sol / gpt-5.6-terra stay single-attempt (no silent switch).
+ */
+export const EXPLICIT_ALLOW_FALLBACK_CHAINS: Record<string, readonly string[]> = {
+  "gpt-5.6-sol": ["gpt-5.6-sol", "gpt-5.5", "gpt-5.6-terra"],
+  "gpt-5.6-terra": ["gpt-5.6-terra", "gpt-5.6-sol", "gpt-5.5"],
+};
 
 export type ModelAliasId = keyof typeof MODEL_ALIAS_CHAINS;
 
@@ -147,14 +156,19 @@ export function isModelAlias(model: string): model is ModelAliasId {
  * Call this once at the start of chat/responses execution.
  *
  * Also exported as resolveModel() — the single entry used by all OpenAI routes.
+ *
+ * @param opts.allowFallback — when true, explicit gpt-5.6-* may use
+ *   EXPLICIT_ALLOW_FALLBACK_CHAINS. Auto-* aliases always keep their chains.
  */
 export function resolveChatModel(
   raw: string,
-  skipModels: ReadonlySet<string> = new Set()
+  skipModels: ReadonlySet<string> = new Set(),
+  opts?: { allowFallback?: boolean }
 ): ResolvedChatModel {
   const requestedRaw = raw.trim();
   const normalized = normalizeClientModelId(requestedRaw);
   const canonicalId = CLIENT_MODEL_REWRITES[normalized] ?? normalized;
+  const allowFallback = opts?.allowFallback === true;
 
   if (isModelAlias(canonicalId)) {
     const attempts = MODEL_ALIAS_CHAINS[canonicalId].filter(
@@ -167,6 +181,21 @@ export function resolveChatModel(
       isAlias: true,
       attempts: [...attempts],
     };
+  }
+
+  if (allowFallback) {
+    const chain = EXPLICIT_ALLOW_FALLBACK_CHAINS[canonicalId];
+    if (chain && chain.length > 0) {
+      const attempts = chain.filter((id) => !skipModels.has(id));
+      return {
+        requestedRaw,
+        normalized,
+        canonicalId,
+        // Treat as alias-like for next-model fallback eligibility.
+        isAlias: attempts.length > 1,
+        attempts: attempts.length > 0 ? [...attempts] : [canonicalId],
+      };
+    }
   }
 
   return {

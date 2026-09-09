@@ -539,10 +539,12 @@ audioRoutes.post("/v1/audio/speech", async (c) => {
     (typeof body.voice === "string" && body.voice.trim()) ||
     cfg.defaultVoice ||
     "alloy";
-  const responseFormat =
+  const responseFormatRaw =
     typeof body.response_format === "string"
-      ? body.response_format.trim()
-      : undefined;
+      ? body.response_format.trim().toLowerCase()
+      : "";
+  // OpenAI Audio Speech default: mp3 → audio/mpeg when client omits response_format.
+  const responseFormat = responseFormatRaw || "mp3";
   const speed =
     typeof body.speed === "number" && Number.isFinite(body.speed)
       ? body.speed
