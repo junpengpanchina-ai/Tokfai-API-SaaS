@@ -61,70 +61,121 @@ function sttProviderFromYaml(yamlText) {
   return pm ? pm[1].replace(/['"]/g, "") : null;
 }
 
-function hasExplicitSttOpenaiBaseUrl(yamlText) {
-  const stt = (String(yamlText || "").match(
-    /^stt:\s*\n([\s\S]*?)(?=\n[a-zA-Z_]|\n*$)/m
-  ) || [])[1];
-  if (!stt) return false;
-  const openai = (stt.match(
-    /openai:\s*\n([\s\S]*?)(?=\n  [a-zA-Z_]|\n[a-zA-Z_]|\n*$)/
-  ) || [])[1];
-  return Boolean(openai && /^\s*base_url:\s*\S+/m.test(openai));
+/**
+ * Extract a top-level YAML mapping section body (lines until next top-level key).
+ * @returns {{ start: number, end: number, body: string } | null}
+ */
+function topLevelSection(yamlText, name) {
+  const text = String(yamlText || "");
+  const re = new RegExp(`^${name}:\\s*(?:\\n|$)`, "m");
+  const m = re.exec(text);
+  if (!m) return null;
+  const bodyStart = m.index + m[0].length;
+  const rest = text.slice(bodyStart);
+  const next = rest.search(/\n[a-zA-Z_][a-zA-Z0-9_]*:/);
+  const bodyEnd = next < 0 ? text.length : bodyStart + next;
+  return { start: m.index, end: bodyEnd, body: text.slice(bodyStart, bodyEnd) };
+}
+
+function sectionProvider(body) {
+  const pm = String(body || "").match(/^\s*provider:\s*(\S+)/m);
+  return pm ? pm[1].replace(/['"]/g, "") : null;
+}
+
+function openaiSubBlock(body) {
+  const m = String(body || "").match(
+    /(^|\n)(  openai:\s*\n)((?:    .*\n)*)/
+  );
+  if (!m) return null;
+  return { full: m[0], lead: m[1], head: m[2], rest: m[3], index: m.index };
+}
+
+function injectOpenaiBaseUrlInSection(yamlText, sectionName, baseUrl, defaults) {
+  const sec = topLevelSection(yamlText, sectionName);
+  if (!sec) {
+    const block = [
+      "",
+      `${sectionName}:`,
+      `  provider: openai`,
+      `  openai:`,
+      ...Object.entries(defaults).map(
+        ([k, v]) => `    ${k}: ${typeof v === "string" ? JSON.stringify(v) : v}`
+      ),
+      `    base_url: ${JSON.stringify(baseUrl)}`,
+      "",
+    ].join("\n");
+    return {
+      text: String(yamlText || "").replace(/\s*$/, "") + block,
+      wrote: true,
+      reason: `appended_${sectionName}_block`,
+    };
+  }
+  const provider = sectionProvider(sec.body);
+  if (provider && provider !== "openai") {
+    return {
+      text: yamlText,
+      wrote: false,
+      reason: `preserve_${sectionName}_provider_${provider}`,
+    };
+  }
+  const oai = openaiSubBlock(sec.body);
+  if (oai && /^\s*base_url:\s*\S+/m.test(oai.rest)) {
+    return {
+      text: yamlText,
+      wrote: false,
+      reason: `explicit_${sectionName}_openai_base_url`,
+    };
+  }
+  let newBody;
+  if (oai) {
+    newBody =
+      sec.body.slice(0, oai.index) +
+      `${oai.lead}${oai.head}    base_url: ${JSON.stringify(baseUrl)}\n${oai.rest}` +
+      sec.body.slice(oai.index + oai.full.length);
+  } else {
+    const trimmed = sec.body.replace(/\s*$/, "");
+    const suffix = [
+      "",
+      "  openai:",
+      ...Object.entries(defaults).map(
+        ([k, v]) => `    ${k}: ${typeof v === "string" ? JSON.stringify(v) : v}`
+      ),
+      `    base_url: ${JSON.stringify(baseUrl)}`,
+      "",
+    ].join("\n");
+    newBody = `${trimmed}${suffix}`;
+  }
+  const next =
+    yamlText.slice(0, sec.start) +
+    `${sectionName}:\n${newBody}` +
+    yamlText.slice(sec.end);
+  return {
+    text: next,
+    wrote: next !== yamlText,
+    reason: oai
+      ? `injected_${sectionName}_openai_base_url`
+      : `injected_openai_under_${sectionName}`,
+  };
+}
+
+/**
+ * Inject tts.openai.base_url when TTS provider is openai/unset and base absent.
+ * Lets Hermes speech hit Tokfai (/v1/audio/speech) instead of api.openai.com.
+ */
+export function ensureTtsOpenaiBaseUrl(yamlText, baseUrl) {
+  return injectOpenaiBaseUrlInSection(yamlText, "tts", baseUrl, {
+    model: "tts-1",
+    voice: "alloy",
+  });
 }
 
 /**
  * Inject stt.openai.base_url only when absent and provider is openai/unset.
  */
 export function ensureSttOpenaiBaseUrl(yamlText, baseUrl) {
-  const provider = sttProviderFromYaml(yamlText);
-  if (provider && provider !== "openai") {
-    return {
-      text: yamlText,
-      wrote: false,
-      reason: `preserve_stt_provider_${provider}`,
-    };
-  }
-  if (hasExplicitSttOpenaiBaseUrl(yamlText)) {
-    return {
-      text: yamlText,
-      wrote: false,
-      reason: "explicit_stt_openai_base_url",
-    };
-  }
-  if (!/^stt:\s*$/m.test(yamlText) && !/^stt:\s*\n/m.test(yamlText)) {
-    return {
-      text:
-        yamlText.replace(/\s*$/, "") +
-        `\nstt:\n  enabled: true\n  provider: openai\n  openai:\n    model: whisper-1\n    base_url: ${JSON.stringify(baseUrl)}\n`,
-      wrote: true,
-      reason: "appended_stt_block",
-    };
-  }
-  if (/^  openai:\s*$/m.test(yamlText) || /^  openai:\s*\n/m.test(yamlText)) {
-    const next = yamlText.replace(
-      /(^  openai:\s*\n(?:    .*\n)*)/m,
-      (block) => {
-        if (/^\s*base_url:/m.test(block)) return block;
-        return block.replace(
-          /(^  openai:\s*\n)/m,
-          `$1    base_url: ${JSON.stringify(baseUrl)}\n`
-        );
-      }
-    );
-    return {
-      text: next,
-      wrote: next !== yamlText,
-      reason: next !== yamlText ? "injected_stt_openai_base_url" : "unchanged",
-    };
-  }
-  return {
-    text: yamlText.replace(
-      /(^stt:\s*\n)/m,
-      `$1  openai:\n    model: whisper-1\n    base_url: ${JSON.stringify(baseUrl)}\n`
-    ),
-    wrote: true,
-    reason: "injected_openai_under_stt",
-  };
+  return injectOpenaiBaseUrlInSection(yamlText, "stt", baseUrl, {
+    model: "whisper-1",
+  });
 }
 
 function modelBaseUrlFromYaml(yamlText) {
@@ -258,10 +309,14 @@ export function applyHermesTokfaiSttSync(opts) {
   let cfgWrote = false;
   let nextCfg = cfgText;
   if (cfgText) {
-    const result = ensureSttOpenaiBaseUrl(cfgText, baseUrl);
-    nextCfg = result.text;
-    cfgWrote = result.wrote;
-    actions.push(`config.yaml: ${result.reason}`);
+    const sttResult = ensureSttOpenaiBaseUrl(cfgText, baseUrl);
+    nextCfg = sttResult.text;
+    cfgWrote = sttResult.wrote;
+    actions.push(`config.yaml stt: ${sttResult.reason}`);
+    const ttsResult = ensureTtsOpenaiBaseUrl(nextCfg, baseUrl);
+    nextCfg = ttsResult.text;
+    cfgWrote = cfgWrote || ttsResult.wrote;
+    actions.push(`config.yaml tts: ${ttsResult.reason}`);
   } else if (mode === "connect") {
     nextCfg = [
       "model:",
