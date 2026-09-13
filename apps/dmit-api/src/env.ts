@@ -338,13 +338,19 @@ const Schema = z
     .optional()
     .default("grsai-primary,grsai-secondary"),
   /**
-   * P8 secondary GRSAI / OpenAI-compat endpoint (aliases of UPSTREAM_SECONDARY).
+   * P8/P11 secondary GRSAI / OpenAI-compat endpoint (aliases of UPSTREAM_SECONDARY).
    * Accepts both GRSI (spec typo) and GRSAI spellings.
    */
   TOKFAI_GRSI_SECONDARY_BASE_URL: z.string().url().optional(),
   TOKFAI_GRSI_SECONDARY_API_KEY: z.string().min(1).optional(),
   TOKFAI_GRSAI_SECONDARY_BASE_URL: z.string().url().optional(),
   TOKFAI_GRSAI_SECONDARY_API_KEY: z.string().min(1).optional(),
+  /** P11 — secondary chat completions path (preferred over UPSTREAM_SECONDARY_CHAT_PATH). */
+  TOKFAI_GRSAI_SECONDARY_CHAT_COMPLETIONS_PATH: z
+    .string()
+    .min(1)
+    .optional(),
+  TOKFAI_GRSI_SECONDARY_CHAT_COMPLETIONS_PATH: z.string().min(1).optional(),
   /**
    * P8 ops-only: comma-separated provider ids whose circuit is forced open
    * at process start (for acceptance when upstream is currently healthy).

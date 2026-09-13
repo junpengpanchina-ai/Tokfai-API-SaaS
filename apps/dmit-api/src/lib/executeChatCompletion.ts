@@ -1492,6 +1492,8 @@ async function runProviderAttempts(args: {
   let transportAttemptsObserved = 0;
   // P10 — empty fallback pool: log fallback_provider_unavailable at most once.
   let fallbackUnavailableLogged = false;
+  // P11 — true once we intentionally left the preferred primary for another provider.
+  let providerFallbackActive = false;
 
   const logFallbackUnavailableOnce = (fields: Record<string, unknown>) => {
     if (fallbackUnavailableLogged) return;
@@ -1562,6 +1564,18 @@ async function runProviderAttempts(args: {
             : "no_secondary_provider",
           message: NO_FALLBACK_PROVIDER_TIMEOUT_PUBLIC_MESSAGE,
         });
+      } else if (allUnhealthy) {
+        // Secondary configured but also open/unhealthy — nothing left to try.
+        log.info("fallback_skipped_reason", {
+          requestId,
+          route,
+          requestedModel,
+          attemptModel,
+          skippedProviderIds: skippedUnhealthy.map((p) => p.id),
+          fallbackSkippedReason: "providers_exhausted",
+          reason: "all_providers_unhealthy",
+          billing_status: "not_billable",
+        });
       }
       lastError = allUnhealthy
         ? ApiError.requestTimeout(
@@ -1582,6 +1596,21 @@ async function runProviderAttempts(args: {
         continue;
       }
       break;
+    }
+
+    // P11 — circuit-open skip of primary: announce secondary as selected fallback.
+    if (skippedUnhealthy.length > 0 && providerAttempts.length > 0) {
+      providerFallbackActive = true;
+      log.info("fallback_provider_selected", {
+        requestId,
+        route,
+        requestedModel,
+        attemptModel,
+        fromProviderId: skippedUnhealthy[0]!.id,
+        toProviderId: providerAttempts[0]!.id,
+        reason: "circuit_open_skip",
+        billing_status: "not_billable",
+      });
     }
 
     // Sole provider already degraded: fail fast with model suggestions —
@@ -3904,7 +3933,17 @@ async function runProviderAttempts(args: {
           route,
           attemptModel,
         });
-        if (providerIndex > 0) {
+        if (providerIndex > 0 || providerFallbackActive) {
+          log.info("fallback_provider_success", {
+            requestId,
+            route,
+            requestedModel,
+            attemptModel,
+            providerId: provider.id,
+            providerIndex,
+            billing_status: "not_billable",
+          });
+          // Legacy alias kept for existing ops greps.
           log.info("fallback_provider_succeeded", {
             requestId,
             route,
@@ -4507,6 +4546,7 @@ async function runProviderAttempts(args: {
 
         if (hasNextProvider) {
           const next = nextProvider!;
+          providerFallbackActive = true;
           log.info("fallback_provider_selected", {
             requestId,
             route,
@@ -4625,6 +4665,19 @@ async function runProviderAttempts(args: {
           : !isChatSecondaryProviderConfigured() || providerAttempts.length <= 1
             ? "no_secondary_provider"
             : "providers_exhausted";
+
+        log.info("fallback_skipped_reason", {
+          requestId,
+          route,
+          requestedModel,
+          attemptModel,
+          providerId: provider.id,
+          status: err.status,
+          code: err.code ?? "failed",
+          upstreamStatus: err.upstreamStatus ?? null,
+          fallbackSkippedReason,
+          billing_status: "not_billable",
+        });
 
         if (
           fallbackSkippedReason === "no_secondary_provider" &&

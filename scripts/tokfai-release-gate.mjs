@@ -9,6 +9,11 @@
  *   TOKFAI_API_KEY=sk-tokfai_... node scripts/tokfai-release-gate.mjs
  *   cd apps/dmit-api && TOKFAI_API_KEY=... npm run release-gate
  *
+ * P12 post-deploy ops checklist (chat/audio/admin health; no PM2/env mutation):
+ *   TOKFAI_KEY=... ADMIN_TOKEN=... OPS_CHECKLIST_ONLY=1 \
+ *     node scripts/tokfai-release-gate.mjs
+ *   # or: node scripts/tokfai-p12-ops-checklist-smoke.mjs
+ *
  * Optional:
  *   TOKFAI_PM2_APP=dmit-api   limit pm2 log grep to one process
  *
@@ -28,6 +33,8 @@
  *   LIVE=1 MODEL=nano-banana node scripts/p948-nano-banana-image-smoke.mjs
  *   Optional brutal harness (not a default PASS marker):
  *   INCLUDE_P986=1 node scripts/tokfai-release-gate.mjs
+ *   Optional P12 ops checklist (not a default PASS marker):
+ *   INCLUDE_P12=1 node scripts/tokfai-release-gate.mjs
  */
 
 import { spawnSync } from "node:child_process";
@@ -37,8 +44,25 @@ import { ensureMockGateway } from "./lib/ensure-mock-gateway.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DMIT = join(ROOT, "apps/dmit-api");
-const API_KEY = (process.env.TOKFAI_API_KEY ?? "").trim();
+const API_KEY = (process.env.TOKFAI_API_KEY ?? process.env.TOKFAI_KEY ?? "").trim();
 const PM2_APP = (process.env.TOKFAI_PM2_APP ?? "").trim();
+
+/** P12-only mode: post-deploy ops checklist, then exit (no full cherry gate). */
+if (
+  process.env.OPS_CHECKLIST_ONLY === "1" ||
+  process.env.TOKFAI_OPS_CHECKLIST_ONLY === "1"
+) {
+  const r = spawnSync(
+    process.execPath,
+    [join(ROOT, "scripts/tokfai-p12-ops-checklist-smoke.mjs")],
+    {
+      cwd: ROOT,
+      env: process.env,
+      stdio: "inherit",
+    }
+  );
+  process.exit(r.status ?? 1);
+}
 
 const PASS_MARKERS = [
   "TOKFAI_P932_CHERRY_STUDIO_REAL_BODY_PASS",
@@ -163,6 +187,16 @@ const STEPS = [
     // PASS or intentional BLOCKED both produce a report; gate only accepts PASS.
     marker: "TOKFAI_P986_BRUTAL_ENGINEERING_HARNESS_PASS",
     optionalIncludeEnv: "INCLUDE_P986",
+  },
+  {
+    id: "p12",
+    label: "11. OPTIONAL P12 ops checklist (INCLUDE_P12=1)",
+    cwd: ROOT,
+    cmd: "node",
+    args: ["scripts/tokfai-p12-ops-checklist-smoke.mjs"],
+    marker: "TOKFAI_P12_OPS_CHECKLIST_PASS",
+    optionalIncludeEnv: "INCLUDE_P12",
+    live: true,
   },
 ];
 

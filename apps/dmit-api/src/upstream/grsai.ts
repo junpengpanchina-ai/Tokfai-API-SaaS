@@ -218,6 +218,8 @@ export function isChatFallbackEligible(err: ApiError): boolean {
     code === "upstream_auth_error" ||
     code === "insufficient_credits" ||
     code === "invalid_request_error" ||
+    code === "invalid_token" ||
+    code === "missing_token" ||
     code === "client_aborted"
   ) {
     return false;
@@ -225,6 +227,14 @@ export function isChatFallbackEligible(err: ApiError): boolean {
   // P9 — upstream 400 validation must not cascade to other providers/models
   // (unless executeChatCompletion special-cases allow_fallback + supportsOriginalBody).
   if (err.upstreamStatus === 400 || err.status === 400) {
+    return false;
+  }
+  if (
+    err.upstreamStatus === 401 ||
+    err.status === 401 ||
+    err.upstreamStatus === 403 ||
+    err.status === 403
+  ) {
     return false;
   }
   if (code === "upstream_error") {

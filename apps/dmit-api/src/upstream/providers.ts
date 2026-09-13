@@ -37,7 +37,7 @@ function parseProviderOrder(raw: string | undefined): string[] {
     .filter(Boolean);
 }
 
-/** Resolve secondary base/key from P8 names or legacy UPSTREAM_SECONDARY_*. */
+/** Resolve secondary base/key from P11 / P8 names or legacy UPSTREAM_SECONDARY_*. */
 function resolveSecondaryCredentials(): {
   baseUrl: string;
   apiKey: string;
@@ -54,7 +54,10 @@ function resolveSecondaryCredentials(): {
     env.TOKFAI_UPSTREAM_SECONDARY_API_KEY ||
     "";
   const chatPath = normalizeChatPath(
-    env.TOKFAI_UPSTREAM_SECONDARY_CHAT_PATH ?? "/v1/chat/completions"
+    env.TOKFAI_GRSAI_SECONDARY_CHAT_COMPLETIONS_PATH ||
+      env.TOKFAI_GRSI_SECONDARY_CHAT_COMPLETIONS_PATH ||
+      env.TOKFAI_UPSTREAM_SECONDARY_CHAT_PATH ||
+      "/v1/chat/completions"
   );
   return {
     baseUrl: baseUrl ? normalizeBaseUrl(baseUrl) : "",
@@ -223,11 +226,18 @@ function providerSupportsModel(
 const DEFAULT_MULTI_PROVIDER_MODELS = new Set(["gpt-5.4", "gpt-5.5"]);
 
 function configuredOrderForModel(model: string): string[] {
-  // P8 — chat fallback pool order (when enabled).
+  // P8/P11 — chat fallback pool order (when enabled).
   if (env.TOKFAI_CHAT_FALLBACK_ENABLED) {
-    const fromEnv = parseProviderOrder(env.TOKFAI_CHAT_FALLBACK_PROVIDERS);
-    if (fromEnv.length > 0) return fromEnv;
-    return ["grsai-primary", "grsai-secondary"];
+    let fromEnv = parseProviderOrder(env.TOKFAI_CHAT_FALLBACK_PROVIDERS);
+    if (fromEnv.length === 0) {
+      fromEnv = ["grsai-primary", "grsai-secondary"];
+    }
+    // TOKFAI_CHAT_FALLBACK_PROVIDERS=grsai-secondary means "fallback targets";
+    // always try primary first unless it is already listed.
+    if (!fromEnv.includes("grsai-primary")) {
+      fromEnv = ["grsai-primary", ...fromEnv];
+    }
+    return fromEnv;
   }
 
   if (model === "gpt-5.4") {

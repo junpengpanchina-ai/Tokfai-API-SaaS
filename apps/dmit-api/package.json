@@ -14,6 +14,7 @@
     "reload:pm2": "pm2 reload ecosystem.config.cjs --update-env",
     "typecheck": "tsc --noEmit",
     "release-gate": "node ../../scripts/tokfai-release-gate.mjs",
+    "ops-checklist": "node ../../scripts/tokfai-p12-ops-checklist-smoke.mjs",
     "brutal-harness": "node ../../scripts/p986-brutal-engineering-harness.mjs",
     "agent-runtime": "node ../../scripts/p987-agent-runtime-compatibility-smoke.mjs"
   },
