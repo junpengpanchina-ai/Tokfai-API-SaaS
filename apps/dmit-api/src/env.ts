@@ -323,6 +323,44 @@ const Schema = z
     .default("false")
     .transform((raw) => raw === "true" || raw === "1"),
   /**
+   * P8 — Chat provider pool fallback (auto-* may move to secondary).
+   * When true and secondary base+key exist, resolveProviderAttempts includes
+   * grsai-secondary for chat models. Independent of image/audio.
+   */
+  TOKFAI_CHAT_FALLBACK_ENABLED: z
+    .string()
+    .optional()
+    .default("false")
+    .transform((raw) => raw === "true" || raw === "1"),
+  /** Ordered provider ids for chat fallback, e.g. grsai-primary,grsai-secondary */
+  TOKFAI_CHAT_FALLBACK_PROVIDERS: z
+    .string()
+    .optional()
+    .default("grsai-primary,grsai-secondary"),
+  /**
+   * P8 secondary GRSAI / OpenAI-compat endpoint (aliases of UPSTREAM_SECONDARY).
+   * Accepts both GRSI (spec typo) and GRSAI spellings.
+   */
+  TOKFAI_GRSI_SECONDARY_BASE_URL: z.string().url().optional(),
+  TOKFAI_GRSI_SECONDARY_API_KEY: z.string().min(1).optional(),
+  TOKFAI_GRSAI_SECONDARY_BASE_URL: z.string().url().optional(),
+  TOKFAI_GRSAI_SECONDARY_API_KEY: z.string().min(1).optional(),
+  /**
+   * P8 ops-only: comma-separated provider ids whose circuit is forced open
+   * at process start (for acceptance when upstream is currently healthy).
+   * Leave unset in normal production.
+   */
+  TOKFAI_PROVIDER_HEALTH_FORCE_OPEN: z
+    .string()
+    .optional()
+    .default("")
+    .transform((raw) =>
+      raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    ),
+  /**
    * P1100 — when no secondary provider is configured, allow one same-provider
    * retry for no-HTTP-response transport errors (connect/headers/socket).
    * Default on. Set "0"/"false" to disable. Success path unchanged.

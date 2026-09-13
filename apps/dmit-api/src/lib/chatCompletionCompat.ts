@@ -56,13 +56,23 @@ export function coerceOptionalBoolean(value: unknown): boolean | undefined {
 
 /**
  * Role compat for Cherry / OpenAI / Cursor SDK variants:
- * developer → system; assistant|user|system|tool|function kept; else → user.
+ * developer/context/user_context/model → system;
+ * assistant|user|system|tool|function kept; else → user.
  * P970: never rewrite tool/function → user (breaks tool call loops).
+ * P9: context-family roles merge to system (GRSAI rejects unknown roles;
+ *      OpenAI-compatible clients often send developer/context).
  */
 export function normalizeChatMessageRole(role: unknown): string {
   if (typeof role !== "string" || !role.trim()) return "user";
   const lower = role.trim().toLowerCase();
-  if (lower === "developer") return "system";
+  if (
+    lower === "developer" ||
+    lower === "context" ||
+    lower === "user_context" ||
+    lower === "model"
+  ) {
+    return "system";
+  }
   if (
     lower === "assistant" ||
     lower === "user" ||

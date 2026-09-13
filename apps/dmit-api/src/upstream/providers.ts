@@ -37,6 +37,44 @@ function parseProviderOrder(raw: string | undefined): string[] {
     .filter(Boolean);
 }
 
+/** Resolve secondary base/key from P8 names or legacy UPSTREAM_SECONDARY_*. */
+function resolveSecondaryCredentials(): {
+  baseUrl: string;
+  apiKey: string;
+  chatPath: string;
+} {
+  const baseUrl =
+    env.TOKFAI_GRSAI_SECONDARY_BASE_URL ||
+    env.TOKFAI_GRSI_SECONDARY_BASE_URL ||
+    env.TOKFAI_UPSTREAM_SECONDARY_BASE_URL ||
+    "";
+  const apiKey =
+    env.TOKFAI_GRSAI_SECONDARY_API_KEY ||
+    env.TOKFAI_GRSI_SECONDARY_API_KEY ||
+    env.TOKFAI_UPSTREAM_SECONDARY_API_KEY ||
+    "";
+  const chatPath = normalizeChatPath(
+    env.TOKFAI_UPSTREAM_SECONDARY_CHAT_PATH ?? "/v1/chat/completions"
+  );
+  return {
+    baseUrl: baseUrl ? normalizeBaseUrl(baseUrl) : "",
+    apiKey,
+    chatPath,
+  };
+}
+
+export function isChatFallbackEnabled(): boolean {
+  return env.TOKFAI_CHAT_FALLBACK_ENABLED === true;
+}
+
+/** True when secondary chat provider is enabled in the registry (usable for failover). */
+export function isChatSecondaryProviderConfigured(): boolean {
+  const secondary =
+    REGISTRY.get("grsai-secondary") ??
+    REGISTRY.get("openai-compatible-secondary");
+  return secondary?.enabled === true;
+}
+
 /** Static provider definitions merged with runtime env. */
 function buildProviderRegistry(): Map<string, UpstreamProvider> {
   const timeoutMs = env.TOKFAI_UPSTREAM_TIMEOUT_MS ?? env.GRSAI_CHAT_TIMEOUT_MS;
@@ -54,30 +92,45 @@ function buildProviderRegistry(): Map<string, UpstreamProvider> {
     supportedModels: ALL_MODELS,
   };
 
-  const secondaryEnabled = env.TOKFAI_UPSTREAM_SECONDARY_ENABLED;
-  const secondaryKey = env.TOKFAI_UPSTREAM_SECONDARY_API_KEY ?? "";
-  const secondaryBase = env.TOKFAI_UPSTREAM_SECONDARY_BASE_URL ?? "";
+  const secondary = resolveSecondaryCredentials();
+  const secondaryEnabled =
+    (env.TOKFAI_UPSTREAM_SECONDARY_ENABLED ||
+      env.TOKFAI_CHAT_FALLBACK_ENABLED) &&
+    secondary.baseUrl.length > 0 &&
+    secondary.apiKey.length > 0;
 
-  const openaiCompatibleSecondary: UpstreamProvider = {
-    id: "openai-compatible-secondary",
-    label: "OpenAI-Compatible Secondary",
-    baseUrl: secondaryBase ? normalizeBaseUrl(secondaryBase) : "",
-    apiKey: secondaryKey,
-    chatPath: normalizeChatPath(
-      env.TOKFAI_UPSTREAM_SECONDARY_CHAT_PATH ?? "/v1/chat/completions"
-    ),
-    enabled:
-      secondaryEnabled &&
-      secondaryBase.length > 0 &&
-      secondaryKey.length > 0,
+  /** P8 — preferred secondary id for chat pool / health logs. */
+  const grsaiSecondary: UpstreamProvider = {
+    id: "grsai-secondary",
+    label: "GRSAI Secondary",
+    baseUrl: secondary.baseUrl,
+    apiKey: secondary.apiKey,
+    chatPath: secondary.chatPath,
+    enabled: secondaryEnabled,
     priority: 2,
     weight: 50,
     timeoutMs,
-    supportedModels: ["gpt-5.4", "gpt-5.5"],
+    // Chat fallback must cover sol / terra / auto chains — not GPT-only.
+    supportedModels: ALL_MODELS,
+  };
+
+  /** Legacy id kept for existing TOKFAI_MODEL_PROVIDER_ORDER_* env values. */
+  const openaiCompatibleSecondary: UpstreamProvider = {
+    id: "openai-compatible-secondary",
+    label: "OpenAI-Compatible Secondary",
+    baseUrl: secondary.baseUrl,
+    apiKey: secondary.apiKey,
+    chatPath: secondary.chatPath,
+    enabled: secondaryEnabled,
+    priority: 3,
+    weight: 40,
+    timeoutMs,
+    supportedModels: ALL_MODELS,
   };
 
   return new Map([
     [grsaiPrimary.id, grsaiPrimary],
+    [grsaiSecondary.id, grsaiSecondary],
     [openaiCompatibleSecondary.id, openaiCompatibleSecondary],
     // P1017 — reserved Provider slots (disabled until env/credentials exist).
     // Capability registry already maps these ids to native for known models.
@@ -170,20 +223,27 @@ function providerSupportsModel(
 const DEFAULT_MULTI_PROVIDER_MODELS = new Set(["gpt-5.4", "gpt-5.5"]);
 
 function configuredOrderForModel(model: string): string[] {
+  // P8 — chat fallback pool order (when enabled).
+  if (env.TOKFAI_CHAT_FALLBACK_ENABLED) {
+    const fromEnv = parseProviderOrder(env.TOKFAI_CHAT_FALLBACK_PROVIDERS);
+    if (fromEnv.length > 0) return fromEnv;
+    return ["grsai-primary", "grsai-secondary"];
+  }
+
   if (model === "gpt-5.4") {
     const fromEnv = parseProviderOrder(env.TOKFAI_MODEL_PROVIDER_ORDER_GPT_5_4);
     if (fromEnv.length > 0) return fromEnv;
-    return ["grsai-primary", "openai-compatible-secondary"];
+    return ["grsai-primary", "grsai-secondary", "openai-compatible-secondary"];
   }
 
   if (model === "gpt-5.5") {
     const fromEnv = parseProviderOrder(env.TOKFAI_MODEL_PROVIDER_ORDER_GPT_5_5);
     if (fromEnv.length > 0) return fromEnv;
-    return ["grsai-primary", "openai-compatible-secondary"];
+    return ["grsai-primary", "grsai-secondary", "openai-compatible-secondary"];
   }
 
   if (DEFAULT_MULTI_PROVIDER_MODELS.has(model)) {
-    return ["grsai-primary", "openai-compatible-secondary"];
+    return ["grsai-primary", "grsai-secondary", "openai-compatible-secondary"];
   }
 
   return ["grsai-primary"];

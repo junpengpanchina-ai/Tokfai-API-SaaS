@@ -118,6 +118,7 @@ import { providerFetch, isChatFallbackEligible } from "../upstream/grsai.js";
 import {
   isSameProviderUpstreamRetryEligible,
   isTransportRetryEligible,
+  STABLE_UPSTREAM_TIMEOUT_PUBLIC_MESSAGE,
   TRANSPORT_RETRIES_EXHAUSTED_PUBLIC_MESSAGE,
   transportRetryReason,
 } from "./providerTransportAttempt.js";
@@ -126,7 +127,10 @@ import {
   MODEL_NOT_AVAILABLE_CODE,
   resolveChatModel,
 } from "../upstream/modelAliases.js";
-import { resolveProviderAttempts } from "../upstream/providers.js";
+import {
+  isChatSecondaryProviderConfigured,
+  resolveProviderAttempts,
+} from "../upstream/providers.js";
 import {
   filterAttemptsByCircuitBreaker,
   recordModelFailure,
@@ -137,8 +141,25 @@ import {
   recordProviderModelSuccess,
   recordProviderModelTimeout,
 } from "../upstream/providerModelCircuitBreaker.js";
+import {
+  filterProvidersByHealth,
+  isAutoRoutingAlias,
+  isProviderCircuitOpen,
+  isProviderHealthFailureEligible,
+  NO_FALLBACK_PROVIDER_TIMEOUT_PUBLIC_MESSAGE,
+  PROVIDER_TEMPORARILY_UNHEALTHY_HINT,
+  recordProviderHealthFailure,
+  recordProviderHealthSuccess,
+} from "../upstream/providerHealth.js";
 import { providerFetchChatPreferNativeNonStream } from "../upstream/providerFetchChatStreamAssembled.js";
 import { buildUpstreamChatBody, droppedUpstreamChatKeysForAudit } from "./upstreamChatBody.js";
+import {
+  isGrsaiChatProvider,
+  isUpstreamInvalidRequest,
+  logChatBodySanitized,
+  sanitizeChatBodyForProvider,
+} from "./sanitizeChatBodyForProvider.js";
+import { getProviderCapabilityProfile } from "./compat/providerCapabilities.js";
 import { measureChatCompletionBodyBytes } from "./chatBodyByteDiagnostics.js";
 import {
   CHAT_USAGE_ESTIMATION_ALGORITHM,
@@ -472,6 +493,20 @@ export async function executeChatCompletion(
     // Policy log is pre-attempt; not a billing event.
     billing_status: "not_billable",
     credits_charged: 0,
+  });
+
+  // P10 — stable model timeout selection (ops / acceptance).
+  log.info("timeout_policy_selected", {
+    request_id: requestId,
+    requestId,
+    route,
+    model: requestedRaw,
+    resolvedModel: requestedModel,
+    firstTokenTimeoutMs: timeoutPolicy.firstTokenTimeoutMs,
+    attemptTimeoutMs: timeoutPolicy.attemptTimeoutMs,
+    totalTimeoutMs: timeoutPolicy.totalTimeoutMs,
+    reason: timeoutPolicy.modelPolicyId,
+    billing_status: "not_billable",
   });
 
   if (
@@ -1243,6 +1278,7 @@ export async function executeChatCompletion(
         idempotencyKey: input.idempotencyKey ?? null,
         timeoutPolicy,
         clientStream,
+        allowFallback,
         transparentExplicitModel,
         autoProTransparentCarrier,
         abortSignal: input.abortSignal,
@@ -1389,6 +1425,8 @@ async function runProviderAttempts(args: {
   idempotencyKey: string | null;
   timeoutPolicy: ReturnType<typeof resolveUpstreamTimeoutPolicy>;
   clientStream: boolean;
+  /** P7/P9 — body.allow_fallback for explicit model / invalid_request fallback. */
+  allowFallback: boolean;
   /**
    * P1059 — explicit gpt / gemini request: bypass Agent orchestration
    * (intent arbitration / native repair / incomplete-task continuation /
@@ -1429,6 +1467,7 @@ async function runProviderAttempts(args: {
     idempotencyKey,
     timeoutPolicy,
     clientStream,
+    allowFallback,
     transparentExplicitModel,
     autoProTransparentCarrier,
     abortSignal,
@@ -1451,12 +1490,23 @@ async function runProviderAttempts(args: {
   // P1100 — at most one same-provider transport retry when no secondary provider.
   let sameProviderTransportRetried = false;
   let transportAttemptsObserved = 0;
+  // P10 — empty fallback pool: log fallback_provider_unavailable at most once.
+  let fallbackUnavailableLogged = false;
+
+  const logFallbackUnavailableOnce = (fields: Record<string, unknown>) => {
+    if (fallbackUnavailableLogged) return;
+    fallbackUnavailableLogged = true;
+    log.warn("fallback_provider_unavailable", {
+      ...fields,
+      billing_status: "not_billable",
+    });
+  };
 
   for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
     const attemptModel = attempts[attemptIndex]!;
     const resolvedProviders = resolveProviderAttempts(attemptModel);
     const {
-      providers: providerAttempts,
+      providers: circuitFiltered,
       skippedDegraded,
       allDegraded,
     } = await filterProvidersByTimeoutCircuit(resolvedProviders, attemptModel);
@@ -1469,13 +1519,65 @@ async function runProviderAttempts(args: {
         resolvedModel: requestedModel,
         attemptModel,
         skippedProviderIds: skippedDegraded.map((p) => p.id),
-        remainingProviderIds: providerAttempts.map((p) => p.id),
+        remainingProviderIds: circuitFiltered.map((p) => p.id),
         allDegraded,
       });
     }
 
+    // P8 — auto-* skip providers with open health circuit; explicit models keep them.
+    const {
+      providers: providerAttempts,
+      skippedUnhealthy,
+      allUnhealthy,
+    } = filterProvidersByHealth({
+      providers: circuitFiltered,
+      canonicalRequestedModel: requestedModel,
+      requestId,
+      route,
+      attemptModel,
+    });
+
     if (providerAttempts.length === 0) {
-      lastError = allUpstreamsUnavailableError();
+      const noSecondary = !isChatSecondaryProviderConfigured();
+      if (allUnhealthy && requestedModel.trim().toLowerCase() === "auto-fast") {
+        log.warn("auto_fast_no_healthy_provider", {
+          requestId,
+          route,
+          requestedModel,
+          attemptModel,
+          skippedProviderIds: skippedUnhealthy.map((p) => p.id),
+          reason: "circuit_open_no_healthy_provider",
+          billing_status: "not_billable",
+        });
+      }
+      if (noSecondary) {
+        logFallbackUnavailableOnce({
+          requestId,
+          route,
+          requestedModel,
+          attemptModel,
+          skippedProviderIds: skippedUnhealthy.map((p) => p.id),
+          reason: allUnhealthy
+            ? "circuit_open_no_healthy_provider"
+            : "no_secondary_provider",
+          message: NO_FALLBACK_PROVIDER_TIMEOUT_PUBLIC_MESSAGE,
+        });
+      }
+      lastError = allUnhealthy
+        ? ApiError.requestTimeout(
+            "Upstream provider circuit open and no healthy provider available.",
+            NO_FALLBACK_PROVIDER_TIMEOUT_PUBLIC_MESSAGE
+          )
+        : allUpstreamsUnavailableError();
+      // P10 — auto-* with open primary + no secondary: fail fast, do not walk
+      // the alias chain re-hitting the same unhealthy provider pool.
+      if (
+        allUnhealthy &&
+        noSecondary &&
+        isAutoRoutingAlias(requestedModel)
+      ) {
+        break;
+      }
       if (isAlias && attemptIndex < attempts.length - 1) {
         continue;
       }
@@ -1495,14 +1597,17 @@ async function runProviderAttempts(args: {
       });
     if (
       allDegraded &&
-      providerAttempts.length === 1 &&
+      circuitFiltered.length === 1 &&
       !isAlias &&
       !gemini25FlashStreamFallbackPath
     ) {
-      const degradedProvider = providerAttempts[0]!;
+      const degradedProvider = circuitFiltered[0]!;
+      const unhealthyHint = isProviderCircuitOpen(degradedProvider.id)
+        ? ` ${PROVIDER_TEMPORARILY_UNHEALTHY_HINT}`
+        : "";
       const timeoutErr = ApiError.requestTimeout(
         "Upstream provider degraded after consecutive timeouts.",
-        "上游模型连续超时，当前供应暂时不可用，请稍后重试或切换其他模型。"
+        `${NO_FALLBACK_PROVIDER_TIMEOUT_PUBLIC_MESSAGE}${unhealthyHint}`.trim()
       );
       logProviderTimeoutStats({
         requestId,
@@ -1858,7 +1963,31 @@ async function runProviderAttempts(args: {
             throw ApiError.requestTimeout();
           }
 
-          upstreamBody = buildUpstreamChatBody(body, attemptModel);
+          // P9 — GRSAI: sanitize messages/roles before whitelist normalize so
+          // context/developer/tool roles are converted before role→user fallback.
+          // Keep tools on the body for local orchestration; outbound strip is later.
+          let bodyForUpstreamBuild = body;
+          if (isGrsaiChatProvider(provider.id)) {
+            const preSanitized = sanitizeChatBodyForProvider(
+              provider.id,
+              body as unknown as Record<string, unknown>,
+              { phase: "messages" }
+            );
+            logChatBodySanitized({
+              requestId,
+              providerId: provider.id,
+              result: preSanitized,
+            });
+            if (!preSanitized.ok) {
+              throw ApiError.badRequest(
+                preSanitized.message,
+                "invalid_request_error"
+              );
+            }
+            bodyForUpstreamBuild = preSanitized.body as ChatCompletionRequestBody;
+          }
+
+          upstreamBody = buildUpstreamChatBody(bodyForUpstreamBuild, attemptModel);
 
           // P1115 — explicit opt-in: transparent /v1/responses auto|missing +
           // tools → outbound tool_choice=required on the first provider fetch.
@@ -2119,6 +2248,26 @@ async function runProviderAttempts(args: {
                 droppedKeyCount: droppedKeys.length,
               });
             }
+          }
+
+          // P9 — GRSAI outbound sanitizer (last mutation before fetch).
+          {
+            const sanitized = sanitizeChatBodyForProvider(
+              provider.id,
+              upstreamBody as Record<string, unknown>
+            );
+            logChatBodySanitized({
+              requestId,
+              providerId: provider.id,
+              result: sanitized,
+            });
+            if (!sanitized.ok) {
+              throw ApiError.badRequest(
+                sanitized.message,
+                "invalid_request_error"
+              );
+            }
+            upstreamBody = sanitized.body as typeof upstreamBody;
           }
 
           const perAttemptTimeoutMs = Math.min(
@@ -3750,6 +3899,22 @@ async function runProviderAttempts(args: {
 
         await recordModelSuccess(attemptModel);
         await recordProviderModelSuccess(provider.id, attemptModel);
+        recordProviderHealthSuccess(provider.id, {
+          requestId,
+          route,
+          attemptModel,
+        });
+        if (providerIndex > 0) {
+          log.info("fallback_provider_succeeded", {
+            requestId,
+            route,
+            requestedModel,
+            attemptModel,
+            providerId: provider.id,
+            providerIndex,
+            billing_status: "not_billable",
+          });
+        }
 
         const strictToolCall =
           !toolsDegradedToChat && isStrictToolCallRequest(clientBody);
@@ -4275,12 +4440,84 @@ async function runProviderAttempts(args: {
           );
         }
 
+        // P8/P9 — provider health (never for client_aborted / invalid_token / 4xx).
+        if (isProviderHealthFailureEligible(err)) {
+          recordProviderHealthFailure(provider.id, err, {
+            requestId,
+            route,
+            attemptModel,
+          });
+        } else if (isUpstreamInvalidRequest(err)) {
+          log.info("upstream_invalid_request_not_health", {
+            requestId,
+            route,
+            providerId: provider.id,
+            attemptModel,
+            status: err.status,
+            code: err.code ?? null,
+            upstreamStatus: err.upstreamStatus ?? null,
+            billing_status: "not_billable",
+          });
+        }
+        if (providerIndex > 0) {
+          log.warn("fallback_provider_failed", {
+            requestId,
+            route,
+            requestedModel,
+            attemptModel,
+            providerId: provider.id,
+            providerIndex,
+            status: err.status,
+            code: err.code ?? "failed",
+            upstreamStatus: err.upstreamStatus ?? null,
+            billing_status: "not_billable",
+          });
+        }
+
+        const invalidRequest = isUpstreamInvalidRequest(err);
+        if (invalidRequest) {
+          log.info("upstream_invalid_request_no_retry", {
+            requestId,
+            route,
+            providerId: provider.id,
+            attemptModel,
+            status: err.status,
+            code: err.code ?? null,
+            upstreamStatus: err.upstreamStatus ?? null,
+            billing_status: "not_billable",
+          });
+        }
+
+        const hasNextProviderSlot = providerIndex < providerAttempts.length - 1;
+        const nextProvider = hasNextProviderSlot
+          ? providerAttempts[providerIndex + 1]!
+          : null;
+        const nextSupportsOriginalBody =
+          nextProvider != null &&
+          getProviderCapabilityProfile(nextProvider.id).supportsOriginalBody ===
+            true;
+        // P9 — 400 invalid_request: no fallback unless allow_fallback + next
+        // provider can accept the original body.
+        const canFallbackInvalidRequest =
+          invalidRequest && allowFallback && nextSupportsOriginalBody;
         const hasNextProvider =
-          providerIndex < providerAttempts.length - 1 &&
-          isChatFallbackEligible(err);
+          hasNextProviderSlot &&
+          (canFallbackInvalidRequest ||
+            (!invalidRequest && isChatFallbackEligible(err)));
 
         if (hasNextProvider) {
-          const nextProvider = providerAttempts[providerIndex + 1]!;
+          const next = nextProvider!;
+          log.info("fallback_provider_selected", {
+            requestId,
+            route,
+            requestedModel,
+            attemptModel,
+            fromProviderId: provider.id,
+            toProviderId: next.id,
+            status: err.status,
+            code: err.code ?? "failed",
+            billing_status: "not_billable",
+          });
           if (isTimeout) {
             logProviderTimeoutStats({
               requestId,
@@ -4294,7 +4531,7 @@ async function runProviderAttempts(args: {
               timeoutMs: attemptTimeoutMs,
               billing_status: "not_billable",
               fallbackSkippedReason: null,
-              nextProviderId: nextProvider.id,
+              nextProviderId: next.id,
             });
           }
           log.warn("chat_provider_fallback_attempt", {
@@ -4306,7 +4543,7 @@ async function runProviderAttempts(args: {
             attemptIndex,
             providerId: provider.id,
             providerIndex,
-            nextProviderId: nextProvider.id,
+            nextProviderId: next.id,
             status: err.status,
             code: err.code ?? "failed",
             upstreamStatus: err.upstreamStatus,
@@ -4385,9 +4622,26 @@ async function runProviderAttempts(args: {
         // No second provider (or error not eligible) — do not pretend fallback ran.
         const fallbackSkippedReason = !isChatFallbackEligible(err)
           ? "error_not_fallback_eligible"
-          : providerAttempts.length <= 1
+          : !isChatSecondaryProviderConfigured() || providerAttempts.length <= 1
             ? "no_secondary_provider"
             : "providers_exhausted";
+
+        if (
+          fallbackSkippedReason === "no_secondary_provider" &&
+          isChatFallbackEligible(err)
+        ) {
+          logFallbackUnavailableOnce({
+            requestId,
+            route,
+            requestedModel,
+            attemptModel,
+            providerId: provider.id,
+            reason: "no_secondary_provider",
+            status: err.status,
+            code: err.code ?? "failed",
+            message: NO_FALLBACK_PROVIDER_TIMEOUT_PUBLIC_MESSAGE,
+          });
+        }
 
         if (isTimeout) {
           logProviderTimeoutStats({
@@ -4501,6 +4755,7 @@ async function runProviderAttempts(args: {
         }
 
         // P1100 — clarify public message after transport retries exhausted.
+        // P8 — stable JSON when timeout and no secondary provider configured.
         let finalErr = err;
         if (
           err.code === "upstream_transport_error" &&
@@ -4512,6 +4767,43 @@ async function runProviderAttempts(args: {
             code: err.code,
             type: err.type,
             publicMessage: TRANSPORT_RETRIES_EXHAUSTED_PUBLIC_MESSAGE,
+            upstreamStatus: err.upstreamStatus,
+            upstreamErrorSnippet: err.upstreamErrorSnippet,
+            transportErrorClass: err.transportErrorClass,
+            hasHttpResponse: err.hasHttpResponse,
+          });
+        } else if (
+          (err.code === "upstream_timeout" || isTimeout) &&
+          fallbackSkippedReason === "no_secondary_provider"
+        ) {
+          const unhealthyHint =
+            !isAutoRoutingAlias(requestedModel) &&
+            isProviderCircuitOpen(provider.id)
+              ? ` ${PROVIDER_TEMPORARILY_UNHEALTHY_HINT}`
+              : "";
+          finalErr = new ApiError({
+            status: 504,
+            message: err.message,
+            code: "upstream_timeout",
+            type: "upstream_error",
+            publicMessage:
+              `${NO_FALLBACK_PROVIDER_TIMEOUT_PUBLIC_MESSAGE}${unhealthyHint}`.trim(),
+            upstreamStatus: err.upstreamStatus ?? 504,
+            upstreamErrorSnippet: err.upstreamErrorSnippet,
+            transportErrorClass: err.transportErrorClass,
+            hasHttpResponse: err.hasHttpResponse,
+          });
+        } else if (
+          (err.code === "upstream_timeout" || isTimeout) &&
+          !isAutoRoutingAlias(requestedModel) &&
+          isProviderCircuitOpen(provider.id)
+        ) {
+          finalErr = new ApiError({
+            status: err.status || 504,
+            message: err.message,
+            code: err.code ?? "upstream_timeout",
+            type: err.type ?? "upstream_error",
+            publicMessage: `${err.publicMessage ?? STABLE_UPSTREAM_TIMEOUT_PUBLIC_MESSAGE} ${PROVIDER_TEMPORARILY_UNHEALTHY_HINT}`.trim(),
             upstreamStatus: err.upstreamStatus,
             upstreamErrorSnippet: err.upstreamErrorSnippet,
             transportErrorClass: err.transportErrorClass,
@@ -4638,8 +4930,15 @@ async function failureResultWithSuggestions(
   if (!opts?.suggestSwitchModel) return base;
 
   let errorMessage = base.errorMessage;
+  // P7/P8 — keep stable English upstream_timeout envelopes; do not rewrite.
+  const preservePublic =
+    errorMessage === NO_FALLBACK_PROVIDER_TIMEOUT_PUBLIC_MESSAGE ||
+    errorMessage === STABLE_UPSTREAM_TIMEOUT_PUBLIC_MESSAGE ||
+    errorMessage.includes(PROVIDER_TEMPORARILY_UNHEALTHY_HINT) ||
+    errorMessage.includes("no fallback provider");
   if (
     base.errorCode === "upstream_timeout" &&
+    !preservePublic &&
     !errorMessage.includes("切换")
   ) {
     errorMessage = "上游模型响应超时，请稍后重试或切换模型。";

@@ -68,6 +68,10 @@ import {
   upsertAdminTenantPricingRule,
 } from "./adminTenants.js";
 import type { AdminUserContext } from "../middleware/requireAdminV1.js";
+import {
+  listProviderHealthAdmin,
+  PROVIDER_HEALTH,
+} from "../upstream/providerHealth.js";
 
 const SUCCESS_STATUSES = ["succeeded", "success", "ok"];
 const PAGE_SIZE = 1000;
@@ -1538,6 +1542,22 @@ protectedAdminRoutes.get("/credits", async (c) => {
   }
 
   return c.json({ data: result });
+});
+
+/**
+ * P10 — in-memory provider health / circuit snapshot for ops.
+ * Never includes upstream API keys or credentials.
+ */
+protectedAdminRoutes.get("/provider-health", async (c) => {
+  const providers = listProviderHealthAdmin();
+  return c.json({
+    data: {
+      providers,
+      windowMs: PROVIDER_HEALTH.FAILURE_WINDOW_MS,
+      circuitOpenMs: PROVIDER_HEALTH.CIRCUIT_OPEN_MS,
+      generatedAt: new Date().toISOString(),
+    },
+  });
 });
 
 adminRoutes.route("/", protectedAdminRoutes);

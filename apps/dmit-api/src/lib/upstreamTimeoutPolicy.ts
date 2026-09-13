@@ -1,13 +1,13 @@
 /**
- * Layered upstream timeout policy (P7).
+ * Layered upstream timeout policy (P7/P10).
  *
- * Chat / ordinary responses:
- * - stream first-token / idle: 30s (TOKFAI_STREAM_FIRST_TOKEN_TIMEOUT_MS)
- * - non-stream attempt: 90s (TOKFAI_CHAT_TIMEOUT_MS / UPSTREAM)
- * - hard wall: 180s (TOKFAI_TOTAL_REQUEST_TIMEOUT_MS)
+ * P10 model budgets (chat pool) — centralized, not scattered in routes:
+ * - auto-fast: firstToken 20s, attempt 60s, total 90s
+ * - gpt-5.6-sol: firstToken 30s, attempt 90s, total 180s
+ * - gpt-5.6-terra: firstToken 45s, attempt 120s, total 180s
+ * - default: firstToken 30s, attempt 90s, total 180s
  *
- * Users must not wait a full 180s on a single hung attempt.
- * Tool / heavy paths still use dedicated budgets but are hard-capped at 180s.
+ * Tool / heavy paths keep dedicated budgets but are hard-capped.
  */
 
 import { env } from "../env.js";
@@ -20,7 +20,7 @@ export type UpstreamTimeoutTier =
   | "tool_call"
   | "stream";
 
-/** Documented defaults (env may override). */
+/** Documented defaults (env may override where model tier does not apply). */
 export const UPSTREAM_TIMEOUT_DEFAULTS = {
   attemptMs: 90_000,
   chatMs: 90_000,
@@ -32,6 +32,41 @@ export const UPSTREAM_TIMEOUT_DEFAULTS = {
   heavyIdleMs: 180_000,
   hardMs: 180_000,
 } as const;
+
+/** P10 — per-model chat timeout budgets (source of truth for logs). */
+export type ModelTimeoutBudget = {
+  policyId: string;
+  firstTokenTimeoutMs: number;
+  attemptTimeoutMs: number;
+  totalTimeoutMs: number;
+};
+
+export const MODEL_TIMEOUT_BUDGETS = {
+  "auto-fast": {
+    policyId: "auto-fast",
+    firstTokenTimeoutMs: 20_000,
+    attemptTimeoutMs: 60_000,
+    totalTimeoutMs: 90_000,
+  },
+  "gpt-5.6-sol": {
+    policyId: "gpt-5.6-sol",
+    firstTokenTimeoutMs: 30_000,
+    attemptTimeoutMs: 90_000,
+    totalTimeoutMs: 180_000,
+  },
+  "gpt-5.6-terra": {
+    policyId: "gpt-5.6-terra",
+    firstTokenTimeoutMs: 45_000,
+    attemptTimeoutMs: 120_000,
+    totalTimeoutMs: 180_000,
+  },
+  default: {
+    policyId: "default",
+    firstTokenTimeoutMs: 30_000,
+    attemptTimeoutMs: 90_000,
+    totalTimeoutMs: 180_000,
+  },
+} as const satisfies Record<string, ModelTimeoutBudget>;
 
 export interface UpstreamTimeoutPolicy {
   tier: UpstreamTimeoutTier;
@@ -47,6 +82,10 @@ export interface UpstreamTimeoutPolicy {
   totalTimeoutMs: number;
   /** Stream first-token budget (for logs / stream_first_token_timeout). */
   streamFirstTokenTimeoutMs: number;
+  /** P10 — selected model budget id. */
+  modelPolicyId: string;
+  firstTokenTimeoutMs: number;
+  attemptTimeoutMs: number;
   reason: string;
 }
 
@@ -83,8 +122,37 @@ const CODING_ALIAS_RE = /(^|[-_/])(coding|codex|code)([-_/]|$)/i;
 const HEAVY_BODY_SIGNAL_RE =
   /\b(codex|coding|long[-_ ]?task|software engineer|agentic)\b/i;
 
+function normalizeModelId(model: string): string {
+  return model.trim().toLowerCase();
+}
+
+/**
+ * Resolve P10 model timeout budget. Prefer requested model, then resolved.
+ * auto-fast wins over concrete carriers when the client asked for auto-fast.
+ */
+export function resolveModelTimeoutBudget(args: {
+  requestedModel: string;
+  resolvedModel?: string;
+}): ModelTimeoutBudget {
+  const candidates = [
+    normalizeModelId(args.requestedModel),
+    normalizeModelId(args.resolvedModel ?? ""),
+  ].filter(Boolean);
+
+  for (const m of candidates) {
+    if (m === "auto-fast") return { ...MODEL_TIMEOUT_BUDGETS["auto-fast"] };
+    if (m === "gpt-5.6-terra" || m === "gpt-5-6-terra") {
+      return { ...MODEL_TIMEOUT_BUDGETS["gpt-5.6-terra"] };
+    }
+    if (m === "gpt-5.6-sol" || m === "gpt-5-6-sol") {
+      return { ...MODEL_TIMEOUT_BUDGETS["gpt-5.6-sol"] };
+    }
+  }
+  return { ...MODEL_TIMEOUT_BUDGETS.default };
+}
+
 export function isHeavyResponsesModel(model: string): boolean {
-  const trimmed = model.trim().toLowerCase();
+  const trimmed = normalizeModelId(model);
   if (!trimmed) return false;
   if (HEAVY_MODEL_IDS.has(trimmed)) return true;
   if (CODING_ALIAS_RE.test(trimmed)) return true;
@@ -92,8 +160,7 @@ export function isHeavyResponsesModel(model: string): boolean {
 }
 
 export function isSlowChatGemini3Model(model: string): boolean {
-  const trimmed = model.trim().toLowerCase();
-  return SLOW_CHAT_GEMINI3_MODEL_IDS.has(trimmed);
+  return SLOW_CHAT_GEMINI3_MODEL_IDS.has(normalizeModelId(model));
 }
 
 export function hasHeavyBodySignals(body: unknown): boolean {
@@ -127,15 +194,15 @@ export function hasHeavyBodySignals(body: unknown): boolean {
   return false;
 }
 
-function hardCapMs(): number {
+function absoluteHardCapMs(): number {
   return Math.max(
     5_000,
     env.TOKFAI_TOTAL_REQUEST_TIMEOUT_MS || UPSTREAM_TIMEOUT_DEFAULTS.hardMs
   );
 }
 
-function clampHard(ms: number): number {
-  return Math.min(Math.max(1_000, ms), hardCapMs());
+function clampTo(ms: number, maxMs: number): number {
+  return Math.min(Math.max(1_000, ms), maxMs);
 }
 
 export function resolveUpstreamTimeoutPolicy(args: {
@@ -153,32 +220,63 @@ export function resolveUpstreamTimeoutPolicy(args: {
   const bodyHeavy = hasHeavyBodySignals(args.body);
   const isHeavy = isResponses && (modelHeavy || bodyHeavy);
 
+  const modelBudget = resolveModelTimeoutBudget({
+    requestedModel: args.requestedModel,
+    resolvedModel: args.resolvedModel,
+  });
+
+  const absoluteHard = absoluteHardCapMs();
+  // Model total may be lower than env hard wall (e.g. auto-fast 90s).
+  const requestHardMs = clampTo(
+    Math.min(modelBudget.totalTimeoutMs, absoluteHard),
+    absoluteHard
+  );
+  const firstTokenMs = clampTo(
+    modelBudget.firstTokenTimeoutMs,
+    requestHardMs
+  );
+  const modelAttemptMs = clampTo(
+    modelBudget.attemptTimeoutMs,
+    requestHardMs
+  );
+
   const attemptMs = env.TOKFAI_UPSTREAM_TIMEOUT_MS;
   const chatMs = env.TOKFAI_CHAT_TIMEOUT_MS;
   const streamMs = env.TOKFAI_STREAM_TIMEOUT_MS;
-  const firstTokenMs =
-    env.TOKFAI_STREAM_FIRST_TOKEN_TIMEOUT_MS ??
-    UPSTREAM_TIMEOUT_DEFAULTS.streamFirstTokenMs;
   const toolCallMs = env.TOKFAI_TOOL_CALL_TIMEOUT_MS;
   const responsesUpstreamMs = env.TOKFAI_RESPONSES_UPSTREAM_TIMEOUT_MS;
   const heavyUpstreamMs = env.TOKFAI_HEAVY_RESPONSES_UPSTREAM_TIMEOUT_MS;
   const heavyIdleMs = env.TOKFAI_HEAVY_RESPONSES_IDLE_TIMEOUT_MS;
-  const hardMs = hardCapMs();
 
   const base = (
-    partial: Omit<UpstreamTimeoutPolicy, "streamFirstTokenTimeoutMs">
-  ): UpstreamTimeoutPolicy => ({
-    ...partial,
-    upstreamTimeoutMs: clampHard(partial.upstreamTimeoutMs),
-    idleTimeoutMs: clampHard(partial.idleTimeoutMs),
-    totalTimeoutMs: clampHard(partial.totalTimeoutMs),
-    streamFirstTokenTimeoutMs: clampHard(firstTokenMs),
-  });
+    partial: Omit<
+      UpstreamTimeoutPolicy,
+      | "streamFirstTokenTimeoutMs"
+      | "modelPolicyId"
+      | "firstTokenTimeoutMs"
+      | "attemptTimeoutMs"
+    > & { attemptTimeoutMs?: number }
+  ): UpstreamTimeoutPolicy => {
+    const attemptTimeoutMs = clampTo(
+      partial.attemptTimeoutMs ?? partial.upstreamTimeoutMs,
+      requestHardMs
+    );
+    return {
+      ...partial,
+      upstreamTimeoutMs: clampTo(partial.upstreamTimeoutMs, requestHardMs),
+      idleTimeoutMs: clampTo(partial.idleTimeoutMs, requestHardMs),
+      totalTimeoutMs: clampTo(partial.totalTimeoutMs, requestHardMs),
+      streamFirstTokenTimeoutMs: firstTokenMs,
+      modelPolicyId: modelBudget.policyId,
+      firstTokenTimeoutMs: firstTokenMs,
+      attemptTimeoutMs,
+    };
+  };
 
   if (isHeavy) {
-    const upstreamTimeoutMs = clampHard(heavyUpstreamMs);
+    const upstreamTimeoutMs = clampTo(heavyUpstreamMs, requestHardMs);
     let idleTimeoutMs = args.clientStream
-      ? clampHard(Math.min(heavyIdleMs, firstTokenMs))
+      ? clampTo(Math.min(heavyIdleMs, firstTokenMs), requestHardMs)
       : upstreamTimeoutMs;
     const streamNoOutputGuard =
       args.clientStream === true && !requestHasTools(args.body);
@@ -193,7 +291,7 @@ export function resolveUpstreamTimeoutPolicy(args: {
         isHeavy: true,
         upstreamTimeoutMs: Math.min(upstreamTimeoutMs, idleTimeoutMs),
         idleTimeoutMs,
-        totalTimeoutMs: hardMs,
+        totalTimeoutMs: requestHardMs,
         reason: "responses_stream_first_token_guard",
       });
     }
@@ -202,9 +300,12 @@ export function resolveUpstreamTimeoutPolicy(args: {
       isHeavy: true,
       upstreamTimeoutMs,
       idleTimeoutMs: args.clientStream
-        ? clampHard(Math.min(heavyIdleMs, Math.max(firstTokenMs, chatMs)))
+        ? clampTo(
+            Math.min(heavyIdleMs, Math.max(firstTokenMs, chatMs)),
+            requestHardMs
+          )
         : upstreamTimeoutMs,
-      totalTimeoutMs: hardMs,
+      totalTimeoutMs: requestHardMs,
       reason: modelHeavy
         ? "responses_heavy_model"
         : "responses_heavy_body_signals",
@@ -212,23 +313,25 @@ export function resolveUpstreamTimeoutPolicy(args: {
   }
 
   if (isResponses) {
-    const upstreamTimeoutMs = clampHard(
-      Math.max(attemptMs, responsesUpstreamMs, chatMs)
+    const upstreamTimeoutMs = clampTo(
+      Math.max(attemptMs, responsesUpstreamMs, chatMs, modelAttemptMs),
+      requestHardMs
     );
     if (args.clientStream === true && !requestHasTools(args.body)) {
-      const idle = clampHard(
+      const idle = clampTo(
         Math.min(
           upstreamTimeoutMs,
           firstTokenMs,
           env.TOKFAI_RESPONSES_STREAM_NO_OUTPUT_TIMEOUT_MS
-        )
+        ),
+        requestHardMs
       );
       return base({
         tier: "responses",
         isHeavy: false,
         upstreamTimeoutMs: idle,
         idleTimeoutMs: idle,
-        totalTimeoutMs: hardMs,
+        totalTimeoutMs: requestHardMs,
         reason: "responses_stream_first_token_guard",
       });
     }
@@ -237,37 +340,48 @@ export function resolveUpstreamTimeoutPolicy(args: {
       isHeavy: false,
       upstreamTimeoutMs,
       idleTimeoutMs: upstreamTimeoutMs,
-      totalTimeoutMs: hardMs,
+      totalTimeoutMs: requestHardMs,
       reason: "responses_default",
     });
   }
 
-  // /v1/chat/completions — tool_call tier (hard-capped).
+  // /v1/chat/completions — tool_call tier (hard-capped by model total).
   const hasTools = requestHasTools(args.body);
   if (hasTools) {
-    const upstreamTimeoutMs = clampHard(Math.max(attemptMs, toolCallMs));
+    const upstreamTimeoutMs = clampTo(
+      Math.max(attemptMs, toolCallMs, modelAttemptMs),
+      requestHardMs
+    );
     return base({
       tier: "tool_call",
       isHeavy: false,
       upstreamTimeoutMs,
       idleTimeoutMs: args.clientStream
-        ? clampHard(Math.min(upstreamTimeoutMs, Math.max(firstTokenMs, chatMs)))
+        ? clampTo(
+            Math.min(upstreamTimeoutMs, Math.max(firstTokenMs, chatMs)),
+            requestHardMs
+          )
         : upstreamTimeoutMs,
-      totalTimeoutMs: hardMs,
+      totalTimeoutMs: requestHardMs,
       reason: "chat_tool_call",
+      attemptTimeoutMs: upstreamTimeoutMs,
     });
   }
 
-  // Client stream=true without tools — first-token 30s (do not wait 180s).
+  // Client stream=true without tools — model first-token budget.
   if (args.clientStream) {
-    const idle = clampHard(Math.min(Math.max(attemptMs, streamMs), firstTokenMs));
+    const idle = clampTo(
+      Math.min(Math.max(modelAttemptMs, streamMs), firstTokenMs),
+      requestHardMs
+    );
     return base({
       tier: "stream",
       isHeavy: false,
       upstreamTimeoutMs: idle,
       idleTimeoutMs: idle,
-      totalTimeoutMs: hardMs,
-      reason: "chat_stream_first_token",
+      totalTimeoutMs: requestHardMs,
+      reason: `chat_stream_first_token:${modelBudget.policyId}`,
+      attemptTimeoutMs: modelAttemptMs,
     });
   }
 
@@ -275,43 +389,49 @@ export function resolveUpstreamTimeoutPolicy(args: {
     isSlowChatGemini3Model(args.requestedModel) ||
     isSlowChatGemini3Model(args.resolvedModel ?? "");
   if (slowGemini3) {
-    const upstreamTimeoutMs = clampHard(
-      Math.max(attemptMs, chatMs, responsesUpstreamMs)
+    const upstreamTimeoutMs = clampTo(
+      Math.max(attemptMs, chatMs, responsesUpstreamMs, modelAttemptMs),
+      requestHardMs
     );
     return base({
       tier: "chat",
       isHeavy: false,
       upstreamTimeoutMs,
       idleTimeoutMs: upstreamTimeoutMs,
-      totalTimeoutMs: hardMs,
+      totalTimeoutMs: requestHardMs,
       reason: "chat_slow_gemini3",
+      attemptTimeoutMs: upstreamTimeoutMs,
     });
   }
 
   const gemini25FlashChat =
     route === "/v1/chat/completions" &&
-    (args.requestedModel.trim().toLowerCase() === "gemini-2.5-flash" ||
-      (args.resolvedModel ?? "").trim().toLowerCase() === "gemini-2.5-flash");
+    (normalizeModelId(args.requestedModel) === "gemini-2.5-flash" ||
+      normalizeModelId(args.resolvedModel ?? "") === "gemini-2.5-flash");
   if (gemini25FlashChat) {
-    const upstreamTimeoutMs = clampHard(Math.max(attemptMs, chatMs));
+    const upstreamTimeoutMs = clampTo(
+      Math.max(attemptMs, chatMs, modelAttemptMs),
+      requestHardMs
+    );
     return base({
       tier: "chat",
       isHeavy: false,
       upstreamTimeoutMs,
       idleTimeoutMs: upstreamTimeoutMs,
-      totalTimeoutMs: hardMs,
+      totalTimeoutMs: requestHardMs,
       reason: "chat_gemini25_flash_nonstream_stream_fallback",
+      attemptTimeoutMs: upstreamTimeoutMs,
     });
   }
 
-  // Default non-stream chat: 90s attempt, 180s hard wall for retries/fallback.
-  const chatWallMs = clampHard(Math.max(attemptMs, chatMs));
+  // Default non-stream chat — P10 model attempt / total budgets win.
   return base({
     tier: "chat",
     isHeavy: false,
-    upstreamTimeoutMs: chatWallMs,
-    idleTimeoutMs: chatWallMs,
-    totalTimeoutMs: hardMs,
-    reason: "chat_default",
+    upstreamTimeoutMs: modelAttemptMs,
+    idleTimeoutMs: modelAttemptMs,
+    totalTimeoutMs: requestHardMs,
+    reason: `chat_model_budget:${modelBudget.policyId}`,
+    attemptTimeoutMs: modelAttemptMs,
   });
 }

@@ -56,6 +56,8 @@ export function buildApp() {
   app.route("/", audioRoutes);
   app.route("/admin/aviation", adminAviationRoutes);
   app.route("/admin", adminRoutes);
+  // P10 — same admin auth surface under /v1/admin (provider-health + rest).
+  app.route("/v1/admin", adminRoutes);
 
   registerDebugRoutes(app);
 

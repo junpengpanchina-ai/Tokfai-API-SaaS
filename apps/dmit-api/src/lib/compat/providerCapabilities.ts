@@ -22,6 +22,12 @@ export type ProviderCapabilityFlags = {
    * Native OpenAI resume semantics remain supportsNativeTools + live native mode.
    */
   supportsCanonicalToolResumeViaAdapter: boolean;
+  /**
+   * P9 — Whether this provider can accept the original (unsanitized) OpenAI
+   * body when falling back after an upstream 400 invalid_request_error.
+   * GRSAI pool entries are false (same sanitizer limitations).
+   */
+  supportsOriginalBody: boolean;
 };
 
 export type ProviderCapabilityProfile = ProviderCapabilityFlags & {
@@ -47,8 +53,26 @@ const PROFILES: ReadonlyMap<string, ProviderCapabilityProfile> = new Map([
       supportsStreaming: true,
       supportsNativeToolChoice: true,
       supportsReasoning: false,
-      supportsVision: true,
+      // P9 — GRSAI chat pool rejects multimodal / tool-heavy OpenAI bodies.
+      supportsVision: false,
       supportsCanonicalToolResumeViaAdapter: false,
+      supportsOriginalBody: false,
+    },
+  ],
+  [
+    "grsai-secondary",
+    {
+      id: "grsai-secondary",
+      providerFamily: "openai_compatible",
+      protocolFamily: "openai_chat_completions",
+      supportsNativeTools: true,
+      supportsParallelTools: true,
+      supportsStreaming: true,
+      supportsNativeToolChoice: true,
+      supportsReasoning: false,
+      supportsVision: false,
+      supportsCanonicalToolResumeViaAdapter: false,
+      supportsOriginalBody: false,
     },
   ],
   [
@@ -62,8 +86,9 @@ const PROFILES: ReadonlyMap<string, ProviderCapabilityProfile> = new Map([
       supportsStreaming: true,
       supportsNativeToolChoice: true,
       supportsReasoning: false,
-      supportsVision: true,
+      supportsVision: false,
       supportsCanonicalToolResumeViaAdapter: false,
+      supportsOriginalBody: false,
     },
   ],
   [
@@ -79,6 +104,7 @@ const PROFILES: ReadonlyMap<string, ProviderCapabilityProfile> = new Map([
       supportsReasoning: true,
       supportsVision: true,
       supportsCanonicalToolResumeViaAdapter: false,
+      supportsOriginalBody: true,
     },
   ],
   [
@@ -94,6 +120,7 @@ const PROFILES: ReadonlyMap<string, ProviderCapabilityProfile> = new Map([
       supportsReasoning: false,
       supportsVision: true,
       supportsCanonicalToolResumeViaAdapter: true,
+      supportsOriginalBody: false,
     },
   ],
   [
@@ -109,6 +136,7 @@ const PROFILES: ReadonlyMap<string, ProviderCapabilityProfile> = new Map([
       supportsReasoning: true,
       supportsVision: true,
       supportsCanonicalToolResumeViaAdapter: false,
+      supportsOriginalBody: true,
     },
   ],
 ]);
@@ -124,6 +152,7 @@ const UNKNOWN_PROFILE: ProviderCapabilityProfile = {
   supportsReasoning: false,
   supportsVision: false,
   supportsCanonicalToolResumeViaAdapter: false,
+  supportsOriginalBody: false,
 };
 
 /** Lookup by provider id. Unknown → safe all-false profile (no throw). */
