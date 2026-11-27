@@ -815,9 +815,13 @@ function ApiKeysTable({
   const [copyingId, setCopyingId] = useState<string | null>(null);
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
   const [copyError, setCopyError] = useState<ActionErrorState | null>(null);
+  // Hide a broken reveal action for this session without changing database state.
+  const [unrecoverableKeyIds, setUnrecoverableKeyIds] = useState<Set<string>>(
+    () => new Set()
+  );
 
   async function handleCopyKey(key: ApiKeyListItem) {
-    if (key.status !== "active" || copyingId) return;
+    if (key.status !== "active" || copyingId || unrecoverableKeyIds.has(key.id)) return;
 
     setCopyingId(key.id);
     setCopyError(null);
@@ -840,6 +844,12 @@ function ApiKeysTable({
         window.setTimeout(() => setCopiedKeyId(null), 2000);
       }
     } catch (err) {
+      if (
+        err instanceof DmitApiError &&
+        (err.code === "key_secret_unrecoverable" || err.code === "key_decrypt_failed")
+      ) {
+        setUnrecoverableKeyIds((previous) => new Set(previous).add(key.id));
+      }
       setCopyError(
         toApiKeyActionError(err, {
           method: "POST",
@@ -878,7 +888,7 @@ function ApiKeysTable({
             const isActive = key.status === "active";
             const isCopying = copyingId === key.id;
             const keyCopied = copiedKeyId === key.id;
-            const canReveal = key.can_reveal === true;
+            const canReveal = key.can_reveal === true && !unrecoverableKeyIds.has(key.id);
 
             return (
               <tr key={key.id} className="border-b last:border-0">

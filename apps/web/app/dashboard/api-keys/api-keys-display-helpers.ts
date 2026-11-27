@@ -83,6 +83,13 @@ export function getApiKeyErrorMessage(
 ): string {
   const normalized = code?.toLowerCase() ?? "";
 
+  if (
+    normalized === "key_secret_unrecoverable" ||
+    normalized === "key_decrypt_failed"
+  ) {
+    return "The full secret for this older API key cannot be restored with the current encryption settings. If you saved the full key, it may still work; otherwise create a replacement and update your clients before revoking the old key.";
+  }
+
   if (status === 401 || status === 403) {
     return "Please sign in again";
   }
