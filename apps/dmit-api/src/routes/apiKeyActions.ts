@@ -194,7 +194,29 @@ export async function revealApiKey(c: Context, id: string) {
     });
   }
 
-  const secret = decryptSecret(data.encrypted_secret);
+  // Legacy rows can still contain ciphertext encrypted with a previous
+  // server secret. Do not revoke or mutate those rows on a reveal failure.
+  let secret: string;
+  try {
+    secret = decryptSecret(data.encrypted_secret);
+  } catch (err) {
+    if (!(err instanceof ApiError) || err.code !== "key_decrypt_failed") {
+      throw err;
+    }
+    log.warn("api_key_reveal_unavailable", {
+      userId: user.id,
+      keyId: maskApiKeyId(owner.id),
+      code: "key_secret_unrecoverable",
+    });
+    throw new ApiError({
+      status: 409,
+      message: "API key secret cannot be decrypted with the current encryption configuration.",
+      publicMessage:
+        "This API key's full secret cannot be shown. A previously saved full key may still work. Otherwise, create a replacement and update your clients before revoking this key.",
+      code: "key_secret_unrecoverable",
+      type: "invalid_request_error",
+    });
+  }
   return c.json({
     api_key: {
       id: owner.id,
